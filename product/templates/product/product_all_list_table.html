@@ -22,14 +22,6 @@ Products - Table View
             </div>
         </div>
         <div class="plt__header-right">
-            <div class="plt__view-toggle">
-                <a href="{% url 'product:product_all_list' %}" class="plt__toggle-btn">
-                    <i class="fas fa-th-large"></i> Grid
-                </a>
-                <a href="{% url 'product:product_all_list_table' %}" class="plt__toggle-btn plt__toggle-btn--active">
-                    <i class="fas fa-table"></i> Table
-                </a>
-            </div>
             <a href="{% url 'product:product_single_add' %}" id="product_table_btn_add" class="plt__add-btn">
                 <i class="fa-solid fa-plus"></i> Add Product
             </a>
@@ -61,7 +53,13 @@ Products - Table View
                     <!-- Product Image -->
                     <td>
                         {% if product.product_image %}
+                        <button type="button" class="plt__thumb-btn"
+                                data-img="{{ product.product_image.url }}"
+                                data-name="{{ product.item_name }}"
+                                id="product_table_thumb_{{ product.id }}"
+                                title="View photo">
                             <img src="{{ product.product_image.url }}" loading="lazy" alt="{{ product.item_name }}" class="plt__thumb">
+                        </button>
                         {% else %}
                             <div class="plt__thumb-placeholder">
                                 <i class="fas fa-box"></i>
@@ -204,11 +202,18 @@ Products - Table View
                     <!-- Actions -->
                     <td>
                         <div class="plt__actions">
-                            <a href="{% url 'product:product_single_update' product_id=product.id %}" class="plt__action-btn plt__action-btn-edit" title="Full Edit">
-                                <i class="fas fa-expand"></i>
+                            <a href="{% url 'product:product_single_update' product_id=product.id %}"
+                               class="plt__action-btn plt__action-btn-edit"
+                               id="product_table_btn_edit_{{ product.id }}"
+                               title="Edit product">
+                                <i class="fas fa-pen"></i> Edit
                             </a>
-                            <a href="{% url 'product:product_single_delete' product_id=product.id %}" class="plt__action-btn plt__action-btn-delete" title="Delete">
-                                <i class="fas fa-trash"></i>
+                            <a href="{% url 'product:product_single_delete' product_id=product.id %}"
+                               class="plt__action-btn plt__action-btn-delete"
+                               id="product_table_btn_delete_{{ product.id }}"
+                               title="Delete product"
+                               onclick="return confirm('Delete \'{{ product.item_name|escapejs }}\'? This cannot be undone.')">
+                                <i class="fas fa-trash"></i> Delete
                             </a>
                         </div>
                     </td>
@@ -236,6 +241,18 @@ Products - Table View
         </a>
     </div>
     {% endif %}
+</div>
+<!-- Photo Modal -->
+<div class="piv__modal-overlay" id="product_table_photo_modal" style="display:none" role="dialog" aria-modal="true">
+  <div class="piv__modal-box">
+    <button type="button" class="piv__modal-close" id="product_table_modal_close" title="Close">
+      <i class="fas fa-xmark"></i>
+    </button>
+    <div class="piv__modal-img-wrap">
+      <img src="" alt="" class="piv__modal-img" id="product_table_modal_img">
+    </div>
+    <p class="piv__modal-caption" id="product_table_modal_caption"></p>
+  </div>
 </div>
 {% endblock content %}
 
@@ -373,5 +390,32 @@ document.addEventListener('DOMContentLoaded', function() {
         return '';
     }
 });
+
+// Photo modal
+(function () {
+    var modal    = document.getElementById('product_table_photo_modal');
+    var modalImg = document.getElementById('product_table_modal_img');
+    var caption  = document.getElementById('product_table_modal_caption');
+    var closeBtn = document.getElementById('product_table_modal_close');
+
+    document.querySelectorAll('.plt__thumb-btn[data-img]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            modalImg.src = this.dataset.img;
+            modalImg.alt = this.dataset.name;
+            caption.textContent = this.dataset.name;
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        });
+    });
+
+    function closeModal() {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        modalImg.src = '';
+    }
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+})();
 </script>
 {% endblock extra_js %}

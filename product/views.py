@@ -67,82 +67,17 @@ logger = logging.getLogger('product')
 
 
 # -----------------------------------------------------------------------------
-# product_all_list: Display all products for the logged-in user's business.
-# Uses select_related to prevent N+1 queries on FK fields.
-# Template: product/product_all_list.html
+# product_all_list / product_all_list_card: Redirect to table view.
+# Grid and card views have been removed; table is the only product list view.
 # -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_all_list(request):
-    """
-    Display all products for the logged-in user's business.
-
-    OPTIMIZATION: Uses select_related to prevent N+1 queries on:
-    - color (FK)
-    - unit (FK)
-    - business (FK)
-    - product_category (FK)
-
-    Expected query reduction: 50-70% (5 queries → 1 query per product)
-    """
-    business = get_cached_business(request)
-    if not business:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
-    logger.info(f"User {request.user.id} accessing product list for business {business.business_id}")
-
-    # N+1 FIX: Optimize queries with select_related for all ForeignKeys
-    products = product_models.Product.objects.filter(
-        business=business
-    ).select_related(
-        'color',             # FK: Product → ColorVariant
-        'unit',              # FK: Product → UnitVariant
-        'business',          # FK: Product → Business
-        'product_category',  # FK: Product → ProductCategory
-    ).annotate(
-        qty=Sum('product_inventory__item_quantity')
-    ).order_by('-created_at')
-
-    logger.debug(f"Fetching {products.count()} products for business {business.business_id}")
-
-    data = {
-        'products': products,
-        'business': business
-    }
-    return render(request, 'product/product_all_list.html', data)
+    return redirect('product:product_all_list_table')
 
 
-# -----------------------------------------------------------------------------
-# product_all_list_card: Display all products as cards (card view layout).
-# Uses select_related to prevent N+1 queries.
-# Template: product/product_all_list_card.html
-# -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_all_list_card(request):
-    business = get_cached_business(request)
-    if not business:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
-    logger.info(f"User {request.user.id} accessing product card list for business {business.business_id}")
-
-    # N+1 FIX: Optimize queries with select_related
-    products = product_models.Product.objects.filter(
-        business=business
-    ).select_related(
-        'color',
-        'unit',
-        'business',
-        'product_category',
-    ).order_by('-created_at')
-
-    logger.debug(f"Fetching {products.count()} products as cards for business {business.business_id}")
-
-    data = {
-        'products': products,
-        'business': business
-    }
-    return render(request, 'product/product_all_list_card.html', data)
+    return redirect('product:product_all_list_table')
 
 
 # -----------------------------------------------------------------------------
@@ -169,7 +104,7 @@ def product_single_add(request):
             product.save()
             logger.info(f"Product {product.id} created for business {business.business_id}")
             messages.success(request, 'Product added successfully!')
-            return redirect('/product/all/')
+            return redirect('product:product_all_list_table')
         else:
             logger.warning(f"Invalid product form submitted by user {request.user.id}: {form.errors}")
             messages.error(request, 'Error adding product. Please check the form.')
@@ -238,7 +173,7 @@ def product_single_update(request, product_id):
     except product_models.Product.DoesNotExist:
         logger.warning(f"User {request.user.id} attempted to update non-existent or unauthorized product {product_id}")
         messages.error(request, "Product not found or unauthorized")
-        return redirect('/product/all/')
+        return redirect('product:product_all_list_table')
 
     if request.method == 'POST':
         form = product_forms.AddItemsForm(request.POST, request.FILES, instance=product)
@@ -246,7 +181,7 @@ def product_single_update(request, product_id):
             form.save()
             logger.info(f"Product {product_id} updated successfully by user {request.user.id}")
             messages.success(request, 'Your product details have been updated!')
-            return redirect('/product/all/')
+            return redirect('product:product_all_list_table')
         else:
             logger.warning(f"Invalid update form for product {product_id}: {form.errors}")
             messages.error(request, 'Error updating product. Please check the form.')
@@ -263,6 +198,8 @@ def product_single_update(request, product_id):
 
 # -----------------------------------------------------------------------------
 # product_inventory: Display product inventory management page.
+# Shows all business products with their stock quantities.
+# Supports search by name/SKU and low-stock filtering.
 # Template: product/product_inventory.html
 # -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
@@ -274,14 +211,76 @@ def product_inventory(request):
         return redirect('business_dashboard')
     logger.info(f"User {request.user.id} accessing inventory for business {business.business_id}")
 
-    # Check if fulfillment service is enabled
-    has_fulfillment_service = business.fulfillment_service_enabled
+    search_q = request.GET.get('q', '').strip()
+    show_low = request.GET.get('low_stock', '') == '1'
+
+    qs = product_models.Product.objects.filter(
+        business=business
+    ).select_related(
+        'color', 'unit', 'product_category'
+    ).annotate(
+        qty=Sum('product_inventory__item_quantity')
+    ).order_by('-created_at')
+
+    if search_q:
+        qs = qs.filter(
+            Q(item_name__icontains=search_q) |
+            Q(brand_name__icontains=search_q) |
+            Q(item_sku__icontains=search_q) |
+            Q(barcode__icontains=search_q)
+        )
+
+    if show_low:
+        # Low stock: qty is None (no inventory record) or qty <= 5
+        qs = qs.filter(Q(qty__isnull=True) | Q(qty__lte=5))
+
+    total_products = qs.count()
+    total_in_stock = qs.filter(qty__gt=0).count()
+    low_stock_count = product_models.Product.objects.filter(
+        business=business
+    ).annotate(qty=Sum('product_inventory__item_quantity')).filter(
+        Q(qty__isnull=True) | Q(qty__lte=5)
+    ).count()
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     data = {
         'business': business,
-        'has_fulfillment_service': has_fulfillment_service,
+        'page_obj': page_obj,
+        'search_q': search_q,
+        'show_low': show_low,
+        'total_products': total_products,
+        'total_in_stock': total_in_stock,
+        'low_stock_count': low_stock_count,
     }
     return render(request, 'product/product_inventory.html', data)
+
+
+# -----------------------------------------------------------------------------
+# inventory_qty_update: AJAX endpoint to update a product's inventory quantity.
+# POST: {qty: int}  → updates or creates ProductInventory record.
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+@require_http_methods(['POST'])
+def inventory_qty_update(request, product_id):
+    business = get_cached_business(request)
+    if not business:
+        return JsonResponse({'success': False, 'error': 'No business'}, status=403)
+
+    product = get_object_or_404(product_models.Product, id=product_id, business=business)
+
+    try:
+        body = json.loads(request.body)
+        qty = int(body.get('qty', 0))
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return JsonResponse({'success': False, 'error': 'Invalid quantity'}, status=400)
+
+    inv, _ = product_models.ProductInventory.objects.update_or_create(
+        item_sku=product,
+        defaults={'item_quantity': qty}
+    )
+    return JsonResponse({'success': True, 'qty': inv.item_quantity})
 
 
 

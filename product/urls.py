@@ -27,6 +27,7 @@ urlpatterns = [
 
     # Product Inventory
     path('product_inventory/', product_views.product_inventory, name='product_inventory'),
+    path('<int:product_id>/inventory/update/', product_views.inventory_qty_update, name='inventory_qty_update'),
 
     # Inventory Management (moved from warehouse app)
     path('inventory/', product_views.inventory_list, name='inventory_list'),

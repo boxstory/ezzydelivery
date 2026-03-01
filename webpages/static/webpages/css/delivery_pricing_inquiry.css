@@ -1,223 +1,275 @@
 /**
- * 3PL INQUIRY PAGE - PREMIUM DESIGN (BEM: wppi__)
- * Modern multi-step form with enhanced UX
- * Uses Brand Kit Pro variables
+ * 3PL INQUIRY PAGE — Premium Design (BEM: wppi__)
+ * EzzyDelivery brand kit — #f7c000 / #001f3f
  */
 
 /* ============================================================================
-   HERO SECTION - MODERN GRADIENT
+   HERO
    ============================================================================ */
 .wppi__hero {
-  background: linear-gradient(135deg, #f7c000 0%, #e5b000 50%, #001f3f 100%);
-  padding: 4rem 0 3rem;
-  margin-bottom: 3rem;
+  background: linear-gradient(150deg, #001f3f 0%, #003366 55%, #001a35 100%);
+  padding: 5rem 0 4rem;
   position: relative;
   overflow: hidden;
 }
 
-.wppi__hero::before {
-  content: '';
+/* Decorative rings */
+.wppi__hero-bg-ring {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  border-radius: 50%;
   pointer-events: none;
+  opacity: 0.07;
+  background: transparent;
+  border: 2px solid #f7c000;
+}
+.wppi__hero-bg-ring--1 {
+  width: 600px;
+  height: 600px;
+  top: -200px;
+  right: -150px;
+}
+.wppi__hero-bg-ring--2 {
+  width: 380px;
+  height: 380px;
+  bottom: -120px;
+  left: -80px;
+  opacity: 0.05;
 }
 
-.wppi__hero .container {
+.wppi__hero-inner {
+  text-align: center;
   position: relative;
   z-index: 1;
+  animation: wppi-fade-up 0.7s ease-out both;
 }
 
-.wppi__hero h1 {
-  color: #001f3f;
+@keyframes wppi-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Badge */
+.wppi__hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(247, 192, 0, 0.12);
+  border: 1px solid rgba(247, 192, 0, 0.3);
+  color: #f7c000;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.4rem 1rem;
+  border-radius: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Title */
+.wppi__hero-title {
+  font-size: clamp(2rem, 5vw, 3.25rem);
   font-weight: 800;
+  color: #ffffff;
+  line-height: 1.15;
   letter-spacing: -0.02em;
   margin-bottom: 1.25rem;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  animation: wppi-hero-fade-in 0.8s ease-out;
 }
 
-.wppi__hero .lead {
-  color: #001f3f;
-  font-size: 1.25rem;
-  font-weight: 500;
-  opacity: 0.9;
-  max-width: 42rem;
-  margin: 0 auto 2rem;
-  animation: wppi-hero-fade-in 1s ease-out 0.2s backwards;
+.wppi__hero-title--accent {
+  color: #f7c000;
 }
 
-@keyframes wppi-hero-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Sub */
+.wppi__hero-sub {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 38rem;
+  margin: 0 auto 2.5rem;
+  line-height: 1.65;
 }
 
-/* ============================================================================
-   WHATSAPP BUTTON - PREMIUM STYLE
-   ============================================================================ */
-.wppi__btn--whatsapp {
-  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-  color: white;
-  border: none;
-  padding: 1rem 2.5rem;
-  font-weight: 700;
-  font-size: 1.1rem;
-  border-radius: 3.125rem;
-  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
-  animation: wppi-hero-fade-in 1.2s ease-out 0.4s backwards;
+/* Trust stats */
+.wppi__hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
 }
 
-.wppi__btn--whatsapp:hover {
-  background: linear-gradient(135deg, #128C7E 0%, #075E54 100%);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(37, 211, 102, 0.4);
+.wppi__hero-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem 2rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.wppi__btn--whatsapp i {
+.wppi__hero-stat:last-child {
+  border-right: none;
+}
+
+.wppi__hero-stat__num {
   font-size: 1.5rem;
-  vertical-align: middle;
+  font-weight: 800;
+  color: #f7c000;
+  line-height: 1;
+}
+
+.wppi__hero-stat__label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 500;
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* CTA buttons */
+.wppi__hero-ctas {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.wppi__hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 2rem;
+  border-radius: 3rem;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wppi__hero-cta--primary {
+  background: #f7c000;
+  color: #001f3f;
+  box-shadow: 0 6px 20px rgba(247, 192, 0, 0.35);
+}
+
+.wppi__hero-cta--primary:hover {
+  background: #e5b000;
+  color: #001f3f;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(247, 192, 0, 0.45);
+}
+
+.wppi__hero-cta--whatsapp {
+  background: transparent;
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.wppi__hero-cta--whatsapp:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #ffffff;
+  transform: translateY(-2px);
 }
 
 /* ============================================================================
-   PROGRESS INDICATOR - ENHANCED
+   PROGRESS STEPPER
    ============================================================================ */
 .wppi__progress {
-  max-width: 50rem;
-  margin: 0 auto 3rem;
-  padding: 0 1rem;
-  animation: wppi-fade-slide-up 0.6s ease-out;
-}
-
-@keyframes wppi-fade-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  padding: 2.5rem 0 0;
+  margin-bottom: 2rem;
 }
 
 .wppi__steps {
   display: flex;
-  justify-content: space-between;
-  position: relative;
-  margin-bottom: 0;
-}
-
-.wppi__steps::before {
-  content: '';
-  position: absolute;
-  top: 1.875rem;
-  left: 10%;
-  width: 80%;
-  height: 3px;
-  background: linear-gradient(90deg, #e0e0e0 0%, #f5f5f5 100%);
-  z-index: 0;
-  border-radius: 2px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  max-width: 44rem;
+  margin: 0 auto;
 }
 
 .wppi__step {
-  flex: 1;
-  text-align: center;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  flex: 0 0 auto;
   z-index: 1;
-  transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wppi__step-connector {
+  flex: 1;
+  height: 3px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  transition: background 400ms;
+  position: relative;
+  margin: 0 0.5rem;
+  margin-bottom: 1.6rem; /* align with circle centre */
+}
+
+.wppi__step.completed ~ .wppi__step-connector,
+.wppi__step.completed + .wppi__step-connector {
+  background: #28a745;
 }
 
 .wppi__step-circle {
-  width: 3.75rem;
-  height: 3.75rem;
+  width: 3.25rem;
+  height: 3.25rem;
   border-radius: 50%;
-  background: white;
-  border: 3px solid #e0e0e0;
+  background: #ffffff;
+  border: 2.5px solid #e0e0e0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 0.75rem;
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   color: #9e9e9e;
-  transition: all 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  position: relative;
-  overflow: hidden;
-}
-
-.wppi__step-circle::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(247, 192, 0, 0.1) 0%, transparent 100%);
-  opacity: 0;
-  transition: opacity 300ms;
+  transition: all 380ms cubic-bezier(0.68, -0.45, 0.265, 1.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 }
 
 .wppi__step.active .wppi__step-circle {
-  background: linear-gradient(135deg, #f7c000 0%, #e5b000 100%);
-  color: #001f3f;
+  background: #f7c000;
   border-color: #f7c000;
-  transform: scale(1.15);
-  box-shadow: 0 8px 24px rgba(247, 192, 0, 0.4), 0 0 0 4px rgba(247, 192, 0, 0.15);
-}
-
-.wppi__step.active .wppi__step-circle::before {
-  opacity: 1;
+  color: #001f3f;
+  transform: scale(1.18);
+  box-shadow: 0 6px 20px rgba(247, 192, 0, 0.4), 0 0 0 5px rgba(247, 192, 0, 0.12);
 }
 
 .wppi__step.completed .wppi__step-circle {
-  background: linear-gradient(135deg, #28a745 0%, #20903b 100%);
+  background: #28a745;
   border-color: #28a745;
-  color: white;
-  transform: scale(1.05);
+  color: #ffffff;
+  transform: scale(1.06);
   box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
 }
 
 .wppi__step.completed .wppi__step-circle i {
-  animation: wppi-checkmark-pop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  animation: wppi-check-pop 0.45s cubic-bezier(0.68, -0.55, 0.265, 1.55) both;
 }
 
-@keyframes wppi-checkmark-pop {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+@keyframes wppi-check-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.3); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .wppi__step-label {
-  font-size: 0.875rem;
-  color: #757575;
+  font-size: 0.8125rem;
   font-weight: 600;
-  transition: all 300ms;
+  color: #9e9e9e;
+  text-align: center;
   line-height: 1.3;
+  transition: color 300ms;
+  white-space: nowrap;
 }
 
 .wppi__step.active .wppi__step-label {
   color: #001f3f;
   font-weight: 700;
-  font-size: 0.9375rem;
 }
 
 .wppi__step.completed .wppi__step-label {
@@ -225,150 +277,161 @@
 }
 
 /* ============================================================================
-   FORM CARD - GLASS MORPHISM STYLE
+   FORM CARD
    ============================================================================ */
 .wppi__form-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 1.5rem;
-  padding: 2.5rem;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1);
-  margin-bottom: 3rem;
-  min-height: 35rem;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  animation: wppi-card-fade-in 0.8s ease-out 0.2s backwards;
-  position: relative;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 20px 48px rgba(0, 0, 0, 0.07);
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+  animation: wppi-card-in 0.6s ease-out 0.15s both;
 }
 
-.wppi__form-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #f7c000 0%, #001f3f 100%);
-}
-
-@keyframes wppi-card-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes wppi-card-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================================
-   FORM ELEMENTS - MODERN STYLING
+   STEP CONTENT ANIMATION
    ============================================================================ */
+.wppi__step-content {
+  animation: wppi-step-in 0.4s ease-out both;
+}
+
+@keyframes wppi-step-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ============================================================================
+   STEP HEADER
+   ============================================================================ */
+.wppi__step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 2rem 2rem 0;
+}
+
+.wppi__step-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, rgba(247, 192, 0, 0.15), rgba(247, 192, 0, 0.05));
+  border: 1px solid rgba(247, 192, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: #001f3f;
+  flex-shrink: 0;
+}
+
 .wppi__section-title {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: #001f3f;
-  margin-bottom: 2rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 3px solid #f7c000;
-  position: relative;
-  animation: wppi-title-slide-in 0.6s ease-out;
+  margin: 0 0 0.25rem;
+  line-height: 1.2;
 }
 
-.wppi__section-title::after {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  width: 80px;
-  height: 3px;
-  background: #001f3f;
+.wppi__section-sub {
+  font-size: 0.875rem;
+  color: #757575;
+  margin: 0;
 }
 
-@keyframes wppi-title-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+/* ============================================================================
+   FIELD GROUPS
+   ============================================================================ */
+.wppi__field-group {
+  margin: 1.75rem 2rem 0;
+  padding: 1.5rem;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 0.875rem;
 }
 
+.wppi__field-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.wppi__field-group-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #001f3f;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.75;
+}
+
+.wppi__field-group-label i {
+  font-size: 0.875rem;
+  color: #f7c000;
+  opacity: 1;
+}
+
+/* ============================================================================
+   FORM CONTROLS
+   ============================================================================ */
 .wppi__form-card .form-label {
   font-weight: 600;
   color: #424242;
-  margin-bottom: 0.5rem;
   font-size: 0.9375rem;
+  margin-bottom: 0.5rem;
   display: block;
 }
 
-.wppi__form-card .form-label::after {
-  content: ' *';
+.wppi__req {
   color: #dc3545;
   font-weight: 700;
-  display: none;
-}
-
-.wppi__form-card .form-control:required + .form-label::after,
-.wppi__form-card input[required] ~ .form-label::after {
-  display: inline;
+  margin-left: 0.125rem;
 }
 
 .wppi__form-card .form-control,
-.wppi__form-card .form-select,
 .wppi__form-card textarea {
-  border-radius: 0.75rem;
-  border: 2px solid #e0e0e0;
-  padding: 0.875rem 1.25rem;
-  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 1rem;
-  background: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: 0.625rem;
+  border: 2px solid #e8e8e8;
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  background: #ffffff;
+  transition: border-color 200ms, box-shadow 200ms;
 }
 
-.wppi__form-card .form-control:hover,
-.wppi__form-card .form-select:hover {
-  border-color: #bdbdbd;
+.wppi__form-card .form-control:hover {
+  border-color: #c8c8c8;
 }
 
 .wppi__form-card .form-control:focus,
-.wppi__form-card .form-select:focus,
 .wppi__form-card textarea:focus {
   border-color: #f7c000;
-  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.12);
   outline: none;
-  background: #fffef8;
 }
 
 .wppi__form-card .form-control::placeholder {
-  color: #9e9e9e;
-  font-style: italic;
-}
-
-/* Input validation states */
-.wppi__form-card .form-control:invalid:not(:placeholder-shown) {
-  border-color: #dc3545;
-  background: #fff5f5;
-}
-
-.wppi__form-card .form-control:valid:not(:placeholder-shown) {
-  border-color: #28a745;
+  color: #b0b0b0;
 }
 
 /* ============================================================================
-   RADIO BUTTON GROUPS - PREMIUM CARD STYLE
+   RADIO GROUPS — Card Style
    ============================================================================ */
 .wppi__radio-group {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .wppi__radio-group .form-check {
   margin: 0;
+  flex: 0 0 auto;
 }
 
 .wppi__radio-group .form-check-input {
@@ -381,409 +444,131 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 1.125rem 1.5rem;
+  padding: 0.625rem 1.375rem;
   border: 2px solid #e0e0e0;
-  border-radius: 0.875rem;
-  background: white;
+  border-radius: 0.625rem;
+  background: #ffffff;
   color: #616161;
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: 0.75rem;
   cursor: pointer;
-  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  white-space: nowrap;
 }
 
 .wppi__radio-group .form-check-label:hover {
   border-color: #f7c000;
-  background: linear-gradient(135deg, rgba(247, 192, 0, 0.05) 0%, rgba(247, 192, 0, 0.02) 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: rgba(247, 192, 0, 0.04);
+  transform: translateY(-1px);
 }
 
 .wppi__radio-group .form-check-input:checked + .form-check-label {
-  background: linear-gradient(135deg, #f7c000 0%, #e5b000 100%);
+  background: #f7c000;
   border-color: #f7c000;
   color: #001f3f;
   font-weight: 700;
-  box-shadow: 0 6px 16px rgba(247, 192, 0, 0.35), 0 0 0 3px rgba(247, 192, 0, 0.1);
-  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+  transform: translateY(-1px);
 }
 
-.wppi__radio-group .form-check-input:checked + .form-check-label::before {
-  content: '\2713';
-  position: absolute;
-  top: 0.625rem;
-  right: 0.625rem;
-  width: 1.5rem;
-  height: 1.5rem;
-  background: #001f3f;
-  color: #f7c000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  font-weight: 800;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  animation: wppi-checkmark-pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.wppi__radio-group .form-check-input:focus + .form-check-label {
+.wppi__radio-group .form-check-input:focus-visible + .form-check-label {
   outline: 2px solid #f7c000;
   outline-offset: 2px;
 }
 
 /* ============================================================================
-   NAVIGATION BUTTONS
+   BUBBLE MULTI-SELECT
    ============================================================================ */
-.wppi__nav {
+.wppi__bubbles {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.wppi__bubble {
+  display: inline-flex;
   align-items: center;
-  margin-top: 2.5rem;
-  padding-top: 2rem;
-  border-top: 2px solid #f5f5f5;
-  gap: 1rem;
-}
-
-.wppi__nav .btn-primary {
-  background: linear-gradient(135deg, #f7c000 0%, #e5b000 100%);
-  border: none;
-  color: #001f3f;
-  padding: 1rem 2.5rem;
-  font-weight: 700;
-  font-size: 1.0625rem;
-  border-radius: 3.125rem;
-  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
-  position: relative;
-  overflow: hidden;
-}
-
-.wppi__nav .btn-primary::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transition: left 500ms;
-}
-
-.wppi__nav .btn-primary:hover::before {
-  left: 100%;
-}
-
-.wppi__nav .btn-primary:hover {
-  background: linear-gradient(135deg, #e5b000 0%, #d4a000 100%);
-  color: #001f3f;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(247, 192, 0, 0.4);
-}
-
-.wppi__nav .btn-primary:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(247, 192, 0, 0.3);
-}
-
-.wppi__nav .btn-secondary {
-  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-  border: none;
-  color: white;
-  padding: 1rem 2.5rem;
-  font-weight: 700;
-  font-size: 1.0625rem;
-  border-radius: 3.125rem;
-  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
-}
-
-.wppi__nav .btn-secondary:hover {
-  background: linear-gradient(135deg, #5a6268 0%, #545b62 100%);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(108, 117, 125, 0.4);
-}
-
-.wppi__nav .btn-lg {
-  min-width: 180px;
-}
-
-/* ============================================================================
-   WHATSAPP MODAL - MODERN DESIGN
-   ============================================================================ */
-.wppi__modal .modal-content {
-  border-radius: 1.5rem;
-  border: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-}
-
-.wppi__modal .modal-header {
-  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-  color: white;
-  border-radius: 0;
-  padding: 1.75rem 2rem;
-  border-bottom: none;
-}
-
-.wppi__modal .modal-title {
-  font-weight: 700;
-  font-size: 1.375rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.wppi__modal .modal-title i {
-  font-size: 1.75rem;
-}
-
-.wppi__modal .modal-body {
-  padding: 2rem;
-}
-
-.wppi__modal .btn-close {
-  filter: brightness(0) invert(1);
-  opacity: 0.9;
-  transition: all 200ms;
-}
-
-.wppi__modal .btn-close:hover {
-  opacity: 1;
-  transform: rotate(90deg);
-}
-
-/* ============================================================================
-   RESPONSIVE DESIGN
-   ============================================================================ */
-@media (max-width: 768px) {
-  .wppi__hero {
-    padding: 3rem 0 2rem;
-    margin-bottom: 2rem;
-  }
-
-  .wppi__hero h1 {
-    font-size: 2rem;
-  }
-
-  .wppi__hero .lead {
-    font-size: 1.125rem;
-  }
-
-  .wppi__btn--whatsapp {
-    padding: 0.875rem 2rem;
-    font-size: 1rem;
-  }
-
-  .wppi__step-circle {
-    width: 3rem;
-    height: 3rem;
-    font-size: 1.125rem;
-  }
-
-  .wppi__step-label {
-    font-size: 0.8125rem;
-  }
-
-  .wppi__form-card {
-    padding: 1.75rem 1.25rem;
-    min-height: auto;
-  }
-
-  .wppi__section-title {
-    font-size: 1.5rem;
-  }
-
-  .wppi__radio-group {
-    grid-template-columns: 1fr;
-  }
-
-  .wppi__radio-group--inline {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .wppi__nav {
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    gap: 0.75rem;
-  }
-
-  .wppi__nav .btn,
-  .wppi__nav .btn.btn-lg {
-    flex: 1 1 0;
-    min-width: 0 !important;
-    width: auto;
-    padding: 0.875rem 0.5rem;
-    font-size: 0.9rem;
-  }
-}
-
-@media (max-width: 576px) {
-  .wppi__steps::before {
-    left: 15%;
-    width: 70%;
-  }
-
-  .wppi__step-circle {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1rem;
-  }
-
-  .wppi__step.active .wppi__step-circle {
-    transform: scale(1.1);
-  }
-
-  .wppi__modal .modal-body {
-    padding: 1.5rem;
-  }
-}
-
-/* ============================================================================
-   LOADING & ANIMATIONS
-   ============================================================================ */
-.wppi__step-content {
-  animation: wppi-step-fade-in 0.5s ease-out;
-}
-
-@keyframes wppi-step-fade-in {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Form submission loading state */
-.wppi__nav .btn-primary.loading {
-  position: relative;
-  color: transparent;
-  pointer-events: none;
-}
-
-.wppi__nav .btn-primary.loading::after {
-  content: '';
-  position: absolute;
-  width: 1.25rem;
-  height: 1.25rem;
-  top: 50%;
-  left: 50%;
-  margin-left: -0.625rem;
-  margin-top: -0.625rem;
-  border: 2px solid #001f3f;
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: wppi-spinner 0.8s linear infinite;
-}
-
-@keyframes wppi-spinner {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ============================================================================
-   SELECT DROPDOWN - MATCH PREMIUM CARD STYLE
-   ============================================================================ */
-.wppi__form-card .form-select {
-  border-radius: 0.875rem;
-  border: 2px solid #e0e0e0;
-  padding: 1rem 3rem 1rem 1.25rem;
-  font-size: 1rem;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border: 1.75px solid #e0e0e0;
+  border-radius: 2rem;
+  background: #ffffff;
+  color: #555;
+  font-size: 0.65rem;
   font-weight: 600;
-  color: #424242;
-  background-color: white;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23001f3f' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 1.25rem center;
-  background-size: 1.125rem;
-  appearance: none;
-  -webkit-appearance: none;
   cursor: pointer;
-  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-  width: 100%;
-  line-height: 1.5;
+  transition: all 160ms ease;
+  white-space: nowrap;
+  line-height: 1.2;
+  min-height: unset;
 }
 
-.wppi__form-card .form-select:hover {
+.wppi__bubble:hover {
   border-color: #f7c000;
-  background-color: rgba(247, 192, 0, 0.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  color: #001f3f;
+  background: rgba(247, 192, 0, 0.06);
+  transform: translateY(-1px);
 }
 
-.wppi__form-card .form-select:focus {
+.wppi__bubble--active {
   border-color: #f7c000;
-  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
-  outline: none;
-  background-color: #fffef8;
+  background: #f7c000;
+  color: #001f3f;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(247, 192, 0, 0.25);
 }
 
-.wppi__form-card .form-select option {
-  font-weight: 500;
-  color: #424242;
-  padding: 0.5rem;
-}
-
-.wppi__form-card .form-select option:first-child {
-  color: #9e9e9e;
+.wppi__bubble--active::before {
+  content: '\2713 ';
+  font-size: 0.7rem;
+  font-weight: 900;
 }
 
 /* ============================================================================
-   CUSTOM STYLED DROPDOWN (replaces native select options list)
+   CUSTOM SELECT DROPDOWN
    ============================================================================ */
 .wppi__select {
   position: relative;
 }
 
-/* The visible trigger button */
 .wppi__select-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 1rem 1.25rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 0.875rem;
-  background: white;
-  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e8e8e8;
+  border-radius: 0.625rem;
+  background: #ffffff;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: #424242;
   cursor: pointer;
-  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: border-color 200ms, box-shadow 200ms;
   user-select: none;
 }
 
 .wppi__select-trigger.placeholder {
-  color: #9e9e9e;
+  color: #b0b0b0;
   font-weight: 500;
 }
 
 .wppi__select-trigger:hover {
-  border-color: #f7c000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #c8c8c8;
 }
 
 .wppi__select-trigger.open {
   border-color: #f7c000;
-  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.15);
-  border-radius: 0.875rem 0.875rem 0 0;
+  box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.12);
+  border-radius: 0.625rem 0.625rem 0 0;
 }
 
-.wppi__select-trigger .wppi__select-chevron {
-  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+.wppi__select-chevron {
+  transition: transform 220ms ease;
   color: #001f3f;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   flex-shrink: 0;
 }
 
@@ -791,46 +576,43 @@
   transform: rotate(180deg);
 }
 
-/* The dropdown options panel */
 .wppi__select-options {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  background: white;
+  background: #ffffff;
   border: 2px solid #f7c000;
   border-top: none;
-  border-radius: 0 0 0.875rem 0.875rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  border-radius: 0 0 0.625rem 0.625rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   z-index: 1000;
-  overflow: hidden;
   display: none;
-  max-height: 18rem;
+  max-height: 16rem;
   overflow-y: auto;
 }
 
 .wppi__select-options.open {
   display: block;
-  animation: wppi-dropdown-open 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: wppi-drop-open 150ms ease;
 }
 
-@keyframes wppi-dropdown-open {
+@keyframes wppi-drop-open {
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Individual option item */
 .wppi__select-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.875rem 1.25rem;
+  padding: 0.75rem 1rem;
   font-size: 0.9375rem;
   font-weight: 500;
   color: #424242;
   cursor: pointer;
-  transition: background 150ms, color 150ms;
   border-bottom: 1px solid #f5f5f5;
+  transition: background 120ms;
 }
 
 .wppi__select-option:last-child {
@@ -838,13 +620,13 @@
 }
 
 .wppi__select-option:hover {
-  background: rgba(247, 192, 0, 0.08);
+  background: rgba(247, 192, 0, 0.07);
   color: #001f3f;
   font-weight: 600;
 }
 
 .wppi__select-option.selected {
-  background: linear-gradient(135deg, rgba(247, 192, 0, 0.15) 0%, rgba(229, 176, 0, 0.08) 100%);
+  background: rgba(247, 192, 0, 0.12);
   color: #001f3f;
   font-weight: 700;
 }
@@ -859,126 +641,231 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 800;
+  font-size: 0.6875rem;
+  font-weight: 900;
   flex-shrink: 0;
 }
 
-/* Scrollbar styling for options panel */
-.wppi__select-options::-webkit-scrollbar {
-  width: 4px;
+/* Scrollbar */
+.wppi__select-options::-webkit-scrollbar { width: 4px; }
+.wppi__select-options::-webkit-scrollbar-track { background: #f5f5f5; }
+.wppi__select-options::-webkit-scrollbar-thumb { background: #f7c000; border-radius: 2px; }
+
+/* ============================================================================
+   NAVIGATION BUTTONS
+   ============================================================================ */
+.wppi__nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.75rem 2rem;
+  margin-top: 1.75rem;
+  border-top: 1px solid #f0f0f0;
+  gap: 1rem;
 }
-.wppi__select-options::-webkit-scrollbar-track {
-  background: #f5f5f5;
-}
-.wppi__select-options::-webkit-scrollbar-thumb {
+
+.wppi__btn-next,
+.wppi__btn-submit {
   background: #f7c000;
-  border-radius: 2px;
+  color: #001f3f;
+  border: none;
+  padding: 0.875rem 2.25rem;
+  font-weight: 700;
+  font-size: 1rem;
+  border-radius: 3rem;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px rgba(247, 192, 0, 0.3);
+  position: relative;
+  overflow: hidden;
 }
 
-/* Help text styling */
-.wppi__help-text {
-  font-size: 0.875rem;
-  color: #757575;
-  margin-top: 0.375rem;
-  font-style: italic;
+.wppi__btn-next::after,
+.wppi__btn-submit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%);
+  transform: translateX(-100%);
+  transition: transform 500ms;
 }
 
-/* Focus visible for accessibility */
-.wppi__form-card :focus-visible {
-  outline: 2px solid #f7c000;
-  outline-offset: 2px;
+.wppi__btn-next:hover::after,
+.wppi__btn-submit:hover::after {
+  transform: translateX(100%);
+}
+
+.wppi__btn-next:hover,
+.wppi__btn-submit:hover {
+  background: #e5b000;
+  color: #001f3f;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(247, 192, 0, 0.42);
+}
+
+.wppi__btn-submit {
+  background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+  color: #f7c000;
+  box-shadow: 0 4px 14px rgba(0, 31, 63, 0.25);
+}
+
+.wppi__btn-submit:hover {
+  background: linear-gradient(135deg, #001530 0%, #002855 100%);
+  color: #f7c000;
+  box-shadow: 0 8px 22px rgba(0, 31, 63, 0.35);
+  transform: translateY(-2px);
+}
+
+.wppi__btn-prev {
+  background: transparent;
+  color: #616161;
+  border: 2px solid #e0e0e0;
+  padding: 0.875rem 2rem;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 3rem;
+  transition: all 200ms ease;
+}
+
+.wppi__btn-prev:hover {
+  background: #f5f5f5;
+  border-color: #c0c0c0;
+  color: #424242;
+  transform: translateY(-1px);
+}
+
+/* Submit loading state */
+.wppi__btn-submit.loading {
+  color: transparent;
+  pointer-events: none;
+}
+
+.wppi__btn-submit.loading::before {
+  content: '';
+  position: absolute;
+  width: 1.125rem;
+  height: 1.125rem;
+  top: 50%;
+  left: 50%;
+  margin: -0.5625rem 0 0 -0.5625rem;
+  border: 2px solid rgba(247, 192, 0, 0.3);
+  border-top-color: #f7c000;
+  border-radius: 50%;
+  animation: wppi-spin 0.7s linear infinite;
+}
+
+@keyframes wppi-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ============================================================================
-   BUBBLE MULTI-SELECT
+   WHATSAPP BUTTON (hero / modal)
    ============================================================================ */
-.wppi__bubbles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0.25rem 0;
+.wppi__btn--whatsapp {
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  color: #ffffff;
+  border: none;
+  padding: 0.875rem 1.75rem;
+  font-weight: 700;
+  font-size: 1rem;
+  border-radius: 0.625rem;
+  transition: all 250ms ease;
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);
 }
 
-.wppi__bubble {
-  display: inline-flex;
+.wppi__btn--whatsapp:hover {
+  background: linear-gradient(135deg, #128C7E 0%, #075E54 100%);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 211, 102, 0.4);
+}
+
+/* ============================================================================
+   WHATSAPP MODAL
+   ============================================================================ */
+.wppi__modal-content {
+  border-radius: 1rem;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.wppi__modal-header {
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wppi__modal-header .modal-title {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.wppi__modal-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  padding: 0.4rem 0.85rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 2rem;
-  background: #fff;
-  color: #555;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 180ms ease;
-  white-space: nowrap;
-  line-height: 1.2;
+  font-size: 1.125rem;
+  color: #ffffff;
 }
 
-.wppi__bubble:hover {
-  border-color: #f7c000;
-  color: #001f3f;
-  background: rgba(247, 192, 0, 0.06);
+.wppi__modal-header .btn-close {
+  filter: brightness(0) invert(1);
+  opacity: 0.85;
+  transition: opacity 200ms, transform 200ms;
 }
 
-.wppi__bubble--active {
-  border-color: #f7c000;
-  background: #f7c000;
-  color: #001f3f;
-  font-weight: 700;
+.wppi__modal-header .btn-close:hover {
+  opacity: 1;
+  transform: rotate(90deg);
 }
 
-.wppi__bubble--active::before {
-  content: '\2713';
-  font-size: 0.7rem;
-  font-weight: 800;
+.wppi__modal-content .form-control {
+  border-radius: 0.5rem;
+  border: 1.5px solid #e0e0e0;
+  transition: border-color 200ms, box-shadow 200ms;
 }
 
-@media (max-width: 576px) {
-  .wppi__bubbles {
-    gap: 0.35rem;
-  }
-  .wppi__bubble {
-    font-size: 0.75rem;
-    padding: 0.38rem 0.7rem;
-  }
+.wppi__modal-content .form-control:focus {
+  border-color: #25D366;
+  box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.12);
+  outline: none;
 }
 
 /* ============================================================================
    SUCCESS PAGE
    ============================================================================ */
-
-/* Checkmark circle in hero */
 .wppi__success-check {
-  width: 5rem;
-  height: 5rem;
+  width: 4.5rem;
+  height: 4.5rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, #28a745 0%, #20903b 100%);
+  background: linear-gradient(135deg, #28a745, #20903b);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(40, 167, 69, 0.4), 0 0 0 6px rgba(40, 167, 69, 0.15);
-  animation: wppi-checkmark-pop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s backwards;
+  box-shadow: 0 8px 24px rgba(40, 167, 69, 0.35), 0 0 0 5px rgba(40, 167, 69, 0.12);
+  animation: wppi-check-pop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s both;
 }
 
 .wppi__success-check i {
-  font-size: 2.25rem;
-  color: white;
+  font-size: 2rem;
+  color: #ffffff;
 }
 
-/* Help Portal CTA card */
 .wppi__success-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 1.5rem;
-  padding: 2.5rem;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #ffffff;
+  border-radius: 1.25rem;
+  padding: 2.25rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,.04), 0 20px 48px rgba(0,0,0,.07);
+  border: 1px solid #f0f0f0;
   position: relative;
-  animation: wppi-card-fade-in 0.8s ease-out 0.4s backwards;
+  animation: wppi-card-in 0.7s ease-out 0.4s both;
 }
 
 .wppi__success-card::before {
@@ -989,29 +876,29 @@
   right: 0;
   height: 4px;
   background: linear-gradient(90deg, #f7c000 0%, #001f3f 100%);
-  border-radius: 1.5rem 1.5rem 0 0;
+  border-radius: 1.25rem 1.25rem 0 0;
 }
 
-/* Engagement hook cards */
+/* Hook cards */
 .wppi__hook {
-  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 300ms;
+  transition: transform 280ms ease, box-shadow 280ms;
 }
 
 .wppi__hook-inner {
-  background: white;
-  border-radius: 1.25rem;
-  padding: 2rem 1.5rem;
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 1.75rem 1.5rem;
   text-align: center;
-  border: 2px solid #e0e0e0;
-  transition: border-color 300ms;
+  border: 1.5px solid #e8e8e8;
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: border-color 280ms;
 }
 
 .wppi__hook:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.09);
 }
 
 .wppi__hook:hover .wppi__hook-inner {
@@ -1019,33 +906,30 @@
 }
 
 .wppi__hook-icon {
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(247, 192, 0, 0.15) 0%, rgba(247, 192, 0, 0.05) 100%);
+  background: rgba(247, 192, 0, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.wppi__hook-icon i {
-  font-size: 1.5rem;
+  margin-bottom: 0.875rem;
+  font-size: 1.375rem;
   color: #001f3f;
 }
 
 .wppi__hook-title {
-  font-size: 1.0625rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #001f3f;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .wppi__hook-text {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: #616161;
   line-height: 1.5;
-  margin-bottom: 1rem;
+  margin-bottom: 0.875rem;
   flex-grow: 1;
 }
 
@@ -1053,29 +937,206 @@
   font-size: 0.875rem;
   font-weight: 700;
   color: #f7c000;
-  transition: color 200ms;
 }
 
 .wppi__hook:hover .wppi__hook-link {
   color: #e5b000;
 }
 
-/* Success page responsive */
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
 @media (max-width: 768px) {
-  .wppi__success-check {
-    width: 4rem;
-    height: 4rem;
+  .wppi__hero {
+    padding: 2.5rem 0 2rem;
   }
 
-  .wppi__success-check i {
-    font-size: 1.75rem;
+  .wppi__hero-sub {
+    font-size: 0.9375rem;
+    margin-bottom: 1.5rem;
   }
 
-  .wppi__success-card {
-    padding: 1.75rem 1.25rem;
+  .wppi__hero-badge {
+    margin-bottom: 1rem;
   }
 
-  .wppi__hook-inner {
-    padding: 1.5rem 1rem;
+  .wppi__hero-stat {
+    padding: 0.5rem 1rem;
+  }
+
+  .wppi__hero-stat__num {
+    font-size: 1.25rem;
+  }
+
+  .wppi__hero-stats {
+    margin-bottom: 1.5rem;
+  }
+
+  .wppi__hero-ctas {
+    gap: 0.625rem;
+  }
+
+  /* Progress */
+  .wppi__progress {
+    padding: 1.5rem 0 0;
+    margin-bottom: 1rem;
+  }
+
+  .wppi__steps {
+    padding: 0 0.25rem;
+  }
+
+  .wppi__step-circle {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .wppi__step-label {
+    font-size: 0.6875rem;
+  }
+
+  .wppi__step-connector {
+    margin: 0 0.25rem;
+    margin-bottom: 1.4rem;
+  }
+
+  /* Form card */
+  .wppi__form-card {
+    border-radius: 0.75rem;
+  }
+
+  .wppi__step-header {
+    padding: 1rem 0.875rem 0;
+    gap: 0.625rem;
+  }
+
+  .wppi__step-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1rem;
+    border-radius: 0.625rem;
+  }
+
+  .wppi__section-title {
+    font-size: 1.125rem;
+  }
+
+  .wppi__section-sub {
+    font-size: 0.75rem;
+  }
+
+  /* Field groups */
+  .wppi__field-group {
+    margin: 0.75rem 0.875rem 0;
+    padding: 0.875rem;
+    border-radius: 0.625rem;
+  }
+
+  .wppi__field-group-label {
+    margin-bottom: 0.75rem;
+    font-size: 0.6875rem;
+  }
+
+  /* Form controls */
+  .wppi__form-card .form-label {
+    font-size: 0.8125rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .wppi__form-card .form-control,
+  .wppi__form-card textarea {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  /* Selects */
+  .wppi__select-trigger {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .wppi__select-option {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  /* Bubbles */
+  .wppi__bubbles {
+    gap: 0.375rem;
+  }
+
+  .wppi__bubble {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.65rem;
+  }
+
+  /* Radio group */
+  .wppi__radio-group {
+    gap: 0.5rem;
+  }
+
+  .wppi__radio-group .form-check-label {
+    padding: 0.5rem 1rem;
+    font-size: 0.6875rem;
+  }
+
+  /* Nav */
+  .wppi__nav {
+    padding: 0.875rem;
+    margin-top: 1rem;
+    flex-wrap: nowrap;
+    gap: 0.625rem;
+  }
+
+  .wppi__btn-next,
+  .wppi__btn-submit,
+  .wppi__btn-prev {
+    flex: 1 1 0;
+    padding: 0.75rem 0.75rem;
+    font-size: 0.875rem;
+    min-width: 0;
+  }
+
+  /* Container gutters — tighten page margins */
+  .container {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .wppi__hero {
+    padding: 2rem 0 1.5rem;
+  }
+
+  .wppi__hero-title {
+    font-size: 1.625rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .wppi__hero-ctas {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .wppi__hero-cta {
+    width: 100%;
+    max-width: 18rem;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .wppi__hero-stat {
+    padding: 0.375rem 0.75rem;
+  }
+
+  .wppi__hero-stat__num {
+    font-size: 1.125rem;
+  }
+
+  .wppi__hero-stat__label {
+    font-size: 0.6875rem;
   }
 }

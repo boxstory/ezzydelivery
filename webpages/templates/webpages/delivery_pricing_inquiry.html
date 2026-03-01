@@ -11,618 +11,817 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260223b" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260301a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<!-- Hero Section -->
-<div class="wppi__hero">
-  <div class="container">
-    <div class="text-center">
-      <h1 class="display-4 fw-bold mb-3">Get Your Custom Delivery Quote</h1>
-      <p class="lead mb-4">Tell us about your business needs and we'll provide a tailored pricing solution</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     HERO SECTION
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="wppi__hero" id="wppi_hero">
+  <div class="wppi__hero-bg-ring wppi__hero-bg-ring--1"></div>
+  <div class="wppi__hero-bg-ring wppi__hero-bg-ring--2"></div>
+  <div class="container position-relative">
+    <div class="wppi__hero-inner">
+
+      <!-- Badge -->
+      <div class="wppi__hero-badge" id="wppi_hero_badge">
+        <i class="fa-solid fa-truck-fast"></i>
+        Qatar's Leading 3PL Partner
+      </div>
+
+      <h1 class="wppi__hero-title" id="wppi_hero_title">
+        Get Your Custom<br>
+        <span class="wppi__hero-title--accent">Delivery Quote</span>
+      </h1>
+      <p class="wppi__hero-sub" id="wppi_hero_sub">
+        Tell us about your business — we'll tailor a pricing plan that fits your volume, product, and delivery needs.
+      </p>
+
+      <!-- Trust Stats -->
+      <div class="wppi__hero-stats" id="wppi_hero_stats">
+        <div class="wppi__hero-stat">
+          <span class="wppi__hero-stat__num">500+</span>
+          <span class="wppi__hero-stat__label">Businesses Served</span>
+        </div>
+        <div class="wppi__hero-stat">
+          <span class="wppi__hero-stat__num">24h</span>
+          <span class="wppi__hero-stat__label">Quote Turnaround</span>
+        </div>
+        <div class="wppi__hero-stat">
+          <span class="wppi__hero-stat__num">All Qatar</span>
+          <span class="wppi__hero-stat__label">Coverage</span>
+        </div>
+      </div>
+
 
     </div>
   </div>
 </div>
 
-<div class="container mb-5">
-  <!-- Progress Indicator -->
-  <div class="wppi__progress">
-    <div class="wppi__steps">
-      <div class="wppi__step {% if current_step == 1 %}active{% elif current_step > 1 %}completed{% endif %}">
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     FORM SECTION
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="container mb-5" id="inquiryFormWrap">
+
+  <!-- Progress Steps -->
+  <div class="wppi__progress" id="wppi_progress">
+    <div class="wppi__steps" id="wppi_steps">
+
+      <div class="wppi__step {% if current_step == 1 %}active{% elif current_step > 1 %}completed{% endif %}"
+           id="wppi_step_1">
         <div class="wppi__step-circle">
-          {% if current_step > 1 %}<i class="fa fa-check"></i>{% else %}1{% endif %}
+          {% if current_step > 1 %}<i class="fa-solid fa-check"></i>{% else %}
+          <span>1</span>{% endif %}
         </div>
-        <div class="wppi__step-label">Company & Product</div>
+        <div class="wppi__step-label">Company &amp; Product</div>
       </div>
-      <div class="wppi__step {% if current_step == 2 %}active{% elif current_step > 2 %}completed{% endif %}">
+
+      <div class="wppi__step-connector"></div>
+
+      <div class="wppi__step {% if current_step == 2 %}active{% elif current_step > 2 %}completed{% endif %}"
+           id="wppi_step_2">
         <div class="wppi__step-circle">
-          {% if current_step > 2 %}<i class="fa fa-check"></i>{% else %}2{% endif %}
+          {% if current_step > 2 %}<i class="fa-solid fa-check"></i>{% else %}
+          <span>2</span>{% endif %}
         </div>
-        <div class="wppi__step-label">Operations & Orders</div>
+        <div class="wppi__step-label">Operations &amp; Orders</div>
       </div>
-      <div class="wppi__step {% if current_step == 3 %}active{% endif %}">
-        <div class="wppi__step-circle">3</div>
-        <div class="wppi__step-label">Delivery & Pickup</div>
+
+      <div class="wppi__step-connector"></div>
+
+      <div class="wppi__step {% if current_step == 3 %}active{% endif %}"
+           id="wppi_step_3">
+        <div class="wppi__step-circle"><span>3</span></div>
+        <div class="wppi__step-label">Delivery &amp; Pickup</div>
       </div>
+
     </div>
   </div>
 
-  <!-- Multi-Step Form -->
-  <div class="wppi__form-card">
+  <!-- Form Card -->
+  <div class="wppi__form-card" id="wppi_form_card">
     <form method="POST" id="inquiryForm" novalidate>
       {% csrf_token %}
 
-      <!-- Step 1: Company & Product Details -->
-      <div class="wppi__step-content" id="step1" style="{% if current_step != 1 %}display: none;{% endif %}">
-        <h2 class="wppi__section-title">Company & Product Details</h2>
+      <!-- ─────────────────────────────────────────────────────────────────
+           STEP 1 — Company & Product Details
+           ───────────────────────────────────────────────────────────────── -->
+      <div class="wppi__step-content" id="step1"
+           {% if current_step != 1 %}style="display:none"{% endif %}>
 
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label" for="full_name">Contact Person Name *</label>
-            <input type="text" class="form-control" id="full_name" name="full_name"
-                   value="{{ saved_data.full_name }}" required>
+        <div class="wppi__step-header" id="wppi_step1_header">
+          <div class="wppi__step-icon">
+            <i class="fa-solid fa-building"></i>
           </div>
-          <div class="col-md-6">
-            <label class="form-label" for="business_name">Business Name *</label>
-            <input type="text" class="form-control" id="business_name" name="business_name"
-                   value="{{ saved_data.business_name }}" required>
+          <div>
+            <h2 class="wppi__section-title">Company &amp; Product Details</h2>
+            <p class="wppi__section-sub">Step 1 of 3 — Tell us who you are and what you sell</p>
           </div>
-          <div class="col-md-6">
-            <label class="form-label" for="business_contact_number">Business Contact Number *</label>
-            <input type="tel" class="form-control" id="business_contact_number" name="business_contact_number"
-                   value="{{ saved_data.business_contact_number }}" required>
+        </div>
+
+        <!-- Contact Info Group -->
+        <div class="wppi__field-group" id="wppi_step1_contact_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-address-card"></i> Contact Information
           </div>
-          <div class="col-md-6">
-            <label class="form-label" for="operation_team_contact_number">Operations Team Contact</label>
-            <input type="tel" class="form-control" id="operation_team_contact_number" name="operation_team_contact_number"
-                   value="{{ saved_data.operation_team_contact_number }}">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="website_url">Website URL</label>
-            <input type="url" class="form-control" id="website_url" name="website_url"
-                   value="{{ saved_data.website_url }}" placeholder="example.qa">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="social_profile">Social Media Profile</label>
-            <input type="url" class="form-control" id="social_profile" name="social_profile"
-                   value="{{ saved_data.social_profile }}" placeholder="Instagram/Facebook URL">
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Product Category *</label>
-            <input type="hidden" name="product_category" id="product_category" value="{{ saved_data.product_category }}" required>
-            <div class="bubble-select" data-target="product_category">
-              {% with cats=saved_data.product_category|default:"" %}
-              <button type="button" class="bubble{% if 'Fashion' in cats %} bubble--active{% endif %}" data-value="Fashion & Clothing">Fashion & Clothing</button>
-              <button type="button" class="bubble{% if 'Electronics' in cats %} bubble--active{% endif %}" data-value="Electronics & Gadgets">Electronics & Gadgets</button>
-              <button type="button" class="bubble{% if 'Food' in cats %} bubble--active{% endif %}" data-value="Food & Beverages">Food & Beverages</button>
-              <button type="button" class="bubble{% if 'Beauty' in cats %} bubble--active{% endif %}" data-value="Beauty & Cosmetics">Beauty & Cosmetics</button>
-              <button type="button" class="bubble{% if 'Home' in cats %} bubble--active{% endif %}" data-value="Home & Furniture">Home & Furniture</button>
-              <button type="button" class="bubble{% if 'Health' in cats %} bubble--active{% endif %}" data-value="Health & Wellness">Health & Wellness</button>
-              <button type="button" class="bubble{% if 'Sports' in cats %} bubble--active{% endif %}" data-value="Sports & Outdoor">Sports & Outdoor</button>
-              <button type="button" class="bubble{% if 'Jewellery' in cats %} bubble--active{% endif %}" data-value="Jewellery & Accessories">Jewellery & Accessories</button>
-              <button type="button" class="bubble{% if 'Books' in cats %} bubble--active{% endif %}" data-value="Books & Stationery">Books & Stationery</button>
-              <button type="button" class="bubble{% if 'Toys' in cats %} bubble--active{% endif %}" data-value="Toys & Kids">Toys & Kids</button>
-              <button type="button" class="bubble{% if 'Gifts' in cats %} bubble--active{% endif %}" data-value="Gifts & Flowers">Gifts & Flowers</button>
-              <button type="button" class="bubble{% if 'Other' in cats %} bubble--active{% endif %}" data-value="Other">Other</button>
-              {% endwith %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="full_name">Contact Person Name <span class="wppi__req">*</span></label>
+              <input type="text" class="form-control" id="full_name" name="full_name"
+                     value="{{ saved_data.full_name }}" placeholder="e.g. Ahmed Al-Rashidi" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="business_name">Business Name <span class="wppi__req">*</span></label>
+              <input type="text" class="form-control" id="business_name" name="business_name"
+                     value="{{ saved_data.business_name }}" placeholder="e.g. My Store Qatar" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="business_contact_number">Business Contact Number <span class="wppi__req">*</span></label>
+              <input type="tel" class="form-control" id="business_contact_number" name="business_contact_number"
+                     value="{{ saved_data.business_contact_number }}" placeholder="+974 5555 0000" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="operation_team_contact_number">Operations Team Contact</label>
+              <input type="tel" class="form-control" id="operation_team_contact_number" name="operation_team_contact_number"
+                     value="{{ saved_data.operation_team_contact_number }}" placeholder="+974 …">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="website_url">Website URL</label>
+              <input type="url" class="form-control" id="website_url" name="website_url"
+                     value="{{ saved_data.website_url }}" placeholder="https://yourstore.qa">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="social_profile">Social Media Profile</label>
+              <input type="url" class="form-control" id="social_profile" name="social_profile"
+                     value="{{ saved_data.social_profile }}" placeholder="Instagram / Facebook URL">
             </div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label">Average Order Value (QAR) *</label>
-            <input type="hidden" name="average_order_value_qar" id="average_order_value_qar" value="{{ saved_data.average_order_value_qar }}" required>
-            <div class="wppi__select" data-target="average_order_value_qar">
-              <div class="wppi__select-trigger {% if not saved_data.average_order_value_qar %}placeholder{% endif %}">
-                <span>{% if saved_data.average_order_value_qar %}{{ saved_data.average_order_value_qar }} QAR{% else %}Select range{% endif %}</span>
-                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
-              </div>
-              <div class="custom-select-options">
-                <div class="custom-select-option {% if saved_data.average_order_value_qar == 'Below 50' %}selected{% endif %}" data-value="Below 50">Below 50 QAR</div>
-                <div class="custom-select-option {% if saved_data.average_order_value_qar == '50-100' %}selected{% endif %}" data-value="50-100">50 – 100 QAR</div>
-                <div class="custom-select-option {% if saved_data.average_order_value_qar == '100-300' %}selected{% endif %}" data-value="100-300">100 – 300 QAR</div>
-                <div class="custom-select-option {% if saved_data.average_order_value_qar == '300-500' %}selected{% endif %}" data-value="300-500">300 – 500 QAR</div>
-                <div class="custom-select-option {% if saved_data.average_order_value_qar == '500-1000' %}selected{% endif %}" data-value="500-1000">500 – 1000 QAR</div>
-                <div class="custom-select-option {% if saved_data.average_order_value_qar == 'Above 1000' %}selected{% endif %}" data-value="Above 1000">Above 1000 QAR</div>
+        </div>
+
+        <!-- Product Group -->
+        <div class="wppi__field-group" id="wppi_step1_product_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-box-open"></i> Product &amp; Business Profile
+          </div>
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label class="form-label">Product Category <span class="wppi__req">*</span></label>
+              <input type="hidden" name="product_category" id="product_category"
+                     value="{{ saved_data.product_category }}" required>
+              <div class="wppi__bubbles" data-target="product_category" id="wppi_bubbles_product_category">
+                {% with cats=saved_data.product_category|default:"" %}
+                <button type="button" class="wppi__bubble{% if 'Fashion' in cats %} wppi__bubble--active{% endif %}" data-value="Fashion & Clothing">Fashion &amp; Clothing</button>
+                <button type="button" class="wppi__bubble{% if 'Electronics' in cats %} wppi__bubble--active{% endif %}" data-value="Electronics & Gadgets">Electronics &amp; Gadgets</button>
+                <button type="button" class="wppi__bubble{% if 'Food' in cats %} wppi__bubble--active{% endif %}" data-value="Food & Beverages">Food &amp; Beverages</button>
+                <button type="button" class="wppi__bubble{% if 'Beauty' in cats %} wppi__bubble--active{% endif %}" data-value="Beauty & Cosmetics">Beauty &amp; Cosmetics</button>
+                <button type="button" class="wppi__bubble{% if 'Home' in cats %} wppi__bubble--active{% endif %}" data-value="Home & Furniture">Home &amp; Furniture</button>
+                <button type="button" class="wppi__bubble{% if 'Health' in cats %} wppi__bubble--active{% endif %}" data-value="Health & Wellness">Health &amp; Wellness</button>
+                <button type="button" class="wppi__bubble{% if 'Sports' in cats %} wppi__bubble--active{% endif %}" data-value="Sports & Outdoor">Sports &amp; Outdoor</button>
+                <button type="button" class="wppi__bubble{% if 'Jewellery' in cats %} wppi__bubble--active{% endif %}" data-value="Jewellery & Accessories">Jewellery &amp; Accessories</button>
+                <button type="button" class="wppi__bubble{% if 'Books' in cats %} wppi__bubble--active{% endif %}" data-value="Books & Stationery">Books &amp; Stationery</button>
+                <button type="button" class="wppi__bubble{% if 'Toys' in cats %} wppi__bubble--active{% endif %}" data-value="Toys & Kids">Toys &amp; Kids</button>
+                <button type="button" class="wppi__bubble{% if 'Gifts' in cats %} wppi__bubble--active{% endif %}" data-value="Gifts & Flowers">Gifts &amp; Flowers</button>
+                <button type="button" class="wppi__bubble{% if 'Other' in cats %} wppi__bubble--active{% endif %}" data-value="Other">Other</button>
+                {% endwith %}
               </div>
             </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">How long have you been operating? *</label>
-            <input type="hidden" name="business_operating_age" id="business_operating_age" value="{{ saved_data.business_operating_age }}" required>
-            <div class="wppi__select" data-target="business_operating_age">
-              <div class="wppi__select-trigger {% if not saved_data.business_operating_age %}placeholder{% endif %}">
-                <span>{% if saved_data.business_operating_age %}{{ saved_data.business_operating_age }}{% else %}Select{% endif %}</span>
-                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
-              </div>
-              <div class="custom-select-options">
-                <div class="custom-select-option {% if saved_data.business_operating_age == 'New (not started yet)' %}selected{% endif %}" data-value="New (not started yet)">New (not started yet)</div>
-                <div class="custom-select-option {% if saved_data.business_operating_age == 'Less than 1 year' %}selected{% endif %}" data-value="Less than 1 year">Less than 1 year</div>
-                <div class="custom-select-option {% if saved_data.business_operating_age == '1-3 years' %}selected{% endif %}" data-value="1-3 years">1 – 3 years</div>
-                <div class="custom-select-option {% if saved_data.business_operating_age == 'More than 3 years' %}selected{% endif %}" data-value="More than 3 years">More than 3 years</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Is this a personalized product? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_personalized_product" id="personalized_yes"
-                       value="True" {% if saved_data.is_personalized_product == 'True' %}checked{% endif %} required>
-                <label class="form-check-label" for="personalized_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_personalized_product" id="personalized_no"
-                       value="False" {% if saved_data.is_personalized_product == 'False' or not saved_data.is_personalized_product %}checked{% endif %}>
-                <label class="form-check-label" for="personalized_no">No</label>
+            <div class="col-md-6">
+              <label class="form-label">Average Order Value (QAR) <span class="wppi__req">*</span></label>
+              <input type="hidden" name="average_order_value_qar" id="average_order_value_qar"
+                     value="{{ saved_data.average_order_value_qar }}" required>
+              <div class="wppi__select" data-target="average_order_value_qar" id="wppi_select_aov">
+                <div class="wppi__select-trigger {% if not saved_data.average_order_value_qar %}placeholder{% endif %}">
+                  <span>{% if saved_data.average_order_value_qar %}{{ saved_data.average_order_value_qar }} QAR{% else %}Select range{% endif %}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.average_order_value_qar == 'Below 50' %}selected{% endif %}" data-value="Below 50">Below 50 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.average_order_value_qar == '50-100' %}selected{% endif %}" data-value="50-100">50 – 100 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.average_order_value_qar == '100-300' %}selected{% endif %}" data-value="100-300">100 – 300 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.average_order_value_qar == '300-500' %}selected{% endif %}" data-value="300-500">300 – 500 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.average_order_value_qar == '500-1000' %}selected{% endif %}" data-value="500-1000">500 – 1000 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.average_order_value_qar == 'Above 1000' %}selected{% endif %}" data-value="Above 1000">Above 1000 QAR</div>
+                </div>
               </div>
             </div>
-          </div>
-          <!-- Always visible — triggers the chain -->
-          <div class="col-md-12">
-            <label class="form-label">Is your business located in Qatar?</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_yes"
-                       value="True" {% if saved_data.is_located_in_qatar == 'True' %}checked{% endif %} required>
-                <label class="form-check-label" for="located_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_no"
-                       value="False" {% if saved_data.is_located_in_qatar == 'False' %}checked{% endif %}>
-                <label class="form-check-label" for="located_no">No</label>
-              </div>
-            </div>
-          </div>
-          <!-- Shown when located in Qatar = Yes -->
-          <div class="col-md-12" id="is_registered_company_in_qatar_field" style="{% if saved_data.is_located_in_qatar != 'True' %}display:none;{% endif %}">
-            <label class="form-label">Is your company registered in Qatar?</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_yes"
-                       value="True" {% if saved_data.is_registered_company_in_qatar == 'True' %}checked{% endif %}>
-                <label class="form-check-label" for="registered_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_no"
-                       value="False" {% if saved_data.is_registered_company_in_qatar == 'False' %}checked{% endif %}>
-                <label class="form-check-label" for="registered_no">No</label>
+            <div class="col-md-6">
+              <label class="form-label">How long have you been operating? <span class="wppi__req">*</span></label>
+              <input type="hidden" name="business_operating_age" id="business_operating_age"
+                     value="{{ saved_data.business_operating_age }}" required>
+              <div class="wppi__select" data-target="business_operating_age" id="wppi_select_age">
+                <div class="wppi__select-trigger {% if not saved_data.business_operating_age %}placeholder{% endif %}">
+                  <span>{% if saved_data.business_operating_age %}{{ saved_data.business_operating_age }}{% else %}Select{% endif %}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.business_operating_age == 'New (not started yet)' %}selected{% endif %}" data-value="New (not started yet)">New (not started yet)</div>
+                  <div class="wppi__select-option {% if saved_data.business_operating_age == 'Less than 1 year' %}selected{% endif %}" data-value="Less than 1 year">Less than 1 year</div>
+                  <div class="wppi__select-option {% if saved_data.business_operating_age == '1-3 years' %}selected{% endif %}" data-value="1-3 years">1 – 3 years</div>
+                  <div class="wppi__select-option {% if saved_data.business_operating_age == 'More than 3 years' %}selected{% endif %}" data-value="More than 3 years">More than 3 years</div>
+                </div>
               </div>
             </div>
-          </div>
-          <!-- Shown when located in Qatar = No -->
-          <div class="col-md-12" id="business_location_country_field" style="{% if saved_data.is_located_in_qatar != 'False' %}display:none;{% endif %}">
-            <label class="form-label">Where is your business located?</label>
-            <input type="hidden" name="business_location_country" id="business_location_country" value="{{ saved_data.business_location_country }}">
-            <div class="wppi__select" data-target="business_location_country">
-              <div class="wppi__select-trigger {% if not saved_data.business_location_country %}placeholder{% endif %}">
-                <span>{{ saved_data.business_location_country|default:"Select country" }}</span>
-                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
-              </div>
-              <div class="custom-select-options">
-                <div class="custom-select-option {% if saved_data.business_location_country == 'UAE' %}selected{% endif %}" data-value="UAE">UAE</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'Saudi Arabia' %}selected{% endif %}" data-value="Saudi Arabia">Saudi Arabia</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'Kuwait' %}selected{% endif %}" data-value="Kuwait">Kuwait</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'Bahrain' %}selected{% endif %}" data-value="Bahrain">Bahrain</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'Oman' %}selected{% endif %}" data-value="Oman">Oman</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'Turkey' %}selected{% endif %}" data-value="Turkey">Turkey</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'China' %}selected{% endif %}" data-value="China">China</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'India' %}selected{% endif %}" data-value="India">India</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'UK' %}selected{% endif %}" data-value="UK">UK</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'USA' %}selected{% endif %}" data-value="USA">USA</div>
-                <div class="custom-select-option {% if saved_data.business_location_country == 'Other' %}selected{% endif %}" data-value="Other">Other</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Do you have a team available in Qatar? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_team_available_in_qatar" id="team_yes"
-                       value="True" {% if saved_data.is_team_available_in_qatar == 'True' %}checked{% endif %} required>
-                <label class="form-check-label" for="team_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_team_available_in_qatar" id="team_no"
-                       value="False" {% if saved_data.is_team_available_in_qatar == 'False' or not saved_data.is_team_available_in_qatar %}checked{% endif %}>
-                <label class="form-check-label" for="team_no">No</label>
+            <div class="col-md-12">
+              <label class="form-label">Is this a personalized product? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_personalized">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_personalized_product" id="personalized_yes"
+                         value="True" {% if saved_data.is_personalized_product == 'True' %}checked{% endif %} required>
+                  <label class="form-check-label" for="personalized_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_personalized_product" id="personalized_no"
+                         value="False" {% if saved_data.is_personalized_product == 'False' or not saved_data.is_personalized_product %}checked{% endif %}>
+                  <label class="form-check-label" for="personalized_no">No</label>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="wppi__nav">
+        <!-- Location Group -->
+        <div class="wppi__field-group" id="wppi_step1_location_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-location-dot"></i> Business Location
+          </div>
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label class="form-label">Is your business located in Qatar?</label>
+              <div class="wppi__radio-group" id="wppi_radio_located">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_yes"
+                         value="True" {% if saved_data.is_located_in_qatar == 'True' %}checked{% endif %} required>
+                  <label class="form-check-label" for="located_yes">Yes, in Qatar</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_no"
+                         value="False" {% if saved_data.is_located_in_qatar == 'False' %}checked{% endif %}>
+                  <label class="form-check-label" for="located_no">No, outside Qatar</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Show when Yes -->
+            <div class="col-md-12" id="is_registered_company_in_qatar_field"
+                 style="{% if saved_data.is_located_in_qatar != 'True' %}display:none{% endif %}">
+              <label class="form-label">Is your company registered in Qatar?</label>
+              <div class="wppi__radio-group" id="wppi_radio_registered">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_yes"
+                         value="True" {% if saved_data.is_registered_company_in_qatar == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="registered_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_no"
+                         value="False" {% if saved_data.is_registered_company_in_qatar == 'False' %}checked{% endif %}>
+                  <label class="form-check-label" for="registered_no">No</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Show when No -->
+            <div class="col-md-12" id="business_location_country_field"
+                 style="{% if saved_data.is_located_in_qatar != 'False' %}display:none{% endif %}">
+              <label class="form-label">Where is your business located?</label>
+              <input type="hidden" name="business_location_country" id="business_location_country"
+                     value="{{ saved_data.business_location_country }}">
+              <div class="wppi__select" data-target="business_location_country" id="wppi_select_country">
+                <div class="wppi__select-trigger {% if not saved_data.business_location_country %}placeholder{% endif %}">
+                  <span>{{ saved_data.business_location_country|default:"Select country" }}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'UAE' %}selected{% endif %}" data-value="UAE">UAE</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'Saudi Arabia' %}selected{% endif %}" data-value="Saudi Arabia">Saudi Arabia</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'Kuwait' %}selected{% endif %}" data-value="Kuwait">Kuwait</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'Bahrain' %}selected{% endif %}" data-value="Bahrain">Bahrain</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'Oman' %}selected{% endif %}" data-value="Oman">Oman</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'Turkey' %}selected{% endif %}" data-value="Turkey">Turkey</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'China' %}selected{% endif %}" data-value="China">China</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'India' %}selected{% endif %}" data-value="India">India</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'UK' %}selected{% endif %}" data-value="UK">UK</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'USA' %}selected{% endif %}" data-value="USA">USA</div>
+                  <div class="wppi__select-option {% if saved_data.business_location_country == 'Other' %}selected{% endif %}" data-value="Other">Other</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">Do you have a team available in Qatar? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_team">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_team_available_in_qatar" id="team_yes"
+                         value="True" {% if saved_data.is_team_available_in_qatar == 'True' %}checked{% endif %} required>
+                  <label class="form-check-label" for="team_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_team_available_in_qatar" id="team_no"
+                         value="False" {% if saved_data.is_team_available_in_qatar == 'False' or not saved_data.is_team_available_in_qatar %}checked{% endif %}>
+                  <label class="form-check-label" for="team_no">No</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wppi__nav" id="wppi_nav_step1">
           <div></div>
-          <button type="submit" name="next_step" class="btn btn-primary btn-lg">
-            Next Step <i class="fa fa-arrow-right ms-2"></i>
+          <button type="submit" name="next_step" class="btn wppi__btn-next btn-lg" id="wppi_btn_next_1">
+            Next Step <i class="fa-solid fa-arrow-right ms-2"></i>
           </button>
         </div>
       </div>
 
-      <!-- Step 2: Operations & Orders -->
-      <div class="wppi__step-content" id="step2" style="{% if current_step != 2 %}display: none;{% endif %}">
-        <h2 class="wppi__section-title">Operations & Orders Details</h2>
+      <!-- ─────────────────────────────────────────────────────────────────
+           STEP 2 — Operations & Orders
+           ───────────────────────────────────────────────────────────────── -->
+      <div class="wppi__step-content" id="step2"
+           {% if current_step != 2 %}style="display:none"{% endif %}>
 
-        <div class="row g-3">
-          <div class="col-md-12">
-            <label class="form-label">Orders Last Week</label>
-            <input type="hidden" name="avarage_number_of_order_last_week" id="avarage_number_of_order_last_week" value="{{ saved_data.avarage_number_of_order_last_week }}">
-            <div class="bubble-select bubble-select--single" data-target="avarage_number_of_order_last_week">
-              {% with v=saved_data.avarage_number_of_order_last_week %}
-              <button type="button" class="bubble{% if v == '1-10' %} bubble--active{% endif %}" data-value="1-10">1–10</button>
-              <button type="button" class="bubble{% if v == '11-30' %} bubble--active{% endif %}" data-value="11-30">11–30</button>
-              <button type="button" class="bubble{% if v == '31-100' %} bubble--active{% endif %}" data-value="31-100">31–100</button>
-              <button type="button" class="bubble{% if v == '101-300' %} bubble--active{% endif %}" data-value="101-300">101–300</button>
-              <button type="button" class="bubble{% if v == '300+' %} bubble--active{% endif %}" data-value="300+">300+</button>
-              {% endwith %}
-            </div>
+        <div class="wppi__step-header" id="wppi_step2_header">
+          <div class="wppi__step-icon">
+            <i class="fa-solid fa-chart-line"></i>
           </div>
-          <div class="col-md-12">
-            <label class="form-label">Orders Last Month</label>
-            <input type="hidden" name="avarage_number_of_order_done_last_month" id="avarage_number_of_order_done_last_month" value="{{ saved_data.avarage_number_of_order_done_last_month }}">
-            <div class="bubble-select bubble-select--single" data-target="avarage_number_of_order_done_last_month">
-              {% with v=saved_data.avarage_number_of_order_done_last_month %}
-              <button type="button" class="bubble{% if v == '1-25' %} bubble--active{% endif %}" data-value="1-25">1–25</button>
-              <button type="button" class="bubble{% if v == '26-100' %} bubble--active{% endif %}" data-value="26-100">26–100</button>
-              <button type="button" class="bubble{% if v == '101-300' %} bubble--active{% endif %}" data-value="101-300">101–300</button>
-              <button type="button" class="bubble{% if v == '301-1000' %} bubble--active{% endif %}" data-value="301-1000">301–1000</button>
-              <button type="button" class="bubble{% if v == '1000+' %} bubble--active{% endif %}" data-value="1000+">1000+</button>
-              {% endwith %}
-            </div>
+          <div>
+            <h2 class="wppi__section-title">Operations &amp; Orders Details</h2>
+            <p class="wppi__section-sub">Step 2 of 3 — Help us understand your order volumes and logistics needs</p>
           </div>
-          <div class="col-md-12">
-            <label class="form-label">Expected Orders Next Month</label>
-            <input type="hidden" name="avarage_number_of_order_expect_next_month" id="avarage_number_of_order_expect_next_month" value="{{ saved_data.avarage_number_of_order_expect_next_month }}">
-            <div class="bubble-select bubble-select--single" data-target="avarage_number_of_order_expect_next_month">
-              {% with v=saved_data.avarage_number_of_order_expect_next_month %}
-              <button type="button" class="bubble{% if v == '1-25' %} bubble--active{% endif %}" data-value="1-25">1–25</button>
-              <button type="button" class="bubble{% if v == '26-100' %} bubble--active{% endif %}" data-value="26-100">26–100</button>
-              <button type="button" class="bubble{% if v == '101-300' %} bubble--active{% endif %}" data-value="101-300">101–300</button>
-              <button type="button" class="bubble{% if v == '301-1000' %} bubble--active{% endif %}" data-value="301-1000">301–1000</button>
-              <button type="button" class="bubble{% if v == '1000+' %} bubble--active{% endif %}" data-value="1000+">1000+</button>
-              {% endwith %}
-            </div>
+        </div>
+
+        <!-- Volume Group -->
+        <div class="wppi__field-group" id="wppi_step2_volume_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-boxes-stacked"></i> Order Volumes
           </div>
-          <div class="col-md-12">
-            <label class="form-label">3-Month Growth Milestone</label>
-            <input type="hidden" name="orders_expected_in_next_3_months_milestone" id="orders_expected_in_next_3_months_milestone" value="{{ saved_data.orders_expected_in_next_3_months_milestone }}">
-            <div class="bubble-select bubble-select--single" data-target="orders_expected_in_next_3_months_milestone">
-              {% with v=saved_data.orders_expected_in_next_3_months_milestone %}
-              <button type="button" class="bubble{% if v == 'Below 100' %} bubble--active{% endif %}" data-value="Below 100">Below 100</button>
-              <button type="button" class="bubble{% if v == '100-500' %} bubble--active{% endif %}" data-value="100-500">100–500</button>
-              <button type="button" class="bubble{% if v == '500-1000' %} bubble--active{% endif %}" data-value="500-1000">500–1000</button>
-              <button type="button" class="bubble{% if v == '1000-3000' %} bubble--active{% endif %}" data-value="1000-3000">1000–3000</button>
-              <button type="button" class="bubble{% if v == '3000+' %} bubble--active{% endif %}" data-value="3000+">3000+</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Do you require COD (Cash on Delivery) service? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_required_COD_service" id="cod_yes"
-                       value="True" {% if saved_data.is_required_COD_service == 'True' %}checked{% endif %}>
-                <label class="form-check-label" for="cod_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_required_COD_service" id="cod_no"
-                       value="False" {% if saved_data.is_required_COD_service == 'False' or not saved_data.is_required_COD_service %}checked{% endif %}>
-                <label class="form-check-label" for="cod_no">No</label>
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label class="form-label">Orders Last Week</label>
+              <input type="hidden" name="avarage_number_of_order_last_week" id="avarage_number_of_order_last_week"
+                     value="{{ saved_data.avarage_number_of_order_last_week }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="avarage_number_of_order_last_week" id="wppi_bubbles_week">
+                {% with v=saved_data.avarage_number_of_order_last_week %}
+                <button type="button" class="wppi__bubble{% if v == '1-10' %} wppi__bubble--active{% endif %}" data-value="1-10">1–10</button>
+                <button type="button" class="wppi__bubble{% if v == '11-30' %} wppi__bubble--active{% endif %}" data-value="11-30">11–30</button>
+                <button type="button" class="wppi__bubble{% if v == '31-100' %} wppi__bubble--active{% endif %}" data-value="31-100">31–100</button>
+                <button type="button" class="wppi__bubble{% if v == '101-300' %} wppi__bubble--active{% endif %}" data-value="101-300">101–300</button>
+                <button type="button" class="wppi__bubble{% if v == '300+' %} wppi__bubble--active{% endif %}" data-value="300+">300+</button>
+                {% endwith %}
               </div>
             </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Do you need fulfillment service to operate from outside Qatar? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
-                       id="fulfillment_outside_yes" value="True" {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'True' %}checked{% endif %}>
-                <label class="form-check-label" for="fulfillment_outside_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
-                       id="fulfillment_outside_no" value="False" {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'False' or not saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar %}checked{% endif %}>
-                <label class="form-check-label" for="fulfillment_outside_no">No</label>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Do you need fulfillment service to make a hub in Doha? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
-                       id="fulfillment_hub_yes" value="True" {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'True' %}checked{% endif %}>
-                <label class="form-check-label" for="fulfillment_hub_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
-                       id="fulfillment_hub_no" value="False" {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'False' or not saved_data.is_required_fulfillment_service_for_make_hub_in_doha %}checked{% endif %}>
-                <label class="form-check-label" for="fulfillment_hub_no">No</label>
+            <div class="col-md-12">
+              <label class="form-label">Orders Last Month</label>
+              <input type="hidden" name="avarage_number_of_order_done_last_month" id="avarage_number_of_order_done_last_month"
+                     value="{{ saved_data.avarage_number_of_order_done_last_month }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="avarage_number_of_order_done_last_month" id="wppi_bubbles_month">
+                {% with v=saved_data.avarage_number_of_order_done_last_month %}
+                <button type="button" class="wppi__bubble{% if v == '1-25' %} wppi__bubble--active{% endif %}" data-value="1-25">1–25</button>
+                <button type="button" class="wppi__bubble{% if v == '26-100' %} wppi__bubble--active{% endif %}" data-value="26-100">26–100</button>
+                <button type="button" class="wppi__bubble{% if v == '101-300' %} wppi__bubble--active{% endif %}" data-value="101-300">101–300</button>
+                <button type="button" class="wppi__bubble{% if v == '301-1000' %} wppi__bubble--active{% endif %}" data-value="301-1000">301–1000</button>
+                <button type="button" class="wppi__bubble{% if v == '1000+' %} wppi__bubble--active{% endif %}" data-value="1000+">1000+</button>
+                {% endwith %}
               </div>
             </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Current Courier / 3PL Provider</label>
-            <input type="hidden" name="current_courier_provider" id="current_courier_provider" value="{{ saved_data.current_courier_provider }}">
-            <div class="wppi__select" data-target="current_courier_provider">
-              <div class="wppi__select-trigger {% if not saved_data.current_courier_provider %}placeholder{% endif %}">
-                <span>{{ saved_data.current_courier_provider|default:"Select provider" }}</span>
-                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
-              </div>
-              <div class="custom-select-options">
-                <div class="custom-select-option {% if saved_data.current_courier_provider == 'None' %}selected{% endif %}" data-value="None">None (No current provider)</div>
-                <div class="custom-select-option {% if saved_data.current_courier_provider == 'DHL' %}selected{% endif %}" data-value="DHL">DHL</div>
-                <div class="custom-select-option {% if saved_data.current_courier_provider == 'Aramex' %}selected{% endif %}" data-value="Aramex">Aramex</div>
-                <div class="custom-select-option {% if saved_data.current_courier_provider == 'QPOST' %}selected{% endif %}" data-value="QPOST">Qatar Post (QPOST)</div>
-                <div class="custom-select-option {% if saved_data.current_courier_provider == 'Other' %}selected{% endif %}" data-value="Other">Other</div>
+            <div class="col-md-12">
+              <label class="form-label">Expected Orders Next Month</label>
+              <input type="hidden" name="avarage_number_of_order_expect_next_month" id="avarage_number_of_order_expect_next_month"
+                     value="{{ saved_data.avarage_number_of_order_expect_next_month }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="avarage_number_of_order_expect_next_month" id="wppi_bubbles_nextmonth">
+                {% with v=saved_data.avarage_number_of_order_expect_next_month %}
+                <button type="button" class="wppi__bubble{% if v == '1-25' %} wppi__bubble--active{% endif %}" data-value="1-25">1–25</button>
+                <button type="button" class="wppi__bubble{% if v == '26-100' %} wppi__bubble--active{% endif %}" data-value="26-100">26–100</button>
+                <button type="button" class="wppi__bubble{% if v == '101-300' %} wppi__bubble--active{% endif %}" data-value="101-300">101–300</button>
+                <button type="button" class="wppi__bubble{% if v == '301-1000' %} wppi__bubble--active{% endif %}" data-value="301-1000">301–1000</button>
+                <button type="button" class="wppi__bubble{% if v == '1000+' %} wppi__bubble--active{% endif %}" data-value="1000+">1000+</button>
+                {% endwith %}
               </div>
             </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Delivery Coverage</label>
-            <input type="hidden" name="delivery_coverage" id="delivery_coverage" value="{{ saved_data.delivery_coverage }}">
-            <div class="wppi__select" data-target="delivery_coverage">
-              <div class="wppi__select-trigger {% if not saved_data.delivery_coverage %}placeholder{% endif %}">
-                <span>{{ saved_data.delivery_coverage|default:"Select coverage" }}</span>
-                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
-              </div>
-              <div class="custom-select-options">
-                <div class="custom-select-option {% if saved_data.delivery_coverage == 'Doha Only' %}selected{% endif %}" data-value="Doha Only">Doha Only</div>
-                <div class="custom-select-option {% if saved_data.delivery_coverage == 'All Qatar' %}selected{% endif %}" data-value="All Qatar">All Qatar</div>
-                <div class="custom-select-option {% if saved_data.delivery_coverage == 'Both' %}selected{% endif %}" data-value="Both">Both (Doha + Qatar)</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Do you require return / reverse logistics? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_return_logistics_required"
-                       id="return_yes" value="True" {% if saved_data.is_return_logistics_required == 'True' %}checked{% endif %}>
-                <label class="form-check-label" for="return_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_return_logistics_required"
-                       id="return_no" value="False" {% if saved_data.is_return_logistics_required == 'False' or not saved_data.is_return_logistics_required %}checked{% endif %}>
-                <label class="form-check-label" for="return_no">No</label>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">When do you want to start?</label>
-            <input type="hidden" name="preferred_start_date" id="preferred_start_date" value="{{ saved_data.preferred_start_date }}">
-            <div class="wppi__select" data-target="preferred_start_date">
-              <div class="wppi__select-trigger {% if not saved_data.preferred_start_date %}placeholder{% endif %}">
-                <span>{{ saved_data.preferred_start_date|default:"Select timeline" }}</span>
-                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
-              </div>
-              <div class="custom-select-options">
-                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Immediately' %}selected{% endif %}" data-value="Immediately">Immediately</div>
-                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Within 2 weeks' %}selected{% endif %}" data-value="Within 2 weeks">Within 2 weeks</div>
-                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Within 1 month' %}selected{% endif %}" data-value="Within 1 month">Within 1 month</div>
-                <div class="custom-select-option {% if saved_data.preferred_start_date == '1-3 months' %}selected{% endif %}" data-value="1-3 months">1 – 3 months</div>
-                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Just exploring' %}selected{% endif %}" data-value="Just exploring">Just exploring</div>
+            <div class="col-md-12">
+              <label class="form-label">3-Month Growth Milestone</label>
+              <input type="hidden" name="orders_expected_in_next_3_months_milestone" id="orders_expected_in_next_3_months_milestone"
+                     value="{{ saved_data.orders_expected_in_next_3_months_milestone }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="orders_expected_in_next_3_months_milestone" id="wppi_bubbles_3month">
+                {% with v=saved_data.orders_expected_in_next_3_months_milestone %}
+                <button type="button" class="wppi__bubble{% if v == 'Below 100' %} wppi__bubble--active{% endif %}" data-value="Below 100">Below 100</button>
+                <button type="button" class="wppi__bubble{% if v == '100-500' %} wppi__bubble--active{% endif %}" data-value="100-500">100–500</button>
+                <button type="button" class="wppi__bubble{% if v == '500-1000' %} wppi__bubble--active{% endif %}" data-value="500-1000">500–1000</button>
+                <button type="button" class="wppi__bubble{% if v == '1000-3000' %} wppi__bubble--active{% endif %}" data-value="1000-3000">1000–3000</button>
+                <button type="button" class="wppi__bubble{% if v == '3000+' %} wppi__bubble--active{% endif %}" data-value="3000+">3000+</button>
+                {% endwith %}
               </div>
             </div>
           </div>
         </div>
 
-        <div class="wppi__nav">
-          <button type="submit" name="prev_step" class="btn btn-secondary btn-lg">
-            <i class="fa fa-arrow-left me-2"></i> Previous
+        <!-- Services Group -->
+        <div class="wppi__field-group" id="wppi_step2_services_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-handshake"></i> Services Required
+          </div>
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label class="form-label">Do you require COD (Cash on Delivery) service? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_cod">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_COD_service" id="cod_yes"
+                         value="True" {% if saved_data.is_required_COD_service == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="cod_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_COD_service" id="cod_no"
+                         value="False" {% if saved_data.is_required_COD_service == 'False' or not saved_data.is_required_COD_service %}checked{% endif %}>
+                  <label class="form-check-label" for="cod_no">No</label>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Do you need fulfillment service to operate from outside Qatar? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_fulfillment_outside">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
+                         id="fulfillment_outside_yes" value="True"
+                         {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_outside_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
+                         id="fulfillment_outside_no" value="False"
+                         {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'False' or not saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_outside_no">No</label>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Do you need fulfillment service to make a hub in Doha? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_fulfillment_hub">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
+                         id="fulfillment_hub_yes" value="True"
+                         {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_hub_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
+                         id="fulfillment_hub_no" value="False"
+                         {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'False' or not saved_data.is_required_fulfillment_service_for_make_hub_in_doha %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_hub_no">No</label>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Do you require return / reverse logistics? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_return">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_return_logistics_required"
+                         id="return_yes" value="True"
+                         {% if saved_data.is_return_logistics_required == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="return_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_return_logistics_required"
+                         id="return_no" value="False"
+                         {% if saved_data.is_return_logistics_required == 'False' or not saved_data.is_return_logistics_required %}checked{% endif %}>
+                  <label class="form-check-label" for="return_no">No</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Provider / Timeline Group -->
+        <div class="wppi__field-group" id="wppi_step2_provider_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-calendar-check"></i> Provider &amp; Timeline
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Current Courier / 3PL Provider</label>
+              <input type="hidden" name="current_courier_provider" id="current_courier_provider"
+                     value="{{ saved_data.current_courier_provider }}">
+              <div class="wppi__select" data-target="current_courier_provider" id="wppi_select_courier">
+                <div class="wppi__select-trigger {% if not saved_data.current_courier_provider %}placeholder{% endif %}">
+                  <span>{{ saved_data.current_courier_provider|default:"Select provider" }}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'None' %}selected{% endif %}" data-value="None">None (No current provider)</div>
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'DHL' %}selected{% endif %}" data-value="DHL">DHL</div>
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'Aramex' %}selected{% endif %}" data-value="Aramex">Aramex</div>
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'QPOST' %}selected{% endif %}" data-value="QPOST">Qatar Post (QPOST)</div>
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'Other' %}selected{% endif %}" data-value="Other">Other</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Delivery Coverage</label>
+              <input type="hidden" name="delivery_coverage" id="delivery_coverage"
+                     value="{{ saved_data.delivery_coverage }}">
+              <div class="wppi__select" data-target="delivery_coverage" id="wppi_select_coverage">
+                <div class="wppi__select-trigger {% if not saved_data.delivery_coverage %}placeholder{% endif %}">
+                  <span>{{ saved_data.delivery_coverage|default:"Select coverage" }}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.delivery_coverage == 'Doha Only' %}selected{% endif %}" data-value="Doha Only">Doha Only</div>
+                  <div class="wppi__select-option {% if saved_data.delivery_coverage == 'All Qatar' %}selected{% endif %}" data-value="All Qatar">All Qatar</div>
+                  <div class="wppi__select-option {% if saved_data.delivery_coverage == 'Both' %}selected{% endif %}" data-value="Both">Both (Doha + Qatar)</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">When do you want to start?</label>
+              <input type="hidden" name="preferred_start_date" id="preferred_start_date"
+                     value="{{ saved_data.preferred_start_date }}">
+              <div class="wppi__select" data-target="preferred_start_date" id="wppi_select_startdate">
+                <div class="wppi__select-trigger {% if not saved_data.preferred_start_date %}placeholder{% endif %}">
+                  <span>{{ saved_data.preferred_start_date|default:"Select timeline" }}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.preferred_start_date == 'Immediately' %}selected{% endif %}" data-value="Immediately">Immediately</div>
+                  <div class="wppi__select-option {% if saved_data.preferred_start_date == 'Within 2 weeks' %}selected{% endif %}" data-value="Within 2 weeks">Within 2 weeks</div>
+                  <div class="wppi__select-option {% if saved_data.preferred_start_date == 'Within 1 month' %}selected{% endif %}" data-value="Within 1 month">Within 1 month</div>
+                  <div class="wppi__select-option {% if saved_data.preferred_start_date == '1-3 months' %}selected{% endif %}" data-value="1-3 months">1 – 3 months</div>
+                  <div class="wppi__select-option {% if saved_data.preferred_start_date == 'Just exploring' %}selected{% endif %}" data-value="Just exploring">Just exploring</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wppi__nav" id="wppi_nav_step2">
+          <button type="submit" name="prev_step" class="btn wppi__btn-prev btn-lg" id="wppi_btn_prev_2">
+            <i class="fa-solid fa-arrow-left me-2"></i> Previous
           </button>
-          <button type="submit" name="next_step" class="btn btn-primary btn-lg">
-            Next Step <i class="fa fa-arrow-right ms-2"></i>
+          <button type="submit" name="next_step" class="btn wppi__btn-next btn-lg" id="wppi_btn_next_2">
+            Next Step <i class="fa-solid fa-arrow-right ms-2"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────────────────────────────────────
+           STEP 3 — Delivery & Pickup Details
+           ───────────────────────────────────────────────────────────────── -->
+      <div class="wppi__step-content" id="step3"
+           {% if current_step != 3 %}style="display:none"{% endif %}>
+
+        <div class="wppi__step-header" id="wppi_step3_header">
+          <div class="wppi__step-icon">
+            <i class="fa-solid fa-truck"></i>
+          </div>
+          <div>
+            <h2 class="wppi__section-title">Delivery &amp; Pickup Details</h2>
+            <p class="wppi__section-sub">Step 3 of 3 — Final details to complete your quote request</p>
+          </div>
+        </div>
+
+        <!-- Delivery Preferences Group -->
+        <div class="wppi__field-group" id="wppi_step3_delivery_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-gauge-high"></i> Delivery Preferences
+          </div>
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label class="form-label">Delivery Speed Offered to Customers</label>
+              <input type="hidden" name="speed_delivery_offer_to_customers" id="speed_delivery_offer_to_customers"
+                     value="{{ saved_data.speed_delivery_offer_to_customers }}">
+              <div class="wppi__bubbles" data-target="speed_delivery_offer_to_customers" id="wppi_bubbles_speed">
+                {% with speeds=saved_data.speed_delivery_offer_to_customers|default:"" %}
+                <button type="button" class="wppi__bubble{% if 'Same Day' in speeds %} wppi__bubble--active{% endif %}" data-value="Same Day">Same Day</button>
+                <button type="button" class="wppi__bubble{% if 'Next Day' in speeds %} wppi__bubble--active{% endif %}" data-value="Next Day">Next Day</button>
+                <button type="button" class="wppi__bubble{% if '2-3 Days' in speeds %} wppi__bubble--active{% endif %}" data-value="2-3 Days">2–3 Days</button>
+                <button type="button" class="wppi__bubble{% if 'Standard' in speeds %} wppi__bubble--active{% endif %}" data-value="Standard (3-5 Days)">Standard (3–5 Days)</button>
+                <button type="button" class="wppi__bubble{% if 'Express' in speeds %} wppi__bubble--active{% endif %}" data-value="Express (Few Hours)">Express (Few Hours)</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Frequent same-day pick and delivery required? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_sameday">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_frequent_same_day_pick_and_delivery_required"
+                         id="sameday_yes" value="True"
+                         {% if saved_data.is_frequent_same_day_pick_and_delivery_required == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="sameday_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_frequent_same_day_pick_and_delivery_required"
+                         id="sameday_no" value="False"
+                         {% if saved_data.is_frequent_same_day_pick_and_delivery_required == 'False' or not saved_data.is_frequent_same_day_pick_and_delivery_required %}checked{% endif %}>
+                  <label class="form-check-label" for="sameday_no">No</label>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Preferred Delivery Time Window</label>
+              <input type="hidden" name="preferred_delivery_time_window" id="preferred_delivery_time_window"
+                     value="{{ saved_data.preferred_delivery_time_window }}">
+              <div class="wppi__bubbles" data-target="preferred_delivery_time_window" id="wppi_bubbles_deliverytime">
+                {% with v=saved_data.preferred_delivery_time_window %}
+                <button type="button" class="wppi__bubble{% if v == 'Morning (8AM–12PM)' %} wppi__bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
+                <button type="button" class="wppi__bubble{% if v == 'Afternoon (12PM–5PM)' %} wppi__bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
+                <button type="button" class="wppi__bubble{% if v == 'Evening (5PM–9PM)' %} wppi__bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
+                <button type="button" class="wppi__bubble{% if v == 'Any Time' %} wppi__bubble--active{% endif %}" data-value="Any Time">Any Time</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Typical Package Size</label>
+              <input type="hidden" name="typical_package_size" id="typical_package_size"
+                     value="{{ saved_data.typical_package_size }}">
+              <div class="wppi__bubbles" data-target="typical_package_size" id="wppi_bubbles_packagesize">
+                {% with v=saved_data.typical_package_size %}
+                <button type="button" class="wppi__bubble{% if v == 'Small (Envelopes / Packets)' %} wppi__bubble--active{% endif %}" data-value="Small (Envelopes / Packets)">Small</button>
+                <button type="button" class="wppi__bubble{% if v == 'Medium (Shoe Box Size)' %} wppi__bubble--active{% endif %}" data-value="Medium (Shoe Box Size)">Medium</button>
+                <button type="button" class="wppi__bubble{% if v == 'Large (Appliances / Bulky)' %} wppi__bubble--active{% endif %}" data-value="Large (Appliances / Bulky)">Large</button>
+                <button type="button" class="wppi__bubble{% if v == 'Mixed Sizes' %} wppi__bubble--active{% endif %}" data-value="Mixed Sizes">Mixed</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Special handling required? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_special">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_special_handling_required"
+                         id="special_yes" value="True"
+                         {% if saved_data.is_special_handling_required == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="special_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_special_handling_required"
+                         id="special_no" value="False"
+                         {% if saved_data.is_special_handling_required == 'False' or not saved_data.is_special_handling_required %}checked{% endif %}>
+                  <label class="form-check-label" for="special_no">No</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pickup Group -->
+        <div class="wppi__field-group" id="wppi_step3_pickup_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-map-pin"></i> Pickup Configuration
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Type of Pickup Location</label>
+              <input type="hidden" name="type_of_pickup_location" id="type_of_pickup_location"
+                     value="{{ saved_data.type_of_pickup_location }}">
+              <div class="wppi__bubbles" data-target="type_of_pickup_location" id="wppi_bubbles_pickuptype">
+                {% with v=saved_data.type_of_pickup_location %}
+                <button type="button" class="wppi__bubble{% if v == 'Home' %} wppi__bubble--active{% endif %}" data-value="Home">Home</button>
+                <button type="button" class="wppi__bubble{% if v == 'Office' %} wppi__bubble--active{% endif %}" data-value="Office">Office</button>
+                <button type="button" class="wppi__bubble{% if v == 'Store' %} wppi__bubble--active{% endif %}" data-value="Store">Store</button>
+                <button type="button" class="wppi__bubble{% if v == 'Multiple Store' %} wppi__bubble--active{% endif %}" data-value="Multiple Store">Multi Store</button>
+                <button type="button" class="wppi__bubble{% if v == 'Fulfillment' %} wppi__bubble--active{% endif %}" data-value="Fulfillment">Fulfillment Center</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="pickup_Location_area_name">Pickup Location Area</label>
+              <input type="text" class="form-control" name="pickup_Location_area_name" id="pickup_Location_area_name"
+                     value="{{ saved_data.pickup_Location_area_name }}" placeholder="e.g., Al Sadd, West Bay">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Pickup Time Slot</label>
+              <input type="hidden" name="pickup_location_time_slab" id="pickup_location_time_slab"
+                     value="{{ saved_data.pickup_location_time_slab }}">
+              <div class="wppi__bubbles" data-target="pickup_location_time_slab" id="wppi_bubbles_pickuptime">
+                {% with v=saved_data.pickup_location_time_slab %}
+                <button type="button" class="wppi__bubble{% if v == 'Morning (8AM–12PM)' %} wppi__bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
+                <button type="button" class="wppi__bubble{% if v == 'Afternoon (12PM–5PM)' %} wppi__bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
+                <button type="button" class="wppi__bubble{% if v == 'Evening (5PM–9PM)' %} wppi__bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
+                <button type="button" class="wppi__bubble{% if v == 'Flexible' %} wppi__bubble--active{% endif %}" data-value="Flexible">Flexible</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Number of Pickups Per Day</label>
+              <input type="hidden" name="number_of_pickup_times_in_day" id="number_of_pickup_times_in_day"
+                     value="{{ saved_data.number_of_pickup_times_in_day|default:'1' }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="number_of_pickup_times_in_day" id="wppi_bubbles_pickupcount">
+                {% with v=saved_data.number_of_pickup_times_in_day %}
+                <button type="button" class="wppi__bubble{% if v == '1-2' %} wppi__bubble--active{% endif %}" data-value="1-3">1–3</button>
+                <button type="button" class="wppi__bubble{% if v == '3-5' %} wppi__bubble--active{% endif %}" data-value="3-5">3–5</button>
+                <button type="button" class="wppi__bubble{% if v == '6-10' %} wppi__bubble--active{% endif %}" data-value="6-10">6–10</button>
+                <button type="button" class="wppi__bubble{% if v == '11-20' %} wppi__bubble--active{% endif %}" data-value="11-20">11–20</button>
+                <button type="button" class="wppi__bubble{% if v == '20+' %} wppi__bubble--active{% endif %}" data-value="20+">20+</button>
+                {% endwith %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OMS & Communication Group -->
+        <div class="wppi__field-group" id="wppi_step3_comm_group">
+          <div class="wppi__field-group-label">
+            <i class="fa-solid fa-comments"></i> Systems &amp; Communication
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">How do you manage orders?</label>
+              <input type="hidden" name="order_management_system" id="order_management_system"
+                     value="{{ saved_data.order_management_system }}">
+              <div class="wppi__bubbles" data-target="order_management_system" id="wppi_bubbles_oms">
+                {% with v=saved_data.order_management_system %}
+                <button type="button" class="wppi__bubble{% if v == 'Shopify' %} wppi__bubble--active{% endif %}" data-value="Shopify">Shopify</button>
+                <button type="button" class="wppi__bubble{% if v == 'WooCommerce' %} wppi__bubble--active{% endif %}" data-value="WooCommerce">WooCommerce</button>
+                <button type="button" class="wppi__bubble{% if v == 'Instagram / WhatsApp' %} wppi__bubble--active{% endif %}" data-value="Instagram / WhatsApp">Instagram / WhatsApp</button>
+                <button type="button" class="wppi__bubble{% if v == 'Spreadsheet / Manual' %} wppi__bubble--active{% endif %}" data-value="Spreadsheet / Manual">Spreadsheet</button>
+                <button type="button" class="wppi__bubble{% if v == 'Custom System' %} wppi__bubble--active{% endif %}" data-value="Custom System">Custom / ERP</button>
+                <button type="button" class="wppi__bubble{% if v == 'Other' %} wppi__bubble--active{% endif %}" data-value="Other">Other</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Preferred Communication Channel</label>
+              <input type="hidden" name="preferred_communication_channel" id="preferred_communication_channel"
+                     value="{{ saved_data.preferred_communication_channel }}">
+              <div class="wppi__bubbles" data-target="preferred_communication_channel" id="wppi_bubbles_comm">
+                {% with v=saved_data.preferred_communication_channel %}
+                <button type="button" class="wppi__bubble{% if v == 'WhatsApp' %} wppi__bubble--active{% endif %}" data-value="WhatsApp">WhatsApp</button>
+                <button type="button" class="wppi__bubble{% if v == 'Phone Call' %} wppi__bubble--active{% endif %}" data-value="Phone Call">Phone Call</button>
+                <button type="button" class="wppi__bubble{% if v == 'Email' %} wppi__bubble--active{% endif %}" data-value="Email">Email</button>
+                <button type="button" class="wppi__bubble{% if v == 'Any' %} wppi__bubble--active{% endif %}" data-value="Any">Any</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Do you provide free delivery to customers? <span class="wppi__req">*</span></label>
+              <input type="hidden" name="is_delivery_free_to_customers" id="is_delivery_free_to_customers"
+                     value="{{ saved_data.is_delivery_free_to_customers }}" required>
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="is_delivery_free_to_customers" id="wppi_bubbles_freedeivery">
+                {% with v=saved_data.is_delivery_free_to_customers %}
+                <button type="button" class="wppi__bubble{% if v == 'Free' %} wppi__bubble--active{% endif %}" data-value="Free">Yes – Free</button>
+                <button type="button" class="wppi__bubble{% if v == 'Paid' %} wppi__bubble--active{% endif %}" data-value="Paid">No – Paid</button>
+                <button type="button" class="wppi__bubble{% if v == 'Mixed' %} wppi__bubble--active{% endif %}" data-value="Mixed">Mixed</button>
+                {% endwith %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wppi__nav" id="wppi_nav_step3">
+          <button type="submit" name="prev_step" class="btn wppi__btn-prev btn-lg" id="wppi_btn_prev_3">
+            <i class="fa-solid fa-arrow-left me-2"></i> Previous
+          </button>
+          <button type="submit" name="submit_final" class="btn wppi__btn-submit btn-lg" id="wppi_btn_submit">
+            <i class="fa-solid fa-paper-plane me-2"></i> Submit Inquiry
           </button>
         </div>
       </div>
 
-      <!-- Step 3: Delivery & Pickup Details -->
-      <div class="wppi__step-content" id="step3" style="{% if current_step != 3 %}display: none;{% endif %}">
-        <h2 class="wppi__section-title">Delivery & Pickup Details</h2>
-
-        <div class="row g-3">
-          <div class="col-md-12">
-            <label class="form-label">Delivery Speed Offered to Customers</label>
-            <input type="hidden" name="speed_delivery_offer_to_customers" id="speed_delivery_offer_to_customers" value="{{ saved_data.speed_delivery_offer_to_customers }}">
-            <div class="bubble-select" data-target="speed_delivery_offer_to_customers">
-              {% with speeds=saved_data.speed_delivery_offer_to_customers|default:"" %}
-              <button type="button" class="bubble{% if 'Same Day' in speeds %} bubble--active{% endif %}" data-value="Same Day">Same Day</button>
-              <button type="button" class="bubble{% if 'Next Day' in speeds %} bubble--active{% endif %}" data-value="Next Day">Next Day</button>
-              <button type="button" class="bubble{% if '2-3 Days' in speeds %} bubble--active{% endif %}" data-value="2-3 Days">2–3 Days</button>
-              <button type="button" class="bubble{% if 'Standard' in speeds %} bubble--active{% endif %}" data-value="Standard (3-5 Days)">Standard (3–5 Days)</button>
-              <button type="button" class="bubble{% if 'Express' in speeds %} bubble--active{% endif %}" data-value="Express (Few Hours)">Express (Few Hours)</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Frequent same-day pick and delivery required? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_frequent_same_day_pick_and_delivery_required"
-                       id="sameday_yes" value="True" {% if saved_data.is_frequent_same_day_pick_and_delivery_required == 'True' %}checked{% endif %}>
-                <label class="form-check-label" for="sameday_yes">Yes, Pick And Delivery Same Time</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_frequent_same_day_pick_and_delivery_required"
-                       id="sameday_no" value="False" {% if saved_data.is_frequent_same_day_pick_and_delivery_required == 'False' or not saved_data.is_frequent_same_day_pick_and_delivery_required %}checked{% endif %}>
-                <label class="form-check-label" for="sameday_no">No</label>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Preferred Delivery Time Window</label>
-            <input type="hidden" name="preferred_delivery_time_window" id="preferred_delivery_time_window" value="{{ saved_data.preferred_delivery_time_window }}">
-            <div class="bubble-select" data-target="preferred_delivery_time_window">
-              {% with v=saved_data.preferred_delivery_time_window %}
-              <button type="button" class="bubble{% if v == 'Morning (8AM–12PM)' %} bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
-              <button type="button" class="bubble{% if v == 'Afternoon (12PM–5PM)' %} bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
-              <button type="button" class="bubble{% if v == 'Evening (5PM–9PM)' %} bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
-              <button type="button" class="bubble{% if v == 'Any Time' %} bubble--active{% endif %}" data-value="Any Time">Any Time</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Typical Package Size</label>
-            <input type="hidden" name="typical_package_size" id="typical_package_size" value="{{ saved_data.typical_package_size }}">
-            <div class="bubble-select" data-target="typical_package_size">
-              {% with v=saved_data.typical_package_size %}
-              <button type="button" class="bubble{% if v == 'Small (Envelopes / Packets)' %} bubble--active{% endif %}" data-value="Small (Envelopes / Packets)">Small</button>
-              <button type="button" class="bubble{% if v == 'Medium (Shoe Box Size)' %} bubble--active{% endif %}" data-value="Medium (Shoe Box Size)">Medium</button>
-              <button type="button" class="bubble{% if v == 'Large (Appliances / Bulky)' %} bubble--active{% endif %}" data-value="Large (Appliances / Bulky)">Large</button>
-              <button type="button" class="bubble{% if v == 'Mixed Sizes' %} bubble--active{% endif %}" data-value="Mixed Sizes">Mixed</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Special handling required? *</label>
-            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_special_handling_required"
-                       id="special_yes" value="True" {% if saved_data.is_special_handling_required == 'True' %}checked{% endif %}>
-                <label class="form-check-label" for="special_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_special_handling_required"
-                       id="special_no" value="False" {% if saved_data.is_special_handling_required == 'False' or not saved_data.is_special_handling_required %}checked{% endif %}>
-                <label class="form-check-label" for="special_no">No</label>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Type of Pickup Location</label>
-            <input type="hidden" name="type_of_pickup_location" id="type_of_pickup_location" value="{{ saved_data.type_of_pickup_location }}">
-            <div class="bubble-select" data-target="type_of_pickup_location">
-              {% with v=saved_data.type_of_pickup_location %}
-              <button type="button" class="bubble{% if v == 'Home' %} bubble--active{% endif %}" data-value="Home">Home</button>
-              <button type="button" class="bubble{% if v == 'Office' %} bubble--active{% endif %}" data-value="Office">Office</button>
-              <button type="button" class="bubble{% if v == 'Store' %} bubble--active{% endif %}" data-value="Store">Store</button>
-              <button type="button" class="bubble{% if v == 'Multiple Store' %} bubble--active{% endif %}" data-value="Multiple Store">Multi Store</button>
-              <button type="button" class="bubble{% if v == 'Fulfillment' %} bubble--active{% endif %}" data-value="Fulfillment">Fulfillment Center</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Pickup Location Area</label>
-            <input type="text" class="form-control" name="pickup_Location_area_name" id="pickup_Location_area_name"
-                   value="{{ saved_data.pickup_Location_area_name }}" placeholder="e.g., Al Sadd, West Bay">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Pickup Time Slot</label>
-            <input type="hidden" name="pickup_location_time_slab" id="pickup_location_time_slab" value="{{ saved_data.pickup_location_time_slab }}">
-            <div class="bubble-select" data-target="pickup_location_time_slab">
-              {% with v=saved_data.pickup_location_time_slab %}
-              <button type="button" class="bubble{% if v == 'Morning (8AM–12PM)' %} bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
-              <button type="button" class="bubble{% if v == 'Afternoon (12PM–5PM)' %} bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
-              <button type="button" class="bubble{% if v == 'Evening (5PM–9PM)' %} bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
-              <button type="button" class="bubble{% if v == 'Flexible' %} bubble--active{% endif %}" data-value="Flexible">Flexible</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Number of Pickups Per Day</label>
-            <input type="hidden" name="number_of_pickup_times_in_day" id="number_of_pickup_times_in_day" value="{{ saved_data.number_of_pickup_times_in_day|default:'1' }}">
-            <div class="bubble-select bubble-select--single" data-target="number_of_pickup_times_in_day">
-              {% with v=saved_data.number_of_pickup_times_in_day %}
-              <button type="button" class="bubble{% if v == '1-2' %} bubble--active{% endif %}" data-value="1-3">1–3</button>
-              <button type="button" class="bubble{% if v == '3-5' %} bubble--active{% endif %}" data-value="3-5">3–5</button>
-              <button type="button" class="bubble{% if v == '6-10' %} bubble--active{% endif %}" data-value="6-10">6–10</button>
-              <button type="button" class="bubble{% if v == '11-20' %} bubble--active{% endif %}" data-value="11-20">11–20</button>
-              <button type="button" class="bubble{% if v == '20+' %} bubble--active{% endif %}" data-value="20+">20+</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">How do you manage orders?</label>
-            <input type="hidden" name="order_management_system" id="order_management_system" value="{{ saved_data.order_management_system }}">
-            <div class="bubble-select" data-target="order_management_system">
-              {% with v=saved_data.order_management_system %}
-              <button type="button" class="bubble{% if v == 'Shopify' %} bubble--active{% endif %}" data-value="Shopify">Shopify</button>
-              <button type="button" class="bubble{% if v == 'WooCommerce' %} bubble--active{% endif %}" data-value="WooCommerce">WooCommerce</button>
-<button type="button" class="bubble{% if v == 'Instagram / WhatsApp' %} bubble--active{% endif %}" data-value="Instagram / WhatsApp">Instagram / WhatsApp</button>
-              <button type="button" class="bubble{% if v == 'Spreadsheet / Manual' %} bubble--active{% endif %}" data-value="Spreadsheet / Manual">Spreadsheet</button>
-              <button type="button" class="bubble{% if v == 'Custom System' %} bubble--active{% endif %}" data-value="Custom System">Custom / ERP</button>
-              <button type="button" class="bubble{% if v == 'Other' %} bubble--active{% endif %}" data-value="Other">Other</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Preferred Communication Channel</label>
-            <input type="hidden" name="preferred_communication_channel" id="preferred_communication_channel" value="{{ saved_data.preferred_communication_channel }}">
-            <div class="bubble-select" data-target="preferred_communication_channel">
-              {% with v=saved_data.preferred_communication_channel %}
-              <button type="button" class="bubble{% if v == 'WhatsApp' %} bubble--active{% endif %}" data-value="WhatsApp">WhatsApp</button>
-              <button type="button" class="bubble{% if v == 'Phone Call' %} bubble--active{% endif %}" data-value="Phone Call">Phone Call</button>
-              <button type="button" class="bubble{% if v == 'Email' %} bubble--active{% endif %}" data-value="Email">Email</button>
-              <button type="button" class="bubble{% if v == 'Any' %} bubble--active{% endif %}" data-value="Any">Any</button>
-              {% endwith %}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Do you provide free delivery to customers? *</label>
-            <input type="hidden" name="is_delivery_free_to_customers" id="is_delivery_free_to_customers" value="{{ saved_data.is_delivery_free_to_customers }}" required>
-            <div class="bubble-select" data-target="is_delivery_free_to_customers">
-              {% with v=saved_data.is_delivery_free_to_customers %}
-              <button type="button" class="bubble{% if v == 'Free' %} bubble--active{% endif %}" data-value="Free">Yes – Free</button>
-              <button type="button" class="bubble{% if v == 'Paid' %} bubble--active{% endif %}" data-value="Paid">No – Paid</button>
-              <button type="button" class="bubble{% if v == 'Mixed' %} bubble--active{% endif %}" data-value="Mixed">Mixed</button>
-              {% endwith %}
-            </div>
-          </div>
-        </div>
-
-        <div class="wppi__nav">
-          <button type="submit" name="prev_step" class="btn btn-secondary btn-lg">
-            <i class="fa fa-arrow-left me-2"></i> Previous
-          </button>
-          <button type="submit" name="submit_final" class="btn btn-primary btn-lg">
-            Submit Inquiry <i class="fa fa-check ms-2"></i>
-          </button>
-        </div>
-      </div>
     </form>
   </div>
 </div>
 
-<!-- WhatsApp Quick Inquiry Modal -->
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     WHATSAPP QUICK INQUIRY MODAL
+     ═══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="whatsappModal" tabindex="-1" aria-labelledby="whatsappModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="whatsappModalLabel">
-          <i class="fa-brands fa-whatsapp me-2"></i>Quick WhatsApp Inquiry
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-content wppi__modal-content" id="wppi_modal_content">
+      <div class="wppi__modal-header">
+        <div class="d-flex align-items-center gap-2">
+          <div class="wppi__modal-icon">
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+          <h5 class="modal-title mb-0" id="whatsappModalLabel">Quick WhatsApp Inquiry</h5>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body p-4" id="wppi_modal_body">
         <form id="whatsappForm">
           {% csrf_token %}
           <div class="mb-3">
-            <label for="wa_company_name" class="form-label">Company Name *</label>
+            <label for="wa_company_name" class="form-label">Company Name <span class="wppi__req">*</span></label>
             <input type="text" class="form-control" id="wa_company_name" name="wa_company_name" required>
           </div>
           <div class="mb-3">
-            <label for="wa_contact_person" class="form-label">Contact Person *</label>
+            <label for="wa_contact_person" class="form-label">Contact Person <span class="wppi__req">*</span></label>
             <input type="text" class="form-control" id="wa_contact_person" name="wa_contact_person" required>
           </div>
           <div class="mb-3">
-            <label for="wa_contact_number" class="form-label">Contact Number *</label>
+            <label for="wa_contact_number" class="form-label">Contact Number <span class="wppi__req">*</span></label>
             <input type="tel" class="form-control" id="wa_contact_number" name="wa_contact_number" required>
           </div>
           <div class="mb-3">
-            <label for="wa_product_category" class="form-label">Product Category *</label>
+            <label for="wa_product_category" class="form-label">Product Category <span class="wppi__req">*</span></label>
             <input type="text" class="form-control" id="wa_product_category" name="wa_product_category"
                    placeholder="e.g., Electronics, Fashion, Food" required>
           </div>
           <div class="mb-3">
-            <label for="wa_product_name" class="form-label">Product Name (Optional)</label>
+            <label for="wa_product_name" class="form-label">Product Name <span class="text-muted fw-normal">(Optional)</span></label>
             <input type="text" class="form-control" id="wa_product_name" name="wa_product_name">
           </div>
-          <div class="mb-3">
-            <label for="wa_additional_info" class="form-label">Additional Information (Optional)</label>
+          <div class="mb-4">
+            <label for="wa_additional_info" class="form-label">Additional Information <span class="text-muted fw-normal">(Optional)</span></label>
             <textarea class="form-control" id="wa_additional_info" name="wa_additional_info" rows="3"></textarea>
           </div>
-          <button type="submit" class="btn wppi__btn--whatsapp w-100">
+          <button type="submit" class="btn wppi__btn--whatsapp w-100" id="wppi_modal_btn_submit">
             <i class="fa-brands fa-whatsapp me-2"></i>Connect via WhatsApp
           </button>
         </form>
@@ -630,24 +829,26 @@
     </div>
   </div>
 </div>
+
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-// ── Custom Dropdown ─────────────────────────────────────────────────────────
+// ── Custom Select Dropdown ───────────────────────────────────────────────────
 (function () {
   function initCustomSelects() {
     document.querySelectorAll('.wppi__select').forEach(function (wrapper) {
-      var trigger = wrapper.querySelector('.wppi__select-trigger');
-      var options = wrapper.querySelector('.custom-select-options');
+      var trigger  = wrapper.querySelector('.wppi__select-trigger');
+      var options  = wrapper.querySelector('.wppi__select-options');
       var targetId = wrapper.dataset.target;
-      var hiddenInput = document.getElementById(targetId);
+      var hidden   = document.getElementById(targetId);
+
+      if (!trigger || !options) return;
 
       trigger.addEventListener('click', function (e) {
         e.stopPropagation();
         var isOpen = options.classList.contains('open');
-        // close all others
-        document.querySelectorAll('.custom-select-options.open').forEach(function (el) {
+        document.querySelectorAll('.wppi__select-options.open').forEach(function (el) {
           el.classList.remove('open');
           el.previousElementSibling.classList.remove('open');
         });
@@ -657,28 +858,23 @@
         }
       });
 
-      options.querySelectorAll('.custom-select-option').forEach(function (opt) {
+      options.querySelectorAll('.wppi__select-option').forEach(function (opt) {
         opt.addEventListener('click', function () {
           var val = opt.dataset.value;
           var label = opt.textContent.trim();
-          // update hidden input
-          if (hiddenInput) hiddenInput.value = val;
-          // update trigger text
+          if (hidden) hidden.value = val;
           trigger.querySelector('span').textContent = label;
           trigger.classList.remove('placeholder');
-          // mark selected
-          options.querySelectorAll('.custom-select-option').forEach(function (o) { o.classList.remove('selected'); });
+          options.querySelectorAll('.wppi__select-option').forEach(function (o) { o.classList.remove('selected'); });
           opt.classList.add('selected');
-          // close
           options.classList.remove('open');
           trigger.classList.remove('open');
         });
       });
     });
 
-    // close on outside click
     document.addEventListener('click', function () {
-      document.querySelectorAll('.custom-select-options.open').forEach(function (el) {
+      document.querySelectorAll('.wppi__select-options.open').forEach(function (el) {
         el.classList.remove('open');
         el.previousElementSibling.classList.remove('open');
       });
@@ -688,89 +884,75 @@
   initCustomSelects();
 })();
 
-// ── Bubble Select (multi + single mode) ─────────────────────────────────────
+// ── Bubble Select (multi + single) ──────────────────────────────────────────
 (function () {
-  document.querySelectorAll('.bubble-select').forEach(function (group) {
+  document.querySelectorAll('.wppi__bubbles').forEach(function (group) {
     var targetId = group.dataset.target;
-    var hiddenInput = document.getElementById(targetId);
-    var isSingle = group.classList.contains('bubble-select--single');
+    var hidden   = document.getElementById(targetId);
+    var isSingle = group.classList.contains('wppi__bubbles--single');
 
-    group.querySelectorAll('.bubble').forEach(function (bubble) {
+    if (!hidden) return;
+
+    group.querySelectorAll('.wppi__bubble').forEach(function (bubble) {
       bubble.addEventListener('click', function () {
         if (isSingle) {
-          // Deselect all, then select clicked (toggle off if already active)
-          var wasActive = bubble.classList.contains('bubble--active');
-          group.querySelectorAll('.bubble').forEach(function (b) { b.classList.remove('bubble--active'); });
-          if (!wasActive) bubble.classList.add('bubble--active');
-          hiddenInput.value = wasActive ? '' : bubble.dataset.value;
+          var wasActive = bubble.classList.contains('wppi__bubble--active');
+          group.querySelectorAll('.wppi__bubble').forEach(function (b) { b.classList.remove('wppi__bubble--active'); });
+          if (!wasActive) bubble.classList.add('wppi__bubble--active');
+          hidden.value = wasActive ? '' : bubble.dataset.value;
         } else {
-          bubble.classList.toggle('bubble--active');
+          bubble.classList.toggle('wppi__bubble--active');
           var selected = [];
-          group.querySelectorAll('.bubble--active').forEach(function (b) { selected.push(b.dataset.value); });
-          hiddenInput.value = selected.join(', ');
+          group.querySelectorAll('.wppi__bubble--active').forEach(function (b) { selected.push(b.dataset.value); });
+          hidden.value = selected.join(', ');
         }
       });
     });
   });
 })();
 
-// Toggle fields based on "Is your business located in Qatar?"
-// Yes → show "Is your company registered in Qatar?", hide "Where is your business located?"
-// No  → hide "Is your company registered in Qatar?", show "Where is your business located?"
+// ── Location field toggle ────────────────────────────────────────────────────
 function toggleLocationFields() {
-    const locatedYes = document.getElementById('located_yes');
-    const locatedNo = document.getElementById('located_no');
-    const registeredField = document.getElementById('is_registered_company_in_qatar_field');
-    const locationCountryField = document.getElementById('business_location_country_field');
-    if (locatedYes && locatedYes.checked) {
-        if (registeredField) registeredField.style.display = '';
-        if (locationCountryField) locationCountryField.style.display = 'none';
-    } else if (locatedNo && locatedNo.checked) {
-        if (registeredField) registeredField.style.display = 'none';
-        if (locationCountryField) locationCountryField.style.display = '';
-    } else {
-        // nothing selected yet — hide both
-        if (registeredField) registeredField.style.display = 'none';
-        if (locationCountryField) locationCountryField.style.display = 'none';
-    }
+  var locatedYes            = document.getElementById('located_yes');
+  var locatedNo             = document.getElementById('located_no');
+  var registeredField       = document.getElementById('is_registered_company_in_qatar_field');
+  var locationCountryField  = document.getElementById('business_location_country_field');
+  if (locatedYes && locatedYes.checked) {
+    if (registeredField)      registeredField.style.display = '';
+    if (locationCountryField) locationCountryField.style.display = 'none';
+  } else if (locatedNo && locatedNo.checked) {
+    if (registeredField)      registeredField.style.display = 'none';
+    if (locationCountryField) locationCountryField.style.display = '';
+  } else {
+    if (registeredField)      registeredField.style.display = 'none';
+    if (locationCountryField) locationCountryField.style.display = 'none';
+  }
 }
-document.querySelectorAll('input[name="is_located_in_qatar"]').forEach(function(radio) {
-    radio.addEventListener('change', toggleLocationFields);
+document.querySelectorAll('input[name="is_located_in_qatar"]').forEach(function (r) {
+  r.addEventListener('change', toggleLocationFields);
 });
-toggleLocationFields(); // sync on page load
+toggleLocationFields();
 
-// WhatsApp Form Submission
-document.getElementById('whatsappForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+// ── WhatsApp Form AJAX ───────────────────────────────────────────────────────
+document.getElementById('whatsappForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var formData = new FormData(this);
+  formData.append('whatsapp_submit', 'true');
 
-    const formData = new FormData(this);
-    formData.append('whatsapp_submit', 'true');
-
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Redirect to WhatsApp
-            window.open(data.redirect_url, '_blank');
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('whatsappModal'));
-            modal.hide();
-            // Optionally redirect user or show success message
-            setTimeout(() => {
-                alert('Thank you! You will be redirected to WhatsApp.');
-            }, 500);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred. Please try again.');
-    });
+  fetch(window.location.href, {
+    method: 'POST',
+    body: formData,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    if (data.success) {
+      window.open(data.redirect_url, '_blank');
+      var modal = bootstrap.Modal.getInstance(document.getElementById('whatsappModal'));
+      modal.hide();
+    }
+  })
+  .catch(function () {});
 });
 </script>
 {% endblock extra_js %}

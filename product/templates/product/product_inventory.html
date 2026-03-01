@@ -1,82 +1,353 @@
 {% extends "business_dashboard_base.html" %}
-{% load crispy_forms_tags %}
 {% load static %}
 
-{% block extra_head %}Products{% endblock extra_head %}
+{% block extra_head %}Inventory{% endblock extra_head %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}">
+{% endblock extra_css %}
 
 {% block content %}
 <div class="piv" id="product_inventory_container">
+
   <!-- Hero Header -->
-  <div class="piv__hero">
+  <div class="piv__hero" id="product_inventory_section_header">
     <div class="d-flex align-items-center gap-3">
       <div class="piv__hero-icon">
         <i class="fas fa-boxes-stacked"></i>
       </div>
       <div>
-        <h1 class="piv__hero-title">Inventory Report</h1>
-        <p class="piv__hero-sub">Track and manage your product inventory</p>
+        <h1 class="piv__hero-title">Inventory</h1>
+        <p class="piv__hero-sub">Stock levels for your product catalogue</p>
+      </div>
+    </div>
+    <div class="piv__hero-stats">
+      <div class="piv__hero-stat">
+        <span class="piv__hero-stat__num">{{ total_products }}</span>
+        <span class="piv__hero-stat__label">Products</span>
+      </div>
+      <div class="piv__hero-stat piv__hero-stat--ok">
+        <span class="piv__hero-stat__num">{{ total_in_stock }}</span>
+        <span class="piv__hero-stat__label">In Stock</span>
+      </div>
+      <div class="piv__hero-stat piv__hero-stat--warn">
+        <span class="piv__hero-stat__num">{{ low_stock_count }}</span>
+        <span class="piv__hero-stat__label">Low / No Stock</span>
       </div>
     </div>
   </div>
 
-  {% if has_fulfillment_service %}
-    <!-- Inventory content for fulfillment service clients -->
-    {% include "webpages/parts/coder.html" %}
-  {% else %}
-    <!-- Upsell Card -->
-    <div class="piv__upsell">
-      <div class="piv__upsell-icon-wrap">
-        <i class="fa-solid fa-boxes-stacked piv__upsell-icon"></i>
-      </div>
-      <h4 class="piv__upsell-title">Unlock Advanced Inventory Management</h4>
-      <p class="piv__upsell-text">
-        Take your business to the next level with our comprehensive fulfillment service.
-        Track every item, streamline operations, and gain complete visibility into your inventory.
-      </p>
-      <div class="piv__upsell-alert">
-        <i class="fa-solid fa-info-circle me-2"></i>
-        <strong>Inventory reporting is available exclusively with our fulfillment service.</strong>
-      </div>
-      <div class="d-flex gap-3 justify-content-center flex-wrap mt-3">
-        <a href="{% url 'business:business_dashboard' %}" class="piv__upsell-btn piv__upsell-btn--primary">
-          <i class="fa-solid fa-rocket me-2"></i>Activate Fulfillment Service
+  <!-- Filters / Search -->
+  <div class="piv__toolbar" id="product_inventory_section_toolbar">
+    <form method="get" class="piv__search-form" id="product_inventory_form_search">
+      <div class="piv__search-wrap">
+        <i class="fas fa-magnifying-glass piv__search-icon"></i>
+        <input type="text" name="q" value="{{ search_q }}"
+               class="piv__search-input" placeholder="Search by name, SKU, barcode…"
+               id="product_inventory_input_search" autocomplete="off">
+        {% if search_q %}
+        <a href="?{% if show_low %}low_stock=1{% endif %}" class="piv__search-clear" title="Clear search">
+          <i class="fas fa-xmark"></i>
         </a>
-        <a href="{% url 'business:business_dashboard' %}" class="piv__upsell-btn piv__upsell-btn--secondary">
-          <i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard
-        </a>
+        {% endif %}
       </div>
+      <label class="piv__low-stock-toggle">
+        <input type="checkbox" name="low_stock" value="1" {% if show_low %}checked{% endif %}
+               onchange="this.form.submit()" id="product_inventory_chk_low_stock">
+        <span><i class="fas fa-triangle-exclamation"></i> Low Stock Only</span>
+      </label>
+      <a href="{% url 'product:product_single_add' %}" class="piv__btn-add" id="product_inventory_btn_add">
+        <i class="fas fa-plus"></i> Add Product
+      </a>
+    </form>
+  </div>
 
-      <!-- Benefits Section -->
-      <div class="piv__benefits">
-        <div class="piv__benefit">
-          <div class="piv__benefit-icon">
-            <i class="fa-solid fa-check-circle"></i>
-          </div>
-          <div>
-            <h6 class="piv__benefit-title">Real-Time Tracking</h6>
-            <p class="piv__benefit-text">Monitor stock levels and movements instantly</p>
-          </div>
-        </div>
-        <div class="piv__benefit">
-          <div class="piv__benefit-icon">
-            <i class="fa-solid fa-chart-line"></i>
-          </div>
-          <div>
-            <h6 class="piv__benefit-title">Smart Analytics</h6>
-            <p class="piv__benefit-text">Get insights to optimize your inventory</p>
-          </div>
-        </div>
-        <div class="piv__benefit">
-          <div class="piv__benefit-icon">
-            <i class="fa-solid fa-warehouse"></i>
-          </div>
-          <div>
-            <h6 class="piv__benefit-title">Multi-Warehouse Support</h6>
-            <p class="piv__benefit-text">Manage inventory across multiple locations</p>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- Inventory Table -->
+  {% if page_obj.object_list %}
+  <div class="piv__table-wrap" id="product_inventory_section_table">
+    <table class="piv__table" id="product_inventory_table">
+      <thead class="piv__thead">
+        <tr>
+          <th class="piv__th piv__th--center piv__th--photo">Photo</th>
+          <th class="piv__th">Product</th>
+          <th class="piv__th">SKU</th>
+          <th class="piv__th piv__th--center">Category</th>
+          <th class="piv__th piv__th--center">Price</th>
+          <th class="piv__th piv__th--center">Stock Qty</th>
+          <th class="piv__th piv__th--center">Status</th>
+        </tr>
+      </thead>
+      <tbody id="product_inventory_tbody">
+        {% for product in page_obj %}
+        <tr class="piv__row" id="product_inventory_row_{{ product.id }}">
+
+          <!-- Photo (clickable thumbnail) -->
+          <td class="piv__td piv__td--center piv__td--photo">
+            {% if product.product_image %}
+            <button type="button" class="piv__thumb-btn"
+                    data-img="{{ product.product_image.url }}"
+                    data-name="{{ product.item_name }}"
+                    id="product_inventory_thumb_{{ product.id }}"
+                    title="View photo">
+              <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}" class="piv__thumb">
+            </button>
+            {% else %}
+            <div class="piv__thumb piv__thumb--none" title="No image">
+              <i class="fas fa-image"></i>
+            </div>
+            {% endif %}
+          </td>
+
+          <!-- Product Info -->
+          <td class="piv__td">
+            <div>
+              <div class="piv__product-name">{{ product.item_name }}</div>
+              {% if product.brand_name %}
+              <div class="piv__product-brand">{{ product.brand_name }}</div>
+              {% endif %}
+            </div>
+          </td>
+
+          <!-- SKU -->
+          <td class="piv__td">
+            <code class="piv__sku">{{ product.item_sku }}</code>
+          </td>
+
+          <!-- Category -->
+          <td class="piv__td piv__td--center">
+            {% if product.product_category %}
+            <span class="piv__badge piv__badge--cat">{{ product.product_category.category_name }}</span>
+            {% else %}
+            <span class="piv__muted">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Price -->
+          <td class="piv__td piv__td--center">
+            <span class="piv__price">QAR {{ product.item_price }}</span>
+          </td>
+
+          <!-- Stock Qty (inline editable) -->
+          <td class="piv__td piv__td--center">
+            <div class="piv__qty-wrap" id="product_inventory_qty_wrap_{{ product.id }}">
+              <button type="button" class="piv__qty-btn piv__qty-btn--minus"
+                      data-product-id="{{ product.id }}"
+                      id="product_inventory_btn_minus_{{ product.id }}">
+                <i class="fas fa-minus"></i>
+              </button>
+              <input type="number" class="piv__qty-input"
+                     value="{{ product.qty|default:0 }}"
+                     min="0" max="99999"
+                     data-product-id="{{ product.id }}"
+                     data-original="{{ product.qty|default:0 }}"
+                     id="product_inventory_qty_{{ product.id }}">
+              <button type="button" class="piv__qty-btn piv__qty-btn--plus"
+                      data-product-id="{{ product.id }}"
+                      id="product_inventory_btn_plus_{{ product.id }}">
+                <i class="fas fa-plus"></i>
+              </button>
+              <button type="button" class="piv__qty-save" style="display:none"
+                      data-product-id="{{ product.id }}"
+                      id="product_inventory_btn_save_{{ product.id }}">
+                <i class="fas fa-check"></i>
+              </button>
+            </div>
+          </td>
+
+          <!-- Status badge -->
+          <td class="piv__td piv__td--center">
+            {% with qty=product.qty|default:0 %}
+            {% if qty <= 0 %}
+            <span class="piv__badge piv__badge--out">Out of Stock</span>
+            {% elif qty <= 5 %}
+            <span class="piv__badge piv__badge--low">Low Stock</span>
+            {% else %}
+            <span class="piv__badge piv__badge--ok">In Stock</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="piv__pagination" id="product_inventory_pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if show_low %}&low_stock=1{% endif %}"
+       class="piv__page-btn" id="product_inventory_btn_prev">
+      <i class="fas fa-chevron-left"></i> Prev
+    </a>
+    {% endif %}
+    <span class="piv__page-info">
+      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if show_low %}&low_stock=1{% endif %}"
+       class="piv__page-btn" id="product_inventory_btn_next">
+      Next <i class="fas fa-chevron-right"></i>
+    </a>
+    {% endif %}
+  </div>
   {% endif %}
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="piv__empty" id="product_inventory_empty_state">
+    <div class="piv__empty-icon"><i class="fas fa-box-open"></i></div>
+    <h3 class="piv__empty-title">
+      {% if search_q %}No products match "{{ search_q }}"{% elif show_low %}No low-stock products{% else %}No products yet{% endif %}
+    </h3>
+    <p class="piv__empty-text">
+      {% if search_q or show_low %}
+      <a href="{% url 'product:product_inventory' %}">Clear filters</a> to see all products.
+      {% else %}
+      Add your first product to start tracking inventory.
+      {% endif %}
+    </p>
+    {% if not search_q and not show_low %}
+    <a href="{% url 'product:product_single_add' %}" class="piv__btn-add">
+      <i class="fas fa-plus"></i> Add Product
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Photo Modal -->
+<div class="piv__modal-overlay" id="product_inventory_photo_modal" style="display:none" role="dialog" aria-modal="true">
+  <div class="piv__modal-box">
+    <button type="button" class="piv__modal-close" id="product_inventory_modal_close" title="Close">
+      <i class="fas fa-xmark"></i>
+    </button>
+    <div class="piv__modal-img-wrap">
+      <img src="" alt="" class="piv__modal-img" id="product_inventory_modal_img">
+    </div>
+    <p class="piv__modal-caption" id="product_inventory_modal_caption"></p>
+  </div>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function getCsrf() {
+        var c = null;
+        document.cookie.split(';').forEach(function (x) {
+            x = x.trim();
+            if (x.startsWith('csrftoken=')) c = decodeURIComponent(x.split('=')[1]);
+        });
+        return c;
+    }
+
+    // Show save button when qty changes
+    document.querySelectorAll('.piv__qty-input').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+            var pid = this.dataset.productId;
+            var saveBtn = document.getElementById('product_inventory_btn_save_' + pid);
+            if (saveBtn) saveBtn.style.display = this.value !== this.dataset.original ? '' : 'none';
+        });
+    });
+
+    // +/- buttons
+    document.querySelectorAll('.piv__qty-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var pid = this.dataset.productId;
+            var inp = document.getElementById('product_inventory_qty_' + pid);
+            var saveBtn = document.getElementById('product_inventory_btn_save_' + pid);
+            var current = parseInt(inp.value) || 0;
+            if (this.classList.contains('piv__qty-btn--plus')) {
+                inp.value = current + 1;
+            } else {
+                inp.value = Math.max(0, current - 1);
+            }
+            if (saveBtn) saveBtn.style.display = inp.value !== inp.dataset.original ? '' : 'none';
+        });
+    });
+
+    // Save quantity via AJAX
+    document.querySelectorAll('.piv__qty-save').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var pid = this.dataset.productId;
+            var inp = document.getElementById('product_inventory_qty_' + pid);
+            var qty = parseInt(inp.value);
+            if (isNaN(qty) || qty < 0) return;
+
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            fetch('/product/' + pid + '/inventory/update/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                credentials: 'same-origin',
+                body: JSON.stringify({ qty: qty })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    inp.dataset.original = data.qty;
+                    btn.style.display = 'none';
+                    btn.innerHTML = '<i class="fas fa-check"></i>';
+                    btn.disabled = false;
+                    // Update status badge
+                    updateStatusBadge(pid, data.qty);
+                } else {
+                    alert(data.error || 'Failed to update');
+                    btn.innerHTML = '<i class="fas fa-check"></i>';
+                    btn.disabled = false;
+                }
+            })
+            .catch(function () {
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                btn.disabled = false;
+            });
+        });
+    });
+
+    // Photo modal
+    var modal    = document.getElementById('product_inventory_photo_modal');
+    var modalImg = document.getElementById('product_inventory_modal_img');
+    var caption  = document.getElementById('product_inventory_modal_caption');
+    var closeBtn = document.getElementById('product_inventory_modal_close');
+
+    document.querySelectorAll('.piv__thumb-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            modalImg.src = this.dataset.img;
+            modalImg.alt = this.dataset.name;
+            caption.textContent = this.dataset.name;
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        });
+    });
+
+    function closeModal() {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        modalImg.src = '';
+    }
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+    function updateStatusBadge(pid, qty) {
+        var row = document.getElementById('product_inventory_row_' + pid);
+        if (!row) return;
+        var badge = row.querySelector('.piv__badge:not(.piv__badge--cat)');
+        if (!badge) return;
+        if (qty <= 0) {
+            badge.className = 'piv__badge piv__badge--out';
+            badge.textContent = 'Out of Stock';
+        } else if (qty <= 5) {
+            badge.className = 'piv__badge piv__badge--low';
+            badge.textContent = 'Low Stock';
+        } else {
+            badge.className = 'piv__badge piv__badge--ok';
+            badge.textContent = 'In Stock';
+        }
+    }
+});
+</script>
+{% endblock extra_js %}
