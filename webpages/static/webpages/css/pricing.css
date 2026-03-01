@@ -1,428 +1,695 @@
 /* ==========================================================================
-   3PL PRICING PAGE - BEM Convention
+   3PL PRICING PAGE - Premium Redesign
    Block: wpp (webpages-pricing)
    ========================================================================== */
 
-.wpp__container {
-  max-width: 87.5rem;
-  margin: 0 auto;
-  padding: 2rem 1rem;
+.wpp {
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 3rem;
 }
 
-/* Hero Section */
+/* ==========================================================================
+   HERO
+   ========================================================================== */
+
 .wpp__hero {
-  background: var(--brand-gradient-black-navy);
-  padding: 2rem 2rem;
-  border-radius: var(--brand-radius-lg);
-  margin-bottom: 2rem;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-  box-shadow: var(--brand-shadow-lg);
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #00284d 50%, var(--brand-navy-light, #003366) 100%);
+    border-radius: var(--brand-radius-lg, 1.125rem);
+    padding: 3rem 2rem 2.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 2.5rem;
 }
 
 .wpp__hero::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, var(--brand-primary) 0%, transparent 60%);
-  opacity: 0.1;
-  pointer-events: none;
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 50%, rgba(247, 192, 0, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 30%, rgba(247, 192, 0, 0.05) 0%, transparent 40%);
+    pointer-events: none;
 }
 
-.wpp__hero h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--brand-white);
-  margin-bottom: 1rem;
-  text-transform: uppercase;
-  letter-spacing: 0.125rem;
-  position: relative;
+.wpp__hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(247, 192, 0, 0.4) 50%, transparent 100%);
 }
 
-.wpp__hero p {
-  color: var(--brand-grey-200);
-  max-width: 50rem;
-  margin: 0 auto;
-  line-height: 1.6;
-  position: relative;
+.wpp__hero-inner {
+    position: relative;
+    z-index: 1;
 }
 
-/* Pricing Grid */
+.wpp__hero-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--brand-primary, #f7c000);
+    background: rgba(247, 192, 0, 0.12);
+    border: 1px solid rgba(247, 192, 0, 0.2);
+    padding: 0.3rem 0.875rem;
+    border-radius: 2rem;
+    margin-bottom: 1rem;
+}
+
+.wpp__hero-chip i {
+    font-size: 0.65rem;
+}
+
+.wpp__hero-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+.wpp__hero-desc {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    max-width: 38rem;
+    margin: 0 auto 1.5rem;
+}
+
+.wpp__hero-trust {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.wpp__hero-trust span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.wpp__hero-trust i {
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.7rem;
+}
+
+/* ==========================================================================
+   SECTION HEADERS
+   ========================================================================== */
+
+.wpp__section {
+    margin-bottom: 2.5rem;
+}
+
+.wpp__section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+    padding-bottom: 0.625rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+
+.wpp__section-head i {
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   GRID
+   ========================================================================== */
+
 .wpp__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(21.875rem, 1fr));
-  gap: 2rem;
-  margin-bottom: 2rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
 }
 
-/* Pricing Card */
+/* ==========================================================================
+   CARD BASE
+   ========================================================================== */
+
 .wpp__card {
-  background: var(--brand-white);
-  border-radius: var(--brand-radius-lg);
-  box-shadow: var(--brand-shadow-md);
-  overflow: hidden;
-  transition: var(--brand-transition);
-  border: 0.125rem solid var(--brand-grey-200);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+    background: #fff;
+    border-radius: var(--brand-radius-md, 0.75rem);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .wpp__card:hover {
-  transform: translateY(-0.5rem);
-  box-shadow: var(--brand-shadow-lg);
-  border-color: var(--brand-primary);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border-color: var(--brand-grey-300, #dcdcdc);
 }
+
+/* ==========================================================================
+   FEATURED CARD
+   ========================================================================== */
 
 .wpp__card--featured {
-  border-color: var(--brand-primary);
-  box-shadow: 0 0.5rem 2rem rgba(255, 211, 59, 0.3);
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 1px rgba(247, 192, 0, 0.15), 0 4px 16px rgba(247, 192, 0, 0.1);
 }
 
-.wpp__card--featured .wpp__card-header {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+.wpp__card--featured::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--brand-primary, #f7c000), #ffe066);
 }
 
-.wpp__card--featured .wpp__card-header h3,
-.wpp__card--featured .wpp__card-header p {
-  color: var(--brand-grey-800);
+.wpp__card--featured:hover {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 1px rgba(247, 192, 0, 0.2), 0 12px 32px rgba(247, 192, 0, 0.15);
 }
 
-.wpp__card--coming-soon {
-  opacity: 0.7;
-  position: relative;
+/* ==========================================================================
+   RIBBON / BADGES
+   ========================================================================== */
+
+.wpp__card-ribbon {
+    position: absolute;
+    top: 0.75rem;
+    right: -2rem;
+    background: linear-gradient(135deg, var(--brand-primary, #f7c000), #ffe066);
+    color: var(--brand-grey-800, #1f1f1f);
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.25rem 2.5rem;
+    transform: rotate(45deg);
+    transform-origin: center;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.wpp__card--coming-soon::after {
-  content: 'COMING SOON';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(-15deg);
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  color: var(--brand-grey-800);
-  padding: 1rem 2rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-  border-radius: var(--brand-radius-md);
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.3);
-  z-index: 10;
+.wpp__card-badge {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    z-index: 2;
 }
 
-.wpp__card-header {
-  background: linear-gradient(135deg, var(--brand-grey-100) 0%, var(--brand-grey-200) 100%);
-  padding: 2rem;
-  text-align: center;
-  border-bottom: 0.1875rem solid var(--brand-primary);
+.wpp__card-badge--offer {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.wpp__card-badge--soon {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+}
+
+/* ==========================================================================
+   CARD TOP (icon + title + subtitle)
+   ========================================================================== */
+
+.wpp__card-top {
+    padding: 1.5rem 1.25rem 0;
+    text-align: center;
 }
 
 .wpp__card-icon {
-  width: 6.25rem;
-  height: 6.25rem;
-  margin: 0 auto 1.5rem;
-  border-radius: 50%;
-  padding: 1rem;
-  background: var(--brand-white);
-  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.1);
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: 0 auto 0.875rem;
+    border-radius: 50%;
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
 }
 
 .wpp__card-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
 }
 
-.wpp__card-header h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--brand-grey-800);
-  margin-bottom: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.0625rem;
+.wpp__card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.01em;
 }
 
-.wpp__amount {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--brand-dark);
-  margin: 1rem 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+.wpp__card-subtitle {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+    margin: 0;
+    font-weight: 400;
 }
 
-.wpp__amount i {
-  font-size: 1.5rem;
+/* ==========================================================================
+   PRICE DISPLAY
+   ========================================================================== */
+
+.wpp__card-price {
+    padding: 1rem 1.25rem;
+    margin: 1rem 1.25rem 0;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid #fde68a;
+    border-radius: 0.5rem;
+    text-align: center;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
 }
 
-.wpp__subtitle {
-  font-size: 0.9375rem;
-  color: var(--brand-grey-600);
-  font-weight: 500;
+.wpp__card-price__amount {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+    line-height: 1;
 }
+
+.wpp__card-price__currency {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #555);
+    text-transform: uppercase;
+}
+
+.wpp__card-price__period {
+    width: 100%;
+    font-size: 0.65rem;
+    color: var(--brand-grey-400, #b0b0b0);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 0.125rem;
+}
+
+.wpp__card-price--label {
+    background: var(--brand-grey-100, #fafafa);
+    border-color: var(--brand-grey-200, #f0f0f0);
+}
+
+.wpp__card-price--label .wpp__card-price__amount {
+    font-size: 1.25rem;
+    color: var(--brand-navy, #001f3f);
+}
+
+/* ==========================================================================
+   CARD BODY
+   ========================================================================== */
 
 .wpp__card-body {
-  padding: 2rem;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+    padding: 1rem 1.25rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
-.wpp__description {
-  font-size: 1rem;
-  line-height: 1.7;
-  color: var(--brand-grey-700);
-  margin-bottom: 2rem;
-  flex: 1;
+.wpp__card-desc {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--brand-grey-600, #555);
+    margin: 0 0 0.875rem;
 }
 
-.wpp__features {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 2rem 0;
+/* Tier Breakdown (Dynamic Pricing) */
+.wpp__card-tiers {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0.875rem;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 0.375rem;
+    overflow: hidden;
 }
 
-.wpp__features li {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--brand-grey-200);
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--brand-grey-700);
+.wpp__card-tier {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4375rem 0.75rem;
+    background: #fff;
 }
 
-.wpp__features li:last-child {
-  border-bottom: none;
+.wpp__card-tier:nth-child(even) {
+    background: var(--brand-grey-100, #fafafa);
 }
 
-.wpp__features li i {
-  color: var(--brand-primary);
-  font-size: 1.125rem;
-  flex-shrink: 0;
+.wpp__card-tier__label {
+    font-size: 0.75rem;
+    color: var(--brand-grey-600, #555);
 }
 
-.wpp__actions {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+.wpp__card-tier__value {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
 }
+
+/* Feature List */
+.wpp__card-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 auto;
+}
+
+.wpp__card-features li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0;
+    font-size: 0.8125rem;
+    color: var(--brand-grey-700, #333);
+}
+
+.wpp__card-features li:not(:last-child) {
+    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
+}
+
+.wpp__card-features i {
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.625rem;
+    flex-shrink: 0;
+    width: 1rem;
+    text-align: center;
+}
+
+/* ==========================================================================
+   CARD ACTIONS
+   ========================================================================== */
+
+.wpp__card-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 1.25rem 1.25rem;
+    margin-top: 1rem;
+}
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
 
 .wpp__btn {
-  flex: 1;
-  min-width: 8.75rem;
-  padding: 0.875rem 1.5rem;
-  border-radius: var(--brand-radius-md);
-  font-weight: 600;
-  font-size: 0.9375rem;
-  transition: var(--brand-transition);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border: 0.125rem solid transparent;
-  text-align: center;
-}
-
-.wpp__btn--primary {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  color: var(--brand-grey-800);
-  border-color: var(--brand-primary-dark);
-  box-shadow: 0 0.25rem 0.75rem rgba(255, 211, 59, 0.3);
-}
-
-.wpp__btn--primary:hover {
-  background: var(--brand-white);
-  color: var(--brand-grey-800);
-  border-color: var(--brand-primary);
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.375rem 1.25rem rgba(255, 211, 59, 0.4);
-}
-
-.wpp__btn--secondary {
-  background: var(--brand-white);
-  color: var(--brand-grey-800);
-  border-color: var(--brand-grey-400);
-}
-
-.wpp__btn--secondary:hover {
-  background: var(--brand-grey-800);
-  color: var(--brand-white);
-  border-color: var(--brand-grey-800);
-  transform: translateY(-0.125rem);
-}
-
-.wpp__btn--disabled {
-  background: var(--brand-grey-300);
-  color: var(--brand-grey-600);
-  cursor: not-allowed;
-  pointer-events: none;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
 .wpp__btn i {
-  font-size: 1rem;
+    font-size: 0.8125rem;
 }
 
-/* Feature Highlight Badge */
-.wpp__feature-badge {
-  display: inline-block;
-  background: linear-gradient(135deg, #38ef7d 0%, #2dd36f 100%);
-  color: var(--brand-white);
-  padding: 0.375rem 0.875rem;
-  border-radius: var(--brand-radius-sm);
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.0312rem;
-  margin-bottom: 1rem;
+/* WhatsApp */
+.wpp__btn--whatsapp {
+    background: #dcfce7;
+    color: #15803d;
+    border-color: #bbf7d0;
 }
 
-/* Additional Services Section */
-.wpp__addl-services {
-  background: var(--brand-grey-50);
-  padding: 2rem 2rem;
-  border-radius: var(--brand-radius-lg);
-  margin-top: 2rem;
+.wpp__btn--whatsapp:hover {
+    background: #22c55e;
+    color: #fff;
+    border-color: #22c55e;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
-.wpp__addl-header {
-  text-align: center;
-  margin-bottom: 2rem;
+/* Outline */
+.wpp__btn--outline {
+    background: #fff;
+    color: var(--brand-grey-700, #333);
+    border-color: var(--brand-grey-300, #dcdcdc);
 }
 
-.wpp__addl-header h2 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--brand-grey-800);
-  margin-bottom: 1rem;
-  text-transform: uppercase;
+.wpp__btn--outline:hover {
+    background: var(--brand-navy, #001f3f);
+    color: #fff;
+    border-color: var(--brand-navy, #001f3f);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 31, 63, 0.2);
 }
 
-.wpp__addl-header p {
-  font-size: 1.125rem;
-  color: var(--brand-grey-600);
-  max-width: 43.75rem;
-  margin: 0 auto;
+/* Navy solid */
+.wpp__btn--navy {
+    background: var(--brand-navy, #001f3f);
+    color: #fff;
+    border-color: var(--brand-navy, #001f3f);
 }
 
-.wpp__addl-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(17.5rem, 1fr));
-  gap: 1.5rem;
+.wpp__btn--navy:hover {
+    background: var(--brand-navy-light, #003366);
+    border-color: var(--brand-navy-light, #003366);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 31, 63, 0.25);
+    color: #fff;
 }
 
-.wpp__service-item {
-  background: var(--brand-white);
-  padding: 1.5rem;
-  border-radius: var(--brand-radius-md);
-  box-shadow: var(--brand-shadow-sm);
-  border-left: 0.25rem solid var(--brand-primary);
-  transition: var(--brand-transition);
+/* Disabled */
+.wpp__btn--disabled {
+    background: var(--brand-grey-100, #fafafa);
+    color: var(--brand-grey-400, #b0b0b0);
+    border-color: var(--brand-grey-200, #f0f0f0);
+    cursor: not-allowed;
+    width: 100%;
 }
 
-.wpp__service-item:hover {
-  transform: translateX(0.25rem);
-  box-shadow: var(--brand-shadow-md);
+.wpp__btn--disabled:hover {
+    transform: none;
+    box-shadow: none;
 }
 
-.wpp__service-item h4 {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--brand-grey-800);
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+/* ==========================================================================
+   COMING SOON CARD
+   ========================================================================== */
+
+.wpp__card--soon {
+    opacity: 0.65;
 }
 
-.wpp__service-item h4 i {
-  color: var(--brand-primary);
+.wpp__card--soon:hover {
+    opacity: 0.85;
+    transform: translateY(-2px);
 }
 
-.wpp__service-item p {
-  color: var(--brand-grey-600);
-  line-height: 1.6;
-  margin: 0;
+.wpp__card--soon .wpp__card-features i {
+    color: var(--brand-grey-400, #b0b0b0);
 }
 
-/* Responsive Design */
+/* ==========================================================================
+   BOTTOM CTA
+   ========================================================================== */
+
+.wpp__cta {
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, var(--brand-navy-light, #003366) 100%);
+    border-radius: var(--brand-radius-lg, 1.125rem);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.wpp__cta::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 120%, rgba(247, 192, 0, 0.1) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+.wpp__cta-inner {
+    position: relative;
+    z-index: 1;
+}
+
+.wpp__cta-icon {
+    font-size: 1.75rem;
+    color: var(--brand-primary, #f7c000);
+    margin-bottom: 0.875rem;
+    display: block;
+}
+
+.wpp__cta-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.5rem;
+}
+
+.wpp__cta-desc {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.875rem;
+    max-width: 30rem;
+    margin: 0 auto 1.5rem;
+    line-height: 1.5;
+}
+
+.wpp__cta-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.wpp__btn--cta-primary {
+    background: var(--brand-primary, #f7c000);
+    color: var(--brand-grey-800, #1f1f1f);
+    border-color: var(--brand-primary, #f7c000);
+    padding: 0.625rem 1.5rem;
+    font-size: 0.8125rem;
+}
+
+.wpp__btn--cta-primary:hover {
+    background: #ffe066;
+    border-color: #ffe066;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(247, 192, 0, 0.35);
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+.wpp__btn--cta-secondary {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.25);
+    padding: 0.625rem 1.5rem;
+    font-size: 0.8125rem;
+}
+
+.wpp__btn--cta-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
 @media (max-width: 992px) {
-  .wpp__grid {
-    grid-template-columns: repeat(auto-fit, minmax(18.75rem, 1fr));
-  }
+    .wpp__grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .wpp__hero-title {
+        font-size: 1.75rem;
+    }
 }
 
 @media (max-width: 768px) {
-  .wpp__container {
-    padding: 1.5rem 1rem;
-  }
+    .wpp {
+        padding: 1rem 0.75rem 2rem;
+    }
 
-  .wpp__hero {
-    padding: 2rem 1.5rem;
-  }
+    .wpp__hero {
+        padding: 2rem 1.25rem 1.75rem;
+        margin-bottom: 1.75rem;
+    }
 
-  .wpp__hero h1 {
-    font-size: 2rem;
-  }
+    .wpp__hero-title {
+        font-size: 1.5rem;
+    }
 
-  .wpp__hero p {
-    font-size: 1.125rem;
-  }
+    .wpp__hero-desc {
+        font-size: 0.8125rem;
+    }
 
-  .wpp__grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
+    .wpp__hero-trust {
+        gap: 0.75rem;
+    }
 
-  .wpp__card-header {
-    padding: 1.5rem;
-  }
+    .wpp__hero-trust span {
+        font-size: 0.6875rem;
+    }
 
-  .wpp__card-body {
-    padding: 1.5rem;
-  }
+    .wpp__grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
 
-  .wpp__actions {
-    flex-direction: column;
-  }
+    .wpp__card-actions {
+        flex-direction: column;
+    }
 
-  .wpp__btn {
-    width: 100%;
-  }
+    .wpp__cta {
+        padding: 2rem 1.25rem;
+    }
 
-  .wpp__addl-grid {
-    grid-template-columns: 1fr;
-  }
+    .wpp__cta-title {
+        font-size: 1.125rem;
+    }
+
+    .wpp__cta-actions {
+        flex-direction: column;
+    }
+
+    .wpp__btn--cta-primary,
+    .wpp__btn--cta-secondary {
+        width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
-  .wpp__hero h1 {
-    font-size: 1.5rem;
-  }
+    .wpp__hero-title {
+        font-size: 1.25rem;
+    }
 
-  .wpp__hero p {
-    font-size: 1rem;
-  }
+    .wpp__card-price__amount {
+        font-size: 1.5rem;
+    }
 
-  .wpp__card-icon {
-    width: 5rem;
-    height: 5rem;
-  }
-
-  .wpp__amount {
-    font-size: 1.75rem;
-  }
-
-  .wpp__addl-services {
-    padding: 2rem 1rem;
-  }
-
-  .wpp__addl-header h2 {
-    font-size: 1.5rem;
-  }
+    .wpp__card-ribbon {
+        font-size: 0.5625rem;
+        padding: 0.2rem 2.25rem;
+        top: 0.625rem;
+        right: -2.125rem;
+    }
 }
