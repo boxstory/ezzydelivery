@@ -1,0 +1,230 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/business.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="bjr" id="client_join_requests_container_main">
+
+    <!-- Header -->
+    <div class="bjr__header" id="client_join_requests_section_header">
+        <div class="bjr__header-left">
+            <div class="bjr__header-icon"><i class="fa-solid fa-users-gear"></i></div>
+            <div>
+                <h1 class="bjr__title">Team Join Requests</h1>
+                <p class="bjr__subtitle">Users requesting to join your business team</p>
+            </div>
+        </div>
+        <a href="{% url 'business:business_teams' business.business_id %}" class="bjr__back-link" id="client_join_requests_btn_back">
+            <i class="fa-solid fa-arrow-left"></i> Back to Team
+        </a>
+    </div>
+
+    <!-- Filter Pills -->
+    <div class="bjr__filters" id="client_join_requests_section_filters">
+        <a href="?status=pending" class="bjr__pill {% if current_filter == 'pending' %}bjr__pill--active{% endif %}">
+            <i class="fa-solid fa-clock"></i> Pending
+            {% if current_filter == 'pending' %}<span class="bjr__pill-count">{{ join_requests|length }}</span>{% endif %}
+        </a>
+        <a href="?status=accepted" class="bjr__pill {% if current_filter == 'accepted' %}bjr__pill--active{% endif %}">
+            <i class="fa-solid fa-circle-check"></i> Accepted
+        </a>
+        <a href="?status=rejected" class="bjr__pill {% if current_filter == 'rejected' %}bjr__pill--active{% endif %}">
+            <i class="fa-solid fa-circle-xmark"></i> Rejected
+        </a>
+        <a href="?status=cancelled" class="bjr__pill {% if current_filter == 'cancelled' %}bjr__pill--active{% endif %}">
+            <i class="fa-solid fa-ban"></i> Cancelled
+        </a>
+    </div>
+
+    <!-- Requests List -->
+    {% if join_requests %}
+    <div class="bjr__list" id="client_join_requests_list_main">
+        {% for req in join_requests %}
+        <div class="bjr__card" id="client_join_requests_card_{{ req.id }}" data-req-id="{{ req.id }}">
+            <div class="bjr__card-head">
+                <!-- User Info -->
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bjr__avatar">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div>
+                        <div class="bjr__name">
+                            {{ req.user.first_name|default:req.user.username }} {{ req.user.last_name|default:"" }}
+                        </div>
+                        <div class="bjr__contact">
+                            <span><i class="fa-solid fa-envelope"></i> {{ req.user.email }}</span>
+                            {% if req.user.profile.phone %}
+                            <span class="bjr__sep">|</span>
+                            <span><i class="fa-solid fa-phone"></i> {{ req.user.profile.phone }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <!-- Status Badge -->
+                <span class="bjr__status bjr__status--{{ req.status }}">
+                    {% if req.status == 'pending' %}<i class="fa-solid fa-clock"></i>
+                    {% elif req.status == 'accepted' %}<i class="fa-solid fa-circle-check"></i>
+                    {% elif req.status == 'rejected' %}<i class="fa-solid fa-circle-xmark"></i>
+                    {% else %}<i class="fa-solid fa-ban"></i>
+                    {% endif %}
+                    {{ req.get_status_display }}
+                </span>
+            </div>
+
+            <!-- Details Row -->
+            <div class="bjr__details">
+                {% if req.user.profile.user_number %}
+                <div class="bjr__detail">
+                    <span class="bjr__detail-label"><i class="fa-solid fa-id-badge"></i> EZZY ID</span>
+                    <span class="bjr__detail-value"><code>{{ req.user.profile.user_number }}</code></span>
+                </div>
+                {% endif %}
+                <div class="bjr__detail">
+                    <span class="bjr__detail-label"><i class="fa-solid fa-chart-pie"></i> Profile</span>
+                    <span class="bjr__detail-value">{{ req.user.profile.get_profile_completion_percentage }}% complete</span>
+                </div>
+                <div class="bjr__detail">
+                    <span class="bjr__detail-label"><i class="fa-solid fa-calendar"></i> Requested</span>
+                    <span class="bjr__detail-value">{{ req.requested_at|date:"d M Y, g:i A" }}</span>
+                </div>
+                {% if req.desired_role_title %}
+                <div class="bjr__detail">
+                    <span class="bjr__detail-label"><i class="fa-solid fa-briefcase"></i> Desired Role</span>
+                    <span class="bjr__detail-value">{{ req.desired_role_title }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if req.message %}
+            <div class="bjr__message">
+                <i class="fa-solid fa-comment-dots"></i>
+                <span>{{ req.message }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            {% if req.status == 'pending' %}
+            <div class="bjr__actions">
+                <button type="button" class="bjr__btn bjr__btn--accept"
+                        data-req-id="{{ req.id }}"
+                        data-action="accept"
+                        id="client_join_requests_btn_accept_{{ req.id }}">
+                    <i class="fa-solid fa-check"></i> Accept &amp; Add Member
+                </button>
+                <button type="button" class="bjr__btn bjr__btn--reject"
+                        data-req-id="{{ req.id }}"
+                        data-action="reject"
+                        id="client_join_requests_btn_reject_{{ req.id }}">
+                    <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+            </div>
+            {% elif req.status == 'accepted' %}
+            <div class="bjr__actions">
+                <a href="{% url 'business:business_teams_add' business.business_id %}?from_request={{ req.id }}"
+                   class="bjr__btn bjr__btn--detail"
+                   id="client_join_requests_btn_add_{{ req.id }}">
+                    <i class="fa-solid fa-user-plus"></i> Go to Add Member
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="bjr__empty" id="client_join_requests_empty_state">
+        <div class="bjr__empty-icon"><i class="fa-solid fa-inbox"></i></div>
+        <h3 class="bjr__empty-title">No requests found</h3>
+        <p class="bjr__empty-text">
+            {% if current_filter == 'pending' %}
+            There are no pending join requests at this time.
+            {% else %}
+            No {{ current_filter }} requests found.
+            {% endif %}
+        </p>
+        <a href="?status=pending" class="bjr__btn bjr__btn--detail">
+            <i class="fa-solid fa-clock"></i> View Pending
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function getCsrf() {
+        var c = null;
+        document.cookie.split(';').forEach(function(x) {
+            x = x.trim();
+            if (x.startsWith('csrftoken=')) c = decodeURIComponent(x.split('=')[1]);
+        });
+        if (!c) { var inp = document.querySelector('[name=csrfmiddlewaretoken]'); if (inp) c = inp.value; }
+        return c;
+    }
+
+    document.querySelectorAll('[data-action]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var reqId  = this.dataset.reqId;
+            var action = this.dataset.action;
+            var bizId  = '{{ business.business_id }}';
+
+            if (action === 'accept') {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Accepting...';
+                fetch('/business/' + bizId + '/teams/join-requests/' + reqId + '/action/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ action: 'accept' })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success && data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert(data.error || 'Failed to accept request.');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i> Accept & Add Member';
+                    }
+                })
+                .catch(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Accept & Add Member';
+                });
+
+            } else if (action === 'reject') {
+                if (!confirm('Reject this join request?')) return;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Rejecting...';
+                fetch('/business/' + bizId + '/teams/join-requests/' + reqId + '/action/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ action: 'reject' })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        var card = document.getElementById('client_join_requests_card_' + reqId);
+                        if (card) card.remove();
+                    } else {
+                        alert(data.error || 'Failed to reject request.');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject';
+                    }
+                })
+                .catch(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject';
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

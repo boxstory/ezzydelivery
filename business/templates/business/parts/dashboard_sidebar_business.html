@@ -2,10 +2,6 @@
 {% with current_url=request.resolver_match.url_name %}
 
 <div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-3 col-lg-2 bsb__container bsb__sidebar" id="client_sidebar_container_main">
-  <!-- Sidebar Toggle Button -->
-  <button type="button" class="btn btn-sm bsb__toggle-btn" id="sidebar_toggle_btn" title="Toggle sidebar">
-    <i class="fas fa-chevron-left" id="sidebar_toggle_icon"></i>
-  </button>
 
   <!-- Brand Header -->
   <div class="bsb__header" id="client_sidebar_header">
@@ -13,10 +9,15 @@
        href="{% url 'business:business_dashboard' %}"
        data-title="Dashboard"
        id="client_sidebar_link_dashboard">
-       <span>{{ user_business.business_name|default:"Business" }}</span>
+       <span class="bsb__dashboard-title-name">{{ user_business.business_name|default:"Business" }}</span>
        <span>Dashboard</span>
     </a>
   </div>
+
+  <!-- Sidebar Toggle Button — below dashboard btn -->
+  <button type="button" class="btn btn-sm bsb__toggle-btn" id="sidebar_toggle_btn" title="Toggle sidebar">
+    <i class="fas fa-chevron-left" id="sidebar_toggle_icon"></i>
+  </button>
 
   <hr class="bsb__divider" />
 
@@ -86,20 +87,20 @@
       <!-- PRODUCTS SECTION -->
       <li class="bsb__section-label">Catalog</li>
       <li class="nav-item">
-        <a class="nav-link btn bsb__link--collapse {% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}active{% endif %}"
+        <a class="nav-link btn bsb__link--collapse {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}active{% endif %}"
            data-bs-toggle="collapse"
            data-bs-target="#submenu-product"
            href="#"
-           aria-expanded="{% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}true{% else %}false{% endif %}">
+           aria-expanded="{% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-box-open me-2"></i>
           <span>Products</span>
           <i class="fa-solid fa-chevron-down ms-auto bsb__icon--rotate"></i>
         </a>
-        <div class="collapse bsb__submenu {% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}show{% endif %}" id="submenu-product">
+        <div class="collapse bsb__submenu {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}show{% endif %}" id="submenu-product">
           <ul class="nav flex-column">
             <li class="nav-item">
-              <a class="nav-link btn bsb__submenu-link {% if current_url == 'product_all_list' %}active{% endif %}"
-                 href="{% url 'product:product_all_list' %}">
+              <a class="nav-link btn bsb__submenu-link {% if current_url == 'product_all_list_table' %}active{% endif %}"
+                 href="{% url 'product:product_all_list_table' %}">
                 <i class="fa-solid fa-bars me-2"></i>
                 <span>All Products</span>
               </a>

@@ -199,6 +199,7 @@ MIDDLEWARE = [
     # Custom middleware for session timeout and auto-logout
     'core.middleware.SessionTimeoutMiddleware',
     'core.middleware.SessionWarningMiddleware',
+    'core.middleware.NoCacheAuthMiddleware',
     # SQL query inspector - disabled (high CPU overhead per request in DEBUG mode)
     # 'core.middleware.QueryInspectorMiddleware',
 ]
@@ -231,6 +232,8 @@ TEMPLATES = [
                 'core.context_processors.htmx_request',
                 # User profile to avoid duplicate queries
                 'core.context_processors.user_profile',
+                # User driver record for fleet profile links
+                'core.context_processors.user_driver',
                 # User business to avoid duplicate queries in sidebar
                 'core.context_processors.user_business',
                 # Business team permissions context
@@ -694,7 +697,10 @@ LOGGING = {
 # ==========================================
 
 # Anthropic API Configuration
-ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+try:
+    ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY') or ''
+except Exception:
+    ANTHROPIC_API_KEY = ''
 AI_AGENT_MODEL = config('AI_AGENT_MODEL', default='claude-sonnet-4-20250514')
 AI_AGENT_MAX_TOKENS = config('AI_AGENT_MAX_TOKENS', default=4096, cast=int)
 

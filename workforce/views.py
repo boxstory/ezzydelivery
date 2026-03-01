@@ -7290,3 +7290,38 @@ def hub_batch_update_status(request, batch_id):
     batch.save(update_fields=['status'])
 
     return JsonResponse({'success': True, 'status': new_status})
+
+
+# =============================================================================
+# TEAM VERIFICATION
+# =============================================================================
+
+@login_required
+@staff_required
+def team_verification_list(request):
+    """Staff view: list BusinessTeamProfile entries pending verification."""
+    status_filter = request.GET.get('status', 'pending')
+
+    qs = business_models.BusinessTeamProfile.objects.select_related(
+        'user', 'user__profile', 'business', 'invited_by'
+    )
+
+    valid_filters = ('pending', 'active', 'rejected', 'suspended', 'inactive', 'all')
+    if status_filter not in valid_filters:
+        status_filter = 'pending'
+
+    if status_filter != 'all':
+        qs = qs.filter(team_status=status_filter)
+
+    qs = qs.order_by('-created_at')
+
+    pending_count = business_models.BusinessTeamProfile.objects.filter(team_status='pending').count()
+    active_count = business_models.BusinessTeamProfile.objects.filter(team_status='active').count()
+
+    context = {
+        'team_profiles': qs,
+        'pending_count': pending_count,
+        'active_count': active_count,
+        'current_filter': status_filter,
+    }
+    return render(request, 'workforce/team_verification_list.html', context)

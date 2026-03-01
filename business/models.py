@@ -625,6 +625,53 @@ class BusinessTeamPermission(models.Model):
         return f"{self.team_member.team_name} - {self.permission_code} ({status})"
 
 
+class BusinessTeamJoinRequest(models.Model):
+    """
+    A request from a user to join a business as a team member.
+
+    Users submit this from the /join_us/team/ page by searching for
+    a business. The business owner reviews pending requests and can
+    accept (creating a BusinessTeamProfile) or reject them.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),
+    ]
+    business = models.ForeignKey(
+        Business, on_delete=models.CASCADE, related_name='join_requests'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='team_join_requests'
+    )
+    desired_role_title = models.CharField(
+        max_length=100, blank=True,
+        help_text="Desired position/role title as entered by the user (e.g. 'Sales Manager')"
+    )
+    message = models.TextField(blank=True, help_text="Optional message to the business owner")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    responded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='responded_join_requests'
+    )
+
+    class Meta:
+        verbose_name = "Team Join Request"
+        verbose_name_plural = "Team Join Requests"
+        db_table = 'client_businessteamjoinrequest'
+        unique_together = [('business', 'user')]
+        indexes = [
+            models.Index(fields=['business', 'status']),
+            models.Index(fields=['user', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} → {self.business.business_name} ({self.status})"
+
+
 class PickupLocation(models.Model):
     business = models.ForeignKey(
         Business, on_delete=models.CASCADE, related_name='pickup_location')

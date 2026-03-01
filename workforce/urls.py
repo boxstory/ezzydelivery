@@ -88,6 +88,7 @@ urlpatterns = [
 
     # User Verification URLs
     path('verification/users/', workforce_views.user_verification_list, name='user_verification_list'),
+    path('verification/teams/', workforce_views.team_verification_list, name='team_verification_list'),
     path('verification/<int:profile_id>/update-status/', workforce_views.update_verification_status, name='update_verification_status'),
     path('verification/team/<int:team_id>/update-status/', workforce_views.update_team_status, name='update_team_status'),
 

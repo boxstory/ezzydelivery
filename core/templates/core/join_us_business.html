@@ -4,23 +4,27 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'core/css/core_join.css' %}?v=20260214c" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/core_dashboard.css' %}?v=20260301c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-    <section class="cjb__section" id="core_join_business_section_main">
-        <div class="p-3">
-            <!-- file path section -->
-            {% include "core/parts/filepath.html" %}
-            <div class="row col-12">
-                <!-- profile left side section -->
-                {% include "core/parts/dashboard_sidebar_profile.html" %}
-                    <!-- profile join form section -->
-                <div class="col-lg-8">
-                    {% include "core/parts/join_business_form.html" %}
+<section class="cjb__section" id="core_join_business_section_main">
+    <div class="container-xl px-3 py-3">
+        {% include "core/parts/filepath.html" %}
 
+        <div class="row g-4">
+            <!-- Profile Sidebar -->
+            <div class="col-12 col-lg-4 col-xl-3">
+                <div class="jnp__sidebar-wrap">
+                    {% include "core/parts/dashboard_sidebar_profile.html" %}
                 </div>
             </div>
+
+            <!-- Main Content -->
+            <div class="col-12 col-lg-8 col-xl-9">
+                {% include "core/parts/join_business_form.html" %}
             </div>
-        </section>
-    {% endblock content %}
+        </div>
+    </div>
+</section>
+{% endblock content %}

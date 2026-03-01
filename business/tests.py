@@ -222,7 +222,9 @@ class PickupLocationTestCase(TestCase):
             profile=self.profile,
             business_name='Pickup Test Business',
             business_code='TB300',
-            business_status='active'
+            business_status='active',
+            fulfillment_service_enabled=False,
+            fulfillment_service_status='none'
         )
 
     def test_pickup_location_creation(self):

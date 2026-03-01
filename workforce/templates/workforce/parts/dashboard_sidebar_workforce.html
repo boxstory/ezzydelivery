@@ -794,6 +794,19 @@
           <span>User Verification</span>
         </a>
       </li>
+      <!-- Team Verification Section -->
+      <li id="workforce_sidebar_menu_team_verification" class="nav-item">
+        <a id="workforce_sidebar_link_team_verification" class="nav-link btn nav-link-single {% if request.resolver_match.url_name == 'team_verification_list' %}active{% endif %}"
+           href="{% url 'workforce:team_verification_list' %}"
+           hx-get="{% url 'workforce:team_verification_list' %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+          <i class="fa-solid fa-users-gear me-2"></i>
+          <span>Team Verification</span>
+        </a>
+      </li>
       <!-- Sellers Section -->
       <li id="workforce_sidebar_menu_sellers" class="nav-item">
         <a id="workforce_sidebar_link_sellers" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-sellers" href="#">
@@ -1069,7 +1082,7 @@
       {% if user_profile %}
       <li id="workforce_sidebar_menu_profile" class="nav-item">
         <a id="workforce_sidebar_link_profile" class="nav-link btn nav-link-single"
-           href="{% url 'core:profile' user_profile.id %}">
+           href="{% url 'core:profile' user_profile.user_number %}">
           <i class="fa-solid fa-user me-2"></i>
           <span>Profile</span>
         </a>

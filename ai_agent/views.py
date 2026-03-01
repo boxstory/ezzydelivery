@@ -425,53 +425,113 @@ class ExtractOrderAPIView(APIView):
         from ai_agent.services.claude_service import get_claude_service
         claude = get_claude_service()
 
-        available, msg = claude.is_available()
-        if not available:
-            return Response(
-                {'success': False, 'error': msg},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
+        available, _ = claude.is_available()
+
+        if available:
+            system_prompt = (
+                "You are an order data extraction assistant for a delivery service in Qatar. "
+                "Extract structured fields from the raw text. Return ONLY valid JSON with these keys: "
+                "customer_name, customer_phone, dl_zone, dl_street, dl_building, "
+                "customer_address, cod_amount, order_notes, zone_name. "
+                "Rules: phone should be digits only (8 digits, no country code). "
+                "dl_zone/dl_street/dl_building should be numbers or empty string. "
+                "cod_amount should be a number or empty string. "
+                "zone_name should be the area/neighborhood name if mentioned (e.g. West Bay, Al Sadd, Pearl Qatar). "
+                "order_notes should capture any delivery instructions. "
+                "If a field is not found, use empty string. Return ONLY the JSON object, nothing else."
             )
 
-        system_prompt = (
-            "You are an order data extraction assistant for a delivery service in Qatar. "
-            "Extract structured fields from the raw text. Return ONLY valid JSON with these keys: "
-            "customer_name, customer_phone, dl_zone, dl_street, dl_building, "
-            "customer_address, cod_amount, order_notes, zone_name. "
-            "Rules: phone should be digits only (8 digits, no country code). "
-            "dl_zone/dl_street/dl_building should be numbers or empty string. "
-            "cod_amount should be a number or empty string. "
-            "zone_name should be the area/neighborhood name if mentioned (e.g. West Bay, Al Sadd, Pearl Qatar). "
-            "order_notes should capture any delivery instructions. "
-            "If a field is not found, use empty string. Return ONLY the JSON object, nothing else."
-        )
-
-        result = claude.chat(
-            messages=[{'role': 'user', 'content': f"Extract order fields from this text:\n\n{raw_text}"}],
-            system=system_prompt,
-            user_id=request.user.id,
-        )
-
-        if result.get('error'):
-            return Response(
-                {'success': False, 'error': result.get('message', 'AI extraction failed')},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            result = claude.chat(
+                messages=[{'role': 'user', 'content': f"Extract order fields from this text:\n\n{raw_text}"}],
+                system=system_prompt,
+                user_id=request.user.id,
             )
 
-        # Parse the AI response JSON
-        try:
-            content = result.get('content', '').strip()
-            # Strip markdown code fences if present
-            if content.startswith('```'):
-                content = content.split('\n', 1)[1] if '\n' in content else content[3:]
-                if content.endswith('```'):
-                    content = content[:-3].strip()
+            if result.get('error'):
+                return Response(
+                    {'success': False, 'error': result.get('message', 'AI extraction failed')},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
-            data = json.loads(content)
-        except (json.JSONDecodeError, AttributeError):
-            return Response(
-                {'success': False, 'error': 'Could not parse AI response'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            try:
+                content = result.get('content', '').strip()
+                if content.startswith('```'):
+                    content = content.split('\n', 1)[1] if '\n' in content else content[3:]
+                    if content.endswith('```'):
+                        content = content[:-3].strip()
+                data = json.loads(content)
+            except (json.JSONDecodeError, AttributeError):
+                return Response(
+                    {'success': False, 'error': 'Could not parse AI response'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        else:
+            # Regex fallback — works without any API key
+            import re
+            text = raw_text
+
+            # Phone: 8 digits, optionally preceded by +974 / 00974 / 974
+            phone_match = re.search(r'(?:(?:\+|00)?974\s*)?(\b[3-7]\d{7}\b)', text)
+            phone = phone_match.group(1) if phone_match else ''
+
+            # Zone / Street / Building — look for keywords
+            zone_match = re.search(r'\bzone\s*[:#]?\s*(\d+)', text, re.IGNORECASE)
+            street_match = re.search(r'\bst(?:reet)?\s*[:#]?\s*(\d+)', text, re.IGNORECASE)
+            building_match = re.search(r'\bb(?:uilding|ldg|ld)?\s*[:#]?\s*(\d+)', text, re.IGNORECASE)
+
+            # COD amount — number followed by QR/QAR/ر.ق or preceded by COD/amount
+            cod_match = re.search(
+                r'(?:cod|amount|total|price)\s*[:#]?\s*(\d+(?:\.\d+)?)'
+                r'|(\d+(?:\.\d+)?)\s*(?:qr|qar|ر\.ق)',
+                text, re.IGNORECASE
             )
+            cod_amount = ''
+            if cod_match:
+                cod_amount = cod_match.group(1) or cod_match.group(2) or ''
+
+            # Customer name — first word(s) before phone/zone if no keyword, else look for "name:" prefix
+            name = ''
+            name_kw = re.search(r'(?:name|customer)\s*[:#]?\s*([A-Za-z][A-Za-z\s]{1,30}?)(?:\s+\d|\s*,|$)', text, re.IGNORECASE)
+            if name_kw:
+                name = name_kw.group(1).strip()
+            elif phone:
+                before_phone = text[:text.find(phone_match.group(0))].strip()
+                words = re.findall(r'[A-Za-z]+', before_phone)
+                if words:
+                    name = ' '.join(words[:3])
+
+            # Notes — anything after "note/instructions/remarks"
+            notes_match = re.search(r'(?:note|instruction|remark|comment)\s*[:#]?\s*(.+)', text, re.IGNORECASE)
+            notes = notes_match.group(1).strip() if notes_match else ''
+
+            # Full address — after "address:" keyword or fallback to full text stripped of name/phone
+            addr_match = re.search(r'(?:address|addr|location)\s*[:#]?\s*(.+?)(?:\n|cod|zone|$)', text, re.IGNORECASE)
+            address = addr_match.group(1).strip() if addr_match else ''
+
+            # zone_name — area/neighbourhood names
+            area_match = re.search(
+                r'\b(west\s*bay|pearl\s*qatar|the\s*pearl|al[\s-]sadd|al[\s-]wakra|al[\s-]rayyan|'
+                r'lusail|msheireb|madinat\s*khalifa|al[\s-]khor|duhail|ain\s*khaled|'
+                r'old\s*airport|new\s*airport|al[\s-]gharafa|al[\s-]waab|al[\s-]aziziyah|'
+                r'industrial\s*area|al[\s-]muntazah|fereej\s*bin\s*mahmoud)\b',
+                text, re.IGNORECASE
+            )
+            zone_name = area_match.group(1).strip() if area_match else ''
+            if zone_name and not address:
+                address = zone_name
+
+            data = {
+                'customer_name': name,
+                'customer_phone': phone,
+                'dl_zone': zone_match.group(1) if zone_match else '',
+                'dl_street': street_match.group(1) if street_match else '',
+                'dl_building': building_match.group(1) if building_match else '',
+                'customer_address': address,
+                'cod_amount': cod_amount,
+                'order_notes': notes,
+                'zone_name': zone_name,
+            }
 
         # Server-side zone resolution: if zone empty but zone_name given, look up via ZoneArea/ZoneName
         zone_val = str(data.get('dl_zone', '')).strip()

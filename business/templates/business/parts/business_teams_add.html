@@ -21,6 +21,22 @@
         </a>
     </div>
 
+    <!-- Join Request Banner -->
+    {% if join_request %}
+    <div class="bta__request-banner" id="client_teams_add_banner_request">
+        <i class="fa-solid fa-user-clock"></i>
+        <div>
+            <strong>Adding from join request</strong> —
+            {{ join_request.user.first_name|default:join_request.user.username }} {{ join_request.user.last_name|default:"" }}
+            requested to join
+            {% if join_request.desired_role_title %}as <em>{{ join_request.desired_role_title }}</em>{% endif %}.
+        </div>
+        <a href="{% url 'business:business_join_requests' business.business_id %}" class="bta__request-banner-link">
+            <i class="fa-solid fa-arrow-left"></i> Back to Requests
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Form Card -->
     <div class="bta__card">
         <div class="bta__card-header">

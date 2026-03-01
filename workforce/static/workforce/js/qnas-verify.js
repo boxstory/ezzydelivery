@@ -235,7 +235,14 @@ async function qnasValidateAndFill(opts) {
             const lng = data.longitude.toFixed(6);
             const isExact = data.match_type === 'exact';
             const accuracy = isExact ? 'exact' : 'street';
+            const zoneName = data.zone_name || '';
             if (accuracyInput) accuracyInput.value = accuracy;
+            // Fill zone name display field if provided
+            const zoneNameId = opts.zoneNameId;
+            if (zoneNameId && zoneName) {
+                const znEl = document.getElementById(zoneNameId);
+                if (znEl) znEl.value = zoneName;
+            }
             if (mapLink) {
                 mapLink.href = `https://www.google.com/maps?q=${lat},${lng}`;
                 mapLink.classList.remove('disabled', 'btn-outline-secondary', 'btn-success', 'btn-warning');
@@ -247,9 +254,10 @@ async function qnasValidateAndFill(opts) {
                     : '<span class="badge bg-warning text-dark" style="font-size:.7rem">Street</span>';
             }
             if (resultDiv) {
-                resultDiv.innerHTML = `<div class="d-flex align-items-center gap-2">
+                const zoneNameHtml = zoneName ? `<span class="text-muted small ms-1">${zoneName}</span>` : '';
+                resultDiv.innerHTML = `<div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge ${isExact ? 'bg-success' : 'bg-warning text-dark'}"><i class="fa-solid fa-check me-1"></i>${isExact ? 'Exact Match' : 'Street Level'}</span>
-                    <span class="text-muted small">(${data.total_buildings} buildings)</span></div>`;
+                    <span class="text-muted small">(${data.total_buildings} buildings)</span>${zoneNameHtml}</div>`;
             }
             if (btn) { btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Verified'; btn.className = btn.className.replace('btn-outline-warning', 'btn-success'); }
         } else {

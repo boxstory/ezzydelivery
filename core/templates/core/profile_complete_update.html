@@ -281,7 +281,7 @@
                             <!-- Action Buttons -->
                             <div class="mt-5 pt-4 border-top">
                                 <div class="row g-3">
-                                    <div class="col-12 col-md-4">
+                                    <div class="col-12 {% if not profile.is_business and not profile.is_driver %}col-md-4{% elif profile.is_business and profile.is_driver %}col-md-12{% else %}col-md-6{% endif %}">
                                         <button id="core_profile_complete_btn_save" type="submit" name="action" value="save"
                                                 class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2 py-3">
                                             <i class="fa-solid fa-floppy-disk"></i>
@@ -289,7 +289,8 @@
                                         </button>
                                     </div>
 
-                                    <div class="col-12 col-md-4">
+                                    {% if not profile.is_business %}
+                                    <div class="col-12 {% if not profile.is_driver %}col-md-4{% else %}col-md-6{% endif %}">
                                         <button id="core_profile_complete_btn_register_business" type="submit" name="action" value="register_business"
                                                 class="btn btn-warning w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold"
                                                 {% if completion_percentage < 100 %}disabled{% endif %}>
@@ -297,8 +298,10 @@
                                             <span>Register as Business</span>
                                         </button>
                                     </div>
+                                    {% endif %}
 
-                                    <div class="col-12 col-md-4">
+                                    {% if not profile.is_driver %}
+                                    <div class="col-12 {% if not profile.is_business %}col-md-4{% else %}col-md-6{% endif %}">
                                         <button id="core_profile_complete_btn_join_driver" type="submit" name="action" value="join_driver"
                                                 class="btn btn-warning w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold"
                                                 {% if completion_percentage < 100 %}disabled{% endif %}>
@@ -306,6 +309,17 @@
                                             <span>Join as Driver</span>
                                         </button>
                                     </div>
+                                    {% endif %}
+
+                                    {% if profile.is_business or profile.is_driver %}
+                                    <div class="col-12 col-md-6">
+                                        <a href="{% url 'core:main_dashboard' %}"
+                                           class="btn btn-dark w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold text-decoration-none">
+                                            <i class="fa-solid fa-tachometer-alt"></i>
+                                            <span>Go to Dashboard</span>
+                                        </a>
+                                    </div>
+                                    {% endif %}
                                 </div>
 
                                 {% if completion_percentage < 100 %}

@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/core_join.css' %}?v=20260301a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/core_join_team.css' %}?v=20260301a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<section class="h-100" id="core_join_team_section_main">
+    <div class="container-xl px-3 py-3">
+        {% include "core/parts/filepath.html" %}
+
+        <div class="row g-3">
+            <!-- Profile Sidebar -->
+            <div class="col-12 col-lg-4 col-xl-3">
+                <div class="jnp__sidebar-wrap">
+                    {% include "core/parts/dashboard_sidebar_profile.html" %}
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-12 col-lg-8 col-xl-9">
+
+                <!-- Page Header -->
+                <div class="cjt__header" id="core_join_team_section_header">
+                    <div class="cjt__header-icon"><i class="fas fa-users"></i></div>
+                    <div>
+                        <h1 class="cjt__title">Join a Business Team</h1>
+                        <p class="cjt__subtitle">Search for a business and submit your join request</p>
+                    </div>
+                    <a href="{% url 'core:join_us' %}" class="cjt__back-link">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
+
+                <!-- Your Profile Info (read-only) -->
+                <div class="cjt__card" id="core_join_team_card_profile">
+                    <div class="cjt__card-header">
+                        <i class="fas fa-id-card"></i>
+                        <h2>Your Details</h2>
+                        <span class="cjt__card-note">Auto-filled from your profile</span>
+                    </div>
+                    <div class="cjt__profile-row">
+                        <div class="cjt__profile-field">
+                            <span class="cjt__profile-label">Full Name</span>
+                            <span class="cjt__profile-value">{{ profile.first_name|default:"—" }} {{ profile.last_name|default:"" }}</span>
+                        </div>
+                        <div class="cjt__profile-field">
+                            <span class="cjt__profile-label">EZZY ID</span>
+                            <span class="cjt__profile-value"><code>{{ profile.user_number|default:"—" }}</code></span>
+                        </div>
+                        <div class="cjt__profile-field">
+                            <span class="cjt__profile-label">Phone</span>
+                            <span class="cjt__profile-value">{{ profile.phone|default:"—" }}</span>
+                        </div>
+                        <div class="cjt__profile-field">
+                            <span class="cjt__profile-label">Email</span>
+                            <span class="cjt__profile-value">{{ profile.email|default:"—" }}</span>
+                        </div>
+                    </div>
+                    {% if not profile.is_profile_completed %}
+                    <div class="cjt__alert cjt__alert--warn">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        Your profile is incomplete. The business owner may not be able to add you without a complete profile (100%). <a href="{% url 'core:profile_complete_update' %}">Complete profile &rarr;</a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Search + Request Form -->
+                <div class="cjt__card" id="core_join_team_card_request">
+                    <div class="cjt__card-header">
+                        <i class="fas fa-magnifying-glass"></i>
+                        <h2>Find a Business</h2>
+                    </div>
+
+                    <!-- Business Search -->
+                    <div class="cjt__search-wrap">
+                        <label class="cjt__label" for="core_join_team_input_search">Business Name or Code <span class="text-danger">*</span></label>
+                        <div class="cjt__search-input-wrap">
+                            <input type="text" id="core_join_team_input_search" class="cjt__search-input"
+                                   placeholder="e.g. Ezzy Store, ESZ001" autocomplete="off" minlength="2">
+                            <span class="cjt__search-spinner" id="core_join_team_spinner" style="display:none">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </span>
+                        </div>
+                        <div class="cjt__search-results" id="core_join_team_search_results" style="display:none"></div>
+                    </div>
+
+                    <!-- Selected Business -->
+                    <div class="cjt__selected-biz" id="core_join_team_selected_biz" style="display:none">
+                        <i class="fas fa-building"></i>
+                        <span id="core_join_team_selected_name"></span>
+                        <button type="button" class="cjt__clear-btn" id="core_join_team_btn_clear" title="Clear">
+                            <i class="fas fa-xmark"></i>
+                        </button>
+                    </div>
+                    <input type="hidden" id="core_join_team_input_biz_id" name="business_id">
+
+                    <!-- Position / Role Title -->
+                    <div class="cjt__field-wrap">
+                        <label class="cjt__label" for="core_join_team_input_role_title">Your Position / Role Title</label>
+                        <input type="text" id="core_join_team_input_role_title" class="cjt__input"
+                               placeholder="e.g. Sales Manager, Store Staff, Operations" maxlength="100">
+                        <small class="cjt__help">Optional — helps the business owner assign the right role</small>
+                    </div>
+
+                    <!-- Message -->
+                    <div class="cjt__field-wrap">
+                        <label class="cjt__label" for="core_join_team_input_message">Message to Business (Optional)</label>
+                        <textarea id="core_join_team_input_message" class="cjt__textarea" rows="3"
+                                  placeholder="Introduce yourself or add any notes..."></textarea>
+                    </div>
+
+                    <!-- Error/success feedback -->
+                    <div class="cjt__feedback" id="core_join_team_feedback" style="display:none"></div>
+
+                    <!-- Submit -->
+                    <div class="cjt__form-actions">
+                        <button type="button" class="cjt__btn-submit" id="core_join_team_btn_submit" disabled>
+                            <i class="fas fa-paper-plane"></i> Send Join Request
+                        </button>
+                    </div>
+                </div>
+
+                <!-- My Existing Requests -->
+                {% if my_requests %}
+                <div class="cjt__card" id="core_join_team_card_requests">
+                    <div class="cjt__card-header">
+                        <i class="fas fa-clock-rotate-left"></i>
+                        <h2>Your Join Requests</h2>
+                    </div>
+                    <div class="cjt__requests-list" id="core_join_team_requests_list">
+                        {% for req in my_requests %}
+                        <div class="cjt__req-row" id="core_join_team_req_{{ req.id }}" data-req-id="{{ req.id }}">
+                            <div class="cjt__req-biz">
+                                <i class="fas fa-building"></i>
+                                <strong>{{ req.business.business_name }}</strong>
+                                {% if req.desired_role_title %}
+                                <span class="cjt__req-role">— {{ req.desired_role_title }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="cjt__req-meta">
+                                <span class="cjt__req-status cjt__req-status--{{ req.status }}">
+                                    {% if req.status == 'pending' %}<i class="fas fa-clock"></i>
+                                    {% elif req.status == 'accepted' %}<i class="fas fa-circle-check"></i>
+                                    {% elif req.status == 'rejected' %}<i class="fas fa-circle-xmark"></i>
+                                    {% endif %}
+                                    {{ req.get_status_display }}
+                                </span>
+                                <span class="cjt__req-date">{{ req.requested_at|date:"d M Y" }}</span>
+                            </div>
+                            {% if req.status == 'pending' %}
+                            <div class="cjt__req-actions">
+                                <button type="button" class="cjt__btn-cancel" data-req-id="{{ req.id }}" id="core_join_team_btn_cancel_{{ req.id }}">
+                                    <i class="fas fa-xmark"></i> Cancel
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput   = document.getElementById('core_join_team_input_search');
+    var searchResults = document.getElementById('core_join_team_search_results');
+    var spinner       = document.getElementById('core_join_team_spinner');
+    var selectedBiz   = document.getElementById('core_join_team_selected_biz');
+    var selectedName  = document.getElementById('core_join_team_selected_name');
+    var bizIdInput    = document.getElementById('core_join_team_input_biz_id');
+    var clearBtn      = document.getElementById('core_join_team_btn_clear');
+    var submitBtn     = document.getElementById('core_join_team_btn_submit');
+    var feedback      = document.getElementById('core_join_team_feedback');
+    var roleInput     = document.getElementById('core_join_team_input_role_title');
+    var msgInput      = document.getElementById('core_join_team_input_message');
+
+    function getCsrf() {
+        var c = null;
+        document.cookie.split(';').forEach(function(x) {
+            x = x.trim();
+            if (x.startsWith('csrftoken=')) c = decodeURIComponent(x.split('=')[1]);
+        });
+        if (!c) {
+            var inp = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (inp) c = inp.value;
+        }
+        return c;
+    }
+
+    function showFeedback(msg, type) {
+        feedback.className = 'cjt__feedback cjt__feedback--' + type;
+        feedback.textContent = msg;
+        feedback.style.display = '';
+    }
+    function hideFeedback() { feedback.style.display = 'none'; }
+
+    /* ---- Business Search ---- */
+    var searchTimer = null;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        var q = this.value.trim();
+        if (q.length < 2) { searchResults.style.display = 'none'; return; }
+        spinner.style.display = '';
+        searchTimer = setTimeout(function() {
+            fetch('/business/search/?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                spinner.style.display = 'none';
+                if (!data.results || data.results.length === 0) {
+                    searchResults.innerHTML = '<div class="cjt__no-result"><i class="fas fa-magnifying-glass"></i> No businesses found</div>';
+                    searchResults.style.display = '';
+                    return;
+                }
+                searchResults.innerHTML = '';
+                data.results.forEach(function(b) {
+                    var div = document.createElement('div');
+                    div.className = 'cjt__result-item';
+                    div.setAttribute('data-id', b.id);
+                    div.setAttribute('data-name', b.name);
+                    div.innerHTML = '<i class="fas fa-building"></i> <strong>' + b.name + '</strong>' +
+                        (b.code ? ' <span class="cjt__code">' + b.code + '</span>' : '');
+                    div.addEventListener('click', function() { selectBusiness(b.id, b.name); });
+                    searchResults.appendChild(div);
+                });
+                searchResults.style.display = '';
+            })
+            .catch(function() { spinner.style.display = 'none'; });
+        }, 350);
+    });
+
+    /* ---- Hide results on outside click ---- */
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+
+    function selectBusiness(id, name) {
+        bizIdInput.value = id;
+        selectedName.textContent = name;
+        selectedBiz.style.display = '';
+        searchResults.style.display = 'none';
+        searchInput.style.display = 'none';
+        submitBtn.disabled = false;
+        hideFeedback();
+    }
+
+    clearBtn.addEventListener('click', function() {
+        bizIdInput.value = '';
+        selectedBiz.style.display = 'none';
+        searchInput.style.display = '';
+        searchInput.value = '';
+        searchInput.focus();
+        submitBtn.disabled = true;
+    });
+
+    /* ---- Submit Request ---- */
+    submitBtn.addEventListener('click', function() {
+        var bizId = bizIdInput.value;
+        if (!bizId) { showFeedback('Please select a business first.', 'error'); return; }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        hideFeedback();
+
+        fetch('/business/join-request/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrf()
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                business_id: parseInt(bizId),
+                desired_role_title: roleInput.value.trim(),
+                message: msgInput.value.trim()
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Join Request';
+            if (data.success) {
+                showFeedback(data.message || 'Request sent successfully!', 'success');
+                submitBtn.disabled = true;
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                showFeedback(data.error || 'Failed to send request.', 'error');
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(function() {
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Join Request';
+            submitBtn.disabled = false;
+            showFeedback('Network error. Please try again.', 'error');
+        });
+    });
+
+    /* ---- Cancel Request ---- */
+    document.querySelectorAll('.cjt__btn-cancel').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var reqId = this.dataset.reqId;
+            if (!confirm('Cancel this join request?')) return;
+            btn.disabled = true;
+            fetch('/business/join-request/' + reqId + '/cancel/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCsrf() },
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var row = document.getElementById('core_join_team_req_' + reqId);
+                    if (row) row.remove();
+                } else {
+                    alert(data.error || 'Failed to cancel.');
+                    btn.disabled = false;
+                }
+            })
+            .catch(function() { btn.disabled = false; });
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

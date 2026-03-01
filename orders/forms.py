@@ -121,7 +121,7 @@ class AddOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
-                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status']
+                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status', 'order_source_text']
         exclude = ['order_number', 'business', 'delivery_task', 'deadline_date', 'cod_status_by_staff',
                    'updated_at', 'created_at']
         widgets = {
@@ -131,6 +131,7 @@ class AddOrderForm(forms.ModelForm):
             'latitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'longitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'coords_accuracy': forms.HiddenInput(),
+            'order_source_text': forms.HiddenInput(),
         }
         labels = {
             'order_notes': _('Order Short description'),

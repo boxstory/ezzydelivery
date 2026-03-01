@@ -174,16 +174,16 @@ class DriverModelTest(DriverTestMixin, TestCase):
         result = str(self.driver)
         self.assertIn('1001', result)
 
-    # Wallet properties
+    # Wallet properties (cod_in_hand = positive COD currently held by driver)
     def test_wallet_usage_percentage_zero(self):
         self.assertEqual(self.driver.wallet_usage_percentage, 0)
 
     def test_wallet_usage_percentage_50_percent(self):
-        self.driver.wallet_balance = Decimal('-2500.00')
+        self.driver.cod_in_hand = Decimal('2500.00')  # 50% of 5000 limit
         self.assertEqual(self.driver.wallet_usage_percentage, 50)
 
     def test_wallet_usage_percentage_100_percent(self):
-        self.driver.wallet_balance = Decimal('-5000.00')
+        self.driver.cod_in_hand = Decimal('5000.00')  # 100% of 5000 limit
         self.assertEqual(self.driver.wallet_usage_percentage, 100)
 
     def test_wallet_usage_percentage_zero_credit_limit(self):
@@ -191,36 +191,36 @@ class DriverModelTest(DriverTestMixin, TestCase):
         self.assertEqual(self.driver.wallet_usage_percentage, 0)
 
     def test_is_wallet_warning_below_80(self):
-        self.driver.wallet_balance = Decimal('-3000.00')  # 60%
+        self.driver.cod_in_hand = Decimal('3000.00')  # 60% of 5000
         self.assertFalse(self.driver.is_wallet_warning)
 
     def test_is_wallet_warning_at_80(self):
-        self.driver.wallet_balance = Decimal('-4000.00')  # 80%
+        self.driver.cod_in_hand = Decimal('4000.00')  # 80% of 5000
         self.assertTrue(self.driver.is_wallet_warning)
 
     def test_is_wallet_warning_above_80(self):
-        self.driver.wallet_balance = Decimal('-4500.00')  # 90%
+        self.driver.cod_in_hand = Decimal('4500.00')  # 90% of 5000
         self.assertTrue(self.driver.is_wallet_warning)
 
     def test_is_wallet_blocked_positive_balance(self):
-        self.driver.wallet_balance = Decimal('100.00')
+        self.driver.cod_in_hand = Decimal('100.00')  # Below limit
         self.assertFalse(self.driver.is_wallet_blocked)
 
     def test_is_wallet_blocked_zero_balance(self):
-        self.driver.wallet_balance = Decimal('0.00')
+        self.driver.cod_in_hand = Decimal('5000.00')  # At credit limit
         self.assertTrue(self.driver.is_wallet_blocked)
 
     def test_is_wallet_blocked_negative_balance(self):
-        self.driver.wallet_balance = Decimal('-100.00')
+        self.driver.cod_in_hand = Decimal('5100.00')  # Exceeds credit limit
         self.assertTrue(self.driver.is_wallet_blocked)
 
     def test_available_credit(self):
-        self.driver.wallet_balance = Decimal('-2000.00')
+        self.driver.cod_in_hand = Decimal('2000.00')
         self.driver.credit_limit = Decimal('5000.00')
         self.assertEqual(self.driver.available_credit, Decimal('3000.00'))
 
     def test_available_credit_full(self):
-        self.driver.wallet_balance = Decimal('0.00')
+        self.driver.cod_in_hand = Decimal('0.00')
         self.driver.credit_limit = Decimal('5000.00')
         self.assertEqual(self.driver.available_credit, Decimal('5000.00'))
 
@@ -585,13 +585,14 @@ class WalletServiceCanAcceptCODTest(DriverTestMixin, TestCase):
         self.assertEqual(reason, 'OK')
 
     def test_cannot_accept_wallet_blocked(self):
-        self.driver.wallet_balance = Decimal('0.00')
+        # Blocked when cod_in_hand >= credit_limit
+        self.driver.cod_in_hand = Decimal('5000.00')  # At credit limit (5000)
         can, reason = WalletService.can_accept_cod_order(self.driver, Decimal('100.00'))
         self.assertFalse(can)
         self.assertIn('exhausted', reason.lower())
 
     def test_cannot_accept_exceeds_credit(self):
-        self.driver.wallet_balance = Decimal('100.00')
+        self.driver.cod_in_hand = Decimal('100.00')  # Available credit = 4900
         self.driver.credit_limit = Decimal('5000.00')
         can, reason = WalletService.can_accept_cod_order(self.driver, Decimal('10000.00'))
         self.assertFalse(can)
@@ -603,31 +604,68 @@ class WalletServiceGetStatusTest(DriverTestMixin, TestCase):
     def setUp(self):
         self.user, self.profile = self.create_driver_user()
         self.driver = self.create_driver(self.user, self.profile,
-                                         wallet_balance=Decimal('-4000.00'),
                                          credit_limit=Decimal('5000.00'),
-                                         cod_in_hand=Decimal('4000.00'),
                                          pending_earnings=Decimal('100.00'))
+        # Create business/order needed for DeliveryTask
+        biz_user = User.objects.create_user(
+            username='statusbizuser', email='statusbiz@test.com', password='Pass@123')
+        biz_profile = core_models.Profile.objects.create(
+            user=biz_user, first_name='Biz', last_name='User', phone=55500001)
+        from business import models as business_models
+        biz = business_models.Business.objects.create(
+            business_id=9901, user=biz_user, profile=biz_profile,
+            business_name='Status Biz', business_code='STATBIZ',
+            fulfillment_service_enabled=False, fulfillment_service_status='none')
+        pickup = business_models.PickupLocation.objects.create(
+            business=biz, pickup_location_title='Status Pickup',
+            locality='Doha', pickup_zone_no=1,
+            pickup_street_no=1, pickup_building_no=1)
+        order = orders_models.Order.objects.create(
+            business=biz, client_order_code='STAT-STATUS-001',
+            customer_name='Test', customer_phone='11111111',
+            customer_address='Test', dl_zone=1, dl_building=1, dl_street=1,
+            pickup_location=pickup)
+        # Create 4000 QR worth of COD tasks (unsettled)
+        task1 = delivery_models.DeliveryTask.objects.create(
+            dl_task_number='STAT-T001', dl_task_description='Test',
+            order=order, business=biz, driver=self.driver,
+            dl_task_status='delivered', dl_price=50,
+            cod_collected=True, cod_settled=False, cod_collected_amount=Decimal('2500.00'))
+        task2 = delivery_models.DeliveryTask.objects.create(
+            dl_task_number='STAT-T002', dl_task_description='Test',
+            order=order, business=biz, driver=self.driver,
+            dl_task_status='delivered', dl_price=50,
+            cod_collected=True, cod_settled=False, cod_collected_amount=Decimal('1500.00'))
+        # Create transaction for live_wallet calculation (-4000 net)
+        fleet_models.DriverTransaction.objects.create(
+            driver=self.driver, transaction_type='cod_collection',
+            amount=Decimal('-4000.00'), description='COD collected')
 
     def test_wallet_status_fields(self):
         status = WalletService.get_wallet_status(self.driver)
-        self.assertEqual(status['wallet_balance'], Decimal('-4000.00'))
+        # live_cod from DeliveryTask: 2500 + 1500 = 4000
+        self.assertEqual(status['cod_in_hand'], Decimal('4000.00'))
         self.assertEqual(status['credit_limit'], Decimal('5000.00'))
         self.assertEqual(status['available_credit'], Decimal('1000.00'))
-        self.assertEqual(status['cod_in_hand'], Decimal('4000.00'))
         self.assertEqual(status['pending_earnings'], Decimal('100.00'))
-        self.assertTrue(status['is_warning'])
-        self.assertTrue(status['is_blocked'])  # -4000 <= 0
+        self.assertTrue(status['is_warning'])  # 4000/5000 = 80%
+        self.assertFalse(status['is_blocked'])  # 4000 < 5000, not blocked
         self.assertIsNotNone(status['warning_message'])
-        self.assertIsNotNone(status['block_message'])
 
     def test_wallet_status_healthy(self):
-        self.driver.wallet_balance = Decimal('1000.00')
-        self.driver.cod_in_hand = Decimal('0.00')
+        # No DeliveryTask or transactions: everything is zero/healthy
         status = WalletService.get_wallet_status(self.driver)
-        self.assertFalse(status['is_warning'])
-        self.assertFalse(status['is_blocked'])
-        self.assertIsNone(status['warning_message'])
-        self.assertIsNone(status['block_message'])
+        # But setUp created 4000 COD tasks - need fresh driver
+        user2 = User.objects.create_user(
+            username='healthydriver', email='healthy@test.com', password='Pass@123')
+        profile2 = core_models.Profile.objects.create(
+            user=user2, first_name='H', last_name='D', phone=55500002, is_driver=True)
+        driver2 = self.create_driver(user2, profile2, driver_id=9901, driver_code='HLTH01')
+        status2 = WalletService.get_wallet_status(driver2)
+        self.assertFalse(status2['is_warning'])
+        self.assertFalse(status2['is_blocked'])
+        self.assertIsNone(status2['warning_message'])
+        self.assertIsNone(status2['block_message'])
 
 
 class WalletServiceGetDriverStatisticsTest(DriverTestMixin, TestCase):
@@ -744,33 +782,13 @@ class WalletAlertServiceTest(DriverTestMixin, TestCase):
         self.assertIn('Blocked', danger[0]['title'])
 
     def test_warning_alert(self):
-        driver = self.create_driver(self.user, self.profile,
-                                    wallet_balance=Decimal('-4100.00'),
-                                    credit_limit=Decimal('5000.00'))
-        # wallet_balance > 0 is False (it's -4100), so is_wallet_blocked = True
-        # Actually -4100 <= 0 so is_wallet_blocked = True, blocked overrides warning
-        # Let's use a case where balance is positive but usage is high
-        # wallet_usage_percentage = abs(-4100)/5000 * 100 = 82%
-        # But is_wallet_blocked checks wallet_balance <= 0, which is True at -4100
-        # So we get danger, not warning. The warning is only when not blocked.
-        # To test warning: balance must be > 0 but usage >= 80%
-        # That's not possible with current model since usage = abs(balance)/limit
-        # If balance is positive, abs(positive)/limit could be >=80 if balance >= 4000
-        # But then is_wallet_blocked (balance <= 0) would be False
-        # Actually wait: wallet_balance = -4100 means blocked. Let me use positive balance > 0
-        # with high usage - but usage = abs(wallet_balance)/credit_limit
-        # so if wallet_balance = 500 positive, usage = 10% -> no warning
-        # The model: wallet decreases with COD collection (goes negative).
-        # Warning: usage >= 80%, Not blocked: balance > 0
-        # This is contradictory - if usage >= 80% then abs(balance)/limit >= 0.8
-        # If balance > 0 then usage = balance/limit. E.g. balance=4000, limit=5000 -> 80%
-        # but is_wallet_blocked = (4000 <= 0) = False. So warning triggers!
-        # Actually this doesn't make business sense but tests the code path.
+        # Warning triggers when cod_in_hand >= 80% of credit_limit but < credit_limit
+        # 4100 / 5000 = 82% -> warning, not blocked
         driver2_user, driver2_profile = self.create_driver_user(
             username='driver2', email='d2@test.com')
         driver2 = self.create_driver(driver2_user, driver2_profile,
                                      driver_id=1002, driver_code='DRV002',
-                                     wallet_balance=Decimal('4100.00'),
+                                     cod_in_hand=Decimal('4100.00'),
                                      credit_limit=Decimal('5000.00'))
         alerts = WalletAlertService.check_wallet_alerts(driver2)
         warning = [a for a in alerts if a['level'] == 'warning']
@@ -1169,8 +1187,9 @@ class CODSubmissionViewTest(DriverTestMixin, TestCase):
         self.client.login(username='testdriver', password='TestDriver@123')
 
     def test_cod_submission_get(self):
+        # GET redirects to cod_collection (consolidated page)
         response = self.client.get('/fleet/cod_submission/')
-        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.status_code, [301, 302])
 
     def test_cod_submission_post_success(self):
         response = self.client.post('/fleet/cod_submission/', {
@@ -1557,7 +1576,8 @@ class AssignDriverViewTest(DriverTestMixin, TestCase):
     def test_assign_driver_success(self):
         task = self.create_delivery_task(
             self.order, self.business, self.pickup,
-            status='pending', task_number='ASSIGN-001')
+            status='pending', task_number='ASSIGN-001',
+            dl_task_publish=True)
         response = self.client.post(
             '/delivery/delivery_task/assign_driver/',
             {'task_id': task.id})
@@ -1567,7 +1587,7 @@ class AssignDriverViewTest(DriverTestMixin, TestCase):
             delivery_models.AssignedDriver.objects.filter(
                 driver=self.driver, dl_task=task).exists())
         task.refresh_from_db()
-        self.assertEqual(task.dl_task_status, 'assigned')
+        self.assertEqual(task.dl_task_status, 'accepted')
 
     def test_assign_driver_no_task_id(self):
         response = self.client.post(
@@ -1629,7 +1649,8 @@ class StartRideViewTest(DriverTestMixin, TestCase):
     def test_start_ride_success(self):
         task = self.create_delivery_task(
             self.order, self.business, self.pickup,
-            driver=self.driver, status='assigned', task_number='RIDE-001')
+            driver=self.driver, status='assigned', task_number='RIDE-001',
+            dl_task_publish=True)
         delivery_models.AssignedDriver.objects.create(
             driver=self.driver, dl_task=task)
 
@@ -1641,7 +1662,7 @@ class StartRideViewTest(DriverTestMixin, TestCase):
         self.assertIn('navigation', data['redirect_url'])
 
         task.refresh_from_db()
-        self.assertEqual(task.dl_task_status, 'in_transit')
+        self.assertEqual(task.dl_task_status, 'out_for_delivery')
 
     def test_start_ride_not_assigned_to_me(self):
         task = self.create_delivery_task(

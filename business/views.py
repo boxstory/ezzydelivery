@@ -1132,11 +1132,19 @@ def business_teams(request, business_id):
                 role_perms.discard(custom_perm.permission_code)
         team.permission_count = len(role_perms)
 
+    join_requests = business_models.BusinessTeamJoinRequest.objects.filter(
+        business=business, status='pending'
+    ).select_related('user', 'user__profile').order_by('-requested_at')
+
+    join_request_count = join_requests.count()
+
     logger.debug(f'Loading teams for business_id={business_id}, count={teams.count()}')
 
     context = {
         'business': business,
         'teams': teams,
+        'join_requests': join_requests,
+        'join_request_count': join_request_count,
         'can_manage_team': user_has_business_permission(
             request.user, BusinessPermissions.TEAM_MANAGE
         ),
@@ -1160,7 +1168,25 @@ def business_teams_add(request, business_id):
         messages.error(request, "Access denied.")
         return redirect('business:business_dashboard')
 
-    form = business_forms.TeamMemberAddForm(business=business)
+    # Pre-fill from join request if coming from accept action
+    from_request_id = request.GET.get('from_request')
+    join_request = None
+    if from_request_id:
+        join_request = business_models.BusinessTeamJoinRequest.objects.filter(
+            id=from_request_id, business_id=business_id, status='accepted'
+        ).select_related('user', 'user__profile').first()
+
+    if join_request and request.method == 'GET':
+        profile = getattr(join_request.user, 'profile', None)
+        first = getattr(profile, 'first_name', '') or ''
+        last = getattr(profile, 'last_name', '') or ''
+        form = business_forms.TeamMemberAddForm(business=business, initial={
+            'user_identifier': join_request.user.email,
+            'team_name': f"{first} {last}".strip() or join_request.user.username,
+            'team_email': join_request.user.email,
+        })
+    else:
+        form = business_forms.TeamMemberAddForm(business=business)
 
     if request.method == 'POST':
         logger.debug(f'Adding team member for business_id={business_id}')
@@ -1194,6 +1220,12 @@ def business_teams_add(request, business_id):
                             granted_by=request.user,
                         )
 
+            # If added from a join request, ensure the request is marked accepted
+            if join_request:
+                join_request.responded_at = timezone.now()
+                join_request.responded_by = request.user
+                join_request.save(update_fields=['responded_at', 'responded_by'])
+
             logger.info(f'Team member {team_member.id} added by user {request.user.id} for business_id={business_id}')
             messages.success(request, f"Team member '{team_member.team_name or user.username}' added successfully. They will get dashboard access after staff verification.")
             return redirect("business:business_teams", business_id)
@@ -1207,6 +1239,7 @@ def business_teams_add(request, business_id):
         'form_title': 'Add Team Member',
         'role_choices': TeamRoles.ROLE_CHOICES,
         'permission_groups': BusinessPermissions.PERMISSION_GROUPS,
+        'join_request': join_request,
     }
     return render(request, 'business/parts/business_teams_add.html', context)
 
@@ -2100,3 +2133,173 @@ def warehouse_request(request):
         'existing_links': existing_links,
     }
     return render(request, 'business/parts/warehouse_request.html', context)
+
+
+# =============================================================================
+# TEAM JOIN REQUEST VIEWS
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+def business_search_ajax(request):
+    """AJAX search for active businesses by name or code."""
+    q = request.GET.get('q', '').strip()
+    if len(q) < 2:
+        return JsonResponse({'results': []})
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).filter(
+        Q(business_name__icontains=q) | Q(business_code__icontains=q)
+    ).values('business_id', 'business_name', 'business_code')[:10]
+
+    results = [
+        {'id': b['business_id'], 'name': b['business_name'], 'code': b['business_code'] or ''}
+        for b in businesses
+    ]
+    return JsonResponse({'results': results})
+
+
+@login_required(login_url='/accounts/login/')
+def business_join_request_submit(request):
+    """Submit a join request to a business team."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        data = request.POST
+
+    business_id = data.get('business_id')
+    desired_role_title = (data.get('desired_role_title') or '').strip()
+    message = (data.get('message') or '').strip()
+
+    if not business_id:
+        return JsonResponse({'success': False, 'error': 'Business ID is required.'})
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id, business_status='active')
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found or not active.'})
+
+    # Cannot request to join own business
+    if business.user_id == request.user.id:
+        return JsonResponse({'success': False, 'error': 'You cannot request to join your own business.'})
+
+    # Already a team member
+    if business_models.BusinessTeamProfile.objects.filter(
+        business=business, user=request.user
+    ).exists():
+        return JsonResponse({'success': False, 'error': 'You are already a team member of this business.'})
+
+    # Existing pending/accepted request
+    existing = business_models.BusinessTeamJoinRequest.objects.filter(
+        business=business, user=request.user
+    ).exclude(status__in=['rejected', 'cancelled']).first()
+    if existing:
+        return JsonResponse({'success': False, 'error': f'You already have a {existing.status} request for this business.'})
+
+    # Create or re-create (if previously rejected/cancelled)
+    business_models.BusinessTeamJoinRequest.objects.filter(
+        business=business, user=request.user, status__in=['rejected', 'cancelled']
+    ).delete()
+
+    business_models.BusinessTeamJoinRequest.objects.create(
+        business=business,
+        user=request.user,
+        desired_role_title=desired_role_title,
+        message=message,
+        status='pending',
+    )
+    logger.info(f'User {request.user.id} submitted join request for business {business_id}')
+    return JsonResponse({'success': True, 'message': f'Join request sent to {business.business_name}.'})
+
+
+@login_required(login_url='/accounts/login/')
+def business_join_request_cancel(request, req_id):
+    """Cancel the user's own pending join request."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    join_req = business_models.BusinessTeamJoinRequest.objects.filter(
+        id=req_id, user=request.user, status='pending'
+    ).first()
+    if not join_req:
+        return JsonResponse({'success': False, 'error': 'Request not found or cannot be cancelled.'})
+
+    join_req.status = 'cancelled'
+    join_req.save(update_fields=['status'])
+    return JsonResponse({'success': True})
+
+
+@login_required(login_url='/accounts/login/')
+@business_required
+@business_permission_required(BusinessPermissions.TEAM_MANAGE)
+def business_join_requests_list(request, business_id):
+    """List pending join requests for a business (business owner view)."""
+    business = request.current_business
+
+    if business.business_id != business_id:
+        messages.error(request, "Access denied.")
+        return redirect('business:business_dashboard')
+
+    join_reqs = business_models.BusinessTeamJoinRequest.objects.filter(
+        business=business
+    ).select_related('user', 'user__profile').order_by('-requested_at')
+
+    status_filter = request.GET.get('status', 'pending')
+    if status_filter in ('pending', 'accepted', 'rejected', 'cancelled'):
+        join_reqs = join_reqs.filter(status=status_filter)
+
+    pending_count = business_models.BusinessTeamJoinRequest.objects.filter(
+        business=business, status='pending'
+    ).count()
+
+    context = {
+        'business': business,
+        'join_requests': join_reqs,
+        'pending_count': pending_count,
+        'current_filter': status_filter,
+    }
+    return render(request, 'business/parts/business_join_requests.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@business_required
+@business_permission_required(BusinessPermissions.TEAM_MANAGE)
+def business_join_request_action(request, business_id, req_id):
+    """Accept or reject a join request (AJAX, business owner)."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    business = request.current_business
+    if business.business_id != business_id:
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        data = request.POST
+
+    action = data.get('action')
+    if action not in ('accept', 'reject'):
+        return JsonResponse({'success': False, 'error': 'Invalid action.'})
+
+    join_req = business_models.BusinessTeamJoinRequest.objects.filter(
+        id=req_id, business=business, status='pending'
+    ).select_related('user').first()
+    if not join_req:
+        return JsonResponse({'success': False, 'error': 'Request not found.'})
+
+    join_req.responded_at = timezone.now()
+    join_req.responded_by = request.user
+
+    if action == 'accept':
+        join_req.status = 'accepted'
+        join_req.save(update_fields=['status', 'responded_at', 'responded_by'])
+        redirect_url = reverse('business:business_teams_add', args=[business_id]) + f'?from_request={req_id}'
+        return JsonResponse({'success': True, 'redirect_url': redirect_url})
+    else:
+        join_req.status = 'rejected'
+        join_req.save(update_fields=['status', 'responded_at', 'responded_by'])
+        return JsonResponse({'success': True})

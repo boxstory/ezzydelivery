@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/core_join.css' %}?v=20260301a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<section class="h-100" id="core_join_team_section_main">
+    <div class="p-3">
+        {% include "core/parts/filepath.html" %}
+
+        <div class="row g-3">
+            <!-- Profile Sidebar -->
+            <div class="col-12 col-lg-4 col-xl-3">
+                <div class="jnp__sidebar-wrap">
+                    {% include "core/parts/dashboard_sidebar_profile.html" %}
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-12 col-lg-8 col-xl-9">
+
+                <div class="cjb__container" id="core_join_container_team">
+
+                    <!-- Hero Banner -->
+                    <div class="cjb__hero">
+                        <div class="cjb__hero-glow"></div>
+                        <div class="cjb__hero-eyebrow">
+                            <i class="fas fa-users fa-xs"></i>
+                            Join a Team
+                        </div>
+                        <div class="cjb__hero-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h1 class="cjb__hero-title">Join a Business Team</h1>
+                        <p class="cjb__hero-subtitle">Search for the business you want to join, then send your application. Access is granted after admin approval.</p>
+                        <div class="cjb__hero-pills">
+                            <span class="cjb__pill"><i class="fas fa-search"></i> Search</span>
+                            <span class="cjb__pill"><i class="fas fa-paper-plane"></i> Apply</span>
+                            <span class="cjb__pill"><i class="fas fa-check-circle"></i> Get Approved</span>
+                        </div>
+                    </div>
+
+                    <!-- Form Card -->
+                    <div class="cjb__card" id="core_join_card_team">
+
+                        <!-- Step 1: Search -->
+                        <div class="cjb__section-block">
+                            <div class="cjb__section-header">
+                                <div class="cjb__section-icon">
+                                    <i class="fas fa-search"></i>
+                                </div>
+                                <div class="cjb__section-header-text">
+                                    <h2 class="cjb__section-title">Find the Business</h2>
+                                    <p class="cjb__section-desc">Search by name, phone number, or business code</p>
+                                </div>
+                                <span class="cjb__section-step">1 of 2</span>
+                            </div>
+
+                            <div class="jnp__team-search-wrap" id="core_join_team_search_wrap">
+                                <label class="cjb__label mb-1"><i class="fas fa-building me-1"></i>Business Name / Phone / Code</label>
+                                <input
+                                    type="text"
+                                    id="core_join_team_search_input"
+                                    class="form-control cjb__input"
+                                    placeholder="Type at least 4 characters to search…"
+                                    autocomplete="off">
+                                <div class="jnp__team-search-results" id="core_join_team_search_results"></div>
+                            </div>
+
+                            <!-- Selected business pill -->
+                            <div class="jnp__team-selected mt-2" id="core_join_team_selected" style="display:none;">
+                                <div class="jnp__team-selected-info">
+                                    <div class="jnp__team-selected-icon"><i class="fas fa-building"></i></div>
+                                    <div>
+                                        <div class="jnp__team-selected-name" id="core_join_team_selected_name"></div>
+                                        <div class="jnp__team-selected-meta" id="core_join_team_selected_meta"></div>
+                                    </div>
+                                </div>
+                                <button type="button" class="jnp__team-selected-clear" id="core_join_team_clear_btn" title="Change">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Your Details -->
+                        <div class="cjb__section-block">
+                            <div class="cjb__section-header">
+                                <div class="cjb__section-icon cjb__section-icon--contact">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div class="cjb__section-header-text">
+                                    <h2 class="cjb__section-title">Your Details</h2>
+                                    <p class="cjb__section-desc">Sent with your application — auto-filled from your profile</p>
+                                </div>
+                                <span class="cjb__section-step">2 of 2</span>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="cjb__label mb-1"><i class="fas fa-user me-1"></i>Full Name</label>
+                                    <input type="text" class="form-control cjb__input cjb__input--readonly"
+                                           value="{{ profile.first_name }} {{ profile.last_name }}" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="cjb__label mb-1"><i class="fab fa-whatsapp me-1"></i>WhatsApp Number</label>
+                                    <input type="text" class="form-control cjb__input cjb__input--readonly"
+                                           value="{{ profile.whatsapp|default:'—' }}" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="cjb__label mb-1"><i class="fas fa-envelope me-1"></i>Email</label>
+                                    <input type="text" class="form-control cjb__input cjb__input--readonly"
+                                           value="{{ request.user.email }}" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Area -->
+                        <div class="cjb__submit-area">
+                            <!-- Approval note -->
+                            <div class="jnp__modal-approval-note mb-3" id="core_join_team_info_note">
+                                <i class="fas fa-info-circle"></i>
+                                <span>
+                                    Your application will be sent as <em>pending</em>.<br>
+                                    Access is granted only after the business admin approves it.
+                                </span>
+                            </div>
+
+                            <!-- Feedback messages -->
+                            <div class="jnp__team-apply-success mb-3" id="core_join_team_success" style="display:none;">
+                                <i class="fas fa-check-circle"></i>
+                                <span id="core_join_team_success_msg"></span>
+                            </div>
+                            <div class="jnp__team-apply-error mb-3" id="core_join_team_error" style="display:none;">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <span id="core_join_team_error_msg"></span>
+                            </div>
+
+                            <button
+                                id="core_join_team_apply_btn"
+                                class="btn cjb__btn-submit"
+                                type="button"
+                                disabled>
+                                <i class="fas fa-paper-plane me-2"></i>
+                                Send Application
+                                <i class="fas fa-arrow-right ms-2 cjb__btn-arrow"></i>
+                            </button>
+
+                            <p class="cjb__submit-note mt-3">
+                                <i class="fas fa-arrow-left"></i>
+                                <a href="{% url 'core:join_us' %}" class="text-decoration-none text-muted">Back to role selection</a>
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var searchInput  = document.getElementById('core_join_team_search_input');
+    var resultsBox   = document.getElementById('core_join_team_search_results');
+    var selectedBox  = document.getElementById('core_join_team_selected');
+    var selectedName = document.getElementById('core_join_team_selected_name');
+    var selectedMeta = document.getElementById('core_join_team_selected_meta');
+    var clearBtn     = document.getElementById('core_join_team_clear_btn');
+    var applyBtn     = document.getElementById('core_join_team_apply_btn');
+    var infoNote     = document.getElementById('core_join_team_info_note');
+    var successBox   = document.getElementById('core_join_team_success');
+    var successMsg   = document.getElementById('core_join_team_success_msg');
+    var errorBox     = document.getElementById('core_join_team_error');
+    var errorMsg     = document.getElementById('core_join_team_error_msg');
+    var searchWrap   = document.getElementById('core_join_team_search_wrap');
+
+    if (!searchInput) return;
+
+    var selectedId  = null;
+    var searchTimer = null;
+
+    function resetFeedback() {
+        successBox.style.display = 'none';
+        errorBox.style.display   = 'none';
+        infoNote.style.display   = 'flex';
+    }
+
+    function showResults() { resultsBox.style.display = 'block'; }
+    function hideResults() { resultsBox.style.display = 'none'; resultsBox.innerHTML = ''; }
+
+    function selectBusiness(id, name, phone, code) {
+        selectedId = id;
+        selectedName.textContent = name;
+        selectedMeta.textContent = [code, phone].filter(Boolean).join(' · ');
+        hideResults();
+        searchWrap.style.display = 'none';
+        selectedBox.style.display = 'flex';
+        applyBtn.disabled = false;
+        resetFeedback();
+    }
+
+    clearBtn.addEventListener('click', function () {
+        selectedId = null;
+        applyBtn.disabled = true;
+        selectedBox.style.display = 'none';
+        searchWrap.style.display = 'block';
+        searchInput.value = '';
+        hideResults();
+        searchInput.focus();
+        resetFeedback();
+    });
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        var q = searchInput.value.trim();
+        if (q.length < 4) { hideResults(); return; }
+        searchTimer = setTimeout(function () {
+            fetch('{% url "core:team_business_search" %}?q=' + encodeURIComponent(q), {
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                resultsBox.innerHTML = '';
+                if (!data.results || !data.results.length) {
+                    resultsBox.innerHTML = '<div class="jnp__team-no-result">No businesses found</div>';
+                    showResults();
+                    return;
+                }
+                data.results.forEach(function (b) {
+                    var row = document.createElement('div');
+                    row.className = 'jnp__team-result-row';
+                    row.innerHTML =
+                        '<div class="jnp__team-result-name">' + b.name + '</div>' +
+                        '<div class="jnp__team-result-meta">' + [b.code, b.phone].filter(Boolean).join(' · ') + '</div>';
+                    row.addEventListener('click', function () { selectBusiness(b.id, b.name, b.phone, b.code); });
+                    resultsBox.appendChild(row);
+                });
+                showResults();
+            })
+            .catch(function () {
+                resultsBox.innerHTML = '<div class="jnp__team-no-result">Search failed. Please try again.</div>';
+                showResults();
+            });
+        }, 300);
+    });
+
+    applyBtn.addEventListener('click', function () {
+        if (!selectedId) return;
+        applyBtn.disabled = true;
+        applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Sending…';
+        fetch('{% url "core:team_apply_request" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({business_id: selectedId})
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            applyBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Send Application <i class="fas fa-arrow-right ms-2 cjb__btn-arrow"></i>';
+            infoNote.style.display = 'none';
+            if (data.ok) {
+                successMsg.textContent = 'Application sent to ' + data.business_name + '! Waiting for admin approval.';
+                successBox.style.display = 'flex';
+                errorBox.style.display   = 'none';
+                applyBtn.disabled = true;
+            } else {
+                errorMsg.textContent = data.error;
+                errorBox.style.display   = 'flex';
+                successBox.style.display = 'none';
+                applyBtn.disabled = false;
+            }
+        })
+        .catch(function () {
+            applyBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Send Application <i class="fas fa-arrow-right ms-2 cjb__btn-arrow"></i>';
+            applyBtn.disabled = false;
+            errorMsg.textContent = 'Something went wrong. Please try again.';
+            errorBox.style.display = 'flex';
+        });
+    });
+});
+</script>
+{% endblock content %}

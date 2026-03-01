@@ -1,70 +1,576 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-<div class="container" id="core_join_container_driver">
-    <div class="card border-0 shadow-lg" id="core_join_card_driver">
-        <div class="card-header bg-gradient text-white text-center py-4" style="background: linear-gradient(135deg, var(--ez-navy-500) 0%, var(--ez-navy-700) 100%);">
-            <div class="mb-3">
-                <i class="fas fa-car fa-3x"></i>
+<div id="core_join_container_driver">
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}info{% endif %} d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="fas fa-{% if message.tags == 'error' %}exclamation-circle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} flex-shrink-0"></i>
+        <span>{{ message }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- ══ SECTION 1: Complete Your Profile (shown only when profile < 100%) ══ -->
+    {% if completion_percentage < 100 %}
+    <div class="card mb-3" id="core_join_card_profile_complete">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h4 class="mb-1 fw-bold">Complete Your Profile</h4>
+                    <p class="text-muted mb-0 small">Your profile must be 100% complete before applying as a driver</p>
+                </div>
+                <span class="badge bg-danger text-white fw-semibold px-3 py-2">
+                    <i class="fas fa-exclamation-triangle me-1"></i>{{ completion_percentage }}% Done
+                </span>
             </div>
-            <h2 class="mb-2 fw-bold">Driver Application</h2>
-            <p class="mb-0 opacity-90">Start earning with EzzyDelivery today</p>
         </div>
 
-        <div class="card-body p-4 p-md-5">
-            <div class="alert alert-success d-flex align-items-start gap-3 mb-4" role="alert">
-                <i class="fas fa-check-circle mt-1"></i>
-                <div>
-                    <strong>Quick Application Process</strong>
-                    <p class="mb-0 small">Complete your driver application below. Most applications are reviewed within 24 hours.</p>
+        <div class="card-body px-4 py-3">
+            <!-- Progress bar -->
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small fw-semibold text-dark">Profile Progress</span>
+                    <span class="small fw-bold" style="color:var(--brand-primary)">{{ completion_percentage }}%</span>
+                </div>
+                <div class="progress" style="height:10px;border-radius:8px;background:#e9ecef;">
+                    <div class="progress-bar" role="progressbar"
+                         style="width:{{ completion_percentage }}%;background:var(--brand-primary);"
+                         aria-valuenow="{{ completion_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
             </div>
 
-            <form
-                id="core_join_form_driver"
-                method="POST"
-                name="driver_join"
-                enctype="multipart/form-data"
-            novalidate>
+            <form method="POST" id="core_join_form_profile_save" novalidate>
                 {% csrf_token %}
+                <input type="hidden" name="action" value="save_profile">
 
-                <div class="row g-4">
-                    {{ driverjoinform | crispy }}
+                {% if profileupdateform.errors %}
+                <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+                    <i class="fas fa-exclamation-circle flex-shrink-0"></i>
+                    <span>Please fix the errors highlighted below.</span>
+                </div>
+                {% endif %}
+
+                <!-- Name -->
+                <h6 class="text-uppercase text-muted fw-bold small mb-3">
+                    <i class="fas fa-user me-2"></i>Personal Information
+                    <span class="float-end text-secondary fw-normal" style="text-transform:none;font-size:0.7rem;letter-spacing:0">Step 1 of 3</span>
+                </h6>
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">First Name <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <input type="text" name="first_name" id="id_pf_first_name"
+                            class="form-control{% if profileupdateform.first_name.errors %} is-invalid{% endif %}"
+                            placeholder="First Name"
+                            value="{{ profileupdateform.first_name.value|default:'' }}" required>
+                        {% if profileupdateform.first_name.errors %}<div class="invalid-feedback">{{ profileupdateform.first_name.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Last Name <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <input type="text" name="last_name" id="id_pf_last_name"
+                            class="form-control{% if profileupdateform.last_name.errors %} is-invalid{% endif %}"
+                            placeholder="Last Name"
+                            value="{{ profileupdateform.last_name.value|default:'' }}" required>
+                        {% if profileupdateform.last_name.errors %}<div class="invalid-feedback">{{ profileupdateform.last_name.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Date of Birth <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <input type="date" name="date_of_birth" id="id_pf_date_of_birth"
+                            class="form-control{% if profileupdateform.date_of_birth.errors %} is-invalid{% endif %}"
+                            value="{{ profileupdateform.date_of_birth.value|default:'' }}"
+                            min="1930-01-01" max="2010-12-31" required>
+                        {% if profileupdateform.date_of_birth.errors %}<div class="invalid-feedback">{{ profileupdateform.date_of_birth.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Nationality <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <input type="text" name="nationlity" id="id_pf_nationlity"
+                            class="form-control{% if profileupdateform.nationlity.errors %} is-invalid{% endif %}"
+                            placeholder="e.g. Qatari, Indian, Filipino"
+                            value="{{ profileupdateform.nationlity.value|default:'' }}" required>
+                        {% if profileupdateform.nationlity.errors %}<div class="invalid-feedback">{{ profileupdateform.nationlity.errors.0 }}</div>{% endif %}
+                    </div>
                 </div>
 
-                <div class="d-grid gap-2 mt-5">
-                    <button
-                        id="core_join_btn_driver_submit"
-                        class="btn btn-lg py-3"
-                        name="join_as_driver"
-                        type="submit"
-                        value="submit"
-                    >
-                        <i class="fas fa-car me-2"></i>
-                        <span class="fw-bold">JOIN AS DRIVER</span>
-                    </button>
+                <!-- Contact -->
+                <h6 class="text-uppercase text-muted fw-bold small mb-3 mt-4">
+                    <i class="fas fa-address-book me-2"></i>Contact Details
+                    <span class="float-end text-secondary fw-normal" style="text-transform:none;font-size:0.7rem;letter-spacing:0">Step 2 of 3</span>
+                </h6>
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Phone <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone-alt"></i></span>
+                            <input type="tel" name="phone" id="id_pf_phone"
+                                class="form-control{% if profileupdateform.phone.errors %} is-invalid{% endif %}"
+                                placeholder="e.g. 33001122"
+                                value="{{ profileupdateform.phone.value|default:'' }}" required>
+                            {% if profileupdateform.phone.errors %}<div class="invalid-feedback">{{ profileupdateform.phone.errors.0 }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">WhatsApp <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                            <input type="tel" name="whatsapp" id="id_pf_whatsapp"
+                                class="form-control{% if profileupdateform.whatsapp.errors %} is-invalid{% endif %}"
+                                placeholder="e.g. 97433001122"
+                                value="{{ profileupdateform.whatsapp.value|default:'' }}" required>
+                            {% if profileupdateform.whatsapp.errors %}<div class="invalid-feedback">{{ profileupdateform.whatsapp.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="form-text text-muted small"><i class="fas fa-info-circle me-1"></i>Include country code (e.g. 974…)</div>
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Email</p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <input type="email" name="email" id="id_pf_email"
+                            class="form-control{% if profileupdateform.email.errors %} is-invalid{% endif %}"
+                            placeholder="your@email.com"
+                            value="{{ profileupdateform.email.value|default:'' }}">
+                        {% if profileupdateform.email.errors %}<div class="invalid-feedback">{{ profileupdateform.email.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <!-- Location -->
+                <h6 class="text-uppercase text-muted fw-bold small mb-3 mt-4">
+                    <i class="fas fa-map-marker-alt me-2"></i>Location
+                    <span class="float-end text-secondary fw-normal" style="text-transform:none;font-size:0.7rem;letter-spacing:0">Step 3 of 3</span>
+                </h6>
+
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Zone / Area <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <input type="text" name="zone_name" id="id_pf_zone_name"
+                            class="form-control{% if profileupdateform.zone_name.errors %} is-invalid{% endif %}"
+                            placeholder="e.g. Al Sadd, Lusail, West Bay"
+                            value="{{ profileupdateform.zone_name.value|default:'' }}" required>
+                        {% if profileupdateform.zone_name.errors %}<div class="invalid-feedback">{{ profileupdateform.zone_name.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <div class="row align-items-start py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Full Address</p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <textarea name="address" id="id_pf_address"
+                            class="form-control{% if profileupdateform.address.errors %} is-invalid{% endif %}"
+                            rows="3"
+                            placeholder="Street, building, flat number…">{{ profileupdateform.address.value|default:'' }}</textarea>
+                        {% if profileupdateform.address.errors %}<div class="invalid-feedback">{{ profileupdateform.address.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <!-- hidden required fields that ProfileUpdateForm needs -->
+                <input type="hidden" name="username" value="{{ profile.username|default:'' }}">
+
+                <div class="card-footer bg-transparent border-0 px-0 pb-2 pt-3 mt-2">
+                    <div class="d-grid d-sm-block text-sm-end">
+                        <button type="submit"
+                            class="btn btn-warning fw-bold text-uppercase d-inline-flex align-items-center justify-content-center gap-2 px-5 py-3">
+                            <i class="fas fa-save"></i>
+                            <span>Save Profile &amp; Continue</span>
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                    </div>
+                    <p class="text-center text-muted small mt-3 mb-0">
+                        <i class="fas fa-info-circle me-1" style="color:var(--brand-primary)"></i>
+                        After saving, your Driver Application form will be ready to submit below.
+                    </p>
                 </div>
             </form>
+        </div>
+    </div>
+    {% endif %}
 
-            <div class="mt-5 p-4 bg-light rounded">
-                <h5 class="fw-bold mb-3">
-                    <i class="fas fa-route text-primary me-2"></i>
-                    Your Journey to Success
-                </h5>
-                <ol class="mb-0 ps-3">
-                    <li class="mb-2">Complete your driver application</li>
-                    <li class="mb-2">Submit required documents for verification</li>
-                    <li class="mb-2">Attend a quick onboarding session</li>
-                    <li class="mb-0">Start accepting deliveries and earning</li>
-                </ol>
+    <!-- ══ SECTION 2: Driver Application Form ══════════════════════════════ -->
+    {% if driverjoinform.errors %}
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="fas fa-exclamation-circle flex-shrink-0"></i>
+        <span>Please fix the errors highlighted below before submitting.</span>
+    </div>
+    {% endif %}
+
+    <form
+        id="core_join_form_driver"
+        method="POST"
+        name="driver_join"
+        enctype="multipart/form-data"
+        novalidate
+        {% if completion_percentage < 100 %}style="opacity:0.5;pointer-events:none;"{% endif %}>
+        {% csrf_token %}
+
+        {% if completion_percentage < 100 %}
+        <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
+            <i class="fas fa-lock flex-shrink-0"></i>
+            <span>Complete your profile above first to unlock the driver application.</span>
+        </div>
+        {% endif %}
+
+        <!-- ── DRIVER APPLICATION CARD ──────────────────────────────── -->
+        <div class="card mb-3" id="core_join_card_driver_info">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h4 class="mb-1 fw-bold">Driver Application</h4>
+                        <p class="text-muted mb-0 small">Join Qatar's fastest-growing delivery platform</p>
+                    </div>
+                    <div class="d-flex flex-column align-items-end gap-1">
+                        <span class="badge bg-warning text-dark fw-semibold px-3 py-2">
+                            <i class="fas fa-car me-1"></i>Driver Partner
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size:0.65rem">
+                            <i class="fas fa-clock me-1"></i>24h Review
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body px-4 py-4">
+
+                <!-- Stats row -->
+                <div class="d-flex gap-3 mb-4 flex-wrap">
+                    <div class="d-flex align-items-center gap-2 px-3 py-2 rounded border" style="background:var(--brand-grey-100);border-color:var(--brand-grey-200)!important">
+                        <i class="fas fa-users" style="color:var(--brand-primary)"></i>
+                        <div>
+                            <div class="fw-bold" style="font-size:0.9rem;line-height:1.1">500+</div>
+                            <div class="text-muted" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em">Active Drivers</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 px-3 py-2 rounded border" style="background:var(--brand-grey-100);border-color:var(--brand-grey-200)!important">
+                        <i class="fas fa-sack-dollar" style="color:var(--brand-primary)"></i>
+                        <div>
+                            <div class="fw-bold" style="font-size:0.9rem;line-height:1.1">QAR 50+</div>
+                            <div class="text-muted" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em">Per Delivery</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 px-3 py-2 rounded border" style="background:var(--brand-grey-100);border-color:var(--brand-grey-200)!important">
+                        <i class="fas fa-headset" style="color:var(--brand-primary)"></i>
+                        <div>
+                            <div class="fw-bold" style="font-size:0.9rem;line-height:1.1">24/7</div>
+                            <div class="text-muted" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em">Driver Support</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact Details -->
+                <h6 class="text-uppercase text-muted fw-bold small mb-3">
+                    <i class="fas fa-phone me-2"></i>Contact Details
+                </h6>
+
+                <!-- Driver Phone -->
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Phone <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone-alt"></i></span>
+                            <input
+                                type="tel"
+                                name="driver_phone"
+                                id="id_driver_phone"
+                                class="form-control{% if driverjoinform.driver_phone.errors %} is-invalid{% endif %}"
+                                placeholder="e.g. 33001122"
+                                value="{{ driverjoinform.driver_phone.value|default:'' }}"
+                                required>
+                            {% if driverjoinform.driver_phone.errors %}
+                            <div class="invalid-feedback">{{ driverjoinform.driver_phone.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <!-- WhatsApp -->
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">WhatsApp <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                            <input
+                                type="tel"
+                                name="driver_whatsapp"
+                                id="id_driver_whatsapp"
+                                class="form-control{% if driverjoinform.driver_whatsapp.errors %} is-invalid{% endif %}"
+                                placeholder="e.g. 97433001122"
+                                value="{{ driverjoinform.driver_whatsapp.value|default:'' }}"
+                                required>
+                            {% if driverjoinform.driver_whatsapp.errors %}
+                            <div class="invalid-feedback">{{ driverjoinform.driver_whatsapp.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-text text-muted small"><i class="fas fa-info-circle me-1"></i>Include country code (e.g. 974…)</div>
+                    </div>
+                </div>
+
+                <!-- Professional Details -->
+                <h6 class="text-uppercase text-muted fw-bold small mb-3 mt-4">
+                    <i class="fas fa-id-card me-2"></i>Professional Details
+                </h6>
+
+                <!-- License Number -->
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">License No. <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <input
+                            type="text"
+                            name="driver_license_number"
+                            id="id_driver_license_number"
+                            class="form-control{% if driverjoinform.driver_license_number.errors %} is-invalid{% endif %}"
+                            placeholder="Qatar driving license number"
+                            value="{{ driverjoinform.driver_license_number.value|default:'' }}"
+                            required>
+                        {% if driverjoinform.driver_license_number.errors %}
+                        <div class="invalid-feedback">{{ driverjoinform.driver_license_number.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <!-- Language -->
+                <div class="row align-items-center py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">Primary Language <span class="text-danger">*</span></p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <select
+                            name="driver_languages"
+                            id="id_driver_languages"
+                            class="form-select{% if driverjoinform.driver_languages.errors %} is-invalid{% endif %}"
+                            required>
+                            {% for value, label in driverjoinform.fields.driver_languages.choices %}
+                            <option value="{{ value }}" {% if driverjoinform.driver_languages.value == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if driverjoinform.driver_languages.errors %}
+                        <div class="invalid-feedback">{{ driverjoinform.driver_languages.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <hr class="my-2 opacity-50" />
+
+                <!-- Bio -->
+                <div class="row align-items-start py-3 px-2">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <p class="mb-2 mb-sm-0 fw-semibold">About / Skills</p>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-9">
+                        <textarea
+                            name="driver_bio"
+                            id="id_driver_bio"
+                            class="form-control{% if driverjoinform.driver_bio.errors %} is-invalid{% endif %}"
+                            rows="3"
+                            placeholder="Briefly describe your experience and skills…">{{ driverjoinform.driver_bio.value|default:'' }}</textarea>
+                        {% if driverjoinform.driver_bio.errors %}
+                        <div class="invalid-feedback">{{ driverjoinform.driver_bio.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Requirements -->
+                <h6 class="text-uppercase text-muted fw-bold small mb-3 mt-4">
+                    <i class="fas fa-list-check me-2"></i>Requirements
+                </h6>
+                <div class="row px-2 pb-2">
+                    <div class="col-12 col-sm-6">
+                        <div class="d-flex align-items-center gap-2 py-1 small text-muted">
+                            <i class="fas fa-check-circle" style="color:#22c55e;font-size:0.75rem"></i>
+                            <span>Valid Qatar driving license</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 py-1 small text-muted">
+                            <i class="fas fa-check-circle" style="color:#22c55e;font-size:0.75rem"></i>
+                            <span>Own vehicle (car or motorcycle)</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 py-1 small text-muted">
+                            <i class="fas fa-check-circle" style="color:#22c55e;font-size:0.75rem"></i>
+                            <span>Valid QID or residence permit</span>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <div class="d-flex align-items-center gap-2 py-1 small text-muted">
+                            <i class="fas fa-check-circle" style="color:#22c55e;font-size:0.75rem"></i>
+                            <span>Smartphone with GPS</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 py-1 small text-muted">
+                            <i class="fas fa-check-circle" style="color:#22c55e;font-size:0.75rem"></i>
+                            <span>18 years or older</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 py-1 small text-muted">
+                            <i class="fas fa-check-circle" style="color:#22c55e;font-size:0.75rem"></i>
+                            <span>Clean driving record</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Card Footer -->
+            <div class="card-footer bg-transparent border-0 px-4 pb-4 pt-2">
+                <!-- Process steps -->
+                <div class="d-flex align-items-center justify-content-center gap-3 mb-3 flex-wrap">
+                    <div class="d-flex align-items-center gap-2 small text-muted">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold" style="width:1.5rem;height:1.5rem;font-size:0.7rem;background:var(--brand-navy);color:var(--brand-primary)">1</span>
+                        Submit application
+                    </div>
+                    <i class="fas fa-chevron-right text-muted" style="font-size:0.6rem"></i>
+                    <div class="d-flex align-items-center gap-2 small text-muted">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold" style="width:1.5rem;height:1.5rem;font-size:0.7rem;background:var(--brand-navy);color:var(--brand-primary)">2</span>
+                        Verification (24h)
+                    </div>
+                    <i class="fas fa-chevron-right text-muted" style="font-size:0.6rem"></i>
+                    <div class="d-flex align-items-center gap-2 small text-muted">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold" style="width:1.5rem;height:1.5rem;font-size:0.7rem;background:var(--brand-navy);color:var(--brand-primary)">3</span>
+                        Start delivering
+                    </div>
+                </div>
+
+                <div class="d-grid d-sm-block text-sm-end">
+                    <button
+                        id="core_join_btn_driver_submit"
+                        class="btn btn-warning fw-bold text-uppercase d-inline-flex align-items-center justify-content-center gap-2 px-5 py-3"
+                        name="join_as_driver"
+                        type="submit"
+                        value="submit">
+                        <i class="fas fa-car"></i>
+                        <span>Join as Driver</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <p class="text-center text-muted small mt-3 mb-0">
+                    <i class="fas fa-shield-alt me-1" style="color:var(--brand-primary)"></i>
+                    All driver information is kept confidential and secure.
+                </p>
             </div>
         </div>
 
-        <div class="card-footer bg-light text-center py-3 border-0">
-            <p class="mb-0 text-muted small">
-                <i class="fas fa-shield-alt me-1"></i>
-                All driver information is kept confidential and secure
-            </p>
+    </form>
+
+    <!-- FAQ Section -->
+    <div class="card" id="core_join_driver_section_faq">
+        <div class="card-header">
+            <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="font-size:0.8125rem">
+                <i class="fas fa-question-circle" style="color:var(--brand-primary)"></i>
+                Frequently Asked Questions
+            </h6>
+        </div>
+        <div class="card-body p-0">
+
+            <div class="cjd__faq-item border-bottom" role="button" tabindex="0" aria-expanded="false">
+                <div class="cjd__faq-question">
+                    <span>How much can I earn as a driver?</span>
+                    <div class="cjd__faq-toggle"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div class="cjd__faq-answer">
+                    Earnings vary based on the number of deliveries you complete. On average, drivers earn QAR 50+ per delivery, with additional bonuses during peak hours and for completing multiple deliveries.
+                </div>
+            </div>
+
+            <div class="cjd__faq-item border-bottom" role="button" tabindex="0" aria-expanded="false">
+                <div class="cjd__faq-question">
+                    <span>When do I get paid?</span>
+                    <div class="cjd__faq-toggle"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div class="cjd__faq-answer">
+                    Payments are processed monthly. You'll receive your earnings directly to your registered bank account within 1–2 business days.
+                </div>
+            </div>
+
+            <div class="cjd__faq-item border-bottom" role="button" tabindex="0" aria-expanded="false">
+                <div class="cjd__faq-question">
+                    <span>Do I need my own vehicle?</span>
+                    <div class="cjd__faq-toggle"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div class="cjd__faq-answer">
+                    Yes, you need your own vehicle (car or motorcycle) with valid registration and insurance in good working condition.
+                </div>
+            </div>
+
+            <div class="cjd__faq-item border-bottom" role="button" tabindex="0" aria-expanded="false">
+                <div class="cjd__faq-question">
+                    <span>What are the working hours?</span>
+                    <div class="cjd__faq-toggle"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div class="cjd__faq-answer">
+                    Complete flexibility — work whenever you want. Peak slots (10 AM–2 PM, 2–6 PM, 6–10 PM) typically have higher demand and bonuses.
+                </div>
+            </div>
+
+            <div class="cjd__faq-item border-bottom" role="button" tabindex="0" aria-expanded="false">
+                <div class="cjd__faq-question">
+                    <span>How long does the application take?</span>
+                    <div class="cjd__faq-toggle"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div class="cjd__faq-answer">
+                    Once submitted, our team reviews your application within 1–2 business days. After approval you can start delivering immediately.
+                </div>
+            </div>
+
+            <div class="cjd__faq-item border-bottom" role="button" tabindex="0" aria-expanded="false">
+                <div class="cjd__faq-question">
+                    <span>What is the notice period if I want to leave?</span>
+                    <div class="cjd__faq-toggle"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div class="cjd__faq-answer">
+                    A 1-month notice period is required before discontinuing your driver account. This ensures your pending earnings are settled and all outstanding deliveries are properly handed over.
+                </div>
+            </div>
+
+            <div class="cjd__faq-item" role="button" tabindex="0" aria-expanded="false">
+                <div class="cjd__faq-question">
+                    <span>What support do drivers receive?</span>
+                    <div class="cjd__faq-toggle"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div class="cjd__faq-answer">
+                    24/7 driver support via phone and in-app chat, plus access to our driver community, training resources, and dedicated account managers.
+                </div>
+            </div>
+
         </div>
     </div>
+
 </div>

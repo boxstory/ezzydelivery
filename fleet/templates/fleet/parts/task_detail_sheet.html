@@ -97,11 +97,18 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                         <i class="fa-regular fa-clock"></i> <span id="tdTimeslotVal"></span>
                     </span>
                 </div>
+                <!-- Quick Navigation Action Row -->
+                <div id="tdNavButtons" style="display:none; gap: 8px; margin-top: 10px;">
+                    <a id="tdNavWaze" href="#" target="_blank" class="task-card__contact-pill"
+                        style="color: #1e293b; border-color: #cbd5e1;">
+                        <i class="fa-brands fa-waze" style="color:#33ccff; font-size: 1.1rem;"></i> Waze
+                    </a>
+                    <a id="tdNavGoogle" href="#" target="_blank" class="task-card__contact-pill"
+                        style="color: #1e293b; border-color: #cbd5e1;">
+                        <i class="fa-solid fa-map" style="color:#34a853; font-size: 1.1rem;"></i> Maps
+                    </a>
+                </div>
             </div>
-            <a id="tdDropMapBtn" href="#" target="_blank" class="td-map-tile td-map-tile--grey" title="Open Dropoff in Maps">
-                <i class="fa-solid fa-location-pin td-map-tile__pin"></i>
-                <span class="td-map-tile__label">Maps</span>
-            </a>
         </div>
 
         <!-- Address Validation Status -->
@@ -555,14 +562,16 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const bestLng  = av.order_lng || av.lng || av.dl_lng || d.lng;
         const pinColor = (av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy]) ? ACCURACY_LABEL[av.coords_accuracy].color : '#718096';
 
-        // Dropoff map tile
-        const dropMapBtn = document.getElementById('tdDropMapBtn');
+        // Dropoff Maps & Navigation Routing
+        const navButtons = document.getElementById('tdNavButtons');
+        const navWaze = document.getElementById('tdNavWaze');
+        const navGoogle = document.getElementById('tdNavGoogle');
         if (bestLat && bestLng && parseFloat(bestLat) !== 0 && parseFloat(bestLng) !== 0) {
-            dropMapBtn.href = 'https://www.google.com/maps?q=' + bestLat + ',' + bestLng;
-            dropMapBtn.className = 'td-map-tile td-map-tile--blue';
+            navWaze.href = `https://waze.com/ul?ll=${bestLat},${bestLng}&navigate=yes`;
+            navGoogle.href = `https://www.google.com/maps/dir/?api=1&destination=${bestLat},${bestLng}&travelmode=driving`;
+            navButtons.style.display = 'flex';
         } else {
-            dropMapBtn.removeAttribute('href');
-            dropMapBtn.className = 'td-map-tile td-map-tile--grey';
+            navButtons.style.display = 'none';
         }
 
         if (bestLat && bestLng && parseFloat(bestLat) !== 0) {

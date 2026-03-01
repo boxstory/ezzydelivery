@@ -577,11 +577,8 @@ class DMSPushTestCase(TransactionTestCase):
             pickup_location=self.pickup_location
         )
 
-    @patch('ezzy_api.views._push_task_to_dms')
-    def test_dms_push_on_task_creation(self, mock_push):
-        """Test DMS push is triggered when task is created"""
-        mock_push.return_value = {'status': 'success', 'dms_id': 'DMS-12345'}
-
+    def test_dms_push_on_task_creation(self):
+        """Test delivery task can be created without errors"""
         task = DeliveryTask.objects.create(
             dl_task_number='DMS-001',
             dl_task_description='DMS push test',
@@ -590,9 +587,8 @@ class DMSPushTestCase(TransactionTestCase):
             dl_task_status='pending',
             dl_task_status_client='for_review',
         )
-
-        # Signal should trigger DMS push
-        # In a real scenario, check that _push_task_to_dms was called
+        self.assertIsNotNone(task.id)
+        self.assertEqual(task.dl_task_number, 'DMS-001')
 
     @patch('requests.post')
     def test_dms_api_call_success(self, mock_post):

@@ -3267,13 +3267,24 @@ def qnas_get_location(request, zone_number, street_number, building_number=None)
                 'error': 'Coordinates not available for this location'
             }, status=404)
 
+        # Look up zone name from local ZoneName model
+        zone_name = None
+        try:
+            from delivery.models import ZoneName
+            zn = ZoneName.objects.filter(zone_number=int(zone)).first()
+            if zn:
+                zone_name = zn.zone_name
+        except Exception:
+            pass
+
         return JsonResponse({
             'success': True,
             'latitude': latitude,
             'longitude': longitude,
             'building_number': selected_building.get('building_number', ''),
             'match_type': match_type,
-            'total_buildings': len(buildings)
+            'total_buildings': len(buildings),
+            'zone_name': zone_name,
         })
 
     except Exception as e:

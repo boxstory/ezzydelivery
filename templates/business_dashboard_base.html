@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="{% static 'orders/css/orders.css' %}?v=20260216b">
     <link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260216a">
     <link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260216b">
-    <link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260218a">
+    <link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260301b">
 
     <!-- Mobile PWA CSS -->
     <link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}?v=20260208b">
@@ -46,6 +46,9 @@
       {% endblock title %}
     Ezzy Dashboard</title>
   </head>
+  <!-- Apply collapsed class before first paint to prevent flash -->
+  <script>if(localStorage.getItem('sidebarCollapsed')==='true'){document.documentElement.classList.add('sidebar-pre-collapsed');}</script>
+  <style>.sidebar-pre-collapsed #client_sidebar_container_main{width:3.5rem!important;min-width:3.5rem!important;padding-left:.5rem!important;padding-right:.5rem!important;overflow:hidden;}</style>
   <body class="business-dashboard business-mobile d-flex flex-column min-vh-100">
     <!-- Toast Notifications -->
     {% include "includes/toast_notifications.html" %}
@@ -172,62 +175,119 @@
         updateSidebarActiveStates();
       });
 
-      // Sidebar toggle functionality
-      function initSidebarToggle() {
-        const sidebar = document.getElementById('client_sidebar_container_main');
-        const toggleBtn = document.getElementById('sidebar_toggle_btn');
+      // ── SIDEBAR CONTROLLER (single init, all behaviour) ──
+      // Wired once to document.body so it survives HTMX swaps that replace sidebar DOM.
+      if (!window._sidebarReady) {
+        window._sidebarReady = true;
 
-        if (sidebar && toggleBtn) {
-          // Restore collapsed state from localStorage
-          const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-          if (isCollapsed) {
+        // ── helper: read current sidebar element ──
+        function getSidebar() { return document.getElementById('client_sidebar_container_main'); }
+
+        // ── TOGGLE BUTTON: collapse / expand ──
+        function initSidebarToggle() {
+          const sidebar = getSidebar();
+          const toggleBtn = document.getElementById('sidebar_toggle_btn');
+          if (!sidebar || !toggleBtn) return;
+
+          // Restore state without flash
+          sidebar.classList.add('no-transition');
+          if (localStorage.getItem('sidebarCollapsed') === 'true') {
             sidebar.classList.add('collapsed');
+          } else {
+            sidebar.classList.remove('collapsed');
           }
+          requestAnimationFrame(() => requestAnimationFrame(() => sidebar.classList.remove('no-transition')));
 
-          // Toggle sidebar on button click
-          toggleBtn.addEventListener('click', function(e) {
+          // Clone to wipe old listeners
+          const freshBtn = toggleBtn.cloneNode(true);
+          toggleBtn.parentNode.replaceChild(freshBtn, toggleBtn);
+
+          freshBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            const sidebar = getSidebar();
+            if (!sidebar) return;
             sidebar.classList.toggle('collapsed');
-            const nowCollapsed = sidebar.classList.contains('collapsed');
-            localStorage.setItem('sidebarCollapsed', nowCollapsed);
-          });
-        }
-      }
-
-      // Initialize on DOMContentLoaded
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSidebarToggle);
-      } else {
-        initSidebarToggle();
-      }
-
-      // Re-initialize after HTMX swaps (in case sidebar is replaced)
-      document.body.addEventListener('htmx:afterSettle', initSidebarToggle);
-
-      // Accordion: auto-collapse other submenus when one opens
-      function initSidebarAccordion() {
-        const sidebarNav = document.getElementById('client_sidebar_nav_main');
-        if (!sidebarNav) return;
-        // Remove old listener to avoid duplicates after HTMX
-        sidebarNav.removeEventListener('show.bs.collapse', sidebarNav._accordionHandler);
-        sidebarNav._accordionHandler = function(e) {
-          const allCollapses = sidebarNav.querySelectorAll('.collapse');
-          allCollapses.forEach(function(other) {
-            if (other !== e.target && other.classList.contains('show')) {
-              bootstrap.Collapse.getOrCreateInstance(other, { toggle: false }).hide();
+            const isNowCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', isNowCollapsed);
+            if (isNowCollapsed) {
+              sidebar.querySelectorAll('.bsb__submenu.show').forEach(function(sub) {
+                bootstrap.Collapse.getOrCreateInstance(sub, { toggle: false }).hide();
+              });
             }
           });
-        };
-        sidebarNav.addEventListener('show.bs.collapse', sidebarNav._accordionHandler);
-      }
+        }
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSidebarAccordion);
-      } else {
-        initSidebarAccordion();
+        // ── ACCORDION: only one submenu open at a time ──
+        function initSidebarAccordion() {
+          const sidebarNav = document.getElementById('client_sidebar_nav_main');
+          if (!sidebarNav) return;
+          sidebarNav.removeEventListener('show.bs.collapse', sidebarNav._accordionHandler);
+          sidebarNav._accordionHandler = function(e) {
+            sidebarNav.querySelectorAll('.collapse').forEach(function(other) {
+              if (other !== e.target && other.classList.contains('show')) {
+                bootstrap.Collapse.getOrCreateInstance(other, { toggle: false }).hide();
+              }
+            });
+          };
+          sidebarNav.addEventListener('show.bs.collapse', sidebarNav._accordionHandler);
+        }
+
+        // ── COLLAPSED CLICK GUARD (on document.body — survives HTMX swaps) ──
+        // Rule: any click inside a collapsed sidebar expands it first.
+        // Then open the relevant submenu or navigate to the clicked link.
+        document.body.addEventListener('click', function(e) {
+          const sidebar = getSidebar();
+          if (!sidebar || !sidebar.classList.contains('collapsed')) return;
+          if (!sidebar.contains(e.target)) return;
+
+          // Skip the toggle button — it handles itself
+          if (e.target.closest('#sidebar_toggle_btn')) return;
+
+          // Always block the original event and expand the sidebar
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          sidebar.classList.remove('collapsed');
+          localStorage.setItem('sidebarCollapsed', 'false');
+
+          // Determine what was clicked and act after expansion
+          const collapseLink = e.target.closest('[data-bs-toggle="collapse"]');
+          const subLink      = e.target.closest('.bsb__submenu-link');
+          const singleLink   = e.target.closest('.bsb__link--single');
+
+          if (collapseLink) {
+            // Parent section header — open its submenu
+            const targetId = collapseLink.getAttribute('data-bs-target');
+            if (targetId) {
+              const submenu = sidebar.querySelector(targetId);
+              if (submenu) bootstrap.Collapse.getOrCreateInstance(submenu, { toggle: false }).show();
+            }
+          } else if (subLink) {
+            // Sub-link — open its parent submenu, then navigate
+            const parentSubmenu = subLink.closest('.bsb__submenu');
+            if (parentSubmenu) bootstrap.Collapse.getOrCreateInstance(parentSubmenu, { toggle: false }).show();
+            const href = subLink.getAttribute('href');
+            if (href && href !== '#') window.location.href = href;
+          } else if (singleLink) {
+            // Single direct link — navigate
+            const href = singleLink.getAttribute('href');
+            if (href && href !== '#') window.location.href = href;
+          }
+
+        }, true); // capture phase — fires before Bootstrap
+
+        // Init on load + after every HTMX swap
+        function initAll() {
+          initSidebarToggle();
+          initSidebarAccordion();
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initAll);
+        } else {
+          initAll();
+        }
+        document.body.addEventListener('htmx:afterSettle', initAll);
       }
-      document.body.addEventListener('htmx:afterSettle', initSidebarAccordion);
     </script>
     <!-- AI Address Parse (global utility) -->
     <script src="{% static 'ai_agent/js/ai-address-parse.js' %}?v=20260219b"></script>

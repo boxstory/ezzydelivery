@@ -2,181 +2,212 @@
 {% load static %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-settings-pro.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-settings-pro.css' %}?v=20260301a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="business-settings" id="client_settings_container_main">
-    <!-- Page Header -->
-    <div class="business-settings__header" id="client_settings_section_header">
-        <h1 class="business-settings__title"><i class="fa-solid fa-gear"></i> Business Settings</h1>
+<div class="bset" id="client_settings_container_main">
+
+  <!-- Page Header -->
+  <div class="bset__header" id="client_settings_section_header">
+    <div class="bset__header-content">
+      <div class="bset__header-icon"><i class="fa-solid fa-gear"></i></div>
+      <div>
+        <h1 class="bset__title">Business Settings</h1>
+        <p class="bset__subtitle">{{ business.business_name }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STORE LOCATIONS ── -->
+  <section class="bset__section" id="client_settings_section_stores">
+    <div class="bset__section-header">
+      <div class="bset__section-label">
+        <i class="fa-solid fa-store"></i>
+        <span>Store Locations</span>
+        {% if stores %}<span class="bset__count-badge">{{ stores.count }}</span>{% endif %}
+      </div>
+      <a href="{% url 'business:pickup_location_add' %}" class="bset__btn-add" id="client_settings_btn_new_store">
+        <i class="fa-solid fa-plus"></i> Add Store
+      </a>
     </div>
 
-    <!-- Stores Section -->
-    <div class="business-settings__section" id="client_settings_section_stores">
-        <div class="business-settings__section-header">
-            <h2 class="business-settings__section-title"><i class="fa-solid fa-store"></i> Store Locations</h2>
-            <a href="{% url 'business:pickup_location_add' %}" class="business-settings__btn-add" id="client_settings_btn_new_store">
-                <i class="fa-solid fa-plus"></i> Add Store
+    <div class="bset__section-body">
+      {% if stores %}
+      <div class="bset__grid">
+        {% for store in stores %}
+        <div class="bset__card" id="client_settings_card_store_{{ store.id }}">
+          <div class="bset__card-top">
+            <div class="bset__card-icon bset__card-icon--store">
+              <i class="fa-solid fa-{% if store.is_fulfilment_center %}warehouse{% else %}store{% endif %}"></i>
+            </div>
+            <div class="bset__card-info">
+              <h3 class="bset__card-name">{{ store.pickup_location_title }}</h3>
+              {% if store.pickup_status == 'active' %}
+              <span class="bset__badge bset__badge--active"><i class="fa-solid fa-circle-dot"></i> Active</span>
+              {% else %}
+              <span class="bset__badge bset__badge--inactive"><i class="fa-solid fa-circle"></i> {{ store.pickup_status|title }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="bset__card-rows">
+            <div class="bset__row">
+              <span class="bset__row-label"><i class="fa-solid fa-location-dot"></i> Location</span>
+              <a href="https://maps.google.com/?q={{ store.locality }}" target="_blank" class="bset__row-link">
+                {{ store.locality|default:"-" }}
+              </a>
+            </div>
+            <div class="bset__row">
+              <span class="bset__row-label"><i class="fa-solid fa-building"></i> Building</span>
+              <span class="bset__row-value">{{ store.pickup_building_no|default:"—" }}</span>
+            </div>
+            <div class="bset__row">
+              <span class="bset__row-label"><i class="fa-solid fa-map"></i> Zone</span>
+              <span class="bset__row-value">{{ store.pickup_zone_no|default:"—" }}</span>
+            </div>
+          </div>
+          <div class="bset__card-footer">
+            <a href="{% url 'business:pickup_location_update' store.id %}" class="bset__btn-edit">
+              <i class="fa-solid fa-pen-to-square"></i> Edit
             </a>
+          </div>
         </div>
-        <div class="business-settings__section-body">
-            {% if stores %}
-            <div class="business-settings__grid">
-                {% for store in stores %}
-                <div class="business-settings__card business-settings__location-card">
-                    <div class="business-settings__card-header">
-                        <h3 class="business-settings__card-title">{{ store.pickup_location_title }}</h3>
-                        {% if store.pickup_status == 'active' %}
-                        <span class="business-settings__status-badge business-settings__status-badge--active">
-                            <i class="fa-solid fa-check-circle"></i> Active
-                        </span>
-                        {% else %}
-                        <span class="business-settings__status-badge business-settings__status-badge--inactive">
-                            <i class="fa-solid fa-circle-xmark"></i> {{ store.pickup_status|title }}
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="business-settings__card-body">
-                        <div class="business-settings__info-row">
-                            <span class="business-settings__info-label">Location</span>
-                            <a href="https://maps.google.com/?q={{ store.locality }}" target="_blank" class="business-settings__location-link">
-                                <i class="fa-solid fa-location-dot"></i> {{ store.locality }}
-                            </a>
-                        </div>
-                        <div class="business-settings__info-row">
-                            <span class="business-settings__info-label">Building</span>
-                            <span class="business-settings__info-value">{{ store.pickup_building_no|default:"-" }}</span>
-                        </div>
-                        <div class="business-settings__info-row">
-                            <span class="business-settings__info-label">Zone</span>
-                            <span class="business-settings__info-value">{{ store.pickup_zone_no|default:"-" }}</span>
-                        </div>
-                    </div>
-                    <div class="business-settings__card-footer">
-                        <a href="{% url 'business:pickup_location_update' store.id %}" class="business-settings__btn-edit">
-                            <i class="fa-solid fa-pen-to-square"></i> Edit Details
-                        </a>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="business-settings__empty">
-                <i class="fa-solid fa-store-slash business-settings__empty-icon"></i>
-                <p class="business-settings__empty-text">No store locations added yet</p>
-                <a href="{% url 'business:pickup_location_add' %}" class="business-settings__btn-add-first">
-                    <i class="fa-solid fa-plus"></i> Add Your First Store
-                </a>
-            </div>
-            {% endif %}
-        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="bset__empty">
+        <div class="bset__empty-icon"><i class="fa-solid fa-store-slash"></i></div>
+        <p class="bset__empty-text">No store locations added yet</p>
+        <a href="{% url 'business:pickup_location_add' %}" class="bset__btn-add-first">
+          <i class="fa-solid fa-plus"></i> Add Your First Store
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ── TEAM MEMBERS ── -->
+  <section class="bset__section" id="client_settings_section_teams">
+    <div class="bset__section-header">
+      <div class="bset__section-label">
+        <i class="fa-solid fa-users"></i>
+        <span>Team Members</span>
+        {% if teams %}<span class="bset__count-badge">{{ teams.count }}</span>{% endif %}
+      </div>
+      <a href="{% url 'business:business_teams_add' business.business_id %}" class="bset__btn-add" id="client_settings_btn_new_team">
+        <i class="fa-solid fa-plus"></i> Add Member
+      </a>
     </div>
 
-    <!-- Teams Section -->
-    <div class="business-settings__section" id="client_settings_section_teams">
-        <div class="business-settings__section-header">
-            <h2 class="business-settings__section-title"><i class="fa-solid fa-users"></i> Team Members</h2>
-            <a href="{% url 'business:business_teams_add' business.business_id %}" class="business-settings__btn-add" id="client_settings_btn_new_team">
-                <i class="fa-solid fa-plus"></i> Add Member
+    <div class="bset__section-body">
+      {% if teams %}
+      <div class="bset__grid">
+        {% for team in teams %}
+        <div class="bset__card" id="client_settings_card_team_{{ team.id }}">
+          <div class="bset__card-top">
+            <div class="bset__card-icon bset__card-icon--team">
+              <i class="fa-solid fa-user-tie"></i>
+            </div>
+            <div class="bset__card-info">
+              <h3 class="bset__card-name">{{ team.team_name }}</h3>
+              {% if team.team_status == 'active' %}
+              <span class="bset__badge bset__badge--active"><i class="fa-solid fa-circle-dot"></i> Active</span>
+              {% else %}
+              <span class="bset__badge bset__badge--inactive"><i class="fa-solid fa-circle"></i> {{ team.team_status|title }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="bset__card-rows">
+            <div class="bset__row">
+              <span class="bset__row-label"><i class="fa-solid fa-hashtag"></i> ID</span>
+              <span class="bset__row-value">#{{ team.id }}</span>
+            </div>
+            <div class="bset__row">
+              <span class="bset__row-label"><i class="fa-solid fa-phone"></i> Phone</span>
+              <span class="bset__row-value">{{ team.team_phone|default:"—" }}</span>
+            </div>
+            <div class="bset__row">
+              <span class="bset__row-label"><i class="fa-solid fa-id-badge"></i> Role</span>
+              <span class="bset__row-value">{{ team.get_team_role_display|default:"—" }}</span>
+            </div>
+          </div>
+          <div class="bset__card-footer">
+            <a href="{% url 'business:business_teams_update' business.business_id team.id %}" class="bset__btn-edit">
+              <i class="fa-solid fa-pen-to-square"></i> Edit
             </a>
+          </div>
         </div>
-        <div class="business-settings__section-body">
-            {% if teams %}
-            <div class="business-settings__grid">
-                {% for team in teams %}
-                <div class="business-settings__card business-settings__team-card">
-                    <div class="business-settings__card-header">
-                        <h3 class="business-settings__card-title">{{ team.team_name }}</h3>
-                        {% if team.team_status == 'active' %}
-                        <span class="business-settings__status-badge business-settings__status-badge--active">
-                            <i class="fa-solid fa-check-circle"></i> Active
-                        </span>
-                        {% else %}
-                        <span class="business-settings__status-badge business-settings__status-badge--inactive">
-                            <i class="fa-solid fa-circle-xmark"></i> {{ team.team_status|title }}
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="business-settings__card-body">
-                        <div class="business-settings__info-row">
-                            <span class="business-settings__info-label">ID</span>
-                            <span class="business-settings__info-value">#{{ team.id }}</span>
-                        </div>
-                        <div class="business-settings__info-row">
-                            <span class="business-settings__info-label">Phone</span>
-                            <span class="business-settings__info-value">{{ team.team_phone|default:"-" }}</span>
-                        </div>
-                    </div>
-                    <div class="business-settings__card-footer">
-                        <a href="{% url 'business:business_teams_update' business.business_id team.id %}" class="business-settings__btn-edit">
-                            <i class="fa-solid fa-pen-to-square"></i> Edit Details
-                        </a>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="business-settings__empty">
-                <i class="fa-solid fa-user-plus business-settings__empty-icon"></i>
-                <p class="business-settings__empty-text">No team members added yet</p>
-                <a href="{% url 'business:business_teams_add' business.business_id %}" class="business-settings__btn-add-first">
-                    <i class="fa-solid fa-plus"></i> Add Your First Team Member
-                </a>
-            </div>
-            {% endif %}
-        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="bset__empty">
+        <div class="bset__empty-icon"><i class="fa-solid fa-user-plus"></i></div>
+        <p class="bset__empty-text">No team members added yet</p>
+        <a href="{% url 'business:business_teams_add' business.business_id %}" class="bset__btn-add-first">
+          <i class="fa-solid fa-plus"></i> Add Your First Team Member
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ── API INTEGRATIONS ── -->
+  <section class="bset__section" id="client_settings_section_api">
+    <div class="bset__section-header">
+      <div class="bset__section-label">
+        <i class="fa-solid fa-plug"></i>
+        <span>API Integrations</span>
+        {% if business_apis %}<span class="bset__count-badge">{{ business_apis.count }}</span>{% endif %}
+      </div>
+      <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bset__btn-add" id="client_settings_btn_new_api">
+        <i class="fa-solid fa-plus"></i> Add API
+      </a>
     </div>
 
-    <!-- API Settings Section -->
-    <div class="business-settings__section" id="client_settings_section_api">
-        <div class="business-settings__section-header">
-            <h2 class="business-settings__section-title"><i class="fa-solid fa-code"></i> API Integrations</h2>
-            <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="business-settings__btn-add" id="client_settings_btn_new_api">
-                <i class="fa-solid fa-plus"></i> Add API
+    <div class="bset__section-body">
+      {% if business_apis %}
+      <div class="bset__grid">
+        {% for api in business_apis %}
+        <div class="bset__card bset__card--api {% if api.is_verify_api %}bset__card--verified{% else %}bset__card--unverified{% endif %}"
+             id="client_settings_card_api_{{ api.id }}">
+          <div class="bset__card-top">
+            <div class="bset__card-icon {% if api.is_verify_api %}bset__card-icon--verified{% else %}bset__card-icon--unverified{% endif %}">
+              <i class="fa-solid fa-code"></i>
+            </div>
+            <div class="bset__card-info">
+              <h3 class="bset__card-name">{{ api.api_type|upper }}</h3>
+              {% if api.is_verify_api %}
+              <span class="bset__badge bset__badge--verified"><i class="fa-solid fa-circle-check"></i> Verified</span>
+              {% else %}
+              <span class="bset__badge bset__badge--warn"><i class="fa-solid fa-triangle-exclamation"></i> Not Verified</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="bset__card-rows">
+            <div class="bset__row bset__row--endpoint">
+              <span class="bset__row-label"><i class="fa-solid fa-link"></i> Endpoint</span>
+              <span class="bset__row-value bset__row-value--truncate" title="{{ api.site_api_url }}">{{ api.site_api_url }}</span>
+            </div>
+          </div>
+          <div class="bset__card-footer">
+            <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="bset__btn-test">
+              <i class="fa-solid fa-flask-vial"></i> Test & Configure
             </a>
+          </div>
         </div>
-        <div class="business-settings__section-body">
-            {% if business_apis %}
-            <div class="business-settings__grid">
-                {% for api in business_apis %}
-                <div class="business-settings__card business-settings__api-card {% if api.is_verify_api %}business-settings__api-card--verified{% else %}business-settings__api-card--not-verified{% endif %}">
-                    <div class="business-settings__card-header">
-                        <h3 class="business-settings__card-title">{{ api.api_type|upper }}</h3>
-                        {% if api.is_verify_api == True %}
-                        <span class="business-settings__status-badge business-settings__status-badge--verified">
-                            <i class="fa-solid fa-circle-check"></i> Verified
-                        </span>
-                        {% else %}
-                        <span class="business-settings__status-badge business-settings__status-badge--not-verified">
-                            <i class="fa-solid fa-exclamation-triangle"></i> Not Verified
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="business-settings__card-body">
-                        <div class="business-settings__info-row">
-                            <span class="business-settings__info-label">Endpoint</span>
-                        </div>
-                        <div class="business-settings__api-endpoint" title="{{ api.site_api_url }}">{{ api.site_api_url }}</div>
-                    </div>
-                    <div class="business-settings__card-footer">
-                        <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="business-settings__btn-edit business-settings__btn-test">
-                            <i class="fa-solid fa-flask"></i> Test & Configure
-                        </a>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="business-settings__empty">
-                <i class="fa-solid fa-plug business-settings__empty-icon"></i>
-                <p class="business-settings__empty-text">No API integrations configured yet</p>
-                <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="business-settings__btn-add-first">
-                    <i class="fa-solid fa-plus"></i> Add Your First API
-                </a>
-            </div>
-            {% endif %}
-        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="bset__empty">
+        <div class="bset__empty-icon"><i class="fa-solid fa-plug-circle-plus"></i></div>
+        <p class="bset__empty-text">No API integrations configured yet</p>
+        <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bset__btn-add-first">
+          <i class="fa-solid fa-plus"></i> Add Your First API
+        </a>
+      </div>
+      {% endif %}
     </div>
+  </section>
+
 </div>
 {% endblock content %}

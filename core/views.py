@@ -52,8 +52,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
-from django.http import HttpResponse
+from django.db.models import Q
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_GET, require_POST
 from django.urls import reverse_lazy
 from PIL import Image
 
@@ -73,6 +75,13 @@ Driver = fleet_models.Driver
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+# ── Profile URL helper ──────────────────────────────────────────────────────
+def _get_user_number(user_id):
+    """Return the user_number for a given user_id, used for profile URL redirects."""
+    profile = core_models.Profile.objects.filter(user_id=user_id).values_list('user_number', flat=True).first()
+    return profile  # may be None if profile doesn't exist yet
+
 
 # Status Constants
 VERIFICATION_STATUS_INCOMPLETE = 'incomplete'
@@ -209,7 +218,7 @@ def join_business(request):
         # Check if role already selected
         if profile.is_driver or profile.is_business:
             logger.info(f"User {request.user.id} already has role selected")
-            return redirect('core:profile', pk=request.user.id)
+            return redirect('core:profile', user_number=_get_user_number(request.user.id))
 
         joinusform = core_forms.JoinUsForm(request.POST or None, instance=profile)
 
@@ -235,29 +244,31 @@ def join_business(request):
             else:
                 logger.warning(f"Invalid business form for user {request.user.id}")
                 messages.error(request, "Please correct the errors below.")
+        else:
+            form = business_forms.businessRegisterForm()
+
+        logger.debug("Loading business register form")
+
+        # Get profile picture for sidebar
+        try:
+            profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
+        except core_models.ProfilePicture.DoesNotExist:
+            profile_picture = core_models.ProfilePicture.objects.create(
+                user=request.user, profile=profile
+            )
+
+        context = {
+            'form': form,
+            'profile': profile,
+            'profile_picture': profile_picture,
+            'completion_percentage': profile.get_profile_completion_percentage(),
+        }
+        return render(request, 'core/join_us_business.html', context)
+
     except core_models.Profile.DoesNotExist:
         logger.error(f"Profile does not exist for user {request.user.id}")
         messages.error(request, "Please create your profile first.")
         return redirect('core:profile_add')
-
-    form = business_forms.businessRegisterForm()
-    logger.debug("Loading business register form")
-
-    # Get profile picture for sidebar
-    try:
-        profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
-    except core_models.ProfilePicture.DoesNotExist:
-        profile_picture = core_models.ProfilePicture.objects.create(
-            user=request.user, profile=profile
-        )
-
-    context = {
-        'form': form,
-        'profile': profile,
-        'profile_picture': profile_picture,
-        'completion_percentage': profile.get_profile_completion_percentage(),
-    }
-    return render(request, 'core/join_us_business.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -271,15 +282,30 @@ def join_driver(request):
         # Check if role already selected
         if profile.is_driver or profile.is_business:
             logger.info(f"User {request.user.id} already has role selected")
-            return redirect('core:profile', pk=request.user.id)
+            return redirect('core:profile', user_number=_get_user_number(request.user.id))
 
         joinusform = core_forms.JoinUsForm(request.POST or None, instance=profile)
+        action = request.POST.get('action', '') if request.method == 'POST' else ''
 
-        if request.method == 'POST':
-            form = fleet_forms.DriverJoinForm(request.POST)
-            if form.is_valid():
+        if request.method == 'POST' and action == 'save_profile':
+            # Handle inline profile completion save
+            profileupdateform = core_forms.ProfileUpdateForm(request.POST, instance=profile)
+            profileupdateform.fields['username'].widget.attrs['readonly'] = True
+            profileupdateform.fields['username'].disabled = True
+            if profileupdateform.is_valid():
+                profileupdateform.save()
+                messages.success(request, "Profile saved! You can now submit your driver application.")
+                logger.info(f"Inline profile save on join_driver for user {request.user.id}")
+                return redirect('core:driver_register')
+            else:
+                messages.error(request, "Please fix the profile errors below.")
+            driverjoinform = fleet_forms.DriverJoinForm()
+        elif request.method == 'POST':
+            profileupdateform = core_forms.ProfileUpdateForm(instance=profile)
+            driverjoinform = fleet_forms.DriverJoinForm(request.POST)
+            if driverjoinform.is_valid():
                 logger.info(f"Driver form valid for user {request.user.id}")
-                driver = form.save(commit=False)
+                driver = driverjoinform.save(commit=False)
                 driver.profile = profile
                 driver.driver_id = profile.id
                 driver.driver_status = DRIVER_STATUS_PROCESSING
@@ -304,14 +330,29 @@ def join_driver(request):
             else:
                 logger.warning(f"Invalid driver form for user {request.user.id}")
                 messages.error(request, "Please correct the errors below.")
+        else:
+            driverjoinform = fleet_forms.DriverJoinForm()
+            profileupdateform = core_forms.ProfileUpdateForm(instance=profile)
+            profileupdateform.fields['username'].widget.attrs['readonly'] = True
+            profileupdateform.fields['username'].disabled = True
 
-        form = fleet_forms.DriverJoinForm()
-        driverjoinform = fleet_forms.DriverJoinForm()
         logger.debug(f"Loading driver join form for profile {profile.id}")
+
+        # Get profile picture for sidebar
+        try:
+            profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
+        except core_models.ProfilePicture.DoesNotExist:
+            profile_picture = core_models.ProfilePicture.objects.create(
+                user=request.user, profile=profile
+            )
+
+        completion_percentage = profile.get_profile_completion_percentage()
         context = {
-            'form': form,
             'driverjoinform': driverjoinform,
+            'profileupdateform': profileupdateform,
             'profile': profile,
+            'profile_picture': profile_picture,
+            'completion_percentage': completion_percentage,
         }
         return render(request, 'core/join_us_driver.html', context)
     except core_models.Profile.DoesNotExist:
@@ -341,7 +382,7 @@ def update_role(request):
             profile_update.user = request.user
             profile_update.save()
             messages.success(request, "Role updated successfully!")
-            return redirect('core:profile', pk=request.user.id)
+            return redirect('core:profile', user_number=_get_user_number(request.user.id))
         else:
             logger.warning(f"Invalid role update form for user {request.user.id}")
             messages.error(request, "Please correct the errors below.")
@@ -366,7 +407,7 @@ def update_driver(request):
         driverjoinform.save()
         logger.info(f"Driver profile updated for user {request.user.id}")
         messages.success(request, "Driver profile updated successfully!")
-        return redirect('core:profile', pk=request.user.id)
+        return redirect('core:profile', user_number=_get_user_number(request.user.id))
     elif request.method == 'POST':
         logger.warning(f"Invalid driver update form for user {request.user.id}")
         messages.error(request, "Please correct the errors below.")
@@ -418,6 +459,107 @@ def business_profile_update(request):
 
 
 @login_required(login_url='/accounts/login/')
+@require_GET
+def team_business_search(request):
+    """AJAX: Search active businesses by name, phone, or business code."""
+    q = request.GET.get('q', '').strip()
+    results = []
+    if len(q) >= 2:
+        businesses = (
+            business_models.Business.objects
+            .filter(business_status='active')
+            .filter(
+                Q(business_name__icontains=q) |
+                Q(business_phone__icontains=q) |
+                Q(business_code__icontains=q)
+            )
+            .values('business_id', 'business_name', 'business_phone', 'business_code')
+            [:10]
+        )
+        for b in businesses:
+            results.append({
+                'id': b['business_id'],
+                'name': b['business_name'],
+                'phone': b['business_phone'] or '',
+                'code': b['business_code'] or '',
+            })
+    return JsonResponse({'results': results})
+
+
+@login_required(login_url='/accounts/login/')
+@require_POST
+def team_apply_request(request):
+    """AJAX: Submit a team join request (creates a pending BusinessTeamProfile)."""
+    import json
+    try:
+        data = json.loads(request.body)
+        business_id = int(data.get('business_id', 0))
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request.'}, status=400)
+
+    try:
+        business = business_models.Business.objects.get(
+            business_id=business_id, business_status='active'
+        )
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Business not found.'}, status=404)
+
+    profile = get_cached_profile(request)
+    if not profile:
+        return JsonResponse({'ok': False, 'error': 'Profile not found.'}, status=400)
+
+    # Prevent duplicate pending/active requests
+    existing = business_models.BusinessTeamProfile.objects.filter(
+        business=business, user=request.user
+    ).exclude(team_status='rejected').first()
+    if existing:
+        status_label = dict(business_models.BusinessTeamProfile.STATUS_CHOICES).get(
+            existing.team_status, existing.team_status
+        )
+        return JsonResponse({
+            'ok': False,
+            'error': f'You already have a {status_label} request for this business.'
+        }, status=400)
+
+    business_models.BusinessTeamProfile.objects.create(
+        business=business,
+        user=request.user,
+        profile=profile,
+        team_name=f'{profile.first_name} {profile.last_name}'.strip() or request.user.username,
+        team_email=request.user.email,
+        team_phone=profile.phone or '',
+        team_role='staff',
+        team_status='pending',
+    )
+    logger.info(f"Team join request: user {request.user.id} → business {business_id}")
+    return JsonResponse({'ok': True, 'business_name': business.business_name})
+
+
+@login_required(login_url='/accounts/login/')
+def join_team(request):
+    """Full-page team join flow — search a business and send an application."""
+    profile = get_cached_profile(request)
+    if not profile:
+        messages.info(request, "Please create your profile first.")
+        return redirect('core:profile_add')
+
+    try:
+        profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
+    except core_models.ProfilePicture.DoesNotExist:
+        profile_picture = core_models.ProfilePicture.objects.create(
+            user_id=request.user.id, profile_id=request.user.id
+        )
+
+    completion_percentage = profile.get_profile_completion_percentage()
+    context = {
+        'profile': profile,
+        'profile_picture': profile_picture,
+        'completion_percentage': completion_percentage,
+    }
+    return render(request, 'core/join_team.html', context)
+
+
+@login_required(login_url='/accounts/login/')
 def join_us(request):
     """Handle role selection (driver or business)"""
     profile = get_cached_profile(request)
@@ -455,7 +597,7 @@ def join_us(request):
                 logger.info(f"Business join completed for user {request.user.id}")
                 messages.success(request, 'Your business account has been created!')
 
-            return redirect('core:profile', pk=request.user.id)
+            return redirect('core:profile', user_number=_get_user_number(request.user.id))
         else:
             logger.debug(f"Loading join us form for user {request.user.id}")
 
@@ -485,6 +627,35 @@ def join_us(request):
     messages.info(request, "Please create your profile first.")
     return redirect('core:profile_add')
 
+
+@login_required(login_url='/accounts/login/')
+def join_us_team(request):
+    """Dedicated page for users to search a business and submit a team join request."""
+    profile = get_cached_profile(request)
+    if not profile:
+        messages.info(request, "Please create your profile first.")
+        return redirect('core:profile_add')
+
+    my_requests = business_models.BusinessTeamJoinRequest.objects.filter(
+        user=request.user
+    ).exclude(status='cancelled').select_related('business').order_by('-requested_at')
+
+    try:
+        profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
+    except core_models.ProfilePicture.DoesNotExist:
+        profile_picture = core_models.ProfilePicture.objects.create(
+            user_id=request.user.id, profile_id=request.user.id
+        )
+
+    completion_percentage = profile.get_profile_completion_percentage()
+
+    context = {
+        'profile': profile,
+        'profile_picture': profile_picture,
+        'completion_percentage': completion_percentage,
+        'my_requests': my_requests,
+    }
+    return render(request, 'core/join_us_team.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -564,31 +735,35 @@ def main_dashboard(request):
 def profile_view(request):
     """Redirect to user's profile page"""
     user_id = request.user.id
-    if core_models.Profile.objects.filter(user_id=user_id).exists():
-        logger.debug(f"Redirecting user {user_id} to profile")
-        return redirect('core:profile', pk=user_id)
-    else:
+    try:
+        profile = core_models.Profile.objects.get(user_id=user_id)
+        # Auto-generate user_number if somehow missing (legacy data)
+        if not profile.user_number:
+            profile.save()
+            profile.refresh_from_db()
+        logger.debug(f"Redirecting user {user_id} to profile {profile.user_number}")
+        return redirect('core:profile', user_number=profile.user_number)
+    except core_models.Profile.DoesNotExist:
         logger.info(f"No profile found for user {user_id}, redirecting to profile_add")
         messages.info(request, "Please create your profile.")
         return redirect('core:profile_add')
 
 
 @login_required(login_url='/accounts/login/')
-def profile(request, pk):
+def profile(request, user_number):
     """Display user profile"""
-    # Staff can view any user's profile; regular users can only view their own
-    target_user_id = pk
-    is_own_profile = (target_user_id == request.user.id)
+    # Look up profile by user_number
+    profile = get_object_or_404(
+        core_models.Profile.objects.select_related('user').prefetch_related('profile_picture'),
+        user_number=user_number
+    )
+
+    is_own_profile = (profile.user_id == request.user.id)
 
     if not is_own_profile and not request.user.is_staff:
         messages.error(request, 'You do not have permission to view this profile.')
-        return redirect('core:profile', pk=request.user.id)
-
-    # Optimized query with select_related and prefetch_related
-    profile = get_object_or_404(
-        core_models.Profile.objects.select_related('user').prefetch_related('profile_picture'),
-        user_id=target_user_id
-    )
+        own_user_number = _get_user_number(request.user.id)
+        return redirect('core:profile', user_number=own_user_number)
 
     # Cache on request so context processor doesn't re-fetch
     if is_own_profile:
@@ -626,7 +801,7 @@ def profile_add(request):
     # Redirect if user already has a profile to prevent duplicate key error
     if core_models.Profile.objects.filter(user_id=request.user.id).exists():
         messages.info(request, 'You already have a profile.')
-        return redirect('core:profile', pk=request.user.id)
+        return redirect('core:profile', user_number=_get_user_number(request.user.id))
 
     if request.method == 'POST':
         profileaddform = core_forms.ProfileForm(request.POST, request.FILES)
@@ -641,7 +816,7 @@ def profile_add(request):
             profile.save()
             logger.info(f"Profile created successfully for user {request.user.id}")
             messages.success(request, 'Your profile has been created!')
-            return redirect('core:profile', pk=request.user.id)
+            return redirect('core:profile', user_number=_get_user_number(request.user.id))
         else:
             logger.warning(f"Invalid profile form for user {request.user.id}")
             messages.error(request, "Please correct the errors below.")
@@ -663,9 +838,9 @@ def profile_add(request):
 
 
 @login_required(login_url='/accounts/login/')
-def profile_update_redirect(request, pk):
+def profile_update_redirect(request, user_number):
     """Redirect old profile update URL to new profile complete update page"""
-    logger.info(f"Redirecting user {pk} from old profile_update to profile_complete_update")
+    logger.info(f"Redirecting user {user_number} from old profile_update to profile_complete_update")
     return redirect('core:profile_complete_update')
 
 
@@ -749,10 +924,10 @@ def profile_picture_update(request):
 
 # profile_completion_test ---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
-def profile_completion_test(request, pk):
+def profile_completion_test(request, user_number):
     """Test profile completion status (for development/testing)"""
-    profile = get_object_or_404(core_models.Profile, user_id=pk)
-    logger.debug(f"Profile completion test for user {pk}")
+    profile = get_object_or_404(core_models.Profile, user_number=user_number)
+    logger.debug(f"Profile completion test for user_number {user_number}")
 
     context = {
         'profile': profile,
@@ -879,18 +1054,23 @@ def profile_complete_update(request):
                 if completion_percentage == 100:
 
                     if action == 'register_business':
+                        # Warn if already applied as business
+                        if profile.is_business or business_models.Business.objects.filter(user_id=request.user.id).exists():
+                            messages.warning(request, "You have already submitted a business registration. Please check your business profile.")
+                            return redirect('core:business_register')
                         profile.is_business = True
-                        profile.is_driver = False
-                    else:  # join_driver
-                        profile.is_driver = True
-                        profile.is_business = False
-
-                    profile.save()
-                    messages.success(request, "Profile completed! Please complete your registration form.")
-
-                    if action == 'register_business':
+                        profile.save()
+                        messages.success(request, "Profile completed! Please complete your business registration form.")
                         return redirect('core:business_register')
-                    else:
+
+                    else:  # join_driver
+                        # Warn if already applied as driver
+                        if profile.is_driver or fleet_models.Driver.objects.filter(user_id=request.user.id).exists():
+                            messages.warning(request, "You have already submitted a driver application. Please check your driver profile.")
+                            return redirect('core:driver_register')
+                        profile.is_driver = True
+                        profile.save()
+                        messages.success(request, "Profile completed! Please complete your driver registration form.")
                         return redirect('core:driver_register')
                 else:
                     messages.error(request, f"Please complete all profile fields before proceeding. ({completion_percentage}% complete)")

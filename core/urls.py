@@ -9,21 +9,24 @@ from business import views as business_views
 
 app_name = 'core'
 urlpatterns = [
+    # Static profile paths MUST come before the <str:user_number> wildcard
     path('profile/', core_views.profile_view, name='profile_view'),
-    path('profile/<int:pk>/', core_views.profile, name='profile'),
-    path('profile/<int:pk>/review/', core_views.profile_completion_test,
+    path('profile/add/', core_views.profile_add, name='profile_add'),
+    path('profile/photo/update/', core_views.profile_picture_update, name='profile_picture_update'),
+    path('profile/complete/', core_views.profile_complete_update, name='profile_complete_update'),
+    # Wildcard profile paths
+    path('profile/<str:user_number>/', core_views.profile, name='profile'),
+    path('profile/<str:user_number>/review/', core_views.profile_completion_test,
          name='profile_completion_test'),
-    path('profile/<int:pk>/update/',
+    path('profile/<str:user_number>/update/',
          core_views.profile_update_redirect, name='profile_update'),
-    path('profile/add/',
-         core_views.profile_add, name='profile_add'),
-     path('profile/photo/update/',
-         core_views.profile_picture_update, name='profile_picture_update'),
 
     path('dashboard/', core_views.main_dashboard, name='main_dashboard'),
 
     path('join_us/',
          core_views.join_us, name='join_us'),
+    path('join_us/team/',
+         core_views.join_us_team, name='join_us_team'),
     path('join_us/business/',
          core_views.join_business, name='join_business'),
     path('join_us/driver/',
@@ -36,7 +39,6 @@ urlpatterns = [
     path('driverjobform/', core_views.driverjobform, name='driverjobform'),
 
     # NEW VERIFICATION WORKFLOW URLs
-    path('profile/complete/', core_views.profile_complete_update, name='profile_complete_update'),
     path('business/register/', core_views.business_register, name='business_register'),
     path('driver/register/', core_views.driver_register, name='driver_register'),
 

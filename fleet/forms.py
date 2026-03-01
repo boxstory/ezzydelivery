@@ -32,7 +32,9 @@ class DriverJoinForm(forms.ModelForm):
         model = fleet_models.Driver
         fields = '__all__'
         exclude = ['user', 'driver_id', 'profile', 'driver_code', 'driver_status', 'driver_rating',
-                   'driver_rating_count', 'driver_reviews', 'driver_reviews_count', 'updated_at', 'created_at', ]
+                   'driver_rating_count', 'driver_reviews', 'driver_reviews_count', 'updated_at', 'created_at',
+                   'wallet_balance', 'credit_limit', 'cod_in_hand', 'total_earnings', 'pending_earnings',
+                   'last_settlement_date', 'preferred_zone_groups', 'driver_availability', ]
         labels = {
                 "driver_bio": "About Skill and Experiance",
             }

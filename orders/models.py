@@ -135,6 +135,7 @@ class Order(models.Model):
     
     # Original order data (proof/backup)
     original_order_data = models.JSONField(blank=True, null=True, help_text="Original order data as proof")
+    order_source_text = models.TextField(blank=True, null=True, help_text="Raw pasted order text (WhatsApp/chat message) kept for reference")
 
     # Warehouse stock reservation tracking
     stock_reserved = models.BooleanField(default=False, help_text="Whether stock has been reserved for this order")

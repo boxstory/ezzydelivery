@@ -1257,3 +1257,157 @@ class BusinessApiSettingsViewTest(BusinessTestMixin, TestCase):
                     kwargs={'business_id': self.business.business_id,
                             'api_id': 99999}))
         self.assertIn(resp.status_code, [302, 404])
+
+
+# =============================================================================
+# 16. FINANCE VIEWS TESTS (12 tests)
+# =============================================================================
+
+class BusinessFinanceViewsTest(BusinessTestMixin, TestCase):
+    """Tests for business_finance_dashboard, business_transactions, business_cod_statement."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user, self.profile = self.create_business_user()
+        self.business = self.create_business(self.user, self.profile)
+        self.client.login(username='bizowner', password='BizPass@123')
+
+    # --- business_finance_dashboard ---
+
+    def test_finance_dashboard_loads(self):
+        """#121: Finance dashboard loads for business owner"""
+        resp = self.client.get(reverse('business:business_finance_dashboard'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_finance_dashboard_requires_auth(self):
+        """#122: Finance dashboard requires login"""
+        self.client.logout()
+        resp = self.client.get(reverse('business:business_finance_dashboard'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url.lower())
+
+    def test_finance_dashboard_invalid_days_param(self):
+        """#123: Finance dashboard handles invalid days param (no 500 error)"""
+        resp = self.client.get(
+            reverse('business:business_finance_dashboard'),
+            {'days': 'invalid'})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_finance_dashboard_negative_days_param(self):
+        """#124: Finance dashboard handles negative days param (clamps to 30)"""
+        resp = self.client.get(
+            reverse('business:business_finance_dashboard'),
+            {'days': '-100'})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_finance_dashboard_zero_days_param(self):
+        """#125: Finance dashboard handles zero days param (clamps to 30)"""
+        resp = self.client.get(
+            reverse('business:business_finance_dashboard'),
+            {'days': '0'})
+        self.assertEqual(resp.status_code, 200)
+
+    # --- business_transactions ---
+
+    def test_transactions_loads(self):
+        """#126: Business transactions page loads"""
+        resp = self.client.get(reverse('business:business_transactions'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_transactions_requires_auth(self):
+        """#127: Transactions page requires login"""
+        self.client.logout()
+        resp = self.client.get(reverse('business:business_transactions'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url.lower())
+
+    def test_transactions_invalid_days_param(self):
+        """#128: Transactions handles invalid days param (no 500 error)"""
+        resp = self.client.get(
+            reverse('business:business_transactions'),
+            {'days': 'abc'})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_transactions_filter_by_type(self):
+        """#129: Transactions can be filtered by type"""
+        resp = self.client.get(
+            reverse('business:business_transactions'),
+            {'type': 'delivery_charge'})
+        self.assertEqual(resp.status_code, 200)
+
+    # --- business_cod_statement ---
+
+    def test_cod_statement_loads(self):
+        """#130: COD statement page loads"""
+        resp = self.client.get(reverse('business:business_cod_statement'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_cod_statement_requires_auth(self):
+        """#131: COD statement requires login"""
+        self.client.logout()
+        resp = self.client.get(reverse('business:business_cod_statement'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url.lower())
+
+    def test_cod_statement_invalid_days_param(self):
+        """#132: COD statement handles invalid days param (no 500 error)"""
+        resp = self.client.get(
+            reverse('business:business_cod_statement'),
+            {'days': 'xyz'})
+        self.assertEqual(resp.status_code, 200)
+
+
+# =============================================================================
+# 17. FINANCE VIEWS — API TEST & MISC (6 tests)
+# =============================================================================
+
+class BusinessApiTestViewTest(BusinessTestMixin, TestCase):
+    """Tests for business_settings_api_test and business_settings_api_test_result."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user, self.profile = self.create_business_user()
+        self.business = self.create_business(self.user, self.profile)
+        self.client.login(username='bizowner', password='BizPass@123')
+
+    def test_api_test_page_nonexistent_api(self):
+        """#133: API test page with nonexistent api_id redirects gracefully (no 500)"""
+        resp = self.client.get(
+            reverse('business:business_settings_api_test',
+                    kwargs={'business_id': self.business.business_id,
+                            'api_id': 99999}))
+        self.assertIn(resp.status_code, [302, 200])
+
+    def test_api_test_result_nonexistent_api_redirects(self):
+        """#134: API test result with nonexistent api_id redirects (no 500)"""
+        resp = self.client.get(
+            reverse('business:business_settings_api_test_result',
+                    kwargs={'business_id': self.business.business_id,
+                            'api_id': 99999}))
+        self.assertIn(resp.status_code, [302, 200])
+
+    def test_api_test_idor(self):
+        """#135: Cannot access another business's API test page"""
+        other = self.create_other_business()
+        resp = self.client.get(
+            reverse('business:business_settings_api_test',
+                    kwargs={'business_id': other.business_id,
+                            'api_id': 1}))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_business_selector_loads(self):
+        """#136: Business selector page loads"""
+        resp = self.client.get(reverse('business:business_selector'))
+        self.assertIn(resp.status_code, [200, 302])
+
+    def test_business_switch_invalid_id(self):
+        """#137: Switching to non-existent business redirects to selector"""
+        resp = self.client.get(
+            reverse('business:business_switch',
+                    kwargs={'business_id': 99999}))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_warehouse_request_loads(self):
+        """#138: Warehouse request page loads without crashing"""
+        resp = self.client.get(reverse('business:warehouse_request'))
+        self.assertIn(resp.status_code, [200, 302])

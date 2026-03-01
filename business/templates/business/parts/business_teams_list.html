@@ -14,11 +14,46 @@
         <p class="btl__subtitle">Manage your business team</p>
       </div>
     </div>
-    {% if can_manage_team %}
-    <a href="{% url 'business:business_teams_add' business.business_id %}" class="btl__add-btn" id="client_teams_list_btn_new">
-      <i class="fa-solid fa-user-plus"></i> Add Member
-    </a>
-    {% endif %}
+    <div class="d-flex align-items-center gap-2">
+      {% if can_manage_team and join_request_count > 0 %}
+      <a href="{% url 'business:business_join_requests' business.business_id %}" class="btl__request-badge" id="client_teams_list_btn_requests">
+          <i class="fa-solid fa-bell"></i> {{ join_request_count }} Join Request{{ join_request_count|pluralize }}
+      </a>
+      {% endif %}
+      {% if can_manage_team %}
+      <a href="{% url 'business:business_teams_add' business.business_id %}" class="btl__add-btn" id="client_teams_list_btn_new">
+        <i class="fa-solid fa-user-plus"></i> Add Member
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- How to Add Team Members Guide -->
+  <div class="btl__guide" id="client_teams_list_guide">
+    <div class="btl__guide-title">
+      <i class="fa-solid fa-circle-info"></i> How to add team members
+    </div>
+    <div class="btl__guide-methods">
+      <div class="btl__guide-method">
+        <div class="btl__guide-method-icon btl__guide-method-icon--direct">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div class="btl__guide-method-body">
+          <span class="btl__guide-method-title">Add Directly</span>
+          <span class="btl__guide-method-desc">You invite a user by their EZZY ID. Click <strong>Add Member</strong> above, enter their EZZY ID, set their role, and they get access immediately.</span>
+        </div>
+      </div>
+      <div class="btl__guide-divider"><i class="fa-solid fa-or fa-solid fa-circle-small"></i><span>or</span></div>
+      <div class="btl__guide-method">
+        <div class="btl__guide-method-icon btl__guide-method-icon--request">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <div class="btl__guide-method-body">
+          <span class="btl__guide-method-title">Via Join Request</span>
+          <span class="btl__guide-method-desc">A user finds your business on the <a href="/join_us/team/" target="_blank" class="btl__guide-link"><strong>Join Team</strong></a> page and sends a request. You'll see a <strong>Join Requests</strong> badge above — approve or reject from there.</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Role Legend -->
@@ -31,6 +66,53 @@
     <span class="btl__badge btl__badge--muted"><i class="fa-solid fa-eye"></i> Viewer</span>
     <span class="btl__legend-desc">Read-only access</span>
   </div>
+
+  <!-- Pending Join Requests -->
+  {% if can_manage_team and join_requests %}
+  <div class="btl__requests" id="client_teams_list_join_requests">
+    <div class="btl__requests-header">
+      <i class="fa-solid fa-bell"></i>
+      <span>Pending Join Requests</span>
+      <span class="btl__requests-count">{{ join_request_count }}</span>
+    </div>
+    <div class="btl__requests-list">
+      {% for req in join_requests %}
+      <div class="btl__req-row" id="client_teams_req_row_{{ req.id }}">
+        <div class="btl__req-avatar">
+          <i class="fa-solid fa-user"></i>
+        </div>
+        <div class="btl__req-info">
+          <span class="btl__req-name">{{ req.user.get_full_name|default:req.user.username }}</span>
+          <span class="btl__req-meta">
+            {{ req.user.email }}
+            {% if req.desired_role_title %} &middot; {{ req.desired_role_title }}{% endif %}
+            &middot; {{ req.requested_at|date:"d M Y" }}
+          </span>
+          {% if req.message %}
+          <span class="btl__req-msg">"{{ req.message|truncatechars:100 }}"</span>
+          {% endif %}
+        </div>
+        <div class="btl__req-actions">
+          <button type="button"
+                  class="btl__req-btn btl__req-btn--accept"
+                  data-req-id="{{ req.id }}"
+                  data-action="accept"
+                  id="client_teams_req_btn_accept_{{ req.id }}">
+            <i class="fa-solid fa-check"></i> Accept
+          </button>
+          <button type="button"
+                  class="btl__req-btn btl__req-btn--reject"
+                  data-req-id="{{ req.id }}"
+                  data-action="reject"
+                  id="client_teams_req_btn_reject_{{ req.id }}">
+            <i class="fa-solid fa-xmark"></i> Reject
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Team Cards Grid -->
   <div class="btl__grid">
@@ -128,4 +210,58 @@
     {% endif %}
   </div>
 </div>
+
+{% if can_manage_team and join_requests %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.btl__req-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var reqId  = btn.dataset.reqId;
+            var action = btn.dataset.action;
+            var row    = document.getElementById('client_teams_req_row_' + reqId);
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            fetch('{% url "business:business_join_request_action" business.business_id 0 %}'.replace('/0/', '/' + reqId + '/'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ action: action })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    row.style.transition = 'opacity 0.3s';
+                    row.style.opacity = '0';
+                    setTimeout(function () {
+                        row.remove();
+                        var remaining = document.querySelectorAll('.btl__req-row').length;
+                        if (remaining === 0) {
+                            document.getElementById('client_teams_list_join_requests').remove();
+                        } else {
+                            var badge = document.querySelector('.btl__requests-count');
+                            if (badge) badge.textContent = remaining;
+                        }
+                        if (action === 'accept') location.reload();
+                    }, 300);
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = action === 'accept'
+                        ? '<i class="fa-solid fa-check"></i> Accept'
+                        : '<i class="fa-solid fa-xmark"></i> Reject';
+                    alert(data.error || 'Action failed.');
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.innerHTML = action === 'accept'
+                    ? '<i class="fa-solid fa-check"></i> Accept'
+                    : '<i class="fa-solid fa-xmark"></i> Reject';
+            });
+        });
+    });
+});
+</script>
+{% endif %}
 {% endblock content %}

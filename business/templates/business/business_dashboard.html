@@ -108,6 +108,27 @@
       </a>
     </div>
 
+    <!-- Analytics Swiper (Mobile Only) -->
+    <div class="pwa-section-header mt-3">
+      <h3 class="pwa-section-header__title">
+        <i class="fa-solid fa-chart-line pwa-text-primary me-1"></i> Analytics Overview
+      </h3>
+    </div>
+    <div class="pwa-horizontal-scroll">
+      <div class="pwa-chart-card">
+        <div class="pwa-chart-card__header">Weekly Trend</div>
+        <div id="mobileWeeklyOrdersChart" class="pwa-chart-container"></div>
+      </div>
+      <div class="pwa-chart-card">
+        <div class="pwa-chart-card__header">Order Status</div>
+        <div id="mobileOrderStatusChart" class="pwa-chart-container"></div>
+      </div>
+      <div class="pwa-chart-card">
+        <div class="pwa-chart-card__header">COD Status</div>
+        <div id="mobileCodStatusChart" class="pwa-chart-container"></div>
+      </div>
+    </div>
+
     <!-- AI Assistant Chat (mobile instance) -->
     {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="mobile" %}
 
@@ -808,6 +829,44 @@
         }
       });
     }
+
+  // ----------------------------------------------------
+  // MOBILE PWA CHARTS INITIALIZATION
+  // ----------------------------------------------------
+  if (document.getElementById('mobileWeeklyOrdersChart')) {
+    createAreaChart('mobileWeeklyOrdersChart', weeklyOrdersData, {
+      colors: ['#f7c000'],
+      height: 240,
+      yaxis: { show: false }, // Cleaner inside mobile cards
+      title: { text: '' },
+      dataLabels: { enabled: false },
+      chart: { sparkline: { enabled: false } }
+    });
+  }
+
+  if (document.getElementById('mobileOrderStatusChart')) {
+    createDonutChart('mobileOrderStatusChart', statusData, {
+      colors: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#6c757d'],
+      height: 240,
+      totalLabel: 'Orders',
+      legend: {
+        position: 'bottom',
+        fontSize: '10px'
+      }
+    });
+  }
+
+  if (document.getElementById('mobileCodStatusChart')) {
+    createDonutChart('mobileCodStatusChart', codData, {
+      colors: ['#F59E0B', '#6c757d'],
+      height: 240,
+      totalLabel: 'COD',
+      legend: {
+        position: 'bottom',
+        fontSize: '10px'
+      }
+    });
+  }
   }
 
   // Reinitialize charts after HTMX swap

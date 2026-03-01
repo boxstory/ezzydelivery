@@ -110,6 +110,25 @@ class SessionWarningMiddleware:
         return self.get_response(request)
 
 
+class NoCacheAuthMiddleware:
+    """
+    Prevents browser bfcache from storing auth pages (login, logout, signup).
+    Without this, navigating to /accounts/login/ can serve a stale cached page
+    that was rendered before CSS changes take effect.
+    """
+
+    AUTH_PATHS = ('/accounts/login/', '/accounts/logout/', '/accounts/signup/')
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if request.path in self.AUTH_PATHS:
+            response['Cache-Control'] = 'no-store'
+        return response
+
+
 class QueryInspectorMiddleware:
     """
     Middleware to detect and log duplicate SQL queries per request.

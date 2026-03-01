@@ -14,12 +14,22 @@
 
         <!-- Profile Picture Section -->
         <div class="cps__picture-wrapper d-inline-block position-relative mb-3">
+            {% if profile_picture and profile_picture.profile_picture %}
             <img src="{{ profile_picture.profile_picture.url }}"
                  alt="{{ profile.first_name }} {{ profile.last_name }}"
                  class="rounded-circle border border-3 border-secondary-subtle shadow-sm"
-                 style="cursor: pointer;"
+                 width="140" height="140"
+                 style="cursor: pointer; object-fit: cover;"
                  data-bs-toggle="modal"
                  data-bs-target="#updatePhotoModal">
+            {% else %}
+            <div class="rounded-circle border border-3 border-secondary-subtle shadow-sm bg-secondary-subtle d-flex align-items-center justify-content-center"
+                 style="width:140px;height:140px;cursor:pointer;"
+                 data-bs-toggle="modal"
+                 data-bs-target="#updatePhotoModal">
+                <i class="fas fa-user fa-3x text-secondary"></i>
+            </div>
+            {% endif %}
             <div class="position-absolute bottom-0 end-0 bg-primary rounded-circle d-flex align-items-center justify-content-center"
                  style="width: 40px; height: 40px; cursor: pointer; border: 3px solid white;"
                  data-bs-toggle="modal"
@@ -247,7 +257,7 @@
                 <i class="fas fa-tachometer-alt"></i>
                 <span>Driver Dashboard</span>
             </a>
-            <a href="{% url 'fleet:driver_profile' profile.id %}" class="btn btn-outline-warning fw-semibold text-dark d-flex align-items-center justify-content-center gap-2">
+            <a href="{% if user_driver %}{% url 'fleet:driver_profile' user_driver.driver_id %}{% else %}{% url 'core:driver_register' %}{% endif %}" class="btn btn-outline-warning fw-semibold text-dark d-flex align-items-center justify-content-center gap-2">
                 <i class="fas fa-user"></i>
                 <span>My Profile</span>
             </a>

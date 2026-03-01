@@ -197,6 +197,33 @@ def user_business(request):
     return {'user_business': get_cached_business(request)}
 
 
+def user_driver(request):
+    """
+    Add user's Driver record to template context.
+    Templates use {{ user_driver.driver_id }} for fleet profile links.
+    Only queries for authenticated users with is_driver flag.
+    """
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return {'user_driver': None}
+
+    if hasattr(request, '_cached_user_driver'):
+        return {'user_driver': request._cached_user_driver}
+
+    profile = get_cached_profile(request)
+    if not profile or not profile.is_driver:
+        request._cached_user_driver = None
+        return {'user_driver': None}
+
+    try:
+        from fleet.models import Driver
+        driver = Driver.objects.only('driver_id', 'user_id').get(user_id=request.user.id)
+        request._cached_user_driver = driver
+        return {'user_driver': driver}
+    except Exception:
+        request._cached_user_driver = None
+        return {'user_driver': None}
+
+
 def driver_pending_tasks(request):
     """
     Inject pending_tasks_count for fleet PWA bottom nav badge.

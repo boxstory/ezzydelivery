@@ -55,6 +55,12 @@ urlpatterns = [
                name='business_team_remove'),
      path('<int:business_id>/teams/<int:team_id>/status/', business_views.business_team_status_change,
                name='business_team_status_change'),
+     # team join requests
+     path('search/', business_views.business_search_ajax, name='business_search'),
+     path('join-request/', business_views.business_join_request_submit, name='business_join_request'),
+     path('join-request/<int:req_id>/cancel/', business_views.business_join_request_cancel, name='business_join_request_cancel'),
+     path('<int:business_id>/teams/join-requests/', business_views.business_join_requests_list, name='business_join_requests'),
+     path('<int:business_id>/teams/join-requests/<int:req_id>/action/', business_views.business_join_request_action, name='business_join_request_action'),
 
     # frontend
      #listing all business profiels cards

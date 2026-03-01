@@ -1,0 +1,245 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Team Verification - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="col-12 uvl" id="workforce_team_verification_container_main">
+
+<!-- Hero Header -->
+<div class="wfd__hero">
+    <div class="wfd__hero-content">
+        <h1 class="wfd__hero-title"><i class="fa-solid fa-users-gear"></i>Team Verification</h1>
+        <p class="wfd__hero-subtitle">Review and activate business team memberships</p>
+        <div class="wfd__hero-stats">
+            <div class="wfd__hero-stat wfd__hero-stat--warn">
+                <span class="wfd__hero-stat__num">{{ pending_count }}</span>
+                <span class="wfd__hero-stat__label">Pending</span>
+            </div>
+            <div class="wfd__hero-stat wfd__hero-stat--ok">
+                <span class="wfd__hero-stat__num">{{ active_count }}</span>
+                <span class="wfd__hero-stat__label">Active</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Pills -->
+<div class="uvl__filters">
+    <a href="?status=pending" class="uvl__pill {% if current_filter == 'pending' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-clock"></i> Pending
+        <span class="uvl__pill__count">{{ pending_count }}</span>
+    </a>
+    <a href="?status=active" class="uvl__pill {% if current_filter == 'active' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-circle-check"></i> Active
+        <span class="uvl__pill__count">{{ active_count }}</span>
+    </a>
+    <a href="?status=rejected" class="uvl__pill {% if current_filter == 'rejected' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-circle-xmark"></i> Rejected
+    </a>
+    <a href="?status=suspended" class="uvl__pill {% if current_filter == 'suspended' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-ban"></i> Suspended
+    </a>
+    <a href="?status=all" class="uvl__pill {% if current_filter == 'all' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-layer-group"></i> All
+    </a>
+</div>
+
+<!-- Team Member Cards -->
+{% if team_profiles %}
+    {% for tm in team_profiles %}
+    <div class="uvl__card" id="workforce_team_verif_card_{{ tm.id }}" data-team-id="{{ tm.id }}">
+
+        <!-- Card Head: Name + Status -->
+        <div class="uvl__card__head">
+            <div class="d-flex align-items-center gap-3">
+                <div class="uvl__avatar">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div>
+                    <div class="uvl__name">
+                        {{ tm.user.first_name|default:tm.user.username }} {{ tm.user.last_name|default:"" }}
+                        <span class="uvl__role {% if tm.team_role == 'manager' %}uvl__role--biz{% else %}uvl__role--drv{% endif %}">
+                            {{ tm.get_team_role_display }}
+                        </span>
+                    </div>
+                    <div class="uvl__contact">
+                        <span><i class="fa-solid fa-envelope"></i> {{ tm.user.email }}</span>
+                        {% if tm.user.profile.phone %}
+                        <span class="uvl__contact__sep">|</span>
+                        <span><i class="fa-solid fa-phone"></i> {{ tm.user.profile.phone }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <span class="uvl__status uvl__status--{{ tm.team_status }}">
+                {% if tm.team_status == 'active' %}<i class="fa-solid fa-circle-check"></i>
+                {% elif tm.team_status == 'pending' %}<i class="fa-solid fa-clock"></i>
+                {% elif tm.team_status == 'rejected' %}<i class="fa-solid fa-circle-xmark"></i>
+                {% elif tm.team_status == 'suspended' %}<i class="fa-solid fa-ban"></i>
+                {% else %}<i class="fa-solid fa-triangle-exclamation"></i>
+                {% endif %}
+                {{ tm.get_team_status_display }}
+            </span>
+        </div>
+
+        <!-- Scope Badges -->
+        <div class="uvl__scopes">
+            <span class="uvl__scope uvl__scope--{{ tm.team_status|yesno:'ok,warn,neutral' }}">
+                <i class="fa-solid fa-building"></i> {{ tm.business.business_name|truncatechars:30 }}
+            </span>
+            {% if tm.user.profile.user_number %}
+            <span class="uvl__scope uvl__scope--neutral">
+                <i class="fa-solid fa-id-badge"></i> {{ tm.user.profile.user_number }}
+            </span>
+            {% endif %}
+            <span class="uvl__scope uvl__scope--neutral">
+                <i class="fa-solid fa-at"></i> {{ tm.user.username }}
+            </span>
+        </div>
+
+        <!-- Details -->
+        <div class="row g-0">
+            <div class="col-sm-6 uvl__col-left">
+                <div class="uvl__fields">
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Business</span>
+                        <span class="uvl__field__value">{{ tm.business.business_name }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Business Code</span>
+                        <span class="uvl__field__value"><code class="uvl__code">{{ tm.business.business_code|default:"—" }}</code></span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Role</span>
+                        <span class="uvl__field__value">{{ tm.get_team_role_display }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 uvl__col-right">
+                <div class="uvl__fields">
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Added</span>
+                        <span class="uvl__field__value">{{ tm.created_at|date:"d M Y" }}</span>
+                    </div>
+                    {% if tm.invited_by %}
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Added by</span>
+                        <span class="uvl__field__value">{{ tm.invited_by.username }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Profile Complete</span>
+                        <span class="uvl__field__value">{{ tm.user.profile.get_profile_completion_percentage }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="uvl__actions uvl__team-actions" style="width:100%">
+            <div class="uvl__team-row d-flex align-items-center justify-content-between gap-2 py-1">
+                <span class="small text-muted">
+                    <i class="fa-solid fa-users"></i>
+                    <strong>{{ tm.business.business_name }}</strong> — {{ tm.get_team_role_display }}
+                </span>
+                <span class="d-flex gap-1">
+                    {% if tm.team_status != 'active' %}
+                    <button type="button" class="uvl__team-btn uvl__team-btn--activate"
+                            data-team-id="{{ tm.id }}" data-action="active"
+                            id="workforce_team_verif_btn_activate_{{ tm.id }}">
+                        <i class="fa-solid fa-check"></i> Activate
+                    </button>
+                    {% endif %}
+                    {% if tm.team_status == 'active' %}
+                    <button type="button" class="uvl__team-btn uvl__team-btn--suspend"
+                            data-team-id="{{ tm.id }}" data-action="suspended"
+                            id="workforce_team_verif_btn_suspend_{{ tm.id }}">
+                        <i class="fa-solid fa-ban"></i> Suspend
+                    </button>
+                    {% endif %}
+                    {% if tm.team_status in 'pending,suspended' %}
+                    <button type="button" class="uvl__team-btn uvl__team-btn--reject"
+                            data-team-id="{{ tm.id }}" data-action="rejected"
+                            id="workforce_team_verif_btn_reject_{{ tm.id }}">
+                        <i class="fa-solid fa-xmark"></i> Reject
+                    </button>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="uvl__empty" id="workforce_team_verif_empty_state">
+        <div class="uvl__empty__icon"><i class="fa-solid fa-users-slash"></i></div>
+        <h3 class="uvl__empty__title">No Team Members Found</h3>
+        <p class="uvl__empty__text">
+            {% if current_filter == 'pending' %}
+            There are no pending team memberships to verify.
+            {% else %}
+            No {{ current_filter }} team memberships found.
+            {% endif %}
+        </p>
+        <a href="?status=pending" class="uvl__btn uvl__btn--review">
+            <i class="fa-solid fa-clock"></i> View Pending
+        </a>
+    </div>
+{% endif %}
+
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function getCsrf() {
+        var c = null;
+        document.cookie.split(';').forEach(function(x) {
+            x = x.trim();
+            if (x.startsWith('csrftoken=')) c = decodeURIComponent(x.split('=')[1]);
+        });
+        if (!c) { var inp = document.querySelector('[name=csrfmiddlewaretoken]'); if (inp) c = inp.value; }
+        return c;
+    }
+
+    var csrftoken = getCsrf();
+
+    function updateTeamStatus(btn, teamId, newStatus) {
+        var labels = { active: 'Activate', suspended: 'Suspend', rejected: 'Reject' };
+        if (!confirm((labels[newStatus] || newStatus) + ' this team membership?')) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        fetch('/workforce/verification/team/' + teamId + '/update-status/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            credentials: 'same-origin',
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) { location.reload(); }
+            else {
+                alert('Error: ' + (data.error || 'Failed to update'));
+                btn.disabled = false;
+                btn.innerHTML = labels[newStatus] || newStatus;
+            }
+        })
+        .catch(function(err) {
+            alert(err.message || 'An error occurred');
+            btn.disabled = false;
+        });
+    }
+
+    document.querySelectorAll('.uvl__team-btn[data-team-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            updateTeamStatus(this, this.dataset.teamId, this.dataset.action);
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

@@ -1,235 +1,293 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
 {% block title %}{{ seo.title }}{% endblock title %}
 
-{% block content %}
-<!-- frontend driver Profile page section -->
-<h1 class="h2 text-center fw-bolder bg-light py-3 m-0 w-100" id="fleet_driver_profile_header_title">Driver Profile</h1>
-<section class="fdp__section bg-light" id="fleet_driver_profile_section_main">
-    <div class="container">
-        <div class="row align-items-center flex-row-reverse p-2">
-            <div class="col-md-6">
-                <div class="fdp__about-text p-2">
-                    <h2 class="h3 dark-color">
-                        {{ profile.user.first_name }} {{ profile.user.last_name }}
-                        ({{ driver.driver_code }})
-                    </h2>
-                    <hr>
-                    <h6 class="theme-color lead">
-                        {% if profile.is_driver == True %}
-                        <b>Role : Driver</b>
-                        {% elif profile.is_business == True %}
-                        <b>Business Details</b>
-                        {% else %}
-                        <b>User</b>
-                        {% endif %}
-                    </h6>
+{% block extra_css %}
+<link href="{% static 'fleet/css/fleet.css' %}?v=20260302a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
 
-                    <div class="row fdp__about-list pt-3">
-                        <div class="col-6 col-md-6">
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-cake-candles  pe-2"></i><label>Birthday</label>
-                                <p>{{ profile.date_of_birth }}</p>
+{% block content %}
+<section id="fleet_driver_profile_section_main">
+    <div class="container-xl px-3 py-4">
+
+        <div class="row g-4">
+
+            <!-- ══ LEFT: Profile Card ══════════════════════════════════════ -->
+            <div class="col-12 col-lg-4 col-xl-3">
+                <div class="card border shadow-sm" id="fleet_driver_profile_card_identity">
+
+                    <!-- Navy gradient header -->
+                    <div class="card-header fdp__card-header position-relative">
+                        <!-- Avatar -->
+                        <div class="fdp__avatar-wrap mx-auto mb-3">
+                            {% if profile_picture and profile_picture.profile_picture %}
+                            <img src="{{ profile_picture.profile_picture.url }}"
+                                 alt="{{ profile.first_name }} {{ profile.last_name }}"
+                                 class="fdp__avatar-img">
+                            {% else %}
+                            <div class="fdp__avatar-placeholder">
+                                <i class="fas fa-user fa-3x"></i>
                             </div>
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-gauge pe-2"></i><label>Birth year</label>
-                                <p>{{ profile.date_of_birth|date:'Y' }}</p>
-                            </div>
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-location-pin pe-2"></i><label>Location</label>
-                                <p>{{ profile.zone_name }}</p>
-                            </div>
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-address-book pe-2"></i><label>Address</label>
-                                <p>{{ profile.address }}</p>
-                            </div>
+                            {% endif %}
                         </div>
-                        <div class="col-6 col-md-6">
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-envelope pe-2"></i><label>E-mail</label>
-                                <p>Add me to see</p>
+
+                        <!-- Name & Code -->
+                        <h5 class="fdp__name text-center mb-1">
+                            {{ profile.first_name|default:"" }} {{ profile.last_name|default:"" }}
+                        </h5>
+                        {% if driver.driver_code %}
+                        <div class="text-center mb-2">
+                            <span class="fdp__code-badge">
+                                <i class="fas fa-id-badge me-1"></i>{{ driver.driver_code }}
+                            </span>
+                        </div>
+                        {% endif %}
+
+                        <!-- Status badge -->
+                        <div class="text-center">
+                            <span class="fdp__status-badge fdp__status-badge--{{ driver.driver_status }}">
+                                <i class="fas fa-circle me-1" style="font-size:0.45rem;vertical-align:middle"></i>
+                                {{ driver.get_driver_status_display|default:driver.driver_status|title }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Stats row -->
+                    <div class="card-body border-bottom p-0">
+                        <div class="d-flex">
+                            <div class="fdp__stat-cell border-end text-center">
+                                <div class="fdp__stat-value">{{ driver.driver_rating|default:"—" }}</div>
+                                <div class="fdp__stat-label">Rating</div>
                             </div>
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-phone pe-2"></i><label>Phone</label>
-                                <p>Add me to see</p>
+                            <div class="fdp__stat-cell border-end text-center">
+                                <div class="fdp__stat-value">{{ driver.driver_reviews_count|default:"0" }}</div>
+                                <div class="fdp__stat-label">Reviews</div>
                             </div>
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-globe pe-2"></i><label>Nationality</label>
-                                <p>{{ profile.nationlity }}</p>
-                            </div>
-                            <div class="fdp__media">
-                                <i class="fa-solid fa-layer-group pe-2"></i><label>Freelance</label>
-                                {% if profile.is_driver == True %}
-                                <p>Driver</p>
-                                {% elif profile.is_business == True %}
-                                <p>Business</p>
-                                {% else %}
-                                <p>User</p>
-                                {% endif %}
+                            <div class="fdp__stat-cell text-center">
+                                <div class="fdp__stat-value">{{ driver_vehicle.count }}</div>
+                                <div class="fdp__stat-label">Vehicles</div>
                             </div>
                         </div>
                     </div>
-                    <p class="p-0 m-0">Bio : </p>
-                    <p>{{ driver.driver_bio }}</p>
-                </div>
-            </div>
-            <div class="col-md-6 my-3">
-                <div class="fdp__about-avatar d-flex justify-content-center">
-                    {% if profile.profile_picture %}
-                    <img src="{{ profile_picture.profile_picture.url }}" loading="lazy" alt="{{ driver.user.first_name|default:'Driver' }} {{ driver.user.last_name|default:'' }} profile picture" class="img-fluid text-center" />
-                    {% else %}
-                    <img src="https://bootdey.com/img/Content/avatar/avatar7.png" loading="lazy" title="avatar" alt="Driver profile picture">
+
+                    <!-- Personal info -->
+                    <div class="card-body border-bottom p-3">
+                        <h6 class="fdp__section-title">
+                            <i class="fas fa-user-circle me-2"></i>Personal Info
+                        </h6>
+
+                        {% if profile.zone_name %}
+                        <div class="fdp__info-row">
+                            <i class="fas fa-map-marker-alt fdp__info-icon"></i>
+                            <span class="fdp__info-label">Zone</span>
+                            <span class="fdp__info-value">{{ profile.zone_name }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if profile.nationlity %}
+                        <div class="fdp__info-row">
+                            <i class="fas fa-flag fdp__info-icon"></i>
+                            <span class="fdp__info-label">Nationality</span>
+                            <span class="fdp__info-value">{{ profile.nationlity }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if profile.date_of_birth %}
+                        <div class="fdp__info-row">
+                            <i class="fas fa-cake-candles fdp__info-icon"></i>
+                            <span class="fdp__info-label">Born</span>
+                            <span class="fdp__info-value">{{ profile.date_of_birth|date:"M Y" }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if driver.driver_languages %}
+                        <div class="fdp__info-row">
+                            <i class="fas fa-language fdp__info-icon"></i>
+                            <span class="fdp__info-label">Language</span>
+                            <span class="fdp__info-value">{{ driver.driver_languages }}</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="fdp__info-row">
+                            <i class="fas fa-phone fdp__info-icon"></i>
+                            <span class="fdp__info-label">Phone</span>
+                            <span class="fdp__info-value text-muted fst-italic small">Hidden</span>
+                        </div>
+                        <div class="fdp__info-row">
+                            <i class="fas fa-envelope fdp__info-icon"></i>
+                            <span class="fdp__info-label">Email</span>
+                            <span class="fdp__info-value text-muted fst-italic small">Hidden</span>
+                        </div>
+                    </div>
+
+                    <!-- Add to directory (business only) -->
+                    {% if user_profile.is_business %}
+                    <div class="card-body p-3">
+                        <form id="fleet_driver_profile_form_add_directory"
+                              action="{% url 'business:driver_directory_add' %}"
+                              method="post" novalidate>
+                            {% csrf_token %}
+                            <input type="hidden" name="driver_id" value="{{ profile.id }}">
+                            <input type="hidden" name="business_id" value="{{ user.id }}">
+                            <button type="submit"
+                                    class="btn btn-warning fw-bold w-100 d-flex align-items-center justify-content-center gap-2"
+                                    id="fleet_driver_profile_btn_add_directory">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Add to Directory</span>
+                            </button>
+                        </form>
+                        <div id="fleet_driver_profile_msg_directory" class="alert py-1 mt-2 d-none"></div>
+                    </div>
                     {% endif %}
-                </div>
-                <div class="m-3  btn-block ">
-                    {% if user_profile.is_business == True %}
-                    <!-- #chatgpt -->
-                    <form id="fleet_driver_profile_form_add_directory" action="{% url 'business:driver_directory_add' %}" method="post" novalidate>
-                        {% csrf_token %}
-                        <input type="hidden" name="driver_id" value="{{ profile.id }}">
-                        <input type="hidden" name="business_id" value="{{ user.id }}">
-                        <button type="submit" class="btn btn-dark  w-100" id="fleet_driver_profile_btn_add_directory">
-                            Add to
-                            directory
-                        </button>
-                    </form>
-                    <div id="form-messages" class="alert  py-1 d-none"></div>
-                    <div id="success-message" class="alert alert-success py-1 d-none"></div>
-                    <div id="error-message" class="alert alert-danger py-1 d-none"></div>
-                    {% endif %}
-                    <div id="alert-message" class="alert alert-info mt-3  py-2 text-center d-none"></div>
+
                 </div>
             </div>
-            <!-- counters -->
-            <div class="fdp__counter p-3">
-                <div class="row">
-                    <div class="col-6 col-lg-3">
-                        <div class="fdp__count-data text-center">
-                            <h6 class="count h2" data-to="500" data-speed="500">200</h6>
-                            <p>Rides Requested</p>
-                        </div>
+
+            <!-- ══ RIGHT: Main Content ════════════════════════════════════ -->
+            <div class="col-12 col-lg-8 col-xl-9">
+
+                <!-- Bio card -->
+                {% if driver.driver_bio %}
+                <div class="card border shadow-sm mb-4" id="fleet_driver_profile_card_bio">
+                    <div class="card-header fdp__card-header-light">
+                        <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                            <i class="fas fa-quote-left" style="color:var(--brand-primary)"></i>
+                            About This Driver
+                        </h6>
                     </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="fdp__count-data text-center">
-                            <h6 class="count h2" data-to="150" data-speed="150">170</h6>
-                            <p>Rides Completed</p>
-                        </div>
+                    <div class="card-body p-4">
+                        <p class="mb-0 text-muted" style="line-height:1.7">{{ driver.driver_bio }}</p>
                     </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="fdp__count-data text-center">
-                            <h6 class="count h2" data-to="850" data-speed="850">2{{ driver_vehicle.id }}</h6>
-                            <p>Vehicles</p>
-                        </div>
+                </div>
+                {% endif %}
+
+                <!-- Documents card -->
+                <div class="card border shadow-sm mb-4" id="fleet_driver_profile_card_documents">
+                    <div class="card-header fdp__card-header-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                            <i class="fas fa-file-alt" style="color:var(--brand-primary)"></i>
+                            Documents
+                        </h6>
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                            {{ driver_documents.count }} on file
+                        </span>
                     </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="fdp__count-data text-center">
-                            <h6 class="count h2" data-to="190" data-speed="190">68 (M)</h6>
-                            <p>Qatar Experiance</p>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="fleet_driver_profile_table_documents">
+                                <thead class="fdp__table-head">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Type</th>
+                                        <th>Doc No.</th>
+                                        <th>Expiry</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in driver_documents %}
+                                    <tr>
+                                        <td class="text-muted small">{{ forloop.counter }}</td>
+                                        <td class="fw-semibold">{{ doc.document_type }}</td>
+                                        <td><code class="fdp__doc-code">***{{ doc.document_no|slice:"-5:" }}</code></td>
+                                        <td class="text-muted small">{{ doc.document_expiry_date|date:"M Y" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            <i class="fas fa-folder-open me-2 opacity-50"></i>No documents on file
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
-            </div>
-            <!-- documents section -----------  -->
-            <div class="fdp__listing-container" id="fleet_driver_profile_section_documents">
-                <div class="fdp__listing-header">
-                    <h6><i class="fa-solid fa-file-alt text-primary"></i>Available Documents</h6>
+
+                <!-- Vehicles card -->
+                <div class="card border shadow-sm" id="fleet_driver_profile_card_vehicles">
+                    <div class="card-header fdp__card-header-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                            <i class="fas fa-car" style="color:var(--brand-primary)"></i>
+                            Vehicles
+                        </h6>
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                            {{ driver_vehicle.count }} registered
+                        </span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="fleet_driver_profile_table_vehicles">
+                                <thead class="fdp__table-head">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Type</th>
+                                        <th>Model</th>
+                                        <th>Added</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for vehicle in driver_vehicle %}
+                                    <tr>
+                                        <td class="text-muted small">{{ forloop.counter }}</td>
+                                        <td>
+                                            <i class="fas fa-car me-1 text-muted"></i>
+                                            {{ vehicle.vehicle_type }}
+                                        </td>
+                                        <td class="fw-semibold">{{ vehicle.vehicle_model }}</td>
+                                        <td class="text-muted small">{{ vehicle.vehicle_date|date:"M Y" }}</td>
+                                        <td>
+                                            <span class="badge {% if vehicle.vehicle_status == 'active' %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %}">
+                                                {{ vehicle.vehicle_status|title }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            <i class="fas fa-car me-2 opacity-50"></i>No vehicles registered
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-                <table class="fdp__listing-table" id="fleet_driver_profile_table_documents">
-                    <thead id="fleet_driver_profile_thead_documents">
-                        <tr>
-                            <th>#</th>
-                            <th>Type</th>
-                            <th>Doc No</th>
-                            <th>Expiry Date</th>
-                        </tr>
-                    </thead>
-                    <tbody id="fleet_driver_profile_tbody_documents">
-                        {% for doc in driver_documents %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ doc.document_type }}</td>
-                            <td><code>***{{ doc.document_no|slice:"-5:" }}</code></td>
-                            <td>{{ doc.document_expiry_date|date:'M-y' }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center text-muted py-3">No documents available</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <!-- vehicle section   -->
-            <div class="fdp__listing-container my-3" id="fleet_driver_profile_section_vehicles">
-                <div class="fdp__listing-header">
-                    <h6><i class="fa-solid fa-car text-primary"></i>Owned Vehicle Details</h6>
-                </div>
-                <table class="fdp__listing-table" id="fleet_driver_profile_table_vehicles">
-                    <thead id="fleet_driver_profile_thead_vehicles">
-                        <tr>
-                            <th>#</th>
-                            <th>Type</th>
-                            <th>Model</th>
-                            <th>Added on</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="fleet_driver_profile_tbody_vehicles">
-                        {% for vehicle in driver_vehicle %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
-                            <td>
-                                <span class="fdp__status fdp__status--primary"><i class="fa-solid fa-car"></i></span>
-                                {{ vehicle.vehicle_type }}
-                            </td>
-                            <td>{{ vehicle.vehicle_model }}</td>
-                            <td class="text-muted">{{ vehicle.vehicle_date }}</td>
-                            <td>
-                                <span class="fdp__status {% if vehicle.vehicle_status == 'active' %}fdp__status--success{% else %}fdp__status--warning{% endif %}">
-                                    {{ vehicle.vehicle_status }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-3">No vehicles added</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
             </div>
         </div>
     </div>
 </section>
 {% endblock content %}
+
 {% block extra_js %}
 <script>
-    $(document).ready(function () {
-        $('#favorite-form').submit(function (e) {
-            e.preventDefault(); // Prevent the default form submission
-
-            $.ajax({
-                type: 'POST',
-                url: $(this).attr('action'),
-                data: $(this).serialize(),
-                success: function (response) {
-                    if (response.success) {
-                        // Show the success message in the alert div
-                        $('#alert-message').removeClass('alert-danger').addClass('alert-success').text('Driver successfully added to the directory!').fadeIn();
-
-                        // Optional: Hide the form after successful submission
-                        $('#favorite-form').hide();
-                    } else {
-                        // Show an error message in the alert div
-                        $('#alert-message').removeClass('alert-success').addClass('alert-danger').text(response.error).fadeIn();
-                    }
-                },
-                error: function (xhr, status, error) {
-                    console.log('An error occurred during form submission.');
-                }
-            });
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('fleet_driver_profile_form_add_directory');
+    var msg  = document.getElementById('fleet_driver_profile_msg_directory');
+    if (!form || !msg) return;
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            msg.className = 'alert py-1 mt-2 ' + (data.success ? 'alert-success' : 'alert-danger');
+            msg.textContent = data.success ? 'Driver added to your directory!' : (data.error || 'An error occurred.');
+            msg.classList.remove('d-none');
+            if (data.success) form.style.display = 'none';
+        })
+        .catch(function() {
+            msg.className = 'alert alert-danger py-1 mt-2';
+            msg.textContent = 'Request failed. Please try again.';
+            msg.classList.remove('d-none');
         });
     });
+});
 </script>
 {% endblock extra_js %}
