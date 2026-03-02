@@ -8,10 +8,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('business', '0010_fulfillment_default_true'),
-        ('delivery', '0012_deliverytask_earnings_settled_and_more'),
-        ('fleet', '0012_drivervehicle_vehicle_photo_drivernotification_and_more'),
-        ('warehouse', '0004_storagelocation_height_cm_storagelocation_length_cm_and_more'),
+        ('business', '0028_business_fulfillment_service_status_and_more'),
+        ('delivery', '0012_deliverytask_cod_client_settled_and_more'),
+        ('fleet', '0012_remove_driver_driver_code_dms'),
+        ('warehouse', '0005_add_dimensions_to_storage_location'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
