@@ -1259,6 +1259,10 @@ def workforce_pickup_location_add(request, business_id):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def dl_list_all(request):
+    from django.db.models import Prefetch
+    failure_history_qs = orders_models.OrderStatusHistory.objects.filter(
+        field_name='dl_task_status', new_value='failed'
+    ).order_by('-created_at')
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).prefetch_related(
@@ -1266,6 +1270,7 @@ def dl_list_all(request):
         'order__order_items',
         'order__order_items__product',
         'task_qrcode',
+        Prefetch('order__status_history', queryset=failure_history_qs, to_attr='failure_history'),
     ).all().order_by('-created_at')
 
     # Get filter parameters
@@ -1859,7 +1864,7 @@ def cancel_order(request, order_id):
     """Cancel an order"""
     try:
         order = get_object_or_404(
-            orders_models.Order.objects.select_related('business'),
+            orders_models.Order.objects.select_related('business').prefetch_related('order_items', 'delivery_task'),
             id=order_id
         )
 
@@ -2149,7 +2154,7 @@ def publish_order_to_delivery(request, order_id):
     """AJAX endpoint to publish order to delivery"""
     try:
         order = get_object_or_404(
-            orders_models.Order.objects.select_related('business'),
+            orders_models.Order.objects.select_related('business').prefetch_related('order_items', 'delivery_task'),
             id=order_id
         )
 
@@ -2157,6 +2162,9 @@ def publish_order_to_delivery(request, order_id):
         order.order_status = 'publish'
         order.task_status = 'dl_task_listed'
         order.save()
+
+        # Refresh to get updated delivery_task after signal runs
+        order = orders_models.Order.objects.select_related('business').prefetch_related('order_items', 'delivery_task').get(id=order_id)
 
         # Log the publish action
         orders_models.OrderVerificationLog.objects.create(
@@ -2374,6 +2382,20 @@ def add_order_comment(request, order_id):
         }, status=400)
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+def ajax_zone_name(request):
+    """Return zone name JSON for a given zone number — used by order edit form."""
+    zone_num = request.GET.get('zone', '').strip()
+    if zone_num.isdigit():
+        name = delivery_models.ZoneName.objects.filter(
+            zone_number=int(zone_num)
+        ).values_list('zone_name', flat=True).first() or ''
+    else:
+        name = ''
+    return JsonResponse({'zone_name': name})
+
+
 @login_required(login_url='account_login')
 @require_POST
 def update_order_coords(request, order_id):
@@ -2498,13 +2520,6 @@ def publish_task_to_fleets(request, task_id):
                 'error': 'Cannot publish — order is cancelled'
             }, status=400)
 
-        # Block if order is not verified
-        if task.order and task.order.verification_status != 'verified':
-            return JsonResponse({
-                'success': False,
-                'error': 'Cannot publish — order must be verified before publishing to fleet'
-            }, status=400)
-
         # Mark task as published to fleet (pending = visible to all fleet drivers)
         task.dl_task_status = 'pending'
         task.dl_task_publish = True
@@ -2592,13 +2607,6 @@ def assign_driver_to_task(request, task_id):
                 return JsonResponse({
                     'success': False,
                     'error': 'Cannot assign driver — order is cancelled'
-                }, status=400)
-
-            # Block if order is not verified
-            if task.order and task.order.verification_status != 'verified':
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Cannot assign driver — order is not verified'
                 }, status=400)
 
             # Block if task already assigned to a different driver
@@ -2760,10 +2768,10 @@ def update_task_status(request, task_id):
                 task.completed_at = timezone.now()
                 update_fields.append('completed_at')
 
-        # Save notes to the order if provided
-        if notes and task.order:
-            task.order.order_notes = notes
-            task.order.save(update_fields=['order_notes'])
+        # Save notes to task description if provided
+        if notes:
+            task.dl_task_description = notes
+            update_fields.append('dl_task_description')
 
         task.save(update_fields=update_fields)
 
@@ -6283,13 +6291,34 @@ def bulk_print_tasks(request):
             'print_mode': True,
         })
 
-    tasks = delivery_models.DeliveryTask.objects.filter(
-        id__in=task_ids
-    ).select_related('order', 'driver', 'driver__user', 'business', 'pickup_location')
+    tasks = list(
+        delivery_models.DeliveryTask.objects.filter(
+            id__in=task_ids
+        ).select_related('order', 'driver', 'driver__user', 'business', 'pickup_location')
+        .prefetch_related('task_qrcode', 'order__order_items__product')
+    )
+
+    # Generate QR code for any task missing one
+    for task in tasks:
+        qr_qs = task.task_qrcode.all()
+        if not qr_qs.exists() and task.dl_task_number:
+            qr_obj = delivery_models.DeliveryTaskQRCode(delivery_task=task, task_number=task.dl_task_number)
+            qr_obj.generate_qrcode()
+            qr_obj.save()
+
+    # Build zone_number → zone_name lookup for all zones used in these tasks
+    zone_numbers = {t.order.dl_zone for t in tasks if t.order and t.order.dl_zone}
+    zone_names = {}
+    if zone_numbers:
+        zone_names = dict(
+            delivery_models.ZoneName.objects.filter(zone_number__in=zone_numbers)
+            .values_list('zone_number', 'zone_name')
+        )
 
     context = {
         'page_title': 'Print Tasks',
         'tasks': tasks,
+        'zone_names': zone_names,
         'print_mode': True,
     }
 
@@ -6657,6 +6686,12 @@ def order_edit(request, order_id):
             logger.exception("Error updating order %s: %s", order_id, str(e))
             messages.error(request, 'An error occurred while updating the order')
 
+    # Zone name lookup for pre-fill
+    zone_name = ''
+    if order.dl_zone:
+        zn = delivery_models.ZoneName.objects.filter(zone_number=order.dl_zone).values_list('zone_name', flat=True).first()
+        zone_name = zn or ''
+
     context = {
         'page_title': f'Edit Order - {order.order_number}',
         'order': order,
@@ -6664,6 +6699,7 @@ def order_edit(request, order_id):
         'order_statuses': orders_models.ORDER_STATUS_BY_CLIENT,
         'verification_statuses': orders_models.Order.VERIFICATION_STATUS,
         'cod_statuses': orders_models.COD_STATUS_BY_CLIENT,
+        'zone_name': zone_name,
     }
 
     return render(request, 'workforce/order_edit.html', context)
@@ -7038,12 +7074,129 @@ def whatsapp_inquiries_list(request):
 @staff_required
 def pricing_inquiry_detail(request, inquiry_id):
     """Full detail view for a single PricingEnquiry submission."""
-    inquiry = get_object_or_404(webpages_models.PricingEnquiry, pk=inquiry_id)
+    inquiry = get_object_or_404(
+        webpages_models.PricingEnquiry.objects.prefetch_related('activities__created_by'),
+        pk=inquiry_id
+    )
+    from django.contrib.auth.models import User
+    staff_users = User.objects.filter(is_staff=True).order_by('first_name', 'username')
     context = {
         'page_title': f'Pricing Inquiry – {inquiry.business_name}',
         'inquiry': inquiry,
+        'activities': inquiry.activities.select_related('created_by').order_by('-created_at'),
+        'staff_users': staff_users,
+        'status_choices': webpages_models.PricingEnquiry.STATUS_CHOICES,
     }
     return render(request, 'workforce/forms/pricing_inquiry_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pricing_inquiry_update_status(request, inquiry_id):
+    """AJAX: update crm_status, assigned_to, or staff_notes and log activity."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    inquiry = get_object_or_404(webpages_models.PricingEnquiry, pk=inquiry_id)
+    from django.contrib.auth.models import User
+
+    new_status = request.POST.get('crm_status', '').strip()
+    assigned_to_id = request.POST.get('assigned_to', '').strip()
+    staff_notes = request.POST.get('staff_notes', '').strip()
+
+    changes = []
+    if new_status and new_status != inquiry.crm_status:
+        old_label = inquiry.get_crm_status_display()
+        inquiry.crm_status = new_status
+        new_label = inquiry.get_crm_status_display()
+        changes.append(f'Status changed: {old_label} → {new_label}')
+
+    if assigned_to_id == '':
+        if inquiry.assigned_to_id is not None:
+            changes.append('Assignment cleared')
+            inquiry.assigned_to = None
+    else:
+        try:
+            user = User.objects.get(pk=int(assigned_to_id))
+            if inquiry.assigned_to_id != user.pk:
+                changes.append(f'Assigned to {user.get_full_name() or user.username}')
+                inquiry.assigned_to = user
+        except (User.DoesNotExist, ValueError):
+            pass
+
+    if staff_notes != (inquiry.staff_notes or ''):
+        inquiry.staff_notes = staff_notes or None
+        changes.append('Notes updated')
+
+    inquiry.save()
+
+    if changes:
+        webpages_models.PricingEnquiryActivity.objects.create(
+            inquiry=inquiry,
+            activity_type=webpages_models.PricingEnquiryActivity.TYPE_STATUS_CHANGE,
+            body='; '.join(changes),
+            created_by=request.user,
+        )
+
+    return JsonResponse({
+        'success': True,
+        'crm_status': inquiry.crm_status,
+        'crm_status_display': inquiry.get_crm_status_display(),
+        'assigned_to': inquiry.assigned_to.get_full_name() or inquiry.assigned_to.username if inquiry.assigned_to else '',
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pricing_inquiry_add_activity(request, inquiry_id):
+    """AJAX: add a followup note or activity to a PricingEnquiry."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    inquiry = get_object_or_404(webpages_models.PricingEnquiry, pk=inquiry_id)
+
+    activity_type = request.POST.get('activity_type', webpages_models.PricingEnquiryActivity.TYPE_NOTE)
+    body = request.POST.get('body', '').strip()
+    if not body:
+        return JsonResponse({'error': 'Body is required'}, status=400)
+
+    valid_types = [t[0] for t in webpages_models.PricingEnquiryActivity.TYPE_CHOICES]
+    if activity_type not in valid_types:
+        activity_type = webpages_models.PricingEnquiryActivity.TYPE_NOTE
+
+    activity = webpages_models.PricingEnquiryActivity.objects.create(
+        inquiry=inquiry,
+        activity_type=activity_type,
+        body=body,
+        created_by=request.user,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'activity': {
+            'id': activity.pk,
+            'activity_type': activity.activity_type,
+            'activity_type_display': activity.get_activity_type_display(),
+            'body': activity.body,
+            'created_by': activity.created_by.get_full_name() or activity.created_by.username,
+            'created_at': activity.created_at.strftime('%d %b %Y, %H:%M'),
+        }
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pricing_inquiry_delete_activity(request, inquiry_id, activity_id):
+    """AJAX: delete an activity entry (staff only, own entries)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    activity = get_object_or_404(
+        webpages_models.PricingEnquiryActivity,
+        pk=activity_id, inquiry_id=inquiry_id
+    )
+    # Only allow deletion by the creator or superuser
+    if activity.created_by_id != request.user.pk and not request.user.is_superuser:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    activity.delete()
+    return JsonResponse({'success': True})
 
 
 @login_required(login_url='/accounts/login/')

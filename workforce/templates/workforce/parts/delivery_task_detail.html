@@ -108,6 +108,17 @@
                             {% if task.pickup_location and task.pickup_location.locality %}
                             <div class="dtd__route__addr">{{ task.pickup_location.locality }}</div>
                             {% endif %}
+                            {% if task.pickup_location %}
+                            {% if task.pickup_location.pickup_lat and task.pickup_location.pickup_lon %}
+                            <a href="https://www.google.com/maps?q={{ task.pickup_location.pickup_lat }},{{ task.pickup_location.pickup_lon }}" target="_blank" class="dtd__addr__map-btn mt-1" hx-boost="false">
+                                <i class="fa-solid fa-location-pin"></i> Pin
+                            </a>
+                            {% elif task.pickup_location.locality %}
+                            <a href="https://maps.google.com/?q={{ task.pickup_location.locality|urlencode }}" target="_blank" class="dtd__addr__map-btn mt-1" hx-boost="false">
+                                <i class="fa-solid fa-location-pin"></i> Pin
+                            </a>
+                            {% endif %}
+                            {% endif %}
                         </div>
                          
                         <div class="dtd__route__point">

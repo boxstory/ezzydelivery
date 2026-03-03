@@ -6,343 +6,537 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3">
+<link href="{% static 'workforce/css/pricing_inquiry_detail.css' %}" rel="stylesheet" type="text/css" />
+<div class="pid col-12 p-3" id="pricing-inquiry-detail">
 
-  <!-- BREADCRUMB -->
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item">
-        <a href="{% url 'workforce:pricing_inquiries_list' %}"
-           hx-get="{% url 'workforce:pricing_inquiries_list' %}"
-           hx-target="#main-content"
-           hx-select="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">Pricing Inquiries</a>
-      </li>
-      <li class="breadcrumb-item active">{{ inquiry.business_name }}</li>
-    </ol>
-  </nav>
+  <!-- ══════════════════════════════════════
+       BACK LINK
+  ═══════════════════════════════════════ -->
+  <a href="{% url 'workforce:pricing_inquiries_list' %}"
+     class="pid__back"
+     hx-get="{% url 'workforce:pricing_inquiries_list' %}"
+     hx-target="#main-content" hx-select="#main-content"
+     hx-swap="outerHTML" hx-push-url="true">
+    <i class="fa-solid fa-arrow-left"></i>Pricing Inquiries
+  </a>
 
-  <!-- HERO CARD -->
-  <div class="card border-0 shadow-sm mb-4">
-    <div class="card-body d-flex flex-wrap align-items-center gap-3">
-      <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
-           style="width:60px;height:60px;flex-shrink:0;">
-        <i class="fa-solid fa-store text-primary fa-xl"></i>
+  <!-- ══════════════════════════════════════
+       HERO
+  ═══════════════════════════════════════ -->
+  <div class="pid__hero">
+    <div class="pid__hero__glow"></div>
+    <div class="pid__hero__content">
+
+      <!-- Avatar -->
+      <div class="pid__hero__avatar">
+        <i class="fa-solid fa-store"></i>
       </div>
-      <div class="flex-grow-1">
-        <h3 class="mb-0 fw-bold">{{ inquiry.business_name }}</h3>
-        <div class="text-muted">{{ inquiry.full_name }}</div>
-        <div class="mt-1 d-flex flex-wrap gap-2">
+
+      <!-- Identity block -->
+      <div class="pid__hero__info">
+        <h1 class="pid__hero__name">{{ inquiry.business_name }}</h1>
+        <div class="pid__hero__sub">
+          <i class="fa-solid fa-user pid__hero__sub-icon"></i>{{ inquiry.full_name }}
+          &nbsp;·&nbsp;
+          <i class="fa-solid fa-calendar pid__hero__sub-icon"></i>{{ inquiry.date_created|date:"d M Y" }}
+          {% if inquiry.assigned_to %}
+          &nbsp;·&nbsp;
+          <i class="fa-solid fa-user-tie pid__hero__sub-icon"></i><span id="assigned-to-display">{{ inquiry.assigned_to.get_full_name|default:inquiry.assigned_to.username }}</span>
+          {% else %}
+          &nbsp;·&nbsp;
+          <span id="assigned-to-display" class="pid__hero__unassigned">Unassigned</span>
+          {% endif %}
+        </div>
+        <div class="pid__hero__badges">
+          <span class="pid__badge pid__badge--status pid__badge--{{ inquiry.crm_status }}" id="crm-status-badge">
+            <i class="fa-solid fa-circle"></i>{{ inquiry.get_crm_status_display }}
+          </span>
+          {% if not inquiry.is_complete %}
+          <span class="pid__badge pid__badge--ghost"><i class="fa-solid fa-circle-half-stroke"></i>Partial</span>
+          {% endif %}
           {% if inquiry.is_required_COD_service %}
-          <span class="badge bg-success">COD Required</span>
+          <span class="pid__badge pid__badge--cod"><i class="fa-solid fa-money-bill-wave"></i>COD</span>
           {% endif %}
           {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar or inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}
-          <span class="badge bg-warning text-dark">Fulfillment Required</span>
+          <span class="pid__badge pid__badge--fulfillment"><i class="fa-solid fa-warehouse"></i>Fulfillment</span>
           {% endif %}
-          {% if inquiry.is_registered_company_in_qatar %}
-          <span class="badge bg-info text-dark">Registered in Qatar</span>
+          {% if inquiry.preferred_start_date == 'Immediately' %}
+          <span class="pid__badge pid__badge--urgent"><i class="fa-solid fa-bolt"></i>Start Immediately</span>
           {% endif %}
         </div>
       </div>
-      <div class="text-end">
-        <div class="text-muted small">Submitted</div>
-        <div class="fw-semibold">{{ inquiry.date_created|date:"d M Y" }}</div>
+
+      <!-- Action buttons -->
+      <div class="pid__hero__actions">
+        <a href="tel:{{ inquiry.business_contact_number }}" class="pid__hero__btn pid__hero__btn--call">
+          <i class="fa-solid fa-phone"></i>Call
+        </a>
+        <a href="https://wa.me/{{ inquiry.business_contact_number|cut:'+' }}" target="_blank" class="pid__hero__btn pid__hero__btn--wa">
+          <i class="fa-brands fa-whatsapp"></i>WhatsApp
+        </a>
+        <button class="pid__hero__btn pid__hero__btn--manage" data-bs-toggle="offcanvas" data-bs-target="#manageOffcanvas">
+          <i class="fa-solid fa-sliders"></i>Manage
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       STATS ROW
+  ═══════════════════════════════════════ -->
+  <div class="pid__stats">
+    <div class="pid__stats__card">
+      <div class="pid__stats__icon pid__stats__icon--blue"><i class="fa-solid fa-boxes-stacked"></i></div>
+      <div>
+        <div class="pid__stats__num">{{ inquiry.avarage_number_of_order_done_last_month|default:"—" }}</div>
+        <div class="pid__stats__lbl">Orders / Month</div>
+      </div>
+    </div>
+    <div class="pid__stats__card">
+      <div class="pid__stats__icon pid__stats__icon--green"><i class="fa-solid fa-coins"></i></div>
+      <div>
+        <div class="pid__stats__num">{{ inquiry.average_order_value_qar|default:"—" }}</div>
+        <div class="pid__stats__lbl">Avg Order Value (QAR)</div>
+      </div>
+    </div>
+    <div class="pid__stats__card">
+      <div class="pid__stats__icon pid__stats__icon--orange"><i class="fa-solid fa-chart-line"></i></div>
+      <div>
+        <div class="pid__stats__num">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"—" }}</div>
+        <div class="pid__stats__lbl">3-Month Milestone</div>
+      </div>
+    </div>
+    <div class="pid__stats__card">
+      <div class="pid__stats__icon pid__stats__icon--purple"><i class="fa-solid fa-truck-fast"></i></div>
+      <div>
+        <div class="pid__stats__num">{{ inquiry.delivery_coverage|default:"—" }}</div>
+        <div class="pid__stats__lbl">Coverage</div>
       </div>
     </div>
   </div>
 
-  <div class="row g-4">
+  <!-- ══════════════════════════════════════
+       MAIN GRID
+  ═══════════════════════════════════════ -->
+  <div class="pid__grid">
 
-    <!-- CONTACT & BUSINESS -->
-    <div class="col-12 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent fw-semibold">
-          <i class="fa-solid fa-address-card me-2 text-primary"></i>Contact & Business
+    <!-- ─── LEFT COLUMN ─────────────────── -->
+    <div class="pid__grid__left">
+
+      <!-- CONTACT & BUSINESS -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-address-card"></i>
+          <h3>Contact & Business</h3>
         </div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-5 text-muted small">Full Name</dt>
-            <dd class="col-7 small">{{ inquiry.full_name }}</dd>
+        <div class="pid__panel__body">
 
-            <dt class="col-5 text-muted small">Business Name</dt>
-            <dd class="col-7 small fw-semibold">{{ inquiry.business_name }}</dd>
-
-            {% if inquiry.business_operating_age %}
-            <dt class="col-5 text-muted small">Operating Since</dt>
-            <dd class="col-7 small">{{ inquiry.business_operating_age }}</dd>
-            {% endif %}
-
-            <dt class="col-5 text-muted small">Contact Number</dt>
-            <dd class="col-7 small">
-              <a href="tel:{{ inquiry.business_contact_number }}" class="text-decoration-none">
-                {{ inquiry.business_contact_number }}
-              </a>
-            </dd>
-
+          <!-- Contact items -->
+          <div class="pid__contact">
+            <a href="tel:{{ inquiry.business_contact_number }}" class="pid__contact__item">
+              <i class="fa-solid fa-phone"></i>
+              <div>
+                <div class="pid__contact__label">Primary Contact</div>
+                <div class="pid__contact__val">{{ inquiry.business_contact_number }}</div>
+              </div>
+            </a>
             {% if inquiry.operation_team_contact_number %}
-            <dt class="col-5 text-muted small">Ops Contact</dt>
-            <dd class="col-7 small">
-              <a href="tel:{{ inquiry.operation_team_contact_number }}" class="text-decoration-none">
-                {{ inquiry.operation_team_contact_number }}
-              </a>
-            </dd>
+            <a href="tel:{{ inquiry.operation_team_contact_number }}" class="pid__contact__item">
+              <i class="fa-solid fa-headset"></i>
+              <div>
+                <div class="pid__contact__label">Ops Team</div>
+                <div class="pid__contact__val">{{ inquiry.operation_team_contact_number }}</div>
+              </div>
+            </a>
             {% endif %}
-
             {% if inquiry.website_url %}
-            <dt class="col-5 text-muted small">Website</dt>
-            <dd class="col-7 small">
-              <a href="{{ inquiry.website_url }}" target="_blank" class="text-primary">
-                <i class="fa-solid fa-external-link-alt me-1"></i>{{ inquiry.website_url|truncatechars:40 }}
-              </a>
-            </dd>
+            <a href="{{ inquiry.website_url }}" target="_blank" class="pid__contact__item">
+              <i class="fa-solid fa-globe"></i>
+              <div>
+                <div class="pid__contact__label">Website</div>
+                <div class="pid__contact__val">{{ inquiry.website_url|truncatechars:45 }}</div>
+              </div>
+            </a>
             {% endif %}
-
             {% if inquiry.social_profile %}
-            <dt class="col-5 text-muted small">Social</dt>
-            <dd class="col-7 small">
-              <a href="{{ inquiry.social_profile }}" target="_blank" class="text-primary">
-                <i class="fa-solid fa-external-link-alt me-1"></i>{{ inquiry.social_profile|truncatechars:40 }}
-              </a>
-            </dd>
+            <a href="{{ inquiry.social_profile }}" target="_blank" class="pid__contact__item">
+              <i class="fa-solid fa-share-nodes"></i>
+              <div>
+                <div class="pid__contact__label">Social Profile</div>
+                <div class="pid__contact__val">{{ inquiry.social_profile|truncatechars:45 }}</div>
+              </div>
+            </a>
             {% endif %}
+          </div>
 
-            {% if inquiry.average_order_value_qar %}
-            <dt class="col-5 text-muted small">Avg Order Value</dt>
-            <dd class="col-7 small fw-semibold text-success">{{ inquiry.average_order_value_qar }} QAR</dd>
-            {% endif %}
-          </dl>
+          <div class="pid__divider"></div>
+
+          <!-- Business fields -->
+          <div class="pid__field">
+            <span class="pid__field__lbl">Business Age</span>
+            <span class="pid__field__val">{{ inquiry.business_operating_age|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Registered in Qatar</span>
+            <span class="pid__field__val">
+              {% if inquiry.is_registered_company_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}
+            </span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Located in Qatar</span>
+            <span class="pid__field__val">
+              {% if inquiry.is_located_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}
+            </span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Team in Qatar</span>
+            <span class="pid__field__val">
+              {% if inquiry.is_team_available_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}
+            </span>
+          </div>
+          {% if inquiry.business_location_country %}
+          <div class="pid__field">
+            <span class="pid__field__lbl">Based In</span>
+            <span class="pid__field__val">{{ inquiry.business_location_country }}</span>
+          </div>
+          {% endif %}
         </div>
       </div>
-    </div>
 
-    <!-- PRODUCT & COMPANY STATUS -->
-    <div class="col-12 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent fw-semibold">
-          <i class="fa-solid fa-box-open me-2 text-warning"></i>Product & Company Status
+      <!-- PRODUCT & SERVICES -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-gears"></i>
+          <h3>Product & Services</h3>
         </div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-6 text-muted small">Product Category</dt>
-            <dd class="col-6 small">{{ inquiry.product_category }}</dd>
+        <div class="pid__panel__body">
+          <div class="pid__field">
+            <span class="pid__field__lbl">Product Category</span>
+            <span class="pid__field__val pid__field__val--primary">{{ inquiry.product_category }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Personalized Product</span>
+            <span class="pid__field__val">{% if inquiry.is_personalized_product %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
+          </div>
 
-            <dt class="col-6 text-muted small">Personalized Product</dt>
-            <dd class="col-6 small">
-              {% if inquiry.is_personalized_product %}
-              <span class="badge bg-info text-dark">Yes</span>
-              {% else %}<span class="text-muted">No</span>{% endif %}
-            </dd>
+          <div class="pid__divider"></div>
 
-            <dt class="col-6 text-muted small">Registered in Qatar</dt>
-            <dd class="col-6 small">
-              {% if inquiry.is_registered_company_in_qatar %}<span class="badge bg-success">Yes</span>
-              {% else %}<span class="badge bg-secondary">No</span>{% endif %}
-            </dd>
-
-            <dt class="col-6 text-muted small">Located in Qatar</dt>
-            <dd class="col-6 small">
-              {% if inquiry.is_located_in_qatar %}<span class="badge bg-success">Yes</span>
-              {% else %}<span class="badge bg-secondary">No</span>{% endif %}
-            </dd>
-
-            <dt class="col-6 text-muted small">Team in Qatar</dt>
-            <dd class="col-6 small">
-              {% if inquiry.is_team_available_in_qatar %}<span class="badge bg-success">Yes</span>
-              {% else %}<span class="badge bg-secondary">No</span>{% endif %}
-            </dd>
-          </dl>
-        </div>
-      </div>
-    </div>
-
-    <!-- SERVICES REQUIRED -->
-    <div class="col-12 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent fw-semibold">
-          <i class="fa-solid fa-gears me-2 text-success"></i>Services Required
-        </div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-7 text-muted small">COD Service</dt>
-            <dd class="col-5 small">
-              {% if inquiry.is_required_COD_service %}<span class="badge bg-success">Required</span>
-              {% else %}<span class="text-muted small">Not required</span>{% endif %}
-            </dd>
-
-            <dt class="col-7 text-muted small">Fulfillment (Outside Qatar)</dt>
-            <dd class="col-5 small">
-              {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}
-              <span class="badge bg-warning text-dark">Required</span>
-              {% else %}<span class="text-muted small">No</span>{% endif %}
-            </dd>
-
-            <dt class="col-7 text-muted small">Fulfillment (Hub in Doha)</dt>
-            <dd class="col-5 small">
-              {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}
-              <span class="badge bg-warning text-dark">Required</span>
-              {% else %}<span class="text-muted small">No</span>{% endif %}
-            </dd>
-
-            <dt class="col-7 text-muted small">Same-Day Pick & Deliver</dt>
-            <dd class="col-5 small">
-              {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}
-              <span class="badge bg-primary">Required</span>
-              {% else %}<span class="text-muted small">No</span>{% endif %}
-            </dd>
-
-            <dt class="col-7 text-muted small">Special Handling</dt>
-            <dd class="col-5 small">
-              {% if inquiry.is_special_handling_required %}
-              <span class="badge bg-danger">Required</span>
-              {% else %}<span class="text-muted small">No</span>{% endif %}
-            </dd>
-          </dl>
+          <!-- Services checklist -->
+          <div class="pid__services">
+            <div class="pid__service {% if inquiry.is_required_COD_service %}pid__service--on{% endif %}">
+              <div class="pid__service__icon"><i class="fa-solid fa-money-bill-wave"></i></div>
+              <span>COD Service</span>
+              <i class="fa-solid {% if inquiry.is_required_COD_service %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            </div>
+            <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}pid__service--on{% endif %}">
+              <div class="pid__service__icon"><i class="fa-solid fa-plane-departure"></i></div>
+              <span>Fulfillment (Outside Qatar)</span>
+              <i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            </div>
+            <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}pid__service--on{% endif %}">
+              <div class="pid__service__icon"><i class="fa-solid fa-warehouse"></i></div>
+              <span>Fulfillment Hub in Doha</span>
+              <i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            </div>
+            <div class="pid__service {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}pid__service--on{% endif %}">
+              <div class="pid__service__icon"><i class="fa-solid fa-bolt"></i></div>
+              <span>Same-Day Delivery</span>
+              <i class="fa-solid {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            </div>
+            <div class="pid__service {% if inquiry.is_special_handling_required %}pid__service--on{% endif %}">
+              <div class="pid__service__icon"><i class="fa-solid fa-hand-holding-box"></i></div>
+              <span>Special Handling</span>
+              <i class="fa-solid {% if inquiry.is_special_handling_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            </div>
+            <div class="pid__service {% if inquiry.is_return_logistics_required %}pid__service--on{% endif %}">
+              <div class="pid__service__icon"><i class="fa-solid fa-rotate-left"></i></div>
+              <span>Return Logistics</span>
+              <i class="fa-solid {% if inquiry.is_return_logistics_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- ORDER VOLUMES -->
-    <div class="col-12 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent fw-semibold">
-          <i class="fa-solid fa-chart-bar me-2 text-info"></i>Order Volumes
+      <!-- ORDER VOLUMES -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-chart-bar"></i>
+          <h3>Order Volumes</h3>
         </div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-7 text-muted small">Orders Last Week</dt>
-            <dd class="col-5 small fw-semibold">{{ inquiry.avarage_number_of_order_last_week|default:"—" }}</dd>
-
-            <dt class="col-7 text-muted small">Orders Last Month</dt>
-            <dd class="col-5 small fw-semibold">{{ inquiry.avarage_number_of_order_done_last_month|default:"—" }}</dd>
-
-            <dt class="col-7 text-muted small">Expected Next Month</dt>
-            <dd class="col-5 small fw-semibold">{{ inquiry.avarage_number_of_order_expect_next_month|default:"—" }}</dd>
-
-            <dt class="col-7 text-muted small">3-Month Milestone</dt>
-            <dd class="col-5 small fw-semibold">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"—" }}</dd>
-          </dl>
-        </div>
-      </div>
-    </div>
-
-    <!-- OPERATIONS EXTENDED -->
-    <div class="col-12 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent fw-semibold">
-          <i class="fa-solid fa-truck-ramp-box me-2 text-secondary"></i>Operations Info
-        </div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-6 text-muted small">Current Provider</dt>
-            <dd class="col-6 small">{{ inquiry.current_courier_provider|default:"—" }}</dd>
-
-            <dt class="col-6 text-muted small">Delivery Coverage</dt>
-            <dd class="col-6 small">{{ inquiry.delivery_coverage|default:"—" }}</dd>
-
-            <dt class="col-6 text-muted small">Return Logistics</dt>
-            <dd class="col-6 small">
-              {% if inquiry.is_return_logistics_required %}
-              <span class="badge bg-warning text-dark">Required</span>
-              {% else %}<span class="text-muted small">Not required</span>{% endif %}
-            </dd>
-
-            <dt class="col-6 text-muted small">Preferred Start</dt>
-            <dd class="col-6 small fw-semibold {% if inquiry.preferred_start_date == 'Immediately' %}text-danger{% endif %}">
-              {{ inquiry.preferred_start_date|default:"—" }}
-            </dd>
-          </dl>
+        <div class="pid__panel__body">
+          <div class="pid__field">
+            <span class="pid__field__lbl">Orders Last Week</span>
+            <span class="pid__field__val pid__field__val--num">{{ inquiry.avarage_number_of_order_last_week|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Orders Last Month</span>
+            <span class="pid__field__val pid__field__val--num">{{ inquiry.avarage_number_of_order_done_last_month|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Expected Next Month</span>
+            <span class="pid__field__val pid__field__val--num">{{ inquiry.avarage_number_of_order_expect_next_month|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">3-Month Milestone</span>
+            <span class="pid__field__val pid__field__val--num">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"—" }}</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- DELIVERY DETAILS -->
-    <div class="col-12 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent fw-semibold">
-          <i class="fa-solid fa-truck-fast me-2 text-primary"></i>Delivery Details
+      <!-- DELIVERY & OPERATIONS -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-truck-fast"></i>
+          <h3>Delivery & Operations</h3>
         </div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-5 text-muted small">Delivery Speed</dt>
-            <dd class="col-7 small">{{ inquiry.speed_delivery_offer_to_customers|default:"—" }}</dd>
-
-            <dt class="col-5 text-muted small">Time Window</dt>
-            <dd class="col-7 small">{{ inquiry.preferred_delivery_time_window|default:"—" }}</dd>
-
-            <dt class="col-5 text-muted small">Package Size</dt>
-            <dd class="col-7 small">{{ inquiry.typical_package_size|default:"—" }}</dd>
-
-            <dt class="col-5 text-muted small">Order System</dt>
-            <dd class="col-7 small">{{ inquiry.order_management_system|default:"—" }}</dd>
-
-            <dt class="col-5 text-muted small">Preferred Contact</dt>
-            <dd class="col-7 small">
+        <div class="pid__panel__body">
+          <div class="pid__field">
+            <span class="pid__field__lbl">Delivery Speed Offered</span>
+            <span class="pid__field__val">{{ inquiry.speed_delivery_offer_to_customers|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Time Window</span>
+            <span class="pid__field__val">{{ inquiry.preferred_delivery_time_window|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Package Size</span>
+            <span class="pid__field__val">{{ inquiry.typical_package_size|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Delivery Cost to Customers</span>
+            <span class="pid__field__val">
+              {% if inquiry.is_delivery_free_to_customers == 'Free' %}<span class="pid__chip pid__chip--yes">Free</span>
+              {% elif inquiry.is_delivery_free_to_customers == 'Paid' %}<span class="pid__chip pid__chip--no">Paid</span>
+              {% elif inquiry.is_delivery_free_to_customers == 'Mixed' %}<span class="pid__chip pid__chip--neutral">Mixed</span>
+              {% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Coverage</span>
+            <span class="pid__field__val">{{ inquiry.delivery_coverage|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Current Provider</span>
+            <span class="pid__field__val">{{ inquiry.current_courier_provider|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Order Management System</span>
+            <span class="pid__field__val">{{ inquiry.order_management_system|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Preferred Contact</span>
+            <span class="pid__field__val">
               {% if inquiry.preferred_communication_channel %}
-              {% if inquiry.preferred_communication_channel == 'WhatsApp' %}
-              <i class="fa-brands fa-whatsapp text-success me-1"></i>
-              {% elif inquiry.preferred_communication_channel == 'Email' %}
-              <i class="fa-solid fa-envelope text-primary me-1"></i>
-              {% elif inquiry.preferred_communication_channel == 'Phone Call' %}
-              <i class="fa-solid fa-phone text-info me-1"></i>
-              {% endif %}
-              {{ inquiry.preferred_communication_channel }}
+                {% if inquiry.preferred_communication_channel == 'WhatsApp' %}<i class="fa-brands fa-whatsapp" style="color:#25d366"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'Email' %}<i class="fa-solid fa-envelope" style="color:#2563eb"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'Phone Call' %}<i class="fa-solid fa-phone" style="color:#0891b2"></i>&nbsp;{% endif %}
+                {{ inquiry.preferred_communication_channel }}
               {% else %}—{% endif %}
-            </dd>
-
-            <dt class="col-5 text-muted small">Delivery to Customers</dt>
-            <dd class="col-7 small">
-              {% if inquiry.is_delivery_free_to_customers == 'Free' %}
-              <span class="badge bg-success">Free</span>
-              {% elif inquiry.is_delivery_free_to_customers == 'Paid' %}
-              <span class="badge bg-secondary">Customers Pay</span>
-              {% elif inquiry.is_delivery_free_to_customers == 'Mixed' %}
-              <span class="badge bg-info text-dark">Mixed</span>
-              {% else %}—{% endif %}
-            </dd>
-          </dl>
+            </span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Preferred Start Date</span>
+            <span class="pid__field__val {% if inquiry.preferred_start_date == 'Immediately' %}pid__field__val--urgent{% endif %}">
+              {% if inquiry.preferred_start_date == 'Immediately' %}<i class="fa-solid fa-bolt me-1"></i>{% endif %}
+              {{ inquiry.preferred_start_date|default:"—" }}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- PICKUP DETAILS -->
-    <div class="col-12 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent fw-semibold">
-          <i class="fa-solid fa-location-dot me-2 text-danger"></i>Pickup Details
+      <!-- PICKUP -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-location-dot"></i>
+          <h3>Pickup Details</h3>
         </div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-5 text-muted small">Pickup Type</dt>
-            <dd class="col-7 small">{{ inquiry.type_of_pickup_location|default:"—" }}</dd>
-
-            <dt class="col-5 text-muted small">Pickup Area</dt>
-            <dd class="col-7 small">{{ inquiry.pickup_Location_area_name|default:"—" }}</dd>
-
-            <dt class="col-5 text-muted small">Pickup Time Slab</dt>
-            <dd class="col-7 small">{{ inquiry.pickup_location_time_slab|default:"—" }}</dd>
-
-            <dt class="col-5 text-muted small">Pickups/Day</dt>
-            <dd class="col-7 small">{{ inquiry.number_of_pickup_times_in_day|default:"1" }}</dd>
-          </dl>
+        <div class="pid__panel__body">
+          <div class="pid__field">
+            <span class="pid__field__lbl">Pickup Type</span>
+            <span class="pid__field__val">{{ inquiry.type_of_pickup_location|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Pickup Area</span>
+            <span class="pid__field__val">{{ inquiry.pickup_Location_area_name|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Pickup Time Slab</span>
+            <span class="pid__field__val">{{ inquiry.pickup_location_time_slab|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Pickups per Day</span>
+            <span class="pid__field__val pid__field__val--num">{{ inquiry.number_of_pickup_times_in_day|default:"1" }}</span>
+          </div>
         </div>
       </div>
+
+    </div><!-- /left -->
+
+    <!-- ─── RIGHT COLUMN ─────────────────── -->
+    <div class="pid__grid__right">
+
+      <!-- CRM STATUS PANEL -->
+      <div class="pid__panel pid__panel--crm">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-circle-dot"></i>
+          <h3>Pipeline Status</h3>
+          <button class="pid__panel__edit-btn" data-bs-toggle="offcanvas" data-bs-target="#manageOffcanvas" title="Edit">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+        </div>
+        <div class="pid__panel__body">
+          <div class="pid__crm-status-display" id="crm-status-display">
+            <span class="pid__crm-pill pid__crm-pill--{{ inquiry.crm_status }}">
+              <i class="fa-solid fa-circle"></i>{{ inquiry.get_crm_status_display }}
+            </span>
+          </div>
+          <div class="pid__field mt-3">
+            <span class="pid__field__lbl">Assigned To</span>
+            <span class="pid__field__val" id="assigned-to-panel">
+              {% if inquiry.assigned_to %}
+              {{ inquiry.assigned_to.get_full_name|default:inquiry.assigned_to.username }}
+              {% else %}<span class="pid__muted">Unassigned</span>{% endif %}
+            </span>
+          </div>
+          {% if inquiry.staff_notes %}
+          <div class="pid__notes-block" id="staff-notes-block">
+            <div class="pid__notes-label"><i class="fa-solid fa-clipboard me-1"></i>Internal Notes</div>
+            <p class="pid__notes-text" id="staff-notes-display">{{ inquiry.staff_notes }}</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ADD ACTIVITY -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-comment-plus"></i>
+          <h3>Add Activity</h3>
+        </div>
+        <div class="pid__panel__body">
+          <div class="pid__type-toggle mb-3">
+            <label class="pid__type-btn">
+              <input type="radio" name="activity_type_sel" value="note" checked>
+              <span><i class="fa-solid fa-sticky-note"></i>Note</span>
+            </label>
+            <label class="pid__type-btn">
+              <input type="radio" name="activity_type_sel" value="followup">
+              <span><i class="fa-solid fa-phone-flip"></i>Follow-up</span>
+            </label>
+          </div>
+          <textarea class="pid__textarea" id="activity-body" rows="4"
+                    placeholder="Write your note or follow-up summary…"></textarea>
+          <button class="pid__submit-btn" id="submit-activity-btn">
+            <i class="fa-solid fa-paper-plane"></i>Submit
+          </button>
+          <div id="activity-error" class="pid__error d-none"></div>
+        </div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-timeline"></i>
+          <h3>Activity Timeline</h3>
+          <span class="pid__count-chip" id="activity-count-badge">{{ activities|length }}</span>
+        </div>
+        <div class="pid__panel__body pid__panel__body--flush">
+          <div id="activity-timeline">
+            {% for activity in activities %}
+            <div class="pid__tl-item pid__tl-item--{{ activity.activity_type }}" data-activity-id="{{ activity.pk }}">
+              <div class="pid__tl-dot"></div>
+              <div class="pid__tl-card">
+                <div class="pid__tl-head">
+                  <span class="pid__tl-type">{{ activity.get_activity_type_display }}</span>
+                  <span class="pid__tl-time">{{ activity.created_at|date:"d M, H:i" }}</span>
+                  {% if activity.created_by == request.user or request.user.is_superuser %}
+                  <button class="pid__tl-del pid__delete-activity" data-activity-id="{{ activity.pk }}">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                  {% endif %}
+                </div>
+                <p class="pid__tl-text">{{ activity.body }}</p>
+                {% if activity.created_by %}
+                <div class="pid__tl-by">{{ activity.created_by.get_full_name|default:activity.created_by.username }}</div>
+                {% endif %}
+              </div>
+            </div>
+            {% empty %}
+            <div class="pid__tl-empty" id="timeline-empty-state">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              <p>No activity yet</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div><!-- /grid -->
+
+</div><!-- /.pid -->
+
+
+<!-- ══════════════════════════════════════
+     MANAGE OFFCANVAS
+═══════════════════════════════════════ -->
+<div class="offcanvas offcanvas-end pid__canvas" tabindex="-1" id="manageOffcanvas">
+  <div class="pid__canvas-hd">
+    <div>
+      <div class="pid__canvas-title">Manage Inquiry</div>
+      <div class="pid__canvas-sub">{{ inquiry.business_name }}</div>
     </div>
-
-  </div><!-- /row -->
-
-  <!-- BACK BUTTON -->
-  <div class="mt-4">
-    <a href="{% url 'workforce:pricing_inquiries_list' %}"
-       class="btn btn-outline-secondary btn-sm"
-       hx-get="{% url 'workforce:pricing_inquiries_list' %}"
-       hx-target="#main-content"
-       hx-select="#main-content"
-       hx-swap="outerHTML"
-       hx-push-url="true">
-      <i class="fa-solid fa-arrow-left me-1"></i>Back to Pricing Inquiries
-    </a>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
   </div>
+  <div class="pid__canvas-body">
 
+    <div class="pid__canvas-section">
+      <div class="pid__canvas-label">Pipeline Status</div>
+      <div class="pid__status-grid" id="status-selector">
+        {% for value, label in status_choices %}
+        <button type="button" class="pid__status-opt pid__status-opt--{{ value }} {% if inquiry.crm_status == value %}active{% endif %}"
+                data-status="{{ value }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="pid__canvas-section">
+      <div class="pid__canvas-label">Assign To</div>
+      <select class="pid__select" id="assigned-to-select">
+        <option value="">— Unassigned —</option>
+        {% for user in staff_users %}
+        <option value="{{ user.pk }}" {% if inquiry.assigned_to_id == user.pk %}selected{% endif %}>
+          {{ user.get_full_name|default:user.username }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="pid__canvas-section">
+      <div class="pid__canvas-label">Internal Notes</div>
+      <textarea class="pid__textarea pid__textarea--tall" id="staff-notes-input"
+                placeholder="Internal notes about this inquiry…">{{ inquiry.staff_notes|default:"" }}</textarea>
+    </div>
+
+    <button class="pid__submit-btn" id="save-status-btn">
+      <i class="fa-solid fa-floppy-disk"></i>Save Changes
+    </button>
+    <div id="save-status-feedback" class="d-none mt-2 pid__feedback"></div>
+
+  </div>
 </div>
+
+<!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
+<script>
+  window.PID_CONFIG = {
+    inquiryId: {{ inquiry.pk }},
+    urlUpdateStatus: "{% url 'workforce:pricing_inquiry_update_status' inquiry.pk %}",
+    urlAddActivity: "{% url 'workforce:pricing_inquiry_add_activity' inquiry.pk %}",
+    urlDeleteBase: "/workforce/forms/pricing-inquiries/{{ inquiry.pk }}/delete-activity/",
+    csrfToken: "{{ csrf_token }}"
+  };
+</script>
+<script src="{% static 'workforce/js/pricing_inquiry_detail.js' %}"></script>
+
 {% endblock %}

@@ -501,11 +501,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return v;
     }
-    var csrftoken = getCookie('csrftoken');
-    if (!csrftoken) {
-        var inp = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (inp) csrftoken = inp.value;
-    }
+    var csrftoken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || getCookie('csrftoken')
+        || document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || '';
 
     function postVerification(profileId, payload) {
         return fetch('/workforce/verification/' + profileId + '/update-status/', {

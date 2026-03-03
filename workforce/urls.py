@@ -57,6 +57,7 @@ urlpatterns = [
     path('orders/bulk-update-status/', workforce_views.bulk_update_order_status, name='bulk_update_order_status'),
     path('orders/<int:order_id>/add-comment/', workforce_views.add_order_comment, name='add_order_comment'),
     path('orders/<int:order_id>/update-coords/', workforce_views.update_order_coords, name='update_order_coords'),
+    path('ajax/zone-name/', workforce_views.ajax_zone_name, name='ajax_zone_name'),
 
 
 
@@ -203,6 +204,9 @@ urlpatterns = [
     # Forms / Inquiries
     path('forms/pricing-inquiries/', workforce_views.pricing_inquiries_list, name='pricing_inquiries_list'),
     path('forms/pricing-inquiries/<int:inquiry_id>/', workforce_views.pricing_inquiry_detail, name='pricing_inquiry_detail'),
+    path('forms/pricing-inquiries/<int:inquiry_id>/update-status/', workforce_views.pricing_inquiry_update_status, name='pricing_inquiry_update_status'),
+    path('forms/pricing-inquiries/<int:inquiry_id>/add-activity/', workforce_views.pricing_inquiry_add_activity, name='pricing_inquiry_add_activity'),
+    path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
 

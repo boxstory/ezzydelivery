@@ -988,6 +988,8 @@ def add_order_product(request, order_id):
         # Get existing items for this order
         existing_items = orders_models.OrderItem.objects.filter(order=order).select_related('product')
 
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
         if request.method == 'POST':
             logger.info(f"Processing product addition for order {order_id}")
 
@@ -1010,6 +1012,7 @@ def add_order_product(request, order_id):
                 )
             }
 
+            added_items = []
             for i, product_id in enumerate(product_ids):
                 if not product_id:  # Skip empty product selections
                     continue
@@ -1034,18 +1037,32 @@ def add_order_product(request, order_id):
                     )
                     order_item.save()
                     products_added += 1
+                    added_items.append({
+                        'id': order_item.id,
+                        'name': f"{product.brand_name} {product.item_name}".strip(),
+                        'sku': product.item_sku or '',
+                        'qty': quantity,
+                        'unit_price': float(unit_price),
+                        'total': float(order_item.total_price or 0),
+                    })
 
                 except (ValueError, IndexError) as e:
                     errors.append(f"Invalid data for product #{i+1}: {str(e)}")
 
             if products_added > 0:
                 logger.info(f"{products_added} product(s) added successfully to order {order_id}")
+                if is_ajax:
+                    return JsonResponse({'success': True, 'added': products_added, 'items': added_items})
                 messages.success(request, f"{products_added} product(s) added to order successfully")
-                return redirect('orders:orders_all_list')
+                return redirect('orders:order_update', order_id=order_id)
             elif errors:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'error': errors[0]})
                 for error in errors:
                     messages.error(request, error)
             else:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'error': 'No products were selected'})
                 messages.warning(request, "No products were selected")
 
         # Get all products for this business (for Select2 AJAX search)

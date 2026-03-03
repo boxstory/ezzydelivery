@@ -3,6 +3,8 @@
 
 {% block extra_css %}
 <link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
+{# Preload detail page CSS so it's ready when navigating via HTMX #}
+<link href="{% static 'workforce/css/pricing_inquiry_detail.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -132,7 +134,12 @@
         </thead>
         <tbody>
           {% for inq in page_obj %}
-          <tr style="cursor:pointer;" onclick="window.location='{% url 'workforce:pricing_inquiry_detail' inq.pk %}'">
+          <tr style="cursor:pointer;"
+              hx-get="{% url 'workforce:pricing_inquiry_detail' inq.pk %}"
+              hx-target="#main-content"
+              hx-select="#main-content"
+              hx-swap="outerHTML"
+              hx-push-url="true">
             <td class="small text-muted">{{ inq.pk }}</td>
             <td>
               <div class="fw-semibold small">{{ inq.business_name }}</div>

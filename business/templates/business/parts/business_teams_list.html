@@ -3,8 +3,21 @@
 {% block content %}
 <div class="btl" id="client_teams_list_container_main">
 
-  <!-- Page Header -->
-  <div class="btl__header">
+  <!-- Mobile Top Bar -->
+  <div class="pwa-detail-topbar d-md-none">
+    <a href="{% url 'business:business_dashboard' %}" class="pwa-detail-topbar__back">
+      <i class="fas fa-chevron-left"></i>
+    </a>
+    <span class="pwa-detail-topbar__title">Team Members</span>
+    {% if can_manage_team %}
+    <a href="{% url 'business:business_teams_add' business.business_id %}" class="pwa-detail-topbar__btn" title="Add Member">
+      <i class="fas fa-user-plus"></i>
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Page Header (desktop only) -->
+  <div class="btl__header d-none d-md-flex">
     <div class="btl__header-left">
       <div class="btl__header-icon">
         <i class="fa-solid fa-users"></i>

@@ -127,28 +127,88 @@
                         <span class="woe__section-label">Delivery Address</span>
                     </div>
                     <div class="woe__card-body">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label for="dl_zone" class="woe__form-label">Zone Number</label>
-                                <input type="number" class="woe__form-input" id="dl_zone" name="dl_zone"
-                                       value="{{ order.dl_zone|default:'' }}" min="1" max="100">
+
+                        <!-- Row 1: Full Address + AI Parse -->
+                        <div class="mb-3">
+                            <label for="customer_address" class="woe__form-label">Full Address</label>
+                            <div class="d-flex gap-2 align-items-start">
+                                <textarea class="woe__form-input flex-fill" id="customer_address" name="customer_address"
+                                          rows="3">{{ order.customer_address }}</textarea>
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0 mt-1"
+                                        onclick="EzzyAIParse.parse({ address: document.getElementById('customer_address').value, zone: document.getElementById('dl_zone').value, street: document.getElementById('dl_street').value, building: document.getElementById('dl_building').value, orderId: '{{ order.id }}', orderNumber: '{{ order.order_number }}', showMap: true })"
+                                        title="AI Parse Address">
+                                    <i class="fa-solid fa-robot me-1"></i>AI Parse
+                                </button>
                             </div>
-                            <div class="col-md-4">
-                                <label for="dl_street" class="woe__form-label">Street Number</label>
+                        </div>
+
+                        <!-- Row 2: Zone, Zone Name, Street, Building + QNAS Verify -->
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-6 col-md-2">
+                                <label for="dl_zone" class="woe__form-label">Zone</label>
+                                <input type="number" class="woe__form-input" id="dl_zone" name="dl_zone"
+                                       value="{{ order.dl_zone|default:'' }}" min="1" max="100"
+                                       oninput="updateZoneName(this.value)">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="woe__form-label">Zone Name</label>
+                                <input type="text" class="woe__form-input bg-light" id="woe_zone_name"
+                                       value="{{ zone_name }}" readonly tabindex="-1">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="dl_street" class="woe__form-label">Street</label>
                                 <input type="number" class="woe__form-input" id="dl_street" name="dl_street"
                                        value="{{ order.dl_street|default:'' }}" min="1">
                             </div>
-                            <div class="col-md-4">
-                                <label for="dl_building" class="woe__form-label">Building Number</label>
+                            <div class="col-6 col-md-2">
+                                <label for="dl_building" class="woe__form-label">Building</label>
                                 <input type="number" class="woe__form-input" id="dl_building" name="dl_building"
                                        value="{{ order.dl_building|default:'' }}" min="1">
                             </div>
-                            <div class="col-12">
-                                <label for="customer_address" class="woe__form-label">Full Address</label>
-                                <textarea class="woe__form-input" id="customer_address" name="customer_address"
-                                          rows="3">{{ order.customer_address }}</textarea>
+                            <div class="col-12 col-md-3">
+                                <label class="woe__form-label d-none d-md-block">&nbsp;</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary qnas-verify__btn"
+                                            id="qnasVerifyBtn{{ order.id }}"
+                                            onclick="document.querySelector('[data-qnas-badge=\'{{ order.id }}\']').style.display='none'; qnasValidateAndFill({ zoneId:'dl_zone', streetId:'dl_street', buildingId:'dl_building', latId:'woe_latitude', lngId:'woe_longitude', accuracyId:'woe_accuracy', zoneNameId:'woe_zone_name', resultId:'qnasResult{{ order.id }}', btnId:'qnasVerifyBtn{{ order.id }}' })">
+                                        <i class="fa-solid fa-check-circle me-1"></i>Verify QNAS
+                                    </button>
+                                    <span class="qnas-verify__status qnas-verify__status--{{ order.qnas_status|default:'not_checked' }}"
+                                          data-qnas-badge="{{ order.id }}"
+                                          {% if order.qnas_status != 'verified' %}style="display:none;"{% endif %}>
+                                        {% if order.qnas_status == 'verified' %}<i class="fa-solid fa-check-circle me-1"></i>Verified{% endif %}
+                                    </span>
+                                </div>
                             </div>
                         </div>
+                        <!-- QNAS result feedback — full width below the address row -->
+                        <div class="row g-2 mb-1">
+                            <div class="col-12">
+                                <div id="qnasResult{{ order.id }}" class="qnas-verify__result"></div>
+                                <div id="qnasCoords{{ order.id }}" class="qnas-verify__coords"></div>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Lat, Long, Accuracy (read-only) -->
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="woe__form-label">Latitude</label>
+                                <input type="text" class="woe__form-input bg-light" id="woe_latitude"
+                                       value="{{ order.latitude|default:'' }}" readonly tabindex="-1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="woe__form-label">Longitude</label>
+                                <input type="text" class="woe__form-input bg-light" id="woe_longitude"
+                                       value="{{ order.longitude|default:'' }}" readonly tabindex="-1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="woe__form-label">Accuracy</label>
+                                <input type="text" class="woe__form-input bg-light" id="woe_accuracy"
+                                       value="{{ order.coords_accuracy|default:'' }}" readonly tabindex="-1">
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -165,7 +225,7 @@
                             {% for location in pickup_locations %}
                             <option value="{{ location.id }}"
                                     {% if order.pickup_location_id == location.id %}selected{% endif %}>
-                                {{ location.location_name }} - {{ location.pickup_location_address|truncatechars:40 }}
+                                {{ location.pickup_location_title }} - {{ location.locality|truncatechars:40 }}
                             </option>
                             {% endfor %}
                         </select>
@@ -282,6 +342,24 @@ function updateTotal() {
     const cod = parseInt(document.getElementById('cod_amount').value) || 0;
     const delivery = parseInt(document.getElementById('dl_amount').value) || 0;
     document.getElementById('totalAmount').textContent = (cod + delivery) + ' QAR';
+}
+
+// Zone name lookup
+var _zoneCache = {};
+function updateZoneName(zoneNum) {
+    var el = document.getElementById('woe_zone_name');
+    if (!el) return;
+    zoneNum = parseInt(zoneNum);
+    if (!zoneNum) { el.value = ''; return; }
+    if (_zoneCache[zoneNum] !== undefined) { el.value = _zoneCache[zoneNum]; return; }
+    fetch('{% url "workforce:ajax_zone_name" %}?zone=' + zoneNum)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var name = d.zone_name || '';
+            _zoneCache[zoneNum] = name;
+            el.value = name;
+        })
+        .catch(function() { el.value = ''; });
 }
 </script>
 {% endblock %}

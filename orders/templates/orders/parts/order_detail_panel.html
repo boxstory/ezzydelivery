@@ -63,9 +63,18 @@
         </div>
         <div class="odp__route-info">
           <span class="odp__route-label">Pickup</span>
-          <span class="odp__route-value">{{ order.pickup_location.pickup_name }}</span>
-          {% if order.pickup_location.pickup_address %}
-          <span class="odp__route-addr">{{ order.pickup_location.pickup_address }}</span>
+          <span class="odp__route-value">{{ order.pickup_location.pickup_location_title }}</span>
+          {% if order.pickup_location.locality %}
+          <span class="odp__route-addr">{{ order.pickup_location.locality }}</span>
+          {% endif %}
+          {% if order.pickup_location.pickup_lat and order.pickup_location.pickup_lon %}
+          <a href="https://www.google.com/maps?q={{ order.pickup_location.pickup_lat }},{{ order.pickup_location.pickup_lon }}" target="_blank" class="odp__route-map-link" hx-boost="false">
+            <i class="fa-solid fa-location-pin"></i> Pin
+          </a>
+          {% elif order.pickup_location.locality %}
+          <a href="https://maps.google.com/?q={{ order.pickup_location.locality|urlencode }}" target="_blank" class="odp__route-map-link" hx-boost="false">
+            <i class="fa-solid fa-location-pin"></i> Pin
+          </a>
           {% endif %}
         </div>
       </div>
@@ -79,13 +88,53 @@
           <span class="odp__route-label">Drop-off
             {% include "includes/components/_ai_parse_button.html" with address=order.customer_address zone=order.dl_zone street=order.dl_street building=order.dl_building order_id=order.id order_number=order.order_number show_map="true" title="Drop-off Location" %}
           </span>
-          <span class="odp__route-value">
-            {% if order.dl_zone %}Zone {{ order.dl_zone }}{% endif %}
-            {% if order.dl_street %}, Street {{ order.dl_street }}{% endif %}
-            {% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}
-          </span>
           {% if order.customer_address %}
           <span class="odp__route-addr">{{ order.customer_address }}</span>
+          {% endif %}
+          <div class="odt__field-row odt__field-row--mt">
+            <div class="odt__field odt__field--compact">
+              <span class="odt__field__label">Zone #</span>
+              <span class="odt__field__value odt__field__value--bold">{{ order.dl_zone|default:"-" }}</span>
+            </div>
+            <div class="odt__field odt__field--compact odt__field--compact-wide">
+              <span class="odt__field__label">Zone Name</span>
+              <span class="odt__field__value odt__field__value--zone">{% get_zone_display order %}</span>
+            </div>
+          </div>
+          <div class="odt__field-row odt__field-row--mt">
+            <div class="odt__field odt__field--compact">
+              <span class="odt__field__label">Street</span>
+              <span class="odt__field__value">{{ order.dl_street|default:"-" }}</span>
+            </div>
+            <div class="odt__field odt__field--compact">
+              <span class="odt__field__label">Bldg</span>
+              <span class="odt__field__value">{{ order.dl_building|default:"-" }}</span>
+            </div>
+          </div>
+          {% if order.latitude and order.longitude %}
+          <div class="odt__field-row odt__field-row--mt">
+            <div class="odt__field odt__field--compact odt__field--compact-wide">
+              <span class="odt__field__label"><i class="fa-solid fa-crosshairs fa-xs"></i> Lat / Lng</span>
+              <span class="odt__field__value odt__field__value--mono">
+                <a href="https://maps.google.com/?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odt__link" hx-boost="false">
+                  {{ order.latitude|floatformat:6 }}, {{ order.longitude|floatformat:6 }}
+                </a>
+              </span>
+            </div>
+            {% if order.coords_accuracy %}
+            <div class="odt__field odt__field--compact">
+              <span class="odt__field__label"><i class="fa-solid fa-signal fa-xs"></i> Accuracy</span>
+              <span class="odt__field__value">
+                <span class="odt__coords-accuracy odt__coords-accuracy--{{ order.coords_accuracy }}">{{ order.coords_accuracy|capfirst }}</span>
+              </span>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if order.customer_address %}
+          <a href="https://maps.google.com/?q={{ order.customer_address|urlencode }}" target="_blank" class="odp__route-map-link" hx-boost="false">
+            <i class="fa-solid fa-location-dot"></i> View on Map
+          </a>
           {% endif %}
         </div>
       </div>
@@ -215,10 +264,16 @@
     <a href="{% url 'orders:order_details' order.id %}" class="odp__action-btn odp__action-btn--primary">
       <i class="fa-solid fa-expand"></i> Full Details
     </a>
-    {% if can_edit_order and order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+    {% if can_edit_order %}
+    {% if order.order_status == 'publish' %}
+    <span class="odp__action-btn odp__action-btn--secondary odp__action-btn--disabled" title="Cannot edit a published order">
+      <i class="fa-solid fa-pen"></i> Edit
+    </span>
+    {% else %}
     <a href="{% url 'orders:order_update' order.id %}" class="odp__action-btn odp__action-btn--secondary">
       <i class="fa-solid fa-pen"></i> Edit
     </a>
+    {% endif %}
     {% endif %}
   </div>
 </div>

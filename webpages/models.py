@@ -208,6 +208,30 @@ class PricingEnquiry(models.Model):
     # Completion status — False for partial (in-progress), True for fully submitted
     is_complete = models.BooleanField(default=False)
 
+    # CRM status — managed by staff
+    STATUS_NEW = 'new'
+    STATUS_CONTACTED = 'contacted'
+    STATUS_QUOTED = 'quoted'
+    STATUS_NEGOTIATING = 'negotiating'
+    STATUS_CONVERTED = 'converted'
+    STATUS_LOST = 'lost'
+    STATUS_ON_HOLD = 'on_hold'
+    STATUS_CHOICES = [
+        (STATUS_NEW, 'New'),
+        (STATUS_CONTACTED, 'Contacted'),
+        (STATUS_QUOTED, 'Quoted'),
+        (STATUS_NEGOTIATING, 'Negotiating'),
+        (STATUS_CONVERTED, 'Converted'),
+        (STATUS_LOST, 'Lost'),
+        (STATUS_ON_HOLD, 'On Hold'),
+    ]
+    crm_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
+    assigned_to = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='assigned_pricing_inquiries'
+    )
+    staff_notes = models.TextField(blank=True, null=True)
+
     # date created
     date_created = models.DateField(auto_now_add=True, null=True)
     date_modified = models.DateField(auto_now=True, null=True)
@@ -217,6 +241,30 @@ class PricingEnquiry(models.Model):
 
     class Meta:
         verbose_name_plural = "Pricing Inquiries"
+
+
+class PricingEnquiryActivity(models.Model):
+    """Timeline activity log for a PricingEnquiry — status changes, followups, notes."""
+    TYPE_NOTE = 'note'
+    TYPE_FOLLOWUP = 'followup'
+    TYPE_STATUS_CHANGE = 'status_change'
+    TYPE_CHOICES = [
+        (TYPE_NOTE, 'Note'),
+        (TYPE_FOLLOWUP, 'Follow-up'),
+        (TYPE_STATUS_CHANGE, 'Status Change'),
+    ]
+    inquiry = models.ForeignKey(PricingEnquiry, on_delete=models.CASCADE, related_name='activities')
+    activity_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_NOTE)
+    body = models.TextField()
+    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Pricing Enquiry Activities"
+
+    def __str__(self):
+        return f"{self.get_activity_type_display()} on {self.inquiry}"
 
 
 class WhatsAppInquiry(models.Model):

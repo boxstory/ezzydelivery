@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 ORDER_STATUS_BY_CLIENT = [
         ('to_review', 'Hold for Review'),
         ('ready_to_pickup', 'Ready to pickup'),
-        ('publish', 'Publish to DL Task'),
+        ('publish', 'Published'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
     ]

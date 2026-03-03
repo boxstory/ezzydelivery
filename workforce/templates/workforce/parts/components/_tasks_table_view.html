@@ -188,6 +188,10 @@ Each task should have select_related: order, driver, business, pickup_location, 
                                     data-driver-id="{{ dl.driver_id|default:'' }}"
                                     data-driver-name="{{ dl.driver|default:'' }}"
                                     data-customer-name="{{ dl.order.customer_name|default:'' }}"
+                                    data-failure-reason="{% with fh=dl.order.failure_history %}{% if fh %}{{ fh.0.new_display|default:'' }}{% endif %}{% endwith %}"
+                                    data-failure-notes="{% with fh=dl.order.failure_history %}{% if fh %}{{ fh.0.notes|default:'' }}{% endif %}{% endwith %}"
+                                    data-task-notes="{{ dl.dl_task_description|default:'' }}"
+                                    onclick="if(window.setStatusModalTask) window.setStatusModalTask(this);"
                                     title="Update Task Status">
                                     <i class="fa-solid fa-circle-dot"></i>
                                 </button>

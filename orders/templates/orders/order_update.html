@@ -136,6 +136,120 @@
           </div>
         </div>
 
+        <!-- Items Card (inline in form column) -->
+        <div class="ou__card ou__card--items">
+          <div class="ou__card-head">
+            <span><i class="fa-solid fa-boxes-stacked me-1"></i> Items (<span id="ou_items_count">{{ order_items.count }}</span>)</span>
+            {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+            <button type="button" class="ou__card-action" id="orders_update_btn_add_product">
+              <i class="fa-solid fa-plus"></i> Add
+            </button>
+            {% endif %}
+          </div>
+          {% if order_items %}
+          <div class="ou__items-list" id="ou_items_list">
+            {% for item in order_items %}
+            <div class="ou__item" id="orders_update_item_row_{{ item.id }}">
+              <div class="ou__item-info">
+                {% if item.product %}
+                <div class="ou__item-name">{{ item.product.brand_name }} {{ item.product.item_name }}</div>
+                {% if item.product.item_sku %}
+                <div class="ou__item-sku">{{ item.product.item_sku }}</div>
+                {% endif %}
+                {% else %}
+                <div class="ou__item-name ou__item-name--muted">Unknown Product</div>
+                {% endif %}
+              </div>
+              <div class="ou__item-qty">x{{ item.quantity }}</div>
+              <div class="ou__item-price">
+                {% if item.total_price %}{{ item.total_price }} QR{% else %}-{% endif %}
+              </div>
+              {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+              <button type="button" class="ou__item-del orders-item-delete-btn" data-item-id="{{ item.id }}" title="Remove">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="ou__empty-items" id="ou_items_empty">
+            <i class="fa-solid fa-box-open"></i>
+            <span>No items yet</span>
+          </div>
+          {% endif %}
+          <div class="ou__items-total" id="ou_items_total_row" {% if not items_total %}style="display:none"{% endif %}>
+            <span>Total</span>
+            <strong id="ou_items_total_val">{{ items_total|floatformat:2 }} QR</strong>
+          </div>
+          <div class="ou__cod-mismatch" id="ou_cod_mismatch" style="display:none;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            COD amount (<span id="ou_cod_mismatch_val"></span> QR) doesn't match items total
+          </div>
+        </div>
+
+        {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+        <!-- Inline Add Products Panel -->
+        <div class="ou__card ou__add-product-panel" id="ou_add_product_panel" style="display:none;">
+          <div class="ou__card-head">
+            <span><i class="fa-solid fa-plus-circle me-1"></i> Add Products</span>
+            <button type="button" class="ou__card-action ou__card-action--close" id="ou_add_product_close">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="ou__add-product-rows" id="ou_add_product_rows">
+            <div class="ou__ap-row" data-row-index="0">
+              <div class="ou__ap-row-head">
+                <span class="ou__ap-row-num">Product #1</span>
+                <button type="button" class="ou__ap-remove" title="Remove" disabled>
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+              <div class="ou__ap-fields">
+                <div class="ou__ap-field ou__ap-field--product">
+                  <label class="ou__label">Product <span class="text-danger">*</span></label>
+                  <select name="product_id[]" class="ou__ap-product-select form-select">
+                    <option value="">Search products…</option>
+                  </select>
+                  <div class="ou__ap-meta" hidden>
+                    <span class="ou__ap-sku"></span>
+                  </div>
+                </div>
+                <div class="d-flex gap-2">
+                  <div class="ou__ap-field flex-grow-1">
+                    <label class="ou__label">Qty</label>
+                    <input type="number" name="quantity[]" class="form-control ou__ap-qty" value="1" min="1">
+                  </div>
+                  <div class="ou__ap-field flex-grow-1">
+                    <label class="ou__label">Price <small class="text-muted">QAR</small></label>
+                    <input type="number" name="unit_price[]" class="form-control ou__ap-price" step="0.01" min="0" placeholder="Auto">
+                  </div>
+                  <div class="ou__ap-field flex-grow-1">
+                    <label class="ou__label">Total</label>
+                    <div class="ou__ap-line-total form-control-plaintext fw-semibold">0.00</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ou__ap-footer">
+            <button type="button" class="ou__ap-add-row" id="ou_ap_btn_add_row">
+              <i class="fa-solid fa-plus"></i> Add Row
+            </button>
+            <div class="ou__ap-total-bar">
+              <span>Order Total</span>
+              <strong id="ou_ap_total">0.00 QAR</strong>
+            </div>
+          </div>
+          <div class="ou__ap-actions">
+            <div class="ou__ap-feedback" id="ou_ap_feedback" style="display:none;"></div>
+            <button type="button" class="ou__submit ou__submit--sm" id="ou_ap_btn_save">
+              <i class="fa-solid fa-floppy-disk me-1"></i> Save Products
+            </button>
+          </div>
+        </div>
+        {% endif %}
+
         <!-- COD & Notes Section -->
         <div class="ou__section">
           <div class="ou__section-head">
@@ -183,63 +297,8 @@
 
       </div>
 
-      <!-- RIGHT COLUMN: Items + Info -->
+      <!-- RIGHT COLUMN: Order Info -->
       <div class="ou__col-sidebar">
-
-        <!-- Items Card -->
-        <div class="ou__card">
-          <div class="ou__card-head">
-            <span><i class="fa-solid fa-boxes-stacked me-1"></i> Items ({{ order_items.count }})</span>
-            {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
-            <a href="{% url 'orders:add_order_product' order.id %}" class="ou__card-action" id="orders_update_btn_add_product">
-              <i class="fa-solid fa-plus"></i> Add
-            </a>
-            {% endif %}
-          </div>
-          {% if order_items %}
-          <div class="ou__items-list">
-            {% for item in order_items %}
-            <div class="ou__item" id="orders_update_item_row_{{ item.id }}">
-              <div class="ou__item-info">
-                {% if item.product %}
-                <div class="ou__item-name">{{ item.product.brand_name }} {{ item.product.item_name }}</div>
-                {% if item.product.item_sku %}
-                <div class="ou__item-sku">{{ item.product.item_sku }}</div>
-                {% endif %}
-                {% else %}
-                <div class="ou__item-name ou__item-name--muted">Unknown Product</div>
-                {% endif %}
-              </div>
-              <div class="ou__item-qty">x{{ item.quantity }}</div>
-              <div class="ou__item-price">
-                {% if item.total_price %}{{ item.total_price }} QR{% else %}-{% endif %}
-              </div>
-              {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
-              <button type="button" class="ou__item-del orders-item-delete-btn" data-item-id="{{ item.id }}" title="Remove">
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-              {% endif %}
-            </div>
-            {% endfor %}
-          </div>
-          {% if items_total %}
-          <div class="ou__items-total">
-            <span>Total</span>
-            <strong>{{ items_total|floatformat:2 }} QR</strong>
-          </div>
-          {% endif %}
-          {% else %}
-          <div class="ou__empty-items">
-            <i class="fa-solid fa-box-open"></i>
-            <span>No items yet</span>
-            {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
-            <a href="{% url 'orders:add_order_product' order.id %}" class="ou__card-action">
-              <i class="fa-solid fa-plus"></i> Add Products
-            </a>
-            {% endif %}
-          </div>
-          {% endif %}
-        </div>
 
         <!-- Order Info Card -->
         <div class="ou__card">
@@ -339,48 +398,288 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   updateMapLink();
 
-  // Delete item buttons
-  document.querySelectorAll('.orders-item-delete-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var itemId = this.getAttribute('data-item-id');
-      if (!confirm('Remove this item from the order?')) return;
+  // ---- Inline Add Products Panel ----
+  var addBtn   = document.getElementById('orders_update_btn_add_product');
+  var panel    = document.getElementById('ou_add_product_panel');
+  var closeBtn = document.getElementById('ou_add_product_close');
+  var addRowBtn= document.getElementById('ou_ap_btn_add_row');
+  var saveBtn  = document.getElementById('ou_ap_btn_save');
+  var feedback = document.getElementById('ou_ap_feedback');
+  var rowsWrap = document.getElementById('ou_add_product_rows');
+  var totalEl  = document.getElementById('ou_ap_total');
+  var addProductUrl = '{% url "orders:add_order_product" order.id %}';
 
-      var row = document.getElementById('orders_update_item_row_' + itemId);
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+  function apRecalcRow(row) {
+    var qty   = parseFloat(row.querySelector('.ou__ap-qty').value) || 0;
+    var price = parseFloat(row.querySelector('.ou__ap-price').value) || 0;
+    row.querySelector('.ou__ap-line-total').textContent = (qty * price).toFixed(2);
+    apRecalcTotal();
+  }
 
-      fetch('/orders/update_order_product/{{ order.id }}/', {
+  function getItemsTotal() {
+    var el = document.getElementById('ou_items_total_val');
+    return el ? parseFloat(el.textContent) || 0 : 0;
+  }
+
+  function checkCodMatch() {
+    var codInput = document.getElementById('id_cod_amount');
+    var mismatchEl = document.getElementById('ou_cod_mismatch');
+    var mismatchVal = document.getElementById('ou_cod_mismatch_val');
+    if (!codInput || !mismatchEl) return;
+    var itemsTotal = getItemsTotal();
+    var codVal = parseFloat(codInput.value) || 0;
+    if (itemsTotal > 0 && codVal > 0 && Math.abs(codVal - itemsTotal) > 0.01) {
+      mismatchVal.textContent = codVal.toFixed(2);
+      mismatchEl.style.display = '';
+    } else {
+      mismatchEl.style.display = 'none';
+    }
+  }
+
+  function apRecalcTotal() {
+    var newTotal = 0;
+    rowsWrap.querySelectorAll('.ou__ap-row').forEach(function(r) {
+      newTotal += parseFloat(r.querySelector('.ou__ap-line-total').textContent) || 0;
+    });
+    var existingTotal = getItemsTotal();
+    totalEl.textContent = (existingTotal + newTotal).toFixed(2) + ' QAR';
+  }
+
+  function apRefreshNumbers() {
+    var rows = rowsWrap.querySelectorAll('.ou__ap-row');
+    rows.forEach(function(r, i) {
+      r.querySelector('.ou__ap-row-num').textContent = 'Product #' + (i + 1);
+      r.querySelector('.ou__ap-remove').disabled = rows.length <= 1;
+    });
+  }
+
+  function apInitSelect2(sel) {
+    $(sel).select2({
+      placeholder: 'Search products…',
+      minimumInputLength: 0,
+      allowClear: true,
+      ajax: {
+        url: '{% url "orders:product_search_api" %}',
+        dataType: 'json',
+        delay: 200,
+        data: function(p) { return { q: p.term || '' }; },
+        processResults: function(d) {
+          return { results: d.results.map(function(i) { return { id: i.id, text: i.text, sku: i.sku, price: i.price }; }) };
+        }
+      },
+      templateResult: function(p) {
+        if (!p.id) return p.text;
+        return $('<div class="ou__ap-opt"><span>' + p.text + '</span><small class="text-muted ms-2">' + (p.sku || '') + ' — ' + p.price + ' QAR</small></div>');
+      },
+      templateSelection: function(s) { return s.text || 'Search products…'; }
+    });
+    $(sel).on('select2:select', function(e) {
+      var d = e.params.data;
+      var row = $(this).closest('.ou__ap-row')[0];
+      row.querySelector('.ou__ap-price').value = d.price;
+      var meta = row.querySelector('.ou__ap-meta');
+      meta.removeAttribute('hidden');
+      meta.querySelector('.ou__ap-sku').textContent = d.sku ? 'SKU: ' + d.sku : '';
+      apRecalcRow(row);
+    });
+    $(sel).on('select2:clear', function() {
+      var row = $(this).closest('.ou__ap-row')[0];
+      row.querySelector('.ou__ap-price').value = '';
+      row.querySelector('.ou__ap-meta').setAttribute('hidden', true);
+      apRecalcRow(row);
+    });
+  }
+
+  function apBuildRow(idx) {
+    var div = document.createElement('div');
+    div.className = 'ou__ap-row';
+    div.dataset.rowIndex = idx;
+    div.innerHTML = '<div class="ou__ap-row-head"><span class="ou__ap-row-num">Product #' + (idx+1) + '</span><button type="button" class="ou__ap-remove" title="Remove"><i class="fa-solid fa-xmark"></i></button></div><div class="ou__ap-fields"><div class="ou__ap-field ou__ap-field--product"><label class="ou__label">Product</label><select name="product_id[]" class="ou__ap-product-select form-select"><option value="">Search products…</option></select><div class="ou__ap-meta" hidden><span class="ou__ap-sku"></span></div></div><div class="d-flex gap-2"><div class="ou__ap-field flex-grow-1"><label class="ou__label">Qty</label><input type="number" name="quantity[]" class="form-control ou__ap-qty" value="1" min="1"></div><div class="ou__ap-field flex-grow-1"><label class="ou__label">Price <small class="text-muted">QAR</small></label><input type="number" name="unit_price[]" class="form-control ou__ap-price" step="0.01" min="0" placeholder="Auto"></div><div class="ou__ap-field flex-grow-1"><label class="ou__label">Total</label><div class="ou__ap-line-total form-control-plaintext fw-semibold">0.00</div></div></div></div>';
+    return div;
+  }
+
+  if (addBtn && panel) {
+    var apPanelInitialized = false;
+    addBtn.addEventListener('click', function() {
+      panel.style.display = '';
+      addBtn.style.display = 'none';
+      if (!apPanelInitialized) {
+        apInitSelect2(panel.querySelector('.ou__ap-product-select'));
+        apPanelInitialized = true;
+      }
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    closeBtn.addEventListener('click', function() {
+      panel.style.display = 'none';
+      addBtn.style.display = '';
+    });
+
+    addRowBtn.addEventListener('click', function() {
+      var idx = rowsWrap.querySelectorAll('.ou__ap-row').length;
+      var row = apBuildRow(idx);
+      rowsWrap.appendChild(row);
+      apInitSelect2(row.querySelector('.ou__ap-product-select'));
+      apRefreshNumbers();
+    });
+
+    rowsWrap.addEventListener('click', function(e) {
+      var btn = e.target.closest('.ou__ap-remove');
+      if (!btn || btn.disabled) return;
+      btn.closest('.ou__ap-row').remove();
+      apRefreshNumbers();
+      apRecalcTotal();
+    });
+
+    rowsWrap.addEventListener('input', function(e) {
+      if (e.target.matches('.ou__ap-qty, .ou__ap-price')) {
+        apRecalcRow(e.target.closest('.ou__ap-row'));
+      }
+    });
+
+    saveBtn.addEventListener('click', function() {
+      var formData = new FormData();
+      formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+      rowsWrap.querySelectorAll('.ou__ap-row').forEach(function(row) {
+        var sel = row.querySelector('.ou__ap-product-select');
+        formData.append('product_id[]', sel ? sel.value : '');
+        formData.append('quantity[]', row.querySelector('.ou__ap-qty').value);
+        formData.append('unit_price[]', row.querySelector('.ou__ap-price').value);
+        formData.append('notes[]', '');
+      });
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving…';
+      feedback.style.display = 'none';
+
+      fetch(addProductUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify({ action: 'delete', item_id: parseInt(itemId) })
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData,
+        credentials: 'same-origin'
       })
-      .then(function(resp) { return resp.json(); })
+      .then(function(r) { return r.json(); })
       .then(function(data) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Products';
         if (data.success) {
-          row.style.opacity = '0';
-          row.style.transform = 'translateX(10px)';
-          setTimeout(function() {
-            row.remove();
-            var remaining = document.querySelectorAll('.ou__item').length;
-            document.querySelector('.ou__card-head span').innerHTML = '<i class="fa-solid fa-boxes-stacked me-1"></i> Items (' + remaining + ')';
-            if (remaining === 0) window.location.reload();
-          }, 200);
+          // Add rows to existing items list
+          var list = document.getElementById('ou_items_list');
+          var empty = document.getElementById('ou_items_empty');
+          if (empty) empty.remove();
+          if (!list) {
+            list = document.createElement('div');
+            list.className = 'ou__items-list';
+            list.id = 'ou_items_list';
+            panel.previousElementSibling.appendChild(list);
+          }
+          data.items.forEach(function(item) {
+            var row = document.createElement('div');
+            row.className = 'ou__item';
+            row.id = 'orders_update_item_row_' + item.id;
+            row.innerHTML = '<div class="ou__item-info"><div class="ou__item-name">' + item.name + '</div>' + (item.sku ? '<div class="ou__item-sku">' + item.sku + '</div>' : '') + '</div><div class="ou__item-qty">x' + item.qty + '</div><div class="ou__item-price">' + item.total.toFixed(2) + ' QR</div><button type="button" class="ou__item-del orders-item-delete-btn" data-item-id="' + item.id + '" title="Remove"><i class="fa-solid fa-xmark"></i></button>';
+            list.appendChild(row);
+          });
+          // Update count
+          var countEl = document.getElementById('ou_items_count');
+          if (countEl) countEl.textContent = list.querySelectorAll('.ou__item').length;
+          // Reset panel
+          while (rowsWrap.querySelectorAll('.ou__ap-row').length > 1) {
+            rowsWrap.querySelector('.ou__ap-row:last-child').remove();
+          }
+          var firstRow = rowsWrap.querySelector('.ou__ap-row');
+          if (firstRow) {
+            $(firstRow.querySelector('.ou__ap-product-select')).val(null).trigger('change');
+            firstRow.querySelector('.ou__ap-price').value = '';
+            firstRow.querySelector('.ou__ap-line-total').textContent = '0.00';
+            firstRow.querySelector('.ou__ap-meta').setAttribute('hidden', true);
+          }
+          // Update existing items total display
+          var newItemsTotal = 0;
+          document.querySelectorAll('.ou__item .ou__item-price').forEach(function(el) {
+            newItemsTotal += parseFloat(el.textContent) || 0;
+          });
+          var totalValEl = document.getElementById('ou_items_total_val');
+          var totalRowEl = document.getElementById('ou_items_total_row');
+          if (totalValEl) {
+            totalValEl.textContent = newItemsTotal.toFixed(2) + ' QR';
+            if (totalRowEl) totalRowEl.style.display = '';
+          }
+          // Auto-fill COD if empty
+          var codInput = document.getElementById('id_cod_amount');
+          if (codInput && (!codInput.value || parseFloat(codInput.value) === 0)) {
+            codInput.value = newItemsTotal.toFixed(2);
+          }
+          apRecalcTotal();
+          checkCodMatch();
+          panel.style.display = 'none';
+          addBtn.style.display = '';
+          attachDeleteHandlers();
         } else {
-          alert('Error: ' + (data.error || 'Failed to delete'));
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+          feedback.className = 'ou__ap-feedback ou__ap-feedback--error';
+          feedback.textContent = data.error || 'Failed to save products.';
+          feedback.style.display = '';
         }
       })
-      .catch(function(err) {
-        alert('Network error: ' + err);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      .catch(function() {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Products';
+        feedback.className = 'ou__ap-feedback ou__ap-feedback--error';
+        feedback.textContent = 'Network error. Please try again.';
+        feedback.style.display = '';
       });
     });
-  });
+  }
+
+  // Delete item buttons
+  function attachDeleteHandlers() {
+    document.querySelectorAll('.orders-item-delete-btn').forEach(function(btn) {
+      if (btn._deleteAttached) return;
+      btn._deleteAttached = true;
+      btn.addEventListener('click', function() {
+        var itemId = this.getAttribute('data-item-id');
+        if (!confirm('Remove this item from the order?')) return;
+        var row = document.getElementById('orders_update_item_row_' + itemId);
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        fetch('/orders/update_order_product/{{ order.id }}/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+          body: JSON.stringify({ action: 'delete', item_id: parseInt(itemId) })
+        })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+          if (data.success) {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(10px)';
+            setTimeout(function() {
+              row.remove();
+              var remaining = document.querySelectorAll('.ou__item').length;
+              var countEl = document.getElementById('ou_items_count');
+              if (countEl) countEl.textContent = remaining;
+              if (remaining === 0) window.location.reload();
+            }, 200);
+          } else {
+            alert('Error: ' + (data.error || 'Failed to delete'));
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+          }
+        })
+        .catch(function(err) {
+          alert('Network error: ' + err);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        });
+      });
+    });
+  }
+
+  // Highlight COD mismatch when user edits the field
+  var codInputEl = document.getElementById('id_cod_amount');
+  if (codInputEl) codInputEl.addEventListener('input', checkCodMatch);
+
+  attachDeleteHandlers();
+  checkCodMatch();
 });
 </script>
 {% endblock %}

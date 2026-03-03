@@ -437,7 +437,7 @@
                         <button type="button" class="orc__btn" title="View" onclick="openOrderDetailPanel({{ order.id }})"><i class="fa-solid fa-eye"></i></button>
                         <a href="{% url 'workforce:order_edit' order.id %}" hx-get="{% url 'workforce:order_edit' order.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true" class="orc__btn orc__btn--edit" title="Edit"><i class="fa-solid fa-pen"></i></a>
                         {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
-                        <button type="button" class="orc__btn orc__btn--info" title="Publish" hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML" hx-confirm="Publish?"><i class="fa-solid fa-paper-plane"></i></button>
+                        <button type="button" class="orc__btn orc__btn--info" title="Publish" hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML"><i class="fa-solid fa-paper-plane"></i></button>
                         {% endif %}
                         {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
                         <button type="button" class="orc__btn orc__btn--err" title="Cancel" hx-post="{% url 'workforce:cancel_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML" hx-confirm="Cancel order?"><i class="fa-solid fa-times"></i></button>
@@ -728,24 +728,13 @@
         updateActiveFiltersDisplay();
     });
 
-    // Get CSRF token - retrieve fresh on each call to handle HTMX content swaps
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
+    // Get CSRF token - reads from meta tag (CSRF_COOKIE_HTTPONLY=True means cookie is inaccessible to JS)
     function getCSRFToken() {
-        return getCookie('csrftoken');
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) return meta.getAttribute('content');
+        // Fallback: try hidden input added by {% csrf_token %}
+        const inp = document.querySelector('[name=csrfmiddlewaretoken]');
+        return inp ? inp.value : '';
     }
 
     // Publish to Delivery
@@ -1172,19 +1161,30 @@
                 },
                 body: JSON.stringify({ order_ids: orderIds, status: status })
             });
+            if (resp.status === 403) {
+                alert('Session expired or permission denied. Please refresh the page and try again.');
+                return;
+            }
+            if (!resp.ok) {
+                alert('Server error (' + resp.status + '). Please try again.');
+                return;
+            }
+            const contentType = resp.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                // Redirect to login or unexpected response — page reload will re-authenticate
+                window.location.reload();
+                return;
+            }
             const data = await resp.json();
             if (data.success) {
                 // Update status badges in-place
                 selectedOrders.forEach(o => {
                     const row = document.querySelector(`.orc__row[data-order-id="${o.id}"]`);
                     if (row) {
-                        const stLine = row.querySelector('.orc__st-line');
-                        if (stLine) {
-                            const badge = stLine.querySelector('.st');
-                            if (badge) {
-                                badge.className = 'st ' + getStatusClass(status);
-                                badge.textContent = label;
-                            }
+                        const badge = row.querySelector('.orc__st-row .st');
+                        if (badge) {
+                            badge.className = 'st ' + getStatusClass(status);
+                            badge.textContent = label;
                         }
                     }
                 });
@@ -1201,7 +1201,7 @@
             }
         } catch (err) {
             console.error('Bulk status update error:', err);
-            alert('Error updating order status');
+            alert('Failed to update status. Check console for details.');
         }
     }
 

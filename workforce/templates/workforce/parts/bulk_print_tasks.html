@@ -1,193 +1,351 @@
 {% extends "base_print.html" %}
-{% load static %}
+{% load static fleet_extras %}
 
-{% block title %}Print Delivery Tasks{% endblock %}
+{% block title %}Print Delivery Labels{% endblock %}
 
 {% block extra_css %}
 <style>
-    @media print {
-        body { margin: 0; padding: 0; }
-        .no-print { display: none !important; }
-        .bpt__card { page-break-inside: avoid; }
-    }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    .bpt__header {
-        text-align: center;
-        padding: 1rem;
-        border-bottom: 2px solid #333;
-        margin-bottom: 1rem;
-    }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #ccc;
+    font-size: 12px;
+    color: #000;
+  }
 
-    .bpt__print-actions {
-        text-align: center;
-        padding: 1rem;
-        background: #f5f5f5;
-        margin-bottom: 1rem;
-    }
+  /* ── Screen controls bar ── */
+  .ctrl-bar {
+    background: #1e293b;
+    color: #fff;
+    padding: 0.6rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .ctrl-bar h1 { font-size: 0.95rem; font-weight: 600; flex: 1; }
+  .ctrl-bar .cnt { font-size: 0.8rem; opacity: 0.65; }
+  .ctrl-btn {
+    padding: 0.35rem 0.9rem;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .ctrl-btn--print { background: #2563eb; color: #fff; }
+  .ctrl-btn--close  { background: #64748b; color: #fff; }
 
-    .bpt__card {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        background: #fff;
-    }
+  /* ── Page wrapper — 4×6 inch label ── */
+  .label-wrap {
+    width: 4in;
+    height: 6in;
+    margin: 6mm auto;
+    background: #fff;
+    border: 1px solid #aaa;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+  }
+  .label-wrap:last-child { page-break-after: auto; break-after: auto; }
 
-    .bpt__card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
+  /* ── Label top: number + title + logo ── */
+  .lbl-top {
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid #000;
+    padding: 4px 6px;
+    gap: 6px;
+  }
+  .lbl-top__num {
+    font-size: 14px;
+    font-weight: 800;
+    min-width: 22px;
+    text-align: center;
+    border-right: 1px solid #000;
+    padding-right: 6px;
+    margin-right: 2px;
+  }
+  .lbl-top__title {
+    font-size: 12px;
+    font-weight: 700;
+    flex: 1;
+  }
+  .lbl-top__logo {
+    width: 48px;
+    height: 48px;
+    border: 1.5px solid #000;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .lbl-top__logo img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+  }
 
-    .bpt__task-number {
-        
-        font-weight: bold;
-    }
+  /* ── Info table rows ── */
+  .lbl-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .lbl-table td {
+    padding: 3px 6px;
+    vertical-align: top;
+    border-bottom: 1px solid #ddd;
+    font-size: 11px;
+  }
+  .lbl-table .td-key {
+    width: 80px;
+    color: #333;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .lbl-table .td-val {
+    font-weight: 400;
+    color: #000;
+  }
+  /* Highlighted row — Task No */
+  .row-taskno td {
+    background: #f0f0f0;
+    font-weight: 700;
+    border-top: 1px solid #aaa;
+    border-bottom: 1px solid #aaa;
+  }
+  /* Customer row */
+  .row-customer .td-val {
+    font-weight: 700;
+    font-size: 12px;
+    color: #1a237e;
+  }
+  /* COD row */
+  .row-cod .td-val {
+    font-weight: 700;
+    color: #b71c1c;
+  }
 
-    .bpt__task-date {
-        color: #666;
-        font-size: 0.9rem;
-    }
+  /* ── SKU section ── */
+  .lbl-sku {
+    padding: 4px 6px;
+    border-bottom: 1px solid #ddd;
+    font-size: 11px;
+  }
+  .lbl-sku__title {
+    font-weight: 700;
+    margin-bottom: 2px;
+    font-size: 11px;
+  }
+  .lbl-sku__line {
+    padding: 1px 0;
+    color: #222;
+  }
 
-    .bpt__task-details {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
-        margin-bottom: 0.75rem;
-    }
+  /* ── Locality / address row ── */
+  .lbl-locality {
+    display: flex;
+    padding: 4px 6px;
+    border-bottom: 1px solid #ddd;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .lbl-locality__key { width: 80px; color: #333; flex-shrink: 0; }
+  .lbl-locality__val { font-weight: 700; font-size: 12px; }
 
-    .bpt__detail-group {
-        padding: 0.5rem;
-        background: #f9f9f9;
-        border-radius: 4px;
-    }
+  /* ── QR + body side-by-side ── */
+  .lbl-body {
+    display: flex;
+  }
+  .lbl-body__main { flex: 1; }
+  .lbl-body__qr {
+    width: 80px;
+    flex-shrink: 0;
+    border-left: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 6px 4px;
+    gap: 3px;
+  }
+  .lbl-body__qr img {
+    width: 68px;
+    height: 68px;
+    display: block;
+  }
+  .lbl-body__qr-num {
+    font-size: 7px;
+    text-align: center;
+    color: #555;
+    word-break: break-all;
+  }
+  .lbl-body__qr-placeholder {
+    width: 68px;
+    height: 68px;
+    border: 1px dashed #bbb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: #aaa;
+    text-align: center;
+  }
 
-    .bpt__detail-label {
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: #666;
-        text-transform: uppercase;
-        margin-bottom: 0.25rem;
-    }
+  /* ── Empty state ── */
+  .lbl-empty {
+    width: 4in;
+    margin: 3rem auto;
+    background: #fff;
+    padding: 2rem;
+    text-align: center;
+    color: #666;
+    border-radius: 4px;
+  }
 
-    .bpt__detail-value {
-        font-size: 0.85rem;
+  /* ── PRINT ── */
+  @page {
+    size: 4in 6in;
+    margin: 0;
+  }
+  @media print {
+    body { background: #fff; }
+    .ctrl-bar { display: none !important; }
+    .label-wrap {
+      width: 4in;
+      height: 6in;
+      margin: 0;
+      border: none;
+      overflow: hidden;
     }
-
-    .bpt__address-section {
-        background: #f0f7ff;
-        padding: 0.75rem;
-        border-radius: 4px;
-        margin-top: 0.5rem;
-    }
-
-    .bpt__address-label {
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: #0066cc;
-        text-transform: uppercase;
-    }
-
-    .bpt__address-value {
-        font-size: 0.9rem;
-        margin-top: 0.25rem;
-    }
-
-    .bpt__status-badge {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        border-radius: 3px;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-
-    .bpt__status-badge--pending { background: #fff3cd; color: #856404; }
-    .bpt__status-badge--assigned { background: #cce5ff; color: #004085; }
-    .bpt__status-badge--delivered { background: #d4edda; color: #155724; }
-    .bpt__status-badge--rejected { background: #f8d7da; color: #721c24; }
-
-    @media print {
-        .bpt__card {
-            border: 1px solid #000;
-        }
-    }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="bpt__header no-print">
-    <h1>Delivery Tasks Print View</h1>
-    <p>{{ tasks|length }} task(s) selected</p>
+
+<div class="ctrl-bar no-print">
+  <h1>Delivery Labels</h1>
+  <span class="cnt">{{ tasks|length }} label(s)</span>
+  <button class="ctrl-btn ctrl-btn--print" onclick="window.print()">&#128438;&nbsp;Print</button>
+  <button class="ctrl-btn ctrl-btn--close" onclick="window.close()">&#10005;&nbsp;Close</button>
 </div>
 
-<div class="bpt__print-actions no-print">
-    <button onclick="window.print()" class="btn btn-primary">
-        <i class="fa-solid fa-print me-2"></i>Print
-    </button>
-    <button onclick="window.close()" class="btn btn-secondary ms-2">
-        <i class="fa-solid fa-times me-2"></i>Close
-    </button>
-</div>
+{% if tasks %}
 
-<div class="bpt__container">
-    {% for task in tasks %}
-    <div class="bpt__card">
-        <div class="bpt__card-header">
-            <div class="bpt__task-number">#{{ task.dl_task_number }}</div>
-            <div class="bpt__task-date">{{ task.dl_task_date|date:"d M Y" }}</div>
-        </div>
+{% for task in tasks %}
+<div class="label-wrap">
 
-        <div class="bpt__task-details">
-            <div class="bpt__detail-group">
-                <div class="bpt__detail-label">Customer</div>
-                <div class="bpt__detail-value">{{ task.order.customer_name|default:"N/A" }}</div>
-            </div>
-            <div class="bpt__detail-group">
-                <div class="bpt__detail-label">Phone</div>
-                <div class="bpt__detail-value">{{ task.order.customer_phone|default:"N/A" }}</div>
-            </div>
-            <div class="bpt__detail-group">
-                <div class="bpt__detail-label">Driver</div>
-                <div class="bpt__detail-value">{{ task.driver|default:"Unassigned" }}</div>
-            </div>
-            <div class="bpt__detail-group">
-                <div class="bpt__detail-label">Status</div>
-                <div class="bpt__detail-value">
-                    <span class="bpt__status-badge bpt__status-badge--{{ task.dl_task_status_client }}">
-                        {{ task.get_dl_task_status_client_display|default:"Pending" }}
-                    </span>
-                </div>
-            </div>
-        </div>
+  <!-- Top bar: index + title + logo -->
+  <div class="lbl-top">
+    <div class="lbl-top__num">{{ forloop.counter }}</div>
+    <div class="lbl-top__title">Job Info - EzzyDelivery</div>
+    <div class="lbl-top__logo">
+      <img src="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}" alt="Ezzy">
+    </div>
+  </div>
 
-        {% if task.pickup_location %}
-        <div class="bpt__address-section">
-            <div class="bpt__address-label">Pickup Location</div>
-            <div class="bpt__address-value">{{ task.pickup_location.pickup_location_title }}</div>
-        </div>
-        {% endif %}
+  <!-- Body: info table left, QR right -->
+  <div class="lbl-body">
 
-        {% if task.order.customer_address %}
-        <div class="bpt__address-section">
-            <div class="bpt__address-label">Delivery Address</div>
-            <div class="bpt__address-value">{{ task.order.customer_address }}</div>
-        </div>
-        {% endif %}
-
+    <div class="lbl-body__main">
+      <table class="lbl-table">
+        <tr>
+          <td class="td-key">Job Date</td>
+          <td class="td-val">{{ task.dl_task_date|date:"d/m/Y" }}</td>
+        </tr>
+        <tr>
+          <td class="td-key">Seller</td>
+          <td class="td-val">{{ task.business.business_code|default:task.business.business_name|default:"—" }}</td>
+        </tr>
+        <tr>
+          <td class="td-key">Category</td>
+          <td class="td-val">{{ task.dl_category|default:"—" }}</td>
+        </tr>
+        <tr class="row-taskno">
+          <td class="td-key">Task No</td>
+          <td class="td-val">{{ task.dl_task_number }}</td>
+        </tr>
+        <tr class="row-customer">
+          <td class="td-key">Customer</td>
+          <td class="td-val">{{ task.order.customer_name|default:"—" }}</td>
+        </tr>
         {% if task.order.cod_amount %}
-        <div class="bpt__detail-group" style="margin-top: 0.5rem; background: #fff3cd;">
-            <div class="bpt__detail-label">COD Amount</div>
-            <div class="bpt__detail-value" style="font-weight: bold;">AED {{ task.order.cod_amount }}</div>
-        </div>
+        <tr class="row-cod">
+          <td class="td-key">COD</td>
+          <td class="td-val">QAR: {{ task.order.cod_amount }}</td>
+        </tr>
         {% endif %}
+        <tr>
+          <td class="td-key">Phone</td>
+          <td class="td-val">{{ task.order.customer_phone|default:"—" }}</td>
+        </tr>
+      </table>
+
+      <!-- SKU / items -->
+      {% with items=task.order.order_items.all %}
+      {% if items %}
+      <div class="lbl-sku">
+        <div class="lbl-sku__title">SKU:</div>
+        {% for item in items %}
+        <div class="lbl-sku__line">
+          {% if item.product %}
+            {{ item.product.item_sku }}_{{ item.product.item_name }}: {{ item.quantity }}
+          {% elif item.notes %}
+            {{ item.notes }}: {{ item.quantity }}
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="lbl-sku">
+        <div class="lbl-sku__title">SKU:</div>
+        <div class="lbl-sku__line">{{ task.order.order_notes|default:"—" }}</div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Locality -->
+      <div class="lbl-locality">
+        <span class="lbl-locality__key">Locality</span>
+        <span class="lbl-locality__val">
+          {% if task.order.dl_zone %}
+            Zone {{ task.order.dl_zone }}{% with zname=zone_names|get_item:task.order.dl_zone %}{% if zname %} — {{ zname }}{% endif %}{% endwith %}
+          {% endif %}
+          {% if task.order.dl_street %} &nbsp;/&nbsp; St {{ task.order.dl_street }}{% endif %}
+          {% if task.order.dl_building %} &nbsp;/&nbsp; Bldg {{ task.order.dl_building }}{% endif %}
+        </span>
+      </div>
+      {% if task.order.customer_address %}
+      <div class="lbl-locality">
+        <span class="lbl-locality__key"></span>
+        <span class="lbl-locality__val" style="font-weight:400;font-size:11px;">{{ task.order.customer_address }}</span>
+      </div>
+      {% endif %}
+
+    </div><!-- /.lbl-body__main -->
+
+    <!-- QR code -->
+    <div class="lbl-body__qr">
+      {% with qr=task.task_qrcode.first %}
+        {% if qr and qr.qrcode %}
+          <img src="{{ qr.qrcode.url }}" alt="{{ task.dl_task_number }}">
+          <div class="lbl-body__qr-num">{{ task.dl_task_number }}</div>
+        {% else %}
+          <div class="lbl-body__qr-placeholder">No QR</div>
+        {% endif %}
+      {% endwith %}
     </div>
-    {% empty %}
-    <div class="text-center py-4">
-        <p>No tasks to print.</p>
-    </div>
-    {% endfor %}
-</div>
+
+  </div><!-- /.lbl-body -->
+
+</div><!-- /.label-wrap -->
+{% endfor %}
+
+{% else %}
+<div class="lbl-empty"><p>No tasks selected.</p></div>
+{% endif %}
+
 {% endblock %}

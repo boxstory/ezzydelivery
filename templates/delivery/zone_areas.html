@@ -104,8 +104,25 @@
     {% else %}
       <div class="zna__empty">
         <i class="fa-solid fa-map-location-dot"></i>
-        <p>No areas found{% if search or zone_filter %} matching your criteria{% endif %}.</p>
+        <p>No areas found{% if search %} for "<strong>{{ search }}</strong>"{% endif %}{% if zone_filter %} in selected zone{% endif %}.</p>
       </div>
+
+      {% if suggestions %}
+      <div class="zna__suggestions">
+        <div class="zna__suggestions-title">
+          <i class="fa-solid fa-lightbulb me-1"></i>Did you mean?
+        </div>
+        <div class="zna__suggestions-list">
+          {% for s in suggestions %}
+          <a href="?search={{ s.term }}" class="zna__suggestion-chip">
+            <span class="zna__suggestion-term">{{ s.term }}</span>
+            <span class="zna__suggestion-meta">Zone {{ s.zone_number }} — {{ s.zone_name }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
     {% endif %}
   </div>
 

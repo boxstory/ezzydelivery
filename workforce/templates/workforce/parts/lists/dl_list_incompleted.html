@@ -584,7 +584,10 @@
     }
 
     function getCSRFToken() {
-        return getCookie('csrftoken');
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) return meta.getAttribute('content');
+        const inp = document.querySelector('[name=csrfmiddlewaretoken]');
+        return inp ? inp.value : (getCookie('csrftoken') || '');
     }
 
     // Publish to Fleets

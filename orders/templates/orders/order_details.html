@@ -316,10 +316,16 @@
           {% endwith %}
         </div>
         <div class="odt__page-header__actions" id="order_details_nav_actions">
-          {% if can_edit_order and order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+          {% if can_edit_order %}
+          {% if order.order_status == 'publish' %}
+          <span class="odt__header-btn odt__header-btn--secondary odt__header-btn--disabled" id="order_details_btn_edit" title="Cannot edit a published order">
+            <i class="fa-solid fa-pen"></i> Edit Order
+          </span>
+          {% else %}
           <a class="odt__header-btn odt__header-btn--secondary" href="{% url 'orders:order_update' order.id %}" id="order_details_btn_edit">
             <i class="fa-solid fa-pen"></i> Edit Order
           </a>
+          {% endif %}
           {% endif %}
           {% if order.customer_whatsapp %}
           <a class="odt__header-btn odt__header-btn--whatsapp" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" hx-boost="false">
@@ -382,9 +388,18 @@
                   </div>
                   <div class="odt__route__info">
                     <span class="odt__route__label">Pickup</span>
-                    <span class="odt__route__value">{{ order.pickup_location.pickup_name }}</span>
-                    {% if order.pickup_location.pickup_address %}
-                    <span class="odt__route__addr">{{ order.pickup_location.pickup_address }}</span>
+                    <span class="odt__route__value">{{ order.pickup_location.pickup_location_title }}</span>
+                    {% if order.pickup_location.locality %}
+                    <span class="odt__route__addr">{{ order.pickup_location.locality }}</span>
+                    {% endif %}
+                    {% if order.pickup_location.pickup_lat and order.pickup_location.pickup_lon %}
+                    <a href="https://www.google.com/maps?q={{ order.pickup_location.pickup_lat }},{{ order.pickup_location.pickup_lon }}" target="_blank" class="odt__route__map-link" hx-boost="false">
+                      <i class="fa-solid fa-location-pin"></i> Pin
+                    </a>
+                    {% elif order.pickup_location.locality %}
+                    <a href="https://maps.google.com/?q={{ order.pickup_location.locality|urlencode }}" target="_blank" class="odt__route__map-link" hx-boost="false">
+                      <i class="fa-solid fa-location-pin"></i> Pin
+                    </a>
                     {% endif %}
                   </div>
                 </div>
@@ -403,7 +418,11 @@
                     </span>
                     <div class="odt__field-row odt__field-row--mt">
                       <div class="odt__field odt__field--compact">
-                        <span class="odt__field__label">Zone</span>
+                        <span class="odt__field__label">Zone #</span>
+                        <span class="odt__field__value odt__field__value--bold">{{ order.dl_zone|default:"-" }}</span>
+                      </div>
+                      <div class="odt__field odt__field--compact odt__field--compact-wide">
+                        <span class="odt__field__label">Zone Name</span>
                         <span class="odt__field__value odt__field__value--zone">{% get_zone_display order %}</span>
                       </div>
                       <div class="odt__field odt__field--compact">
@@ -415,6 +434,26 @@
                         <span class="odt__field__value">{{ order.dl_building|default:"-" }}</span>
                       </div>
                     </div>
+                    {% if order.latitude and order.longitude %}
+                    <div class="odt__field-row odt__field-row--mt">
+                      <div class="odt__field odt__field--compact odt__field--compact-wide">
+                        <span class="odt__field__label"><i class="fa-solid fa-crosshairs fa-xs"></i> Lat / Lng</span>
+                        <span class="odt__field__value odt__field__value--mono">
+                          <a href="https://maps.google.com/?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odt__link" hx-boost="false">
+                            {{ order.latitude|floatformat:6 }}, {{ order.longitude|floatformat:6 }}
+                          </a>
+                        </span>
+                      </div>
+                      {% if order.coords_accuracy %}
+                      <div class="odt__field odt__field--compact">
+                        <span class="odt__field__label"><i class="fa-solid fa-signal fa-xs"></i> Accuracy</span>
+                        <span class="odt__field__value">
+                          <span class="odt__coords-accuracy odt__coords-accuracy--{{ order.coords_accuracy }}">{{ order.coords_accuracy|capfirst }}</span>
+                        </span>
+                      </div>
+                      {% endif %}
+                    </div>
+                    {% endif %}
                     {% if order.customer_address %}
                     <a href="https://maps.google.com/?q={{ order.customer_address|urlencode }}" target="_blank" class="odt__route__map-link" hx-boost="false">
                       <i class="fa-solid fa-location-dot"></i> View on Map

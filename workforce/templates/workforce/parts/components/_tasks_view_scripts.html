@@ -558,9 +558,9 @@ window.setStatusModalTask = function setStatusModalTask(button) {
     const driverId = button.getAttribute('data-driver-id') || '';
     const driverName = button.getAttribute('data-driver-name') || '';
     const customerName = button.getAttribute('data-customer-name') || '';
-
-    console.log('=== Modal Opening ===');
-    console.log('Type:', statusType, '| Task Status:', currentStatus, '| DMS:', currentDms);
+    const failureReason = button.getAttribute('data-failure-reason') || '';
+    const failureNotes = button.getAttribute('data-failure-notes') || '';
+    const taskNotes = button.getAttribute('data-task-notes') || '';
 
     // Set task ID, type and number
     document.getElementById('statusModalTaskId').value = taskId;
@@ -654,9 +654,26 @@ window.setStatusModalTask = function setStatusModalTask(button) {
         timeEl.value = local.toISOString().slice(0, 16);
     }
 
-    // Clear notes
+    // Pre-fill notes from task description
     const notesEl = document.getElementById('statusModalNotes');
-    if (notesEl) notesEl.value = '';
+    if (notesEl) notesEl.value = taskNotes || '';
+
+    // Failure info — read-only, from latest failed status history entry (driver-set)
+    const failureSection = document.getElementById('statusModalFailureSection');
+    const failureReasonEl = document.getElementById('statusModalFailureReason');
+    const failureNotesEl = document.getElementById('statusModalFailureNotes');
+    if (failureSection) {
+        if (failureReason || failureNotes) {
+            if (failureReasonEl) failureReasonEl.textContent = failureReason || '';
+            if (failureNotesEl) {
+                failureNotesEl.textContent = failureNotes || '';
+                failureNotesEl.style.display = failureNotes ? '' : 'none';
+            }
+            failureSection.style.display = '';
+        } else {
+            failureSection.style.display = 'none';
+        }
+    }
 
     // Show driver info if assigned
     const driverInfoEl = document.getElementById('statusModalDriverInfo');
