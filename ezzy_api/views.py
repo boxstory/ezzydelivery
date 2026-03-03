@@ -434,6 +434,7 @@ def driver_update_task_status(request, task_id):
 
             task.dl_task_status = new_status
             task._status_actor = 'driver'
+            task._status_changed_by = request.user
 
         task.save()
         
@@ -753,6 +754,8 @@ def driver_complete_task(request, task_id):
         
         # Update task status with DMS mapping
         task.dl_task_status = status_value
+        task._status_actor = 'driver'
+        task._status_changed_by = request.user
         # Attach notes so delivery/signals.py can pass them to OrderStatusHistory
         if notes:
             task._status_notes = notes

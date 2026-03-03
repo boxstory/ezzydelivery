@@ -41,12 +41,12 @@ STAFF_TRANSITIONS = {
 # Drivers can make these transitions (fleet app / API)
 DRIVER_TRANSITIONS = {
     'assigned':   {'accepted', 'rejected'},
-    'accepted':   {'picked_up', 'rejected'},
+    'accepted':   {'picked_up', 'out_for_delivery', 'delivered', 'failed', 'rejected'},
     'picked_up':  {'start_ride', 'in_transit', 'out_for_delivery', 'failed'},
     'start_ride': {'in_transit', 'out_for_delivery', 'failed'},
     'in_transit': {'out_for_delivery', 'contacted', 'non_reachable', 'address_pending',
                    'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed'},
-    'out_for_delivery': {'contacted', 'non_reachable', 'address_pending',
+    'out_for_delivery': {'delivered', 'contacted', 'non_reachable', 'address_pending',
                          'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed'},
     'contacted':          {'delivered', 'non_reachable', 'failed', 'dl_pending_payment'},
     'non_reachable':      {'contacted', 'customer_delaying', 'address_pending', 'failed'},
@@ -54,13 +54,14 @@ DRIVER_TRANSITIONS = {
     'customer_confirmation_pending': {'contacted', 'non_reachable', 'failed'},
     'customer_delaying':  {'contacted', 'failed'},
     'dl_pending_payment': {'delivered', 'failed'},
+    # Self-assign from pool (driver clicks "Take" on a published task)
+    'pending':    {'accepted'},
+    'for_review': {'accepted'},
     # Terminal — drivers cannot change these
     'delivered': set(),
     'failed':    set(),
     'rejected':  set(),
     'cancelled': set(),
-    'for_review': set(),
-    'pending':    set(),
 }
 
 # ---------------------------------------------------------------------------

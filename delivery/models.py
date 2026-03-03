@@ -29,6 +29,7 @@ Related:
     - business.models.Business: Business that placed the order
 """
 
+import datetime
 from django.db import models
 
 from core import models as core_models
@@ -215,7 +216,7 @@ class DeliveryTask(models.Model):
     dl_task_status_client = models.CharField(
         max_length=100, choices=dl_task_status_client)
     dl_task_status = models.CharField(max_length=100, choices=dl_task_status)
-    dl_task_date = models.DateField(auto_now_add=True)
+    dl_task_date = models.DateField(default=datetime.date.today)
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_task')
     dl_address_update = models.ForeignKey(
         DlAddressUpdate, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='dl_task')

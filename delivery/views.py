@@ -386,6 +386,8 @@ def assign_driver(request):
                 # Update task: set driver and status to accepted
                 task.driver = driver
                 task.dl_task_status = 'accepted'
+                task._status_actor = 'driver'  # state machine: pending/for_review → accepted allowed for driver
+                task._status_changed_by = request.user
                 task.save(update_fields=['driver', 'dl_task_status'])
                 logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
 
@@ -455,6 +457,8 @@ def accept_task(request):
                     return JsonResponse({"success": False, "error": "Order is cancelled — cannot accept task"})
             # Update task status to accepted
             task.dl_task_status = 'accepted'
+            task._status_actor = 'driver'  # state machine: assigned → accepted allowed for driver
+            task._status_changed_by = request.user
             task.save(update_fields=['dl_task_status', 'driver'])
             logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
 
@@ -506,6 +510,8 @@ def start_ride(request):
 
             # Update status to out_for_delivery
             task.dl_task_status = 'out_for_delivery'
+            task._status_actor = 'driver'  # state machine: accepted → out_for_delivery allowed for driver
+            task._status_changed_by = request.user
             task.save(update_fields=['dl_task_status'])
             logger.info(f"Driver {driver.driver_id} started ride for task {task_id}")
 
@@ -1030,6 +1036,7 @@ def zone_areas(request):
     Display all zone areas in a dashboard-style list view.
     Shows areas grouped by zone with search and filter capabilities.
     """
+    import difflib
     from django.db.models import Q, Count
     from django.core.paginator import Paginator
 
@@ -1069,6 +1076,39 @@ def zone_areas(request):
     total_areas = delivery_models.ZoneArea.objects.count()
     total_zones_with_areas = zones.count()
 
+    # Typo suggestions — only when search returns no results
+    suggestions = []
+    if search and paginator.count == 0:
+        all_names = list(
+            delivery_models.ZoneArea.objects.values_list('area_name', flat=True)
+        ) + list(
+            delivery_models.ZoneName.objects.values_list('zone_name', flat=True)
+        )
+        matches = difflib.get_close_matches(search, all_names, n=6, cutoff=0.5)
+        # For each match, get the area/zone info
+        for name in matches:
+            area = delivery_models.ZoneArea.objects.select_related('zone').filter(
+                area_name__iexact=name
+            ).first()
+            if area:
+                suggestions.append({
+                    'term': name,
+                    'zone_number': area.zone.zone_number,
+                    'zone_name': area.zone.zone_name,
+                    'type': 'area',
+                })
+            else:
+                zone = delivery_models.ZoneName.objects.filter(
+                    zone_name__iexact=name
+                ).first()
+                if zone:
+                    suggestions.append({
+                        'term': name,
+                        'zone_number': zone.zone_number,
+                        'zone_name': zone.zone_name,
+                        'type': 'zone',
+                    })
+
     context = {
         'areas': areas_page,
         'zones': zones,
@@ -1076,6 +1116,7 @@ def zone_areas(request):
         'total_zones_with_areas': total_zones_with_areas,
         'search': search,
         'zone_filter': zone_filter,
+        'suggestions': suggestions,
     }
     return render(request, 'delivery/zone_areas.html', context)
 

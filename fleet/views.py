@@ -1938,6 +1938,8 @@ def pickup_scan_process(request):
 
         # Update task status to in_transit (picked up)
         task.dl_task_status = 'in_transit'
+        task._status_actor = 'driver'  # state machine: accepted → in_transit allowed for driver
+        task._status_changed_by = request.user
         task.save(update_fields=['dl_task_status'])
 
         logger.info(f"Driver {driver.driver_id} confirmed pickup for task {task.dl_task_number}")
@@ -2416,6 +2418,8 @@ def fleet_task_take_scan(request):
         with db_transaction.atomic():
             task.driver = driver
             task.dl_task_status = 'accepted'
+            task._status_actor = 'driver'  # state machine: pending/for_review → accepted allowed for driver
+            task._status_changed_by = request.user
             task.save(update_fields=['driver', 'dl_task_status'])
 
             delivery_models.AssignedDriver.objects.get_or_create(
@@ -2508,6 +2512,8 @@ def fleet_start_ride(request):
         if task.order and task.order.order_status == 'cancelled':
             return JsonResponse({'success': False, 'error': 'Order is cancelled — cannot start ride'})
         task.dl_task_status = 'out_for_delivery'
+        task._status_actor = 'driver'  # state machine: accepted → out_for_delivery allowed for driver
+        task._status_changed_by = request.user
         task.save(update_fields=['dl_task_status'])
 
         return JsonResponse({'success': True, 'redirect_url': f'/fleet/tasks/{task_id}/navigate/'})
@@ -2579,6 +2585,28 @@ def fleet_postpone_task(request):
             update_fields.append('dl_task_description')
 
         task.save(update_fields=update_fields)
+
+        # Log postpone action to order status history so it appears in the timeline
+        try:
+            from orders.models import OrderStatusHistory
+            note_parts = [f'New date: {parsed_date}']
+            if preferred_time in valid_slots:
+                note_parts.append(preferred_time)
+            if time_note:
+                note_parts.append(time_note)
+            OrderStatusHistory.objects.create(
+                order=task.order,
+                field_name='dl_task_status',
+                old_value='postponed',
+                new_value='postponed',
+                old_display='',
+                new_display='Delivery Postponed',
+                changed_by=request.user,
+                notes=' · '.join(note_parts),
+            )
+        except Exception:
+            pass
+
         return JsonResponse({'success': True, 'new_date': str(parsed_date)})
 
     except fleet_models.Driver.DoesNotExist:
@@ -2619,7 +2647,7 @@ def fleet_task_timeline(request, task_id):
         history = OrderStatusHistory.objects.filter(
             order_id=task.order_id,
             field_name__in=['dl_task_status', 'dl_task_publish', 'task_status'],
-        ).select_related('changed_by').order_by('created_at')
+        ).exclude(old_value='postponed', new_value='postponed', new_display='').select_related('changed_by').order_by('created_at')
 
         # Human-readable label overrides for specific field+value combos
         EVENT_LABELS = {
@@ -2638,6 +2666,7 @@ def fleet_task_timeline(request, task_id):
             ('dl_task_status', 'failed'):          'Delivery Failed',
             ('dl_task_status', 'cancelled'):       'Cancelled',
             ('dl_task_publish', 'True'):           'Published to Fleet',
+            ('dl_task_status', 'postponed'):       'Delivery Postponed',
         }
 
         STATUS_ICONS = {
@@ -2656,6 +2685,7 @@ def fleet_task_timeline(request, task_id):
             'delivered':        'fa-circle-check',
             'failed':           'fa-circle-xmark',
             'cancelled':        'fa-ban',
+            'postponed':        'fa-calendar-days',
         }
 
         STATUS_COLORS = {
@@ -2674,6 +2704,7 @@ def fleet_task_timeline(request, task_id):
             'delivered':        '#16a34a',
             'failed':           '#dc2626',
             'cancelled':        '#dc2626',
+            'postponed':        '#7c3aed',
         }
 
         events = []
