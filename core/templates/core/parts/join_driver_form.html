@@ -46,9 +46,23 @@
                 <input type="hidden" name="action" value="save_profile">
 
                 {% if profileupdateform.errors %}
-                <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
-                    <i class="fas fa-exclamation-circle flex-shrink-0"></i>
-                    <span>Please fix the errors highlighted below.</span>
+                <div class="alert alert-danger mb-3" role="alert">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="fas fa-exclamation-circle flex-shrink-0"></i>
+                        <strong>Please fix the errors highlighted below.</strong>
+                    </div>
+                    <ul class="mb-0 ps-3 small">
+                        {% for field in profileupdateform %}
+                            {% if field.errors %}
+                                <li><strong>{{ field.label }}</strong>: {{ field.errors.0 }}</li>
+                            {% endif %}
+                        {% endfor %}
+                        {% if profileupdateform.non_field_errors %}
+                            {% for error in profileupdateform.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        {% endif %}
+                    </ul>
                 </div>
                 {% endif %}
 
@@ -93,7 +107,7 @@
                     <div class="col-12 col-sm-8 col-lg-9">
                         <input type="date" name="date_of_birth" id="id_pf_date_of_birth"
                             class="form-control{% if profileupdateform.date_of_birth.errors %} is-invalid{% endif %}"
-                            value="{{ profileupdateform.date_of_birth.value|default:'' }}"
+                            value="{{ profile.date_of_birth|date:'Y-m-d'|default:'' }}"
                             min="1930-01-01" max="2010-12-31" required>
                         {% if profileupdateform.date_of_birth.errors %}<div class="invalid-feedback">{{ profileupdateform.date_of_birth.errors.0 }}</div>{% endif %}
                     </div>
@@ -156,7 +170,7 @@
 
                 <div class="row align-items-center py-3 px-2">
                     <div class="col-12 col-sm-4 col-lg-3">
-                        <p class="mb-2 mb-sm-0 fw-semibold">Email</p>
+                        <p class="mb-2 mb-sm-0 fw-semibold">Email <span class="text-danger">*</span></p>
                     </div>
                     <div class="col-12 col-sm-8 col-lg-9">
                         <input type="email" name="email" id="id_pf_email"
@@ -223,6 +237,7 @@
     {% endif %}
 
     <!-- ══ SECTION 2: Driver Application Form ══════════════════════════════ -->
+    {% if completion_percentage == 100 %}
     {% if driverjoinform.errors %}
     <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
         <i class="fas fa-exclamation-circle flex-shrink-0"></i>
@@ -235,16 +250,8 @@
         method="POST"
         name="driver_join"
         enctype="multipart/form-data"
-        novalidate
-        {% if completion_percentage < 100 %}style="opacity:0.5;pointer-events:none;"{% endif %}>
+        novalidate>
         {% csrf_token %}
-
-        {% if completion_percentage < 100 %}
-        <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
-            <i class="fas fa-lock flex-shrink-0"></i>
-            <span>Complete your profile above first to unlock the driver application.</span>
-        </div>
-        {% endif %}
 
         <!-- ── DRIVER APPLICATION CARD ──────────────────────────────── -->
         <div class="card mb-3" id="core_join_card_driver_info">
@@ -489,6 +496,7 @@
         </div>
 
     </form>
+    {% endif %}{# completion_percentage == 100 #}
 
     <!-- FAQ Section -->
     <div class="card" id="core_join_driver_section_faq">
