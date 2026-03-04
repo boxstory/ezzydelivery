@@ -1279,7 +1279,7 @@ def dl_list_all(request):
     mobile = request.GET.get('mobile', '')
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
-    dms_status = request.GET.get('dmsStatus', '')
+    dl_status = request.GET.get('dlStatus', '')
     date_from = request.GET.get('dateFrom', '')
     date_to = request.GET.get('dateTo', '')
     business_id = request.GET.get('business', '')
@@ -1299,6 +1299,8 @@ def dl_list_all(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dl_status:
+        dl_tasks = dl_tasks.filter(dl_task_status=dl_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -1346,7 +1348,7 @@ def dl_list_all(request):
             'mobile': mobile,
             'driverName': driver_name,
             'cStatus': c_status,
-            'dmsStatus': dms_status,
+            'dlStatus': dl_status,
             'dateFrom': date_from,
             'dateTo': date_to,
             'business': business_id,

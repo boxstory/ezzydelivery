@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
+{# workforce.css already loaded in wf_dashboard_base.html #}
 {% endblock extra_css %}
 
 {% block content %}
@@ -74,9 +74,9 @@
         <a href="https://wa.me/{{ inquiry.business_contact_number|cut:'+' }}" target="_blank" class="pid__hero__btn pid__hero__btn--wa">
           <i class="fa-brands fa-whatsapp"></i>WhatsApp
         </a>
-        <button class="pid__hero__btn pid__hero__btn--manage" data-bs-toggle="offcanvas" data-bs-target="#manageOffcanvas">
+        <a href="#manage-panel" class="pid__hero__btn pid__hero__btn--manage">
           <i class="fa-solid fa-sliders"></i>Manage
-        </button>
+        </a>
       </div>
 
     </div>
@@ -376,61 +376,68 @@
     <!-- ─── RIGHT COLUMN ─────────────────── -->
     <div class="pid__grid__right">
 
-      <!-- CRM STATUS PANEL -->
-      <div class="pid__panel pid__panel--crm">
+      <!-- MANAGE PANEL -->
+      <div class="pid__panel pid__panel--crm" id="manage-panel">
         <div class="pid__panel__hd">
-          <i class="fa-solid fa-circle-dot"></i>
-          <h3>Pipeline Status</h3>
-          <button class="pid__panel__edit-btn" data-bs-toggle="offcanvas" data-bs-target="#manageOffcanvas" title="Edit">
-            <i class="fa-solid fa-pen"></i>
-          </button>
+          <i class="fa-solid fa-sliders"></i>
+          <h3>Manage Inquiry</h3>
         </div>
         <div class="pid__panel__body">
-          <div class="pid__crm-status-display" id="crm-status-display">
-            <span class="pid__crm-pill pid__crm-pill--{{ inquiry.crm_status }}">
-              <i class="fa-solid fa-circle"></i>{{ inquiry.get_crm_status_display }}
-            </span>
+
+          <div class="pid__canvas-section">
+            <div class="pid__canvas-label">Pipeline Status</div>
+            <div class="pid__crm-status-display mb-2" id="crm-status-display">
+              <span class="pid__crm-pill pid__crm-pill--{{ inquiry.crm_status }}">
+                <i class="fa-solid fa-circle"></i>{{ inquiry.get_crm_status_display }}
+              </span>
+            </div>
+            <div class="pid__status-grid" id="status-selector">
+              {% for value, label in status_choices %}
+              <button type="button" class="pid__status-opt pid__status-opt--{{ value }} {% if inquiry.crm_status == value %}active{% endif %}"
+                      data-status="{{ value }}">{{ label }}</button>
+              {% endfor %}
+            </div>
           </div>
-          <div class="pid__field mt-3">
-            <span class="pid__field__lbl">Assigned To</span>
-            <span class="pid__field__val" id="assigned-to-panel">
+
+          <div class="pid__canvas-section">
+            <div class="pid__canvas-label">Assign To</div>
+            <span class="d-none" id="assigned-to-panel">
               {% if inquiry.assigned_to %}
               {{ inquiry.assigned_to.get_full_name|default:inquiry.assigned_to.username }}
               {% else %}<span class="pid__muted">Unassigned</span>{% endif %}
             </span>
+            <select class="pid__select" id="assigned-to-select">
+              <option value="">— Unassigned —</option>
+              {% for user in staff_users %}
+              <option value="{{ user.pk }}" {% if inquiry.assigned_to_id == user.pk %}selected{% endif %}>
+                {{ user.get_full_name|default:user.username }}
+              </option>
+              {% endfor %}
+            </select>
           </div>
-          {% if inquiry.staff_notes %}
-          <div class="pid__notes-block" id="staff-notes-block">
-            <div class="pid__notes-label"><i class="fa-solid fa-clipboard me-1"></i>Internal Notes</div>
-            <p class="pid__notes-text" id="staff-notes-display">{{ inquiry.staff_notes }}</p>
-          </div>
-          {% endif %}
-        </div>
-      </div>
 
-      <!-- ADD ACTIVITY -->
-      <div class="pid__panel">
-        <div class="pid__panel__hd">
-          <i class="fa-solid fa-comment-plus"></i>
-          <h3>Add Activity</h3>
-        </div>
-        <div class="pid__panel__body">
-          <div class="pid__type-toggle mb-3">
-            <label class="pid__type-btn">
-              <input type="radio" name="activity_type_sel" value="note" checked>
-              <span><i class="fa-solid fa-sticky-note"></i>Note</span>
-            </label>
-            <label class="pid__type-btn">
-              <input type="radio" name="activity_type_sel" value="followup">
-              <span><i class="fa-solid fa-phone-flip"></i>Follow-up</span>
-            </label>
+          <div class="pid__canvas-section">
+            <div class="pid__canvas-label">Activity Log</div>
+            <div class="pid__type-toggle mb-2">
+              <label class="pid__type-btn">
+                <input type="radio" name="activity_type_sel" value="note" checked>
+                <span><i class="fa-solid fa-sticky-note"></i>Note</span>
+              </label>
+              <label class="pid__type-btn">
+                <input type="radio" name="activity_type_sel" value="followup">
+                <span><i class="fa-solid fa-phone-flip"></i>Follow-up</span>
+              </label>
+            </div>
+            <textarea class="pid__textarea" id="activity-body" rows="3"
+                      placeholder="Write a note or follow-up summary…"></textarea>
           </div>
-          <textarea class="pid__textarea" id="activity-body" rows="4"
-                    placeholder="Write your note or follow-up summary…"></textarea>
-          <button class="pid__submit-btn" id="submit-activity-btn">
-            <i class="fa-solid fa-paper-plane"></i>Submit
+
+          <button class="pid__submit-btn" id="save-status-btn">
+            <i class="fa-solid fa-floppy-disk"></i>Save Changes
           </button>
+          <div id="save-status-feedback" class="d-none mt-2 pid__feedback"></div>
           <div id="activity-error" class="pid__error d-none"></div>
+
         </div>
       </div>
 
@@ -475,57 +482,8 @@
     </div><!-- /right -->
   </div><!-- /grid -->
 
+
 </div><!-- /.pid -->
-
-
-<!-- ══════════════════════════════════════
-     MANAGE OFFCANVAS
-═══════════════════════════════════════ -->
-<div class="offcanvas offcanvas-end pid__canvas" tabindex="-1" id="manageOffcanvas">
-  <div class="pid__canvas-hd">
-    <div>
-      <div class="pid__canvas-title">Manage Inquiry</div>
-      <div class="pid__canvas-sub">{{ inquiry.business_name }}</div>
-    </div>
-    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
-  </div>
-  <div class="pid__canvas-body">
-
-    <div class="pid__canvas-section">
-      <div class="pid__canvas-label">Pipeline Status</div>
-      <div class="pid__status-grid" id="status-selector">
-        {% for value, label in status_choices %}
-        <button type="button" class="pid__status-opt pid__status-opt--{{ value }} {% if inquiry.crm_status == value %}active{% endif %}"
-                data-status="{{ value }}">{{ label }}</button>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div class="pid__canvas-section">
-      <div class="pid__canvas-label">Assign To</div>
-      <select class="pid__select" id="assigned-to-select">
-        <option value="">— Unassigned —</option>
-        {% for user in staff_users %}
-        <option value="{{ user.pk }}" {% if inquiry.assigned_to_id == user.pk %}selected{% endif %}>
-          {{ user.get_full_name|default:user.username }}
-        </option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="pid__canvas-section">
-      <div class="pid__canvas-label">Internal Notes</div>
-      <textarea class="pid__textarea pid__textarea--tall" id="staff-notes-input"
-                placeholder="Internal notes about this inquiry…">{{ inquiry.staff_notes|default:"" }}</textarea>
-    </div>
-
-    <button class="pid__submit-btn" id="save-status-btn">
-      <i class="fa-solid fa-floppy-disk"></i>Save Changes
-    </button>
-    <div id="save-status-feedback" class="d-none mt-2 pid__feedback"></div>
-
-  </div>
-</div>
 
 <!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
 <script>

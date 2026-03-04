@@ -53,6 +53,33 @@ Each task should have select_related: order, driver, business, pickup_location, 
         </div>
     </div>
 
+    <!-- AI Agent Toolbar (shows when tasks selected) -->
+    <div class="aim__actions-toolbar" id="aiActionsToolbar" style="display:none;">
+        <div class="aim__toolbar-info">
+            <i class="fa-solid fa-robot"></i>
+            <span>AI Tools</span>
+            <span class="selected-count"><span id="selectedTaskCountAI">0</span> tasks selected</span>
+        </div>
+        <div class="aim__toolbar-actions">
+            <button type="button" class="btn" onclick="aiParseTaskAddresses()" title="Parse addresses from text">
+                <i class="fa-solid fa-location-dot"></i> Parse Addresses
+            </button>
+            <button type="button" class="btn" onclick="aiVerifyTasks()" title="Verify task completeness">
+                <i class="fa-solid fa-clipboard-check"></i> Verify Tasks
+            </button>
+            <button type="button" class="btn" onclick="aiCheckTaskCODRisk()" title="Check COD risk for customers">
+                <i class="fa-solid fa-shield-halved"></i> COD Risk
+            </button>
+            <button type="button" class="btn" onclick="aiEstimateTaskDelivery()" title="Estimate delivery times">
+                <i class="fa-solid fa-clock"></i> Estimate Time
+            </button>
+            <div class="aim__toolbar-divider"></div>
+            <button type="button" class="btn btn-clear" onclick="clearAllSelections()">
+                <i class="fa-solid fa-xmark"></i> Clear
+            </button>
+        </div>
+    </div>
+
     <div class="table-responsive">
         <table class="dl-table">
             <thead>
@@ -87,7 +114,7 @@ Each task should have select_related: order, driver, business, pickup_location, 
             </thead>
             <tbody>
                 {% for dl in tasks %}
-                <tr class="dl-table__row" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
+                <tr class="dl-table__row" data-task-id="{{ dl.id }}" data-order-number="{{ dl.order.order_number|default:'' }}" data-client-order-code="{{ dl.order.client_order_code|default:'' }}" data-customer-phone="{{ dl.order.customer_phone|default:'' }}" data-customer-address="{{ dl.order.customer_address|default:'' }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
                     <td class="dl-table__td-check" onclick="event.stopPropagation();">
                         <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
                     </td>
@@ -116,21 +143,23 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <!-- Zone / Address -->
                     <td class="dl-table__td-zone">
                         <div class="dl-table__address-stack">
+                            {% if dl.order.dl_zone %}
+                            {% get_zone_display dl.order as zone_display %}
                             <div class="dl-table__address-line1">
-                                {% if dl.order.dl_zone %}
-                                <span class="dl-table__zone-badge">Z{{ dl.order.dl_zone }}</span>
-                                {% endif %}
-                                {% if dl.order.street_name %}{{ dl.order.street_name }}{% endif %}
-                                {% if dl.order.building_number %} #{{ dl.order.building_number }}{% endif %}
-                                {% if dl.order.latitude and dl.order.longitude %}
-                                <a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map">
-                                    <i class="fa-solid fa-location-dot"></i>
-                                </a>
-                                {% endif %}
+                                <strong>{{ zone_display }}</strong>{% if dl.order.latitude and dl.order.longitude %} <a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map"><i class="fa-solid fa-location-dot"></i></a>{% endif %}
+                            </div>
+                            <div class="dl-table__address-line2">
+                                Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
                             </div>
                             <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
-                                {{ dl.order.customer_address|default:"—"|truncatechars:35 }}
+                                {{ dl.order.customer_address|default:""|truncatechars:40 }}
                             </div>
+                            {% else %}
+                            <div class="dl-table__address-line1">—</div>
+                            <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
+                                {{ dl.order.customer_address|default:""|truncatechars:40 }}
+                            </div>
+                            {% endif %}
                         </div>
                     </td>
                     <!-- COD / Verify -->

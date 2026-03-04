@@ -115,6 +115,7 @@
                         <select class="form-select" name="cStatus" id="cStatus">
                             <option value="">All Statuses</option>
                             <option value="for_review" {% if filters.cStatus == 'for_review' %}selected{% endif %}>For Review</option>
+                            <option value="customer_confiration_pending" {% if filters.cStatus == 'customer_confiration_pending' %}selected{% endif %}>Customer Confirmation Pending</option>
                             <option value="0" {% if filters.cStatus == '0' %}selected{% endif %}>Assigned to Driver</option>
                             <option value="2" {% if filters.cStatus == '2' %}selected{% endif %}>Delivered</option>
                             <option value="rejected" {% if filters.cStatus == 'rejected' %}selected{% endif %}>Rejected</option>
@@ -122,20 +123,25 @@
                         </select>
                     </div>
                     <div class="col-md-6 col-lg-4">
-                        <label for="dmsStatus" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-cloud me-1"></i>DMS Status
+                        <label for="dlStatus" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-circle-dot me-1"></i>DL Task Status
                         </label>
-                        <select class="form-select" name="dmsStatus" id="dmsStatus">
-                            <option value="">All DMS Statuses</option>
-                            <option value="0" {% if filters.dmsStatus == '0' %}selected{% endif %}>Assigned</option>
-                            <option value="1" {% if filters.dmsStatus == '1' %}selected{% endif %}>Started</option>
-                            <option value="2" {% if filters.dmsStatus == '2' %}selected{% endif %}>Successful</option>
-                            <option value="3" {% if filters.dmsStatus == '3' %}selected{% endif %}>Failed</option>
-                            <option value="4" {% if filters.dmsStatus == '4' %}selected{% endif %}>In Progress</option>
-                            <option value="6" {% if filters.dmsStatus == '6' %}selected{% endif %}>Unassigned</option>
-                            <option value="7" {% if filters.dmsStatus == '7' %}selected{% endif %}>Accepted</option>
-                            <option value="8" {% if filters.dmsStatus == '8' %}selected{% endif %}>Declined</option>
-                            <option value="9" {% if filters.dmsStatus == '9' %}selected{% endif %}>Cancelled</option>
+                        <select class="form-select" name="dlStatus" id="dlStatus">
+                            <option value="">All Task Statuses</option>
+                            <option value="for_review" {% if filters.dlStatus == 'for_review' %}selected{% endif %}>For Review</option>
+                            <option value="pending" {% if filters.dlStatus == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="assigned" {% if filters.dlStatus == 'assigned' %}selected{% endif %}>Assigned</option>
+                            <option value="accepted" {% if filters.dlStatus == 'accepted' %}selected{% endif %}>Accepted</option>
+                            <option value="picked_up" {% if filters.dlStatus == 'picked_up' %}selected{% endif %}>Picked Up</option>
+                            <option value="start_ride" {% if filters.dlStatus == 'start_ride' %}selected{% endif %}>Start Ride</option>
+                            <option value="out_for_delivery" {% if filters.dlStatus == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
+                            <option value="in_transit" {% if filters.dlStatus == 'in_transit' %}selected{% endif %}>In Transit</option>
+                            <option value="contacted" {% if filters.dlStatus == 'contacted' %}selected{% endif %}>Contacted & Confirmed</option>
+                            <option value="non_reachable" {% if filters.dlStatus == 'non_reachable' %}selected{% endif %}>Non Reachable</option>
+                            <option value="delivered" {% if filters.dlStatus == 'delivered' %}selected{% endif %}>Delivered</option>
+                            <option value="failed" {% if filters.dlStatus == 'failed' %}selected{% endif %}>Failed</option>
+                            <option value="rejected" {% if filters.dlStatus == 'rejected' %}selected{% endif %}>Rejected</option>
+                            <option value="cancelled" {% if filters.dlStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
                         </select>
                     </div>
                 </div>
@@ -209,10 +215,27 @@
 
 <!-- Status Update Modal -->
 {% include "workforce/parts/components/_tasks_status_modal.html" %}
-{% endblock content %}
 
-{% block extra_js %}
+<!-- AI Results Modal -->
+<div class="aim__modal" id="aiResultsModal">
+    <div class="aim__modal-overlay" onclick="closeAIModal()"></div>
+    <div class="aim__modal-content">
+        <div class="aim__modal-header">
+            <h5><i class="fa-solid fa-robot"></i> <span id="aiModalTitle">AI Analysis</span></h5>
+            <button type="button" class="btn-close" onclick="closeAIModal()" aria-label="Close"></button>
+        </div>
+        <div class="aim__modal-body" id="aiModalBody"></div>
+        <div class="aim__modal-footer" id="aiModalFooter">
+            <button type="button" class="btn btn-secondary" onclick="closeAIModal()">Close</button>
+            <button type="button" class="btn btn-primary" id="aiApplyBtn" style="display: none;" onclick="applyAIResults()">
+                <i class="fa-solid fa-check me-1"></i> Apply Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts inside content block for HTMX compatibility -->
 <script src="{% static 'orders/js/orders_main.js' %}"></script>
-<script src="{% static 'workforce/js/workforce.js' %}"></script>
 {% include "workforce/parts/components/_tasks_view_scripts.html" %}
-{% endblock extra_js %}
+{% include "workforce/parts/components/_tasks_ai_scripts.html" %}
+{% endblock content %}

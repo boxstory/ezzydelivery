@@ -72,20 +72,30 @@ function toggleSelectAll(checkbox) {
     updateBulkSelection();
 }
 
-// Update bulk selection count and show/hide bulk actions bar
+// Update bulk selection count and show/hide bulk actions bar + AI toolbar
 function updateBulkSelection() {
     const taskCheckboxes = document.querySelectorAll('.task-checkbox');
     const selectedCheckboxes = document.querySelectorAll('.task-checkbox:checked');
     const bulkActionsBar = document.getElementById('bulkActionsBar');
     const selectedCount = document.getElementById('selectedCount');
     const selectAllCheckbox = document.getElementById('selectAllTasks');
+    const aiToolbar = document.getElementById('aiActionsToolbar');
+    const aiCount = document.getElementById('selectedTaskCountAI');
 
     if (selectedCount) {
         selectedCount.textContent = selectedCheckboxes.length;
     }
+    if (aiCount) {
+        aiCount.textContent = selectedCheckboxes.length;
+    }
+
+    const hasSelection = selectedCheckboxes.length > 0;
 
     if (bulkActionsBar) {
-        bulkActionsBar.style.display = selectedCheckboxes.length > 0 ? 'block' : 'none';
+        bulkActionsBar.style.display = hasSelection ? 'block' : 'none';
+    }
+    if (aiToolbar) {
+        aiToolbar.style.display = hasSelection ? 'flex' : 'none';
     }
 
     // Update select all checkbox state

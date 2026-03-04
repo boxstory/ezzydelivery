@@ -1,0 +1,406 @@
+{% comment %}
+AI Tools Scripts for Delivery Tasks
+Usage: {% include "workforce/parts/components/_tasks_ai_scripts.html" %}
+
+Requires:
+- aim__actions-toolbar in _tasks_table_view.html
+- aim__modal (#aiResultsModal) in the parent template
+- Task rows with data-task-id, data-order-number, data-customer-phone, data-customer-address
+{% endcomment %}
+
+<script>
+(function() {
+    'use strict';
+
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    function getCSRFToken() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) return meta.getAttribute('content');
+        var inp = document.querySelector('[name=csrfmiddlewaretoken]');
+        return inp ? inp.value : '';
+    }
+
+    function delay(ms) {
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
+    }
+
+    // Get selected tasks with their data attributes
+    function getSelectedTasks() {
+        var checkboxes = document.querySelectorAll('.task-checkbox:checked');
+        return Array.from(checkboxes).map(function(cb) {
+            var row = cb.closest('.dl-table__row');
+            return {
+                id: row.dataset.taskId,
+                orderNumber: row.dataset.orderNumber || row.dataset.clientOrderCode || '',
+                customerPhone: row.dataset.customerPhone || '',
+                customerAddress: row.dataset.customerAddress || ''
+            };
+        });
+    }
+
+    // ── AI Modal ─────────────────────────────────────────────────────
+
+    window.closeAIModal = function() {
+        var modal = document.getElementById('aiResultsModal');
+        if (modal) modal.classList.remove('show');
+        document.body.style.overflow = '';
+    };
+
+    window.applyAIResults = function() {
+        window.closeAIModal();
+    };
+
+    // ── AI Bulk Process State Manager ────────────────────────────────
+
+    var AITaskProcess = {
+        totalItems: 0,
+        processedItems: 0,
+        successCount: 0,
+        errorCount: 0,
+        results: [],
+        currentLabel: '',
+        startTime: null,
+
+        init: function(title, total) {
+            this.totalItems = total;
+            this.processedItems = 0;
+            this.successCount = 0;
+            this.errorCount = 0;
+            this.results = [];
+            this.startTime = new Date();
+
+            document.getElementById('aiModalTitle').textContent = title;
+            this.render();
+            document.getElementById('aiApplyBtn').style.display = 'none';
+            document.getElementById('aiResultsModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        },
+
+        updateProgress: function(label) {
+            this.currentLabel = label;
+            this.render();
+        },
+
+        addResult: function(label, success, html) {
+            this.processedItems++;
+            if (success) this.successCount++;
+            else this.errorCount++;
+            this.results.push({ label: label, success: success, html: html });
+            this.render();
+        },
+
+        getProgress: function() {
+            return Math.round((this.processedItems / this.totalItems) * 100);
+        },
+
+        render: function() {
+            var progress = this.getProgress();
+            var isProcessing = this.processedItems < this.totalItems;
+            var elapsed = Math.round((new Date() - this.startTime) / 1000);
+            var recent = this.results.slice(-5).reverse();
+
+            document.getElementById('aiModalBody').innerHTML =
+                '<div class="aim__process-container">' +
+                    '<div class="aim__process-header">' +
+                        '<div class="aim__process-icon ' + (progress === 100 ? 'success' : '') + '">' +
+                            '<i class="fa-solid ' + (progress === 100 ? 'fa-check' : 'fa-robot') + '"></i>' +
+                        '</div>' +
+                        '<div class="aim__process-title">' + (isProcessing ? 'Processing Tasks...' : 'Analysis Complete') + '</div>' +
+                        '<div class="aim__process-subtitle">' +
+                            (isProcessing ? 'Analyzing: ' + this.currentLabel : this.successCount + ' successful, ' + this.errorCount + ' failed') +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="aim__progress-container">' +
+                        '<div class="aim__progress-bar">' +
+                            '<div class="aim__progress-fill" style="width: ' + progress + '%"></div>' +
+                        '</div>' +
+                        '<div class="aim__progress-text">' +
+                            '<span>Task ' + this.processedItems + ' of ' + this.totalItems + '</span>' +
+                            '<span>' + progress + '% complete &bull; ' + elapsed + 's</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="aim__process-steps">' +
+                        recent.map(function(r) {
+                            return '<div class="aim__process-step ' + (r.success ? 'completed' : 'error') + '">' +
+                                '<div class="aim__step-indicator"><i class="fa-solid ' + (r.success ? 'fa-check' : 'fa-times') + '"></i></div>' +
+                                '<div class="aim__step-content">' +
+                                    '<div class="aim__step-title">' + r.label + '</div>' +
+                                    '<div class="aim__step-status">' +
+                                        (r.success ? '<i class="fa-solid fa-check text-success me-1"></i>Processed' : '<i class="fa-solid fa-times text-danger me-1"></i>Error') +
+                                    '</div>' +
+                                '</div>' +
+                            '</div>';
+                        }).join('') +
+                        (isProcessing ?
+                            '<div class="aim__process-step active">' +
+                                '<div class="aim__step-indicator"><i class="fa-solid fa-gear fa-spin"></i></div>' +
+                                '<div class="aim__step-content">' +
+                                    '<div class="aim__step-title">' + this.currentLabel + '</div>' +
+                                    '<div class="aim__step-status"><span class="aim__step-spinner"></span>Processing...</div>' +
+                                '</div>' +
+                            '</div>' : '') +
+                    '</div>' +
+                    (!isProcessing ?
+                        '<div class="aim__result-summary"><h6><i class="fa-solid fa-clipboard-check me-1"></i>Summary</h6>' +
+                        '<p>' + this.successCount + ' tasks analyzed successfully' + (this.errorCount > 0 ? ', ' + this.errorCount + ' errors' : '') + '</p></div>' : '') +
+                '</div>';
+        },
+
+        showResults: function(resultsHtml) {
+            var elapsed = Math.round((new Date() - this.startTime) / 1000);
+            var recent = this.results.slice(-5).reverse();
+
+            document.getElementById('aiModalBody').innerHTML =
+                '<div class="aim__process-container">' +
+                    '<div class="aim__process-header">' +
+                        '<div class="aim__process-icon success"><i class="fa-solid fa-check"></i></div>' +
+                        '<div class="aim__process-title">Analysis Complete</div>' +
+                        '<div class="aim__process-subtitle">' +
+                            this.successCount + ' successful, ' + this.errorCount + ' failed &bull; ' + elapsed + 's' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="aim__progress-container">' +
+                        '<div class="aim__progress-bar"><div class="aim__progress-fill" style="width: 100%"></div></div>' +
+                        '<div class="aim__progress-text"><span>Processed ' + this.totalItems + ' tasks</span><span>100% complete</span></div>' +
+                    '</div>' +
+                    '<div class="aim__process-steps">' +
+                        recent.map(function(r) {
+                            return '<div class="aim__process-step ' + (r.success ? 'completed' : 'error') + '">' +
+                                '<div class="aim__step-indicator"><i class="fa-solid ' + (r.success ? 'fa-check' : 'fa-times') + '"></i></div>' +
+                                '<div class="aim__step-content">' +
+                                    '<div class="aim__step-title">' + r.label + '</div>' +
+                                    '<div class="aim__step-status">' +
+                                        (r.success ? '<i class="fa-solid fa-check text-success me-1"></i>Processed' : '<i class="fa-solid fa-times text-danger me-1"></i>Error') +
+                                    '</div>' +
+                                '</div>' +
+                            '</div>';
+                        }).join('') +
+                    '</div>' +
+                    '<div class="aim__result-output mt-3"><h6 class="mb-3"><i class="fa-solid fa-list-check me-1"></i>Results</h6>' +
+                        resultsHtml +
+                    '</div>' +
+                '</div>';
+        }
+    };
+
+    // ── AI Tool Functions ────────────────────────────────────────────
+
+    // Parse Addresses
+    window.aiParseTaskAddresses = function() {
+        var tasks = getSelectedTasks();
+        if (tasks.length === 0) { alert('Please select at least one task'); return; }
+
+        if (typeof EzzyAIParse !== 'undefined' && EzzyAIParse.parseBulk) {
+            var orders = tasks.map(function(t) {
+                return { id: t.id, orderNumber: t.orderNumber, address: t.customerAddress || '' };
+            });
+            EzzyAIParse.parseBulk(orders);
+        } else {
+            alert('Address parsing module not available');
+        }
+    };
+
+    // Verify Tasks
+    window.aiVerifyTasks = async function() {
+        var tasks = getSelectedTasks();
+        if (tasks.length === 0) { alert('Please select at least one task'); return; }
+
+        AITaskProcess.init('Task Verification', tasks.length);
+        await delay(300);
+
+        var resultsHtml = '';
+        for (var i = 0; i < tasks.length; i++) {
+            var task = tasks[i];
+            AITaskProcess.updateProgress(task.orderNumber);
+            await delay(100);
+
+            try {
+                var response = await fetch('/api/ai-agent/tools/verify-order/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify({ order_number: task.orderNumber })
+                });
+                var data = await response.json();
+
+                if (data.success) {
+                    var result = data.data;
+                    var statusBadge = result.is_valid ?
+                        '<span class="badge bg-success">Valid</span>' :
+                        '<span class="badge bg-danger">Issues Found</span>';
+
+                    var issuesHtml = '';
+                    if (result.issues && result.issues.length > 0) {
+                        issuesHtml = '<ul class="aim__issues-list mt-3">';
+                        result.issues.forEach(function(issue) {
+                            issuesHtml += '<li><i class="fa-solid fa-circle-exclamation"></i>' +
+                                '<div class="aim__issue-content"><div class="issue-field">' + issue.field + '</div>' +
+                                '<div class="issue-msg">' + issue.issue + '</div>' +
+                                (issue.suggestion ? '<div class="issue-suggestion">' + issue.suggestion + '</div>' : '') +
+                                '</div></li>';
+                        });
+                        issuesHtml += '</ul>';
+                    }
+
+                    var cardHtml = '<div class="aim__result-card" data-task-id="' + task.id + '">' +
+                        '<div class="aim__result-card-header"><i class="fa-solid fa-clipboard-check"></i>' +
+                        '<strong>' + task.orderNumber + '</strong><span class="ms-auto">' + statusBadge + '</span></div>' +
+                        '<div class="aim__result-grid">' +
+                            '<div class="aim__result-item"><span class="label">Issues</span><span class="value ' + (result.summary.total_issues > 0 ? 'danger' : 'success') + '">' + result.summary.total_issues + '</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Warnings</span><span class="value ' + (result.summary.total_warnings > 0 ? 'warning' : 'success') + '">' + result.summary.total_warnings + '</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Customer</span><span class="value">' + (result.summary.customer_name || '-') + '</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Status</span><span class="value">' + result.summary.current_status + '</span></div>' +
+                        '</div>' + issuesHtml + '</div>';
+                    resultsHtml += cardHtml;
+                    AITaskProcess.addResult(task.orderNumber, true, cardHtml);
+                } else {
+                    var errHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
+                        '<i class="fa-solid fa-circle-exclamation text-danger"></i><strong>' + task.orderNumber + '</strong></div>' +
+                        '<div class="text-danger">' + (data.error || 'Failed to verify') + '</div></div>';
+                    resultsHtml += errHtml;
+                    AITaskProcess.addResult(task.orderNumber, false, errHtml);
+                }
+            } catch (error) {
+                var eHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
+                    '<i class="fa-solid fa-circle-exclamation text-danger"></i><strong>' + task.orderNumber + '</strong></div>' +
+                    '<div class="text-danger">Error: ' + error.message + '</div></div>';
+                resultsHtml += eHtml;
+                AITaskProcess.addResult(task.orderNumber, false, eHtml);
+            }
+        }
+        await delay(500);
+        AITaskProcess.showResults(resultsHtml);
+    };
+
+    // COD Risk Check
+    window.aiCheckTaskCODRisk = async function() {
+        var tasks = getSelectedTasks();
+        if (tasks.length === 0) { alert('Please select at least one task'); return; }
+
+        AITaskProcess.init('COD Risk Assessment', tasks.length);
+        await delay(300);
+
+        var resultsHtml = '';
+        for (var i = 0; i < tasks.length; i++) {
+            var task = tasks[i];
+            AITaskProcess.updateProgress(task.orderNumber);
+            await delay(100);
+
+            if (!task.customerPhone) {
+                var warnHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
+                    '<i class="fa-solid fa-shield-halved"></i><strong>' + task.orderNumber + '</strong></div>' +
+                    '<div class="text-warning">No phone number available for risk assessment</div></div>';
+                resultsHtml += warnHtml;
+                AITaskProcess.addResult(task.orderNumber, false, warnHtml);
+                continue;
+            }
+
+            try {
+                var response = await fetch('/api/ai-agent/tools/cod-risk/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify({ phone_number: task.customerPhone })
+                });
+                var data = await response.json();
+
+                if (data.success) {
+                    var result = data.data;
+                    var riskLevel = result.risk_level.toLowerCase().replace('_', '-');
+                    var riskLabels = { 'low-risk': 'Low Risk', 'moderate-risk': 'Moderate', 'elevated-risk': 'Elevated', 'high-risk': 'High Risk' };
+                    var riskClass = riskLevel.includes('low') ? 'low' :
+                                   riskLevel.includes('moderate') || riskLevel.includes('normal') ? 'normal' :
+                                   riskLevel.includes('elevated') ? 'elevated' : 'high';
+
+                    var cardHtml = '<div class="aim__result-card">' +
+                        '<div class="aim__result-card-header"><i class="fa-solid fa-shield-halved"></i>' +
+                        '<strong>' + task.orderNumber + '</strong>' +
+                        '<span class="ms-auto aim__risk-badge ' + riskClass + '"><i class="fa-solid fa-circle"></i>' +
+                        (riskLabels[riskLevel] || result.risk_level) + '</span></div>' +
+                        '<div class="aim__result-grid">' +
+                            '<div class="aim__result-item"><span class="label">Risk Score</span><span class="value">' + (result.risk_score * 100).toFixed(0) + '%</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Total Orders</span><span class="value">' + result.order_history.total_orders + '</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Delivered</span><span class="value success">' + result.order_history.delivered_orders + '</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Refused COD</span><span class="value ' + (result.order_history.cod_refused_orders > 0 ? 'danger' : '') + '">' + result.order_history.cod_refused_orders + '</span></div>' +
+                        '</div>' +
+                        '<div class="mt-3 p-2 rounded" style="background: var(--brand-grey-100);"><small><strong>Recommendation:</strong> ' + result.recommendation + '</small></div>' +
+                        (result.risk_factors && result.risk_factors.length > 0 ? '<div class="mt-2"><small class="text-muted">Factors: ' + result.risk_factors.join(', ') + '</small></div>' : '') +
+                        '</div>';
+                    resultsHtml += cardHtml;
+                    AITaskProcess.addResult(task.orderNumber, true, cardHtml);
+                } else {
+                    var errHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
+                        '<i class="fa-solid fa-circle-exclamation text-danger"></i><strong>' + task.orderNumber + '</strong></div>' +
+                        '<div class="text-danger">' + (data.error || 'Failed to assess COD risk') + '</div></div>';
+                    resultsHtml += errHtml;
+                    AITaskProcess.addResult(task.orderNumber, false, errHtml);
+                }
+            } catch (error) {
+                var eHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
+                    '<i class="fa-solid fa-circle-exclamation text-danger"></i><strong>' + task.orderNumber + '</strong></div>' +
+                    '<div class="text-danger">Error: ' + error.message + '</div></div>';
+                resultsHtml += eHtml;
+                AITaskProcess.addResult(task.orderNumber, false, eHtml);
+            }
+        }
+        await delay(500);
+        AITaskProcess.showResults(resultsHtml);
+    };
+
+    // Estimate Delivery Time
+    window.aiEstimateTaskDelivery = async function() {
+        var tasks = getSelectedTasks();
+        if (tasks.length === 0) { alert('Please select at least one task'); return; }
+
+        AITaskProcess.init('Delivery Time Estimates', tasks.length);
+        await delay(300);
+
+        var resultsHtml = '';
+        for (var i = 0; i < tasks.length; i++) {
+            var task = tasks[i];
+            AITaskProcess.updateProgress(task.orderNumber);
+            await delay(100);
+
+            try {
+                var response = await fetch('/api/ai-agent/tools/estimate-delivery/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify({ order_number: task.orderNumber })
+                });
+                var data = await response.json();
+
+                if (data.success) {
+                    var result = data.data;
+                    var cardHtml = '<div class="aim__result-card">' +
+                        '<div class="aim__result-card-header"><i class="fa-solid fa-clock"></i>' +
+                        '<strong>' + task.orderNumber + '</strong></div>' +
+                        '<div class="aim__result-grid">' +
+                            '<div class="aim__result-item"><span class="label">Est. Time</span><span class="value success">' + result.estimate.min_minutes + '-' + result.estimate.max_minutes + ' min</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Expected</span><span class="value">' + result.arrival_window.expected + '</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Pickup Zone</span><span class="value">' + (result.pickup_zone ? result.pickup_zone.number : '-') + '</span></div>' +
+                            '<div class="aim__result-item"><span class="label">Delivery Zone</span><span class="value">' + (result.delivery_zone ? result.delivery_zone.number : '-') + '</span></div>' +
+                        '</div>' +
+                        '<div class="mt-2"><small class="text-muted">Arrival: ' + result.arrival_window.earliest + ' - ' + result.arrival_window.latest + '</small></div>' +
+                        '</div>';
+                    resultsHtml += cardHtml;
+                    AITaskProcess.addResult(task.orderNumber, true, cardHtml);
+                } else {
+                    var errHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
+                        '<i class="fa-solid fa-circle-exclamation text-danger"></i><strong>' + task.orderNumber + '</strong></div>' +
+                        '<div class="text-danger">' + (data.error || 'Failed to estimate delivery') + '</div></div>';
+                    resultsHtml += errHtml;
+                    AITaskProcess.addResult(task.orderNumber, false, errHtml);
+                }
+            } catch (error) {
+                var eHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
+                    '<i class="fa-solid fa-circle-exclamation text-danger"></i><strong>' + task.orderNumber + '</strong></div>' +
+                    '<div class="text-danger">Error: ' + error.message + '</div></div>';
+                resultsHtml += eHtml;
+                AITaskProcess.addResult(task.orderNumber, false, eHtml);
+            }
+        }
+        await delay(500);
+        AITaskProcess.showResults(resultsHtml);
+    };
+
+})();
+</script>
