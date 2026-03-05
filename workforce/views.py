@@ -1039,15 +1039,22 @@ def add_order(request):
                 }
             }
 
-            # Parse scheduled time if provided
+            # Parse scheduled date and time if provided
             scheduled_delivery = request.POST.get('scheduled_delivery') == 'on'
+            scheduled_date = None
             scheduled_time = None
-            if scheduled_delivery and request.POST.get('scheduled_time'):
+            if scheduled_delivery:
                 from datetime import datetime
-                try:
-                    scheduled_time = datetime.strptime(request.POST.get('scheduled_time'), '%H:%M').time()
-                except ValueError:
-                    scheduled_time = None
+                if request.POST.get('scheduled_date'):
+                    try:
+                        scheduled_date = datetime.strptime(request.POST.get('scheduled_date'), '%Y-%m-%d').date()
+                    except ValueError:
+                        scheduled_date = None
+                if request.POST.get('scheduled_time'):
+                    try:
+                        scheduled_time = datetime.strptime(request.POST.get('scheduled_time'), '%H:%M').time()
+                    except ValueError:
+                        scheduled_time = None
 
             # Create order
             order = orders_models.Order(
@@ -1060,10 +1067,14 @@ def add_order(request):
                 dl_zone=safe_int(request.POST.get('dl_zone')),
                 dl_street=safe_int(request.POST.get('dl_street')),
                 dl_building=safe_int(request.POST.get('dl_building')),
+                latitude=request.POST.get('latitude') or None,
+                longitude=request.POST.get('longitude') or None,
+                coords_accuracy=request.POST.get('coords_accuracy') or None,
                 cod_amount=safe_int(request.POST.get('cod_amount')),
                 dl_amount=safe_int(request.POST.get('dl_amount')),
                 order_type=request.POST.get('order_type', 'normal_delivery'),
                 scheduled_delivery=scheduled_delivery,
+                scheduled_date=scheduled_date,
                 scheduled_time=scheduled_time,
                 order_notes=combined_notes[:100] if combined_notes else '',
                 deadline_date=request.POST.get('deadline_date', '').strip(),
@@ -4951,22 +4962,57 @@ def store_documents_list(request):
 @staff_required
 def store_document_detail(request, business_id):
     """View for viewing and updating store documents for a specific business"""
-    business = get_object_or_404(business_models.Business, business_id=business_id)
+    from django.db.models import Count, Sum, Q
+
+    business = get_object_or_404(
+        business_models.Business.objects.select_related('user', 'profile'),
+        business_id=business_id
+    )
 
     try:
         business_profile = business.business_profile
     except business_models.Business.business_profile.RelatedObjectDoesNotExist:
         business_profile = None
 
+    # Get user profile
+    try:
+        user_profile = business.user.profile if business.user else None
+    except Exception:
+        user_profile = None
+
+    # Pickup locations
+    pickup_locations = business.pickup_location.all()
+
+    # Order stats
+    order_stats = orders_models.Order.objects.filter(business=business).aggregate(
+        total_orders=Count('id'),
+        delivered_orders=Count('id', filter=Q(order_status='delivered')),
+    )
+
+    # Registration completion
+    required_fields = ['business_name', 'business_phone', 'business_whatsapp',
+                       'business_email', 'business_product_category', 'business_qid']
+    filled = sum(1 for f in required_fields if getattr(business, f, None))
+    completion_pct = round(filled / len(required_fields) * 100)
+
     if request.method == 'POST':
-        # Handle business document update
+        # Handle business document update via HTMX or fetch
         try:
             business.business_name = request.POST.get('business_name', business.business_name)
             business.business_phone = request.POST.get('business_phone', business.business_phone)
+            business.business_whatsapp = request.POST.get('business_whatsapp', business.business_whatsapp)
             business.business_email = request.POST.get('business_email', business.business_email)
             business.business_qid = request.POST.get('business_qid', business.business_qid)
+            business.business_product_category = request.POST.get('business_product_category', business.business_product_category)
             business.business_status = request.POST.get('business_status', business.business_status)
             business.save()
+
+            # Update business profile if exists
+            if business_profile:
+                business_profile.business_city = request.POST.get('business_city', business_profile.business_city) or None
+                business_profile.business_country = request.POST.get('business_country', business_profile.business_country) or 'Qatar'
+                business_profile.business_founters_name = request.POST.get('business_founters_name', business_profile.business_founters_name) or None
+                business_profile.save()
 
             return JsonResponse({
                 'success': True,
@@ -4980,9 +5026,14 @@ def store_document_detail(request, business_id):
             }, status=400)
 
     context = {
-        'page_title': 'Store Document Detail',
+        'page_title': f'Store: {business.business_name}',
         'business': business,
         'business_profile': business_profile,
+        'user_profile': user_profile,
+        'pickup_locations': pickup_locations,
+        'order_stats': order_stats,
+        'completion_pct': completion_pct,
+        'required_fields': required_fields,
     }
 
     return render(request, 'workforce/store_document_detail.html', context)
@@ -5635,6 +5686,25 @@ def seller_detail(request, business_id):
             'document_expiry_date': None,
         })
 
+    # Calculate business registration completion percentage
+    required_fields = ['business_name', 'business_phone', 'business_whatsapp',
+                       'business_email', 'business_product_category', 'business_qid']
+    filled = sum(1 for f in required_fields if getattr(business, f, None))
+    completion_percentage = round(filled / len(required_fields) * 100)
+
+    # Get user profile
+    try:
+        user_profile = business.user.profile if business.user else None
+    except Exception:
+        user_profile = None
+
+    # User profile completion
+    user_required_fields = ['first_name', 'last_name', 'email', 'phone']
+    user_filled = 0
+    if user_profile:
+        user_filled = sum(1 for f in user_required_fields if getattr(user_profile, f, None))
+    user_completion = round(user_filled / len(user_required_fields) * 100) if user_required_fields else 0
+
     context = {
         'page_title': f'Seller: {business.business_name}',
         'business': business,
@@ -5652,6 +5722,9 @@ def seller_detail(request, business_id):
         'avg_orders_per_month': avg_orders_per_month,
         'documents': documents,
         'now': timezone.now(),
+        'completion_percentage': completion_percentage,
+        'user_profile': user_profile,
+        'user_completion': user_completion,
     }
 
     return render(request, 'workforce/seller_detail.html', context)

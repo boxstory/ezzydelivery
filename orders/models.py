@@ -109,6 +109,7 @@ class Order(models.Model):
         max_length=20, choices=ORDER_TYPE_CHOICES, default='normal_delivery',
         help_text="Order type: normal delivery or pick and drop")
     scheduled_delivery = models.BooleanField(default=False, help_text="Whether delivery is scheduled for a specific time")
+    scheduled_date = models.DateField(blank=True, null=True, help_text="Scheduled delivery date if scheduled_delivery is True")
     scheduled_time = models.TimeField(blank=True, null=True, help_text="Scheduled delivery time if scheduled_delivery is True")
 
     # Verification tracking

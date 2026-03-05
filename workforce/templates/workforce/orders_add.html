@@ -93,28 +93,69 @@
                         <h6 class="woa__form-section-title">
                             <i class="fa-solid fa-location-dot me-2 woa__icon-accent"></i>Delivery Address
                         </h6>
-                        <div class="row mb-4">
-                            <div class="col-md-8 mb-3">
+                        <div class="row mb-3">
+                            <div class="col-12 mb-3">
                                 <label class="woa__form-label" for="customer_address">Full Address <span class="text-danger">*</span></label>
-                                <textarea class="woa__form-input" id="customer_address" name="customer_address" rows="2" required></textarea>
+                                <div class="d-flex gap-2">
+                                    <textarea class="woa__form-input flex-grow-1" id="customer_address" name="customer_address" rows="2" required placeholder="Full address or area name"></textarea>
+                                    <button type="button" class="btn btn-sm btn-outline-info" id="wfAddOrderAiParseBtn" style="height:38px; white-space:nowrap; align-self:flex-start;"
+                                            onclick="aiParseAddress('customer_address', 'dl_zone', 'dl_street', 'dl_building', 'wfAddOrderAiParseBtn', 'wfAddOrderAiParseResult', {qnasOpts: {zoneId:'dl_zone', streetId:'dl_street', buildingId:'dl_building', latId:'wf_latitude', lngId:'wf_longitude', zoneNameId:'wf_zone_name_display', resultId:'wfAddOrderQnasResult', btnId:'wfAddOrderQnasBtn', mapId:'wfAddOrderMapLink', accuracyId:'wf_coords_accuracy', accuracyBadgeId:'wfAddOrderAccuracyBadge'}})">
+                                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Parse
+                                    </button>
+                                </div>
+                                <div id="wfAddOrderAiParseResult" class="mt-1"></div>
                             </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-4 col-md-3 mb-3">
+                                <label class="woa__form-label" for="dl_zone"><i class="fa-solid fa-map me-1"></i>Zone</label>
+                                <input type="number" class="woa__form-input" id="dl_zone" name="dl_zone" min="0" placeholder="e.g., 45">
+                            </div>
+                            <div class="col-4 col-md-3 mb-3">
+                                <label class="woa__form-label" for="dl_street"><i class="fa-solid fa-road me-1"></i>Street</label>
+                                <input type="number" class="woa__form-input" id="dl_street" name="dl_street" min="0" placeholder="e.g., 123">
+                            </div>
+                            <div class="col-4 col-md-3 mb-3">
+                                <label class="woa__form-label" for="dl_building"><i class="fa-solid fa-building me-1"></i>Building</label>
+                                <input type="number" class="woa__form-input" id="dl_building" name="dl_building" min="0" placeholder="e.g., 56">
+                            </div>
+                            <div class="col-auto d-flex align-items-end mb-3">
+                                <button type="button" class="btn btn-sm btn-outline-warning" id="wfAddOrderQnasBtn" style="height:38px; white-space:nowrap;"
+                                        onclick="qnasValidateAndFill({zoneId:'dl_zone', streetId:'dl_street', buildingId:'dl_building', latId:'wf_latitude', lngId:'wf_longitude', zoneNameId:'wf_zone_name_display', resultId:'wfAddOrderQnasResult', btnId:'wfAddOrderQnasBtn', mapId:'wfAddOrderMapLink', accuracyId:'wf_coords_accuracy', accuracyBadgeId:'wfAddOrderAccuracyBadge'})">
+                                    <i class="fa-solid fa-satellite-dish me-1"></i>Validate
+                                </button>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-4 col-md-3 mb-3">
+                                <label class="woa__form-label" for="wf_latitude">Latitude</label>
+                                <input type="text" class="woa__form-input" id="wf_latitude" name="latitude" placeholder="--" readonly>
+                            </div>
+                            <div class="col-4 col-md-3 mb-3">
+                                <label class="woa__form-label" for="wf_longitude">Longitude</label>
+                                <input type="text" class="woa__form-input" id="wf_longitude" name="longitude" placeholder="--" readonly>
+                            </div>
+                            <div class="col-4 col-md-3 mb-3">
+                                <label class="woa__form-label" for="wf_zone_name_display">Zone Name</label>
+                                <input type="text" class="woa__form-input" id="wf_zone_name_display" placeholder="Auto-filled" readonly>
+                            </div>
+                            <div class="col-auto d-flex align-items-end gap-2 mb-3">
+                                <a id="wfAddOrderMapLink" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled" style="height:38px; line-height:28px;" title="View on Google Maps">
+                                    <i class="fa-solid fa-map-location-dot"></i>
+                                </a>
+                                <input type="hidden" id="wf_coords_accuracy" name="coords_accuracy" value="">
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mb-3">
+                            <span id="wfAddOrderAccuracyBadge"></span>
+                            <div id="wfAddOrderQnasResult"></div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label class="woa__form-label" for="dl_landmark">City / Landmark</label>
                                 <input type="text" class="woa__form-input" id="dl_landmark" name="dl_landmark" placeholder="e.g., Al Wakrah, near Mall">
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="woa__form-label" for="dl_zone">Zone Number</label>
-                                <input type="number" class="woa__form-input" id="dl_zone" name="dl_zone" min="0" placeholder="e.g., 45">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="woa__form-label" for="dl_street">Street Number</label>
-                                <input type="number" class="woa__form-input" id="dl_street" name="dl_street" min="0" placeholder="e.g., 123">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="woa__form-label" for="dl_building">Building Number</label>
-                                <input type="number" class="woa__form-input" id="dl_building" name="dl_building" min="0" placeholder="e.g., 56">
-                            </div>
-                            <div class="col-12 mb-3">
+                            <div class="col-md-8 mb-3">
                                 <label class="woa__form-label" for="location_link">Google Maps Link</label>
                                 <input type="url" class="woa__form-input" id="location_link" name="location_link" placeholder="https://maps.google.com/...">
                             </div>
@@ -217,6 +258,10 @@
                                     <label class="form-check-label" for="scheduled_delivery">Scheduled Delivery</label>
                                 </div>
                             </div>
+                            <div class="col-md-4 mb-3 woa__scheduled-time" id="scheduled_date_container">
+                                <label class="woa__form-label" for="scheduled_date">Scheduled Date</label>
+                                <input type="date" class="woa__form-input" id="scheduled_date" name="scheduled_date">
+                            </div>
                             <div class="col-md-4 mb-3 woa__scheduled-time" id="scheduled_time_container">
                                 <label class="woa__form-label" for="scheduled_time">Scheduled Time</label>
                                 <input type="time" class="woa__form-input" id="scheduled_time" name="scheduled_time">
@@ -273,14 +318,21 @@
 <script>
 function toggleScheduledTime() {
     var checkbox = document.getElementById('scheduled_delivery');
+    var dateContainer = document.getElementById('scheduled_date_container');
+    var dateInput = document.getElementById('scheduled_date');
     var timeContainer = document.getElementById('scheduled_time_container');
     var timeInput = document.getElementById('scheduled_time');
 
     if (checkbox.checked) {
+        dateContainer.classList.add('woa__scheduled-time--visible');
         timeContainer.classList.add('woa__scheduled-time--visible');
+        dateInput.required = true;
         timeInput.required = true;
     } else {
+        dateContainer.classList.remove('woa__scheduled-time--visible');
         timeContainer.classList.remove('woa__scheduled-time--visible');
+        dateInput.required = false;
+        dateInput.value = '';
         timeInput.required = false;
         timeInput.value = '';
     }
