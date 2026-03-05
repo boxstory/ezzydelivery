@@ -236,6 +236,8 @@ class TaskCompletionSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     cod_collected = serializers.BooleanField(required=False, default=False)
     cod_amount_collected = serializers.IntegerField(required=False, allow_null=True)
+    completion_latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
+    completion_longitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
 
 
 # Shopify Order Import Serializer

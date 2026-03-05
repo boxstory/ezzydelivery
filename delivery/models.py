@@ -291,6 +291,14 @@ class DeliveryTask(models.Model):
         null=True, blank=True,
         help_text="When the delivery was completed"
     )
+    completion_latitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        help_text="Driver GPS latitude when task was completed"
+    )
+    completion_longitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        help_text="Driver GPS longitude when task was completed"
+    )
     earnings_processed = models.BooleanField(
         default=False,
         help_text="Whether earnings have been added to driver's wallet"

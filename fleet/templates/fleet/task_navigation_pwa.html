@@ -499,6 +499,31 @@
         map.fitBounds([[pickupLat, pickupLng], [dropoffLat, dropoffLng]], {padding:[50,50]});
     }
 
+    // ---- Driver blue dot (live GPS) ----
+    var driverMarker = null;
+    var driverAccCircle = null;
+    var blueDotHtml = '<div style="width:16px;height:16px;border-radius:50%;background:#4285F4;border:3px solid #fff;box-shadow:0 0 8px rgba(66,133,244,.6);"></div>';
+    var blueDotIcon = L.divIcon({ className: '', html: blueDotHtml, iconSize:[16,16], iconAnchor:[8,8] });
+
+    document.addEventListener('ezzy:gps', function(e) {
+        var d = e.detail;
+        if (!d || !d.lat || !d.lng) return;
+        var latlng = [d.lat, d.lng];
+        if (!driverMarker) {
+            driverMarker = L.marker(latlng, { icon: blueDotIcon, zIndexOffset: 1000 }).addTo(map);
+            driverAccCircle = L.circle(latlng, { radius: d.accuracy || 30, color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.1, weight: 1 }).addTo(map);
+        } else {
+            driverMarker.setLatLng(latlng);
+            driverAccCircle.setLatLng(latlng);
+            if (d.accuracy) driverAccCircle.setRadius(d.accuracy);
+        }
+    });
+
+    // Start GPS tracking for this task
+    if (typeof EzzyGPS !== 'undefined') {
+        EzzyGPS.start({{ task.id }});
+    }
+
     // Google Maps navigate
     document.getElementById('btn-open-maps').addEventListener('click', function() {
         var url = hasDropoff
@@ -581,17 +606,29 @@ function confirmComplete(taskId, status) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating...';
 
+    // Build body with GPS proof-of-delivery coordinates
+    var body = { status: status };
+    if (typeof EzzyGPS !== 'undefined') {
+        var gps = EzzyGPS.getPosition();
+        if (gps) {
+            body.completion_latitude = gps.lat;
+            body.completion_longitude = gps.lng;
+        }
+    }
+
     fetch('/api/driver/tasks/' + taskId + '/complete/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCsrf()
         },
-        body: JSON.stringify({ status: status })
+        body: JSON.stringify(body)
     })
     .then(r => r.json())
     .then(data => {
         if (data.success !== false) {
+            // Stop GPS tracking after completion
+            if (typeof EzzyGPS !== 'undefined') EzzyGPS.stop();
             haptic([10, 50, 10]);
             showToast(status === 'delivered' ? 'Delivery completed!' : 'Delivery marked failed', status === 'delivered' ? 'success' : 'warning');
             closeStatusSheet();

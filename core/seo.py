@@ -28,7 +28,7 @@ class SEOMetadata:
 
     # Contact information for local SEO
     BUSINESS_NAME = "EzzyDelivery"
-    BUSINESS_PHONE = "+974-XXXX-XXXX"
+    BUSINESS_PHONE = "+974-6660-9347"
     BUSINESS_EMAIL = "info@ezzydelivery.qa"
     BUSINESS_ADDRESS = "Doha, Qatar"
 
@@ -439,7 +439,7 @@ class SEOLandingPages:
     def get_ecommerce_delivery_qatar_meta():
         """Target: 'ecommerce delivery qatar'"""
         return SEOMetadata.get_page_meta(
-            title="E-commerce Delivery Qatar | Online Store Shipping",  # 50 chars
+            title="E-commerce Delivery Qatar | Online Store Shipping & COD",  # 56 chars
             description=(
                 "Complete e-commerce shipping solutions in Qatar. Shopify & WooCommerce integration, "
                 "automated orders, COD & same-day delivery. Join 500+ online stores."
@@ -450,7 +450,7 @@ class SEOLandingPages:
     def get_instagram_sellers_delivery_meta():
         """Target: Instagram sellers and social commerce"""
         return SEOMetadata.get_page_meta(
-            title="Instagram Seller Delivery Qatar | Social Commerce",  # 50 chars
+            title="Instagram Seller Delivery Qatar | Social Commerce Doha",  # 55 chars
             description=(
                 "Perfect delivery partner for Instagram sellers in Qatar. No minimum orders, easy COD, "
                 "WhatsApp integration. Affordable rates for small business owners."
@@ -483,7 +483,7 @@ class SEOLandingPages:
     def get_3pl_qatar_meta():
         """Target: '3pl qatar'"""
         return SEOMetadata.get_page_meta(
-            title="3PL Services Qatar | Third-Party Logistics Doha",  # 48 chars
+            title="3PL Services Qatar | Third-Party Logistics & Fulfillment",  # 57 chars
             description=(
                 "Complete 3PL solutions in Qatar. Warehousing, inventory management, order fulfillment "
                 "& distribution. Trusted third-party logistics for e-commerce."
@@ -564,7 +564,7 @@ class SEOLandingPages:
     def get_shopify_delivery_qatar_meta():
         """Target: 'shopify delivery qatar', 'shopify fulfillment qatar'"""
         return SEOMetadata.get_page_meta(
-            title="Shopify Delivery Qatar | E-commerce Fulfillment",  # 48 chars
+            title="Shopify Delivery Qatar | E-commerce Fulfillment Doha",  # 53 chars
             description=(
                 "Seamless Shopify integration for Qatar stores. Auto-sync orders, print labels, track "
                 "deliveries. COD support, same-day shipping. Connect in 5 minutes."
@@ -578,8 +578,8 @@ class SEOLandingPages:
             title="توصيل قطر | خدمة توصيل سريعة في الدوحة",  # Arabic: Delivery Qatar | Fast Delivery Service in Doha
             description=(
                 "أفضل خدمة توصيل في قطر. توصيل سريع في نفس اليوم في الدوحة، الوكرة ولوسيل. "
-                "خدمة الدفع عند الاستلام متوفرة. تتبع الطلبات مباشرة."
-            ),  # Arabic description
+                "خدمة الدفع عند الاستلام متوفرة. تتبع الطلبات مباشرة. أسعار تنافسية للشركات والأفراد."
+            ),  # Arabic description ~155 chars
         )
 
     @staticmethod
@@ -589,15 +589,15 @@ class SEOLandingPages:
             title="شركة توصيل الدوحة | كوريير قطر الموثوق",  # Arabic: Delivery Company Doha | Trusted Qatar Courier
             description=(
                 "شركة توصيل موثوقة في الدوحة وجميع أنحاء قطر. توصيل طرود، مستندات وتجارة إلكترونية. "
-                "أسعار منافسة وخدمة عملاء ممتازة."
-            ),  # Arabic description
+                "أسعار منافسة وخدمة عملاء ممتازة. توصيل في نفس اليوم مع تتبع مباشر."
+            ),  # Arabic description ~155 chars
         )
 
     @staticmethod
     def get_food_delivery_partner_qatar_meta():
         """Target: 'food delivery partner qatar', 'restaurant delivery service qatar'"""
         return SEOMetadata.get_page_meta(
-            title="Food Delivery Partner Qatar | Restaurant Courier",  # 49 chars
+            title="Food Delivery Partner Qatar | Restaurant Courier Doha",  # 54 chars
             description=(
                 "Reliable food delivery partner for Qatar restaurants. Temperature-controlled delivery, "
                 "fast dispatch, branded experience. Join 100+ restaurants using us."

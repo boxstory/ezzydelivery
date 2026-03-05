@@ -26,6 +26,7 @@ def delivery_task_pre_save(sender, instance, **kwargs):
         try:
             old = DeliveryTask.objects.get(pk=instance.pk)
             instance._old_dl_task_status = old.dl_task_status
+            instance._old_dl_task_publish = old.dl_task_publish
 
             if instance.dl_task_status != old.dl_task_status:
 
@@ -165,6 +166,60 @@ def _send_customer_notification(task, old_status, new_status):
         logger.warning(f"Customer notification failed for task {task.pk} event={event}: {e}")
 
 
+def _send_location_verification_on_publish(task):
+    """
+    Send WhatsApp location verification link when a delivery task is published.
+    Gets or creates the AddressVerification record, generates a token if needed,
+    and sends via WhatsApp.
+    """
+    try:
+        order = task.order
+        if not order or not order.customer_address:
+            return
+
+        from django.conf import settings as django_settings
+        n8n_url = getattr(django_settings, 'N8N_WHATSAPP_WEBHOOK_URL', None)
+        if not n8n_url:
+            return
+
+        from core.whatsapp_utils import send_location_verification_whatsapp, validate_input_phone
+
+        # Get or create AddressVerification record
+        address_verification, addr_created = orders_models.AddressVerification.objects.get_or_create(
+            order=order,
+            defaults={
+                'original_address': order.customer_address,
+                'verification_result': 'pending',
+            }
+        )
+
+        # Generate token if missing
+        token = address_verification.verification_token
+        if not token:
+            token = address_verification.generate_token()
+            address_verification.save()
+
+        # Validate phone
+        is_valid, sanitized_phone, error_msg = validate_input_phone(order.customer_phone)
+        if not is_valid:
+            logger.warning(f"Invalid phone for order {order.order_number} on publish: {error_msg}")
+            return
+
+        result = send_location_verification_whatsapp(
+            order=order,
+            verification_token=token,
+            phone_number=sanitized_phone,
+        )
+
+        if result['success']:
+            logger.info(f"Location verification link sent on publish for order {order.order_number}")
+        else:
+            logger.warning(f"Failed to send location verification on publish: {result.get('error', 'Unknown error')}")
+
+    except Exception as e:
+        logger.error(f"Error sending location verification on publish for task {task.pk}: {e}", exc_info=True)
+
+
 @receiver(post_save, sender=DeliveryTask)
 def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs):
     """Handle delivery task creation/update side effects"""
@@ -239,6 +294,12 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         # --- Customer WhatsApp notifications ---
         if old_status is not None and old_status != new_status:
             _send_customer_notification(instance, old_status, new_status)
+
+    # Send WhatsApp location verification when task is published
+    if not created:
+        old_publish = getattr(instance, '_old_dl_task_publish', None)
+        if old_publish is False and instance.dl_task_publish is True:
+            _send_location_verification_on_publish(instance)
 
     # Sync delivery task status → driver availability
     if instance.driver_id:

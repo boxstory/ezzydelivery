@@ -9,8 +9,18 @@ from blog.models import BlogPost, BlogCategory
 
 class StaticViewSitemap(Sitemap):
     """Sitemap for static pages"""
-    priority = 0.8
     changefreq = 'weekly'
+
+    # Per-page priority overrides (default is 0.8)
+    _priority_map = {
+        'webpages:affiliate_marketing': 0.7,
+        'webpages:delivery_request': 0.7,
+        'webpages:client_faq': 0.6,
+        'webpages:driver_faq': 0.6,
+        'webpages:help_guides': 0.6,
+        'webpages:client_guide': 0.6,
+        'webpages:driver_guide': 0.6,
+    }
 
     def items(self):
         # List of URL names for static pages
@@ -27,8 +37,17 @@ class StaticViewSitemap(Sitemap):
             'webpages:privacy',
             'webpages:terms',
             'webpages:help_center',
+            'webpages:affiliate_marketing',
+            'webpages:delivery_request',
             'webpages:client_faq',
+            'webpages:driver_faq',
+            'webpages:help_guides',
+            'webpages:client_guide',
+            'webpages:driver_guide',
         ]
+
+    def priority(self, item):
+        return self._priority_map.get(item, 0.8)
 
     def location(self, item):
         return reverse(item)

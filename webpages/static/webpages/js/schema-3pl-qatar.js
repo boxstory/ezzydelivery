@@ -78,4 +78,18 @@
     faqScript.type = 'application/ld+json';
     faqScript.textContent = JSON.stringify(faqSchema);
     document.head.appendChild(faqScript);
+
+    // BreadcrumbList
+    const breadcrumb = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://ezzydelivery.qa/"},
+            {"@type": "ListItem", "position": 2, "name": "3PL Services Qatar", "item": "https://ezzydelivery.qa/3pl-qatar/"}
+        ]
+    };
+    const bcScript = document.createElement('script');
+    bcScript.type = 'application/ld+json';
+    bcScript.textContent = JSON.stringify(breadcrumb);
+    document.head.appendChild(bcScript);
 })();

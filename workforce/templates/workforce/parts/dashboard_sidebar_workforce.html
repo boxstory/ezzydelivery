@@ -930,6 +930,79 @@
         </div>
       </li>
 
+      <!-- Verifications Section -->
+      <li id="workforce_sidebar_menu_verifications" class="nav-item">
+        <a id="workforce_sidebar_link_verifications" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-verifications" href="#">
+          <i class="fa-solid fa-clipboard-check me-2"></i>
+          <span>Verifications</span>
+          <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
+        </a>
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'user_verification_list,team_verification_list,sellers_pending,drivers_pending' %}show{% endif %}" id="submenu-verifications">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_verify_all" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'user_verification_list' %}active{% endif %}"
+                 href="{% url 'workforce:user_verification_list' %}"
+                 hx-get="{% url 'workforce:user_verification_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-list me-2"></i>
+                All
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_verify_business" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'sellers_pending' %}active{% endif %}"
+                 href="{% url 'workforce:sellers_pending' %}"
+                 hx-get="{% url 'workforce:sellers_pending' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-store me-2"></i>
+                Business
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_verify_driver" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_pending' %}active{% endif %}"
+                 href="{% url 'workforce:drivers_pending' %}"
+                 hx-get="{% url 'workforce:drivers_pending' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-motorcycle me-2"></i>
+                Driver
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_verify_team" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'team_verification_list' %}active{% endif %}"
+                 href="{% url 'workforce:team_verification_list' %}"
+                 hx-get="{% url 'workforce:team_verification_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-users me-2"></i>
+                Team
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_verify_user" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'user_verification_list' %}active{% endif %}"
+                 href="{% url 'workforce:user_verification_list' %}"
+                 hx-get="{% url 'workforce:user_verification_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-user me-2"></i>
+                User
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
       <hr class="wf-sidebar__divider" />
 
       <!-- Reports Section -->

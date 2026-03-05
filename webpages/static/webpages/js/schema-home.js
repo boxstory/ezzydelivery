@@ -47,4 +47,17 @@
     script.type = 'application/ld+json';
     script.textContent = JSON.stringify(schema);
     document.head.appendChild(script);
+
+    // BreadcrumbList
+    const breadcrumb = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://ezzydelivery.qa/"}
+        ]
+    };
+    const bcScript = document.createElement('script');
+    bcScript.type = 'application/ld+json';
+    bcScript.textContent = JSON.stringify(breadcrumb);
+    document.head.appendChild(bcScript);
 })();

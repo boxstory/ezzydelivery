@@ -189,6 +189,127 @@
             </div>
 
             <div>
+                <!-- Profile & Business Completion -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-circle-check sld__section-icon"></i> Completion Status
+                    </h3>
+                    <div class="sld__completion-list">
+                        <!-- User Profile Completion -->
+                        <div class="sld__completion-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-semibold small">User Profile</span>
+                                <span class="badge {% if user_completion == 100 %}bg-success{% elif user_completion >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ user_completion }}%</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar {% if user_completion == 100 %}bg-success{% elif user_completion >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ user_completion }}%;"></div>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                {% if user_profile %}
+                                {{ user_profile.first_name|default:"" }} {{ user_profile.last_name|default:"" }}
+                                {% if user_profile.phone %} &bull; {{ user_profile.phone }}{% endif %}
+                                {% if user_profile.email %} &bull; {{ user_profile.email }}{% endif %}
+                                {% else %}No profile found{% endif %}
+                            </div>
+                        </div>
+                        <!-- Business Registration Completion -->
+                        <div class="sld__completion-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-semibold small">Business Registration</span>
+                                <span class="badge {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ completion_percentage }}%</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ completion_percentage }}%;"></div>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                {% if not business.business_name %}<span class="text-danger">Name</span> {% endif %}
+                                {% if not business.business_phone %}<span class="text-danger">Phone</span> {% endif %}
+                                {% if not business.business_whatsapp %}<span class="text-danger">WhatsApp</span> {% endif %}
+                                {% if not business.business_email %}<span class="text-danger">Email</span> {% endif %}
+                                {% if not business.business_product_category %}<span class="text-danger">Category</span> {% endif %}
+                                {% if not business.business_qid %}<span class="text-danger">QID</span> {% endif %}
+                                {% if completion_percentage == 100 %}<span class="text-success">All fields complete</span>{% else %}<span class="text-danger small">Missing fields</span>{% endif %}
+                            </div>
+                        </div>
+                        <!-- Verification Status -->
+                        <div class="sld__completion-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold small">Verification</span>
+                                {% if business.profile and business.profile.verification_status == 'verified' %}
+                                <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Verified</span>
+                                {% elif business.profile and business.profile.verification_status == 'pending' %}
+                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Pending</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Not Applied</span>
+                                {% endif %}
+                            </div>
+                            {% if business.profile and business.profile.verified_at %}
+                            <div class="small text-muted mt-1">Verified on {{ business.profile.verified_at|date:"d M Y" }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Business Scale -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-chart-line sld__section-icon"></i> Business Scale
+                    </h3>
+                    <ul class="sld__contact-list">
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-tag"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Category</div>
+                                <div class="sld__contact-val">{{ business.business_product_category|default:"Not set" }}</div>
+                            </div>
+                        </li>
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-calendar-day"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Member Since</div>
+                                <div class="sld__contact-val">{{ business.business_since|date:"d M Y"|default:"Not set" }}</div>
+                            </div>
+                        </li>
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-chart-simple"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Avg Orders/Month</div>
+                                <div class="sld__contact-val">{{ avg_orders_per_month|default:"0" }}</div>
+                            </div>
+                        </li>
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-users"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Team Size</div>
+                                <div class="sld__contact-val">{{ team_members.count|default:0 }} members</div>
+                            </div>
+                        </li>
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-map-pin"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Pickup Locations</div>
+                                <div class="sld__contact-val">{{ pickup_locations.count|default:0 }} locations</div>
+                            </div>
+                        </li>
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-plug"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">API Integrations</div>
+                                <div class="sld__contact-val">{{ api_settings.count|default:0 }} connected</div>
+                            </div>
+                        </li>
+                        {% if business.fulfillment_service_enabled %}
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-warehouse"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Fulfillment</div>
+                                <div class="sld__contact-val"><span class="badge bg-success">Active</span></div>
+                            </div>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+
                 <!-- Recent Activity -->
                 <div class="sld__section">
                     <h3 class="sld__section-title">
@@ -500,7 +621,7 @@
                 </button>
             </div>
             <div class="sld__modal-body">
-                <img id="docModalImage" src="" alt="Document">
+                <img id="docModalImage" src="" alt="{{ doc.document_type|default:'Seller' }} document image">
             </div>
             <div class="sld__modal-footer">
                 <a href="#" id="docModalDownload" class="sld__modal-btn sld__modal-btn--secondary" target="_blank">

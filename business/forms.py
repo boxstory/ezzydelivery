@@ -132,13 +132,20 @@ class businessRegisterForm(forms.ModelForm):
                    'business_status', 'business_code', 'updated_at', 'created_at']
         widgets = {
             'business_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_product_category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Cosmetics, Clothing, Food'}),
+            'business_phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_whatsapp': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'business_bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'business_qid': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_facebook_page': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_instagram': forms.TextInput(attrs={'class': 'form-control'}),
             'business_languages': forms.Select(
-                choices=business_LANGUAGE_CHOICES),
+                choices=business_LANGUAGE_CHOICES,
+                attrs={'class': 'form-select'}),
             'business_status': forms.Select(
                 choices=business_STATUS_CHOICES),
-            'business_since' : forms.TextInput(attrs={'type': 'date'}),
-
-
+            'business_since': forms.TextInput(attrs={'type': 'date', 'class': 'form-control'}),
         }
         labels = {
             "business_name": "business Name",

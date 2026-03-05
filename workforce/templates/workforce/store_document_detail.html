@@ -1,211 +1,462 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}Store Document Detail - Ezzy Delivery{% endblock title %}
+{% block title %}{{ business.business_name|default:"Store" }} - Store Documents{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/store-document-detail.css' %}?v=20260304a">
+{% endblock %}
 
 {% block content %}
-<div class="col-12 p-3">
-  <!-- Hero Header -->
-  <div class="sdd__hero">
-    <div class="sdd__hero-content">
-      <h1 class="sdd__hero-title">
-        <i class="fa-solid fa-store sdd__hero-icon"></i>{{ business.business_name|default:"Store Document Detail" }}
-      </h1>
-      <p class="sdd__hero-subtitle">View and manage store business information</p>
-    </div>
-  </div>
+<div class="sdd">
 
-  <!-- Back Button -->
-  <div class="sdd__back-section">
-    <a href="{% url 'workforce:store_documents_list' %}" class="sdd__back-link">
-      <i class="fa-solid fa-arrow-left"></i> Back to Stores
+    <!-- Back -->
+    <a href="{% url 'workforce:store_documents_list' %}" class="sdd__back">
+        <i class="fa-solid fa-arrow-left"></i> Back to Stores
     </a>
-  </div>
 
-  <!-- Store Basic Info -->
-  <div class="sdd__card">
-    <div class="sdd__card-header">
-      <i class="fa-solid fa-circle-info sdd__section-icon"></i>
-      <h5 class="sdd__card-title">BUSINESS INFORMATION</h5>
+    <!-- Hero -->
+    <div class="sdd__hero">
+        <div class="sdd__hero-left">
+            <h1 class="sdd__hero-title">
+                <i class="fa-solid fa-store"></i>
+                {{ business.business_name|default:"Unknown Store" }}
+            </h1>
+            <div class="sdd__hero-id">{{ business.business_code|default:"N/A" }} &bull; ID #{{ business.business_id }}</div>
+            <div class="sdd__hero-contacts">
+                {% if business.business_phone %}
+                <span class="sdd__hero-contact"><i class="fa-solid fa-phone"></i> {{ business.business_phone }}</span>
+                {% endif %}
+                {% if business.business_email %}
+                <span class="sdd__hero-contact"><i class="fa-solid fa-envelope"></i> {{ business.business_email }}</span>
+                {% endif %}
+                {% if business.business_since %}
+                <span class="sdd__hero-contact"><i class="fa-solid fa-calendar"></i> Since {{ business.business_since|date:"M Y" }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="sdd__hero-badges">
+            <span class="sdd__pill sdd__pill--{% if business.business_status == 'active' %}active{% elif business.business_status == 'pending' %}pending{% elif business.business_status == 'suspended' %}suspended{% else %}inactive{% endif %}">
+                {{ business.business_status|title }}
+            </span>
+            {% if business.profile and business.profile.verification_status == 'verified' %}
+            <span class="sdd__pill sdd__pill--verified"><i class="fa-solid fa-check"></i> Verified</span>
+            {% endif %}
+            {% if business.fulfillment_service_enabled %}
+            <span class="sdd__pill sdd__pill--fulfillment"><i class="fa-solid fa-warehouse"></i> Fulfillment</span>
+            {% endif %}
+        </div>
     </div>
-    <div class="sdd__info-grid">
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Business Name</span>
-        <span class="sdd__info-value">{{ business.business_name|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Business Code</span>
-        <span class="sdd__info-value">{{ business.business_code|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Phone</span>
-        <span class="sdd__info-value">{{ business.business_phone|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Email</span>
-        <span class="sdd__info-value">{{ business.business_email|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">WhatsApp</span>
-        <span class="sdd__info-value">{{ business.business_whatsapp|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">QID</span>
-        <span class="sdd__info-value">{{ business.business_qid|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Status</span>
-        <span class="sdd__info-value">
-          <span class="sdd__status-badge sdd__status-badge--{{ business.business_status }}">
-            {{ business.business_status|title }}
-          </span>
+
+    <!-- Completion Bar -->
+    <div class="sdd__completion">
+        <span class="sdd__completion-label"><i class="fa-solid fa-circle-check"></i> Registration</span>
+        <div class="sdd__completion-bar">
+            <div class="sdd__completion-fill {% if completion_pct == 100 %}sdd__completion-fill--full{% elif completion_pct >= 50 %}sdd__completion-fill--partial{% else %}sdd__completion-fill--low{% endif %}"
+                 style="width: {{ completion_pct }}%;"></div>
+        </div>
+        <span class="sdd__completion-pct">{{ completion_pct }}%</span>
+        {% if completion_pct < 100 %}
+        <span class="sdd__completion-missing">
+            Missing:
+            {% if not business.business_name %}<span>Name</span> {% endif %}
+            {% if not business.business_phone %}<span>Phone</span> {% endif %}
+            {% if not business.business_whatsapp %}<span>WhatsApp</span> {% endif %}
+            {% if not business.business_email %}<span>Email</span> {% endif %}
+            {% if not business.business_product_category %}<span>Category</span> {% endif %}
+            {% if not business.business_qid %}<span>QID</span> {% endif %}
         </span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Created At</span>
-        <span class="sdd__info-value">{{ business.created_at|date:"d M Y, h:i A" }}</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Store Profile Info -->
-  {% if business_profile %}
-  <div class="sdd__card">
-    <div class="sdd__card-header">
-      <i class="fa-solid fa-location-dot sdd__section-icon"></i>
-      <h5 class="sdd__card-title">ADDRESS & DETAILS</h5>
-    </div>
-    <div class="sdd__info-grid">
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Address</span>
-        <span class="sdd__info-value">{{ business_profile.business_address|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">City</span>
-        <span class="sdd__info-value">{{ business_profile.business_city|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">State</span>
-        <span class="sdd__info-value">{{ business_profile.business_state|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Zip Code</span>
-        <span class="sdd__info-value">{{ business_profile.business_zip_code|default:"N/A" }}</span>
-      </div>
-      <div class="sdd__info-row">
-        <span class="sdd__info-label">Country</span>
-        <span class="sdd__info-value">{{ business_profile.business_country|default:"N/A" }}</span>
-      </div>
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Edit Form -->
-  <div class="sdd__card">
-    <div class="sdd__card-header">
-      <i class="fa-solid fa-edit sdd__section-icon"></i>
-      <h5 class="sdd__card-title">UPDATE STORE INFORMATION</h5>
+        {% endif %}
     </div>
 
-    <form id="updateForm">
-      {% csrf_token %}
-      <div class="sdd__form-grid">
-        <div class="sdd__form-group">
-          <label class="sdd__form-label">Business Name</label>
-          <input type="text" name="business_name" value="{{ business.business_name }}" class="form-control" required>
+    <!-- Main Grid -->
+    <div class="sdd__grid">
+
+        <!-- LEFT COLUMN -->
+        <div>
+            <!-- Business Info Card -->
+            <div class="sdd__card" style="margin-bottom: 1rem;">
+                <div class="sdd__card-head">
+                    <i class="fa-solid fa-building"></i> Business Information
+                </div>
+                <div class="sdd__card-body">
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Business Name</span>
+                        <span class="sdd__field-value">{{ business.business_name|default:"N/A" }}</span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Business Code</span>
+                        <span class="sdd__field-value sdd__field-value--mono">{{ business.business_code|default:"N/A" }}</span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Category</span>
+                        <span class="sdd__field-value">{{ business.business_product_category|default:"N/A" }}</span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">QID / CR</span>
+                        <span class="sdd__field-value sdd__field-value--mono">{{ business.business_qid|default:"N/A" }}</span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Language</span>
+                        <span class="sdd__field-value">{{ business.business_languages|default:"N/A"|title }}</span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Status</span>
+                        <span class="sdd__field-value">
+                            <span class="sdd__pill sdd__pill--{{ business.business_status }}">{{ business.business_status|title }}</span>
+                        </span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Created</span>
+                        <span class="sdd__field-value">{{ business.created_at|date:"d M Y" }}</span>
+                    </div>
+                    {% if business.business_bio %}
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Bio</span>
+                        <span class="sdd__field-value">{{ business.business_bio }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <!-- Stats -->
+                <div class="sdd__stats">
+                    <div class="sdd__stat">
+                        <div class="sdd__stat-val">{{ order_stats.total_orders|default:0 }}</div>
+                        <div class="sdd__stat-lbl">Orders</div>
+                    </div>
+                    <div class="sdd__stat">
+                        <div class="sdd__stat-val">{{ order_stats.delivered_orders|default:0 }}</div>
+                        <div class="sdd__stat-lbl">Delivered</div>
+                    </div>
+                    <div class="sdd__stat">
+                        <div class="sdd__stat-val">{{ pickup_locations.count|default:0 }}</div>
+                        <div class="sdd__stat-lbl">Locations</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Card -->
+            <div class="sdd__card" style="margin-bottom: 1rem;">
+                <div class="sdd__card-head">
+                    <i class="fa-solid fa-address-book"></i> Contact
+                </div>
+                <div class="sdd__card-body">
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Phone</span>
+                        <span class="sdd__field-value">
+                            {% if business.business_phone %}
+                            <a href="tel:{{ business.business_phone }}" class="sdd__contact-pill sdd__contact-pill--phone">
+                                <i class="fa-solid fa-phone"></i> {{ business.business_phone }}
+                            </a>
+                            {% else %}N/A{% endif %}
+                        </span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">WhatsApp</span>
+                        <span class="sdd__field-value">
+                            {% if business.business_whatsapp %}
+                            <a href="https://wa.me/{{ business.business_whatsapp }}" target="_blank" class="sdd__contact-pill sdd__contact-pill--whatsapp">
+                                <i class="fa-brands fa-whatsapp"></i> {{ business.business_whatsapp }}
+                            </a>
+                            {% else %}N/A{% endif %}
+                        </span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Email</span>
+                        <span class="sdd__field-value">
+                            {% if business.business_email %}
+                            <a href="mailto:{{ business.business_email }}" class="sdd__contact-pill sdd__contact-pill--email">
+                                <i class="fa-solid fa-envelope"></i> {{ business.business_email }}
+                            </a>
+                            {% else %}N/A{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="sdd__form-group">
-          <label class="sdd__form-label">Phone</label>
-          <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="form-control">
-        </div>
+        <!-- RIGHT COLUMN -->
+        <div>
+            <!-- Owner Card -->
+            <div class="sdd__card" style="margin-bottom: 1rem;">
+                <div class="sdd__card-head">
+                    <i class="fa-solid fa-user-tie"></i> Account Owner
+                </div>
+                <div class="sdd__card-body">
+                    {% if business.user %}
+                    <div class="sdd__owner">
+                        <div class="sdd__owner-avatar">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <div class="sdd__owner-name">{{ business.user.first_name }} {{ business.user.last_name|default:"" }}</div>
+                            <div class="sdd__owner-meta">@{{ business.user.username }} &bull; {{ business.user.email|default:"No email" }}</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if user_profile %}
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Phone</span>
+                        <span class="sdd__field-value">{{ user_profile.phone|default:"N/A" }}</span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Verification</span>
+                        <span class="sdd__field-value">
+                            <span class="sdd__pill {% if user_profile.verification_status == 'verified' %}sdd__pill--active{% elif user_profile.verification_status == 'pending' %}sdd__pill--pending{% else %}sdd__pill--inactive{% endif %}">
+                                {{ user_profile.verification_status|title }}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Profile</span>
+                        <span class="sdd__field-value">
+                            {% if user_profile.is_profile_completed %}
+                            <span class="sdd__pill sdd__pill--active"><i class="fa-solid fa-check"></i> Complete</span>
+                            {% else %}
+                            <span class="sdd__pill sdd__pill--pending">Incomplete</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Biz Profile</span>
+                        <span class="sdd__field-value">
+                            {% if user_profile.is_business_profile_completed %}
+                            <span class="sdd__pill sdd__pill--active"><i class="fa-solid fa-check"></i> Complete</span>
+                            {% else %}
+                            <span class="sdd__pill sdd__pill--pending">Incomplete</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
 
-        <div class="sdd__form-group">
-          <label class="sdd__form-label">Email</label>
-          <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="form-control">
-        </div>
+            <!-- Address Card -->
+            {% if business_profile %}
+            <div class="sdd__card" style="margin-bottom: 1rem;">
+                <div class="sdd__card-head">
+                    <i class="fa-solid fa-location-dot"></i> Address & Details
+                </div>
+                <div class="sdd__card-body">
+                    {% if business_profile.business_founters_name %}
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Founder</span>
+                        <span class="sdd__field-value">{{ business_profile.business_founters_name }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">City</span>
+                        <span class="sdd__field-value">{{ business_profile.business_city|default:"N/A" }}</span>
+                    </div>
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Country</span>
+                        <span class="sdd__field-value">{{ business_profile.business_country|default:"N/A" }}</span>
+                    </div>
+                    {% if business_profile.business_address %}
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Address</span>
+                        <span class="sdd__field-value">{{ business_profile.business_address }}</span>
+                    </div>
+                    {% endif %}
+                    {% if business_profile.business_description %}
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">Description</span>
+                        <span class="sdd__field-value">{{ business_profile.business_description }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
 
-        <div class="sdd__form-group">
-          <label class="sdd__form-label">QID</label>
-          <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="form-control">
+            <!-- Pickup Locations Card -->
+            <div class="sdd__card" style="margin-bottom: 1rem;">
+                <div class="sdd__card-head">
+                    <i class="fa-solid fa-map-location-dot"></i> Pickup Locations
+                </div>
+                <div class="sdd__card-body">
+                    {% if pickup_locations %}
+                    {% for loc in pickup_locations %}
+                    <div class="sdd__location">
+                        <div class="sdd__location-icon {% if loc.is_fulfilment_center %}sdd__location-icon--fc{% endif %}">
+                            <i class="fa-solid fa-{% if loc.is_fulfilment_center %}warehouse{% else %}location-dot{% endif %}"></i>
+                        </div>
+                        <div>
+                            <div class="sdd__location-title">{{ loc.pickup_location_title }}</div>
+                            <div class="sdd__location-sub">
+                                {{ loc.locality|default:"" }}
+                                {% if loc.is_fulfilment_center %}&bull; Fulfillment Center{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="sdd__field">
+                        <span class="sdd__field-label">No pickup locations configured</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
+    </div>
 
-        <div class="sdd__form-group">
-          <label class="sdd__form-label">Status</label>
-          <select name="business_status" class="form-select">
-            <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
-            <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
-            <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
-            <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
-          </select>
+    <!-- Quick Actions -->
+    <div class="sdd__card" style="margin-bottom: 1rem;">
+        <div class="sdd__card-head">
+            <i class="fa-solid fa-bolt"></i> Quick Actions
         </div>
-
-        <div class="sdd__form-actions">
-          <button type="submit" class="sdd__btn sdd__btn--primary">
-            <i class="fa-solid fa-save"></i> Save Changes
-          </button>
-          <a href="{% url 'workforce:store_documents_list' %}" class="sdd__btn sdd__btn--cancel">
-            Cancel
-          </a>
+        <div class="sdd__actions">
+            <a href="{% url 'workforce:seller_detail' business.business_id %}" class="sdd__action-btn">
+                <i class="fa-solid fa-eye"></i> Full Seller Profile
+            </a>
+            <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="sdd__action-btn">
+                <i class="fa-solid fa-box"></i> View Orders
+            </a>
+            <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="sdd__action-btn">
+                <i class="fa-solid fa-certificate"></i> License
+            </a>
+            {% if business.business_phone %}
+            <a href="tel:{{ business.business_phone }}" class="sdd__action-btn">
+                <i class="fa-solid fa-phone"></i> Call
+            </a>
+            {% endif %}
+            {% if business.business_whatsapp %}
+            <a href="https://wa.me/{{ business.business_whatsapp }}" target="_blank" class="sdd__action-btn">
+                <i class="fa-brands fa-whatsapp"></i> WhatsApp
+            </a>
+            {% endif %}
         </div>
-      </div>
-    </form>
+    </div>
 
-    <div id="updateMessage" class="sdd__message"></div>
-  </div>
+    <!-- Edit Toggle -->
+    <button class="sdd__edit-toggle" id="sdd_edit_toggle" type="button">
+        <i class="fa-solid fa-pen-to-square"></i> Edit Store Information
+    </button>
+
+    <!-- Edit Form -->
+    <div class="sdd__edit-panel" id="sdd_edit_panel">
+        <div class="sdd__card">
+            <div class="sdd__card-head">
+                <i class="fa-solid fa-pen-to-square"></i> Update Store Information
+            </div>
+            <form id="sdd_update_form">
+                {% csrf_token %}
+                <div class="sdd__form-grid">
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">Business Name</label>
+                        <input type="text" name="business_name" value="{{ business.business_name|default:'' }}" class="sdd__form-input" required>
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">Category</label>
+                        <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="sdd__form-input" placeholder="e.g., Cosmetics, Clothing">
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">Phone</label>
+                        <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="sdd__form-input">
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">WhatsApp</label>
+                        <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="sdd__form-input">
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">Email</label>
+                        <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="sdd__form-input">
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">QID / CR</label>
+                        <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="sdd__form-input">
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">Status</label>
+                        <select name="business_status" class="sdd__form-input">
+                            <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                            <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                        </select>
+                    </div>
+                    {% if business_profile %}
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">Founder Name</label>
+                        <input type="text" name="business_founters_name" value="{{ business_profile.business_founters_name|default:'' }}" class="sdd__form-input">
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">City</label>
+                        <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="sdd__form-input">
+                    </div>
+                    <div class="sdd__form-group">
+                        <label class="sdd__form-label">Country</label>
+                        <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="sdd__form-input">
+                    </div>
+                    {% endif %}
+                    <div class="sdd__form-actions">
+                        <button type="submit" class="sdd__btn sdd__btn--primary">
+                            <i class="fa-solid fa-save"></i> Save Changes
+                        </button>
+                        <button type="button" class="sdd__btn sdd__btn--secondary" id="sdd_cancel_edit">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </form>
+            <div id="sdd_toast" class="sdd__toast"></div>
+        </div>
+    </div>
+
 </div>
-{% endblock content %}
 
-{% block extra_js %}
+<!-- Scripts inside content for HTMX compatibility -->
 <script>
-    function showMessage(messageDiv, isSuccess, text) {
-        messageDiv.style.display = 'block';
-        messageDiv.className = 'sdd__message ' + (isSuccess ? 'sdd__message--success' : 'sdd__message--error');
-        messageDiv.textContent = '';
-        var icon = document.createElement('i');
-        icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
-        icon.setAttribute('aria-hidden', 'true');
-        messageDiv.appendChild(icon);
-        messageDiv.appendChild(document.createTextNode(' ' + text));
+(function() {
+    // Edit toggle
+    var toggleBtn = document.getElementById('sdd_edit_toggle');
+    var editPanel = document.getElementById('sdd_edit_panel');
+    var cancelBtn = document.getElementById('sdd_cancel_edit');
+
+    if (toggleBtn && editPanel) {
+        toggleBtn.addEventListener('click', function() {
+            editPanel.classList.toggle('sdd__edit-panel--open');
+            if (editPanel.classList.contains('sdd__edit-panel--open')) {
+                toggleBtn.style.display = 'none';
+                editPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+            editPanel.classList.remove('sdd__edit-panel--open');
+            toggleBtn.style.display = 'flex';
+        });
     }
 
-    document.getElementById('updateForm').addEventListener('submit', function(e) {
-        e.preventDefault();
+    // Form submit
+    var form = document.getElementById('sdd_update_form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = form.querySelector('button[type="submit"]');
+            var toast = document.getElementById('sdd_toast');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
-        var formData = new FormData(this);
-        var messageDiv = document.getElementById('updateMessage');
-        var submitBtn = this.querySelector('button[type="submit"]');
-
-        submitBtn.disabled = true;
-        var originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Saving...';
-
-        fetch('{% url 'workforce:store_document_detail' business.business_id %}', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(function(response) {
-            if (!response.ok) { throw new Error('Network response was not ok'); }
-            return response.json();
-        })
-        .then(function(data) {
-            if (data.success) {
-                showMessage(messageDiv, true, data.message || 'Store document updated successfully');
-                setTimeout(function() { window.location.reload(); }, 1500);
-            } else {
-                showMessage(messageDiv, false, data.error || 'Failed to update store document');
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-            }
-        })
-        .catch(function(error) {
-            showMessage(messageDiv, false, 'Error updating store document. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
+            fetch('{% url "workforce:store_document_detail" business.business_id %}', {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                toast.className = 'sdd__toast sdd__toast--show sdd__toast--' + (data.success ? 'success' : 'error');
+                toast.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
+                if (data.success) setTimeout(function() { location.reload(); }, 1200);
+                else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes'; }
+            })
+            .catch(function() {
+                toast.className = 'sdd__toast sdd__toast--show sdd__toast--error';
+                toast.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
+            });
         });
-    });
+    }
+})();
 </script>
-{% endblock extra_js %}
+{% endblock content %}

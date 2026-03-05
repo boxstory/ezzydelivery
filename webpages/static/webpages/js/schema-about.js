@@ -132,6 +132,20 @@ function injectSchemas() {
   localScript.type = 'application/ld+json';
   localScript.text = JSON.stringify(localBusinessSchema);
   document.head.appendChild(localScript);
+
+  // BreadcrumbList
+  const breadcrumb = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+          {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://ezzydelivery.qa/"},
+          {"@type": "ListItem", "position": 2, "name": "About Us", "item": "https://ezzydelivery.qa/about/"}
+      ]
+  };
+  const bcScript = document.createElement('script');
+  bcScript.type = 'application/ld+json';
+  bcScript.text = JSON.stringify(breadcrumb);
+  document.head.appendChild(bcScript);
 }
 
 // Run on page load

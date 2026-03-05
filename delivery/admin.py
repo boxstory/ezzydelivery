@@ -85,7 +85,9 @@ class ZoneGroupAdmin(admin.ModelAdmin):
 
 @admin.register(delivery_models.DeliveryTask)
 class DeliveryTaskAdmin(admin.ModelAdmin):
-    list_display = ('dl_task_number',  'dl_price')
+    list_display = ('dl_task_number', 'dl_price', 'dl_task_status', 'driver', 'completed_at')
+    list_filter = ('dl_task_status', 'dl_task_date')
+    readonly_fields = ('completion_latitude', 'completion_longitude', 'completed_at')
 
 
 @admin.register(delivery_models.DlAddressUpdate)

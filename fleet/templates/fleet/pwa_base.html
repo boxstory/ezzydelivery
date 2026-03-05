@@ -51,6 +51,9 @@
                 <h1 class="fleet-pwa__title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="fleet-pwa__header-actions">
                     {% block header_actions %}
+                    <button type="button" class="fleet-btn-icon" id="fleet_pwa_install_btn" style="display:none;" title="Install App">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
                     <button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
                         <i class="fa-solid fa-rotate-right"></i>
                     </button>
@@ -191,13 +194,48 @@
             });
         }
 
-        // Install PWA prompt
+        // PWA Install — header download icon
         let deferredPrompt;
+        const installBtn = document.getElementById('fleet_pwa_install_btn');
+
+        function isStandalone() {
+            return window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+        }
+
+        // Show icon if not already installed
+        if (installBtn && !isStandalone()) {
+            installBtn.style.display = '';
+        }
+
+        // Android / Chrome - capture the beforeinstallprompt event
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            // Show install button if needed
+            if (installBtn) installBtn.style.display = '';
         });
+
+        // Install button click
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const result = await deferredPrompt.userChoice;
+                    if (result.outcome === 'accepted') {
+                        showToast('App installed!', 'success');
+                        installBtn.style.display = 'none';
+                    }
+                    deferredPrompt = null;
+                } else {
+                    const isIosDevice = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+                    if (isIosDevice) {
+                        showToast('Tap Share ↑ then "Add to Home Screen"', 'info', 5000);
+                    } else {
+                        showToast('Open browser menu ⋮ → "Install app"', 'info', 5000);
+                    }
+                }
+            });
+        }
 
         // Handle online/offline status
         window.addEventListener('online', () => {
@@ -207,6 +245,99 @@
         window.addEventListener('offline', () => {
             showToast('You are offline', 'warning');
         });
+    </script>
+
+    <!-- EzzyGPS — global driver location tracking module -->
+    <script>
+    (function() {
+        var watchId = null;
+        var sendTimer = null;
+        var currentPos = null;
+        var activeTaskId = null;
+        var SEND_INTERVAL = 30000; // 30 seconds
+        var MAX_ACCURACY = 100;    // ignore readings worse than 100m
+
+        function getCsrf() {
+            return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        }
+
+        function sendLocation() {
+            if (!currentPos) return;
+            var body = {
+                latitude: currentPos.lat,
+                longitude: currentPos.lng,
+                accuracy: currentPos.accuracy,
+                speed: currentPos.speed,
+                heading: currentPos.heading
+            };
+            if (activeTaskId) body.task_id = activeTaskId;
+
+            fetch('/api/driver/location/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrf()
+                },
+                body: JSON.stringify(body)
+            }).catch(function() { /* silent — offline is fine */ });
+        }
+
+        function onPosition(pos) {
+            var c = pos.coords;
+            if (c.accuracy > MAX_ACCURACY) return; // skip inaccurate
+            currentPos = {
+                lat: c.latitude,
+                lng: c.longitude,
+                accuracy: c.accuracy,
+                speed: c.speed,
+                heading: c.heading
+            };
+            document.dispatchEvent(new CustomEvent('ezzy:gps', { detail: currentPos }));
+        }
+
+        function onError(err) {
+            if (err.code === 1) { // PERMISSION_DENIED
+                if (typeof showToast === 'function') {
+                    showToast('Location permission denied. GPS tracking disabled.', 'warning', 5000);
+                }
+            }
+        }
+
+        window.EzzyGPS = {
+            start: function(taskId) {
+                if (watchId !== null) return; // already running
+                activeTaskId = taskId || null;
+                if (!('geolocation' in navigator)) {
+                    if (typeof showToast === 'function') {
+                        showToast('GPS not supported on this device.', 'warning');
+                    }
+                    return;
+                }
+                watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+                    enableHighAccuracy: true,
+                    maximumAge: 10000,
+                    timeout: 15000
+                });
+                // Send first ping after 5s, then every 30s
+                sendTimer = setInterval(sendLocation, SEND_INTERVAL);
+                setTimeout(sendLocation, 5000);
+            },
+            stop: function() {
+                if (watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
+                if (sendTimer) {
+                    clearInterval(sendTimer);
+                    sendTimer = null;
+                }
+                activeTaskId = null;
+            },
+            getPosition: function() {
+                return currentPos ? Object.assign({}, currentPos) : null;
+            }
+        };
+    })();
     </script>
 
     {% block extra_js %}{% endblock %}

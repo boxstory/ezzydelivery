@@ -462,6 +462,62 @@
                 </div>
             </div>
 
+            <!-- Driver GPS at Completion (Delivered / Failed / Cancelled) -->
+            {% if task.dl_task_status in 'delivered,failed,cancelled' %}
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-map-pin"></i>
+                        {% if task.dl_task_status == 'delivered' %}Delivery GPS
+                        {% elif task.dl_task_status == 'failed' %}Return / Failed GPS
+                        {% else %}Cancellation GPS{% endif %}
+                    </div>
+                    {% if task.completion_latitude and task.completion_longitude %}
+                    <span class="badge bg-success"><i class="fa-solid fa-satellite-dish me-1"></i>Captured</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS</span>
+                    {% endif %}
+                </div>
+                <div class="dtd__card__body">
+                    {% if task.completion_latitude and task.completion_longitude %}
+                    <div class="dtd__fields">
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-location-crosshairs"></i> Coordinates</span>
+                            <span class="dtd__field__value">{{ task.completion_latitude }}, {{ task.completion_longitude }}</span>
+                        </div>
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-circle-info"></i> Status</span>
+                            <span class="dtd__field__value">
+                                {% if task.dl_task_status == 'delivered' %}
+                                <span class="badge bg-success">Delivered</span>
+                                {% elif task.dl_task_status == 'failed' %}
+                                <span class="badge bg-danger">Failed / Returned</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Cancelled</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% if task.completed_at %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-regular fa-clock"></i> Time</span>
+                            <span class="dtd__field__value">{{ task.completed_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <a href="https://www.google.com/maps?q={{ task.completion_latitude }},{{ task.completion_longitude }}"
+                       target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="fa-solid fa-external-link me-1"></i> View on Google Maps
+                    </a>
+                    {% else %}
+                    <div class="dtd__empty">
+                        <i class="fa-solid fa-location-crosshairs d-block mb-1"></i>
+                        <p>GPS was not captured — driver may have denied location permission or had poor signal.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Seller Comments -->
             <div class="dtd__card">
                 <div class="dtd__card__head">
@@ -753,6 +809,12 @@
         iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
     });
 
+    var completionIcon = L.divIcon({
+        className: '',
+        html: '<div style="background:#16a34a;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-flag-checkered"></i></div>',
+        iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
+    });
+
     // Stored dropoff coordinates (order.latitude/longitude takes priority, fallback to dl_address_update)
     var dropoffLat = {% if task.order.latitude %}{{ task.order.latitude }}{% elif task.dl_address_update.dl_latitude %}{{ task.dl_address_update.dl_latitude }}{% else %}null{% endif %};
     var dropoffLon = {% if task.order.longitude %}{{ task.order.longitude }}{% elif task.dl_address_update.dl_longitude %}{{ task.dl_address_update.dl_longitude }}{% else %}null{% endif %};
@@ -816,6 +878,26 @@
             loadingEl.style.display = 'none';
             if (markers.length > 0) { map.setView([pickupLat, pickupLon], 14); }
         });
+    }
+
+    // Driver GPS marker at completion (delivered = green, failed/cancelled = orange)
+    var compLat = {% if task.completion_latitude %}{{ task.completion_latitude }}{% else %}null{% endif %};
+    var compLon = {% if task.completion_longitude %}{{ task.completion_longitude }}{% else %}null{% endif %};
+    var taskStatus = '{{ task.dl_task_status }}';
+    if (compLat && compLon) {
+        var isDelivered = (taskStatus === 'delivered');
+        var gpsBg = isDelivered ? '#16a34a' : '#ea580c';
+        var gpsLabel = isDelivered ? 'Driver GPS — Delivered' : 'Driver GPS — Failed / Returned';
+        var gpsIcon = L.divIcon({
+            className: '',
+            html: '<div style="background:' + gpsBg + ';color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-flag-checkered"></i></div>',
+            iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
+        });
+        var cm = L.marker([compLat, compLon], { icon: gpsIcon })
+            .addTo(map)
+            .bindPopup('<strong>' + gpsLabel + '</strong><br>' + compLat.toFixed(6) + ', ' + compLon.toFixed(6) + '{% if task.completed_at %}<br><small>{{ task.completed_at|date:"M d, H:i" }}</small>{% endif %}');
+        markers.push(cm);
+        fitMarkers();
     }
 
     setTimeout(function() { map.invalidateSize(); }, 300);

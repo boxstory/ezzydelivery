@@ -1,7 +1,7 @@
 // EzzyDriver Service Worker
-const CACHE_NAME = 'ezzydriver-v3';
-const STATIC_CACHE = 'ezzydriver-static-v3';
-const DYNAMIC_CACHE = 'ezzydriver-dynamic-v3';
+const CACHE_NAME = 'ezzydriver-v4';
+const STATIC_CACHE = 'ezzydriver-static-v4';
+const DYNAMIC_CACHE = 'ezzydriver-dynamic-v4';
 
 // Static assets to cache
 const STATIC_ASSETS = [
@@ -52,8 +52,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Skip admin and API requests
-  if (url.pathname.startsWith('/admin/') || url.pathname.startsWith('/api/')) {
+  // Skip admin, API, and auth requests
+  if (url.pathname.startsWith('/admin/') || url.pathname.startsWith('/api/') || url.pathname.startsWith('/accounts/')) {
     return;
   }
 
@@ -80,8 +80,8 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(networkResponse => {
-          // Only cache successful responses
-          if (networkResponse.ok) {
+          // Only cache successful, non-redirected responses
+          if (networkResponse.ok && !networkResponse.redirected) {
             const responseClone = networkResponse.clone();
             caches.open(DYNAMIC_CACHE).then(cache => {
               cache.put(request, responseClone);

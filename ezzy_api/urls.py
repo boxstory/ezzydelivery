@@ -20,6 +20,7 @@ urlpatterns = [
     path('driver/tasks/<int:task_id>/documents/', ezzy_api_views.driver_task_documents, name='driver_task_documents'),
     path('driver/tasks/<int:task_id>/documents/upload/', ezzy_api_views.driver_upload_task_document, name='driver_upload_task_document'),
     path('driver/location/', ezzy_api_views.driver_update_location, name='driver_update_location'),
+    path('driver/<int:driver_id>/location/', ezzy_api_views.driver_latest_location, name='driver_latest_location'),
     path('driver/statistics/', ezzy_api_views.driver_statistics, name='driver_statistics'),
 
     # Hub pickup batch endpoints (driver app)

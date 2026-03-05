@@ -134,6 +134,15 @@ class DriverSettlementAdmin(admin.ModelAdmin):
     mark_as_paid.short_description = 'Mark selected as Paid'
 
 
+@admin.register(fleet_models.DriverLocation)
+class DriverLocationAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'latitude', 'longitude', 'accuracy', 'speed', 'task', 'created_at')
+    list_filter = ('created_at',)
+    raw_id_fields = ('driver', 'task')
+    readonly_fields = ('created_at',)
+    list_per_page = 50
+
+
 @admin.register(fleet_models.ZoneEarningsRate)
 class ZoneEarningsRateAdmin(admin.ModelAdmin):
     list_display = ('order_type', 'pickup_zone', 'delivery_zone', 'driver_rate',

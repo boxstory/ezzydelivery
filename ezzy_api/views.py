@@ -469,35 +469,68 @@ def driver_update_task_status(request, task_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def driver_update_location(request):
-    """Update driver's current location"""
+    """Save a GPS ping from the driver PWA."""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        
+
         latitude = request.data.get('latitude')
         longitude = request.data.get('longitude')
-        
-        if not latitude or not longitude:
+
+        if latitude is None or longitude is None:
             return Response(
                 {'error': 'Latitude and longitude are required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Store location in driver model or create a separate location tracking model
-        # For now, we'll just return success
-        # You can create a DriverLocation model to track location history
-        
+
+        loc = fleet_models.DriverLocation.objects.create(
+            driver=driver,
+            latitude=latitude,
+            longitude=longitude,
+            accuracy=request.data.get('accuracy'),
+            speed=request.data.get('speed'),
+            heading=request.data.get('heading'),
+            task_id=request.data.get('task_id'),
+        )
+
         return Response({
             'message': 'Location updated successfully',
-            'latitude': latitude,
-            'longitude': longitude,
-            'timestamp': timezone.now()
+            'id': loc.pk,
+            'latitude': str(loc.latitude),
+            'longitude': str(loc.longitude),
+            'timestamp': loc.created_at.isoformat(),
         }, status=status.HTTP_200_OK)
-    
+
     except fleet_models.Driver.DoesNotExist:
         return Response(
             {'error': 'Driver profile not found'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_latest_location(request, driver_id):
+    """Get the latest GPS location for a driver (admin/workforce use)."""
+    loc = fleet_models.DriverLocation.objects.filter(
+        driver_id=driver_id
+    ).order_by('-created_at').first()
+
+    if not loc:
+        return Response(
+            {'error': 'No location data for this driver'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    return Response({
+        'driver_id': driver_id,
+        'latitude': str(loc.latitude),
+        'longitude': str(loc.longitude),
+        'accuracy': loc.accuracy,
+        'speed': loc.speed,
+        'heading': loc.heading,
+        'task_id': loc.task_id,
+        'timestamp': loc.created_at.isoformat(),
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -762,6 +795,13 @@ def driver_complete_task(request, task_id):
 
         if status_value in ('delivered', 'failed', 'cancelled'):
             task.completed_at = timezone.now()
+
+        # Save proof-of-delivery GPS coordinates
+        comp_lat = serializer.validated_data.get('completion_latitude')
+        comp_lng = serializer.validated_data.get('completion_longitude')
+        if comp_lat is not None and comp_lng is not None:
+            task.completion_latitude = comp_lat
+            task.completion_longitude = comp_lng
 
         # Track COD on task-level fields
         if cod_collected:

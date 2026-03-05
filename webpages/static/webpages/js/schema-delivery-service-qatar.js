@@ -66,4 +66,18 @@
     serviceScript.type = 'application/ld+json';
     serviceScript.textContent = JSON.stringify(serviceSchema);
     document.head.appendChild(serviceScript);
+
+    // BreadcrumbList
+    const breadcrumb = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://ezzydelivery.qa/"},
+            {"@type": "ListItem", "position": 2, "name": "Delivery Service Qatar", "item": "https://ezzydelivery.qa/delivery-service-in-qatar/"}
+        ]
+    };
+    const bcScript = document.createElement('script');
+    bcScript.type = 'application/ld+json';
+    bcScript.textContent = JSON.stringify(breadcrumb);
+    document.head.appendChild(bcScript);
 })();

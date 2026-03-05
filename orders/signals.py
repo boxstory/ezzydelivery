@@ -134,32 +134,8 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                 token = address_verification.generate_token()
                 address_verification.save()
 
-                # Send verification link via WhatsApp (only if N8N webhook is configured)
-                try:
-                    from django.conf import settings as django_settings
-                    n8n_url = getattr(django_settings, 'N8N_WHATSAPP_WEBHOOK_URL', None)
-                    if n8n_url:
-                        from core.whatsapp_utils import send_location_verification_whatsapp
-                        from core.whatsapp_utils import validate_input_phone
-
-                        # Validate and sanitize phone number
-                        is_valid, sanitized_phone, error_msg = validate_input_phone(instance.customer_phone)
-
-                        if is_valid:
-                            result = send_location_verification_whatsapp(
-                                order=instance,
-                                verification_token=token,
-                                phone_number=sanitized_phone
-                            )
-
-                            if result['success']:
-                                logger.info(f"Location verification link sent for order {instance.order_number}")
-                            else:
-                                logger.warning(f"Failed to send location verification: {result.get('error', 'Unknown error')}")
-                        else:
-                            logger.warning(f"Invalid phone number for order {instance.order_number}: {error_msg}")
-                except Exception as e:
-                    logger.error(f"Error sending location verification for order {instance.id}: {str(e)}", exc_info=True)
+                # WhatsApp verification link is sent later when the delivery task is published
+                # (see delivery/signals.py → _send_location_verification_on_publish)
         
         if instance.order_number not in DlAddressUpdate.objects.values_list('dl_task_number', flat=True):
             from decimal import Decimal

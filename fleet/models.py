@@ -710,6 +710,37 @@ class DriverNotification(models.Model):
         ordering = ['-created_at']
 
 
+class DriverLocation(models.Model):
+    """
+    Periodic GPS pings from driver PWA (~every 30s while on active task).
+    Used for real-time tracking and proof-of-delivery location.
+    """
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name='locations', db_index=True
+    )
+    latitude = models.DecimalField(max_digits=10, decimal_places=7)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7)
+    accuracy = models.FloatField(null=True, blank=True, help_text="GPS accuracy in metres")
+    speed = models.FloatField(null=True, blank=True, help_text="Speed in m/s")
+    heading = models.FloatField(null=True, blank=True, help_text="Heading in degrees")
+    task = models.ForeignKey(
+        'delivery.DeliveryTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='driver_locations'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"[{self.driver}] {self.latitude},{self.longitude} @ {self.created_at:%H:%M}"
+
+    class Meta:
+        verbose_name = "Driver Location"
+        verbose_name_plural = "Driver Locations"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['driver', '-created_at'], name='driverloc_driver_ts_idx'),
+        ]
+
+
 class DriverActivityLog(models.Model):
     """
     Audit log for all driver actions — task events, COD, login, status changes.
