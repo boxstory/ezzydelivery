@@ -271,8 +271,46 @@
           <span>Fleet A/Cs</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report' %}show{% endif %}" id="submenu-accounts">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail' %}show{% endif %}" id="submenu-accounts">
           <ul class="nav flex-column">
+            <!-- Drivers sub-section header -->
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_all_drivers" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name in 'drivers_list,driver_detail' %}active{% endif %}"
+                 href="{% url 'workforce:drivers_list' %}"
+                 hx-get="{% url 'workforce:drivers_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-motorcycle me-2"></i>
+                All Drivers
+              </a>
+            </li>
+            <li class="nav-item ps-3">
+              <a id="workforce_sidebar_link_drivers_active" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_active' %}active{% endif %}"
+                 href="{% url 'workforce:drivers_active' %}"
+                 hx-get="{% url 'workforce:drivers_active' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-circle-check me-2"></i>
+                Active
+              </a>
+            </li>
+            <li class="nav-item ps-3">
+              <a id="workforce_sidebar_link_drivers_inactive" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_inactive' %}active{% endif %}"
+                 href="{% url 'workforce:drivers_inactive' %}"
+                 hx-get="{% url 'workforce:drivers_inactive' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-circle-xmark me-2"></i>
+                Inactive
+              </a>
+            </li>
+            <li><hr class="wf-sidebar__divider my-1 opacity-25"></li>
             <li class="nav-item">
               <a id="workforce_sidebar_link_fleet_cod" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'fleet_cod_in_hand' %}active{% endif %}"
                  href="{% url 'workforce:fleet_cod_in_hand' %}"
@@ -319,43 +357,6 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-money-bill-transfer me-2"></i>
                 Transactions
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Inventory Section -->
-      <li id="workforce_sidebar_menu_inventory" class="nav-item">
-        <a id="workforce_sidebar_link_inventory" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-inventory" href="#">
-          <i class="fa-solid fa-boxes-stacked me-2"></i>
-          <span>Inventory</span>
-          <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
-        </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'inventory_reports,inventory_restock_list' %}show{% endif %}" id="submenu-inventory">
-          <ul class="nav flex-column">
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_inventory_reports" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'inventory_reports' %}active{% endif %}"
-                 href="{% url 'workforce:inventory_reports' %}"
-                 hx-get="{% url 'workforce:inventory_reports' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-file-lines me-2"></i>
-                Reports
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_inventory_restock" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'inventory_restock_list' %}active{% endif %}"
-                 href="{% url 'workforce:inventory_restock_list' %}"
-                 hx-get="{% url 'workforce:inventory_restock_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-box-open me-2"></i>
-                Restock List
               </a>
             </li>
           </ul>
@@ -567,13 +568,13 @@
       </li>
 
       <!-- Inventory Management Section -->
-      <li id="workforce_sidebar_menu_inventory" class="nav-item">
-        <a id="workforce_sidebar_link_inventory" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-inventory" href="#">
+      <li id="workforce_sidebar_menu_wh_inventory" class="nav-item">
+        <a id="workforce_sidebar_link_wh_inventory_menu" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-wh-inventory" href="#">
           <i class="fa-solid fa-boxes-stacked me-2"></i>
           <span>Inventory</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,location_list,location_add,receive_stock,confirm_receive,pick_list_list,create_pick_list,pick_list_detail,cycle_count_list,create_cycle_count,cycle_count_detail' %}show{% endif %}" id="submenu-inventory">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,location_list,location_add,receive_stock,confirm_receive,pick_list_list,create_pick_list,pick_list_detail,cycle_count_list,create_cycle_count,cycle_count_detail' %}show{% endif %}" id="submenu-wh-inventory">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_wh_inventory" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}"
@@ -780,34 +781,6 @@
         </div>
       </li>
 
-      <hr class="wf-sidebar__divider" />
-
-      <!-- User Verification Section -->
-      <li id="workforce_sidebar_menu_verification" class="nav-item">
-        <a id="workforce_sidebar_link_verification" class="nav-link btn nav-link-single {% if request.resolver_match.url_name == 'user_verification_list' %}active{% endif %}"
-           href="{% url 'workforce:user_verification_list' %}"
-           hx-get="{% url 'workforce:user_verification_list' %}"
-           hx-target="#main-content"
-           hx-select="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-          <i class="fa-solid fa-user-check me-2"></i>
-          <span>User Verification</span>
-        </a>
-      </li>
-      <!-- Team Verification Section -->
-      <li id="workforce_sidebar_menu_team_verification" class="nav-item">
-        <a id="workforce_sidebar_link_team_verification" class="nav-link btn nav-link-single {% if request.resolver_match.url_name == 'team_verification_list' %}active{% endif %}"
-           href="{% url 'workforce:team_verification_list' %}"
-           hx-get="{% url 'workforce:team_verification_list' %}"
-           hx-target="#main-content"
-           hx-select="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-          <i class="fa-solid fa-users-gear me-2"></i>
-          <span>Team Verification</span>
-        </a>
-      </li>
       <!-- Sellers Section -->
       <li id="workforce_sidebar_menu_sellers" class="nav-item">
         <a id="workforce_sidebar_link_sellers" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-sellers" href="#">
@@ -869,67 +842,6 @@
         </div>
       </li>
 
-      <!-- Drivers Section -->
-      <li id="workforce_sidebar_menu_drivers" class="nav-item">
-        <a id="workforce_sidebar_link_drivers" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-drivers" href="#">
-          <i class="fa-solid fa-motorcycle me-2"></i>
-          <span>Drivers</span>
-          <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
-        </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail' %}show{% endif %}" id="submenu-drivers">
-          <ul class="nav flex-column">
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_all_drivers" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_list' or request.resolver_match.url_name == 'driver_detail' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_list' %}"
-                 hx-get="{% url 'workforce:drivers_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-list me-2"></i>
-                All Drivers
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_drivers_pending" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_pending' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_pending' %}"
-                 hx-get="{% url 'workforce:drivers_pending' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-clock me-2"></i>
-                Pending Approval
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_drivers_active" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_active' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_active' %}"
-                 hx-get="{% url 'workforce:drivers_active' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-circle-check me-2"></i>
-                Active Drivers
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_drivers_inactive" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_inactive' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_inactive' %}"
-                 hx-get="{% url 'workforce:drivers_inactive' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-circle-xmark me-2"></i>
-                Inactive Drivers
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
       <!-- Verifications Section -->
       <li id="workforce_sidebar_menu_verifications" class="nav-item">
         <a id="workforce_sidebar_link_verifications" class="nav-link btn wf-sidebar__link--collapse" data-bs-toggle="collapse" data-bs-target="#submenu-verifications" href="#">
@@ -937,7 +849,7 @@
           <span>Verifications</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'user_verification_list,team_verification_list,sellers_pending,drivers_pending' %}show{% endif %}" id="submenu-verifications">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'user_verification_list,team_verification_list,business_verification_list,driver_verification_list' %}show{% endif %}" id="submenu-verifications">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_verify_all" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'user_verification_list' %}active{% endif %}"
@@ -948,31 +860,31 @@
                  hx-swap="outerHTML"
                  hx-push-url="true">
                 <i class="fa-solid fa-list me-2"></i>
-                All
+                All Users
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_verify_business" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'sellers_pending' %}active{% endif %}"
-                 href="{% url 'workforce:sellers_pending' %}"
-                 hx-get="{% url 'workforce:sellers_pending' %}"
+              <a id="workforce_sidebar_link_verify_business" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'business_verification_list' %}active{% endif %}"
+                 href="{% url 'workforce:business_verification_list' %}"
+                 hx-get="{% url 'workforce:business_verification_list' %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
                  hx-push-url="true">
-                <i class="fa-solid fa-store me-2"></i>
+                <i class="fa-solid fa-building-circle-check me-2"></i>
                 Business
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_verify_driver" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'drivers_pending' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_pending' %}"
-                 hx-get="{% url 'workforce:drivers_pending' %}"
+              <a id="workforce_sidebar_link_verify_driver" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'driver_verification_list' %}active{% endif %}"
+                 href="{% url 'workforce:driver_verification_list' %}"
+                 hx-get="{% url 'workforce:driver_verification_list' %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
                  hx-push-url="true">
-                <i class="fa-solid fa-motorcycle me-2"></i>
-                Driver
+                <i class="fa-solid fa-car me-2"></i>
+                Drivers
               </a>
             </li>
             <li class="nav-item">
@@ -985,18 +897,6 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-users me-2"></i>
                 Team
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_verify_user" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'user_verification_list' %}active{% endif %}"
-                 href="{% url 'workforce:user_verification_list' %}"
-                 hx-get="{% url 'workforce:user_verification_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-user me-2"></i>
-                User
               </a>
             </li>
           </ul>
