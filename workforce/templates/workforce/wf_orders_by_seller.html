@@ -6,84 +6,108 @@
 {% block content %}
 <div class="obs">
     <!-- Hero Header -->
-    <div class="obs__hero">
-        <div class="obs__hero-content">
-            <h1 class="obs__hero-title">
-                <i class="fa-solid fa-store me-2"></i>Orders by Seller
-            </h1>
-            <p class="obs__hero-sub">View order summaries grouped by seller</p>
+    <header class="oli__hero">
+        <div class="oli__hero__left">
+            <h2><i class="fa-solid fa-store me-1"></i>Orders by Seller</h2>
         </div>
-    </div>
+        <div class="oli__hero__right">
+            <div class="oli__hero__count">
+                <span class="oli__hero__count-value">{{ page_obj.paginator.count|default:"0" }}</span>
+                <span class="oli__hero__count-label">sellers</span>
+            </div>
+        </div>
+    </header>
 
     <div class="p-3">
-        <!-- Search Section -->
-        <div class="obs__filter-card">
-            <div class="obs__filter-header">
-                <i class="fa-solid fa-search me-2 obs__icon-accent"></i>
-                <span class="obs__section-label">Search Sellers</span>
-            </div>
-            <form method="get" class="row g-3"
-                  hx-get=""
-                  hx-target="#main-content"
-                  hx-select="#main-content"
-                  hx-swap="outerHTML"
-                  hx-push-url="true">
-                <div class="col-md-10">
-                    <label for="searchInput" class="obs__field-label">
-                        <i class="fa-solid fa-search me-1"></i>Search
-                    </label>
-                    <input type="text" id="searchInput" name="search" class="obs__input"
-                           placeholder="Search by business name, email, phone, code..." value="{{ search }}">
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="obs__btn obs__btn--primary w-100">
-                        <i class="fa-solid fa-search me-1"></i>Search
-                    </button>
-                </div>
+        <!-- Compact Filter Card -->
+        <div class="obs__filter-card mb-3">
+            <form method="get" action="" id="obsFilterForm" class="d-flex align-items-center gap-2 flex-wrap">
+                <input type="text" name="search" class="form-control form-control-sm" style="max-width:200px"
+                       placeholder="Search seller..." value="{{ search }}" autocomplete="off">
+                <span class="text-muted small"><i class="fa-solid fa-calendar-days"></i></span>
+                <button type="button" class="btn btn-xs pg-filter__date-btn {% if date_preset == 'today' %}active{% endif %}" data-obs-preset="today">Today</button>
+                <button type="button" class="btn btn-xs pg-filter__date-btn {% if date_preset == 'yesterday' %}active{% endif %}" data-obs-preset="yesterday">Yesterday</button>
+                <button type="button" class="btn btn-xs pg-filter__date-btn {% if date_preset == '3days' %}active{% endif %}" data-obs-preset="3days">3 Days</button>
+                <button type="button" class="btn btn-xs pg-filter__date-btn {% if date_preset == 'week' %}active{% endif %}" data-obs-preset="week">Week</button>
+                <button type="button" class="btn btn-xs pg-filter__date-btn {% if date_preset == 'month' %}active{% endif %}" data-obs-preset="month">Month</button>
+                <button type="button" class="btn btn-xs pg-filter__date-btn {% if date_preset == 'custom' %}active{% endif %}" data-obs-preset="custom">Custom</button>
+                <input type="hidden" name="datePreset" id="obs_date_preset" value="{{ date_preset }}">
+                <input type="hidden" name="dateFrom" id="obs_dateFrom" value="{{ date_from }}">
+                <input type="hidden" name="dateTo"   id="obs_dateTo"   value="{{ date_to }}">
+                <input type="date" class="form-control form-control-sm {% if date_preset != 'custom' %}d-none{% endif %}" id="obs_from_vis" style="max-width:130px" value="{{ date_from }}">
+                <input type="date" class="form-control form-control-sm {% if date_preset != 'custom' %}d-none{% endif %}" id="obs_to_vis"   style="max-width:130px" value="{{ date_to }}">
+                <button type="submit" class="btn btn-dark btn-sm"><i class="fa fa-search"></i></button>
+                {% if search or date_from or date_to %}
+                <a href="?" class="btn btn-outline-secondary btn-sm"><i class="fa fa-times"></i></a>
+                {% endif %}
             </form>
+            <script>
+            (function(){
+                function isoDate(d){return d.toISOString().split('T')[0];}
+                document.querySelectorAll('[data-obs-preset]').forEach(function(btn){
+                    btn.addEventListener('click',function(){
+                        var preset=this.dataset.obsPreset;
+                        var today=new Date();today.setHours(0,0,0,0);
+                        var from='',to='';
+                        if(preset==='today'){from=to=isoDate(today);}
+                        else if(preset==='yesterday'){var y=new Date(today);y.setDate(y.getDate()-1);from=to=isoDate(y);}
+                        else if(preset==='3days'){var d=new Date(today);d.setDate(d.getDate()-2);from=isoDate(d);to=isoDate(today);}
+                        else if(preset==='week'){var d=new Date(today);d.setDate(d.getDate()-6);from=isoDate(d);to=isoDate(today);}
+                        else if(preset==='month'){var d=new Date(today);d.setDate(d.getDate()-29);from=isoDate(d);to=isoDate(today);}
+                        document.getElementById('obs_dateFrom').value=from;
+                        document.getElementById('obs_dateTo').value=to;
+                        document.getElementById('obs_date_preset').value=preset;
+                        document.getElementById('obs_from_vis').classList.toggle('d-none',preset!=='custom');
+                        document.getElementById('obs_to_vis').classList.toggle('d-none',preset!=='custom');
+                        document.querySelectorAll('[data-obs-preset]').forEach(function(b){b.classList.toggle('active',b.dataset.obsPreset===preset);});
+                        if(preset!=='custom') document.getElementById('obsFilterForm').submit();
+                    });
+                });
+                document.getElementById('obs_from_vis').addEventListener('change',function(){
+                    document.getElementById('obs_dateFrom').value=this.value;
+                    if(this.value&&document.getElementById('obs_to_vis').value) document.getElementById('obsFilterForm').submit();
+                });
+                document.getElementById('obs_to_vis').addEventListener('change',function(){
+                    document.getElementById('obs_dateTo').value=this.value;
+                    if(this.value&&document.getElementById('obs_from_vis').value) document.getElementById('obsFilterForm').submit();
+                });
+            })();
+            </script>
 
-            <!-- Quick Seller Selection -->
+            <!-- Seller Bubbles -->
             {% if all_sellers %}
-            <div class="obs__quick-select">
-                <label class="obs__field-label mb-2">
-                    <i class="fa-solid fa-store me-1"></i>Quick Select Seller
-                </label>
-                <div class="d-flex flex-wrap gap-2">
-                    {% for seller in all_sellers %}
-                    <a href="?search={{ seller.business_name }}"
-                       class="obs__pill {% if search == seller.business_name %}obs__pill--active{% endif %}"
-                       title="{{ seller.business_code }}">
-                        {{ seller.business_name }}
-                    </a>
-                    {% endfor %}
-                    {% if search %}
-                    <a href="?" class="obs__pill obs__pill--danger" title="Clear filter">
-                        <i class="fa-solid fa-times me-1"></i>Clear
-                    </a>
-                    {% endif %}
-                </div>
+            <div class="d-flex flex-wrap gap-1 mt-2">
+                {% for seller in all_sellers %}
+                <a href="?search={{ seller.business_name }}"
+                   class="obs__pill {% if search == seller.business_name %}obs__pill--active{% endif %}"
+                   title="{{ seller.business_code }}">
+                    {{ seller.business_name }}
+                    {% if seller.order_count %}<span class="obs__pill-count">{{ seller.order_count }}</span>{% endif %}
+                </a>
+                {% endfor %}
             </div>
             {% endif %}
         </div>
 
-        <!-- Sellers with Orders Table -->
+        <!-- Sellers Table -->
         <div class="obs__card">
             <div class="obs__card-header">
                 <i class="fa-solid fa-table me-2 obs__icon-accent"></i>
-                <span class="obs__section-label">Sellers</span>
+                <span class="obs__section-label">Sellers with Orders</span>
             </div>
             {% if page_obj %}
             <div class="table-responsive">
                 <table class="obs__table">
                     <thead>
                         <tr>
-                            <th class="obs__th">Business Name</th>
+                            <th class="obs__th">Business</th>
                             <th class="obs__th">Contact</th>
-                            <th class="obs__th">Total Orders</th>
-                            <th class="obs__th">Pending</th>
-                            <th class="obs__th">Processing</th>
-                            <th class="obs__th">Completed</th>
-                            <th class="obs__th">Actions</th>
+                            <th class="obs__th text-center">Total</th>
+                            <th class="obs__th text-center">Pending</th>
+                            <th class="obs__th text-center">Processing</th>
+                            <th class="obs__th text-center">Done</th>
+                            <th class="obs__th text-center">Failed</th>
+                            <th class="obs__th"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -91,60 +115,37 @@
                         <tr class="obs__row">
                             <td class="obs__td">
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="obs__icon-circle">
-                                        <i class="fa-solid fa-store"></i>
-                                    </span>
+                                    <span class="obs__icon-circle"><i class="fa-solid fa-store"></i></span>
                                     <div>
-                                        <span class="obs__td--bold">{{ business.business_name|default:"Unknown Business" }}</span>
-                                        <span class="obs__td--sub">{{ business.business_code|default:"N/A" }}</span>
+                                        <div class="obs__td--bold">{{ business.business_name|default:"Unknown" }}</div>
+                                        <div class="obs__td--sub">{{ business.business_code|default:"—" }}</div>
                                     </div>
                                 </div>
                             </td>
                             <td class="obs__td">
-                                {% if business.business_email %}
-                                <div class="obs__contact-line"><i class="fa-solid fa-envelope me-1"></i>{{ business.business_email }}</div>
-                                {% endif %}
-                                {% if business.business_phone %}
-                                <div class="obs__contact-line"><i class="fa-solid fa-phone me-1"></i>{{ business.business_phone }}</div>
-                                {% endif %}
+                                {% if business.business_email %}<div class="obs__contact-line"><i class="fa-solid fa-envelope me-1"></i>{{ business.business_email }}</div>{% endif %}
+                                {% if business.business_phone %}<div class="obs__contact-line"><i class="fa-solid fa-phone me-1"></i>{{ business.business_phone }}</div>{% endif %}
                             </td>
+                            <td class="obs__td text-center"><span class="obs__count obs__count--primary">{{ business.total_orders|default:0 }}</span></td>
+                            <td class="obs__td text-center"><span class="obs__badge obs__badge--amber">{{ business.pending_orders|default:0 }}</span></td>
+                            <td class="obs__td text-center"><span class="obs__badge obs__badge--blue">{{ business.processing_orders|default:0 }}</span></td>
+                            <td class="obs__td text-center"><span class="obs__badge obs__badge--green">{{ business.completed_orders|default:0 }}</span></td>
+                            <td class="obs__td text-center"><span class="obs__badge obs__badge--red">{{ business.failed_orders|default:0 }}</span></td>
                             <td class="obs__td">
-                                <span class="obs__count obs__count--primary">{{ business.total_orders|default:0 }}</span>
-                            </td>
-                            <td class="obs__td">
-                                <span class="obs__badge obs__badge--amber">{{ business.pending_orders|default:0 }}</span>
-                            </td>
-                            <td class="obs__td">
-                                <span class="obs__badge obs__badge--blue">{{ business.processing_orders|default:0 }}</span>
-                            </td>
-                            <td class="obs__td">
-                                <span class="obs__badge obs__badge--green">{{ business.completed_orders|default:0 }}</span>
-                            </td>
-                            <td class="obs__td">
-                                <div class="d-flex gap-1">
-                                    <a href="{% url 'workforce:wf_orders_all' %}?business={{ business.business_id }}"
-                                       class="obs__action-btn" title="View all orders">
-                                        <i class="fa-solid fa-list"></i>
-                                    </a>
-                                    <a href="{% url 'workforce:business_license_detail' business.business_id %}"
-                                       class="obs__action-btn obs__action-btn--secondary" title="View business details">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </a>
-                                </div>
+                                <a href="{% url 'workforce:wf_orders_all' %}?business={{ business.business_id }}{% if date_from %}&dateFrom={{ date_from }}{% endif %}{% if date_to %}&dateTo={{ date_to }}{% endif %}{% if date_preset %}&datePreset={{ date_preset }}{% endif %}"
+                                   class="obs__action-btn" title="View orders"><i class="fa-solid fa-list"></i></a>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-
             {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
-
             {% else %}
             <div class="obs__empty">
                 <i class="fa-solid fa-box-open"></i>
-                <h3>No Orders Found</h3>
-                <p>{% if search %}No sellers with orders match your search criteria.{% else %}There are no orders from any sellers yet.{% endif %}</p>
+                <h3>No Sellers Found</h3>
+                <p>{% if search %}No sellers match "{{ search }}".{% else %}No orders from any sellers yet.{% endif %}</p>
             </div>
             {% endif %}
         </div>

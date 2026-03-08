@@ -9,14 +9,14 @@
             <h1 class="wfd__hero-title">
                 <i class="fa-solid fa-warehouse"></i>
                 {{ batch.batch_number }}
-                {% if batch.status == 'pending' %}<span class="badge bg-secondary ms-2 fs-6">Pending</span>
-                {% elif batch.status == 'assigned' %}<span class="badge bg-info text-dark ms-2 fs-6">Assigned</span>
-                {% elif batch.status == 'accepted' %}<span class="badge bg-primary ms-2 fs-6">Accepted</span>
-                {% elif batch.status == 'in_progress' %}<span class="badge bg-warning text-dark ms-2 fs-6">In Progress</span>
-                {% elif batch.status == 'arrived' %}<span class="badge bg-warning text-dark ms-2 fs-6">Arrived at Pickup</span>
-                {% elif batch.status == 'collected' %}<span class="badge bg-warning text-dark ms-2 fs-6">Packages Collected</span>
-                {% elif batch.status == 'at_hub' %}<span class="badge bg-success ms-2 fs-6">At Hub ✓</span>
-                {% elif batch.status == 'cancelled' %}<span class="badge bg-danger ms-2 fs-6">Cancelled</span>
+                {% if batch.status == 'pending' %}<span class="badge bg-secondary ms-2">Pending</span>
+                {% elif batch.status == 'assigned' %}<span class="badge badge-info ms-2">Assigned</span>
+                {% elif batch.status == 'accepted' %}<span class="badge bg-primary ms-2">Accepted</span>
+                {% elif batch.status == 'in_progress' %}<span class="badge badge-warning ms-2">In Progress</span>
+                {% elif batch.status == 'arrived' %}<span class="badge badge-warning ms-2">Arrived at Pickup</span>
+                {% elif batch.status == 'collected' %}<span class="badge badge-warning ms-2">Packages Collected</span>
+                {% elif batch.status == 'at_hub' %}<span class="badge badge-success ms-2">At Hub ✓</span>
+                {% elif batch.status == 'cancelled' %}<span class="badge badge-error ms-2">Cancelled</span>
                 {% endif %}
             </h1>
             <p class="wfd__hero-subtitle">Hub Pickup Batch — {{ batch.order_count }} order{{ batch.order_count|pluralize }}</p>
@@ -157,7 +157,7 @@
                                     {% for task in order.delivery_task.filter %}
                                         {% if task.task_leg == 'hub_delivery' %}
                                         <code>{{ task.dl_task_number }}</code>
-                                        <span class="badge bg-info text-dark ms-1">{{ task.get_dl_task_status_display }}</span>
+                                        <span class="badge badge-info ms-1">{{ task.get_dl_task_status_display }}</span>
                                         {% endif %}
                                     {% empty %}
                                         {% if batch.status == 'at_hub' %}

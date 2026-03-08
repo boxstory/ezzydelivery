@@ -250,6 +250,7 @@ class BusinessApiSettings(models.Model):
         ('opencart', 'OpenCart'),
         ('prestashop', 'PrestaShop'),
         ('bigcommerce', 'BigCommerce'),
+        ('google_sheet', 'Google Sheet'),
         ('custom', 'Custom'),
     ]
     api_type = models.CharField(
@@ -267,6 +268,8 @@ class BusinessApiSettings(models.Model):
     site_contry = models.CharField(max_length=100, blank=True, null=True, default='Qatar')
     order_api_endpoint = models.CharField(max_length=255, blank=True, null=True)
     product_api_endpoint = models.CharField(max_length=255, blank=True, null=True)
+    google_sheet_url = models.TextField(blank=True, null=True,
+        help_text='Google Sheets URL (published as CSV or shareable link)')
 
     # TikTok Shop specific fields
     tiktok_shop_id = models.CharField(max_length=100, blank=True, null=True,

@@ -272,6 +272,15 @@ def upload_path_handler(instance, filename):
     return os.path.join(upload_dir, filename)
 
 
+def upload_path_handler_back(instance, filename):
+    upload_dir = os.path.join('core/driver', str(instance.driver_id), 'documents', instance.document_type)
+    extension = os.path.splitext(filename)[1]
+    filename = f'{instance.document_type}_{instance.driver_id}_back{extension}'
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+    return os.path.join(upload_dir, filename)
+
+
 
 class DriverDocument(models.Model):
     driver = models.ForeignKey(
@@ -288,6 +297,8 @@ class DriverDocument(models.Model):
     document_expiry_date = models.DateField( blank=True, null=True)
     document_file = models.ImageField(
         upload_to=upload_path_handler, default='core/driver/default/doc_default.png', blank=True, null=True)
+    document_file_back = models.ImageField(
+        upload_to=upload_path_handler_back, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -696,6 +707,10 @@ class DriverNotification(models.Model):
     message = models.TextField()
     notification_type = models.CharField(
         max_length=30, choices=NOTIFICATION_TYPE_CHOICES, default='system'
+    )
+    related_task = models.ForeignKey(
+        'delivery.DeliveryTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='driver_notifications'
     )
     is_read = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -286,6 +286,7 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                     title='New Task Assigned',
                     message=f'You have been assigned task {instance.dl_task_number} for order {instance.order.order_number if instance.order_id else ""}.',
                     notification_type='delivery_assigned',
+                    related_task=instance,
                 )
                 logger.info(f"DriverNotification created for driver {instance.driver_id} — task {instance.dl_task_number} assigned")
             except Exception as e:

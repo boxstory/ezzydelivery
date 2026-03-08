@@ -57,7 +57,7 @@ Dashboard Title:     1.75rem (28px) - Bold 700
 Card Title:          1.125rem (18px) - Semibold 600
 Metric Value:        2rem (32px) - Bold 700
 Status Value:        1.5rem (24px) - Bold 700
-Body Text:           0.9375rem (15px) - Regular 400
+Body Text:           0.875rem (15px) - Regular 400
 Small Text:          0.875rem (14px) - Medium 500
 Tiny Text:           0.8125rem (13px) - Medium 500
 ```

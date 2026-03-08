@@ -248,7 +248,7 @@
           </div>
           <div class="row g-3">
             <div class="col-md-12">
-              <label class="form-label">Is your business located in Qatar?</label>
+              <label class="form-label">Is your business located in Qatar? <span class="wppi__req">*</span></label>
               <div class="wppi__radio-group" id="wppi_radio_located">
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_yes"
@@ -257,7 +257,7 @@
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_no"
-                         value="False" {% if saved_data.is_located_in_qatar == 'False' %}checked{% endif %}>
+                         value="False" {% if saved_data.is_located_in_qatar == 'False' %}checked{% endif %} required>
                   <label class="form-check-label" for="located_no">No, outside Qatar</label>
                 </div>
               </div>
@@ -357,7 +357,7 @@
           </div>
           <div class="row g-3">
             <div class="col-md-12">
-              <label class="form-label">Orders Last Week</label>
+              <label class="form-label">Orders Last Week <span class="wppi__req">*</span></label>
               <input type="hidden" name="avarage_number_of_order_last_week" id="avarage_number_of_order_last_week"
                      value="{{ saved_data.avarage_number_of_order_last_week }}">
               <div class="wppi__bubbles wppi__bubbles--single" data-target="avarage_number_of_order_last_week" id="wppi_bubbles_week">
@@ -371,7 +371,7 @@
               </div>
             </div>
             <div class="col-md-12">
-              <label class="form-label">Orders Last Month</label>
+              <label class="form-label">Orders Last Month <span class="wppi__req">*</span></label>
               <input type="hidden" name="avarage_number_of_order_done_last_month" id="avarage_number_of_order_done_last_month"
                      value="{{ saved_data.avarage_number_of_order_done_last_month }}">
               <div class="wppi__bubbles wppi__bubbles--single" data-target="avarage_number_of_order_done_last_month" id="wppi_bubbles_month">
@@ -385,7 +385,7 @@
               </div>
             </div>
             <div class="col-md-12">
-              <label class="form-label">Expected Orders Next Month</label>
+              <label class="form-label">Expected Orders Next Month <span class="wppi__req">*</span></label>
               <input type="hidden" name="avarage_number_of_order_expect_next_month" id="avarage_number_of_order_expect_next_month"
                      value="{{ saved_data.avarage_number_of_order_expect_next_month }}">
               <div class="wppi__bubbles wppi__bubbles--single" data-target="avarage_number_of_order_expect_next_month" id="wppi_bubbles_nextmonth">
@@ -497,7 +497,7 @@
           </div>
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label">Current Courier / 3PL Provider</label>
+              <label class="form-label">Current Courier / 3PL Provider <span class="wppi__req">*</span></label>
               <input type="hidden" name="current_courier_provider" id="current_courier_provider"
                      value="{{ saved_data.current_courier_provider }}">
               <div class="wppi__select" data-target="current_courier_provider" id="wppi_select_courier">
@@ -515,7 +515,7 @@
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Delivery Coverage</label>
+              <label class="form-label">Delivery Coverage <span class="wppi__req">*</span></label>
               <input type="hidden" name="delivery_coverage" id="delivery_coverage"
                      value="{{ saved_data.delivery_coverage }}">
               <div class="wppi__select" data-target="delivery_coverage" id="wppi_select_coverage">
@@ -531,7 +531,7 @@
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">When do you want to start?</label>
+              <label class="form-label">When do you want to start? <span class="wppi__req">*</span></label>
               <input type="hidden" name="preferred_start_date" id="preferred_start_date"
                      value="{{ saved_data.preferred_start_date }}">
               <div class="wppi__select" data-target="preferred_start_date" id="wppi_select_startdate">
@@ -667,7 +667,7 @@
           </div>
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label">Type of Pickup Location</label>
+              <label class="form-label">Type of Pickup Location <span class="wppi__req">*</span></label>
               <input type="hidden" name="type_of_pickup_location" id="type_of_pickup_location"
                      value="{{ saved_data.type_of_pickup_location }}">
               <div class="wppi__bubbles" data-target="type_of_pickup_location" id="wppi_bubbles_pickuptype">
@@ -737,7 +737,7 @@
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Preferred Communication Channel</label>
+              <label class="form-label">Preferred Communication Channel <span class="wppi__req">*</span></label>
               <input type="hidden" name="preferred_communication_channel" id="preferred_communication_channel"
                      value="{{ saved_data.preferred_communication_channel }}">
               <div class="wppi__bubbles" data-target="preferred_communication_channel" id="wppi_bubbles_comm">
@@ -910,6 +910,94 @@
     });
   });
 })();
+
+// ── Step validation ──────────────────────────────────────────────────────────
+function showBubbleError(fieldId, message) {
+  var el = document.getElementById(fieldId);
+  if (!el) return;
+  var existing = el.parentElement.querySelector('.wppi__field-error');
+  if (!existing) {
+    var err = document.createElement('div');
+    err.className = 'wppi__field-error text-danger small mt-1';
+    err.textContent = message;
+    el.parentElement.insertBefore(err, el.nextSibling);
+  }
+}
+function clearBubbleErrors() {
+  document.querySelectorAll('.wppi__field-error').forEach(function (el) { el.remove(); });
+}
+function validateStep(step) {
+  clearBubbleErrors();
+  var errors = [];
+  if (step === 1) {
+    if (!document.getElementById('product_category').value) {
+      showBubbleError('product_category', 'Please select a product category.');
+      errors.push('product_category');
+    }
+    if (!document.getElementById('average_order_value_qar').value) {
+      showBubbleError('average_order_value_qar', 'Please select an average order value.');
+      errors.push('average_order_value_qar');
+    }
+    if (!document.getElementById('business_operating_age').value) {
+      showBubbleError('business_operating_age', 'Please select how long you have been operating.');
+      errors.push('business_operating_age');
+    }
+  } else if (step === 2) {
+    if (!document.getElementById('avarage_number_of_order_last_week').value) {
+      showBubbleError('avarage_number_of_order_last_week', 'Please select orders last week.');
+      errors.push('avarage_number_of_order_last_week');
+    }
+    if (!document.getElementById('avarage_number_of_order_done_last_month').value) {
+      showBubbleError('avarage_number_of_order_done_last_month', 'Please select orders last month.');
+      errors.push('avarage_number_of_order_done_last_month');
+    }
+    if (!document.getElementById('avarage_number_of_order_expect_next_month').value) {
+      showBubbleError('avarage_number_of_order_expect_next_month', 'Please select expected orders next month.');
+      errors.push('avarage_number_of_order_expect_next_month');
+    }
+    if (!document.getElementById('current_courier_provider').value) {
+      showBubbleError('current_courier_provider', 'Please select your current courier provider.');
+      errors.push('current_courier_provider');
+    }
+    if (!document.getElementById('delivery_coverage').value) {
+      showBubbleError('delivery_coverage', 'Please select delivery coverage.');
+      errors.push('delivery_coverage');
+    }
+    if (!document.getElementById('preferred_start_date').value) {
+      showBubbleError('preferred_start_date', 'Please select when you want to start.');
+      errors.push('preferred_start_date');
+    }
+  } else if (step === 3) {
+    if (!document.getElementById('type_of_pickup_location').value) {
+      showBubbleError('type_of_pickup_location', 'Please select type of pickup location.');
+      errors.push('type_of_pickup_location');
+    }
+    if (!document.getElementById('preferred_communication_channel').value) {
+      showBubbleError('preferred_communication_channel', 'Please select a preferred communication channel.');
+      errors.push('preferred_communication_channel');
+    }
+    if (!document.getElementById('is_delivery_free_to_customers').value) {
+      showBubbleError('is_delivery_free_to_customers', 'Please select delivery pricing for customers.');
+      errors.push('is_delivery_free_to_customers');
+    }
+  }
+  if (errors.length > 0) {
+    var firstId = errors[0];
+    var firstEl = document.getElementById(firstId);
+    if (firstEl) firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  return errors.length === 0;
+}
+
+document.getElementById('wppi_btn_next_1') && document.getElementById('wppi_btn_next_1').addEventListener('click', function (e) {
+  if (!validateStep(1)) e.preventDefault();
+});
+document.getElementById('wppi_btn_next_2') && document.getElementById('wppi_btn_next_2').addEventListener('click', function (e) {
+  if (!validateStep(2)) e.preventDefault();
+});
+document.getElementById('wppi_btn_submit') && document.getElementById('wppi_btn_submit').addEventListener('click', function (e) {
+  if (!validateStep(3)) e.preventDefault();
+});
 
 // ── Location field toggle ────────────────────────────────────────────────────
 function toggleLocationFields() {

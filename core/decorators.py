@@ -21,6 +21,18 @@ from django.contrib import messages
 logger = logging.getLogger('core.permissions')
 
 
+def is_superadmin(user):
+    """
+    Returns True if the user is a superadmin.
+    Checks Profile.is_superadmin OR Django's User.is_superuser.
+    Safe to call with any user object.
+    """
+    if getattr(user, 'is_superuser', False):
+        return True
+    profile = getattr(user, 'profile', None)
+    return bool(profile and getattr(profile, 'is_superadmin', False))
+
+
 def staff_required(view_func=None, redirect_url=None):
     """
     Decorator to require staff access.

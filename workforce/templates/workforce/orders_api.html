@@ -1,0 +1,312 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Order Auto/API — Staff Dashboard{% endblock %}
+
+{% block content %}
+<div class="woa">
+    <!-- Header -->
+    <div class="woa__hero">
+        <div class="woa__hero-content">
+            <h1 class="woa__hero-title">
+                <i class="fa-solid fa-plug me-2"></i>Order Auto/API
+            </h1>
+            <p class="woa__hero-sub">Orders imported via Shopify, WooCommerce, TikTok Shop &amp; other integrations</p>
+        </div>
+    </div>
+
+    <div class="p-3">
+        <!-- Filters -->
+        <div class="woa__card woa__card--select mb-3">
+            <div class="woa__card-body">
+                <!-- Business filter row -->
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                    <span class="woa__form-label mb-0 me-1 text-nowrap"><i class="fa-solid fa-store me-1"></i>Business:</span>
+                    <a href="{% url 'workforce:wf_api_orders' %}{% if status_filter %}?status={{ status_filter }}{% endif %}"
+                       class="btn btn-sm {% if not selected_business_id %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        All
+                    </a>
+                    {% for biz in api_businesses %}
+                    <a href="?business={{ biz.business_id }}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+                       class="btn btn-sm {% if selected_business_id == biz.business_id|stringformat:'s' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        {{ biz.business_name }}
+                        {% for cfg in biz.business_settings_api.all %}{% if cfg.is_verify_api %}
+                        <span class="badge bg-success ms-1" style="font-size:0.6rem;">{{ cfg.api_type|upper }}</span>
+                        {% endif %}{% endfor %}
+                    </a>
+                    {% empty %}
+                    <span class="text-muted small">No approved API integrations yet.</span>
+                    {% endfor %}
+                </div>
+                <!-- Status filter row -->
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span class="woa__form-label mb-0 me-1 text-nowrap"><i class="fa-solid fa-filter me-1"></i>Show:</span>
+                    <a href="?{% if selected_business_id %}business={{ selected_business_id }}&{% endif %}"
+                       class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        All
+                    </a>
+                    <a href="?{% if selected_business_id %}business={{ selected_business_id }}&{% endif %}status=not_imported"
+                       class="btn btn-sm {% if status_filter == 'not_imported' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+                        <i class="fa-solid fa-clock me-1"></i>Not Imported
+                    </a>
+                    <a href="?{% if selected_business_id %}business={{ selected_business_id }}&{% endif %}status=imported"
+                       class="btn btn-sm {% if status_filter == 'imported' %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                        <i class="fa-solid fa-circle-check me-1"></i>Imported
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {% if selected_business and selected_api %}
+        <!-- Live API Orders (fetched directly from platform) -->
+
+        {% if live_error %}
+        <div class="alert alert-danger">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            <strong>API Error:</strong> {{ live_error }}
+        </div>
+        {% endif %}
+
+        <!-- Bulk Action Bar -->
+        <div id="wfapi_bulk_bar" class="d-none mb-3 p-2 rounded d-flex align-items-center gap-3" style="background:#fef9c3; border:1px solid #fde047;">
+            <span class="fw-semibold small"><span id="wfapi_selected_count">0</span> order(s) selected</span>
+            <button type="button" class="btn btn-success btn-sm" id="wfapi_transfer_btn">
+                <i class="fa-solid fa-circle-check me-1"></i> Import to Main Orders
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="wfapi_deselect_btn">
+                <i class="fa-solid fa-xmark me-1"></i> Deselect All
+            </button>
+            <div id="wfapi_transfer_status" class="small ms-2"></div>
+        </div>
+
+        <div class="woa__card">
+            <div class="woa__card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fa-solid fa-plug me-2 woa__icon-accent"></i>
+                    <span class="woa__section-label">
+                        {{ selected_business.business_name }} — Live {{ selected_api.api_type|title }} Orders
+                    </span>
+                    {% if live_total %}
+                    <span class="badge bg-secondary ms-2">{{ live_total }} total</span>
+                    {% endif %}
+                    {% if live_orders %}
+                    <span class="badge bg-info text-dark ms-1">showing {{ live_orders|length }}</span>
+                    {% endif %}
+                </div>
+                {% if live_orders %}
+                <label class="d-flex align-items-center gap-1 small text-muted mb-0" style="cursor:pointer;">
+                    <input type="checkbox" id="wfapi_select_all"> Select all
+                </label>
+                {% endif %}
+            </div>
+            <div class="woa__card-body p-0">
+                {% if live_orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:36px;"></th>
+                                <th>Order #</th>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Address</th>
+                                <th>COD</th>
+                                <th>Country</th>
+                                <th>Status</th>
+                                {% if selected_api.api_type == 'shopify' %}<th>Fulfillment</th>{% endif %}
+                                <th>Date</th>
+                                <th>Imported</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in live_orders %}
+                            <tr class="{% if o.imported %}table-success{% endif %}">
+                                <td>
+                                    {% if not o.imported %}
+                                    <input type="checkbox" class="wfapi-check form-check-input" value="{{ o.platform_id }}" data-source="{{ o.source }}">
+                                    {% else %}
+                                    <i class="fa-solid fa-circle-check text-success"></i>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-semibold">{{ o.name }}</td>
+                                <td>{{ o.customer|default:'—'|truncatechars:20 }}</td>
+                                <td class="text-muted small">{{ o.phone|default:'—' }}</td>
+                                <td class="text-muted small">{{ o.address|default:'—'|truncatechars:30 }}</td>
+                                <td>{% if o.cod %}<span class="fw-semibold">{{ o.cod }} {{ o.currency }}</span>{% else %}—{% endif %}</td>
+                                <td class="text-muted small">{{ o.country|default:'—' }}</td>
+                                <td><span class="badge bg-light text-dark border">{{ o.status|default:'—' }}</span></td>
+                                {% if selected_api.api_type == 'shopify' %}<td><span class="badge bg-light text-dark border">{{ o.fulfillment|default:'—' }}</span></td>{% endif %}
+                                <td class="text-muted small">{{ o.date|default:'—' }}</td>
+                                <td>
+                                    {% if o.imported %}
+                                    <a href="{% url 'workforce:order_detail' o.imported_order_id %}"
+                                       class="badge bg-success text-decoration-none"
+                                       title="View imported order">
+                                        <i class="fa-solid fa-circle-check me-1"></i>{{ o.imported_order_number }}
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% elif not live_error %}
+                <div class="woa__empty">
+                    <i class="fa-solid fa-inbox"></i>
+                    <h3>No Orders Found</h3>
+                    <p>No orders returned from {{ selected_api.api_type|title }} API.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+            <div class="small text-muted">
+                Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ total_filtered }}
+                {% if live_total and live_total != total_filtered %} ({{ live_total }} total in sheet){% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <select class="form-select form-select-sm" style="width:auto;"
+                        onchange="window.location.href='?business={{ selected_business_id }}&status={{ status_filter }}&per_page='+this.value+'&page=1'">
+                    <option value="25"  {% if per_page == 25  %}selected{% endif %}>25 / page</option>
+                    <option value="50"  {% if per_page == 50  %}selected{% endif %}>50 / page</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100 / page</option>
+                    <option value="200" {% if per_page == 200 %}selected{% endif %}>200 / page</option>
+                </select>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">‹</a>
+                        </li>
+                        {% endif %}
+                        {% for p in page_obj.paginator.page_range %}
+                        {% if p == page_obj.number %}
+                        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                        {% elif p == 1 or p == page_obj.paginator.num_pages or p >= page_obj.number|add:"-2" and p <= page_obj.number|add:"2" %}
+                        <li class="page-item">
+                            <a class="page-link" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ p }}">{{ p }}</a>
+                        </li>
+                        {% elif p == page_obj.number|add:"-3" or p == page_obj.number|add:"3" %}
+                        <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                        {% endfor %}
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}">›</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- No business selected: prompt to pick one -->
+        <div class="woa__card">
+            <div class="woa__card-body">
+                <div class="woa__empty">
+                    <i class="fa-solid fa-arrow-pointer"></i>
+                    <h3>Select a Business</h3>
+                    <p>Choose an approved API business above to load their live orders.</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const selectAll = document.getElementById('wfapi_select_all');
+    const bulkBar  = document.getElementById('wfapi_bulk_bar');
+    const countEl  = document.getElementById('wfapi_selected_count');
+    const transferBtn = document.getElementById('wfapi_transfer_btn');
+    const deselectBtn = document.getElementById('wfapi_deselect_btn');
+    const statusEl = document.getElementById('wfapi_transfer_status');
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+             || document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    function getChecked() {
+        return [...document.querySelectorAll('.wfapi-check:checked')];
+    }
+
+    function updateBar() {
+        const checked = getChecked();
+        countEl.textContent = checked.length;
+        bulkBar.classList.toggle('d-none', checked.length === 0);
+    }
+
+    document.addEventListener('change', function(e) {
+        if (e.target.matches('.wfapi-check')) updateBar();
+    });
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.wfapi-check').forEach(cb => cb.checked = this.checked);
+            updateBar();
+        });
+    }
+
+    if (deselectBtn) {
+        deselectBtn.addEventListener('click', function() {
+            document.querySelectorAll('.wfapi-check').forEach(cb => cb.checked = false);
+            if (selectAll) selectAll.checked = false;
+            updateBar();
+        });
+    }
+
+    if (transferBtn) {
+        transferBtn.addEventListener('click', async function() {
+            const checked = getChecked();
+            if (!checked.length) return;
+
+            transferBtn.disabled = true;
+            statusEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Importing...</span>';
+
+            const body = new URLSearchParams();
+            body.append('csrfmiddlewaretoken', csrf);
+            body.append('business_id', '{{ selected_business_id }}');
+            body.append('source', checked[0].dataset.source || '');
+            checked.forEach(cb => body.append('platform_ids[]', cb.value));
+
+            try {
+                const resp = await fetch('{% url "workforce:import_api_orders" %}', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrf },
+                    body: body
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    let msg = result.created + ' order(s) imported';
+                    if (result.skipped) msg += ', ' + result.skipped + ' already existed';
+                    if (result.errors && result.errors.length) msg += ' (' + result.errors.length + ' errors)';
+                    statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + msg + '</span>';
+                    checked.forEach(cb => {
+                        const row = cb.closest('tr');
+                        if (row) row.classList.add('table-success');
+                        cb.disabled = true;
+                    });
+                    if (selectAll) selectAll.checked = false;
+                    updateBar();
+                } else {
+                    statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>' + (result.error || 'Failed') + '</span>';
+                }
+            } catch(err) {
+                statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>Network error</span>';
+            } finally {
+                transferBtn.disabled = false;
+            }
+        });
+    }
+})();
+</script>
+{% endblock extra_js %}

@@ -123,15 +123,15 @@
                             <label class="form-label text-muted small">Order Status</label>
                             <p class="mb-0">
                                 {% if order.order_status == 'to_review' %}
-                                <span class="badge bg-warning text-dark fs-6">To Review</span>
+                                <span class="badge badge-warning">To Review</span>
                                 {% elif order.order_status == 'to_publish' %}
-                                <span class="badge bg-info fs-6">To Publish</span>
+                                <span class="badge badge-info">To Publish</span>
                                 {% elif order.order_status == 'published' %}
-                                <span class="badge bg-success fs-6">Published</span>
+                                <span class="badge badge-success">Published</span>
                                 {% elif order.order_status == 'cancelled' %}
-                                <span class="badge bg-danger fs-6">Cancelled</span>
+                                <span class="badge badge-error">Cancelled</span>
                                 {% else %}
-                                <span class="badge bg-secondary fs-6">{{ order.order_status }}</span>
+                                <span class="badge bg-secondary">{{ order.order_status }}</span>
                                 {% endif %}
                             </p>
                         </div>
@@ -361,7 +361,7 @@
                     </p>
                     <p class="mb-2">
                         <strong>Status:</strong>
-                        <span class="badge bg-info">{{ delivery_task.dl_task_status }}</span>
+                        <span class="badge badge-info">{{ delivery_task.dl_task_status }}</span>
                     </p>
                     {% if delivery_task.driver %}
                     <p class="mb-0">
@@ -886,8 +886,8 @@ async function aiVerifyOrderDetail(orderNumber) {
             await delay(300);
 
             const statusBadge = result.is_valid ?
-                '<span class="badge bg-success">Valid</span>' :
-                '<span class="badge bg-danger">Issues Found</span>';
+                '<span class="badge badge-success">Valid</span>' :
+                '<span class="badge badge-error">Issues Found</span>';
 
             let issuesHtml = '';
             if (result.issues && result.issues.length > 0) {
@@ -1207,7 +1207,7 @@ async function aiEstimateDeliveryDetail(orderNumber) {
                     <div class="aim__result-card-header">
                         <i class="fa-solid fa-clock"></i>
                         <strong>Delivery Time Estimate</strong>
-                        <span class="ms-auto badge bg-success">${result.estimate.min_minutes}-${result.estimate.max_minutes} min</span>
+                        <span class="ms-auto badge badge-success">${result.estimate.min_minutes}-${result.estimate.max_minutes} min</span>
                     </div>
                     <div class="aim__result-grid">
                         <div class="aim__result-item">
@@ -1377,7 +1377,7 @@ async function aiSuggestDriverDetail(orderId, orderNumber) {
                     <div class="aim__result-card-header">
                         <i class="fa-solid fa-motorcycle"></i>
                         <strong>Driver Suggestions</strong>
-                        <span class="ms-auto badge bg-success">${result.count} found</span>
+                        <span class="ms-auto badge badge-success">${result.count} found</span>
                     </div>
                     <div class="aim__result-grid">
                         <div class="aim__result-item">

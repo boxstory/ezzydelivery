@@ -320,7 +320,18 @@
       else if (currentPath.includes('/workforce/') && currentPath.includes('orders')) {
         targetDropdownId = 'submenu-orders';
       }
-      // Tasks/Deliveries URLs
+      // Reports section: task-sheets, reports, receipt-templates, documents, licenses
+      else if (currentPath.includes('/workforce/') && (
+        currentPath.includes('task-sheet') ||
+        currentPath.includes('/reports') ||
+        currentPath.includes('receipt-template') ||
+        currentPath.includes('document') ||
+        currentPath.includes('license') ||
+        currentPath.includes('vehicle')
+      )) {
+        targetDropdownId = 'submenu-reports';
+      }
+      // Tasks/Deliveries URLs (must come after reports to avoid matching task-sheet)
       else if (currentPath.includes('/workforce/') && (currentPath.includes('task') || currentPath.includes('delivery') || currentPath.includes('dl_'))) {
         targetDropdownId = 'submenu-deliveries';
       }
@@ -328,13 +339,9 @@
       else if (currentPath.includes('/workforce/') && currentPath.includes('dms')) {
         targetDropdownId = 'submenu-dms';
       }
-      // Fleet URLs
+      // Fleet URLs (drivers, COD, earnings — not task-sheets which is caught above)
       else if (currentPath.includes('/workforce/') && currentPath.includes('fleet')) {
         targetDropdownId = 'submenu-accounts';
-      }
-      // Document URLs
-      else if (currentPath.includes('/workforce/') && (currentPath.includes('document') || currentPath.includes('license') || currentPath.includes('vehicle'))) {
-        targetDropdownId = 'submenu-documents';
       }
       // Inventory URLs (workforce)
       else if (currentPath.includes('/workforce/') && currentPath.includes('inventory')) {

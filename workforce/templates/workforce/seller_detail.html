@@ -111,28 +111,28 @@
                             <div class="sld__order-text">Delivered</div>
                         </div>
                         <div class="sld__order-cell">
-                            <div class="sld__order-num sld__order-num--warning">{{ order_stats.pending_orders|default:0 }}</div>
-                            <div class="sld__order-text">Pending</div>
+                            <div class="sld__order-num sld__order-num--info">{{ order_stats.active_orders|default:0 }}</div>
+                            <div class="sld__order-text">Active</div>
                         </div>
                         <div class="sld__order-cell">
-                            <div class="sld__order-num sld__order-num--info">{{ order_stats.processing_orders|default:0 }}</div>
-                            <div class="sld__order-text">Processing</div>
+                            <div class="sld__order-num sld__order-num--warning">{{ order_stats.ready_orders|default:0 }}</div>
+                            <div class="sld__order-text">Ready</div>
+                        </div>
+                        <div class="sld__order-cell">
+                            <div class="sld__order-num sld__order-num--muted">{{ order_stats.to_review_orders|default:0 }}</div>
+                            <div class="sld__order-text">Review</div>
                         </div>
                         <div class="sld__order-cell">
                             <div class="sld__order-num sld__order-num--danger">{{ order_stats.cancelled_orders|default:0 }}</div>
                             <div class="sld__order-text">Cancelled</div>
                         </div>
-                        <div class="sld__order-cell">
-                            <div class="sld__order-num sld__order-num--muted">{{ order_stats.failed_orders|default:0 }}</div>
-                            <div class="sld__order-text">Failed</div>
-                        </div>
                     </div>
                     {% if order_stats.total_orders > 0 %}
                     <div class="sld__progress">
-                        {% with d=order_stats.delivered_orders|default:0 p=order_stats.pending_orders|default:0 pr=order_stats.processing_orders|default:0 c=order_stats.cancelled_orders|default:0 t=order_stats.total_orders %}
+                        {% with d=order_stats.delivered_orders|default:0 a=order_stats.active_orders|default:0 r=order_stats.ready_orders|default:0 c=order_stats.cancelled_orders|default:0 t=order_stats.total_orders %}
                         <div class="sld__progress-bar sld__progress-bar--success" style="width: {% widthratio d t 100 %}%;"></div>
-                        <div class="sld__progress-bar sld__progress-bar--warning" style="width: {% widthratio p t 100 %}%;"></div>
-                        <div class="sld__progress-bar sld__progress-bar--info" style="width: {% widthratio pr t 100 %}%;"></div>
+                        <div class="sld__progress-bar sld__progress-bar--info" style="width: {% widthratio a t 100 %}%;"></div>
+                        <div class="sld__progress-bar sld__progress-bar--warning" style="width: {% widthratio r t 100 %}%;"></div>
                         <div class="sld__progress-bar sld__progress-bar--danger" style="width: {% widthratio c t 100 %}%;"></div>
                         {% endwith %}
                     </div>
@@ -165,6 +165,31 @@
                     </div>
                 </div>
                 {% endif %}
+
+                <!-- Recent Activity -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-clock-rotate-left sld__section-icon"></i> Recent Activity
+                    </h3>
+                    {% if recent_orders %}
+                    <ul class="sld__activity-list">
+                        {% for order in recent_orders %}
+                        <li class="sld__activity-item">
+                            <span class="sld__activity-dot {% if order.order_status == 'delivered' %}sld__activity-dot--success{% elif order.order_status == 'pending' %}sld__activity-dot--warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}sld__activity-dot--danger{% endif %}"></span>
+                            <div class="sld__activity-body">
+                                <div class="sld__activity-title">#{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</div>
+                                <div class="sld__activity-meta">{{ order.order_status|title }} &bull; {{ order.created_at|timesince }} ago</div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="sld__empty-msg">
+                        <i class="fa-solid fa-inbox"></i>
+                        No recent orders
+                    </div>
+                    {% endif %}
+                </div>
 
                 <!-- Quick Actions -->
                 <div class="sld__section">
@@ -201,15 +226,17 @@
                                 <span class="fw-semibold small">User Profile</span>
                                 <span class="badge {% if user_completion == 100 %}bg-success{% elif user_completion >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ user_completion }}%</span>
                             </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar {% if user_completion == 100 %}bg-success{% elif user_completion >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ user_completion }}%;"></div>
+                            <div class="sld__segments">
+                                <div class="sld__segment {% if user_profile and user_profile.first_name %}sld__segment--done{% endif %}" title="First Name"></div>
+                                <div class="sld__segment {% if user_profile and user_profile.last_name %}sld__segment--done{% endif %}" title="Last Name"></div>
+                                <div class="sld__segment {% if user_profile and user_profile.email %}sld__segment--done{% endif %}" title="Email"></div>
+                                <div class="sld__segment {% if user_profile and user_profile.phone %}sld__segment--done{% endif %}" title="Phone"></div>
                             </div>
-                            <div class="small text-muted mt-1">
-                                {% if user_profile %}
-                                {{ user_profile.first_name|default:"" }} {{ user_profile.last_name|default:"" }}
-                                {% if user_profile.phone %} &bull; {{ user_profile.phone }}{% endif %}
-                                {% if user_profile.email %} &bull; {{ user_profile.email }}{% endif %}
-                                {% else %}No profile found{% endif %}
+                            <div class="sld__segment-labels">
+                                <span class="{% if user_profile and user_profile.first_name %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">First</span>
+                                <span class="{% if user_profile and user_profile.last_name %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">Last</span>
+                                <span class="{% if user_profile and user_profile.email %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">Email</span>
+                                <span class="{% if user_profile and user_profile.phone %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">Phone</span>
                             </div>
                         </div>
                         <!-- Business Registration Completion -->
@@ -218,17 +245,21 @@
                                 <span class="fw-semibold small">Business Registration</span>
                                 <span class="badge {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ completion_percentage }}%</span>
                             </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ completion_percentage }}%;"></div>
+                            <div class="sld__segments">
+                                <div class="sld__segment {% if business.business_name %}sld__segment--done{% endif %}" title="Name"></div>
+                                <div class="sld__segment {% if business.business_phone %}sld__segment--done{% endif %}" title="Phone"></div>
+                                <div class="sld__segment {% if business.business_whatsapp %}sld__segment--done{% endif %}" title="WhatsApp"></div>
+                                <div class="sld__segment {% if business.business_email %}sld__segment--done{% endif %}" title="Email"></div>
+                                <div class="sld__segment {% if business.business_product_category %}sld__segment--done{% endif %}" title="Category"></div>
+                                <div class="sld__segment {% if business.business_qid %}sld__segment--done{% endif %}" title="QID"></div>
                             </div>
-                            <div class="small text-muted mt-1">
-                                {% if not business.business_name %}<span class="text-danger">Name</span> {% endif %}
-                                {% if not business.business_phone %}<span class="text-danger">Phone</span> {% endif %}
-                                {% if not business.business_whatsapp %}<span class="text-danger">WhatsApp</span> {% endif %}
-                                {% if not business.business_email %}<span class="text-danger">Email</span> {% endif %}
-                                {% if not business.business_product_category %}<span class="text-danger">Category</span> {% endif %}
-                                {% if not business.business_qid %}<span class="text-danger">QID</span> {% endif %}
-                                {% if completion_percentage == 100 %}<span class="text-success">All fields complete</span>{% else %}<span class="text-danger small">Missing fields</span>{% endif %}
+                            <div class="sld__segment-labels">
+                                <span class="{% if business.business_name %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">Name</span>
+                                <span class="{% if business.business_phone %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">Phone</span>
+                                <span class="{% if business.business_whatsapp %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">WA</span>
+                                <span class="{% if business.business_email %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">Email</span>
+                                <span class="{% if business.business_product_category %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">Cat.</span>
+                                <span class="{% if business.business_qid %}sld__seg-lbl--done{% else %}sld__seg-lbl--miss{% endif %}">QID</span>
                             </div>
                         </div>
                         <!-- Verification Status -->
@@ -236,9 +267,9 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="fw-semibold small">Verification</span>
                                 {% if business.profile and business.profile.verification_status == 'verified' %}
-                                <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Verified</span>
+                                <span class="badge badge-success"><i class="fa-solid fa-check me-1"></i>Verified</span>
                                 {% elif business.profile and business.profile.verification_status == 'pending' %}
-                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Pending</span>
+                                <span class="badge badge-warning"><i class="fa-solid fa-clock me-1"></i>Pending</span>
                                 {% else %}
                                 <span class="badge bg-secondary">Not Applied</span>
                                 {% endif %}
@@ -303,36 +334,11 @@
                             <span class="sld__contact-icon"><i class="fa-solid fa-warehouse"></i></span>
                             <div class="sld__contact-body">
                                 <div class="sld__contact-lbl">Fulfillment</div>
-                                <div class="sld__contact-val"><span class="badge bg-success">Active</span></div>
+                                <div class="sld__contact-val"><span class="badge badge-success">Active</span></div>
                             </div>
                         </li>
                         {% endif %}
                     </ul>
-                </div>
-
-                <!-- Recent Activity -->
-                <div class="sld__section">
-                    <h3 class="sld__section-title">
-                        <i class="fa-solid fa-clock-rotate-left sld__section-icon"></i> Recent Activity
-                    </h3>
-                    {% if recent_orders %}
-                    <ul class="sld__activity-list">
-                        {% for order in recent_orders %}
-                        <li class="sld__activity-item">
-                            <span class="sld__activity-dot {% if order.order_status == 'delivered' %}sld__activity-dot--success{% elif order.order_status == 'pending' %}sld__activity-dot--warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}sld__activity-dot--danger{% endif %}"></span>
-                            <div class="sld__activity-body">
-                                <div class="sld__activity-title">#{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</div>
-                                <div class="sld__activity-meta">{{ order.order_status|title }} &bull; {{ order.created_at|timesince }} ago</div>
-                            </div>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <div class="sld__empty-msg">
-                        <i class="fa-solid fa-inbox"></i>
-                        No recent orders
-                    </div>
-                    {% endif %}
                 </div>
 
                 <!-- Contact Info -->
@@ -573,41 +579,93 @@
             <i class="fa-solid fa-folder-open sld__section-icon"></i> Business Documents
         </h3>
         {% if documents %}
-        {% for doc in documents %}
-        <div class="sld__doc-card">
-            <div class="sld__doc-icon">
-                <i class="fa-solid fa-{% if doc.document_type == 'license' %}certificate{% elif doc.document_type == 'id' %}id-card{% else %}file-alt{% endif %}"></i>
-            </div>
-            <div class="sld__doc-info">
-                <div class="sld__doc-type">{{ doc.document_type|default:"Document"|title }}</div>
-                <div class="sld__doc-number">{{ doc.document_no|default:"N/A" }}</div>
-                {% if doc.document_expiry_date %}
-                <div class="sld__doc-expiry">
-                    Expires: {{ doc.document_expiry_date|date:"d M Y" }}
-                    {% if doc.document_expiry_date < now %}
-                    <span class="sld__badge sld__badge--danger sld__badge--sm">Expired</span>
+        <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Type</th>
+                    <th>Number / Name</th>
+                    <th>Expiry</th>
+                    <th>View</th>
+                    <th>Download</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for doc in documents %}
+            <tr>
+                <td>
+                    <i class="fa-solid fa-{% if doc.document_type == 'license' %}certificate{% elif doc.document_type == 'id' %}id-card{% else %}file-alt{% endif %} me-1 text-muted"></i>
+                    {{ doc.document_type|default:"Document"|title }}
+                </td>
+                <td class="fw-semibold">{{ doc.document_no|default:"—" }}</td>
+                <td>
+                    {% if doc.document_expiry_date %}
+                        {{ doc.document_expiry_date|date:"d M Y" }}
+                        {% if doc.document_expiry_date < now %}
+                        <span class="badge bg-danger ms-1">Expired</span>
+                        {% endif %}
+                    {% else %}
+                    <span class="text-muted">—</span>
                     {% endif %}
-                </div>
-                {% endif %}
-            </div>
-            {% if doc.document_file and doc.document_file.name %}
-            <button type="button" class="sld__doc-btn sld__doc-btn--available doc-view-btn"
-                    data-doc-url="{{ doc.document_file.url }}"
-                    data-doc-title="{{ doc.document_type|default:'Document'|title }} - {{ doc.document_no }}">
-                <i class="fa-solid fa-eye"></i> View
-            </button>
-            {% else %}
-            <span class="sld__doc-btn sld__doc-btn--unavailable">
-                <i class="fa-solid fa-eye-slash"></i> No File
-            </span>
-            {% endif %}
+                </td>
+                <td>
+                    {% if doc.document_file and doc.document_file.name %}
+                    <button type="button" class="btn btn-sm btn-outline-primary doc-view-btn"
+                            data-doc-url="{{ doc.document_file.url }}"
+                            data-doc-title="{{ doc.document_type|default:'Document'|title }} - {{ doc.document_no }}">
+                        <i class="fa-solid fa-eye"></i> View
+                    </button>
+                    {% else %}
+                    <span class="text-muted small">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if doc.document_file and doc.document_file.name %}
+                    <a href="{{ doc.document_file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                        <i class="fa-solid fa-download"></i> Download
+                    </a>
+                    {% else %}
+                    <span class="text-muted small">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="d-flex gap-1">
+                    <button type="button" class="btn btn-sm btn-outline-warning sld-doc-edit-btn"
+                            data-field="{{ doc.field_name }}"
+                            data-label="{{ doc.document_type|default:'Document'|title }}"
+                            data-type="{{ doc.field_type|default:'text' }}"
+                            data-current="{{ doc.document_no|default:'' }}"
+                            data-url="{% if doc.current_logo %}{{ doc.current_logo.url }}{% elif doc.document_file and doc.document_file.name %}{{ doc.document_file.url }}{% endif %}">
+                        <i class="fa-solid fa-pen"></i> Edit
+                    </button>
+                    {% if doc.document_file and doc.document_file.name %}
+                    <button type="button" class="btn btn-sm btn-outline-danger sld-doc-del-btn"
+                            data-field="{{ doc.field_name }}"
+                            data-label="{{ doc.document_type|default:'Document'|title }}">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                    {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
         </div>
-        {% endfor %}
+        <div class="mt-2">
+            <a href="{% url 'workforce:store_document_detail' business.business_id %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fa-solid fa-folder-open me-1"></i> Manage All Documents
+            </a>
+        </div>
         {% else %}
         <div class="sld__empty-msg">
             <i class="fa-solid fa-folder-open"></i>
             No documents uploaded
         </div>
+        <a href="{% url 'workforce:store_document_detail' business.business_id %}" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="fa-solid fa-folder-open me-1"></i> Manage Documents
+        </a>
         {% endif %}
     </div>
 
@@ -867,6 +925,53 @@
         <div id="updateMessage" class="sld__toast"></div>
     </div>
 
+<!-- Doc Field Edit Modal -->
+<div id="sldDocEditModal" class="sld__modal-overlay">
+    <div class="sld__modal" style="max-width:480px;">
+        <div class="sld__modal-header">
+            <h4 class="sld__modal-title" id="sldDocEditTitle">Edit Field</h4>
+            <button type="button" class="sld__modal-close" id="sldDocEditClose"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="sld__modal-body">
+            <!-- Current value section -->
+            <div id="sldDocCurrentSection" class="mb-3 p-2 rounded" style="background:#f8f9fa; border:1px solid #e9ecef;">
+                <div class="small text-muted mb-1 fw-semibold">Current Value</div>
+                <div id="sldDocCurrentText" class="fw-semibold"></div>
+                <div id="sldDocCurrentImgWrap" class="d-none mt-2">
+                    <img id="sldDocCurrentImg" src="" alt="Current" style="max-width:100%; max-height:160px; border-radius:4px; border:1px solid #dee2e6;">
+                </div>
+                <div id="sldDocNoFile" class="d-none text-muted small fst-italic">No file uploaded yet</div>
+            </div>
+            <form id="sldDocEditForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="field" id="sldDocEditField">
+                <input type="hidden" name="action" value="update">
+                <!-- Text field (e.g. QID) -->
+                <div id="sldDocEditTextWrap">
+                    <label class="form-label small fw-semibold" id="sldDocEditLabel">New Value</label>
+                    <input type="text" name="value" id="sldDocEditTextInput" class="form-control form-control-sm" placeholder="Enter value...">
+                </div>
+                <!-- File upload (e.g. Logo) -->
+                <div id="sldDocEditFileWrap" class="d-none">
+                    <label class="form-label small fw-semibold">Upload New Image / File</label>
+                    <input type="file" name="value" id="sldDocEditFileInput" class="form-control form-control-sm" accept="image/*,.pdf">
+                    <div id="sldDocNewPreviewWrap" class="d-none mt-2">
+                        <div class="small text-muted mb-1">New file preview:</div>
+                        <img id="sldDocNewPreview" src="" alt="Preview" style="max-width:100%; max-height:140px; border-radius:4px; border:1px solid #dee2e6;">
+                    </div>
+                </div>
+                <div id="sldDocEditMsg" class="small mt-2"></div>
+            </form>
+        </div>
+        <div class="sld__modal-footer">
+            <button type="button" class="sld__modal-btn sld__modal-btn--primary" id="sldDocEditSave">
+                <i class="fa-solid fa-save me-1"></i> Save
+            </button>
+            <button type="button" class="sld__modal-btn sld__modal-btn--secondary" id="sldDocEditCancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
 </div>
 {% endblock content %}
 
@@ -912,6 +1017,139 @@ document.getElementById('docModalClose').addEventListener('click', closeDocModal
 document.getElementById('docModalCloseBtn').addEventListener('click', closeDocModal);
 docModal.addEventListener('click', function(e) { if (e.target === docModal) closeDocModal(); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && docModal.classList.contains('show')) closeDocModal(); });
+
+// Doc field edit/delete
+(function() {
+    var docEditModal = document.getElementById('sldDocEditModal');
+    var docEditTitle = document.getElementById('sldDocEditTitle');
+    var docEditField = document.getElementById('sldDocEditField');
+    var docEditLabel = document.getElementById('sldDocEditLabel');
+    var docEditTextWrap = document.getElementById('sldDocEditTextWrap');
+    var docEditFileWrap = document.getElementById('sldDocEditFileWrap');
+    var docEditTextInput = document.getElementById('sldDocEditTextInput');
+    var docEditFileInput = document.getElementById('sldDocEditFileInput');
+    var docEditMsg = document.getElementById('sldDocEditMsg');
+    var docEditSave = document.getElementById('sldDocEditSave');
+    var sldDocCurrentText = document.getElementById('sldDocCurrentText');
+    var sldDocCurrentImgWrap = document.getElementById('sldDocCurrentImgWrap');
+    var sldDocCurrentImg = document.getElementById('sldDocCurrentImg');
+    var sldDocNoFile = document.getElementById('sldDocNoFile');
+    var sldDocNewPreviewWrap = document.getElementById('sldDocNewPreviewWrap');
+    var sldDocNewPreview = document.getElementById('sldDocNewPreview');
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    var docFieldUrl = '{% url "workforce:seller_doc_field_update" business.business_id %}';
+
+    function openEditModal(field, label, type, current, url) {
+        docEditField.value = field;
+        docEditTitle.textContent = 'Edit ' + label;
+        docEditLabel.textContent = 'New ' + label;
+        docEditMsg.textContent = '';
+
+        // Populate current value section
+        if (type === 'file') {
+            sldDocCurrentText.textContent = url ? 'File uploaded' : 'No file yet';
+            if (url) {
+                sldDocCurrentImg.src = url;
+                sldDocCurrentImgWrap.classList.remove('d-none');
+                sldDocNoFile.classList.add('d-none');
+            } else {
+                sldDocCurrentImgWrap.classList.add('d-none');
+                sldDocNoFile.classList.remove('d-none');
+            }
+            // Show file upload section
+            docEditTextWrap.classList.add('d-none');
+            docEditFileWrap.classList.remove('d-none');
+            docEditFileInput.value = '';
+            sldDocNewPreviewWrap.classList.add('d-none');
+            sldDocNewPreview.src = '';
+        } else {
+            sldDocCurrentText.textContent = (current && current !== '—') ? current : '(not set)';
+            sldDocCurrentImgWrap.classList.add('d-none');
+            sldDocNoFile.classList.add('d-none');
+            // Show text input pre-filled with current value
+            docEditFileWrap.classList.add('d-none');
+            docEditTextWrap.classList.remove('d-none');
+            docEditTextInput.value = (current && current !== '—') ? current : '';
+        }
+
+        docEditModal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // Live preview for file upload
+    docEditFileInput.addEventListener('change', function() {
+        var file = this.files[0];
+        if (file && file.type.startsWith('image/')) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                sldDocNewPreview.src = e.target.result;
+                sldDocNewPreviewWrap.classList.remove('d-none');
+            };
+            reader.readAsDataURL(file);
+        } else {
+            sldDocNewPreviewWrap.classList.add('d-none');
+            sldDocNewPreview.src = '';
+        }
+    });
+
+    function closeEditModal() {
+        docEditModal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.sld-doc-edit-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            openEditModal(this.dataset.field, this.dataset.label, this.dataset.type, this.dataset.current, this.dataset.url);
+        });
+    });
+
+    document.getElementById('sldDocEditClose').addEventListener('click', closeEditModal);
+    document.getElementById('sldDocEditCancel').addEventListener('click', closeEditModal);
+    docEditModal.addEventListener('click', function(e) { if (e.target === docEditModal) closeEditModal(); });
+
+    docEditSave.addEventListener('click', function() {
+        var fd = new FormData();
+        fd.append('csrfmiddlewaretoken', csrf);
+        fd.append('field', docEditField.value);
+        fd.append('action', 'update');
+        var isFile = !docEditFileWrap.classList.contains('d-none');
+        if (isFile) {
+            var f = docEditFileInput.files[0];
+            if (!f) { docEditMsg.innerHTML = '<span class="text-danger">Please choose a file.</span>'; return; }
+            fd.append('value', f);
+        } else {
+            fd.append('value', docEditTextInput.value.trim());
+        }
+        docEditSave.disabled = true;
+        docEditSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        fetch(docFieldUrl, { method: 'POST', body: fd })
+            .then(function(r) {
+                if (!r.ok) { return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 200)); }); }
+                return r.json();
+            })
+            .then(function(data) {
+                if (data.success) { location.reload(); }
+                else { docEditMsg.innerHTML = '<span class="text-danger">' + (data.error || 'Failed') + '</span>'; docEditSave.disabled = false; docEditSave.innerHTML = '<i class="fa-solid fa-save me-1"></i> Save'; }
+            })
+            .catch(function(err) { docEditMsg.innerHTML = '<span class="text-danger">' + (err.message || 'Network error') + '</span>'; docEditSave.disabled = false; docEditSave.innerHTML = '<i class="fa-solid fa-save me-1"></i> Save'; });
+    });
+
+    document.querySelectorAll('.sld-doc-del-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var label = this.dataset.label;
+            var field = this.dataset.field;
+            if (!confirm('Clear ' + label + '? This cannot be undone.')) return;
+            var fd = new FormData();
+            fd.append('csrfmiddlewaretoken', csrf);
+            fd.append('field', field);
+            fd.append('action', 'clear');
+            fetch(docFieldUrl, { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) { if (data.success) location.reload(); else alert(data.error || 'Failed'); })
+                .catch(function() { alert('Network error'); });
+        });
+    });
+})();
 
 // Form submit
 document.getElementById('updateForm').addEventListener('submit', function(e) {

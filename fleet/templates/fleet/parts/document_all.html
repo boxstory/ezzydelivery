@@ -22,68 +22,154 @@
 
 {% block content %}
 <div class="fleet-section">
-    {% if documents %}
     <div class="fleet-list">
+
         {% for document in documents %}
-        <div class="fleet-list-item">
-            <div class="fleet-list-item__icon fleet-list-item__icon--primary">
-                <i class="fa-solid fa-file-lines"></i>
-            </div>
-            <div class="fleet-list-item__body">
-                <div class="fleet-list-item__title">{{ document.document_type }}</div>
-                <div class="fleet-list-item__meta">
-                    <span>**{{ document.document_no|slice:"-5:" }}</span>
+        <div class="fleet-doc-card">
+            <!-- Document type label -->
+            <div class="fleet-doc-card__label">
+                <span class="fleet-doc-card__type">{{ document.document_type }}</span>
+                <div class="fleet-doc-card__meta">
+                    {% if document.document_no %}<span>{{ document.document_no }}</span>{% endif %}
+                    {% if document.document_expiry_date %}
                     <span class="fleet-list-item__dot"></span>
-                    <span>Exp: {{ document.document_expiry_date|date:'M Y' }}</span>
+                    <span>Exp: {{ document.document_expiry_date|date:'d M Y' }}</span>
+                    {% endif %}
+                    {% if document.document_issued_from %}
+                    <span class="fleet-list-item__dot"></span>
+                    <span>{{ document.document_issued_from }}</span>
+                    {% endif %}
                 </div>
             </div>
-            <div class="fleet-list-item__actions">
-                <button type="button" class="fleet-btn-icon fleet-btn-icon--sm"
-                    data-bs-toggle="modal" data-bs-target="#fleet_documents_modal_view_{{ document.id }}"
-                    title="View Document">
-                    <i class="fa-solid fa-image"></i>
-                </button>
-                <a href="{% url 'fleet:driver_documents_update' fleet_id=request.user.id doc_id=document.id %}"
-                    class="fleet-btn-icon fleet-btn-icon--sm" title="Edit">
-                    <i class="fa-solid fa-pen"></i>
-                </a>
-                <a href="{% url 'fleet:driver_documents_delete' fleet_id=request.user.id doc_id=document.id %}"
-                    class="fleet-btn-icon fleet-btn-icon--sm fleet-btn-icon--danger" title="Delete">
-                    <i class="fa-solid fa-trash"></i>
-                </a>
-            </div>
-        </div>
 
-        <!-- Document View Modal -->
-        <div class="modal fade" id="fleet_documents_modal_view_{{ document.id }}" tabindex="-1"
-            aria-labelledby="fleet_documents_modal_view_label_{{ document.id }}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="fleet_documents_modal_view_label_{{ document.id }}">
-                            {{ document.document_type }}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <!-- Front + Back images side by side -->
+            <div class="fleet-doc-card__images">
+                <!-- Front -->
+                <div class="fleet-doc-card__img-col">
+                    <div class="fleet-doc-card__img-badge">Front</div>
+                    <button type="button" class="fleet-doc-card__img-wrap fleet-doc-view-btn"
+                        data-img="{{ document.document_file.url }}"
+                        data-title="{{ document.document_type }} — Front">
+                        <img src="{{ document.document_file.url }}" alt="Front">
+                        <span class="fleet-doc-card__img-tap"><i class="fa-solid fa-magnifying-glass-plus"></i></span>
+                    </button>
+                </div>
+
+                <!-- Back (if uploaded) -->
+                {% if document.document_file_back %}
+                <div class="fleet-doc-card__img-col">
+                    <div class="fleet-doc-card__img-badge">Back</div>
+                    <button type="button" class="fleet-doc-card__img-wrap fleet-doc-view-btn"
+                        data-img="{{ document.document_file_back.url }}"
+                        data-title="{{ document.document_type }} — Back">
+                        <img src="{{ document.document_file_back.url }}" alt="Back">
+                        <span class="fleet-doc-card__img-tap"><i class="fa-solid fa-magnifying-glass-plus"></i></span>
+                    </button>
+                </div>
+                {% else %}
+                <!-- Back placeholder — tap to add -->
+                <a href="{% url 'fleet:driver_documents_update' fleet_id=request.user.id doc_id=document.id %}"
+                    class="fleet-doc-card__img-col fleet-doc-card__img-col--add text-decoration-none">
+                    <div class="fleet-doc-card__img-badge">Back</div>
+                    <div class="fleet-doc-card__img-placeholder">
+                        <i class="fa-solid fa-camera-plus"></i>
+                        <span>Add back</span>
                     </div>
-                    <div class="modal-body p-2">
-                        <img class="w-100 rounded" src="{{ document.document_file.url }}" loading="lazy"
-                            alt="{{ document.document_type|default:'Document' }} image">
-                    </div>
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Actions row -->
+            <div class="fleet-doc-card__footer">
+                <div class="fleet-doc-card__actions">
+                    <a href="{% url 'fleet:driver_documents_update' fleet_id=request.user.id doc_id=document.id %}"
+                        class="fleet-btn-icon fleet-btn-icon--sm" title="Edit">
+                        <i class="fa-solid fa-pen"></i>
+                    </a>
+                    <a href="{% url 'fleet:driver_documents_delete' fleet_id=request.user.id doc_id=document.id %}"
+                        class="fleet-btn-icon fleet-btn-icon--sm fleet-btn-icon--danger" title="Delete">
+                        <i class="fa-solid fa-trash"></i>
+                    </a>
                 </div>
             </div>
         </div>
         {% endfor %}
-    </div>
-    {% else %}
-    <div class="fleet-empty">
-        <i class="fa-solid fa-file-circle-xmark fleet-empty__icon"></i>
-        <p class="fleet-empty__title">No Documents</p>
-        <p class="fleet-empty__text">Upload your documents to get verified</p>
-    </div>
-    {% endif %}
 
-    <a href="{% url 'fleet:driver_documents_upload' fleet_id=request.user.id %}" class="fleet-btn fleet-btn--primary fleet-btn--full mt-4">
-        <i class="fa-solid fa-plus me-2"></i>Add Document
-    </a>
+        {% for doc_type in missing_types %}
+        <a href="{% url 'fleet:driver_documents_upload' fleet_id=request.user.id %}?type={{ doc_type|urlencode }}"
+            class="fleet-list-item fleet-list-item--missing text-decoration-none">
+            <div class="fleet-list-item__icon fleet-list-item__icon--missing">
+                <i class="fa-solid fa-file-circle-plus"></i>
+            </div>
+            <div class="fleet-list-item__body">
+                <div class="fleet-list-item__title fleet-list-item__title--missing">{{ doc_type }}</div>
+                <div class="fleet-list-item__meta">
+                    <span class="fleet-list-item__missing-label">Tap to upload</span>
+                </div>
+            </div>
+            <div class="fleet-list-item__actions">
+                <span class="fleet-btn-icon fleet-btn-icon--sm fleet-btn-icon--missing">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                </span>
+            </div>
+        </a>
+        {% endfor %}
+
+    </div>
 </div>
+
+<!-- Document Image Lightbox -->
+<div id="fleet_doc_lightbox" class="fleet-doc-lb">
+    <div class="fleet-doc-lb__backdrop"></div>
+    <div class="fleet-doc-lb__box">
+        <div class="fleet-doc-lb__header">
+            <span id="fleet_doc_lightbox_title" class="fleet-doc-lb__title"></span>
+            <button id="fleet_doc_lightbox_close" class="fleet-doc-lb__close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="fleet-doc-lb__body">
+            <img id="fleet_doc_lightbox_img" src="" alt="Document" class="fleet-doc-lb__img">
+        </div>
+        <div class="fleet-doc-lb__footer">
+            <a id="fleet_doc_lightbox_open" href="#" target="_blank" class="fleet-btn fleet-btn--dark fleet-btn--full">
+                <i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Open Full Size
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var lb = document.getElementById('fleet_doc_lightbox');
+    var img = document.getElementById('fleet_doc_lightbox_img');
+    var title = document.getElementById('fleet_doc_lightbox_title');
+    var openLink = document.getElementById('fleet_doc_lightbox_open');
+    var closeBtn = document.getElementById('fleet_doc_lightbox_close');
+    var backdrop = lb.querySelector('.fleet-doc-lb__backdrop');
+
+    document.querySelectorAll('.fleet-doc-view-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            img.src = this.dataset.img;
+            title.textContent = this.dataset.title;
+            openLink.href = this.dataset.img;
+            lb.classList.add('fleet-doc-lb--open');
+            document.body.style.overflow = 'hidden';
+        });
+    });
+
+    function closeLb() {
+        lb.classList.remove('fleet-doc-lb--open');
+        img.src = '';
+        document.body.style.overflow = '';
+    }
+
+    closeBtn.addEventListener('click', closeLb);
+    backdrop.addEventListener('click', closeLb);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLb(); });
+})();
+</script>
 {% endblock %}

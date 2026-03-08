@@ -26,14 +26,36 @@
                 <div class="bapi__result-value">{{ status }}</div>
             </div>
             <div class="bapi__result-item">
-                <div class="bapi__result-label">Orders Found</div>
+                <div class="bapi__result-label">{% if api.api_type == 'google_sheet' %}Data Rows{% else %}Orders Found{% endif %}</div>
                 <div class="bapi__result-value">{{ order_count|default:"0" }}</div>
             </div>
             <div class="bapi__result-item">
-                <div class="bapi__result-label">Products Found</div>
+                <div class="bapi__result-label">{% if api.api_type == 'google_sheet' %}Sheets Found{% else %}Products Found{% endif %}</div>
                 <div class="bapi__result-value">{{ product_count|default:"0" }}</div>
             </div>
         </div>
+
+        <!-- Google Sheets breakdown -->
+        {% if sheets_info %}
+        <div class="bapi__sheets-list mt-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th><i class="fa-solid fa-table-cells me-1"></i>Sheet Name</th>
+                        <th class="text-end">Rows</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sheet in sheets_info %}
+                    <tr>
+                        <td>{{ sheet.name }}</td>
+                        <td class="text-end">{{ sheet.rows }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
 
         <!-- Status Section -->
         {% if status == 200 %}
@@ -131,6 +153,16 @@
                 <li><strong>Check Status:</strong> Visit {{ api.api_type|title }}'s status page for any ongoing issues</li>
                 <li><strong>Contact Support:</strong> If the issue persists, contact {{ api.api_type|title }} support</li>
             </ol>
+        </div>
+        {% elif error_message %}
+        <div class="bapi__status-section bapi__status-section--error">
+            <div class="bapi__status-icon">
+                <i class="fa-solid fa-circle-exclamation"></i>
+            </div>
+            <div class="bapi__status-content">
+                <h4>Test Failed</h4>
+                <p>{{ error_message }}</p>
+            </div>
         </div>
         {% else %}
         <div class="bapi__status-section bapi__status-section--error">

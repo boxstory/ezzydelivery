@@ -138,7 +138,7 @@
                 input.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        htmx.trigger('#filterForm', 'submit');
+                        FilterManager.submitForm();
                     }
                 });
 
@@ -170,26 +170,23 @@
             };
         },
 
-        clearAllFilters: function() {
-            const filters = this.getFilterValues();
-            Object.keys(filters).forEach(key => {
-                const element = document.getElementById(key);
-                if (element) element.value = '';
-            });
+        submitForm: function() {
+            const form = document.getElementById('filterForm');
+            if (!form) return;
+            const p = new URLSearchParams(new FormData(form));
+            // Remove empty params
+            for (const [k, v] of [...p.entries()]) { if (!v) p.delete(k); }
+            window.location.href = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
+        },
 
-            // Use HTMX to navigate
-            htmx.ajax('GET', window.location.pathname, {
-                target: '#main-content',
-                select: '#main-content',
-                swap: 'outerHTML'
-            });
-            history.pushState({}, '', window.location.pathname);
+        clearAllFilters: function() {
+            window.location.href = window.location.pathname;
         },
 
         removeFilter: function(filterKey) {
             const element = document.getElementById(filterKey);
             if (element) element.value = '';
-            htmx.trigger('#filterForm', 'submit');
+            this.submitForm();
         },
 
         updateActiveFiltersDisplay: function() {
@@ -286,7 +283,7 @@
                     break;
             }
 
-            htmx.trigger('#filterForm', 'submit');
+            this.submitForm();
         },
 
         saveFilterPreset: function() {
@@ -318,7 +315,7 @@
                     if (element) element.value = preset[key];
                 }
             });
-            htmx.trigger('#filterForm', 'submit');
+            this.submitForm();
         },
 
         deleteFilterPreset: function(index) {
@@ -930,7 +927,7 @@
             // Only open the submenu that contains the active page
             let shouldBeOpen = (collapseId === activeCollapseId);
 
-            // Apply state
+            // Apply state — always set both cases to override server-rendered show class
             if (shouldBeOpen) {
                 collapse.classList.add('show');
                 if (chevron) {
@@ -938,13 +935,18 @@
                 }
                 if (toggle) {
                     toggle.setAttribute('aria-expanded', 'true');
-                    // Only add active class to parent nav-item if this collapse contains the active page
-                    if (collapseId === activeCollapseId) {
-                        const parentNavItem = toggle.closest('.nav-item');
-                        if (parentNavItem) {
-                            parentNavItem.classList.add('active');
-                        }
+                    const parentNavItem = toggle.closest('.nav-item');
+                    if (parentNavItem) {
+                        parentNavItem.classList.add('active');
                     }
+                }
+            } else {
+                collapse.classList.remove('show');
+                if (chevron) {
+                    chevron.style.transform = 'rotate(0deg)';
+                }
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', 'false');
                 }
             }
 
@@ -1065,4 +1067,78 @@
     // setInterval(updateBadges, 60000);
     // updateBadges(); // Initial load
 
+})();
+
+/* ---------- PG-FILTER (Orders list filter) ---------- */
+(function() {
+    function el(id) { return document.getElementById(id); }
+    function isoDate(d) { return d.toISOString().split('T')[0]; }
+
+    function pgFilterSubmit() {
+        if (!el('pgf_business')) return;
+        var basePath = window.location.pathname;
+        var p = new URLSearchParams();
+        function add(k, v) { if (v) p.set(k, v); }
+        add('business',     el('pgf_business').value);
+        add('dlCode',       el('pgf_dlCode').value);
+        add('search',       el('pgf_search').value);
+        add('cStatus',      el('pgf_cStatus').value);
+        add('dlTaskStatus', el('pgf_dlTaskStatus').value);
+        add('datePreset',   el('pgf_date_preset').value);
+        add('dateFrom',     el('pgf_dateFrom').value);
+        add('dateTo',       el('pgf_dateTo').value);
+        var qs = p.toString();
+        window.location.href = basePath + (qs ? '?' + qs : '');
+    }
+
+    function pgApplyPreset(preset) {
+        var today = new Date(); today.setHours(0,0,0,0);
+        var from = '', to = '';
+        if (preset === 'today')          { from = to = isoDate(today); }
+        else if (preset === 'yesterday') { var y=new Date(today); y.setDate(y.getDate()-1); from=to=isoDate(y); }
+        else if (preset === '3days')     { var d3=new Date(today); d3.setDate(d3.getDate()-2); from=isoDate(d3); to=isoDate(today); }
+        else if (preset === 'week')      { var dw=new Date(today); dw.setDate(dw.getDate()-6); from=isoDate(dw); to=isoDate(today); }
+        else if (preset === 'month')     { var dm=new Date(today); dm.setDate(dm.getDate()-29); from=isoDate(dm); to=isoDate(today); }
+        else if (preset === 'custom')    { from = el('pgf_from_vis') ? el('pgf_from_vis').value : ''; to = el('pgf_to_vis') ? el('pgf_to_vis').value : ''; }
+        if (el('pgf_dateFrom'))    el('pgf_dateFrom').value    = from;
+        if (el('pgf_dateTo'))      el('pgf_dateTo').value      = to;
+        if (el('pgf_date_preset')) el('pgf_date_preset').value = preset;
+        if (el('pgf_from_vis'))    el('pgf_from_vis').classList.toggle('d-none', preset !== 'custom');
+        if (el('pgf_to_vis'))      el('pgf_to_vis').classList.toggle('d-none',   preset !== 'custom');
+        document.querySelectorAll('.pg-filter__date-btn').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.preset === preset);
+        });
+    }
+
+    // Use event delegation on document — works regardless of when DOM is swapped
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.pg-filter__date-btn');
+        if (!btn) return;
+        var preset = btn.dataset.preset;
+        pgApplyPreset(preset);
+        if (preset !== 'custom') pgFilterSubmit();
+    });
+
+    document.addEventListener('change', function(e) {
+        var id = e.target.id;
+        if (id === 'pgf_business' || id === 'pgf_cStatus' || id === 'pgf_dlTaskStatus') {
+            pgFilterSubmit();
+        }
+        if (id === 'pgf_from_vis') {
+            if (el('pgf_dateFrom')) el('pgf_dateFrom').value = e.target.value;
+            if (e.target.value && el('pgf_to_vis') && el('pgf_to_vis').value) pgFilterSubmit();
+        }
+        if (id === 'pgf_to_vis') {
+            if (el('pgf_dateTo')) el('pgf_dateTo').value = e.target.value;
+            if (e.target.value && el('pgf_from_vis') && el('pgf_from_vis').value) pgFilterSubmit();
+        }
+    });
+
+    document.addEventListener('keypress', function(e) {
+        var id = e.target.id;
+        if ((id === 'pgf_dlCode' || id === 'pgf_search') && e.key === 'Enter') {
+            e.preventDefault();
+            pgFilterSubmit();
+        }
+    });
 })();

@@ -95,6 +95,19 @@ color: var(--brand-primary);
 }
 ```
 
+### Staff Dashboard Font Size Rules (dashboard-modern.css)
+
+**Desktop (base styles — outside media queries):**
+- All `font-size` values > 1rem → cap at `1rem`
+- Exception: icon-only elements (e.g. `.wf-empty-state i { font-size: 3rem }`) — leave untouched
+
+**Mobile (`@media (max-width: 768px)`):**
+- All `font-size` values of `0.875rem` → change to `0.75rem`
+- All `font-size` values > 1rem → change to `0.875rem`
+- `.wfd { font-size: 0.75rem }` — base font scale for the whole dashboard wrapper
+
+**Cache busting:** Always bump `?v=` on `dashboard-modern.css` and `workforce.css` after edits, then run `collectstatic`.
+
 Please describe:
 1. What element/page has the issue
 2. Expected vs actual appearance

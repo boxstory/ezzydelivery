@@ -246,8 +246,15 @@ def driver_documents(request):
     logger.debug(f'driver_documents for driver_id={driver.driver_id}')
     documents = fleet_models.DriverDocument.objects.filter(
         driver_id=driver.driver_id)
+
+    required_types = ['QID', 'Driving License', 'Passport', 'National Identification']
+    uploaded_types = set(documents.values_list('document_type', flat=True))
+    missing_types = [t for t in required_types if t not in uploaded_types]
+
     context = {
         'documents': documents,
+        'missing_types': missing_types,
+        'fleet_id': request.user.id,
     }
     return render(request, 'fleet/parts/document_all.html', context)
 
@@ -262,7 +269,6 @@ def driver_documents_upload(request, fleet_id):
         return redirect('webpages:join_driver')
 
     logger.debug(f'driver_documents_upload for driver_id={driver.driver_id}')
-    form = fleet_forms.DriverDocumentForm()
     if request.method == 'POST':
         form = fleet_forms.DriverDocumentForm(request.POST, request.FILES)
         if form.is_valid():
@@ -272,12 +278,13 @@ def driver_documents_upload(request, fleet_id):
             f.save()
             return redirect('/fleet/documents/')
     else:
-        form = fleet_forms.DriverDocumentForm()
-        context = {
-            'form': form,
-        }
+        initial = {}
+        doc_type = request.GET.get('type')
+        if doc_type:
+            initial['document_type'] = doc_type
+        form = fleet_forms.DriverDocumentForm(initial=initial)
 
-        return render(request, 'fleet/parts/document_add.html', context)
+    return render(request, 'fleet/parts/document_add.html', {'form': form})
 
 
 @login_required(login_url='/accounts/login/')
@@ -311,8 +318,9 @@ def driver_documents_update(request, fleet_id, doc_id):
             return redirect('/fleet/documents/')
 
     context = {
-            'form': form,
-        }
+        'form': form,
+        'document': document,
+    }
 
     return render(request, 'fleet/parts/document_update.html', context)
 
@@ -1977,7 +1985,9 @@ def driver_notifications(request):
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
 
         show_unread_only = request.GET.get('filter') == 'unread'
-        notifications_qs = fleet_models.DriverNotification.objects.filter(driver=driver)
+        notifications_qs = fleet_models.DriverNotification.objects.filter(
+            driver=driver
+        ).select_related('related_task')
         if show_unread_only:
             notifications_qs = notifications_qs.filter(is_read=False)
 

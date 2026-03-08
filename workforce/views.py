@@ -127,7 +127,7 @@ def get_per_page(request, default=10):
     return str(per_page)
 
 
-def paginate_queryset(request, queryset, items_per_page=10):
+def paginate_queryset(request, queryset, items_per_page=25):
     """
     A helper function to handle pagination for a given queryset.
     Reads 'per_page' from request.GET to allow users to change page size.
@@ -290,11 +290,13 @@ def all_orders(request):
 
     # Apply filters based on GET parameters
     dl_code = request.GET.get('dlCode', '').strip()
-    c_code = request.GET.get('cCode', '').strip()
-    mobile = request.GET.get('mobile', '').strip()
+    search = request.GET.get('search', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
-    dms_status = request.GET.get('dmsStatus', '').strip()
+    dl_task_status = request.GET.get('dlTaskStatus', '').strip()
     business_id = request.GET.get('business', '').strip()
+    date_from = request.GET.get('dateFrom', '').strip()
+    date_to = request.GET.get('dateTo', '').strip()
+    date_preset = request.GET.get('datePreset', '').strip()
 
     # Filter by Business ID
     if business_id:
@@ -304,19 +306,25 @@ def all_orders(request):
     if dl_code:
         orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
 
-    # Filter by Business Order Code
-    if c_code:
-        orders = orders.filter(client_order_code__icontains=c_code)
-
-    # Filter by Customer Mobile
-    if mobile:
-        orders = orders.filter(customer_phone__icontains=mobile)
+    # Filter by Customer Name or Mobile (combined search)
+    if search:
+        orders = orders.filter(
+            Q(customer_name__icontains=search) | Q(customer_phone__icontains=search)
+        )
 
     # Filter by Order Status
     if c_status:
         orders = orders.filter(order_status=c_status)
 
-    # Filter by DMS Status
+    # Filter by Delivery Task Status
+    if dl_task_status:
+        orders = orders.filter(delivery_task__dl_task_status=dl_task_status)
+
+    # Filter by date range
+    if date_from:
+        orders = orders.filter(created_at__date__gte=date_from)
+    if date_to:
+        orders = orders.filter(created_at__date__lte=date_to)
 
     # Annotate with comment count (for now, all comments are counted as unread)
     orders = orders.annotate(unread_comments_count=Count('order_comments'))
@@ -334,14 +342,12 @@ def all_orders(request):
     filter_params_list = []
     if dl_code:
         filter_params_list.append(f'dlCode={dl_code}')
-    if c_code:
-        filter_params_list.append(f'cCode={c_code}')
-    if mobile:
-        filter_params_list.append(f'mobile={mobile}')
+    if search:
+        filter_params_list.append(f'search={search}')
     if c_status:
         filter_params_list.append(f'cStatus={c_status}')
-    if dms_status:
-        filter_params_list.append(f'dmsStatus={dms_status}')
+    if dl_task_status:
+        filter_params_list.append(f'dlTaskStatus={dl_task_status}')
     if business_id:
         filter_params_list.append(f'business={business_id}')
 
@@ -352,14 +358,16 @@ def all_orders(request):
         'all_businesses': all_businesses,
         'filters': {
             'dlCode': dl_code,
-            'cCode': c_code,
-            'mobile': mobile,
+            'search': search,
             'cStatus': c_status,
-            'dmsStatus': dms_status,
+            'dlTaskStatus': dl_task_status,
             'business': business_id,
+            'dateFrom': date_from,
+            'dateTo': date_to,
+            'datePreset': date_preset,
         },
         'filter_params': filter_params,
-        'per_page': request.GET.get('per_page', '10'),
+        'per_page': request.GET.get('per_page', '25'),
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
@@ -379,22 +387,23 @@ def fulfilled_clients_orders(request):
 
     # Apply filters based on GET parameters
     dl_code = request.GET.get('dlCode', '').strip()
-    c_code = request.GET.get('cCode', '').strip()
-    mobile = request.GET.get('mobile', '').strip()
+    search = request.GET.get('search', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
-    dms_status = request.GET.get('dmsStatus', '').strip()
+    dl_task_status = request.GET.get('dlTaskStatus', '').strip()
     business_id = request.GET.get('business', '').strip()
 
     if business_id:
         orders = orders.filter(business_id=business_id)
     if dl_code:
         orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
-    if c_code:
-        orders = orders.filter(client_order_code__icontains=c_code)
-    if mobile:
-        orders = orders.filter(customer_phone__icontains=mobile)
+    if search:
+        orders = orders.filter(
+            Q(customer_name__icontains=search) | Q(customer_phone__icontains=search)
+        )
     if c_status:
         orders = orders.filter(order_status=c_status)
+    if dl_task_status:
+        orders = orders.filter(delivery_task__dl_task_status=dl_task_status)
 
     # Annotate with comment count
     orders = orders.annotate(unread_comments_count=Count('order_comments'))
@@ -410,14 +419,12 @@ def fulfilled_clients_orders(request):
     filter_params_list = []
     if dl_code:
         filter_params_list.append(f'dlCode={dl_code}')
-    if c_code:
-        filter_params_list.append(f'cCode={c_code}')
-    if mobile:
-        filter_params_list.append(f'mobile={mobile}')
+    if search:
+        filter_params_list.append(f'search={search}')
     if c_status:
         filter_params_list.append(f'cStatus={c_status}')
-    if dms_status:
-        filter_params_list.append(f'dmsStatus={dms_status}')
+    if dl_task_status:
+        filter_params_list.append(f'dlTaskStatus={dl_task_status}')
     if business_id:
         filter_params_list.append(f'business={business_id}')
 
@@ -428,14 +435,13 @@ def fulfilled_clients_orders(request):
         'all_businesses': all_businesses,
         'filters': {
             'dlCode': dl_code,
-            'cCode': c_code,
-            'mobile': mobile,
+            'search': search,
             'cStatus': c_status,
-            'dmsStatus': dms_status,
+            'dlTaskStatus': dl_task_status,
             'business': business_id,
         },
         'filter_params': filter_params,
-        'per_page': request.GET.get('per_page', '10'),
+        'per_page': request.GET.get('per_page', '25'),
         'page_title': 'Fulfilled Clients Orders',
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -456,22 +462,23 @@ def non_fulfilled_clients_orders(request):
 
     # Apply filters based on GET parameters
     dl_code = request.GET.get('dlCode', '').strip()
-    c_code = request.GET.get('cCode', '').strip()
-    mobile = request.GET.get('mobile', '').strip()
+    search = request.GET.get('search', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
-    dms_status = request.GET.get('dmsStatus', '').strip()
+    dl_task_status = request.GET.get('dlTaskStatus', '').strip()
     business_id = request.GET.get('business', '').strip()
 
     if business_id:
         orders = orders.filter(business_id=business_id)
     if dl_code:
         orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
-    if c_code:
-        orders = orders.filter(client_order_code__icontains=c_code)
-    if mobile:
-        orders = orders.filter(customer_phone__icontains=mobile)
+    if search:
+        orders = orders.filter(
+            Q(customer_name__icontains=search) | Q(customer_phone__icontains=search)
+        )
     if c_status:
         orders = orders.filter(order_status=c_status)
+    if dl_task_status:
+        orders = orders.filter(delivery_task__dl_task_status=dl_task_status)
 
     # Annotate with comment count
     orders = orders.annotate(unread_comments_count=Count('order_comments'))
@@ -487,14 +494,12 @@ def non_fulfilled_clients_orders(request):
     filter_params_list = []
     if dl_code:
         filter_params_list.append(f'dlCode={dl_code}')
-    if c_code:
-        filter_params_list.append(f'cCode={c_code}')
-    if mobile:
-        filter_params_list.append(f'mobile={mobile}')
+    if search:
+        filter_params_list.append(f'search={search}')
     if c_status:
         filter_params_list.append(f'cStatus={c_status}')
-    if dms_status:
-        filter_params_list.append(f'dmsStatus={dms_status}')
+    if dl_task_status:
+        filter_params_list.append(f'dlTaskStatus={dl_task_status}')
     if business_id:
         filter_params_list.append(f'business={business_id}')
 
@@ -505,14 +510,13 @@ def non_fulfilled_clients_orders(request):
         'all_businesses': all_businesses,
         'filters': {
             'dlCode': dl_code,
-            'cCode': c_code,
-            'mobile': mobile,
+            'search': search,
             'cStatus': c_status,
-            'dmsStatus': dms_status,
+            'dlTaskStatus': dl_task_status,
             'business': business_id,
         },
         'filter_params': filter_params,
-        'per_page': request.GET.get('per_page', '10'),
+        'per_page': request.GET.get('per_page', '25'),
         'page_title': 'Non-Fulfilled Clients Orders',
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -533,10 +537,9 @@ def export_orders_csv(request):
 
     # Apply same filters as all_orders view
     dl_code = request.GET.get('dlCode', '').strip()
-    c_code = request.GET.get('cCode', '').strip()
-    mobile = request.GET.get('mobile', '').strip()
+    search = request.GET.get('search', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
-    dms_status = request.GET.get('dmsStatus', '').strip()
+    dl_task_status = request.GET.get('dlTaskStatus', '').strip()
     business_id = request.GET.get('business', '').strip()
     date_from = request.GET.get('dateFrom', '').strip()
     date_to = request.GET.get('dateTo', '').strip()
@@ -545,12 +548,14 @@ def export_orders_csv(request):
         orders = orders.filter(business_id=business_id)
     if dl_code:
         orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
-    if c_code:
-        orders = orders.filter(client_order_code__icontains=c_code)
-    if mobile:
-        orders = orders.filter(customer_phone__icontains=mobile)
+    if search:
+        orders = orders.filter(
+            Q(customer_name__icontains=search) | Q(customer_phone__icontains=search)
+        )
     if c_status:
         orders = orders.filter(order_status=c_status)
+    if dl_task_status:
+        orders = orders.filter(delivery_task__dl_task_status=dl_task_status)
     if date_from:
         orders = orders.filter(order_date__gte=date_from)
     if date_to:
@@ -672,23 +677,34 @@ def orders_by_seller(request):
     """
     from django.db.models import Count, Q
 
-    # Get all seller names for quick selection (active businesses only)
+    search = request.GET.get('search', '').strip()
+    date_from = request.GET.get('dateFrom', '').strip()
+    date_to = request.GET.get('dateTo', '').strip()
+    date_preset = request.GET.get('datePreset', '').strip()
+
+    # Build date filter for order counts
+    date_q = Q()
+    if date_from:
+        date_q &= Q(order__created_at__date__gte=date_from)
+    if date_to:
+        date_q &= Q(order__created_at__date__lte=date_to)
+
+    # All active sellers for bubbles
+    from django.db.models import Count as _Count
     all_sellers = business_models.Business.objects.filter(
         business_status='active'
-    ).values('business_id', 'business_name', 'business_code').order_by('business_name')
+    ).annotate(order_count=_Count('order')
+    ).values('business_id', 'business_name', 'business_code', 'order_count').order_by('business_name')
 
-    # Get all businesses with their order counts
-    businesses = business_models.Business.objects.select_related(
-        'profile', 'business_profile'
-    ).annotate(
-        total_orders=Count('order'),
-        pending_orders=Count('order', filter=Q(order__order_status='pending')),
-        processing_orders=Count('order', filter=Q(order__order_status='processing')),
-        completed_orders=Count('order', filter=Q(order__order_status='delivered'))
-    ).filter(total_orders__gt=0)  # Only show businesses with orders
+    # All businesses (show zero-order businesses too)
+    businesses = business_models.Business.objects.annotate(
+        total_orders=Count('order', filter=date_q),
+        pending_orders=Count('order', filter=date_q & Q(order__order_status='pending')),
+        processing_orders=Count('order', filter=date_q & Q(order__order_status='processing')),
+        completed_orders=Count('order', filter=date_q & Q(order__order_status='delivered')),
+        failed_orders=Count('order', filter=date_q & Q(order__order_status='cancelled')),
+    )
 
-    # Apply search filter
-    search = request.GET.get('search', '').strip()
     if search:
         businesses = businesses.filter(
             Q(business_name__icontains=search) |
@@ -697,16 +713,17 @@ def orders_by_seller(request):
             Q(business_code__icontains=search)
         )
 
-    # Order by total orders (most orders first)
-    businesses = businesses.order_by('-total_orders', '-business_id')
+    businesses = businesses.order_by('-total_orders', 'business_name')
 
-    # Paginate
     page_obj = paginate_queryset(request, businesses, items_per_page=20)
 
     context = {
         'page_title': 'Orders by Seller',
         'page_obj': page_obj,
         'search': search,
+        'date_from': date_from,
+        'date_to': date_to,
+        'date_preset': date_preset,
         'all_sellers': all_sellers,
     }
 
@@ -948,7 +965,6 @@ def add_order(request):
                         order__business=selected_business,
                         order__order_status='delivered',
                         product__isnull=False,
-                        product__is_active=True
                     ).values('product_id').annotate(
                         total_delivered=Sum('quantity')
                     ).values_list('product_id', flat=True).distinct()
@@ -957,11 +973,10 @@ def add_order(request):
                     warehouse_products = warehouse_models.StockLevel.objects.filter(
                         warehouse_id__in=warehouse_ids,
                         product_id__in=delivered_order_products,
-                        available_quantity__gt=0,
-                        product__is_active=True
+                        quantity_on_hand__gt=0,
                     ).select_related(
-                        'product', 'warehouse', 'storage_location'
-                    ).order_by('product__name')[:100]  # Limit to 100 products for performance
+                        'product', 'warehouse', 'location'
+                    ).order_by('product__item_name')[:100]  # Limit to 100 products for performance
         except business_models.Business.DoesNotExist:
             pass
 
@@ -1095,15 +1110,47 @@ def add_order(request):
 
             order.save()
 
-            # Create OrderItem if product name is provided
-            product_name = request.POST.get('product_name', '').strip()
-            if product_name:
-                orders_models.OrderItem.objects.create(
-                    order=order,
-                    quantity=safe_int(request.POST.get('quantity')) or 1,
-                    unit_price=safe_int(request.POST.get('cod_amount')) if request.POST.get('cod_amount') else None,
-                    notes=product_name
-                )
+            # Create OrderItems from inline product rows
+            inline_product_ids = request.POST.getlist('inline_product_id[]')
+            inline_quantities = request.POST.getlist('inline_quantity[]')
+            inline_prices = request.POST.getlist('inline_unit_price[]')
+            inline_notes = request.POST.getlist('inline_notes[]')
+            items_created = 0
+            for i, product_id in enumerate(inline_product_ids):
+                product_id = product_id.strip()
+                qty = safe_int(inline_quantities[i]) if i < len(inline_quantities) else 1
+                qty = qty or 1
+                try:
+                    price_raw = inline_prices[i] if i < len(inline_prices) else ''
+                    price = float(price_raw) if price_raw.strip() else None
+                except (ValueError, TypeError):
+                    price = None
+                note = inline_notes[i] if i < len(inline_notes) else ''
+                if product_id:
+                    try:
+                        from product.models import Product
+                        product_obj = Product.objects.get(pk=product_id)
+                        orders_models.OrderItem.objects.create(
+                            order=order, product=product_obj, quantity=qty,
+                            unit_price=price, notes=note
+                        )
+                        items_created += 1
+                    except Exception:
+                        pass
+                elif note:
+                    # No product selected — save as notes-only item
+                    orders_models.OrderItem.objects.create(
+                        order=order, quantity=qty, unit_price=price, notes=note
+                    )
+                    items_created += 1
+
+            # Fallback: old plain product_name hidden field
+            if items_created == 0:
+                product_name = request.POST.get('product_name', '').strip()
+                if product_name:
+                    orders_models.OrderItem.objects.create(
+                        order=order, quantity=1, notes=product_name
+                    )
 
             messages.success(request, f'Order {order.order_number} created successfully.')
 
@@ -1146,6 +1193,440 @@ def add_order(request):
 
 # Bulk import views removed - now using shared views from orders app
 # See orders/views.py: bulk_import_orders, bulk_import_preview, bulk_import_save
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def bulk_transfer_api_orders(request):
+    """
+    Bulk-mark selected API orders as transferred into main workflow.
+    POST: order_ids (list), sets is_transferred=True, transferred_at, transferred_by.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    from django.utils import timezone
+    order_ids = request.POST.getlist('order_ids[]')
+    if not order_ids:
+        return JsonResponse({'success': False, 'error': 'No orders selected'}, status=400)
+
+    try:
+        updated = orders_models.Order.objects.filter(
+            id__in=order_ids,
+            is_transferred=False
+        ).update(
+            is_transferred=True,
+            transferred_at=timezone.now(),
+            transferred_by=request.user,
+            order_status='to_review',
+        )
+        return JsonResponse({'success': True, 'updated': updated})
+    except Exception as e:
+        logger.exception('bulk_transfer_api_orders error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def import_api_orders(request):
+    """
+    POST: Fetch selected platform orders by platform_id from Shopify/WooCommerce
+    and create Order records in the DB (is_transferred=False, ready for review).
+    POST params: business_id, platform_ids[] (list of platform order IDs), source
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json
+    from django.utils import timezone as dj_tz
+
+    business_id = request.POST.get('business_id', '').strip()
+    platform_ids = request.POST.getlist('platform_ids[]')
+    source = request.POST.get('source', '').strip()
+
+    if not business_id or not platform_ids:
+        return JsonResponse({'success': False, 'error': 'Missing business_id or platform_ids'}, status=400)
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+        api = business.business_settings_api.filter(is_verify_api=True).first()
+        if not api:
+            return JsonResponse({'success': False, 'error': 'No approved API config for this business'}, status=400)
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+    created = 0
+    skipped = 0
+    errors = []
+
+    try:
+        if api.api_type == 'shopify':
+            import shopify
+            shop_name = (api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+            session = shopify.Session(shop_name, api.api_version or '2023-10', api.api_access_token)
+            shopify.ShopifyResource.activate_session(session)
+
+            for pid in platform_ids:
+                try:
+                    # Skip if already imported
+                    if orders_models.Order.objects.filter(
+                        business=business,
+                        original_order_data__platform_id=pid,
+                        original_order_data__source='shopify'
+                    ).exists():
+                        skipped += 1
+                        continue
+
+                    o = shopify.Order.find(pid)
+                    shipping = getattr(o, 'shipping_address', None)
+                    billing = getattr(o, 'billing_address', None)
+                    addr = shipping or billing
+                    addr_str = ' '.join(filter(None, [
+                        getattr(addr, 'address1', '') or '',
+                        getattr(addr, 'city', '') or '',
+                    ])) if addr else ''
+                    phone = getattr(addr, 'phone', '') or ''
+                    customer = getattr(o, 'customer', None)
+                    customer_name = f"{getattr(customer, 'first_name', '')} {getattr(customer, 'last_name', '')}".strip() if customer else ''
+                    original_data = {
+                        'source': 'shopify',
+                        'platform_id': str(o.id),
+                        'name': o.name,
+                        'financial_status': o.financial_status,
+                        'fulfillment_status': o.fulfillment_status,
+                        'total_price': str(o.total_price),
+                        'currency': o.currency,
+                        'created_at': str(o.created_at),
+                    }
+
+                    orders_models.Order.objects.create(
+                        business=business,
+                        customer_name=customer_name or o.name,
+                        customer_phone=phone,
+                        customer_address=addr_str,
+                        cod_amount=o.total_price,
+                        order_status='to_review',
+                        is_transferred=False,
+                        original_order_data=original_data,
+                    )
+                    created += 1
+                except Exception as e:
+                    errors.append(f"{pid}: {e}")
+
+            shopify.ShopifyResource.clear_session()
+
+        elif api.api_type == 'woocommerce':
+            from woocommerce import API as WooAPI
+            wcapi = WooAPI(
+                url=api.site_api_url or '',
+                consumer_key=api.api_key or '',
+                consumer_secret=api.api_secret or '',
+                version='wc/v3',
+                timeout=15,
+            )
+            for pid in platform_ids:
+                try:
+                    if orders_models.Order.objects.filter(
+                        business=business,
+                        original_order_data__platform_id=pid,
+                        original_order_data__source='woocommerce'
+                    ).exists():
+                        skipped += 1
+                        continue
+
+                    r = wcapi.get(f'orders/{pid}')
+                    if r.status_code != 200:
+                        errors.append(f"#{pid}: HTTP {r.status_code}")
+                        continue
+                    o = r.json()
+                    billing = o.get('billing', {})
+                    shipping = o.get('shipping', {})
+                    addr_parts = [
+                        shipping.get('address_1') or billing.get('address_1', ''),
+                        shipping.get('city') or billing.get('city', ''),
+                    ]
+                    addr_str = ', '.join(filter(None, addr_parts))
+                    customer_name = f"{billing.get('first_name','')} {billing.get('last_name','')}".strip()
+
+                    original_data = {
+                        'source': 'woocommerce',
+                        'platform_id': str(o.get('id')),
+                        'number': o.get('number'),
+                        'status': o.get('status'),
+                        'total': str(o.get('total')),
+                        'currency': o.get('currency'),
+                        'date_created': o.get('date_created'),
+                    }
+
+                    orders_models.Order.objects.create(
+                        business=business,
+                        customer_name=customer_name or f"#{o.get('number')}",
+                        customer_phone=billing.get('phone', ''),
+                        customer_address=addr_str,
+                        cod_amount=o.get('total') or 0,
+                        order_status='to_review',
+                        is_transferred=False,
+                        original_order_data=original_data,
+                    )
+                    created += 1
+                except Exception as e:
+                    errors.append(f"{pid}: {e}")
+        else:
+            return JsonResponse({'success': False, 'error': f'Import not supported for {api.api_type}'}, status=400)
+
+    except Exception as e:
+        logger.exception('import_api_orders error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({
+        'success': True,
+        'created': created,
+        'skipped': skipped,
+        'errors': errors,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_api_orders(request):
+    """
+    List orders from approved API businesses.
+    When a business is selected, fetch live orders from their Shopify/WooCommerce API.
+    """
+    # Businesses with at least one approved API config
+    api_businesses = business_models.Business.objects.filter(
+        business_settings_api__is_verify_api=True
+    ).prefetch_related('business_settings_api').distinct().order_by('business_name')
+
+    selected_business_id = request.GET.get('business', '')
+    status_filter = request.GET.get('status', '')
+    selected_business = None
+    selected_api = None
+    live_orders = []
+    live_error = None
+    live_total = None
+
+    if selected_business_id:
+        try:
+            selected_business = business_models.Business.objects.prefetch_related(
+                'business_settings_api'
+            ).get(business_id=selected_business_id)
+            # Get the approved API config for this business
+            selected_api = selected_business.business_settings_api.filter(
+                is_verify_api=True
+            ).first()
+        except business_models.Business.DoesNotExist:
+            pass
+
+    # Fetch live orders from the platform API when a business with approved config is selected
+    if selected_api:
+        try:
+            if selected_api.api_type == 'shopify':
+                import shopify
+                shop_name = (selected_api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+                session = shopify.Session(shop_name, selected_api.api_version or '2023-10', selected_api.api_access_token)
+                shopify.ShopifyResource.activate_session(session)
+                orders = shopify.Order.find(limit=50, status='any')
+                for o in orders:
+                    ship = getattr(o, 'shipping_address', None)
+                    live_orders.append({
+                        'platform_id': str(o.id),
+                        'name': o.name,
+                        'customer': getattr(o, 'contact_email', '') or (getattr(o.customer, 'email', '') if hasattr(o, 'customer') and o.customer else ''),
+                        'phone': getattr(ship, 'phone', '') if ship else '',
+                        'address': getattr(ship, 'address1', '') if ship else '',
+                        'country': getattr(ship, 'country', '') if ship else '',
+                        'cod': o.total_price,
+                        'currency': o.currency,
+                        'status': o.financial_status,
+                        'fulfillment': o.fulfillment_status or 'unfulfilled',
+                        'date': o.created_at,
+                        'source': 'shopify',
+                    })
+                try:
+                    live_total = shopify.Order.count(status='any')
+                except Exception:
+                    live_total = len(live_orders)
+                shopify.ShopifyResource.clear_session()
+
+            elif selected_api.api_type == 'woocommerce':
+                from woocommerce import API as WooAPI
+                wcapi = WooAPI(
+                    url=selected_api.site_api_url or '',
+                    consumer_key=selected_api.api_key or '',
+                    consumer_secret=selected_api.api_secret or '',
+                    version='wc/v3',
+                    timeout=15,
+                )
+                r = wcapi.get('orders', params={'per_page': 50, 'orderby': 'date', 'order': 'desc'})
+                if r.status_code == 200:
+                    live_total = r.headers.get('X-WP-Total')
+                    for o in r.json():
+                        billing = o.get('billing', {})
+                        shipping = o.get('shipping', {})
+                        addr_parts = [shipping.get('address_1') or billing.get('address_1'), shipping.get('city') or billing.get('city')]
+                        live_orders.append({
+                            'platform_id': str(o.get('id')),
+                            'name': f"#{o.get('number')}",
+                            'customer': f"{billing.get('first_name','')} {billing.get('last_name','')}".strip(),
+                            'phone': billing.get('phone', ''),
+                            'address': ', '.join(filter(None, addr_parts)),
+                            'country': shipping.get('country') or billing.get('country', ''),
+                            'cod': o.get('total'),
+                            'currency': o.get('currency'),
+                            'status': o.get('status'),
+                            'fulfillment': None,
+                            'date': o.get('date_created'),
+                            'source': 'woocommerce',
+                        })
+                else:
+                    live_error = f"API error {r.status_code}: {r.text[:200]}"
+
+            elif selected_api.api_type == 'google_sheet':
+                import re
+                import gspread
+                from google.oauth2.credentials import Credentials
+                from google.auth.transport.requests import Request
+                from django.conf import settings as django_settings
+                from pathlib import Path
+
+                sheet_url = selected_api.google_sheet_url or ''
+                token_path = Path(django_settings.BASE_DIR) / getattr(
+                    django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+                )
+                if not token_path.exists():
+                    raise Exception(
+                        'Google Sheets not authorized yet. '
+                        'Run: python google_sheets_auth.py (one-time setup)'
+                    )
+
+                import json as _json
+                _td = _json.loads(token_path.read_text())
+                creds = Credentials(
+                    token=_td.get('access_token'),
+                    refresh_token=_td.get('refresh_token'),
+                    token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                    client_id=_td.get('client_id'),
+                    client_secret=_td.get('client_secret'),
+                    scopes=_td.get('scope', '').split(),
+                )
+                if creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                    _td['access_token'] = creds.token
+                    token_path.write_text(_json.dumps(_td, indent=2))
+
+                gc = gspread.authorize(creds)
+
+                match = re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+                if not match:
+                    raise Exception('Invalid Google Sheet URL.')
+                sheet_id = match.group(1)
+                gid_match = re.search(r'gid=(\d+)', sheet_url)
+                gid = int(gid_match.group(1)) if gid_match else 0
+
+                spreadsheet = gc.open_by_key(sheet_id)
+                worksheet = None
+                for ws in spreadsheet.worksheets():
+                    if ws.id == gid:
+                        worksheet = ws
+                        break
+                if worksheet is None:
+                    worksheet = spreadsheet.sheet1
+
+                rows = worksheet.get_all_records(head=1)
+                live_total = len(rows)
+                headers = list(rows[0].keys()) if rows else []
+
+                # Map common column name variants (case-insensitive)
+                def col(row, *keys):
+                    for k in keys:
+                        for h in headers:
+                            if h.strip().lower() == k.lower():
+                                v = row.get(h)
+                                return str(v).strip() if v is not None else ''
+                    return ''
+
+                for i, row in enumerate(rows):
+                    name = col(row, 'name', 'customer name', 'customer', 'client name', 'client')
+                    phone = col(row, 'phone', 'mobile', 'phone number', 'contact')
+                    address = col(row, 'address', 'delivery address', 'location', 'area')
+                    cod = col(row, 'cod', 'amount', 'cod amount', 'price', 'total')
+                    status = col(row, 'status', 'order status', 'state')
+                    date = col(row, 'date', 'order date', 'created', 'created at')
+                    country = col(row, 'country', 'country code')
+                    order_num = col(row, 'order', 'order number', 'order #', 'order id', 'ref', 'reference') or str(i + 1)
+                    live_orders.append({
+                        'platform_id': f'gs_{i}_{order_num}',
+                        'name': order_num,
+                        'customer': name,
+                        'phone': phone,
+                        'address': address,
+                        'country': country,
+                        'cod': cod,
+                        'currency': '',
+                        'status': status or 'pending',
+                        'fulfillment': None,
+                        'date': date,
+                        'source': 'google_sheet',
+                    })
+
+        except Exception as e:
+            live_error = str(e)
+
+    # Annotate live_orders with import status from DB
+    if live_orders and selected_business and selected_api:
+        platform_ids = [o['platform_id'] for o in live_orders]
+        imported_qs = orders_models.Order.objects.filter(
+            business=selected_business,
+            original_order_data__source=selected_api.api_type,
+            original_order_data__platform_id__in=platform_ids,
+        ).values('original_order_data__platform_id', 'id', 'order_number', 'client_order_code')
+        imported_map = {
+            str(r['original_order_data__platform_id']): {
+                'id': r['id'],
+                'number': r['order_number'] or r['client_order_code'] or f"#{r['id']}",
+            }
+            for r in imported_qs
+        }
+        for o in live_orders:
+            match = imported_map.get(str(o['platform_id']))
+            o['imported'] = bool(match)
+            o['imported_order_id'] = match['id'] if match else None
+            o['imported_order_number'] = match['number'] if match else None
+
+    # Apply import status filter
+    if status_filter == 'imported':
+        live_orders = [o for o in live_orders if o.get('imported')]
+    elif status_filter == 'not_imported':
+        live_orders = [o for o in live_orders if not o.get('imported')]
+
+    # Paginate live_orders (list, not queryset)
+    from django.core.paginator import Paginator
+    try:
+        per_page = max(1, min(200, int(request.GET.get('per_page', 50))))
+    except (ValueError, TypeError):
+        per_page = 50
+    paginator = Paginator(live_orders, per_page)
+    try:
+        page_number = int(request.GET.get('page', 1))
+    except (ValueError, TypeError):
+        page_number = 1
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'api_businesses': api_businesses,
+        'selected_business': selected_business,
+        'selected_business_id': selected_business_id,
+        'selected_api': selected_api,
+        'status_filter': status_filter,
+        'live_orders': page_obj,
+        'live_error': live_error,
+        'live_total': live_total,
+        'total_filtered': len(live_orders),
+        'page_obj': page_obj,
+        'per_page': per_page,
+    }
+    return render(request, 'workforce/orders_api.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -2803,6 +3284,105 @@ def update_task_status(request, task_id):
 
 
 # USER VERIFICATION VIEWS --------------------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def business_verification_list(request):
+    """Staff view to manage business verification — all businesses with verification status & approval buttons"""
+    from django.db.models import Count
+
+    # Get filter
+    verification_filter = request.GET.get('status', 'all')
+    search = request.GET.get('search', '').strip()
+
+    # Base queryset — only businesses that have a profile (inner join via select_related)
+    businesses = business_models.Business.objects.select_related(
+        'profile__user', 'business_profile'
+    ).filter(profile__isnull=False)
+
+    # Count stats from same base queryset (not from Profile directly)
+    status_counts = dict(
+        businesses.values_list('profile__verification_status')
+        .annotate(cnt=Count('business_id'))
+        .values_list('profile__verification_status', 'cnt')
+    )
+
+    if verification_filter not in ('all', ''):
+        businesses = businesses.filter(profile__verification_status=verification_filter)
+
+    if search:
+        businesses = businesses.filter(
+            Q(business_name__icontains=search) |
+            Q(business_email__icontains=search) |
+            Q(business_phone__icontains=search) |
+            Q(profile__user__email__icontains=search)
+        )
+
+    businesses = businesses.order_by('-profile__verification_applied_at', '-business_id')
+
+    # Paginate
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    context = {
+        'page_title': 'Business Verification',
+        'page_obj': page_obj,
+        'status_counts': status_counts,
+        'current_filter': verification_filter,
+        'search': search,
+        'total_count': sum(status_counts.values()),
+    }
+    return render(request, 'workforce/business_verification_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def driver_verification_list(request):
+    """Staff view to manage driver verification — all drivers with verification status & approval buttons"""
+    from django.db.models import Count
+
+    verification_filter = request.GET.get('status', 'all')
+    search = request.GET.get('search', '').strip()
+
+    # Base queryset — drivers that have a profile
+    drivers = fleet_models.Driver.objects.select_related(
+        'user', 'profile', 'profile__verified_by'
+    ).filter(profile__isnull=False)
+
+    # Count stats from same base queryset
+    status_counts = dict(
+        drivers.values_list('profile__verification_status')
+        .annotate(cnt=Count('driver_id'))
+        .values_list('profile__verification_status', 'cnt')
+    )
+
+    if verification_filter not in ('all', ''):
+        drivers = drivers.filter(profile__verification_status=verification_filter)
+
+    if search:
+        drivers = drivers.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(user__email__icontains=search) |
+            Q(driver_phone__icontains=search) |
+            Q(driver_code__icontains=search)
+        )
+
+    drivers = drivers.order_by('-profile__verification_applied_at', '-driver_id')
+
+    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+
+    context = {
+        'page_title': 'Driver Verification',
+        'page_obj': page_obj,
+        'status_counts': status_counts,
+        'current_filter': verification_filter,
+        'search': search,
+        'total_count': sum(status_counts.values()),
+    }
+    return render(request, 'workforce/driver_verification_list.html', context)
+
 
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -5321,6 +5901,256 @@ def api_warehouse_locations(request):
 
 
 # Sellers section  ------------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_seller_api_configs(request):
+    """
+    Staff view: list all businesses' API configurations.
+    Allows staff to test and approve each API config.
+    """
+    from django.db.models import Count
+
+    # All API configs across all businesses
+    api_configs = business_models.BusinessApiSettings.objects.select_related(
+        'business'
+    ).order_by('-is_verify_api', 'business__business_name', 'api_type')
+
+    # Optional filter by business
+    selected_business_id = request.GET.get('business', '')
+    selected_business = None
+    if selected_business_id:
+        try:
+            selected_business = business_models.Business.objects.get(business_id=selected_business_id)
+            api_configs = api_configs.filter(business=selected_business)
+        except business_models.Business.DoesNotExist:
+            pass
+
+    # Status filter
+    status_filter = request.GET.get('status', '')
+    if status_filter == 'approved':
+        api_configs = api_configs.filter(is_verify_api=True)
+    elif status_filter == 'pending':
+        api_configs = api_configs.filter(is_verify_api=False)
+
+    businesses_with_api = business_models.Business.objects.filter(
+        business_settings_api__isnull=False
+    ).distinct().order_by('business_name')
+
+    context = {
+        'api_configs': api_configs,
+        'businesses_with_api': businesses_with_api,
+        'selected_business': selected_business,
+        'selected_business_id': selected_business_id,
+        'status_filter': status_filter,
+        'total_count': api_configs.count(),
+        'approved_count': business_models.BusinessApiSettings.objects.filter(is_verify_api=True).count(),
+        'pending_count': business_models.BusinessApiSettings.objects.filter(is_verify_api=False).count(),
+    }
+    return render(request, 'workforce/seller_api_configs.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_approve_api_config(request, api_id):
+    """
+    Staff action: toggle approval (is_verify_api) for a BusinessApiSettings.
+    POST only.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    try:
+        api = business_models.BusinessApiSettings.objects.select_related('business').get(pk=api_id)
+        api.is_verify_api = not api.is_verify_api
+        api.save(update_fields=['is_verify_api', 'updated_at'])
+        return JsonResponse({
+            'success': True,
+            'is_approved': api.is_verify_api,
+            'label': 'Approved' if api.is_verify_api else 'Pending',
+        })
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
+    except Exception as e:
+        logger.exception('wf_approve_api_config error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_save_google_sheet(request):
+    """
+    POST: Save a Google Sheet URL for a business as a BusinessApiSettings record
+    with api_type='google_sheet'.
+    Params: business_id, sheet_url, sheet_name (optional label)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    business_id = request.POST.get('business_id', '').strip()
+    sheet_url = request.POST.get('sheet_url', '').strip()
+    sheet_name = request.POST.get('sheet_name', '').strip() or 'Google Sheet'
+
+    if not business_id or not sheet_url:
+        return JsonResponse({'success': False, 'error': 'business_id and sheet_url required'}, status=400)
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+    try:
+        api, created = business_models.BusinessApiSettings.objects.update_or_create(
+            business=business,
+            api_type='google_sheet',
+            defaults={
+                'google_sheet_url': sheet_url,
+                'order_api_endpoint': sheet_name,
+                'is_verify_api': True,
+            }
+        )
+        return JsonResponse({
+            'success': True,
+            'created': created,
+            'api_id': api.id,
+            'business_name': business.business_name,
+        })
+    except Exception as e:
+        logger.exception('wf_save_google_sheet error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_test_api_config(request, api_id):
+    """
+    Staff proxy for testing a BusinessApiSettings (any business).
+    Fetches orders + products and returns a summary status line.
+    """
+    try:
+        api = business_models.BusinessApiSettings.objects.select_related('business').get(pk=api_id)
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'API config not found'}, status=404)
+
+    business = api.business
+    from django.utils import timezone as dj_timezone
+    update_time = dj_timezone.localtime().strftime('%Y-%m-%d  Time : %H:%M:%S')
+
+    order_response = None
+    product_response = None
+    order_status_code = None
+    product_status_code = None
+    error_message = None
+    # api_stats: platform-specific summary shown in the status line
+    api_stats = {}
+
+    try:
+        if api.api_type == 'shopify':
+            import shopify
+            shop_name = (api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+            session = shopify.Session(shop_name, api.api_version or '2023-10', api.api_access_token)
+            shopify.ShopifyResource.activate_session(session)
+
+            # Fetch orders (last 5 for preview)
+            orders = shopify.Order.find(limit=5, status='any')
+            order_response = [{'id': o.id, 'name': o.name, 'financial_status': o.financial_status, 'fulfillment_status': o.fulfillment_status, 'total_price': o.total_price, 'created_at': o.created_at} for o in orders]
+            order_status_code = 200
+
+            # Order count
+            try:
+                order_count_obj = shopify.Order.count(status='any')
+                api_stats['order_count'] = order_count_obj
+            except Exception:
+                api_stats['order_count'] = None
+
+            # Product count
+            try:
+                product_count_obj = shopify.Product.count()
+                api_stats['product_count'] = product_count_obj
+                products = shopify.Product.find(limit=5)
+                product_response = [{'id': p.id, 'title': p.title, 'status': p.status, 'variants': len(p.variants)} for p in products]
+                product_status_code = 200
+            except Exception as pe:
+                api_stats['product_count'] = None
+                product_status_code = 500
+
+            # Shop info
+            try:
+                shop = shopify.Shop.current()
+                api_stats['shop_name'] = shop.name
+                api_stats['shop_email'] = shop.email
+                api_stats['plan'] = shop.plan_display_name
+                api_stats['currency'] = shop.currency
+            except Exception:
+                pass
+
+            shopify.ShopifyResource.clear_session()
+
+        elif api.api_type == 'woocommerce':
+            from woocommerce import API as WooAPI
+            wcapi = WooAPI(
+                url=api.site_api_url or '',
+                consumer_key=api.api_key or '',
+                consumer_secret=api.api_secret or '',
+                version='wc/v3',
+                timeout=10,
+            )
+
+            # Fetch orders (last 5 for preview)
+            r = wcapi.get('orders', params={'per_page': 5})
+            order_status_code = r.status_code
+            if r.status_code == 200:
+                orders_data = r.json()
+                order_response = [{'id': o.get('id'), 'number': o.get('number'), 'status': o.get('status'), 'total': o.get('total'), 'currency': o.get('currency'), 'date_created': o.get('date_created')} for o in orders_data]
+                # Total order count from response headers (WooCommerce sends X-WP-Total)
+                api_stats['order_count'] = r.headers.get('X-WP-Total')
+            else:
+                order_response = {'error': r.text}
+
+            # Product count + preview
+            try:
+                rp = wcapi.get('products', params={'per_page': 5})
+                product_status_code = rp.status_code
+                if rp.status_code == 200:
+                    products_data = rp.json()
+                    product_response = [{'id': p.get('id'), 'name': p.get('name'), 'status': p.get('status'), 'stock_status': p.get('stock_status'), 'price': p.get('price')} for p in products_data]
+                    api_stats['product_count'] = rp.headers.get('X-WP-Total')
+            except Exception:
+                product_status_code = 500
+
+            # WC system status for extra info
+            try:
+                rs = wcapi.get('system_status')
+                if rs.status_code == 200:
+                    ss = rs.json()
+                    env = ss.get('environment', {})
+                    api_stats['wc_version'] = env.get('version')
+                    api_stats['wp_version'] = env.get('wp_version')
+                    api_stats['currency'] = ss.get('settings', {}).get('currency')
+            except Exception:
+                pass
+
+        else:
+            error_message = f"Test not implemented for api_type={api.api_type}"
+            order_status_code = 0
+
+    except Exception as e:
+        error_message = str(e)
+        order_status_code = 500
+
+    context = {
+        'business': business,
+        'api': api,
+        'order_response': order_response,
+        'product_response': product_response,
+        'order_status_code': order_status_code,
+        'product_status_code': product_status_code,
+        'api_stats': api_stats,
+        'update_time': update_time,
+        'error_message': error_message,
+    }
+    return render(request, 'workforce/seller_api_test_result.html', context)
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def sellers_list(request):
@@ -5536,11 +6366,11 @@ def seller_detail(request, business_id):
     # Get comprehensive order statistics
     order_stats = orders_models.Order.objects.filter(business=business).aggregate(
         total_orders=Count('id'),
-        pending_orders=Count('id', filter=Q(order_status='pending')),
-        processing_orders=Count('id', filter=Q(order_status='processing')),
+        to_review_orders=Count('id', filter=Q(order_status='to_review')),
+        ready_orders=Count('id', filter=Q(order_status='ready_to_pickup')),
+        active_orders=Count('id', filter=Q(order_status='publish')),
         delivered_orders=Count('id', filter=Q(order_status='delivered')),
         cancelled_orders=Count('id', filter=Q(order_status='cancelled')),
-        failed_orders=Count('id', filter=Q(order_status='failed')),
     )
 
     # Get COD statistics
@@ -5551,11 +6381,11 @@ def seller_detail(request, business_id):
         total_cod_orders=Count('id'),
         total_cod_amount=Sum('cod_amount'),
         collected_cod=Sum('cod_amount', filter=Q(order_status='delivered')),
-        pending_cod=Sum('cod_amount', filter=~Q(order_status__in=['delivered', 'cancelled', 'failed'])),
+        pending_cod=Sum('cod_amount', filter=~Q(order_status__in=['delivered', 'cancelled'])),
     )
 
     # Calculate delivery success rate
-    total_completed = (order_stats.get('delivered_orders') or 0) + (order_stats.get('failed_orders') or 0) + (order_stats.get('cancelled_orders') or 0)
+    total_completed = (order_stats.get('delivered_orders') or 0) + (order_stats.get('cancelled_orders') or 0)
     delivery_success_rate = 0
     if total_completed > 0:
         delivery_success_rate = round((order_stats.get('delivered_orders') or 0) / total_completed * 100, 1)
@@ -5664,27 +6494,39 @@ def seller_detail(request, business_id):
 
     # Build documents list from business profile fields (if available)
     documents = []
-    # Add QID document if available
-    if business.business_qid:
-        documents.append({
-            'document_type': 'QID',
-            'document_no': business.business_qid,
-            'document_file': None,
-            'document_expiry_date': None,
-        })
-    # Add business logo as document if available (check for actual file, not default)
-    if hasattr(business, 'business_logo') and business.business_logo:
+    # Always show QID row (editable even if empty)
+    documents.append({
+        'document_type': 'QID / CR',
+        'document_no': business.business_qid or '—',
+        'document_file': None,
+        'document_expiry_date': None,
+        'field_name': 'business_qid',
+        'field_type': 'text',
+    })
+    # Add business logo row — logo is on BusinessLogo related model
+    logo_obj = business.business_logo.first()
+    logo_file = None
+    has_real_file = False
+    if logo_obj and logo_obj.business_logo:
         try:
-            # Check if file actually exists and has content (not just default placeholder)
-            has_real_file = business.business_logo.name and business.business_logo.size > 0
+            has_real_file = (
+                bool(logo_obj.business_logo.name)
+                and logo_obj.business_logo.name != 'business/avatar.png'
+                and logo_obj.business_logo.size > 0
+            )
         except Exception:
             has_real_file = False
-        documents.append({
-            'document_type': 'Business Logo',
-            'document_no': 'Logo Image',
-            'document_file': business.business_logo if has_real_file else None,
-            'document_expiry_date': None,
-        })
+        if has_real_file:
+            logo_file = logo_obj.business_logo
+    documents.append({
+        'document_type': 'Business Logo',
+        'document_no': 'Custom Logo' if has_real_file else 'Default Avatar',
+        'document_file': logo_file,
+        'document_expiry_date': None,
+        'field_name': 'business_logo',
+        'field_type': 'file',
+        'current_logo': logo_obj.business_logo if logo_obj else None,
+    })
 
     # Calculate business registration completion percentage
     required_fields = ['business_name', 'business_phone', 'business_whatsapp',
@@ -5728,6 +6570,80 @@ def seller_detail(request, business_id):
     }
 
     return render(request, 'workforce/seller_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def seller_doc_field_update(request, business_id):
+    """Update or clear a single document field (business_qid or business_logo) for a seller."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+    field = request.POST.get('field', '')
+    action = request.POST.get('action', 'update')
+
+    ALLOWED_FIELDS = {'business_qid', 'business_logo'}
+    if field not in ALLOWED_FIELDS:
+        return JsonResponse({'success': False, 'error': 'Invalid field'}, status=400)
+
+    try:
+        if field == 'business_logo':
+            # Logo lives on BusinessLogo related model; upload_path_handler needs instance.path
+            # so we save the file manually to avoid that crash.
+            import os
+            from django.core.files.storage import default_storage
+            from django.core.files.base import ContentFile
+
+            logo_obj = business.business_logo.first()
+
+            if action == 'clear':
+                if logo_obj and logo_obj.business_logo and logo_obj.business_logo.name != 'business/avatar.png':
+                    try:
+                        default_storage.delete(logo_obj.business_logo.name)
+                    except Exception:
+                        pass
+                    logo_obj.business_logo = 'business/avatar.png'
+                    logo_obj.save(update_fields=['business_logo'])
+                return JsonResponse({'success': True, 'message': 'Logo cleared'})
+
+            # update — save file manually to a fixed upload path
+            file = request.FILES.get('value')
+            if not file:
+                return JsonResponse({'success': False, 'error': 'No file provided'}, status=400)
+
+            ext = os.path.splitext(file.name)[1].lower()
+            upload_path = f'business/logos/{business_id}/logo{ext}'
+            # Delete old file if it's not the default
+            if logo_obj and logo_obj.business_logo and logo_obj.business_logo.name != 'business/avatar.png':
+                try:
+                    default_storage.delete(logo_obj.business_logo.name)
+                except Exception:
+                    pass
+            file.seek(0)
+            saved_path = default_storage.save(upload_path, ContentFile(file.read()))
+
+            if logo_obj:
+                logo_obj.business_logo = saved_path
+                logo_obj.save(update_fields=['business_logo'])
+            else:
+                business_models.BusinessLogo.objects.create(business=business, business_logo=saved_path)
+            return JsonResponse({'success': True, 'message': 'Logo updated successfully'})
+
+        # Text fields on Business model directly
+        if action == 'clear':
+            setattr(business, field, None)
+            business.save(update_fields=[field])
+            return JsonResponse({'success': True, 'message': 'Field cleared'})
+
+        value = request.POST.get('value', '').strip() or None
+        setattr(business, field, value)
+        business.save(update_fields=[field])
+        return JsonResponse({'success': True, 'message': 'Updated successfully'})
+
+    except Exception as e:
+        logger.exception("Error updating doc field %s for business %s: %s", field, business_id, str(e))
+        return JsonResponse({'success': False, 'error': 'Update failed'}, status=500)
 
 
 # =============================================================================
@@ -5994,20 +6910,33 @@ def driver_detail(request, driver_id):
         driver=driver
     ).order_by('-created_at')[:10]
 
+    from core.decorators import is_superadmin as check_superadmin
+    user_is_superadmin = check_superadmin(request.user)
+
     # Handle POST request for updates
     if request.method == 'POST':
         try:
             driver.driver_phone = request.POST.get('driver_phone', driver.driver_phone)
             driver.driver_whatsapp = request.POST.get('driver_whatsapp', driver.driver_whatsapp)
-            driver.driver_status = request.POST.get('driver_status', driver.driver_status)
             driver.driver_bio = request.POST.get('driver_bio', driver.driver_bio)
             # Update wallet limit if provided
             credit_limit = request.POST.get('credit_limit')
             if credit_limit:
                 from decimal import Decimal
                 driver.credit_limit = Decimal(credit_limit)
-            driver.save()
 
+            # Status change — superadmin only
+            new_status = request.POST.get('driver_status')
+            if new_status and new_status != driver.driver_status:
+                if user_is_superadmin:
+                    driver.driver_status = new_status
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Only super admins can change driver status.'
+                    }, status=403)
+
+            driver.save()
             return JsonResponse({
                 'success': True,
                 'message': 'Driver updated successfully'
@@ -6032,6 +6961,7 @@ def driver_detail(request, driver_id):
         'cod_stats': cod_stats,
         'recent_transactions': recent_transactions,
         'now': timezone.now(),
+        'user_is_superadmin': user_is_superadmin,
     }
 
     return render(request, 'workforce/driver_detail.html', context)

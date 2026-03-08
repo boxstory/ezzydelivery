@@ -76,6 +76,7 @@ class Profile(models.Model):
     is_business = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_driver = models.BooleanField(default=False)
+    is_superadmin = models.BooleanField(default=False, help_text='Super admin — can approve driver status changes and other sensitive actions')
 
     # Profile completion tracking
     is_profile_completed = models.BooleanField(default=False)

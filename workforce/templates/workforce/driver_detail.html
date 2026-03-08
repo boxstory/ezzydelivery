@@ -585,6 +585,7 @@
                     </div>
                     <div class="wdd__form-group">
                         <label class="wdd__form-label">Status</label>
+                        {% if user_is_superadmin %}
                         <select name="driver_status" class="wdd__form-input">
                             <option value="pending" {% if driver.driver_status == 'pending' %}selected{% endif %}>Pending</option>
                             <option value="processing" {% if driver.driver_status == 'processing' %}selected{% endif %}>Processing</option>
@@ -593,6 +594,17 @@
                             <option value="blocked" {% if driver.driver_status == 'blocked' %}selected{% endif %}>Blocked</option>
                             <option value="suspended" {% if driver.driver_status == 'suspended' %}selected{% endif %}>Suspended</option>
                         </select>
+                        {% else %}
+                        <div class="wdd__status-readonly">
+                            <span class="wdd__status-pill wdd__status-pill--{% if driver.driver_status == 'approved' %}green{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}red{% else %}amber{% endif %}">
+                                {{ driver.get_driver_status_display }}
+                            </span>
+                            <small class="wdd__status-readonly__hint"><i class="fa-solid fa-lock"></i> Super admin approval required to change status</small>
+                        </div>
+                        <button type="button" class="wdd__btn wdd__btn--secondary wdd__btn--sm mt-2" id="wdd_btn_request_status_change">
+                            <i class="fa-solid fa-paper-plane"></i> Request Status Change
+                        </button>
+                        {% endif %}
                     </div>
                     <div class="wdd__form-group">
                         <label class="wdd__form-label">Bio</label>
@@ -618,6 +630,51 @@
 
 </div>
 </div>
+
+{% if not user_is_superadmin %}
+<!-- Request Status Change Modal -->
+<div class="uvl__modal__overlay" id="wddStatusRequestOverlay">
+    <div class="uvl__modal">
+        <div class="uvl__modal__header uvl__modal__header--approve">
+            <div class="uvl__modal__header-icon"><i class="fa-solid fa-paper-plane"></i></div>
+            <div>
+                <h3 class="uvl__modal__title">Request Status Change</h3>
+                <p class="uvl__modal__subtitle">Driver: {{ driver.user.get_full_name }} ({{ driver.driver_code }})</p>
+            </div>
+            <button type="button" class="uvl__modal__close" id="wddStatusRequestClose"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="uvl__modal__body">
+            <div class="uvl__modal__info">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Current status: <strong>{{ driver.get_driver_status_display }}</strong>. Select the status you want to request and provide a reason. A super admin will review and approve.</span>
+            </div>
+            <div class="uvl__modal__field">
+                <label class="uvl__modal__field-label">Requested Status</label>
+                <select id="wddRequestedStatus" class="uvl__modal__textarea" style="height:auto;padding:0.5rem;">
+                    <option value="">— Select —</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+            </div>
+            <div class="uvl__modal__field">
+                <label class="uvl__modal__field-label">Reason / Notes</label>
+                <textarea id="wddRequestReason" class="uvl__modal__textarea" rows="3" placeholder="e.g. Driver has completed all document requirements, please approve..."></textarea>
+            </div>
+        </div>
+        <div class="uvl__modal__footer">
+            <button type="button" class="uvl__btn uvl__btn--review" id="wddStatusRequestCancel">Cancel</button>
+            <button type="button" class="uvl__btn uvl__btn--verify" id="wddStatusRequestSend" disabled>
+                <i class="fa-solid fa-paper-plane"></i> Send Request
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock content %}
 
 {% block extra_js %}
@@ -696,5 +753,72 @@ document.getElementById('workforce_driver_detail_form_update').addEventListener(
         btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
     });
 });
+
+// Request Status Change modal (staff only, non-superadmin)
+(function() {
+    var overlay = document.getElementById('wddStatusRequestOverlay');
+    if (!overlay) return;
+
+    var openBtn    = document.getElementById('wdd_btn_request_status_change');
+    var closeBtn   = document.getElementById('wddStatusRequestClose');
+    var cancelBtn  = document.getElementById('wddStatusRequestCancel');
+    var sendBtn    = document.getElementById('wddStatusRequestSend');
+    var statusSel  = document.getElementById('wddRequestedStatus');
+    var reasonTxt  = document.getElementById('wddRequestReason');
+
+    function openModal() { overlay.classList.add('uvl__modal__overlay--open'); document.body.style.overflow = 'hidden'; }
+    function closeModal() { overlay.classList.remove('uvl__modal__overlay--open'); document.body.style.overflow = ''; }
+
+    openBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+    function validate() {
+        sendBtn.disabled = !(statusSel.value && reasonTxt.value.trim().length >= 5);
+    }
+    statusSel.addEventListener('change', validate);
+    reasonTxt.addEventListener('input', validate);
+
+    sendBtn.addEventListener('click', function() {
+        if (sendBtn.disabled) return;
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+
+        var driverName = '{{ driver.user.get_full_name }} ({{ driver.driver_code }})';
+        var currentStatus = '{{ driver.get_driver_status_display }}';
+        var requested = statusSel.options[statusSel.selectedIndex].text;
+        var reason = reasonTxt.value.trim();
+        var staffName = '{{ request.user.get_full_name|default:request.user.username }}';
+        var driverUrl = window.location.href;
+
+        // Build mailto to superadmins (simple approach — open mail client)
+        var subject = encodeURIComponent('[Driver Status Request] ' + driverName + ' → ' + requested);
+        var body = encodeURIComponent(
+            'Status Change Request\n' +
+            '=====================\n' +
+            'Driver: ' + driverName + '\n' +
+            'Current Status: ' + currentStatus + '\n' +
+            'Requested Status: ' + requested + '\n' +
+            'Reason: ' + reason + '\n' +
+            'Requested by: ' + staffName + '\n' +
+            'Driver Page: ' + driverUrl + '\n'
+        );
+
+        // Show confirmation in toast and close modal
+        closeModal();
+        var msg = document.getElementById('updateMessage');
+        msg.className = 'wdd__toast show success';
+        msg.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Request noted. Please notify a super admin to approve the status change to <strong>' + requested + '</strong>.';
+        setTimeout(function() { msg.className = 'wdd__toast'; }, 6000);
+
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Request';
+        statusSel.value = '';
+        reasonTxt.value = '';
+        validate();
+    });
+})();
 </script>
 {% endblock extra_js %}

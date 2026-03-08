@@ -58,7 +58,7 @@ Replace these with `.75rem`:
 - `0.85rem` (labels)
 - `0.875rem` (nav links, table headers)
 - `0.9rem` (page subtitles)
-- `0.9375rem` (timestamps)
+- `0.875rem` (timestamps)
 - `0.95rem` (content)
 
 ## Sizes to PRESERVE

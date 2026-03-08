@@ -912,9 +912,16 @@ def business_settings_api_test_result(request, business_id, api_id):
     from django.utils import timezone as dj_timezone
     update_time = dj_timezone.localtime().strftime('%Y-%m-%d  Time : %H:%M:%S')
 
+    def _htmx_error(msg):
+        return HttpResponse(
+            f'<div class="bapi__status-section bapi__status-section--error">'
+            f'<div class="bapi__status-icon"><i class="fa-solid fa-circle-exclamation"></i></div>'
+            f'<div class="bapi__status-content"><h4>Configuration Error</h4><p>{msg}</p></div>'
+            f'</div>'
+        )
+
     if not business_api:
-        messages.error(request, "API settings not found.")
-        return redirect('business:business_settings_api_list', business_id=business_id)
+        return _htmx_error("API settings not found.")
 
     BASE_API_KEY = business_api.api_key
     BASE_API_ACCESS_KEY = business_api.api_access_token
@@ -924,6 +931,8 @@ def business_settings_api_test_result(request, business_id, api_id):
     BASE_API_ORDER_ENDPINT = business_api.order_api_endpoint
     BASE_API_PRODUCT_ENDPINT = business_api.product_api_endpoint
 
+    if not BASE_API_STORE_NAME:
+        return _htmx_error("API store URL is not configured. Please update your API settings.")
     BASE_API_STORE_NAME = BASE_API_STORE_NAME.replace('https://', '')
 
     # Initialize variables with defaults to prevent undefined variable errors
@@ -976,6 +985,39 @@ def business_settings_api_test_result(request, business_id, api_id):
             product_count = int(product_count_str) if product_count_str else 0
             logger.debug(f'WooCommerce product_count={product_count}')
 
+        elif business_api.api_type == 'google_sheet':
+            import re
+            import gspread
+            from google.oauth2.credentials import Credentials
+            from django.conf import settings as django_settings
+
+            token_file = os.path.join(django_settings.BASE_DIR, django_settings.GOOGLE_SHEETS_TOKEN_FILE)
+            if not os.path.exists(token_file):
+                error_message = 'Google Sheets token file not found. Please run the OAuth setup script.'
+            else:
+                creds = Credentials.from_authorized_user_file(
+                    token_file,
+                    scopes=['https://www.googleapis.com/auth/spreadsheets.readonly',
+                            'https://www.googleapis.com/auth/drive.readonly']
+                )
+                gc = gspread.authorize(creds)
+                sheet_url = business_api.site_api_url
+                match = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', sheet_url)
+                if not match:
+                    error_message = 'Invalid Google Sheet URL. Could not extract spreadsheet ID.'
+                else:
+                    sheet_id = match.group(1)
+                    spreadsheet = gc.open_by_key(sheet_id)
+                    worksheets = spreadsheet.worksheets()
+                    sheets_info = []
+                    for ws in worksheets:
+                        values = ws.get_all_values()
+                        data_rows = max(len([r for r in values if any(r)]) - 1, 0)
+                        sheets_info.append({'name': ws.title, 'rows': data_rows})
+                    order_count = sum(s['rows'] for s in sheets_info)
+                    product_count = len(worksheets)
+                    status = 200
+
         else:
             error_message = f'API type "{business_api.api_type}" is not yet supported for testing.'
 
@@ -1006,6 +1048,8 @@ def business_settings_api_test_result(request, business_id, api_id):
         except ValueError:
             result = {'error': 'Invalid JSON response from API'}
             status = order_response.status_code if order_response else 0
+    elif status == 200:
+        result = {'rows': order_count, 'sheets': product_count}
     else:
         result = {'error': f'API type "{business_api.api_type}" is not yet supported for testing.'}
         status = 0
@@ -1013,13 +1057,13 @@ def business_settings_api_test_result(request, business_id, api_id):
     context = {
         'business': business,
         'api': business_api,
-        'update_time'  : update_time,
-        'order_count'  : order_count,
-        'product_count'  : product_count,
-
-        'status'  : status,
-        'result'  : result,
-
+        'update_time': update_time,
+        'order_count': order_count,
+        'product_count': product_count,
+        'status': status,
+        'result': result,
+        'error_message': error_message,
+        'sheets_info': sheets_info if 'sheets_info' in dir() else None,
     }
     return render(request, 'business/parts/business_settings_api_test_result.html', context)
 

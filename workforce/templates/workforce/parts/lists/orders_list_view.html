@@ -22,276 +22,125 @@
         </header>
         <!-- Filter Section -->
         <div class="pg-filter">
-            <div class="pg-filter__toggle"
-                 data-bs-toggle="collapse"
-                 data-bs-target="#filterCollapse">
-                <div class="d-flex align-items-center gap-3">
-                    <div>
-                        <i class="fa-solid fa-filter me-2"></i>
-                        <strong>Filter Orders</strong>
-                    </div>
-                    <div id="activeFiltersCount" class="pg-filter__active-count">
-                        <span class="badge bg-primary" id="filterCountBadge">0</span>
-                        <span class="small text-muted ms-1">active filters</span>
-                    </div>
+            <form id="filterForm" method="get" action="{{ request.path }}">
+
+                <!-- Row 1: Business | DL Code | Name/Mobile | Actions -->
+                <div class="pg-filter__row mb-2">
+                    <select class="form-select form-select-sm pg-filter__select-biz" name="business" id="pgf_business">
+                        <option value="">All Businesses</option>
+                        {% for biz in all_businesses %}
+                        <option value="{{ biz.business_id }}"
+                                {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>
+                            {{ biz.business_name }} ({{ biz.business_code|default:biz.business_id }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <input type="text"
+                           class="form-control form-control-sm pg-filter__input-sm"
+                           name="dlCode"
+                           id="pgf_dlCode"
+                           placeholder="DL Code..."
+                           value="{{ filters.dlCode }}"
+                           autocomplete="off">
+                    <input type="text"
+                           class="form-control form-control-sm pg-filter__input-sm"
+                           name="search"
+                           id="pgf_search"
+                           placeholder="Name / Mobile..."
+                           value="{{ filters.search }}"
+                           autocomplete="off">
+                    <button type="submit" class="btn btn-dark btn-sm">
+                        <i class="fa fa-search"></i>
+                    </button>
+                    <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary btn-sm" title="Clear">
+                        <i class="fa fa-times"></i>
+                    </a>
+                    <a href="{% url 'workforce:export_orders_csv' %}?{{ request.GET.urlencode }}"
+                       class="btn btn-outline-success btn-sm" title="Export CSV">
+                        <i class="fa fa-file-csv"></i>
+                    </a>
                 </div>
-                <i class="fa-solid fa-chevron-down"></i>
-            </div>
-            <!-- Search Filters -->
-            <div class="collapse" id="filterCollapse">
-                <form id="filterForm" method="get"
-                      hx-get=""
-                      hx-target="#main-content"
-                      hx-select="#main-content"
-                      hx-swap="outerHTML"
-                      hx-push-url="true">
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6 col-lg-3">
-                            <label for="cCode" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-code me-1"></i>Business Code
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">
-                                    <i class="fa-solid fa-search text-muted"></i>
-                                </span>
-                                <input type="text"
-                                       class="form-control border-start-0 ps-0"
-                                       name="cCode"
-                                       id="cCode"
-                                       placeholder="Search Business Code..."
-                                       value="{{ filters.cCode }}"
-                                       autocomplete="off">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="dlCode" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-hashtag me-1"></i>DL Code
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">
-                                    <i class="fa-solid fa-search text-muted"></i>
-                                </span>
-                                <input type="text"
-                                       class="form-control border-start-0 ps-0"
-                                       name="dlCode"
-                                       id="dlCode"
-                                       placeholder="Search DL Code..."
-                                       value="{{ filters.dlCode }}"
-                                       autocomplete="off">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="mobile" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-mobile me-1"></i>Mobile Number
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">
-                                    <i class="fa-solid fa-phone text-muted"></i>
-                                </span>
-                                <input type="text"
-                                       class="form-control border-start-0 ps-0"
-                                       name="mobile"
-                                       id="mobile"
-                                       placeholder="Search Mobile..."
-                                       value="{{ filters.mobile }}"
-                                       autocomplete="off">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="customerName" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-user me-1"></i>Customer Name
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">
-                                    <i class="fa-solid fa-search text-muted"></i>
-                                </span>
-                                <input type="text"
-                                       class="form-control border-start-0 ps-0"
-                                       name="customerName"
-                                       id="customerName"
-                                       placeholder="Search Customer..."
-                                       value="{{ filters.customerName }}"
-                                       autocomplete="off">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row g-3">
-                        <!-- Status Filters -->
-                        <div class="col-md-6 col-lg-3">
-                            <label for="cStatus" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-circle-check me-1"></i>Order Status
-                            </label>
-                            <select class="form-select" name="cStatus" id="cStatus">
-                                <option value="">All Statuses</option>
-                                <option value="to_review"
-                                        {% if filters.cStatus == 'to_review' %}selected{% endif %}>To Review</option>
-                                <option value="ready_to_pickup"
-                                        {% if filters.cStatus == 'ready_to_pickup' %}selected{% endif %}>
-                                    Ready to Pickup
-                                </option>
-                                <option value="publish"
-                                        {% if filters.cStatus == 'publish' %}selected{% endif %}>Publish</option>
-                                <option value="cancelled"
-                                        {% if filters.cStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="dmsStatus" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-cloud me-1"></i>DMS Status
-                            </label>
-                            <select class="form-select" name="dmsStatus" id="dmsStatus">
-                                <option value="">All DMS Statuses</option>
-                                <option value="published"
-                                        {% if filters.dmsStatus == 'published' %}selected{% endif %}>
-                                    📤 Published
-                                </option>
-                                <option value="assigned"
-                                        {% if filters.dmsStatus == 'assigned' %}selected{% endif %}>👤 Assigned</option>
-                                <option value="in_transit"
-                                        {% if filters.dmsStatus == 'in_transit' %}selected{% endif %}>
-                                    🚚 In Transit
-                                </option>
-                                <option value="delivered"
-                                        {% if filters.dmsStatus == 'delivered' %}selected{% endif %}>
-                                    ✅ Delivered
-                                </option>
-                                <option value="failed"
-                                        {% if filters.dmsStatus == 'failed' %}selected{% endif %}>❌ Failed</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="dateFrom" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-calendar-days me-1"></i>Date From
-                            </label>
-                            <input type="date"
-                                   class="form-control"
-                                   name="dateFrom"
-                                   id="dateFrom"
-                                   value="{{ filters.dateFrom }}">
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="dateTo" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-calendar-days me-1"></i>Date To
-                            </label>
-                            <input type="date"
-                                   class="form-control"
-                                   name="dateTo"
-                                   id="dateTo"
-                                   value="{{ filters.dateTo }}">
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="business" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-store me-1"></i>Business
-                            </label>
-                            <select class="form-select" name="business" id="business">
-                                <option value="">All Businesses</option>
-                                {% for biz in all_businesses %}
-                                <option value="{{ biz.business_id }}"
-                                        {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>
-                                    {{ biz.business_name }} ({{ biz.business_code|default:biz.business_id }})
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <!-- Action Buttons -->
-                    <div class="row g-2 mt-3 pt-3 border-top">
-                        <div class="col-12">
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button type="submit" class="btn btn-dark px-4">
-                                    <i class="fa fa-search me-2"></i>Apply Filters
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary px-4" id="clearFilter">
-                                    <i class="fa fa-times me-2"></i>Clear All
-                                </button>
-                                <a href="{% url 'workforce:export_orders_csv' %}?{{ request.GET.urlencode }}"
-                                   class="btn btn-outline-success px-4">
-                                    <i class="fa fa-file-csv me-2"></i>Export CSV
-                                </a>
-                                <button type="button"
-                                        class="btn btn-outline-primary px-4"
-                                        id="saveFilter"
-                                        title="Save current filter as preset">
-                                    <i class="fa fa-bookmark me-2"></i>Save Filter
-                                </button>
-                                <div class="ms-auto d-flex align-items-center gap-2" role="group" aria-label="Quick Filters">
-                                    <span class="text-muted small" id="quickFilterLabel">Quick Filters:</span>
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-info btn-quick-filter"
-                                            data-filter="today"
-                                            aria-describedby="quickFilterLabel">Today</button>
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-info btn-quick-filter"
-                                            data-filter="pending"
-                                            aria-describedby="quickFilterLabel">Pending</button>
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-info btn-quick-filter"
-                                            data-filter="in_transit"
-                                            aria-describedby="quickFilterLabel">In Transit</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
+
+                <!-- Row 2: Date quick-select | Order Status | DL Status -->
+                <div class="pg-filter__row">
+                    <span class="text-muted small text-nowrap"><i class="fa-solid fa-calendar-days"></i></span>
+                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'today' %}active{% endif %}" data-preset="today">Today</button>
+                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'yesterday' %}active{% endif %}" data-preset="yesterday">Yesterday</button>
+                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == '3days' %}active{% endif %}" data-preset="3days">3 Days</button>
+                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'week' %}active{% endif %}" data-preset="week">Last Week</button>
+                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'month' %}active{% endif %}" data-preset="month">Month</button>
+                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'custom' %}active{% endif %}" data-preset="custom">Custom</button>
+                    <input type="hidden" name="datePreset" id="pgf_date_preset" value="{{ filters.datePreset }}">
+                    <input type="hidden" name="dateFrom" id="pgf_dateFrom" value="{{ filters.dateFrom }}">
+                    <input type="hidden" name="dateTo" id="pgf_dateTo" value="{{ filters.dateTo }}">
+                    <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_from_vis" value="{{ filters.dateFrom }}">
+                    <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_to_vis" value="{{ filters.dateTo }}">
+                    <span class="pg-filter__sep"></span>
+                    <select class="form-select form-select-sm pg-filter__input-sm" name="cStatus" id="pgf_cStatus">
+                        <option value="">Order Status</option>
+                        <option value="to_review" {% if filters.cStatus == 'to_review' %}selected{% endif %}>To Review</option>
+                        <option value="ready_to_pickup" {% if filters.cStatus == 'ready_to_pickup' %}selected{% endif %}>Ready to Pickup</option>
+                        <option value="publish" {% if filters.cStatus == 'publish' %}selected{% endif %}>Publish</option>
+                        <option value="cancelled" {% if filters.cStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                    <select class="form-select form-select-sm pg-filter__input-sm" name="dlTaskStatus" id="pgf_dlTaskStatus">
+                        <option value="">DL Status</option>
+                        <option value="for_review" {% if filters.dlTaskStatus == 'for_review' %}selected{% endif %}>For Review</option>
+                        <option value="pending" {% if filters.dlTaskStatus == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="assigned" {% if filters.dlTaskStatus == 'assigned' %}selected{% endif %}>Assigned</option>
+                        <option value="accepted" {% if filters.dlTaskStatus == 'accepted' %}selected{% endif %}>Accepted</option>
+                        <option value="picked_up" {% if filters.dlTaskStatus == 'picked_up' %}selected{% endif %}>Picked Up</option>
+                        <option value="out_for_delivery" {% if filters.dlTaskStatus == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
+                        <option value="in_transit" {% if filters.dlTaskStatus == 'in_transit' %}selected{% endif %}>In Transit</option>
+                        <option value="contacted" {% if filters.dlTaskStatus == 'contacted' %}selected{% endif %}>Contacted</option>
+                        <option value="non_reachable" {% if filters.dlTaskStatus == 'non_reachable' %}selected{% endif %}>Non Reachable</option>
+                        <option value="delivered" {% if filters.dlTaskStatus == 'delivered' %}selected{% endif %}>Delivered</option>
+                        <option value="failed" {% if filters.dlTaskStatus == 'failed' %}selected{% endif %}>Failed</option>
+                        <option value="cancelled" {% if filters.dlTaskStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                </div>
+
+            </form>
         </div>
-        <!-- Active Filters Display (Server-side rendered) -->
-        {% if filters.cCode or filters.dlCode or filters.mobile or filters.customerName or filters.cStatus or filters.dmsStatus or filters.dateFrom or filters.dateTo or filters.business %}
+        <!-- Active Filters Display -->
+        {% if filters.dlCode or filters.search or filters.cStatus or filters.dlTaskStatus or filters.datePreset or filters.business %}
         <div class="active-filters-bar">
-            <span class="active-filters-label"><i class="fa-solid fa-filter me-1"></i>Active Filters:</span>
+            <span class="active-filters-label"><i class="fa-solid fa-filter me-1"></i>Active:</span>
             <div class="active-filters-list">
                 {% if filters.business %}
                 <span class="pg-filter__tag">
-                    <strong>Business:</strong> {% for biz in all_businesses %}{% if biz.business_id|stringformat:"s" == filters.business %}{{ biz.business_name }}{% endif %}{% endfor %}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'business' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
-                </span>
-                {% endif %}
-                {% if filters.cCode %}
-                <span class="pg-filter__tag">
-                    <strong>Business Code:</strong> {{ filters.cCode }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <strong>Biz:</strong> {% for biz in all_businesses %}{% if biz.business_id|stringformat:"s" == filters.business %}{{ biz.business_name }}{% endif %}{% endfor %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'business' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dlCode %}
                 <span class="pg-filter__tag">
-                    <strong>DL Code:</strong> {{ filters.dlCode }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <strong>DL:</strong> {{ filters.dlCode }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlCode' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
-                {% if filters.mobile %}
+                {% if filters.search %}
                 <span class="pg-filter__tag">
-                    <strong>Mobile:</strong> {{ filters.mobile }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'mobile' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
-                </span>
-                {% endif %}
-                {% if filters.customerName %}
-                <span class="pg-filter__tag">
-                    <strong>Customer:</strong> {{ filters.customerName }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'customerName' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <strong>Search:</strong> {{ filters.search }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'search' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.cStatus %}
                 <span class="pg-filter__tag">
-                    <strong>Status:</strong> {{ filters.cStatus }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <strong>Order:</strong> {{ filters.cStatus }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
-                {% if filters.dmsStatus %}
+                {% if filters.dlTaskStatus %}
                 <span class="pg-filter__tag">
-                    <strong>DMS:</strong> {{ filters.dmsStatus }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dmsStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <strong>DL Status:</strong> {{ filters.dlTaskStatus }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlTaskStatus' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
-                {% if filters.dateFrom %}
+                {% if filters.datePreset %}
                 <span class="pg-filter__tag">
-                    <strong>From:</strong> {{ filters.dateFrom }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateFrom' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
-                </span>
-                {% endif %}
-                {% if filters.dateTo %}
-                <span class="pg-filter__tag">
-                    <strong>To:</strong> {{ filters.dateTo }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateTo' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <strong>Date:</strong> {% if filters.datePreset == 'custom' %}{{ filters.dateFrom }} → {{ filters.dateTo }}{% else %}{{ filters.datePreset }}{% endif %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'datePreset' and key != 'dateFrom' and key != 'dateTo' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
             </div>
@@ -362,6 +211,7 @@
                     <div class="orc__cell orc__cell--chk"><input type="checkbox" class="orc__chk order-select-checkbox" data-order-id="{{ order.id }}" onchange="updateOrderSelection()"></div>
                     <div class="orc__cell orc__cell--id">
                         <a class="orc__id-link" href="{% url 'workforce:order_detail' order.id %}" hx-get="{% url 'workforce:order_detail' order.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code }}</a>
+                        {% if order.is_transferred %}<span class="badge bg-success ms-1" style="font-size:0.6rem;vertical-align:middle;">Transferred</span>{% endif %}
                         <span class="orc__seller">{{ order.business.business_name }}</span>
                     </div>
                     <div class="orc__cell orc__cell--cust">
@@ -459,13 +309,13 @@
                 </div>
                 <h4 class="text-muted mb-3">No Orders Found</h4>
                 <p class="text-muted mb-4">
-                    {% if filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus %}
+                    {% if filters.dlCode or filters.search or filters.cStatus or filters.dlTaskStatus %}
                         No orders match your current filters. Try adjusting your search criteria.
                     {% else %}
                         There are no orders in the system yet.
                     {% endif %}
                 </p>
-                {% if filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus %}
+                {% if filters.dlCode or filters.search or filters.cStatus or filters.dlTaskStatus %}
                     <button type="button" class="btn btn-primary" id="clearFilterEmpty">
                         <i class="fa fa-times me-2"></i>Clear All Filters
                     </button>
@@ -517,216 +367,8 @@
             charset="UTF-8"
             src="{%static 'orders/js/orders_main.js' %}"></script>
     <script>
-    // Filter toggle animation
-    const filterToggle = document.querySelector('.pg-filter__toggle');
-    const filterCollapse = document.getElementById('filterCollapse');
-
-    if (filterToggle && filterCollapse) {
-        filterCollapse.addEventListener('show.bs.collapse', function() {
-            filterToggle.classList.add('active');
-        });
-        filterCollapse.addEventListener('hide.bs.collapse', function() {
-            filterToggle.classList.remove('active');
-        });
-    }
-
-    // Clear filter functionality
-    function clearAllFilters() {
-        document.getElementById('dlCode').value = '';
-        document.getElementById('cCode').value = '';
-        document.getElementById('mobile').value = '';
-        document.getElementById('customerName').value = '';
-        document.getElementById('cStatus').value = '';
-        document.getElementById('dmsStatus').value = '';
-        document.getElementById('dateFrom').value = '';
-        document.getElementById('dateTo').value = '';
-        // Use HTMX to reload without filters
-        htmx.ajax('GET', window.location.pathname, {
-            target: '#main-content',
-            select: '#main-content',
-            swap: 'outerHTML'
-        });
-        history.pushState({}, '', window.location.pathname);
-    }
-
-    const clearFilterBtn = document.getElementById('clearFilter');
-    if (clearFilterBtn) {
-        clearFilterBtn.addEventListener('click', clearAllFilters);
-    }
-
-    // Clear filter from empty state
-    const clearFilterEmpty = document.getElementById('clearFilterEmpty');
-    if (clearFilterEmpty) {
-        clearFilterEmpty.addEventListener('click', clearAllFilters);
-    }
-
-    // Submit form on Enter key for input fields
-    const filterInputs = document.querySelectorAll('#filterForm input');
-    filterInputs.forEach(input => {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('filterForm').submit();
-            }
-        });
-    });
-
-    // Count and display active filters
-    function updateActiveFiltersDisplay() {
-        const filters = {
-            'dlCode': document.getElementById('dlCode').value,
-            'cCode': document.getElementById('cCode').value,
-            'mobile': document.getElementById('mobile').value,
-            'customerName': document.getElementById('customerName').value,
-            'cStatus': document.getElementById('cStatus').value,
-            'dmsStatus': document.getElementById('dmsStatus').value,
-            'dateFrom': document.getElementById('dateFrom').value,
-            'dateTo': document.getElementById('dateTo').value
-        };
-
-        const activeFilters = Object.entries(filters).filter(([key, value]) => value !== '');
-        const filterCount = activeFilters.length;
-
-        // Update count badge
-        const countDisplay = document.getElementById('activeFiltersCount');
-        const countBadge = document.getElementById('filterCountBadge');
-        if (filterCount > 0) {
-            countDisplay.classList.add('show');
-            countBadge.textContent = filterCount;
-        } else {
-            countDisplay.classList.remove('show');
-        }
-
-        // Update filter tags
-        const tagsContainer = document.getElementById('filterTagsContainer');
-        const tagsDisplay = document.getElementById('activeFilterTags');
-
-        if (filterCount > 0) {
-            tagsDisplay.classList.add('show');
-            tagsContainer.innerHTML = '';
-
-            const filterLabels = {
-                'dlCode': 'DL Code',
-                'cCode': 'Client Code',
-                'mobile': 'Mobile',
-                'customerName': 'Customer',
-                'cStatus': 'Order Status',
-                'dmsStatus': 'DMS Status',
-                'dateFrom': 'From',
-                'dateTo': 'To'
-            };
-
-            activeFilters.forEach(function(entry) {
-                var key = entry[0];
-                var value = entry[1];
-                var tag = document.createElement('span');
-                tag.className = 'pg-filter__tag';
-
-                var strong = document.createElement('strong');
-                strong.textContent = filterLabels[key] + ':';
-                tag.appendChild(strong);
-                tag.appendChild(document.createTextNode(' ' + value + ' '));
-
-                var closeBtn = document.createElement('button');
-                closeBtn.type = 'button';
-                closeBtn.className = 'btn-close btn-close-sm ms-1 btn-remove-filter';
-                closeBtn.title = 'Remove filter';
-                closeBtn.dataset.filterKey = key;
-                closeBtn.addEventListener('click', function() {
-                    removeFilter(this.dataset.filterKey);
-                });
-                tag.appendChild(closeBtn);
-
-                tagsContainer.appendChild(tag);
-            });
-        } else {
-            tagsDisplay.classList.remove('show');
-        }
-    }
-
-    // Remove individual filter
-    function removeFilter(filterKey) {
-        document.getElementById(filterKey).value = '';
-        htmx.trigger('#filterForm', 'submit');
-    }
-
-    // Quick filter functions
-    function quickFilter(type) {
-        // Clear all fields first
-        document.getElementById('dlCode').value = '';
-        document.getElementById('cCode').value = '';
-        document.getElementById('mobile').value = '';
-        document.getElementById('customerName').value = '';
-        document.getElementById('cStatus').value = '';
-        document.getElementById('dmsStatus').value = '';
-        document.getElementById('dateFrom').value = '';
-        document.getElementById('dateTo').value = '';
-
-        switch(type) {
-            case 'today':
-                var today = new Date().toISOString().split('T')[0];
-                document.getElementById('dateFrom').value = today;
-                document.getElementById('dateTo').value = today;
-                break;
-            case 'pending':
-                document.getElementById('cStatus').value = 'to_review';
-                break;
-            case 'in_transit':
-                document.getElementById('dmsStatus').value = 'in_transit';
-                break;
-        }
-
-        htmx.trigger('#filterForm', 'submit');
-    }
-
-    // Event delegation for quick filter buttons
-    document.querySelectorAll('.btn-quick-filter[data-filter]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            quickFilter(this.dataset.filter);
-        });
-    });
-
-    // Save filter preset
-    const saveFilterBtn = document.getElementById('saveFilter');
-    if (saveFilterBtn) {
-        saveFilterBtn.addEventListener('click', function() {
-            const filterName = prompt('Enter a name for this filter preset:');
-            if (filterName) {
-                const filters = {
-                    name: filterName,
-                    dlCode: document.getElementById('dlCode').value,
-                    cCode: document.getElementById('cCode').value,
-                    mobile: document.getElementById('mobile').value,
-                    customerName: document.getElementById('customerName').value,
-                    cStatus: document.getElementById('cStatus').value,
-                    dmsStatus: document.getElementById('dmsStatus').value,
-                    dateFrom: document.getElementById('dateFrom').value,
-                    dateTo: document.getElementById('dateTo').value
-                };
-
-                // Save to localStorage
-                let savedFilters = JSON.parse(localStorage.getItem('orderFilters') || '[]');
-                savedFilters.push(filters);
-                localStorage.setItem('orderFilters', JSON.stringify(savedFilters));
-
-                alert('Filter preset saved successfully!');
-            }
-        });
-    }
-
-    // Auto-submit on select change (optional)
-    document.querySelectorAll('#filterForm select').forEach(select => {
-        select.addEventListener('change', function() {
-            // Optional: Auto-submit on select change
-            // Uncomment the line below if you want instant filtering
-            // document.getElementById('filterForm').submit();
-        });
-    });
-
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        updateActiveFiltersDisplay();
-    });
+    // Signal workforce.js to init the pg-filter on this page
+    window._pgFilterPath = '{{ request.path }}';
 
     // Get CSRF token - reads from meta tag (CSRF_COOKIE_HTTPONLY=True means cookie is inaccessible to JS)
     function getCSRFToken() {
@@ -1286,8 +928,8 @@
                 if (data.success) {
                     const result = data.data;
                     const statusBadge = result.is_valid ?
-                        '<span class="badge bg-success">Valid</span>' :
-                        '<span class="badge bg-danger">Issues Found</span>';
+                        '<span class="badge badge-success">Valid</span>' :
+                        '<span class="badge badge-error">Issues Found</span>';
 
                     let issuesHtml = '';
                     if (result.issues && result.issues.length > 0) {

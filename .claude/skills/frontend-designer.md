@@ -56,13 +56,13 @@ Use this skill when designing UI components, creating landing pages, or building
 --brand-font-primary: "Inter", "Poppins", "Helvetica Neue", sans-serif;
 
 /* Font Sizes (rem-based) */
---brand-font-size-base: 0.9375rem   /* 15px base */
+--brand-font-size-base: 0.875rem   /* 15px base */
 --brand-font-size-heading: 1.25rem  /* 20px headings */
 
 /* Standard scale */
 --text-xs: 0.75rem      /* 12px */
 --text-sm: 0.875rem     /* 14px */
---text-base: 0.9375rem  /* 15px (brand default) */
+--text-base: 0.875rem  /* 15px (brand default) */
 --text-lg: 1.125rem     /* 18px */
 --text-xl: 1.25rem      /* 20px */
 --text-2xl: 1.5rem      /* 24px */
@@ -1327,7 +1327,7 @@ Base font size is 16px, so:
 }
 
 .empty-state__text {
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   color: var(--brand-grey-500);
   margin: 0 0 1.5rem;
 }
@@ -1482,7 +1482,7 @@ Modern sidebar with active states and icons:
     border-radius: var(--brand-radius-sm);
     color: var(--brand-grey-700);
     text-decoration: none;
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     font-weight: 500;
     transition: var(--brand-transition);
     margin-bottom: 0.25rem;

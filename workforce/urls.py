@@ -15,7 +15,12 @@ urlpatterns = [
     path('sellers/pending/', workforce_views.sellers_pending, name='sellers_pending'),
     path('sellers/active/', workforce_views.sellers_active, name='sellers_active'),
     path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
+    path('sellers/api-configs/', workforce_views.wf_seller_api_configs, name='wf_seller_api_configs'),
+    path('sellers/api-configs/<int:api_id>/approve/', workforce_views.wf_approve_api_config, name='wf_approve_api_config'),
+    path('sellers/api-configs/<int:api_id>/test/', workforce_views.wf_test_api_config, name='wf_test_api_config'),
+    path('sellers/api-configs/google-sheet/save/', workforce_views.wf_save_google_sheet, name='wf_save_google_sheet'),
     path('sellers/<int:business_id>/', workforce_views.seller_detail, name='seller_detail'),
+    path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
 
     # Drivers section urls -------------------------------------------------------------------
     path('drivers/', workforce_views.drivers_list, name='drivers_list'),
@@ -31,6 +36,9 @@ urlpatterns = [
     path('orders/bulk-import/', orders_views.bulk_import_orders, name='wf_orders_bulk_import'),
     path('orders/bulk-import/preview/', orders_views.bulk_import_preview, name='wf_orders_bulk_preview'),
     path('orders/bulk-import/save/', orders_views.bulk_import_save, name='wf_orders_bulk_save'),
+    path('orders/api-orders/', workforce_views.wf_api_orders, name='wf_api_orders'),
+    path('orders/api-orders/bulk-transfer/', workforce_views.bulk_transfer_api_orders, name='bulk_transfer_api_orders'),
+    path('orders/api-orders/import/', workforce_views.import_api_orders, name='import_api_orders'),
     path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
     path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
@@ -88,6 +96,8 @@ urlpatterns = [
     path('tasks/bulk-assign-driver/', workforce_views.bulk_assign_driver, name='bulk_assign_driver'),
 
     # User Verification URLs
+    path('verification/business/', workforce_views.business_verification_list, name='business_verification_list'),
+    path('verification/drivers/', workforce_views.driver_verification_list, name='driver_verification_list'),
     path('verification/users/', workforce_views.user_verification_list, name='user_verification_list'),
     path('verification/teams/', workforce_views.team_verification_list, name='team_verification_list'),
     path('verification/<int:profile_id>/update-status/', workforce_views.update_verification_status, name='update_verification_status'),

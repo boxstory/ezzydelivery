@@ -26,7 +26,7 @@
           <span>Orders</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,order_detail' %}show{% endif %}" id="submenu-orders">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,wf_api_orders,order_detail' %}show{% endif %}" id="submenu-orders">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_wf_orders_add" class="nav-link btn wf-sidebar__submenu-link wf-sidebar__submenu-link--highlight {% if request.resolver_match.url_name == 'wf_orders_add' %}active{% endif %}"
@@ -53,15 +53,15 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_wf_orders_api" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'wf_orders_api_guide' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_api_guide' %}"
-                 hx-get="{% url 'workforce:wf_orders_api_guide' %}"
+              <a id="workforce_sidebar_link_wf_api_orders" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'wf_api_orders' %}active{% endif %}"
+                 href="{% url 'workforce:wf_api_orders' %}"
+                 hx-get="{% url 'workforce:wf_api_orders' %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
                  hx-push-url="true">
-                <i class="fa-solid fa-code me-2"></i>
-                API Integration
+                <i class="fa-solid fa-plug me-2"></i>
+                Order Auto/API
               </a>
             </li>
             <li class="nav-item">
@@ -122,7 +122,7 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-spinner me-2"></i>
                 <span class="flex-grow-1">Publish to Task</span>
-                {% if pending_publish_count %}<span class="badge bg-warning text-dark ms-auto" data-badge="pending_publish">{{ pending_publish_count }}</span>{% endif %}
+                {% if pending_publish_count %}<span class="badge badge-warning ms-auto" data-badge="pending_publish">{{ pending_publish_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -208,7 +208,7 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-spinner me-2"></i>
                 <span class="flex-grow-1">Unpublished Tasks</span>
-                {% if unpublished_tasks_count %}<span class="badge bg-info ms-auto" data-badge="unpublished_tasks">{{ unpublished_tasks_count }}</span>{% endif %}
+                {% if unpublished_tasks_count %}<span class="badge badge-info ms-auto" data-badge="unpublished_tasks">{{ unpublished_tasks_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -233,7 +233,7 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-phone me-2"></i>
                 <span class="flex-grow-1">FollowUp List</span>
-                {% if followup_count %}<span class="badge bg-danger ms-auto" data-badge="followup">{{ followup_count }}</span>{% endif %}
+                {% if followup_count %}<span class="badge badge-error ms-auto" data-badge="followup">{{ followup_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -610,7 +610,7 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-triangle-exclamation me-2"></i>
                 <span class="flex-grow-1">Low Stock Alerts</span>
-                {% if low_stock_count %}<span class="badge bg-danger ms-auto" data-badge="low_stock">{{ low_stock_count }}</span>{% endif %}
+                {% if low_stock_count %}<span class="badge badge-error ms-auto" data-badge="low_stock">{{ low_stock_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -788,7 +788,7 @@
           <span>Sellers</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'sellers_list,sellers_pending,sellers_active,sellers_inactive,seller_detail' %}show{% endif %}" id="submenu-sellers">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'sellers_list,sellers_pending,sellers_active,sellers_inactive,seller_detail,wf_seller_api_configs,wf_test_api_config' %}show{% endif %}" id="submenu-sellers">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_all_sellers" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'sellers_list' or request.resolver_match.url_name == 'seller_detail' %}active{% endif %}"
@@ -836,6 +836,18 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-circle-xmark me-2"></i>
                 Inactive Sellers
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_seller_api_configs" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name in 'wf_seller_api_configs,wf_test_api_config' %}active{% endif %}"
+                 href="{% url 'workforce:wf_seller_api_configs' %}"
+                 hx-get="{% url 'workforce:wf_seller_api_configs' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-plug me-2"></i>
+                API Configs
               </a>
             </li>
           </ul>

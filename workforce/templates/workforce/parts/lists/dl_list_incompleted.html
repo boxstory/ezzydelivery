@@ -39,12 +39,7 @@
             <i class="fa-solid fa-chevron-down"></i>
         </div>
         <div class="collapse" id="filterCollapse">
-            <form id="filterForm" method="get"
-                  hx-get=""
-                  hx-target="#main-content"
-                  hx-select="#main-content"
-                  hx-swap="outerHTML"
-                  hx-push-url="true">
+            <form id="filterForm" method="get" action="{{ request.path }}">
                 <div class="row g-3 mb-3">
                     <!-- Search Filters -->
                     <div class="col-md-6 col-lg-3">
@@ -272,7 +267,7 @@
                     <i class="fa-solid fa-user-tie me-2 text-primary"></i>
                     <strong>Driver:</strong> {{ dl.driver }}
                 </div>
-                <span class="badge bg-primary">Assigned</span>
+                <span class="badge badge-info">Assigned</span>
             </div>
             {% endif %}
 
@@ -406,13 +401,7 @@
         if (dateFrom) dateFrom.value = '';
         if (dateTo) dateTo.value = '';
 
-        // Use HTMX to navigate
-        htmx.ajax('GET', window.location.pathname, {
-            target: '#main-content',
-            select: '#main-content',
-            swap: 'outerHTML'
-        });
-        history.pushState({}, '', window.location.pathname);
+        window.location.href = window.location.pathname;
     }
 
     const clearFilter = document.getElementById('clearFilter');
@@ -432,7 +421,7 @@
         input.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                htmx.trigger('#filterForm', 'submit');
+                document.getElementById('filterForm').submit();
             }
         });
     });
@@ -514,7 +503,7 @@
     function removeFilter(filterKey) {
         const element = document.getElementById(filterKey);
         if (element) element.value = '';
-        htmx.trigger('#filterForm', 'submit');
+        document.getElementById('filterForm').submit();
     }
 
     // Quick filter functions
@@ -552,7 +541,7 @@
                 break;
         }
 
-        htmx.trigger('#filterForm', 'submit');
+        document.getElementById('filterForm').submit();
     }
 
     // Event delegation for quick filter buttons

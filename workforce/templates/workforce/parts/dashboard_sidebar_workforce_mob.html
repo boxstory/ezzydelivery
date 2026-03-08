@@ -42,6 +42,9 @@
                 <a id="workforce_sidebar_mob_link_sellers_inactive" href="{% url 'workforce:sellers_inactive' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-circle-xmark"></i><span>Inactive Sellers</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_seller_api_configs" href="{% url 'workforce:wf_seller_api_configs' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plug"></i><span>API Configs</span>
+                </a>
             </div>
         </div>
 
@@ -61,8 +64,8 @@
                 <a id="workforce_sidebar_mob_link_orders_bulk" href="{% url 'workforce:wf_orders_bulk_import' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-import"></i><span>Bulk Import</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_orders_api" href="{% url 'workforce:wf_orders_api_guide' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-code"></i><span>API Guide</span>
+                <a id="workforce_sidebar_mob_link_api_orders" href="{% url 'workforce:wf_api_orders' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plug"></i><span>Order Auto/API</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_all_orders" href="{% url 'workforce:wf_orders_all' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Orders</span>
@@ -408,36 +411,29 @@
 
         <div class="wsm__nav-divider"></div>
 
-        <!-- User Verification -->
-        <div id="workforce_sidebar_mob_section_verification" class="wsm__nav-single">
-            <a id="workforce_sidebar_mob_link_verification" href="{% url 'workforce:user_verification_list' %}">
-                <i class="fa-solid fa-user-check"></i>
-                <span>User Verification</span>
-            </a>
-        </div>
-
-        <!-- Team Verification -->
-        <div id="workforce_sidebar_mob_section_team_verification" class="wsm__nav-single">
-            <a id="workforce_sidebar_mob_link_team_verification" href="{% url 'workforce:team_verification_list' %}">
-                <i class="fa-solid fa-users-line"></i>
-                <span>Team Verification</span>
-            </a>
-        </div>
-
-        <!-- Business Verification -->
-        <div id="workforce_sidebar_mob_section_biz_verification" class="wsm__nav-single">
-            <a id="workforce_sidebar_mob_link_biz_verification" href="{% url 'workforce:business_verification_list' %}">
-                <i class="fa-solid fa-building-circle-check"></i>
-                <span>Business Verification</span>
-            </a>
-        </div>
-
-        <!-- Driver Verification -->
-        <div id="workforce_sidebar_mob_section_drv_verification" class="wsm__nav-single">
-            <a id="workforce_sidebar_mob_link_drv_verification" href="{% url 'workforce:driver_verification_list' %}">
-                <i class="fa-solid fa-car"></i>
-                <span>Driver Verification</span>
-            </a>
+        <!-- Verifications -->
+        <div id="workforce_sidebar_mob_section_verifications" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('verifications')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    <span>Verifications</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-verifications">
+                <a id="workforce_sidebar_mob_link_verification" href="{% url 'workforce:user_verification_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-user-check"></i><span>All Users</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_biz_verification" href="{% url 'workforce:business_verification_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-building-circle-check"></i><span>Business</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_drv_verification" href="{% url 'workforce:driver_verification_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-car"></i><span>Drivers</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_team_verification" href="{% url 'workforce:team_verification_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-users-line"></i><span>Team</span>
+                </a>
+            </div>
         </div>
 
         <!-- Staff Contacts -->
@@ -479,20 +475,38 @@ function toggleMobileSidebar() {
 function toggleMobileSection(sectionId) {
     const submenu = document.getElementById('mobile-section-' + sectionId);
     const header = submenu.previousElementSibling;
+    const isOpen = submenu.classList.contains('show');
 
-    // Close all other open sections
+    // Close all other open sections (accordion behaviour)
     document.querySelectorAll('.wsm__nav-submenu').forEach(function(item) {
         if (item !== submenu) {
             item.classList.remove('show');
-            item.previousElementSibling.classList.remove('active');
+            // Only remove active from non-highlighted headers (preserve active-page highlight)
+            if (!item.previousElementSibling.dataset.hasActivePage) {
+                item.previousElementSibling.classList.remove('active');
+            }
         }
     });
 
-    submenu.classList.toggle('show');
-    header.classList.toggle('active');
+    if (isOpen) {
+        submenu.classList.remove('show');
+        if (!header.dataset.hasActivePage) {
+            header.classList.remove('active');
+        }
+    } else {
+        submenu.classList.add('show');
+        header.classList.add('active');
+    }
 }
 
-// Highlight active link and auto-expand its section on page load
+// Close sidebar menu when a nav link is tapped (mobile UX)
+function closeMobileSidebarOnNav() {
+    const menu = document.getElementById('mobileSidebarMenu');
+    // Small delay so the active class can render before closing
+    setTimeout(function() { menu.classList.remove('show'); }, 150);
+}
+
+// Highlight active link, auto-expand its section, mark section header
 document.addEventListener('DOMContentLoaded', function() {
     const currentPath = window.location.pathname;
 
@@ -500,11 +514,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const linkPath = new URL(link.href, window.location.origin).pathname;
         if (currentPath === linkPath) {
             link.classList.add('active');
+
+            // Auto-open parent submenu
             const submenu = link.closest('.wsm__nav-submenu');
             if (submenu) {
                 submenu.classList.add('show');
-                submenu.previousElementSibling.classList.add('active');
+                const header = submenu.previousElementSibling;
+                header.classList.add('active');
+                header.dataset.hasActivePage = '1'; // persist across accordion open/close
             }
+        }
+
+        // Close menu on tap for nav links (not section headers)
+        if (link.tagName === 'A' && !link.classList.contains('wsm__dashboard-btn')) {
+            link.addEventListener('click', closeMobileSidebarOnNav);
         }
     });
 });

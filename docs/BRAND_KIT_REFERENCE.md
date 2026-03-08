@@ -135,7 +135,7 @@ This document is the **single source of truth** for all design decisions in the 
 ```css
 --brand-font-size-xs: 0.75rem;      /* 12px - Small labels */
 --brand-font-size-sm: 0.875rem;     /* 14px - Secondary text */
---brand-font-size-base: 0.9375rem;  /* 15px - Body text */
+--brand-font-size-base: 0.875rem;  /* 15px - Body text */
 --brand-font-size-md: 1rem;         /* 16px - Emphasized text */
 --brand-font-size-lg: 1.125rem;     /* 18px - Subheadings */
 --brand-font-size-xl: 1.25rem;      /* 20px - Section headings */

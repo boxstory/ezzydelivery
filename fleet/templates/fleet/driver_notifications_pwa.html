@@ -56,7 +56,7 @@
                    {% if not notif.is_read %}background:var(--fleet-primary-light, #fffbea);{% endif %}
                    {% if forloop.last %}border-bottom:none;{% endif %}
                    cursor:pointer;"
-            onclick="markRead({{ notif.id }}, this)">
+            onclick="markRead({{ notif.id }}, this{% if notif.related_task_id %}, '{% url 'fleet:fleet_task_navigation' notif.related_task_id %}'{% endif %})">
             <!-- Icon by type -->
             <div class="fleet-list-item__icon
                 {% if notif.notification_type == 'delivery_assigned' %}fleet-stat__icon--info
@@ -79,6 +79,11 @@
                 <div class="fleet-list-item__subtitle" style="margin-top:2px;">
                     {{ notif.message|truncatechars:80 }}
                 </div>
+                {% if notif.related_task_id %}
+                <div style="font-size:var(--font-size-xs); color:var(--fleet-primary); margin-top:var(--spacing-xs); font-weight:600;">
+                    Task #{{ notif.related_task.dl_task_number }} &rarr; View Task
+                </div>
+                {% endif %}
                 <div style="font-size:var(--font-size-xs); color:var(--fleet-grey-400); margin-top:var(--spacing-xs);">
                     {{ notif.created_at|timesince }} ago
                 </div>
@@ -119,8 +124,9 @@
     const MARK_READ_URL = "{% url 'fleet:notifications_mark_read' %}";
     const CSRF_TOKEN = "{{ csrf_token }}";
 
-    function markRead(notifId, el) {
+    function markRead(notifId, el, taskUrl) {
         haptic([5]);
+        const navigate = () => { if (taskUrl) window.location.href = taskUrl; };
         if (el.classList.contains('notif-item--unread')) {
             fetch(MARK_READ_URL, {
                 method: 'POST',
@@ -142,9 +148,12 @@
                     const title = el.querySelector('.fleet-list-item__title');
                     if (title) title.style.fontWeight = '';
                     updateUnreadBadge(data.unread_count);
+                    navigate();
                 }
             })
-            .catch(() => {});
+            .catch(() => navigate());
+        } else {
+            navigate();
         }
     }
 

@@ -138,6 +138,14 @@ class Order(models.Model):
     original_order_data = models.JSONField(blank=True, null=True, help_text="Original order data as proof")
     order_source_text = models.TextField(blank=True, null=True, help_text="Raw pasted order text (WhatsApp/chat message) kept for reference")
 
+    # Transferred tag — set by staff when API orders are confirmed and added to the main workflow
+    is_transferred = models.BooleanField(default=False, db_index=True, help_text="Order has been transferred/accepted into main workflow by staff")
+    transferred_at = models.DateTimeField(null=True, blank=True, help_text="When the order was transferred")
+    transferred_by = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='transferred_orders', help_text="Staff who transferred this order"
+    )
+
     # Warehouse stock reservation tracking
     stock_reserved = models.BooleanField(default=False, help_text="Whether stock has been reserved for this order")
 

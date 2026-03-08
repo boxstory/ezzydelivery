@@ -1,6 +1,5 @@
 {% extends "fleet/pwa_base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
 
 {% block title %}Update Document{% endblock %}
 {% block page_title %}Update Document{% endblock %}
@@ -19,17 +18,152 @@
 
 {% block content %}
 <div class="fleet-section">
-    <div class="fleet-card">
-        <div class="fleet-card__body">
-            <form method="post" enctype="multipart/form-data" id="fleet_document_update_form_main" novalidate>
-                {% csrf_token %}
-                {{ form | crispy }}
-                <button type="submit" class="fleet-btn fleet-btn--primary fleet-btn--full mt-3" id="fleet_document_update_btn_submit">
-                    <i class="fa-solid fa-floppy-disk me-2"></i>Save Changes
-                </button>
-                <a href="{% url 'fleet:driver_documents' %}" class="fleet-btn fleet-btn--ghost fleet-btn--full mt-2">Cancel</a>
-            </form>
+    <form method="post" enctype="multipart/form-data" id="fleet_document_update_form_main" novalidate>
+        {% csrf_token %}
+
+        <!-- Document Type -->
+        <div class="fleet-field-group">
+            <label class="fleet-field-label" for="id_document_type">Document Type</label>
+            <select name="document_type" id="id_document_type" class="fleet-field-select">
+                <option value="">— Select type —</option>
+                {% for val, label in form.fields.document_type.choices %}
+                {% if val %}
+                <option value="{{ val }}" {% if document.document_type == val %}selected{% endif %}>{{ label }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
         </div>
-    </div>
+
+        <!-- Document Number -->
+        <div class="fleet-field-group">
+            <label class="fleet-field-label" for="id_document_no">Document Number</label>
+            <input type="text" name="document_no" id="id_document_no"
+                class="fleet-field-input" placeholder="e.g. 28412345678"
+                value="{{ document.document_no|default:'' }}">
+        </div>
+
+        <!-- Issued From -->
+        <div class="fleet-field-group">
+            <label class="fleet-field-label" for="id_document_issued_from">Issued From</label>
+            <input type="text" name="document_issued_from" id="id_document_issued_from"
+                class="fleet-field-input" placeholder="e.g. Qatar"
+                value="{{ document.document_issued_from|default:'Qatar' }}">
+        </div>
+
+        <!-- Expiry Date -->
+        <div class="fleet-field-group">
+            <label class="fleet-field-label" for="id_document_expiry_date">Expiry Date</label>
+            <input type="date" name="document_expiry_date" id="id_document_expiry_date"
+                class="fleet-field-input"
+                value="{{ document.document_expiry_date|date:'Y-m-d'|default:'' }}">
+        </div>
+
+        <!-- Front Image -->
+        <div class="fleet-field-group">
+            <label class="fleet-field-label">Front Page Photo</label>
+            {% if document.document_file %}
+            <div class="fleet-doc-current-img" id="fleet_doc_current_front">
+                <img src="{{ document.document_file.url }}" alt="Current front">
+                <span class="fleet-doc-current-img__label">Current — tap below to replace</span>
+            </div>
+            {% endif %}
+            <label for="id_document_file" class="fleet-doc-upload" id="fleet_doc_upload_zone_front">
+                <div class="fleet-doc-upload__inner" id="fleet_doc_upload_inner_front">
+                    <i class="fa-solid fa-camera fleet-doc-upload__icon" id="fleet_doc_upload_icon_front"></i>
+                    <span class="fleet-doc-upload__text" id="fleet_doc_upload_text_front">
+                        {% if document.document_file %}Replace photo{% else %}Tap to take photo or choose file{% endif %}
+                    </span>
+                    <span class="fleet-doc-upload__hint" id="fleet_doc_upload_hint_front">JPG, PNG or PDF · max 5MB</span>
+                </div>
+                <img id="fleet_doc_upload_img_front" class="fleet-doc-upload__preview" style="display:none" alt="Front Preview">
+            </label>
+            <input type="file" name="document_file" id="id_document_file"
+                accept="image/*,application/pdf" style="display:none">
+        </div>
+
+        <!-- Back Image -->
+        <div class="fleet-field-group">
+            <label class="fleet-field-label">Back Page Photo <span class="fleet-field-optional">(optional)</span></label>
+            {% if document.document_file_back %}
+            <div class="fleet-doc-current-img" id="fleet_doc_current_back">
+                <img src="{{ document.document_file_back.url }}" alt="Current back">
+                <span class="fleet-doc-current-img__label">Current — tap below to replace</span>
+            </div>
+            {% endif %}
+            <label for="id_document_file_back" class="fleet-doc-upload" id="fleet_doc_upload_zone_back">
+                <div class="fleet-doc-upload__inner" id="fleet_doc_upload_inner_back">
+                    <i class="fa-solid fa-camera fleet-doc-upload__icon" id="fleet_doc_upload_icon_back"></i>
+                    <span class="fleet-doc-upload__text" id="fleet_doc_upload_text_back">
+                        {% if document.document_file_back %}Replace back photo{% else %}Tap to take photo or choose file{% endif %}
+                    </span>
+                    <span class="fleet-doc-upload__hint" id="fleet_doc_upload_hint_back">JPG, PNG or PDF · max 5MB</span>
+                </div>
+                <img id="fleet_doc_upload_img_back" class="fleet-doc-upload__preview" style="display:none" alt="Back Preview">
+            </label>
+            <input type="file" name="document_file_back" id="id_document_file_back"
+                accept="image/*,application/pdf" style="display:none">
+        </div>
+
+        <button type="submit" class="fleet-btn fleet-btn--primary fleet-btn--full mt-2" id="fleet_document_update_btn_submit">
+            <i class="fa-solid fa-floppy-disk me-2"></i>Save Changes
+        </button>
+        <a href="{% url 'fleet:driver_documents' %}" class="fleet-btn fleet-btn--ghost fleet-btn--full mt-2">Cancel</a>
+    </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function initUploadZone(inputId, zoneId, imgId, iconId, textId, hintId) {
+        var input = document.getElementById(inputId);
+        var zone  = document.getElementById(zoneId);
+        var img   = document.getElementById(imgId);
+        var icon  = document.getElementById(iconId);
+        var text  = document.getElementById(textId);
+        var hint  = document.getElementById(hintId);
+
+        input.addEventListener('change', function () {
+            var file = this.files[0];
+            if (!file) return;
+            if (file.type.startsWith('image/')) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    img.src = e.target.result;
+                    img.style.display = '';
+                    icon.style.display = 'none';
+                    text.textContent = file.name;
+                    hint.textContent = (file.size / 1024).toFixed(0) + ' KB';
+                    zone.classList.add('fleet-doc-upload--selected');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                img.style.display = 'none';
+                icon.style.display = '';
+                icon.className = 'fa-solid fa-file-pdf fleet-doc-upload__icon fleet-doc-upload__icon--pdf';
+                text.textContent = file.name;
+                hint.textContent = (file.size / 1024).toFixed(0) + ' KB';
+                zone.classList.add('fleet-doc-upload--selected');
+            }
+        });
+    }
+
+    initUploadZone(
+        'id_document_file',
+        'fleet_doc_upload_zone_front',
+        'fleet_doc_upload_img_front',
+        'fleet_doc_upload_icon_front',
+        'fleet_doc_upload_text_front',
+        'fleet_doc_upload_hint_front'
+    );
+    initUploadZone(
+        'id_document_file_back',
+        'fleet_doc_upload_zone_back',
+        'fleet_doc_upload_img_back',
+        'fleet_doc_upload_icon_back',
+        'fleet_doc_upload_text_back',
+        'fleet_doc_upload_hint_back'
+    );
+})();
+</script>
 {% endblock %}

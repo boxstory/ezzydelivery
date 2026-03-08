@@ -1,0 +1,328 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Seller API Configs — Staff Dashboard{% endblock %}
+
+{% block content %}
+<div class="woa">
+    <div class="woa__hero">
+        <div class="woa__hero-content">
+            <h1 class="woa__hero-title"><i class="fa-solid fa-plug me-2"></i>Seller API Configurations</h1>
+            <p class="woa__hero-sub">Review, test, and approve API integrations for all sellers</p>
+        </div>
+    </div>
+
+    <div class="p-3">
+        <!-- Stats -->
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="woa__card text-center py-3">
+                    <div class="fs-4 fw-bold text-primary">{{ total_count }}</div>
+                    <div class="small text-muted">Total Configs</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="woa__card text-center py-3">
+                    <div class="fs-4 fw-bold text-success">{{ approved_count }}</div>
+                    <div class="small text-muted">Approved</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="woa__card text-center py-3">
+                    <div class="fs-4 fw-bold text-warning">{{ pending_count }}</div>
+                    <div class="small text-muted">Pending</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="woa__card text-center py-3">
+                    <div class="fs-4 fw-bold text-secondary">{{ businesses_with_api|length }}</div>
+                    <div class="small text-muted">Sellers with API</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="woa__card woa__card--select mb-3">
+            <div class="woa__card-body">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span class="woa__form-label mb-0 me-1 text-nowrap"><i class="fa-solid fa-filter me-1"></i>Filter:</span>
+                    <a href="{% url 'workforce:wf_seller_api_configs' %}"
+                       class="btn btn-sm {% if not status_filter and not selected_business_id %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        All
+                    </a>
+                    <a href="?status=pending{% if selected_business_id %}&business={{ selected_business_id }}{% endif %}"
+                       class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+                        <i class="fa-solid fa-clock me-1"></i>Pending
+                    </a>
+                    <a href="?status=approved{% if selected_business_id %}&business={{ selected_business_id }}{% endif %}"
+                       class="btn btn-sm {% if status_filter == 'approved' %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                        <i class="fa-solid fa-circle-check me-1"></i>Approved
+                    </a>
+                    <span class="text-muted mx-1">|</span>
+                    {% for biz in businesses_with_api %}
+                    <a href="?business={{ biz.business_id }}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+                       class="btn btn-sm {% if selected_business_id == biz.business_id|stringformat:'s' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        {{ biz.business_name }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Google Sheet Quick-Add -->
+        <div class="woa__card mb-3">
+            <div class="woa__card-header">
+                <i class="fa-brands fa-google me-2 woa__icon-accent"></i>
+                <span class="woa__section-label">Google Sheet Integration</span>
+                <span class="badge bg-light text-dark border ms-2 small">Paste a Google Sheet link to pull orders</span>
+            </div>
+            <div class="woa__card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1">Business</label>
+                        <select class="form-select form-select-sm" id="gs_business_id">
+                            <option value="">— Select business —</option>
+                            {% for biz in businesses_with_api %}
+                            <option value="{{ biz.business_id }}">{{ biz.business_name }}</option>
+                            {% endfor %}
+                            {% for api in api_configs %}
+                            {% if api.business not in businesses_with_api %}
+                            <option value="{{ api.business.business_id }}">{{ api.business.business_name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="form-label small mb-1">Google Sheet URL</label>
+                        <input type="url" class="form-control form-control-sm" id="gs_sheet_url"
+                               placeholder="https://docs.google.com/spreadsheets/d/...">
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small mb-1">Label (optional)</label>
+                        <input type="text" class="form-control form-control-sm" id="gs_sheet_name" placeholder="e.g. Daily Orders">
+                    </div>
+                    <div class="col-12 col-md-1">
+                        <button type="button" class="btn btn-success btn-sm w-100" id="gs_save_btn">
+                            <i class="fa-solid fa-link me-1"></i>Link
+                        </button>
+                    </div>
+                </div>
+                <div id="gs_status" class="mt-2 small"></div>
+            </div>
+        </div>
+
+        <!-- Config Cards -->
+        <div class="row g-3" id="wf_api_configs_list">
+            {% for api in api_configs %}
+            <div class="col-12 col-lg-6" id="wf_api_card_{{ api.id }}">
+                <div class="woa__card h-100">
+                    <div class="woa__card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            {% if api.api_type == 'shopify' %}
+                                <span class="badge bg-success fs-6 px-2"><i class="fa-brands fa-shopify me-1"></i>Shopify</span>
+                            {% elif api.api_type == 'woocommerce' %}
+                                <span class="badge bg-primary fs-6 px-2"><i class="fa-brands fa-wordpress me-1"></i>WooCommerce</span>
+                            {% elif api.api_type == 'tiktokshop' %}
+                                <span class="badge bg-dark fs-6 px-2"><i class="fa-brands fa-tiktok me-1"></i>TikTok Shop</span>
+                            {% elif api.api_type == 'google_sheet' %}
+                                <span class="badge bg-danger fs-6 px-2"><i class="fa-brands fa-google me-1"></i>Google Sheet</span>
+                            {% else %}
+                                <span class="badge bg-secondary fs-6 px-2"><i class="fa-solid fa-plug me-1"></i>{{ api.api_type|title }}</span>
+                            {% endif %}
+                            <span class="woa__section-label">{{ api.business.business_name }}</span>
+                        </div>
+                        <span class="badge {% if api.is_verify_api %}bg-success{% else %}bg-warning text-dark{% endif %} wf-api-status-badge" id="wf_api_status_{{ api.id }}">
+                            {% if api.is_verify_api %}<i class="fa-solid fa-circle-check me-1"></i>Approved{% else %}<i class="fa-solid fa-clock me-1"></i>Pending{% endif %}
+                        </span>
+                    </div>
+                    <div class="woa__card-body">
+                        <div class="row g-2 mb-3 small">
+                            <div class="col-6">
+                                <span class="text-muted">Store URL</span><br>
+                                <span class="fw-medium text-break">{{ api.site_api_url|default:'—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted">API Key</span><br>
+                                <code class="small">{{ api.api_key|default:'—'|slice:':20' }}{% if api.api_key and api.api_key|length > 20 %}…{% endif %}</code>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted">Version</span><br>
+                                <span>{{ api.api_version|default:'—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted">Country</span><br>
+                                <span>{{ api.site_contry|default:'Qatar' }}</span>
+                            </div>
+                            {% if api.api_type == 'google_sheet' and api.google_sheet_url %}
+                            <div class="col-12">
+                                <span class="text-muted">Sheet URL</span><br>
+                                <a href="{{ api.google_sheet_url }}" target="_blank" class="small text-break text-primary">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>{{ api.google_sheet_url|truncatechars:60 }}
+                                </a>
+                            </div>
+                            {% elif api.order_api_endpoint %}
+                            <div class="col-12">
+                                <span class="text-muted">Orders Endpoint</span><br>
+                                <code class="small text-break">{{ api.order_api_endpoint }}</code>
+                            </div>
+                            {% endif %}
+                            <div class="col-6">
+                                <span class="text-muted">Default</span><br>
+                                {% if api.is_default %}<span class="text-success fw-semibold">Yes</span>{% else %}<span class="text-muted">No</span>{% endif %}
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted">Added</span><br>
+                                <span>{{ api.created_at|date:"d M Y" }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="d-flex gap-2 flex-wrap">
+                            {% if api.api_type == 'google_sheet' %}
+                            <!-- View live sheet orders -->
+                            <a href="{% url 'workforce:wf_api_orders' %}?business={{ api.business.business_id }}"
+                               class="btn btn-sm btn-outline-danger">
+                                <i class="fa-brands fa-google me-1"></i>View Orders
+                            </a>
+                            {% else %}
+                            <!-- Test -->
+                            <a href="{% url 'workforce:wf_test_api_config' api.id %}"
+                               hx-get="{% url 'workforce:wf_test_api_config' api.id %}"
+                               hx-target="#main-content" hx-select="#main-content"
+                               hx-swap="outerHTML" hx-push-url="true"
+                               class="btn btn-sm btn-outline-info">
+                                <i class="fa-solid fa-vial me-1"></i>Test API
+                            </a>
+                            {% endif %}
+
+                            <!-- Approve/Revoke toggle -->
+                            <button type="button"
+                                    class="btn btn-sm {% if api.is_verify_api %}btn-outline-danger{% else %}btn-success{% endif %} wf-approve-btn"
+                                    data-api-id="{{ api.id }}"
+                                    data-approved="{{ api.is_verify_api|yesno:'true,false' }}">
+                                {% if api.is_verify_api %}
+                                    <i class="fa-solid fa-ban me-1"></i>Revoke
+                                {% else %}
+                                    <i class="fa-solid fa-circle-check me-1"></i>Approve
+                                {% endif %}
+                            </button>
+
+                            <!-- View Seller -->
+                            <a href="{% url 'workforce:seller_detail' api.business.business_id %}"
+                               hx-get="{% url 'workforce:seller_detail' api.business.business_id %}"
+                               hx-target="#main-content" hx-select="#main-content"
+                               hx-swap="outerHTML" hx-push-url="true"
+                               class="btn btn-sm btn-outline-secondary ms-auto">
+                                <i class="fa-solid fa-store me-1"></i>Seller Profile
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="woa__empty">
+                    <i class="fa-solid fa-plug"></i>
+                    <h3>No API Configurations Found</h3>
+                    <p>No sellers have configured API integrations yet.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+    document.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.wf-approve-btn');
+        if (!btn) return;
+
+        const apiId = btn.dataset.apiId;
+        btn.disabled = true;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        try {
+            const resp = await fetch(`{% url 'workforce:wf_approve_api_config' 0 %}`.replace('/0/', `/${apiId}/`), {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `csrfmiddlewaretoken=${csrf}`
+            });
+            const result = await resp.json();
+            if (result.success) {
+                const approved = result.is_approved;
+                // Update badge
+                const badge = document.getElementById('wf_api_status_' + apiId);
+                if (badge) {
+                    badge.className = 'badge wf-api-status-badge ' + (approved ? 'bg-success' : 'bg-warning text-dark');
+                    badge.innerHTML = approved
+                        ? '<i class="fa-solid fa-circle-check me-1"></i>Approved'
+                        : '<i class="fa-solid fa-clock me-1"></i>Pending';
+                }
+                // Update button
+                btn.dataset.approved = approved ? 'true' : 'false';
+                btn.className = 'btn btn-sm wf-approve-btn ' + (approved ? 'btn-outline-danger' : 'btn-success');
+                btn.innerHTML = approved
+                    ? '<i class="fa-solid fa-ban me-1"></i>Revoke'
+                    : '<i class="fa-solid fa-circle-check me-1"></i>Approve';
+            } else {
+                btn.innerHTML = orig;
+                alert('Error: ' + (result.error || 'Failed'));
+            }
+        } catch(err) {
+            btn.innerHTML = orig;
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // Google Sheet save handler
+    const gsSaveBtn = document.getElementById('gs_save_btn');
+    const gsStatus  = document.getElementById('gs_status');
+
+    if (gsSaveBtn) {
+        gsSaveBtn.addEventListener('click', async function() {
+            const bizId    = document.getElementById('gs_business_id').value.trim();
+            const sheetUrl = document.getElementById('gs_sheet_url').value.trim();
+            const label    = document.getElementById('gs_sheet_name').value.trim();
+
+            if (!bizId) { gsStatus.innerHTML = '<span class="text-danger">Please select a business.</span>'; return; }
+            if (!sheetUrl) { gsStatus.innerHTML = '<span class="text-danger">Please enter a Google Sheet URL.</span>'; return; }
+
+            gsSaveBtn.disabled = true;
+            gsStatus.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Saving...</span>';
+
+            const body = new URLSearchParams();
+            body.append('csrfmiddlewaretoken', csrf);
+            body.append('business_id', bizId);
+            body.append('sheet_url', sheetUrl);
+            body.append('sheet_name', label);
+
+            try {
+                const resp   = await fetch('{% url "workforce:wf_save_google_sheet" %}', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrf },
+                    body: body
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    gsStatus.innerHTML = '<span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Saved! Reloading...</span>';
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    gsStatus.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>' + (result.error || 'Failed') + '</span>';
+                }
+            } catch(err) {
+                gsStatus.innerHTML = '<span class="text-danger">Network error</span>';
+            } finally {
+                gsSaveBtn.disabled = false;
+            }
+        });
+    }
+})();
+</script>
+{% endblock extra_js %}

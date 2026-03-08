@@ -63,6 +63,22 @@
                     {% csrf_token %}
                     <input type="hidden" name="business" value="{{ selected_business.business_id }}">
 
+                    <!-- AI Auto-fill -->
+                    <div class="woa__form-section woa__form-section--ai">
+                        <h6 class="woa__form-section-title">
+                            <i class="fa-solid fa-wand-magic-sparkles me-2 woa__icon-accent"></i>AI Auto-fill <span class="badge bg-secondary ms-1 fw-normal" style="font-size:0.65rem;">BETA</span>
+                        </h6>
+                        <textarea id="woa_ai_text_input" class="woa__form-input mb-2" rows="3"
+                            placeholder="Paste order text — e.g. Ahmed 55512345 zone 44 street 12 building 8 West Bay COD 150 QR, leave at reception..."></textarea>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-primary btn-sm" id="woa_ai_autofill_btn">
+                                <span class="woa-ai-idle"><i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-fill Fields</span>
+                                <span class="woa-ai-loading d-none"><span class="spinner-border spinner-border-sm me-1"></span> Extracting...</span>
+                            </button>
+                            <div id="woa_ai_autofill_status" class="small"></div>
+                        </div>
+                    </div>
+
                     <!-- Customer Information -->
                     <div class="woa__form-section">
                         <h6 class="woa__form-section-title">
@@ -165,51 +181,58 @@
                     <!-- Product Details -->
                     <div class="woa__form-section">
                         <h6 class="woa__form-section-title">
-                            <i class="fa-solid fa-box me-2 woa__icon-accent"></i>Product Details
+                            <i class="fa-solid fa-boxes-stacked me-2 woa__icon-accent"></i>Products <span class="badge bg-secondary ms-1 fw-normal" id="woa_inline_product_badge" style="font-size:0.65rem;">Optional</span>
                         </h6>
 
                         {% if has_fulfillment and warehouse_products %}
-                        <div class="woa__alert woa__alert--info">
+                        <div class="woa__alert woa__alert--info mb-3">
                             <i class="fa-solid fa-warehouse me-2"></i>
-                            <strong>Fulfillment Service Active:</strong> Select from available warehouse inventory below, or enter product details manually.
-                        </div>
-
-                        <div class="row mb-3">
-                            <div class="col-12">
-                                <label class="woa__form-label">
-                                    <i class="fa-solid fa-box me-1"></i> Select from Warehouse Inventory
-                                </label>
-                                <select class="woa__form-input" id="warehouse_product_select" onchange="fillProductFromWarehouse()">
-                                    <option value="">-- Or Enter Product Manually Below --</option>
-                                    {% for stock in warehouse_products %}
-                                    <option
-                                        value="{{ stock.product.id }}"
-                                        data-name="{{ stock.product.name }}"
-                                        data-sku="{{ stock.product.sku }}"
-                                        data-available="{{ stock.available_quantity }}"
-                                        data-warehouse="{{ stock.warehouse.name }}"
-                                        data-location="{{ stock.storage_location.full_code|default:'-' }}">
-                                        {{ stock.product.name }} (SKU: {{ stock.product.sku }}) - {{ stock.available_quantity }} available at {{ stock.warehouse.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="text-muted">Showing {{ warehouse_products|length }} product(s) with available stock</small>
-                            </div>
+                            <strong>Fulfillment Active:</strong> Products below are pre-loaded from warehouse stock. Search or add manually.
                         </div>
                         {% endif %}
 
-                        <div class="row mb-4">
-                            <div class="col-md-8 mb-3">
-                                <label class="woa__form-label" for="product_name">Product Name / Description</label>
-                                <input type="text" class="woa__form-input" id="product_name" name="product_name" placeholder="e.g., iPhone 15 Pro Max 256GB">
-                                <input type="hidden" id="warehouse_product_id" name="warehouse_product_id" value="">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="woa__form-label" for="quantity">Quantity</label>
-                                <input type="number" class="woa__form-input" id="quantity" name="quantity" min="1" value="1">
-                                <small class="text-muted" id="quantity_hint"></small>
+                        <div id="woa_inline_rows">
+                            <div class="woa__inline-row" data-row-index="0">
+                                <div class="woa__inline-col--num"><span class="woa__inline-row-num">#1</span></div>
+                                <div class="woa__inline-col--product">
+                                    <span class="woa__inline-col-label">Product</span>
+                                    <select name="inline_product_id[]" class="form-select form-select-sm woa__inline-product-sel">
+                                        <option value="">Search…</option>
+                                    </select>
+                                    <div class="woa__inline-meta"></div>
+                                </div>
+                                <div class="woa__inline-col--qty">
+                                    <span class="woa__inline-col-label">Qty</span>
+                                    <input type="number" name="inline_quantity[]" class="form-control form-control-sm woa__inline-qty" value="1" min="1">
+                                </div>
+                                <div class="woa__inline-col--price">
+                                    <span class="woa__inline-col-label">Price (QAR)</span>
+                                    <input type="number" name="inline_unit_price[]" class="form-control form-control-sm woa__inline-price" step="0.01" min="0" placeholder="Auto">
+                                </div>
+                                <div class="woa__inline-col--total">
+                                    <span class="woa__inline-col-label">Total</span>
+                                    <div class="woa__inline-line-total">0.00</div>
+                                </div>
+                                <div class="woa__inline-col--remove">
+                                    <span class="woa__inline-col-label">&nbsp;</span>
+                                    <button type="button" class="woa__inline-remove" title="Remove"><i class="fas fa-times"></i></button>
+                                </div>
+                                <input type="hidden" name="inline_notes[]" value="">
                             </div>
                         </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="woa_inline_add_row">
+                                <i class="fas fa-plus me-1"></i> Add Product
+                            </button>
+                        </div>
+                        <div class="woa__inline-total-bar d-none mt-2" id="woa_inline_total_bar">
+                            <span><i class="fas fa-calculator me-1"></i>Products Total</span>
+                            <strong id="woa_inline_total_display">0.00 QAR</strong>
+                        </div>
+
+                        <!-- fallback hidden field for plain product name (filled by JS if no product selected) -->
+                        <input type="hidden" id="product_name" name="product_name" value="">
+                        <input type="hidden" id="warehouse_product_id" name="warehouse_product_id" value="">
                     </div>
 
                     <!-- Order Details -->
@@ -230,7 +253,7 @@
                                 <label class="woa__form-label" for="pickup_location">Pickup Location</label>
                                 <select class="woa__form-input" id="pickup_location" name="pickup_location">
                                     {% for location in pickup_locations %}
-                                        <option value="{{ location.id }}" {% if 'ezzy' in location.location_name|lower or 'fulfilment' in location.location_name|lower or 'fulfillment' in location.location_name|lower %}selected{% endif %}>{{ location.location_name }}</option>
+                                        <option value="{{ location.id }}" {% if location.is_fulfilment_center %}selected{% endif %}>{{ location.pickup_location_title }}</option>
                                     {% endfor %}
                                     {% if not pickup_locations %}
                                         <option value="">-- No Locations Available --</option>
@@ -316,13 +339,13 @@
 
 {% block extra_js %}
 <script>
+// ---- Scheduled delivery toggle ----
 function toggleScheduledTime() {
     var checkbox = document.getElementById('scheduled_delivery');
     var dateContainer = document.getElementById('scheduled_date_container');
     var dateInput = document.getElementById('scheduled_date');
     var timeContainer = document.getElementById('scheduled_time_container');
     var timeInput = document.getElementById('scheduled_time');
-
     if (checkbox.checked) {
         dateContainer.classList.add('woa__scheduled-time--visible');
         timeContainer.classList.add('woa__scheduled-time--visible');
@@ -331,100 +354,241 @@ function toggleScheduledTime() {
     } else {
         dateContainer.classList.remove('woa__scheduled-time--visible');
         timeContainer.classList.remove('woa__scheduled-time--visible');
-        dateInput.required = false;
-        dateInput.value = '';
-        timeInput.required = false;
-        timeInput.value = '';
+        dateInput.required = false; dateInput.value = '';
+        timeInput.required = false; timeInput.value = '';
     }
 }
 
-function fillProductFromWarehouse() {
-    var select = document.getElementById('warehouse_product_select');
-    var selectedOption = select.options[select.selectedIndex];
-
-    if (selectedOption.value) {
-        document.getElementById('product_name').value = selectedOption.dataset.name;
-        document.getElementById('warehouse_product_id').value = selectedOption.value;
-
-        var availableQty = selectedOption.dataset.available;
-        var quantityInput = document.getElementById('quantity');
-        var quantityHint = document.getElementById('quantity_hint');
-
-        quantityHint.textContent = availableQty + ' available in stock';
-        quantityHint.style.color = '#10b981';
-        quantityInput.max = availableQty;
-
-        var warehouse = selectedOption.dataset.warehouse;
-        var location = selectedOption.dataset.location;
-        var sku = selectedOption.dataset.sku;
-
-        var note = 'Warehouse: ' + warehouse;
-        if (location && location !== '-') {
-            note += ' | Location: ' + location;
-        }
-        note += ' | SKU: ' + sku;
-
-        var internalNotes = document.getElementById('internal_notes');
-        if (internalNotes.value) {
-            internalNotes.value += '\n' + note;
-        } else {
-            internalNotes.value = note;
-        }
-    } else {
-        document.getElementById('warehouse_product_id').value = '';
-        document.getElementById('quantity_hint').textContent = '';
-        document.getElementById('quantity').removeAttribute('max');
-    }
-}
-
+// ---- WhatsApp auto-format ----
 document.addEventListener('DOMContentLoaded', function() {
     function convertArabicNumerals(text) {
         if (!text) return '';
-        const arabicNumerals = '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669';
-        const persianNumerals = '\u06F0\u06F1\u06F2\u06F3\u06F4\u06F5\u06F6\u06F7\u06F8\u06F9';
-        const englishNumerals = '0123456789';
-
-        let result = String(text);
-        for (let i = 0; i < 10; i++) {
-            result = result.split(arabicNumerals[i]).join(englishNumerals[i]);
-            result = result.split(persianNumerals[i]).join(englishNumerals[i]);
-        }
-        return result;
+        const a = '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669';
+        const p = '\u06F0\u06F1\u06F2\u06F3\u06F4\u06F5\u06F6\u06F7\u06F8\u06F9';
+        let r = String(text);
+        for (let i = 0; i < 10; i++) { r = r.split(a[i]).join(i+'').split(p[i]).join(i+''); }
+        return r;
     }
-
     function formatWhatsAppNumber(phone) {
         if (!phone) return '';
-        phone = convertArabicNumerals(String(phone));
-        let digitsOnly = phone.replace(/\D/g, '');
-        if (!digitsOnly) return '';
-        if (digitsOnly.length === 8 && '3567'.includes(digitsOnly[0])) {
-            return '974' + digitsOnly;
-        }
-        if (digitsOnly.length === 8 && digitsOnly[0] === '4') {
-            return digitsOnly;
-        }
-        return digitsOnly;
+        let d = convertArabicNumerals(String(phone)).replace(/\D/g, '');
+        if (!d) return '';
+        if (d.length === 8 && '3567'.includes(d[0])) return '974' + d;
+        return d;
     }
-
     var phoneField = document.getElementById('customer_phone');
     var whatsappField = document.getElementById('customer_whatsapp');
-
     if (phoneField) {
         phoneField.addEventListener('blur', function() {
-            if (whatsappField && !whatsappField.value.trim() && this.value.trim()) {
-                var formatted = formatWhatsAppNumber(this.value);
-                whatsappField.value = formatted;
+            if (whatsappField && !whatsappField.value.trim() && this.value.trim())
+                whatsappField.value = formatWhatsAppNumber(this.value);
+        });
+    }
+    if (whatsappField) {
+        whatsappField.addEventListener('blur', function() {
+            if (this.value.trim()) this.value = formatWhatsAppNumber(this.value);
+        });
+    }
+});
+</script>
+
+<script>
+// ---- AI Auto-fill ----
+(function() {
+    const btn = document.getElementById('woa_ai_autofill_btn');
+    const textarea = document.getElementById('woa_ai_text_input');
+    const status = document.getElementById('woa_ai_autofill_status');
+    if (!btn || !textarea) return;
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    btn.addEventListener('click', async function() {
+        const text = textarea.value.trim();
+        if (!text) { textarea.focus(); return; }
+        const idle = btn.querySelector('.woa-ai-idle');
+        const loading = btn.querySelector('.woa-ai-loading');
+        btn.disabled = true;
+        idle.classList.add('d-none');
+        loading.classList.remove('d-none');
+        status.innerHTML = '';
+        try {
+            const resp = await fetch('/api/ai-agent/tools/extract-order/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({ text: text })
+            });
+            const result = await resp.json();
+            if (result.success && result.data) {
+                const d = result.data;
+                const fieldMap = {
+                    'customer_name':    'customer_name',
+                    'customer_phone':   'customer_phone',
+                    'customer_address': 'customer_address',
+                    'dl_zone':          'dl_zone',
+                    'dl_street':        'dl_street',
+                    'dl_building':      'dl_building',
+                    'cod_amount':       'cod_amount',
+                    'order_notes':      'order_notes'
+                };
+                let filled = 0;
+                for (const [key, elId] of Object.entries(fieldMap)) {
+                    const val = String(d[key] || '').trim();
+                    const el = document.getElementById(elId);
+                    if (val && el) {
+                        el.value = val;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        filled++;
+                    }
+                }
+                if (d.customer_phone) {
+                    const wa = document.getElementById('customer_whatsapp');
+                    if (wa && !wa.value) wa.value = '974' + d.customer_phone;
+                }
+                status.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + filled + ' fields filled</span>';
+                textarea.value = '';
+            } else {
+                status.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>' + (result.error || 'Could not extract') + '</span>';
             }
+        } catch(err) {
+            status.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>Network error</span>';
+        } finally {
+            btn.disabled = false;
+            idle.classList.remove('d-none');
+            loading.classList.add('d-none');
+        }
+    });
+})();
+</script>
+
+<script>
+// ---- Inline Product Rows ----
+$(document).ready(function() {
+    const productSearchUrl = '{% url "orders:product_search_api" %}';
+    const container = document.getElementById('woa_inline_rows');
+    const badge = document.getElementById('woa_inline_product_badge');
+    const totalBar = document.getElementById('woa_inline_total_bar');
+    const totalDisplay = document.getElementById('woa_inline_total_display');
+    let rowCount = 1;
+
+    function buildRow(idx) {
+        const div = document.createElement('div');
+        div.className = 'woa__inline-row';
+        div.dataset.rowIndex = idx;
+        div.innerHTML = `
+            <div class="woa__inline-col--num"><span class="woa__inline-row-num">#${idx + 1}</span></div>
+            <div class="woa__inline-col--product">
+                <span class="woa__inline-col-label">Product</span>
+                <select name="inline_product_id[]" class="form-select form-select-sm woa__inline-product-sel">
+                    <option value="">Search…</option>
+                </select>
+                <div class="woa__inline-meta"></div>
+            </div>
+            <div class="woa__inline-col--qty">
+                <span class="woa__inline-col-label">Qty</span>
+                <input type="number" name="inline_quantity[]" class="form-control form-control-sm woa__inline-qty" value="1" min="1">
+            </div>
+            <div class="woa__inline-col--price">
+                <span class="woa__inline-col-label">Price (QAR)</span>
+                <input type="number" name="inline_unit_price[]" class="form-control form-control-sm woa__inline-price" step="0.01" min="0" placeholder="Auto">
+            </div>
+            <div class="woa__inline-col--total">
+                <span class="woa__inline-col-label">Total</span>
+                <div class="woa__inline-line-total">0.00</div>
+            </div>
+            <div class="woa__inline-col--remove">
+                <span class="woa__inline-col-label">&nbsp;</span>
+                <button type="button" class="woa__inline-remove" title="Remove"><i class="fas fa-times"></i></button>
+            </div>
+            <input type="hidden" name="inline_notes[]" value="">
+        `;
+        return div;
+    }
+
+    function initSelect2(row) {
+        const sel = $(row).find('.woa__inline-product-sel');
+        sel.select2({
+            placeholder: 'Search product…',
+            allowClear: true,
+            minimumInputLength: 1,
+            ajax: {
+                url: productSearchUrl,
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ q: params.term, business: '{{ selected_business.business_id }}' }),
+                processResults: data => ({ results: (data.results || []).map(p => ({ id: p.id, text: p.item_name + ' (' + p.item_sku + ')', price: p.item_price, sku: p.item_sku })) })
+            }
+        });
+        sel.on('select2:select', function(e) {
+            const d = e.params.data;
+            const meta = $(this).closest('.woa__inline-col--product').find('.woa__inline-meta');
+            meta.html('<small class="text-muted">SKU: ' + (d.sku || '-') + ' | Price: ' + (d.price || 0) + ' QAR</small>');
+            const priceInput = $(this).closest('.woa__inline-row').find('.woa__inline-price');
+            if (!priceInput.val()) priceInput.val(d.price || '');
+            updateRowTotal($(this).closest('.woa__inline-row')[0]);
+            updateGrandTotal();
+        });
+        sel.on('select2:clear', function() {
+            $(this).closest('.woa__inline-col--product').find('.woa__inline-meta').html('');
+            updateGrandTotal();
         });
     }
 
-    if (whatsappField) {
-        whatsappField.addEventListener('blur', function() {
-            if (this.value.trim()) {
-                this.value = formatWhatsAppNumber(this.value);
-            }
-        });
+    function updateRowTotal(row) {
+        const qty = parseFloat($(row).find('.woa__inline-qty').val()) || 0;
+        const price = parseFloat($(row).find('.woa__inline-price').val()) || 0;
+        const total = qty * price;
+        $(row).find('.woa__inline-line-total').text(total.toFixed(2));
     }
+
+    function updateGrandTotal() {
+        let grand = 0;
+        document.querySelectorAll('#woa_inline_rows .woa__inline-row').forEach(row => {
+            grand += parseFloat($(row).find('.woa__inline-line-total').text()) || 0;
+        });
+        const hasProducts = grand > 0;
+        totalBar.classList.toggle('d-none', !hasProducts);
+        if (hasProducts) totalDisplay.textContent = grand.toFixed(2) + ' QAR';
+        const filled = [...document.querySelectorAll('#woa_inline_rows .woa__inline-product-sel')].filter(s => s.value).length;
+        badge.textContent = filled ? filled + ' product(s)' : 'Optional';
+        badge.className = 'badge ms-1 fw-normal ' + (filled ? 'bg-success' : 'bg-secondary');
+        badge.style.fontSize = '0.65rem';
+    }
+
+    // Init first row
+    initSelect2(container.querySelector('.woa__inline-row'));
+
+    container.addEventListener('input', function(e) {
+        if (e.target.matches('.woa__inline-qty, .woa__inline-price')) {
+            updateRowTotal(e.target.closest('.woa__inline-row'));
+            updateGrandTotal();
+        }
+    });
+
+    container.addEventListener('click', function(e) {
+        if (e.target.closest('.woa__inline-remove')) {
+            const rows = container.querySelectorAll('.woa__inline-row');
+            if (rows.length > 1) {
+                e.target.closest('.woa__inline-row').remove();
+                updateGrandTotal();
+            }
+        }
+    });
+
+    document.getElementById('woa_inline_add_row').addEventListener('click', function() {
+        const row = buildRow(rowCount++);
+        container.appendChild(row);
+        initSelect2(row);
+    });
+
+    // On form submit — populate hidden product_name from first selected product
+    document.getElementById('workforce_orders_add_form_order').addEventListener('submit', function() {
+        const firstSel = container.querySelector('.woa__inline-product-sel');
+        const selectedText = firstSel && firstSel.options[firstSel.selectedIndex] ? firstSel.options[firstSel.selectedIndex].text : '';
+        const productNameField = document.getElementById('product_name');
+        if (productNameField && !productNameField.value && selectedText) {
+            productNameField.value = selectedText;
+        }
+    });
 });
 </script>
 {% endblock extra_js %}
