@@ -1096,7 +1096,16 @@ def product_search_api(request):
     Returns products matching search query with price and inventory info.
     Requires minimum 3 characters to trigger search.
     """
-    business = get_cached_business(request)
+    # Support business param from workforce/staff pages
+    business_id = request.GET.get('business', '')
+    if business_id and request.user.is_staff:
+        from business.models import Business as BusinessModel
+        try:
+            business = BusinessModel.objects.get(business_id=business_id)
+        except BusinessModel.DoesNotExist:
+            business = None
+    else:
+        business = get_cached_business(request)
     if not business:
         return JsonResponse({'results': [], 'pagination': {'more': False}})
     try:
@@ -1138,9 +1147,12 @@ def product_search_api(request):
 
             result = {
                 'id': product.id,
-                'text': f"{product.brand_name} {product.item_name}",
+                'text': f"{product.brand_name} {product.item_name}".strip(),
+                'item_name': product.item_name,
                 'sku': product.item_sku,
+                'item_sku': product.item_sku,
                 'price': float(product.item_price),
+                'item_price': float(product.item_price),
                 'unit': product.unit.short_code if product.unit else '',
                 'inventory': inventory_qty,
             }
@@ -1443,10 +1455,9 @@ def update_order_zone(request, order_id):
             return JsonResponse({'success': False, 'error': 'Zone number is required'}, status=400)
 
         from delivery import models as delivery_models
-        try:
-            zone = delivery_models.ZoneName.objects.get(zone_number=zone_number, is_active=True)
-        except delivery_models.ZoneName.DoesNotExist:
-            return JsonResponse({'success': False, 'error': f'Zone {zone_number} not found or inactive'}, status=400)
+        # Look up zone name (save even if zone not in ZoneName table)
+        zone = delivery_models.ZoneName.objects.filter(zone_number=zone_number, is_active=True).first()
+        zone_display = zone.zone_name if zone else f'Zone {zone_number}'
 
         old_zone = order.dl_zone
         order.dl_zone = zone_number
@@ -1454,9 +1465,24 @@ def update_order_zone(request, order_id):
             order.dl_street = str(street_number)
         if building_number:
             order.dl_building = str(building_number)
+
+        # Save coordinates to order
+        coords_accuracy = data.get('coords_accuracy')
+        coords_saved = False
+        if latitude and longitude:
+            order.latitude = latitude
+            order.longitude = longitude
+            if coords_accuracy:
+                order.coords_accuracy = coords_accuracy
+            elif building_number:
+                order.coords_accuracy = 'exact'
+            else:
+                order.coords_accuracy = 'street'
+            coords_saved = True
+
         order.save()
 
-        coords_saved = False
+        # Also update delivery task address for legacy compatibility
         if latitude and longitude:
             delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
             if delivery_task and delivery_task.dl_to_address:
@@ -1469,22 +1495,24 @@ def update_order_zone(request, order_id):
                 if building_number:
                     dl_address.dl_building = str(building_number)
                 dl_address.save()
-                coords_saved = True
 
+        notes = f'Zone updated from AI parse: {zone_display}'
+        if coords_saved:
+            notes += f' | Coordinates saved: {latitude}, {longitude}'
         orders_models.OrderVerificationLog.objects.create(
             order=order,
             verified_by=request.user,
             action='zone_updated',
             old_status=str(old_zone) if old_zone else 'None',
             new_status=str(zone_number),
-            notes=f'Zone updated from AI parse: {zone.zone_name}' + (f' | Coordinates: {latitude}, {longitude}' if coords_saved else '')
+            notes=notes
         )
 
         return JsonResponse({
             'success': True,
-            'message': f'Zone updated to {zone_number} ({zone.zone_name})' + (' with coordinates' if coords_saved else ''),
+            'message': f'Zone updated to {zone_number} ({zone_display})' + (' with coordinates' if coords_saved else ''),
             'zone_number': zone_number,
-            'zone_name': zone.zone_name,
+            'zone_name': zone_display,
             'coordinates_saved': coords_saved
         })
     except json.JSONDecodeError:

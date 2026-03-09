@@ -68,15 +68,15 @@
                         </div>
 
                         <!-- File Upload Zone -->
-                        <div class="file-drop-zone" id="fileDropZone">
+                        <label class="file-drop-zone" id="fileDropZone" for="importFile" style="cursor:pointer;display:block;">
                             <i class="fa-solid fa-cloud-arrow-up"></i>
                             <p class="mb-2"><strong>Drop your file here</strong></p>
                             <p class="text-muted mb-3">or click to browse</p>
-                            <input type="file" id="importFile" accept=".csv,.xlsx,.xls" hidden>
+                            <input type="file" id="importFile" accept=".csv,.xlsx,.xls" style="display:none;">
                             <span class="badge bg-secondary me-1">CSV</span>
                             <span class="badge badge-success me-1">XLSX</span>
                             <span class="badge badge-success">XLS</span>
-                        </div>
+                        </label>
 
                         <!-- File Info -->
                         <div class="file-info" id="fileInfo">
@@ -355,10 +355,10 @@
 {% endblock content %}
 
 {% block extra_js %}
-<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+{# XLSX library preloaded in wf_dashboard_base.html for HTMX compatibility #}
 <script>
-// Global state
-let uploadedData = {
+// Global state (use var for HTMX re-navigation compatibility)
+var uploadedData = {
     columns: [],
     rows: [],
     mappings: {},
@@ -366,7 +366,7 @@ let uploadedData = {
     failedRows: []
 };
 
-const targetFields = [
+var targetFields = [
     // Core Order Fields
     { name: 'client_order_code', label: 'Order ID', required: false, group: 'Order Info' },
     { name: 'order_date', label: 'Order Date', required: false, group: 'Order Info' },
@@ -648,17 +648,23 @@ function applyMappings() {
     });
 
     uploadedData.mappedRows = transformedRows;
+    uploadedData.appliedMappings = mappings;
     buildPreviewTable();
 }
 
 function buildPreviewTable() {
     const thead = document.getElementById('previewTableHead');
     const tbody = document.getElementById('previewTableBody');
+    const mappings = uploadedData.appliedMappings || {};
 
-    // Build header
+    // Build header — show DB field label + source column name
     let headerHtml = '<th class="row-number">#</th>';
     targetFields.forEach(field => {
-        headerHtml += `<th>${field.label}${field.required ? ' <span class="text-danger">*</span>' : ''}</th>`;
+        const sourceCol = mappings[field.name] || '';
+        const sourceTag = sourceCol
+            ? `<div class="preview-th__source" title="File column: ${escapeHtml(sourceCol)}"><i class="fa-solid fa-file-import me-1"></i>${escapeHtml(sourceCol)}</div>`
+            : '<div class="preview-th__source preview-th__source--empty">not mapped</div>';
+        headerHtml += `<th><div class="preview-th__label">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ''}</div>${sourceTag}</th>`;
     });
     thead.innerHTML = headerHtml;
 

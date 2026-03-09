@@ -55,7 +55,11 @@ urlpatterns = [
     # Order detail and actions
     path('orders/<int:order_id>/', workforce_views.order_detail, name='order_detail'),
     path('orders/<int:order_id>/edit/', workforce_views.order_edit, name='order_edit'),
+    path('orders/<int:order_id>/items/add/', workforce_views.order_item_add, name='order_item_add'),
+    path('orders/<int:order_id>/items/<int:item_id>/update/', workforce_views.order_item_update, name='order_item_update'),
+    path('orders/<int:order_id>/items/<int:item_id>/delete/', workforce_views.order_item_delete, name='order_item_delete'),
     path('orders/<int:order_id>/cancel/', workforce_views.cancel_order, name='cancel_order'),
+    path('orders/<int:order_id>/delete/', workforce_views.delete_order, name='delete_order'),
     path('order/<int:order_id>/update-zone/', workforce_views.update_order_zone, name='update_order_zone'),
     path('order/<int:order_id>/assign-driver/', workforce_views.assign_driver_to_order, name='assign_driver_to_order'),
 
@@ -109,6 +113,7 @@ urlpatterns = [
     # Additional Tasks URLs
     path('tasks/followup-list/', workforce_views.tasks_followup_list, name='tasks_followup_list'),
     path('tasks/reported/', workforce_views.tasks_reported, name='tasks_reported'),
+    path('tasks/live-map/', workforce_views.tasks_live_map, name='tasks_live_map'),
 
     # Finance Dashboard
     path('finance/', workforce_views.workforce_finance_dashboard, name='workforce_finance_dashboard'),

@@ -325,49 +325,41 @@
         </div>
 
         <!-- Products Panel -->
-        <div class="bld__panel {% if business.fulfillment_service_status != 'active' %}bld__panel--disabled{% endif %}" data-panel="products">
+        <div class="bld__panel" data-panel="products">
             <div class="bld__panel__header">
                 <i class="fa-solid fa-box-open"></i>
-                <h3>Products</h3>
-                {% if business.fulfillment_service_status == 'active' %}
-                <a href="{% url 'workforce:workforce_pickup_location_add' business.business_id %}" class="bld__panel__link-btn" title="Manage Products">
-                    <i class="fa-solid fa-arrow-right"></i>
-                </a>
-                {% else %}
-                <span class="bld__panel__disabled-badge">
-                    <i class="fa-solid fa-lock"></i> Requires Fulfillment
-                </span>
-                {% endif %}
+                <h3>Products ({{ product_stats.total_products|default:0 }})</h3>
             </div>
             <div class="bld__panel__body">
-                {% if business.fulfillment_service_status == 'active' %}
-                <div class="bld__info-grid">
-                    <div class="bld__info-item">
-                        <label class="bld__info-label">Total Products</label>
-                        <div class="bld__info-value">{{ product_stats.total_products|default:0 }}</div>
-                    </div>
-                    <div class="bld__info-item">
-                        <label class="bld__info-label">Active SKUs</label>
-                        <div class="bld__info-value">{{ product_stats.active_skus|default:0 }}</div>
-                    </div>
-                    <div class="bld__info-item">
-                        <label class="bld__info-label">Total Stock</label>
-                        <div class="bld__info-value">{{ product_stats.total_stock|default:0 }} units</div>
-                    </div>
-                    <div class="bld__info-item">
-                        <label class="bld__info-label">Low Stock Items</label>
-                        <div class="bld__info-value bld__info-value--warning">{{ product_stats.low_stock_items|default:0 }}</div>
-                    </div>
-                </div>
-                <div class="bld__panel__note">
-                    <i class="fa-solid fa-info-circle"></i>
-                    Product management is available through the fulfillment service. Click the arrow to manage products.
+                {% if products_list %}
+                <div class="table-responsive" style="max-height:400px;overflow:auto;">
+                    <table class="table table-sm mb-0" style="font-size:0.78rem;">
+                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+                            <tr>
+                                <th style="width:35px;">#</th>
+                                <th>Product Name</th>
+                                <th>SKU</th>
+                                <th>Brand</th>
+                                <th class="text-end">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in products_list %}
+                            <tr>
+                                <td class="text-muted">{{ forloop.counter }}</td>
+                                <td class="fw-semibold">{{ p.item_name }}</td>
+                                <td><code class="small">{{ p.item_sku }}</code></td>
+                                <td class="text-muted">{{ p.brand_name }}</td>
+                                <td class="text-end">{% if p.item_price %}{{ p.item_price }} QAR{% else %}-{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
                 {% else %}
                 <div class="bld__panel__empty-state">
                     <i class="fa-solid fa-boxes-stacked"></i>
-                    <p>Activate fulfillment service to manage products</p>
-                    <small>Products section will be enabled once fulfillment service is active and a warehouse is linked.</small>
+                    <p>No products added yet</p>
                 </div>
                 {% endif %}
             </div>

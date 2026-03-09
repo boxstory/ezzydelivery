@@ -232,6 +232,48 @@
                     </div>
                 </div>
 
+                <!-- Order Items (Editable) -->
+                <div class="woe__card">
+                    <div class="woe__card-header woe__card-header--info">
+                        <i class="fa-solid fa-box-open me-2"></i>
+                        <span class="woe__section-label">Order Items <span class="badge bg-secondary ms-1 fw-normal" id="woe_items_badge" style="font-size:0.65rem;">{{ order_items|length }} item{{ order_items|length|pluralize }}</span></span>
+                    </div>
+                    <div class="woe__card-body p-0">
+                        <div id="woe_item_rows">
+                            {% for item in order_items %}
+                            <div class="woe__item-row" data-item-id="{{ item.id }}">
+                                <div class="woe__item-col--num"><span class="woe__item-row-num">#{{ forloop.counter }}</span></div>
+                                <div class="woe__item-col--product">
+                                    <select class="form-select form-select-sm woe__item-product-sel" data-initial-id="{{ item.product_id|default:'' }}" data-initial-text="{{ item.display_name }}">
+                                        {% if item.product %}<option value="{{ item.product_id }}" selected>{{ item.product.item_name }} ({{ item.product.item_sku|default:'-' }})</option>{% endif %}
+                                    </select>
+                                    <div class="woe__item-meta">{% if item.product %}<small class="text-muted">SKU: {{ item.product.item_sku|default:'-' }}</small>{% endif %}</div>
+                                </div>
+                                <div class="woe__item-col--qty">
+                                    <input type="number" class="form-control form-control-sm woe__item-qty" value="{{ item.quantity|default:1 }}" min="1">
+                                </div>
+                                <div class="woe__item-col--price">
+                                    <input type="number" class="form-control form-control-sm woe__item-price" step="0.01" min="0" value="{{ item.unit_price|default:'' }}">
+                                </div>
+                                <div class="woe__item-col--total">
+                                    <div class="woe__item-line-total">{{ item.total_price|default:"0.00" }}</div>
+                                </div>
+                                <div class="woe__item-col--actions">
+                                    <button type="button" class="btn btn-sm btn-outline-success woe__item-save" title="Save"><i class="fas fa-check"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger woe__item-delete" title="Delete"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="p-2 border-top">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="woe_add_item_btn">
+                                <i class="fas fa-plus me-1"></i> Add Item
+                            </button>
+                            <span class="float-end fw-semibold me-2 mt-1" id="woe_grand_total" style="font-size:0.85rem;"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Notes -->
                 <div class="woe__card">
                     <div class="woe__card-header">
@@ -361,5 +403,202 @@ function updateZoneName(zoneNum) {
         })
         .catch(function() { el.value = ''; });
 }
+</script>
+
+<script>
+// ---- Editable Order Items ----
+$(document).ready(function() {
+    const orderId = {{ order.id }};
+    const businessId = '{{ order.business.business_id }}';
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const productSearchUrl = '{% url "orders:product_search_api" %}';
+    const container = document.getElementById('woe_item_rows');
+    let rowIdx = {{ order_items|length }};
+
+    function initSelect2(row) {
+        const sel = $(row).find('.woe__item-product-sel');
+        sel.select2({
+            placeholder: 'Search product…',
+            allowClear: true,
+            minimumInputLength: 1,
+            width: '100%',
+            ajax: {
+                url: productSearchUrl,
+                dataType: 'json',
+                delay: 250,
+                data: function(params) { return { q: params.term, business: businessId }; },
+                processResults: function(data) {
+                    return { results: (data.results || []).map(function(p) {
+                        return { id: p.id, text: p.item_name + ' (' + (p.item_sku || '-') + ')', price: p.item_price, sku: p.item_sku };
+                    })};
+                }
+            }
+        });
+        sel.on('select2:select', function(e) {
+            var d = e.params.data;
+            var meta = $(this).closest('.woe__item-col--product').find('.woe__item-meta');
+            meta.html('<small class="text-muted">SKU: ' + (d.sku || '-') + '</small>');
+            var priceInput = $(this).closest('.woe__item-row').find('.woe__item-price');
+            if (!priceInput.val()) priceInput.val(d.price || '');
+            updateRowTotal($(this).closest('.woe__item-row')[0]);
+        });
+    }
+
+    function updateRowTotal(row) {
+        var qty = parseFloat($(row).find('.woe__item-qty').val()) || 0;
+        var price = parseFloat($(row).find('.woe__item-price').val()) || 0;
+        $(row).find('.woe__item-line-total').text((qty * price).toFixed(2));
+        updateGrandTotal();
+    }
+
+    function updateGrandTotal() {
+        var grand = 0;
+        container.querySelectorAll('.woe__item-row').forEach(function(row) {
+            grand += parseFloat($(row).find('.woe__item-line-total').text()) || 0;
+        });
+        var el = document.getElementById('woe_grand_total');
+        el.textContent = grand > 0 ? 'Total: ' + grand.toFixed(2) + ' QAR' : '';
+        var badge = document.getElementById('woe_items_badge');
+        var count = container.querySelectorAll('.woe__item-row').length;
+        badge.textContent = count + ' item' + (count !== 1 ? 's' : '');
+    }
+
+    function renumberRows() {
+        container.querySelectorAll('.woe__item-row').forEach(function(row, i) {
+            row.querySelector('.woe__item-row-num').textContent = '#' + (i + 1);
+        });
+    }
+
+    function buildNewRow() {
+        rowIdx++;
+        var div = document.createElement('div');
+        div.className = 'woe__item-row woe__item-row--new';
+        div.dataset.itemId = '';
+        div.innerHTML =
+            '<div class="woe__item-col--num"><span class="woe__item-row-num">#' + (container.querySelectorAll('.woe__item-row').length + 1) + '</span></div>' +
+            '<div class="woe__item-col--product">' +
+                '<select class="form-select form-select-sm woe__item-product-sel"><option value="">Search…</option></select>' +
+                '<div class="woe__item-meta"></div>' +
+            '</div>' +
+            '<div class="woe__item-col--qty"><input type="number" class="form-control form-control-sm woe__item-qty" value="1" min="1"></div>' +
+            '<div class="woe__item-col--price"><input type="number" class="form-control form-control-sm woe__item-price" step="0.01" min="0" placeholder="Auto"></div>' +
+            '<div class="woe__item-col--total"><div class="woe__item-line-total">0.00</div></div>' +
+            '<div class="woe__item-col--actions">' +
+                '<button type="button" class="btn btn-sm btn-outline-success woe__item-save" title="Save"><i class="fas fa-check"></i></button>' +
+                '<button type="button" class="btn btn-sm btn-outline-danger woe__item-delete" title="Remove"><i class="fas fa-times"></i></button>' +
+            '</div>';
+        return div;
+    }
+
+    // Init existing rows
+    container.querySelectorAll('.woe__item-row').forEach(function(row) {
+        initSelect2(row);
+    });
+
+    // Qty/price change → update total
+    container.addEventListener('input', function(e) {
+        if (e.target.matches('.woe__item-qty, .woe__item-price')) {
+            updateRowTotal(e.target.closest('.woe__item-row'));
+        }
+    });
+
+    // Save button
+    container.addEventListener('click', function(e) {
+        var saveBtn = e.target.closest('.woe__item-save');
+        if (!saveBtn) return;
+        var row = saveBtn.closest('.woe__item-row');
+        var itemId = row.dataset.itemId;
+        var productSel = $(row).find('.woe__item-product-sel');
+        var productId = productSel.val() || '';
+        var qty = $(row).find('.woe__item-qty').val() || '1';
+        var price = $(row).find('.woe__item-price').val() || '';
+
+        if (!productId) { alert('Please select a product'); return; }
+
+        var formData = new FormData();
+        formData.append('product_id', productId);
+        formData.append('quantity', qty);
+        formData.append('unit_price', price);
+
+        var url, isNew;
+        if (!itemId) {
+            url = '/workforce/orders/' + orderId + '/items/add/';
+            isNew = true;
+        } else {
+            url = '/workforce/orders/' + orderId + '/items/' + itemId + '/update/';
+            isNew = false;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf }, body: formData })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) {
+                    row.dataset.itemId = d.item.id;
+                    row.classList.remove('woe__item-row--new');
+                    $(row).find('.woe__item-line-total').text(parseFloat(d.item.total_price).toFixed(2));
+                    // Flash green
+                    row.style.background = 'rgba(25,135,84,0.08)';
+                    setTimeout(function() { row.style.background = ''; }, 1200);
+                    updateGrandTotal();
+                } else {
+                    alert('Error saving item');
+                }
+            })
+            .catch(function() { alert('Network error'); })
+            .finally(function() {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+            });
+    });
+
+    // Delete button
+    container.addEventListener('click', function(e) {
+        var delBtn = e.target.closest('.woe__item-delete');
+        if (!delBtn) return;
+        var row = delBtn.closest('.woe__item-row');
+        var itemId = row.dataset.itemId;
+
+        if (!itemId) {
+            // Unsaved row - just remove it
+            row.remove();
+            renumberRows();
+            updateGrandTotal();
+            return;
+        }
+
+        if (!confirm('Delete this item?')) return;
+
+        delBtn.disabled = true;
+        fetch('/workforce/orders/' + orderId + '/items/' + itemId + '/delete/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                row.remove();
+                renumberRows();
+                updateGrandTotal();
+            } else {
+                alert('Error deleting item');
+                delBtn.disabled = false;
+            }
+        })
+        .catch(function() { alert('Network error'); delBtn.disabled = false; });
+    });
+
+    // Add row button
+    document.getElementById('woe_add_item_btn').addEventListener('click', function() {
+        var row = buildNewRow();
+        container.appendChild(row);
+        initSelect2(row);
+        $(row).find('.woe__item-product-sel').select2('open');
+    });
+
+    updateGrandTotal();
+});
 </script>
 {% endblock %}

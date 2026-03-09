@@ -92,6 +92,7 @@
         <button class="sld__tab" data-tab="details">Details</button>
         <button class="sld__tab" data-tab="documents">Documents <span class="sld__tab-count">{{ documents|length }}</span></button>
         <button class="sld__tab" data-tab="team">Team <span class="sld__tab-count">{{ team_members.count|default:0 }}</span></button>
+        <button class="sld__tab" data-tab="products">Products <span class="sld__tab-count">{{ products_list.count|default:0 }}</span></button>
         <button class="sld__tab" data-tab="integrations">Integrations <span class="sld__tab-count">{{ api_settings.count|default:0 }}</span></button>
         <button class="sld__tab" data-tab="edit">Edit</button>
     </div>
@@ -789,6 +790,60 @@
         {% endif %}
     </div>
 
+    <!-- Tab: Products -->
+    <div id="panel-products" class="sld__panel">
+        <h3 class="sld__section-title">
+            <i class="fa-solid fa-boxes-stacked sld__section-icon"></i> Products ({{ products_list.count|default:0 }})
+        </h3>
+        {% if products_list %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:36px">#</th>
+                        <th>Product Name</th>
+                        <th>SKU</th>
+                        <th>Brand</th>
+                        <th>Barcode</th>
+                        <th>Size</th>
+                        <th>Unit</th>
+                        <th>Color</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th class="text-end">Price</th>
+                        <th>Image</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products_list %}
+                    <tr>
+                        <td class="text-muted">{{ forloop.counter }}</td>
+                        <td>{{ product.item_name }}</td>
+                        <td><code>{{ product.item_sku|default:"-" }}</code></td>
+                        <td>{{ product.brand_name|default:"-" }}</td>
+                        <td>{{ product.barcode|default:"-" }}</td>
+                        <td>{{ product.size|default:"-" }}</td>
+                        <td>{{ product.unit|default:"-" }}</td>
+                        <td>{% if product.color %}<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{{ product.color.hex_code|default:'#ccc' }};border:1px solid #ddd;vertical-align:middle;"></span> {{ product.color }}{% else %}-{% endif %}</td>
+                        <td>{{ product.product_category|default:"-" }}</td>
+                        <td class="small">{{ product.item_discription|default:"-"|truncatewords:10 }}</td>
+                        <td class="text-end">{{ product.item_price|default:"0" }} QAR</td>
+                        <td>{% if product.product_image %}<img src="{{ product.product_image.url }}" alt="" style="max-height:28px;border-radius:3px;cursor:pointer;" onclick="document.getElementById('sldProductImgOverlay').style.display='flex';document.getElementById('sldProductImgFull').src=this.src;">{% else %}-{% endif %}</td>
+                        <td class="small text-muted">{{ product.created_at|date:"d M Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="fa-solid fa-box-open fa-2x mb-2 d-block"></i>
+            No products added yet.
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Tab: Edit -->
     <div id="panel-edit" class="sld__panel">
         <h3 class="sld__section-title">
@@ -970,6 +1025,12 @@
             <button type="button" class="sld__modal-btn sld__modal-btn--secondary" id="sldDocEditCancel">Cancel</button>
         </div>
     </div>
+</div>
+
+<!-- Product Image Lightbox -->
+<div id="sldProductImgOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;cursor:pointer;" onclick="this.style.display='none';">
+    <img id="sldProductImgFull" src="" alt="" style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,.5);">
+    <button style="position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:2rem;cursor:pointer;" onclick="document.getElementById('sldProductImgOverlay').style.display='none';">&times;</button>
 </div>
 
 </div>

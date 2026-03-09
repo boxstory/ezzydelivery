@@ -77,6 +77,7 @@ class ProductCategory(models.Model):
 class ColorVariant(models.Model):
     color_variant = models.CharField(max_length=100)
     short_code = models.CharField(max_length=5, null=True, blank=True)
+    hex_code = models.CharField(max_length=7, null=True, blank=True, help_text="Hex color code e.g. #FF0000")
     discription = models.CharField(max_length=100)
     color_variants_date = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)

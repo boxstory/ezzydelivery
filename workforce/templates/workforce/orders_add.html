@@ -462,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script>
 // ---- Inline Product Rows ----
-$(document).ready(function() {
+function _initInlineProducts() {
     const productSearchUrl = '{% url "orders:product_search_api" %}';
     const container = document.getElementById('woa_inline_rows');
     const badge = document.getElementById('woa_inline_product_badge');
@@ -509,13 +509,13 @@ $(document).ready(function() {
         sel.select2({
             placeholder: 'Search product…',
             allowClear: true,
-            minimumInputLength: 1,
+            minimumInputLength: 0,
             ajax: {
                 url: productSearchUrl,
                 dataType: 'json',
                 delay: 250,
-                data: params => ({ q: params.term, business: '{{ selected_business.business_id }}' }),
-                processResults: data => ({ results: (data.results || []).map(p => ({ id: p.id, text: p.item_name + ' (' + p.item_sku + ')', price: p.item_price, sku: p.item_sku })) })
+                data: params => ({ q: params.term || '', business: '{{ selected_business.business_id }}' }),
+                processResults: data => ({ results: (data.results || []).map(p => ({ id: p.id, text: (p.text || p.item_name || '') + ' (' + (p.sku || p.item_sku || '') + ')', price: p.price || p.item_price || 0, sku: p.sku || p.item_sku || '' })) })
             }
         });
         sel.on('select2:select', function(e) {
@@ -589,6 +589,14 @@ $(document).ready(function() {
             productNameField.value = selectedText;
         }
     });
-});
+}
+// Wait for jQuery + Select2 to be available (they load after this block)
+(function _waitForSelect2() {
+    if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+        jQuery(function() { _initInlineProducts(); });
+    } else {
+        setTimeout(_waitForSelect2, 50);
+    }
+})();
 </script>
 {% endblock extra_js %}

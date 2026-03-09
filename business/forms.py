@@ -63,10 +63,11 @@ Driver = fleet_models.Driver
 # =============================================================================
 
 business_LANGUAGE_CHOICES = (
-    ('arabic', 'Arabic'),
     ('english', 'English'),
-    ('hindi', 'Hindi'),
-    ('philipine', 'Philipine'),
+    ('arabic', 'Arabic'),
+    ('hindi', 'Hindi / Indian'),
+    ('philipine', 'Filipino'),
+    ('french', 'French'),
     ('other', 'Other'),
 )
 business_STATUS_CHOICES = (
@@ -112,6 +113,12 @@ class businessRegisterForm(forms.ModelForm):
         - core.views.business_register (initial registration)
         - business.views.business_profile_update (updates)
     """
+    business_languages = forms.ChoiceField(
+        choices=business_LANGUAGE_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
     class Meta:
         model = business_models.Business
         fields = [

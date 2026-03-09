@@ -77,6 +77,7 @@ from core import models as core_models
 from orders import models as orders_models
 from delivery import models as delivery_models
 from fleet import models as fleet_models
+from product import models as product_models
 from webpages import models as webpages_models
 
 from business import forms as business_forms
@@ -2538,6 +2539,57 @@ def assign_driver_to_order(request, order_id):
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
+def delete_order(request, order_id):
+    """Permanently delete an order and its related records. Superadmin only."""
+    profile = get_cached_profile(request)
+    if not profile or not profile.is_superadmin:
+        return JsonResponse({'success': False, 'error': 'Superadmin access required'}, status=403)
+    try:
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id
+        )
+
+        # Block deletion of delivered orders with COD collected
+        delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+        if delivery_task and delivery_task.cod_collected:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot delete — COD has been collected for this order. Cancel it instead.'
+            }, status=400)
+
+        order_number = order.order_number or order.client_order_code or str(order.id)
+        logger.info("Order %s (ID %s) deleted by %s", order_number, order.id, request.user.username)
+
+        # Delete related records (order uses DO_NOTHING FKs, so manual cleanup)
+        # Order matters: delivery tasks reference address updates, so tasks first
+        orders_models.OrderVerificationLog.objects.filter(order=order).delete()
+        orders_models.OrderStatusHistory.objects.filter(order=order).delete()
+        delivery_models.DeliveryTask.objects.filter(order=order).delete()
+        delivery_models.DlAddressUpdate.objects.filter(order=order).delete()
+        order.order_items.all().delete()
+        order.delete()
+
+        if request.headers.get('HX-Request'):
+            return HttpResponse('')
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Order {order_number} deleted'
+        })
+    except Http404:
+        raise
+    except Exception as e:
+        logger.exception("Error deleting order %s: %s", order_id, str(e))
+        return JsonResponse({
+            'success': False,
+            'error': 'An error occurred while deleting the order'
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
 def update_order_zone(request, order_id):
     """Update order delivery zone (from AI parse result)"""
     try:
@@ -2559,14 +2611,9 @@ def update_order_zone(request, order_id):
                 'error': 'Zone number is required'
             }, status=400)
 
-        # Verify zone exists
-        try:
-            zone = delivery_models.ZoneName.objects.get(zone_number=zone_number, is_active=True)
-        except delivery_models.ZoneName.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': f'Zone {zone_number} not found or inactive'
-            }, status=400)
+        # Look up zone name (optional — save even if zone not in ZoneName table)
+        zone = delivery_models.ZoneName.objects.filter(zone_number=zone_number, is_active=True).first()
+        zone_display = zone.zone_name if zone else f'Zone {zone_number}'
 
         # Update order zone and address fields
         old_zone = order.dl_zone
@@ -2607,7 +2654,7 @@ def update_order_zone(request, order_id):
                 dl_address.save()
 
         # Log the update
-        notes = f'Zone updated from AI parse: {zone.zone_name}'
+        notes = f'Zone updated from AI parse: {zone_display}'
         if coords_saved:
             notes += f' | Coordinates saved: {latitude}, {longitude}'
         orders_models.OrderVerificationLog.objects.create(
@@ -2621,9 +2668,9 @@ def update_order_zone(request, order_id):
 
         return JsonResponse({
             'success': True,
-            'message': f'Zone updated to {zone_number} ({zone.zone_name})' + (' with coordinates' if coords_saved else ''),
+            'message': f'Zone updated to {zone_number} ({zone_display})' + (' with coordinates' if coords_saved else ''),
             'zone_number': zone_number,
-            'zone_name': zone.zone_name,
+            'zone_name': zone_display,
             'coordinates_saved': coords_saved
         })
     except json.JSONDecodeError:
@@ -2982,6 +3029,16 @@ def delivery_task_detail(request, task_id):
         driver_status='approved'
     ).select_related('user').order_by('driver_code')
 
+    # GPS status points — build lookup by (old_status, new_status) for timeline matching
+    status_points = delivery_models.TaskStatusPoint.objects.filter(
+        task=task
+    ).order_by('created_at')
+    # Build lookup: key = new_status value (for dl_task_status entries)
+    status_point_map = {}
+    for sp in status_points:
+        key = f"{sp.old_status}__{sp.new_status}"
+        status_point_map[key] = sp
+
     context = {
         'page_title': f'Delivery Task #{task.dl_task_number}',
         'task': task,
@@ -2991,6 +3048,8 @@ def delivery_task_detail(request, task_id):
         'driver_documents': driver_documents,
         'seller_comments': seller_comments,
         'approved_drivers': approved_drivers,
+        'status_points': status_points,
+        'status_point_map': status_point_map,
     }
 
     return render(request, 'workforce/parts/delivery_task_detail.html', context)
@@ -3637,25 +3696,84 @@ def orders_reported(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def tasks_followup_list(request):
-    """View for follow-up tasks list"""
+    """View for follow-up tasks list — latest driver updates sorted by time"""
+    # All task statuses including delivered for follow-up tracking
+    active_statuses = [
+        'pending', 'assigned', 'accepted', 'picked_up',
+        'start_ride', 'out_for_delivery', 'in_transit',
+        'contacted', 'non_reachable', 'failed', 'rejected',
+        'delivered',
+    ]
+
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).prefetch_related(
         'order__order_items',
     ).filter(
-        dl_task_status='pending'
-    ).order_by('-created_at')
+        dl_task_status__in=active_statuses
+    )
 
-    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
+    # Optional filters
+    status_filter = request.GET.get('status', '')
+    driver_filter = request.GET.get('driver', '')
+
+    if status_filter:
+        tasks_list = tasks_list.filter(dl_task_status=status_filter)
+    if driver_filter:
+        tasks_list = tasks_list.filter(driver_id=driver_filter)
+
+    # Sorting
+    sort_param = request.GET.get('sort', 'updated')
+    SORT_MAP = {
+        'task':         ('dl_task_number', 'asc'),
+        'task-desc':    ('-dl_task_number', 'desc'),
+        'updated':      ('-updated_at', 'desc'),
+        'updated-asc':  ('updated_at', 'asc'),
+        'driver':       ('driver__user__first_name', 'asc'),
+        'driver-desc':  ('-driver__user__first_name', 'desc'),
+        'status':       ('dl_task_status', 'asc'),
+        'status-desc':  ('-dl_task_status', 'desc'),
+        'cod':          ('-order__cod_amount', 'desc'),
+        'cod-asc':      ('order__cod_amount', 'asc'),
+    }
+    order_field, sort_dir = SORT_MAP.get(sort_param, ('-updated_at', 'desc'))
+    tasks_list = tasks_list.order_by(order_field)
+
+    # Extract sort name without direction suffix for template
+    current_sort = sort_param.replace('-desc', '').replace('-asc', '')
+
+    # Get active drivers for filter dropdown
+    active_drivers = fleet_models.Driver.objects.filter(
+        driver_status='approved'
+    ).select_related('user').order_by('user__first_name')
+
+    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=30)
+
+    # Build filter params for pagination
+    filter_params = ''
+    if status_filter:
+        filter_params += f'&status={status_filter}'
+    if driver_filter:
+        filter_params += f'&driver={driver_filter}'
+    if sort_param and sort_param != 'updated':
+        filter_params += f'&sort={sort_param}'
 
     context = {
         'dl_tasks': tasks_with_pagination,
         'page_title': 'Follow-Up Tasks',
-        'page_subtitle': 'Tasks requiring follow-up',
+        'page_subtitle': 'Latest updates by driver & status',
         'page_icon': 'fa-flag',
         'list_type': 'followup',
+        'active_drivers': active_drivers,
+        'active_statuses': active_statuses,
+        'current_status': status_filter,
+        'current_driver': driver_filter,
+        'current_sort': current_sort,
+        'current_dir': sort_dir,
+        'filter_params': filter_params,
+        'show_followup_filters': True,
     }
-    return render(request, 'workforce/parts/lists/dl_list_all.html', context)
+    return render(request, 'workforce/parts/lists/dl_list_followup.html', context)
 
 
 
@@ -5859,6 +5977,16 @@ def business_license_detail(request, business_id):
         except Exception as e:
             logger.warning(f"Error fetching product stats for business {business.business_id}: {e}")
 
+    # Get all products for this business (regardless of fulfillment status)
+    products_list = product_models.Product.objects.filter(
+        business=business
+    ).order_by('item_sku')
+
+    # Update product_stats for all businesses (not just fulfillment)
+    if not product_stats['total_products'] and products_list.exists():
+        product_stats['total_products'] = products_list.count()
+        product_stats['active_skus'] = products_list.count()
+
     context = {
         'page_title': f'{business.business_name} - Business Detail',
         'business': business,
@@ -5866,6 +5994,7 @@ def business_license_detail(request, business_id):
         'order_stats': order_stats,
         'linked_warehouse': linked_warehouse,
         'product_stats': product_stats,
+        'products_list': products_list,
     }
 
     return render(request, 'workforce/business_license_detail.html', context)
@@ -6547,6 +6676,11 @@ def seller_detail(request, business_id):
         user_filled = sum(1 for f in user_required_fields if getattr(user_profile, f, None))
     user_completion = round(user_filled / len(user_required_fields) * 100) if user_required_fields else 0
 
+    # Get products for this business
+    products_list = product_models.Product.objects.filter(
+        business=business
+    ).select_related('color', 'unit', 'product_category').order_by('item_sku')
+
     context = {
         'page_title': f'Seller: {business.business_name}',
         'business': business,
@@ -6563,6 +6697,7 @@ def seller_detail(request, business_id):
         'recent_orders': recent_orders,
         'avg_orders_per_month': avg_orders_per_month,
         'documents': documents,
+        'products_list': products_list,
         'now': timezone.now(),
         'completion_percentage': completion_percentage,
         'user_profile': user_profile,
@@ -7257,8 +7392,8 @@ def delivery_task_edit(request, task_id):
         # Get the linked warehouse (if any) for this business
         wh_link = SellerWarehouseLink.objects.filter(
             business=task_business
-        ).select_related('default_location').first()
-        linked_wh = wh_link.default_location if (wh_link and wh_link.default_location) else None
+        ).select_related('warehouse').first()
+        linked_wh = wh_link.warehouse if wh_link else None
 
         # Include: business's own pickup locations + any fulfillment center linked to their warehouse
         q = Q(business=task_business)
@@ -7697,9 +7832,15 @@ def order_edit(request, order_id):
         zn = delivery_models.ZoneName.objects.filter(zone_number=order.dl_zone).values_list('zone_name', flat=True).first()
         zone_name = zn or ''
 
+    # Order items
+    order_items = orders_models.OrderItem.objects.filter(
+        order=order
+    ).select_related('product').order_by('id')
+
     context = {
         'page_title': f'Edit Order - {order.order_number}',
         'order': order,
+        'order_items': order_items,
         'pickup_locations': pickup_locations,
         'order_statuses': orders_models.ORDER_STATUS_BY_CLIENT,
         'verification_statuses': orders_models.Order.VERIFICATION_STATUS,
@@ -7708,6 +7849,99 @@ def order_edit(request, order_id):
     }
 
     return render(request, 'workforce/order_edit.html', context)
+
+
+# --- Order Item AJAX endpoints -----------------------------------------------
+
+@login_required
+@staff_required
+@require_http_methods(["POST"])
+def order_item_add(request, order_id):
+    """Add a new item to an order via AJAX."""
+    order = get_object_or_404(orders_models.Order, id=order_id)
+    product_id = request.POST.get('product_id')
+    quantity = int(request.POST.get('quantity', 1) or 1)
+    unit_price = request.POST.get('unit_price', '')
+
+    product = None
+    if product_id:
+        from product.models import Product
+        product = Product.objects.filter(id=product_id).first()
+
+    price = None
+    if unit_price:
+        from decimal import Decimal
+        price = Decimal(unit_price)
+    elif product and product.item_price:
+        price = product.item_price
+
+    item = orders_models.OrderItem.objects.create(
+        order=order,
+        product=product,
+        quantity=quantity,
+        unit_price=price,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'item': {
+            'id': item.id,
+            'product_id': product.id if product else None,
+            'product_name': product.item_name if product else '',
+            'sku': product.item_sku if product else '',
+            'quantity': item.quantity,
+            'unit_price': str(item.unit_price or 0),
+            'total_price': str(item.total_price or 0),
+        }
+    })
+
+
+@login_required
+@staff_required
+@require_http_methods(["POST"])
+def order_item_update(request, order_id, item_id):
+    """Update an existing order item via AJAX."""
+    item = get_object_or_404(orders_models.OrderItem, id=item_id, order_id=order_id)
+    quantity = request.POST.get('quantity')
+    unit_price = request.POST.get('unit_price')
+    product_id = request.POST.get('product_id')
+
+    if product_id:
+        from product.models import Product
+        product = Product.objects.filter(id=product_id).first()
+        if product:
+            item.product = product
+
+    if quantity:
+        item.quantity = int(quantity)
+    if unit_price:
+        from decimal import Decimal
+        item.unit_price = Decimal(unit_price)
+
+    item.save()
+
+    return JsonResponse({
+        'success': True,
+        'item': {
+            'id': item.id,
+            'product_id': item.product_id,
+            'product_name': item.product.item_name if item.product else '',
+            'sku': item.product.item_sku if item.product else '',
+            'quantity': item.quantity,
+            'unit_price': str(item.unit_price or 0),
+            'total_price': str(item.total_price or 0),
+        }
+    })
+
+
+@login_required
+@staff_required
+@require_http_methods(["POST"])
+def order_item_delete(request, order_id, item_id):
+    """Delete an order item via AJAX."""
+    item = get_object_or_404(orders_models.OrderItem, id=item_id, order_id=order_id)
+    item.delete()
+    return JsonResponse({'success': True})
 
 
 # =============================================================================
@@ -8483,3 +8717,182 @@ def team_verification_list(request):
         'current_filter': status_filter,
     }
     return render(request, 'workforce/team_verification_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def tasks_live_map(request):
+    """Live map showing all active delivery task pins and driver locations."""
+    from django.db.models import Subquery, OuterRef
+
+    active_statuses = [
+        'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
+        'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
+        'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
+    ]
+
+    # Get all active tasks with coordinates
+    tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'driver', 'driver__user', 'dl_to_address',
+    ).filter(
+        dl_task_status__in=active_statuses,
+    )
+
+    pins = []
+    for t in tasks:
+        lat = lng = None
+        if t.order.latitude and t.order.longitude:
+            lat = float(t.order.latitude)
+            lng = float(t.order.longitude)
+        elif t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
+            lat = float(t.dl_to_address.dl_latitude)
+            lng = float(t.dl_to_address.dl_longitude)
+
+        pins.append({
+            'id': t.id,
+            'task_number': t.dl_task_number or str(t.id),
+            'status': t.dl_task_status,
+            'status_display': t.get_dl_task_status_display(),
+            'customer_name': t.order.customer_name or '',
+            'customer_phone': t.order.customer_phone or '',
+            'zone': t.order.dl_zone or '',
+            'street': t.order.dl_street or '',
+            'building': t.order.dl_building or '',
+            'address': t.order.customer_address or '',
+            'driver_name': str(t.driver) if t.driver else 'Unassigned',
+            'driver_id': t.driver_id,
+            'business_name': t.order.business.business_name if t.order.business else '',
+            'lat': lat,
+            'lng': lng,
+        })
+
+    # Get latest GPS location for drivers
+    # Include drivers with active tasks AND any driver with recent GPS pings (online)
+    active_driver_ids = set(t.driver_id for t in tasks if t.driver_id)
+    driver_locations = []
+    drivers_with_gps = set()
+
+    # Get ALL recent GPS pings (last 2 hours) — catches online drivers with no tasks
+    recent_cutoff = timezone.now() - timezone.timedelta(hours=2)
+    latest_locs = fleet_models.DriverLocation.objects.filter(
+        created_at__gte=recent_cutoff,
+    ).order_by('driver_id', '-created_at').distinct('driver_id')
+
+    # Build a driver lookup for names
+    gps_driver_ids = set(loc.driver_id for loc in latest_locs)
+    all_relevant_driver_ids = active_driver_ids | gps_driver_ids
+    driver_map = {}
+    if all_relevant_driver_ids:
+        for d in fleet_models.Driver.objects.select_related('user').filter(
+            driver_id__in=all_relevant_driver_ids
+        ):
+            driver_map[d.driver_id] = d
+
+    for loc in latest_locs:
+        drivers_with_gps.add(loc.driver_id)
+        driver = driver_map.get(loc.driver_id)
+        task_count = sum(1 for t in tasks if t.driver_id == loc.driver_id)
+        driver_locations.append({
+            'driver_id': loc.driver_id,
+            'driver_name': str(driver) if driver else f'Driver #{loc.driver_id}',
+            'lat': float(loc.latitude),
+            'lng': float(loc.longitude),
+            'accuracy': loc.accuracy,
+            'speed': loc.speed,
+            'updated': loc.created_at.strftime('%H:%M'),
+            'minutes_ago': int((timezone.now() - loc.created_at).total_seconds() / 60),
+            'has_gps': True,
+            'task_count': task_count,
+        })
+
+    # For drivers with active tasks but no GPS pings, show at task location
+    for driver_id in active_driver_ids - drivers_with_gps:
+        driver = driver_map.get(driver_id)
+        fallback_lat = fallback_lng = None
+        task_count = 0
+        for t in tasks:
+            if t.driver_id == driver_id:
+                task_count += 1
+                if fallback_lat is None:
+                    if t.order.latitude and t.order.longitude:
+                        fallback_lat = float(t.order.latitude)
+                        fallback_lng = float(t.order.longitude)
+                    elif t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
+                        fallback_lat = float(t.dl_to_address.dl_latitude)
+                        fallback_lng = float(t.dl_to_address.dl_longitude)
+        driver_locations.append({
+            'driver_id': driver_id,
+            'driver_name': str(driver) if driver else f'Driver #{driver_id}',
+            'lat': fallback_lat,
+            'lng': fallback_lng,
+            'accuracy': None,
+            'speed': None,
+            'updated': None,
+            'minutes_ago': -1,
+            'has_gps': False,
+            'task_count': task_count,
+        })
+
+    # Static mode: show each driver at their latest task's delivery location
+    # Drivers with GPS but no tasks still show at GPS position
+    mode = request.GET.get('mode', 'live')
+    if mode == 'static':
+        static_locations = []
+        # Drivers with active tasks — show at latest task location
+        for driver_id in active_driver_ids:
+            driver = driver_map.get(driver_id)
+            latest_task = None
+            task_count = 0
+            for t in tasks:
+                if t.driver_id == driver_id:
+                    task_count += 1
+                    if latest_task is None or t.updated_at > latest_task.updated_at:
+                        latest_task = t
+            if latest_task:
+                lat = lng = None
+                if latest_task.order.latitude and latest_task.order.longitude:
+                    lat = float(latest_task.order.latitude)
+                    lng = float(latest_task.order.longitude)
+                elif latest_task.dl_to_address and latest_task.dl_to_address.dl_latitude and latest_task.dl_to_address.dl_longitude:
+                    lat = float(latest_task.dl_to_address.dl_latitude)
+                    lng = float(latest_task.dl_to_address.dl_longitude)
+                minutes_ago = int((timezone.now() - latest_task.updated_at).total_seconds() / 60)
+                static_locations.append({
+                    'driver_id': driver_id,
+                    'driver_name': str(driver) if driver else f'Driver #{driver_id}',
+                    'lat': lat,
+                    'lng': lng,
+                    'accuracy': None,
+                    'speed': None,
+                    'updated': latest_task.updated_at.strftime('%H:%M'),
+                    'minutes_ago': minutes_ago,
+                    'has_gps': False,
+                    'task_count': task_count,
+                    'last_status': latest_task.get_dl_task_status_display(),
+                    'last_task_number': latest_task.dl_task_number or str(latest_task.id),
+                })
+        # GPS-only drivers (no tasks) — keep their GPS position in static mode too
+        for loc_entry in driver_locations:
+            if loc_entry['driver_id'] not in active_driver_ids and loc_entry.get('has_gps'):
+                loc_entry['last_status'] = 'Online (no tasks)'
+                static_locations.append(loc_entry)
+        driver_locations = static_locations
+
+    # Return JSON for AJAX refresh requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'pins': pins,
+            'drivers': driver_locations,
+            'pin_count': len([p for p in pins if p['lat']]),
+            'driver_count': len(driver_locations),
+            'mode': mode,
+        })
+
+    context = {
+        'pins_json': json.dumps(pins),
+        'drivers_json': json.dumps(driver_locations),
+        'pin_count': len([p for p in pins if p['lat']]),
+        'total_count': len(pins),
+        'driver_count': len(driver_locations),
+    }
+    return render(request, 'workforce/tasks_live_map.html', context)

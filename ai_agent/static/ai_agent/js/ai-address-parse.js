@@ -26,6 +26,7 @@
 
     var PARSE_ENDPOINT = '/api/ai-agent/tools/parse-address/';
     var QNAS_BUILDINGS_ENDPOINT = '/api/qnas/get-buildings/';
+    var ZONE_NAME_ENDPOINT = '/workforce/ajax/zone-name/';
     var MODAL_ID = 'ezzyAiParseModal';
 
     // ─── Helpers ───────────────────────────────────────────────
@@ -234,25 +235,44 @@
             }
         }
 
-        return fetch(_getSaveEndpoint(orderId), {
+        var csrfToken = _getCSRFToken();
+        var endpoint = _getSaveEndpoint(orderId);
+        var payload = {
+            zone_number: data.zone_number,
+            street_number: data.street_number,
+            building_number: data.building_number,
+            latitude: lat,
+            longitude: lng,
+            coords_accuracy: accuracy
+        };
+        console.log('[AIParse Save] endpoint:', endpoint, 'payload:', payload, 'csrf:', csrfToken ? 'present' : 'MISSING');
+
+        return fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': _getCSRFToken()
+                'X-CSRFToken': csrfToken
             },
             credentials: 'same-origin',
-            body: JSON.stringify({
-                zone_number: data.zone_number,
-                street_number: data.street_number,
-                building_number: data.building_number,
-                latitude: lat,
-                longitude: lng,
-                coords_accuracy: accuracy
-            })
+            redirect: 'error',
+            body: JSON.stringify(payload)
         }).then(function(r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + r.statusText);
+            console.log('[AIParse Save] response status:', r.status, 'type:', r.type, 'url:', r.url);
+            if (!r.ok) {
+                return r.text().then(function(text) {
+                    console.log('[AIParse Save] error body:', text.substring(0, 200));
+                    try {
+                        var json = JSON.parse(text);
+                        throw new Error(json.error || ('Server error: HTTP ' + r.status));
+                    } catch(e) {
+                        if (e.message && e.message.indexOf('Server error') === 0) throw e;
+                        throw new Error('Server error: HTTP ' + r.status);
+                    }
+                });
+            }
             return r.json();
         }).then(function(resp) {
+            console.log('[AIParse Save] response:', resp);
             if (resp.success) {
                 if (btn) {
                     btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Saved!';
@@ -264,13 +284,64 @@
                 throw new Error(resp.error || 'Failed to save');
             }
         }).catch(function(err) {
+            console.error('[AIParse Save] error:', err);
+            var msg = err.message || 'Unknown error';
+            // Detect redirect block (login redirect)
+            if (err instanceof TypeError && err.message.indexOf('redirect') !== -1) {
+                msg = 'Session expired — please refresh and try again';
+            }
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-save me-2"></i>Save to Order';
+                btn.classList.remove('btn-info');
                 btn.classList.add('btn-danger');
-                setTimeout(function() { btn.classList.remove('btn-danger'); }, 2000);
+                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-2"></i>' + msg;
             }
-            alert('Error saving: ' + err.message);
+        });
+    }
+
+    // ─── Silent Save (for bulk operations) ────────────────────
+
+    function _saveToOrderSilent(orderId, data) {
+        var coords = data.coordinates || {};
+        var lat = coords.latitude || null;
+        var lng = coords.longitude || null;
+
+        var accuracy = null;
+        if (lat && lng) {
+            if (data.building_number && data._qnasExactMatch) {
+                accuracy = 'exact';
+            } else if (data.building_number || data._qnasMatch) {
+                accuracy = 'street';
+            } else {
+                accuracy = 'ai_estimate';
+            }
+        }
+
+        var csrfToken = _getCSRFToken();
+        var endpoint = _getSaveEndpoint(orderId);
+        var payload = {
+            zone_number: data.zone_number,
+            street_number: data.street_number,
+            building_number: data.building_number,
+            latitude: lat,
+            longitude: lng,
+            coords_accuracy: accuracy
+        };
+
+        return fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        }).then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }).then(function(resp) {
+            if (!resp.success) throw new Error(resp.error || 'Save failed');
+            return resp;
         });
     }
 
@@ -414,10 +485,22 @@
             html += '</div>';
         }
 
+        // Google Maps link found in text
+        if (result.location_link) {
+            html += '<div class="mt-2 p-2 rounded" style="background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.2);">';
+            html += '<strong class="small text-primary"><i class="fa-solid fa-link me-1"></i>Google Maps Link:</strong> ';
+            html += '<a href="' + _escapeHtml(result.location_link) + '" target="_blank" class="small">' + _escapeHtml(result.location_link.substring(0, 80)) + (result.location_link.length > 80 ? '...' : '') + '</a>';
+            html += '</div>';
+        }
+
         // Regular coordinates (from AI parse, no QNAS)
         if (!opts.qnasCoords && coords.latitude && coords.longitude) {
+            var srcLabel = result.geocode_source === 'google_maps' ? 'From Google Maps link'
+                : result.geocode_source === 'raw_coordinates' ? 'From text coordinates'
+                : result.geocode_source === 'zone_center' ? 'Zone center (approximate)'
+                : 'Estimated';
             html += '<div class="mt-3">';
-            html += '<strong class="small"><i class="fa-solid fa-map-marker-alt text-info me-1"></i>Coordinates:</strong>';
+            html += '<strong class="small"><i class="fa-solid fa-map-marker-alt text-info me-1"></i>Coordinates (' + srcLabel + '):</strong>';
             html += '<p class="text-muted small mb-2" id="ezzyAiParseCoordsText">' + coords.latitude.toFixed(6) + ', ' + coords.longitude.toFixed(6) + '</p>';
 
             if (opts.existingLat && opts.existingLng) {
@@ -788,19 +871,39 @@
             // Build final result object
             if (!result && hasStructured) {
                 // No AI parse was done, build a minimal result from structured data
+                // Look up zone name from server
+                var zoneName = null;
+                try {
+                    var znResp = await fetch(ZONE_NAME_ENDPOINT + '?zone=' + zone);
+                    var znData = await znResp.json();
+                    zoneName = znData.zone_name || null;
+                } catch (e) { /* ignore */ }
+
                 result = {
                     zone_number: zone,
                     street_number: street,
                     building_number: building,
-                    zone_name: null,
+                    zone_name: zoneName,
                     unit_number: null,
-                    area_name: null,
+                    area_name: zoneName,
                     landmarks: [],
                     confidence: qnasCoords ? (qnasCoords.exact_match ? 0.95 : 0.75) : 0.5,
                     parse_notes: ['Built from page data (zone/street/building)'],
-                    original_address: address || ('Zone ' + zone + ', Street ' + street + (building ? ', Building ' + building : '')),
+                    original_address: address || ('Zone ' + zone + (zoneName ? ' (' + zoneName + ')' : '') + ', Street ' + street + (building ? ', Building ' + building : '')),
                     coordinates: qnasCoords ? { latitude: qnasCoords.latitude, longitude: qnasCoords.longitude } : {}
                 };
+            }
+
+            // Ensure zone_name is populated when we have a zone number but no name
+            if (result && result.zone_number && !result.zone_name) {
+                try {
+                    var znResp2 = await fetch(ZONE_NAME_ENDPOINT + '?zone=' + result.zone_number);
+                    var znData2 = await znResp2.json();
+                    if (znData2.zone_name) {
+                        result.zone_name = znData2.zone_name;
+                        if (!result.area_name) result.area_name = znData2.zone_name;
+                    }
+                } catch (e) { /* ignore */ }
             }
 
             // ── Step: Compare Coordinates ──
@@ -854,11 +957,14 @@
                 });
                 _process.showResult(resultHtml);
 
-                // Wire save button
-                if (opts.orderId && result.zone_number) {
+                // Wire save button (zone or coordinates available)
+                if (opts.orderId && (result.zone_number || (result.coordinates && result.coordinates.latitude))) {
                     var saveBtn = document.getElementById('ezzyAiParseSaveBtn');
                     if (saveBtn) {
                         saveBtn.addEventListener('click', function() {
+                            // Reset error state if retrying
+                            saveBtn.classList.remove('btn-danger');
+                            saveBtn.classList.add('btn-info');
                             _saveToOrder(opts.orderId, result);
                         });
                     }
@@ -958,14 +1064,30 @@
                         qc = await _lookupQNASCoords(r.zone_number, r.street_number, r.building_number);
                         if (qc) {
                             r.coordinates = { latitude: qc.latitude, longitude: qc.longitude };
+                            r._qnasMatch = true;
+                            r._qnasExactMatch = qc.exact_match || false;
+                        }
+                    }
+
+                    // Auto-save to order if we have zone data
+                    var saved = false;
+                    if (order.id && r.zone_number) {
+                        try {
+                            await _saveToOrderSilent(order.id, r);
+                            saved = true;
+                        } catch (saveErr) {
+                            console.error('[BulkParse] Save error for ' + order.orderNumber + ':', saveErr);
                         }
                     }
 
                     var cardHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
                         '<i class="fa-solid fa-location-dot"></i><strong>' + _escapeHtml(order.orderNumber) + '</strong>' +
-                        '<span class="ms-auto badge bg-' + (r.confidence > 0.7 ? 'success' : 'warning') + '">' + Math.round(r.confidence * 100) + '%</span></div>' +
+                        '<span class="ms-auto">' +
+                        (saved ? '<span class="badge bg-success me-1"><i class="fa-solid fa-check me-1"></i>Saved</span>' : '<span class="badge bg-secondary me-1">Not saved</span>') +
+                        '<span class="badge bg-' + (r.confidence > 0.7 ? 'success' : 'warning') + '">' + Math.round(r.confidence * 100) + '%</span>' +
+                        '</span></div>' +
                         '<div class="aim__result-grid">' +
-                        '<div class="aim__result-item"><span class="label">Zone</span><span class="value' + (r.zone_number ? ' success' : '') + '">' + (r.zone_number || '-') + '</span></div>' +
+                        '<div class="aim__result-item"><span class="label">Zone</span><span class="value' + (r.zone_number ? ' success' : '') + '">' + (r.zone_number || '-') + (r.zone_name ? ' (' + _escapeHtml(r.zone_name) + ')' : '') + '</span></div>' +
                         '<div class="aim__result-item"><span class="label">Street</span><span class="value">' + (r.street_number || '-') + '</span></div>' +
                         '<div class="aim__result-item"><span class="label">Building</span><span class="value">' + (r.building_number || '-') + '</span></div>' +
                         '<div class="aim__result-item"><span class="label">Area</span><span class="value">' + _escapeHtml(r.area_name || '-') + '</span></div>' +
@@ -980,7 +1102,7 @@
                         cardHtml += '<div class="mt-2"><strong class="small">Landmarks:</strong> <span class="text-muted small">' + _escapeHtml(r.landmarks.join(', ')) + '</span></div>';
                     }
                     cardHtml += '<div class="mt-2"><strong class="small">Original:</strong> <span class="text-muted small">' + _escapeHtml(r.original_address || order.address) + '</span></div></div>';
-                    results.push({ order: order, success: true, data: r, html: cardHtml });
+                    results.push({ order: order, success: true, data: r, saved: saved, html: cardHtml });
                     successCount++;
                 } else {
                     results.push({ order: order, success: false, error: data.error || 'Failed', html: '' });
@@ -993,6 +1115,7 @@
         }
 
         var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        var savedCount = results.filter(function(r) { return r.saved; }).length;
         var allCardsHtml = results.map(function(r) {
             if (r.success) return r.html;
             return '<div class="aim__result-card"><div class="aim__result-card-header">' +
@@ -1007,13 +1130,20 @@
                 '<div class="aim__process-header">' +
                     '<div class="aim__process-icon success"><i class="fa-solid fa-check"></i></div>' +
                     '<div class="aim__process-title">Bulk Parse Complete</div>' +
-                    '<div class="aim__process-subtitle">' + successCount + ' succeeded, ' + errorCount + ' failed in ' + elapsed + 's</div>' +
+                    '<div class="aim__process-subtitle">' +
+                        successCount + ' parsed, ' + savedCount + ' saved, ' + errorCount + ' failed in ' + elapsed + 's' +
+                    '</div>' +
                 '</div>' +
                 '<div class="aim__progress-container">' +
                     '<div class="aim__progress-bar"><div class="aim__progress-fill" style="width:100%"></div></div>' +
                 '</div>' +
                 '<div class="mt-3">' + allCardsHtml + '</div>' +
             '</div>'
+        );
+
+        _setFooter(
+            '<button class="btn btn-secondary" onclick="EzzyAIParse.close()">Close</button>' +
+            (savedCount > 0 ? ' <button class="btn btn-primary" onclick="window.location.reload()"><i class="fa-solid fa-refresh me-1"></i>Refresh Page</button>' : '')
         );
 
         if (typeof opts.onComplete === 'function') {

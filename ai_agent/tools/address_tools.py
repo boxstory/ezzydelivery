@@ -44,6 +44,111 @@ QATAR_PATTERNS = {
     ],
 }
 
+# Google Maps link patterns — extract lat/lng from various URL formats
+GOOGLE_MAPS_PATTERNS = [
+    # https://maps.google.com/?q=25.3548,51.4218
+    r'maps\.google\.com/?\?[^"\s]*q=([-\d.]+),([-\d.]+)',
+    # https://www.google.com/maps?q=25.3548,51.4218
+    r'google\.com/maps\?[^"\s]*q=([-\d.]+),([-\d.]+)',
+    # https://www.google.com/maps/place/.../@25.3548,51.4218,17z
+    r'google\.com/maps/[^"\s]*@([-\d.]+),([-\d.]+)',
+    # https://maps.app.goo.gl/... (short links — can't extract coords, but detect presence)
+    # https://goo.gl/maps/...
+    # https://www.google.com/maps/search/25.3548,51.4218
+    r'google\.com/maps/search/([-\d.]+),([-\d.]+)',
+    # Plain Google Maps with ll= parameter
+    r'maps\.google\.com[^"\s]*ll=([-\d.]+),([-\d.]+)',
+]
+
+# Raw lat/lng patterns in text (Qatar region: lat ~24-27, lng ~50-52)
+RAW_COORDS_PATTERNS = [
+    # 25.3548, 51.4218 or 25.3548,51.4218
+    r'(2[4-6]\.\d{3,8})\s*[,\s]\s*(5[0-2]\.\d{3,8})',
+]
+
+# Full Google Maps URL extraction (to save the link itself)
+GOOGLE_LINK_PATTERN = r'(https?://(?:www\.)?(?:maps\.google\.com|google\.com/maps|maps\.app\.goo\.gl|goo\.gl/maps)[^\s"<>]*)'
+
+
+def extract_coords_from_text(text: str):
+    """Extract latitude/longitude from Google Maps links or raw coordinates in text.
+    Returns (lat, lng, source, link) or (None, None, None, None).
+    """
+    if not text:
+        return None, None, None, None
+
+    # 1. Try Google Maps links
+    for pattern in GOOGLE_MAPS_PATTERNS:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            lat, lng = float(match.group(1)), float(match.group(2))
+            # Validate Qatar region
+            if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
+                # Extract full link
+                link_match = re.search(GOOGLE_LINK_PATTERN, text, re.IGNORECASE)
+                link = link_match.group(1) if link_match else None
+                return lat, lng, 'google_maps', link
+
+    # 2. Try raw coordinates
+    for pattern in RAW_COORDS_PATTERNS:
+        match = re.search(pattern, text)
+        if match:
+            lat, lng = float(match.group(1)), float(match.group(2))
+            if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
+                return lat, lng, 'raw_coordinates', None
+
+    # 3. Detect Google short link — resolve server-side to get actual URL with coords
+    link_match = re.search(GOOGLE_LINK_PATTERN, text, re.IGNORECASE)
+    if link_match:
+        short_url = link_match.group(1)
+        resolved = _resolve_google_short_link(short_url)
+        if resolved:
+            resolved_lat, resolved_lng, resolved_url = resolved
+            if resolved_lat and resolved_lng:
+                return resolved_lat, resolved_lng, 'google_maps', resolved_url or short_url
+        return None, None, 'google_link_unresolved', short_url
+
+    return None, None, None, None
+
+
+def _resolve_google_short_link(short_url: str):
+    """Follow a Google Maps short link redirect to get the full URL with coordinates.
+    Returns (lat, lng, full_url) or None.
+    """
+    import requests as http_requests
+
+    try:
+        resp = http_requests.head(short_url, allow_redirects=True, timeout=5,
+                                   headers={'User-Agent': 'EzzyDelivery/1.0'})
+        final_url = resp.url
+        if not final_url or final_url == short_url:
+            # Try GET if HEAD didn't redirect
+            resp = http_requests.get(short_url, allow_redirects=True, timeout=5,
+                                      headers={'User-Agent': 'EzzyDelivery/1.0'},
+                                      stream=True)
+            final_url = resp.url
+            resp.close()
+
+        if final_url:
+            # Try extracting coords from the resolved URL
+            for pattern in GOOGLE_MAPS_PATTERNS:
+                match = re.search(pattern, final_url, re.IGNORECASE)
+                if match:
+                    lat, lng = float(match.group(1)), float(match.group(2))
+                    if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
+                        return lat, lng, final_url
+            # Also try raw coords in URL
+            for pattern in RAW_COORDS_PATTERNS:
+                match = re.search(pattern, final_url)
+                if match:
+                    lat, lng = float(match.group(1)), float(match.group(2))
+                    if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
+                        return lat, lng, final_url
+    except Exception as e:
+        logger.warning(f"Failed to resolve Google short link {short_url}: {e}")
+
+    return None
+
 
 def extract_pattern(text: str, patterns: List[str]) -> Optional[str]:
     """Extract first matching pattern from text."""
@@ -113,7 +218,26 @@ class ParseAddressTool(BaseTool):
                 'longitude': None,
             },
             'geocode_source': None,
+            'location_link': None,
         }
+
+        # Extract coordinates from Google Maps links or raw lat/lng in text
+        text_lat, text_lng, coord_source, google_link = extract_coords_from_text(address)
+        if text_lat and text_lng:
+            result['coordinates']['latitude'] = text_lat
+            result['coordinates']['longitude'] = text_lng
+            result['geocode_source'] = coord_source
+            # Google Maps pin = high-confidence exact location
+            if coord_source == 'google_maps':
+                result['confidence'] += 0.7
+                result['parse_notes'].append(f'Exact coordinates from Google Maps: {text_lat:.6f}, {text_lng:.6f}')
+            else:
+                result['confidence'] += 0.5
+                result['parse_notes'].append(f'Coordinates from {coord_source}: {text_lat:.6f}, {text_lng:.6f}')
+        if google_link:
+            result['location_link'] = google_link
+            if not text_lat:
+                result['parse_notes'].append('Google Maps link found (could not extract coordinates)')
 
         # Extract zone number
         zone_num = extract_pattern(address, QATAR_PATTERNS['zone'])
@@ -161,7 +285,8 @@ class ParseAddressTool(BaseTool):
                 result['area_name'] = zone_from_db.get('area_name')
                 result['confidence'] += 0.25
                 result['parse_notes'].append(f"Matched from database: {zone_from_db.get('area_name')}")
-                if zone_from_db.get('latitude') and zone_from_db.get('longitude'):
+                # Only set zone_center coords if we don't already have better coords (google/raw)
+                if not result['coordinates']['latitude'] and zone_from_db.get('latitude') and zone_from_db.get('longitude'):
                     result['coordinates']['latitude'] = zone_from_db['latitude']
                     result['coordinates']['longitude'] = zone_from_db['longitude']
                     result['geocode_source'] = 'zone_center'
@@ -285,7 +410,8 @@ class ParseAddressTool(BaseTool):
             'khor': ['al khor', 'alkhor', 'khawr'],
             'sadd': ['al sadd', 'alsadd'],
             'duhail': ['al duhail', 'duheil'],
-            'rayyan': ['al rayyan', 'alrayyan'],
+            'rayyan': ['al rayyan', 'alrayyan', 'rayan', 'al rayan'],
+            'rayan': ['rayyan', 'al rayyan', 'alrayyan'],
             'gharafa': ['al gharafa', 'algharafa', 'gharrafa'],
             'markhiya': ['al markhiya', 'markhiyya'],
             'messila': ['al messila', 'messilah'],
@@ -307,50 +433,72 @@ class ParseAddressTool(BaseTool):
 
         # Build search terms including variants
         search_terms = set(words)
+        # Also try the full address as a search term (e.g. "al rayan")
+        search_terms.add(address_lower.replace(',', ' ').strip())
         for word in words:
             word_clean = word.replace(',', '').strip()
             if word_clean in spelling_variants:
                 search_terms.update(spelling_variants[word_clean])
-            # Also check partial matches
-            for key, variants in spelling_variants.items():
-                if key in word_clean or word_clean in key:
-                    search_terms.add(key)
-                    search_terms.update(variants)
+            # Partial matches only for words long enough to be meaningful (>3 chars)
+            if len(word_clean) > 3:
+                for key, variants in spelling_variants.items():
+                    if key in word_clean or word_clean in key:
+                        search_terms.add(key)
+                        search_terms.update(variants)
 
-        # Search with all terms
-        for term in search_terms:
-            if len(term) < 3:
-                continue
+        # Sort search terms: longer/more specific first for better matching
+        sorted_terms = sorted(
+            [t for t in search_terms if len(t) >= 3],
+            key=lambda t: -len(t)
+        )
 
+        # Search with all terms — collect candidates and pick best match
+        candidates = []
+        for term in sorted_terms:
             # Search in ZoneArea
-            area_match = ZoneArea.objects.filter(
+            area_matches = ZoneArea.objects.filter(
                 Q(area_name__icontains=term) |
                 Q(area_name_arabic__icontains=term)
-            ).select_related('zone').first()
+            ).select_related('zone')[:5]
 
-            if area_match:
-                return {
+            for area_match in area_matches:
+                # Score: how much of the area name is covered by our search
+                area_lower = area_match.area_name.lower()
+                score = len(term) / max(len(area_lower), 1)
+                # Bonus if full address appears in area name or vice versa
+                if address_lower in area_lower or area_lower in address_lower:
+                    score += 0.5
+                candidates.append((score, {
                     'zone_number': area_match.zone.zone_number,
                     'zone_name': area_match.zone.zone_name,
                     'area_name': area_match.area_name,
                     'latitude': float(area_match.zone.latitude) if area_match.zone.latitude else None,
                     'longitude': float(area_match.zone.longitude) if area_match.zone.longitude else None,
-                }
+                }))
 
             # Search in ZoneName
-            zone_match = ZoneName.objects.filter(
+            zone_matches = ZoneName.objects.filter(
                 Q(zone_name__icontains=term) |
                 Q(zone_name_arabic__icontains=term)
-            ).first()
+            )[:5]
 
-            if zone_match:
-                return {
+            for zone_match in zone_matches:
+                zone_lower = zone_match.zone_name.lower()
+                score = len(term) / max(len(zone_lower), 1)
+                if address_lower in zone_lower or zone_lower in address_lower:
+                    score += 0.5
+                candidates.append((score, {
                     'zone_number': zone_match.zone_number,
                     'zone_name': zone_match.zone_name,
                     'area_name': zone_match.zone_name,
                     'latitude': float(zone_match.latitude) if zone_match.latitude else None,
                     'longitude': float(zone_match.longitude) if zone_match.longitude else None,
-                }
+                }))
+
+        if candidates:
+            # Return highest-scoring match
+            candidates.sort(key=lambda x: -x[0])
+            return candidates[0][1]
 
         return None
 
