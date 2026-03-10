@@ -11,15 +11,8 @@
     </button>
     <div class="collapse navbar-collapse w-100" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
-        <li class="nav-item d-none d-lg-block">
-          <a class="site-nav__link" href="{% url 'webpages:index' %}">
-            Home
-          </a>
-        </li>
-        <li class="nav-item d-lg-none">
-          <a class="site-nav__link--icon" href="{% url 'webpages:index' %}" title="Home">
-            <i class="fa-solid fa-house"></i>
-          </a>
+        <li class="nav-item">
+          <a class="site-nav__link" href="{% url 'webpages:index' %}">Home</a>
         </li>
         <li class="nav-item">
           <a class="site-nav__link" href="{% url 'webpages:services' %}">Services</a>
@@ -30,63 +23,88 @@
         <li class="nav-item">
           <a class="site-nav__link" href="{% url 'webpages:contactus' %}">Contact</a>
         </li>
-        <li class="nav-item">
+        <li class="nav-item site-nav__sep"></li>
+        {% if user.is_authenticated %}
+        <!-- Desktop: Dashboard btn + user pill dropdown -->
+        <li class="nav-item site-nav__desktop-auth d-none d-md-flex">
+          {% if user_profile.is_staff %}
+          <a class="site-nav__btn site-nav__btn--ghost" href="{% url 'workforce:wf_dashboard' %}">
+            <i class="fa-solid fa-gauge-high"></i> Dashboard
+          </a>
+          {% else %}
+          <a class="site-nav__btn site-nav__btn--ghost" href="{% url 'core:main_dashboard' %}">
+            <i class="fa-solid fa-gauge-high"></i> Dashboard
+          </a>
+          {% endif %}
+        </li>
+        <li class="nav-item d-none d-md-block">
           <div class="dropdown">
-            {% if user.is_authenticated %}
-              <div class="site-nav__avatar" data-bs-toggle="dropdown" aria-expanded="false">
-                <img src="{% static 'webpages/img/avatar.png' %}" alt="{{ user.username }}" title="{{ user.username }}" width="36" height="36" />
+            <button class="site-nav__user-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
+              <div class="site-nav__user-avatar">
+                <img src="{% static 'webpages/img/avatar.png' %}" alt="{{ user.username }}" width="28" height="28" />
               </div>
-              <ul class="dropdown-menu site-nav__dropdown dropdown-menu-end">
-                <li>
-                  <a class="site-nav__dropdown-item" href="{% url 'core:profile_view' %}">
-                    <i class="fa-solid fa-user me-2"></i>
-                    Profile
-                  </a>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                  {% if user_profile.is_staff %}
-                    <a class="site-nav__dropdown-item" href="{% url 'workforce:wf_dashboard' %}">
-                      <i class="fa-solid fa-gauge-high me-2"></i>
-                      Dashboard
-                    </a>
-                  {% else %}
-                    <a class="site-nav__dropdown-item" href="{% url 'core:main_dashboard' %}">
-                      <i class="fa-solid fa-gauge-high me-2"></i>
-                      Dashboard
-                    </a>
-                  {% endif %}
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                  <a class="site-nav__dropdown-item" href="{% url 'account_logout' %}">
-                    <i class="fa-solid fa-right-from-bracket me-2"></i>
-                    Log Out
-                  </a>
-                </li>
-              </ul>
-            {% else %}
-              <div class="site-nav__avatar" data-bs-toggle="dropdown" aria-expanded="false">
-                <img src="{% static 'webpages/img/avatar.png' %}" alt="User" width="36" height="36" />
-              </div>
-              <ul class="dropdown-menu site-nav__dropdown dropdown-menu-end">
-                <li>
-                  <a class="site-nav__dropdown-item" href="{% url 'account_login' %}">
-                    <i class="fa-solid fa-right-to-bracket me-2"></i>
-                    Log In
-                  </a>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                  <a class="site-nav__dropdown-item" href="{% url 'account_signup' %}">
-                    <i class="fa-solid fa-user-plus me-2"></i>
-                    Sign Up
-                  </a>
-                </li>
-              </ul>
-            {% endif %}
+              <!-- Name shown in dropdown head only -->
+              <i class="fa-solid fa-chevron-down site-nav__user-caret"></i>
+            </button>
+            <ul class="dropdown-menu site-nav__dropdown dropdown-menu-end">
+              <li class="site-nav__dropdown-head">
+                <span class="site-nav__dropdown-name">{{ user.get_full_name|default:user.username }}</span>
+                <span class="site-nav__dropdown-email">{{ user.email }}</span>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="site-nav__dropdown-item" href="{% url 'core:profile_view' %}">
+                  <i class="fa-solid fa-user"></i> Profile
+                </a>
+              </li>
+              <li>
+                <a class="site-nav__dropdown-item site-nav__dropdown-item--danger" href="{% url 'account_logout' %}">
+                  <i class="fa-solid fa-right-from-bracket"></i> Log Out
+                </a>
+              </li>
+            </ul>
           </div>
         </li>
+        <!-- Mobile: inline account bar (no dropdown) -->
+        <li class="nav-item d-md-none site-nav__mob-account">
+          <div class="site-nav__mob-bar">
+            <div class="site-nav__mob-bar__left">
+              <div class="site-nav__mob-bar__avatar">
+                <img src="{% static 'webpages/img/avatar.png' %}" alt="{{ user.username }}" width="32" height="32" />
+              </div>
+              <div class="site-nav__mob-bar__info">
+                <span class="site-nav__mob-bar__name">{{ user.first_name|default:user.username }}</span>
+              </div>
+            </div>
+            <div class="site-nav__mob-bar__actions">
+              {% if user_profile.is_staff %}
+              <a class="site-nav__mob-pill site-nav__mob-pill--dash" href="{% url 'workforce:wf_dashboard' %}" aria-label="Dashboard">
+                <i class="fa-solid fa-gauge-high"></i> <span>Dashboard</span>
+              </a>
+              {% else %}
+              <a class="site-nav__mob-pill site-nav__mob-pill--dash" href="{% url 'core:main_dashboard' %}" aria-label="Dashboard">
+                <i class="fa-solid fa-gauge-high"></i> <span>Dashboard</span>
+              </a>
+              {% endif %}
+              <a class="site-nav__mob-pill" href="{% url 'core:profile_view' %}" aria-label="Profile">
+                <i class="fa-solid fa-user"></i>
+              </a>
+              <a class="site-nav__mob-pill site-nav__mob-pill--danger" href="{% url 'account_logout' %}" aria-label="Log Out">
+                <i class="fa-solid fa-right-from-bracket"></i>
+              </a>
+            </div>
+          </div>
+        </li>
+        {% else %}
+        <li class="nav-item">
+          <a class="site-nav__btn site-nav__btn--ghost" href="{% url 'account_login' %}">Log In</a>
+        </li>
+        <li class="nav-item">
+          <a class="site-nav__btn site-nav__btn--primary" href="{% url 'account_signup' %}">
+            Get Started <i class="fa-solid fa-arrow-right"></i>
+          </a>
+        </li>
+        {% endif %}
       </ul>
     </div>
   </div>
