@@ -18,19 +18,19 @@ query_logger = logging.getLogger('queries')
 
 class SessionTimeoutMiddleware:
     """
-    Middleware to automatically logout users after 1 hour of inactivity
+    Middleware to automatically logout users after 1 day of inactivity
 
     How it works:
     1. Tracks last activity time in session
-    2. On each request, checks if 1 hour has passed since last activity
+    2. On each request, checks if 1 day has passed since last activity
     3. If expired, logs out user and redirects to login with message
     4. If not expired, updates last activity time
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
-        # Timeout duration: 1 hour = 3600 seconds
-        self.timeout_duration = timedelta(seconds=3600)
+        # Timeout duration: 1 day = 86400 seconds
+        self.timeout_duration = timedelta(days=1)
 
     def __call__(self, request):
         # Skip timeout check for anonymous users
@@ -62,7 +62,7 @@ class SessionTimeoutMiddleware:
             if timezone.is_naive(last_activity):
                 last_activity = timezone.make_aware(last_activity)
 
-            # Check if session has expired (1 hour of inactivity)
+            # Check if session has expired (1 day of inactivity)
             time_since_activity = timezone.now() - last_activity
 
             if time_since_activity > self.timeout_duration:
@@ -105,7 +105,7 @@ class SessionWarningMiddleware:
                 if timezone.is_naive(last_activity):
                     last_activity = timezone.make_aware(last_activity)
                 elapsed = (timezone.now() - last_activity).total_seconds()
-                request.session_time_remaining = max(0, int(3600 - elapsed))
+                request.session_time_remaining = max(0, int(86400 - elapsed))
 
         return self.get_response(request)
 

@@ -281,6 +281,9 @@ class BusinessApiSettings(models.Model):
     tiktok_token_expires_at = models.DateTimeField(blank=True, null=True,
         help_text='When the TikTok access token expires')
 
+    column_mapping = models.JSONField(blank=True, null=True, default=None,
+        help_text='Google Sheet column mapping: {"customer_name": "Col Header", "phone": "Col Header", ...}')
+
     is_verify_api = models.BooleanField(default=False)
     is_default = models.BooleanField(default=False)
     business = models.ForeignKey(

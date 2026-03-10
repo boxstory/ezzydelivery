@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
 {% endblock extra_css %}
 
 {% block content %}
@@ -225,6 +225,52 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Package Description -->
+            {% if task.order.package_description or task.order.order_items.exists or task.order.cod_amount %}
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-box-open"></i>
+                        Package Description
+                    </div>
+                </div>
+                <div class="dtd__card__body">
+                    <!-- Summary: Package / Qty / COD -->
+                    <div class="d-flex flex-column gap-2 mb-3 p-2 rounded" style="background:var(--brand-warning-light, #fff8e1); border:1px solid var(--brand-warning, #f5c542);">
+                        {% if task.order.package_description %}
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-box-open" style="color:#c49000;"></i>
+                            <span class="text-muted small" style="min-width:50px;">Package</span>
+                            <span class="fw-medium">{{ task.order.package_description }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
+                            <span class="text-muted small" style="min-width:50px;">Qty</span>
+                            <span class="fw-semibold">{% if task.order.total_quantity %}{{ task.order.total_quantity }}{% else %}{{ task.order.order_items.count }}{% endif %}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-money-bill-wave text-success"></i>
+                            <span class="text-muted small" style="min-width:50px;">COD</span>
+                            <span class="fw-semibold">{% if task.order.cod_amount %}{{ task.order.cod_amount }} QR{% else %}—{% endif %}</span>
+                        </div>
+                    </div>
+
+                    <!-- Product Items -->
+                    {% if task.order.order_items.exists %}
+                    <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.65rem;">Product Items ({{ task.order.order_items.count }})</div>
+                    {% for item in task.order.order_items.all %}
+                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}">
+                        <span class="badge bg-light text-dark">{{ item.quantity }}</span>
+                        <span>{% if item.product %}{{ item.product.item_name }}{% else %}{{ item.notes|default:"Item" }}{% endif %}</span>
+                        {% if item.unit_price %}<span class="ms-auto text-muted small">{{ item.unit_price }} QR</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Driver App Updates -->
             <div class="dtd__card">
@@ -772,8 +818,7 @@
 
 </script>
 
-<!-- Leaflet Map -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Map (library preloaded in wf_dashboard_base.html) -->
 <script>
 (function() {
     var mapEl = document.getElementById('taskMap');

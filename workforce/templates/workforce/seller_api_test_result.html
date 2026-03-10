@@ -1,310 +1,195 @@
-{% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}API Test — {{ api.business.business_name }}{% endblock %}
+<!-- Status Line -->
+{% if not error_message %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <span class="badge bg-success wftest-result__badge--ok"><i class="fa-solid fa-circle-check me-1"></i>Connected</span>
 
-{% block content %}
-<div class="woa">
-    <div class="woa__hero">
-        <div class="woa__hero-content">
-            <h1 class="woa__hero-title"><i class="fa-solid fa-vial me-2"></i>API Test Result</h1>
-            <p class="woa__hero-sub">{{ api.business.business_name }} — {{ api.api_type|title }}</p>
-        </div>
-    </div>
+    {% if api_stats.order_count is not None %}
+    <span class="badge bg-light text-dark border"><i class="fa-solid fa-receipt me-1 text-muted"></i><strong>{{ api_stats.order_count }}</strong> {% if api.api_type == 'google_sheet' %}rows{% else %}orders{% endif %}</span>
+    {% endif %}
 
-    <div class="p-3">
-        <div class="mb-3">
-            <a href="{% url 'workforce:wf_seller_api_configs' %}"
-               hx-get="{% url 'workforce:wf_seller_api_configs' %}"
-               hx-target="#main-content" hx-select="#main-content"
-               hx-swap="outerHTML" hx-push-url="true"
-               class="btn btn-sm btn-outline-secondary">
-                <i class="fa-solid fa-arrow-left me-1"></i>Back to API Configs
-            </a>
-        </div>
+    {% if api_stats.product_count is not None %}
+    <span class="badge bg-light text-dark border"><i class="fa-solid fa-box me-1 text-muted"></i><strong>{{ api_stats.product_count }}</strong> products</span>
+    {% endif %}
 
-        <!-- Status Line -->
-        {% if not error_message %}
-        <div class="woa__status-line mb-3">
-            <div class="woa__status-badge woa__status-badge--ok">
-                <i class="fa-solid fa-circle-check me-1"></i>Connected
-            </div>
-
-            {% if api_stats.product_count is not None %}
-            <div class="woa__status-pill">
-                <i class="fa-solid fa-box me-1 text-muted"></i>
-                <strong>{{ api_stats.product_count }}</strong> products
-            </div>
-            {% endif %}
-
-            {% if api_stats.order_count is not None %}
-            <div class="woa__status-pill">
-                <i class="fa-solid fa-receipt me-1 text-muted"></i>
-                <strong>{{ api_stats.order_count }}</strong> orders
-            </div>
-            {% endif %}
-
-            {% if api.api_type == 'shopify' %}
-                {% if api_stats.currency %}
-                <div class="woa__status-pill">
-                    <i class="fa-solid fa-coins me-1 text-muted"></i>{{ api_stats.currency }}
-                </div>
-                {% endif %}
-                {% if api_stats.plan %}
-                <div class="woa__status-pill">
-                    <i class="fa-solid fa-tag me-1 text-muted"></i>{{ api_stats.plan }}
-                </div>
-                {% endif %}
-                {% if api_stats.shop_email %}
-                <div class="woa__status-pill woa__status-pill--muted">
-                    <i class="fa-solid fa-envelope me-1"></i>{{ api_stats.shop_email }}
-                </div>
-                {% endif %}
-            {% elif api.api_type == 'woocommerce' %}
-                {% if api_stats.currency %}
-                <div class="woa__status-pill">
-                    <i class="fa-solid fa-coins me-1 text-muted"></i>{{ api_stats.currency }}
-                </div>
-                {% endif %}
-                {% if api_stats.wc_version %}
-                <div class="woa__status-pill woa__status-pill--muted">
-                    WC {{ api_stats.wc_version }}
-                </div>
-                {% endif %}
-                {% if api_stats.wp_version %}
-                <div class="woa__status-pill woa__status-pill--muted">
-                    WP {{ api_stats.wp_version }}
-                </div>
-                {% endif %}
-            {% endif %}
-
-            <div class="woa__status-pill woa__status-pill--muted ms-auto">
-                <i class="fa-solid fa-clock me-1"></i>{{ update_time }}
-            </div>
-        </div>
-        {% else %}
-        <div class="woa__status-line mb-3">
-            <div class="woa__status-badge woa__status-badge--err">
-                <i class="fa-solid fa-circle-xmark me-1"></i>Connection Failed
-            </div>
-            <div class="woa__status-pill woa__status-pill--muted ms-auto">
-                <i class="fa-solid fa-clock me-1"></i>{{ update_time }}
-            </div>
-        </div>
+    {% if api.api_type == 'shopify' %}
+        {% if api_stats.currency %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-coins me-1 text-muted"></i>{{ api_stats.currency }}</span>
         {% endif %}
+        {% if api_stats.plan %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-tag me-1 text-muted"></i>{{ api_stats.plan }}</span>
+        {% endif %}
+        {% if api_stats.shop_email %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-envelope me-1 text-muted"></i>{{ api_stats.shop_email }}</span>
+        {% endif %}
+    {% elif api.api_type == 'woocommerce' %}
+        {% if api_stats.currency %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-coins me-1 text-muted"></i>{{ api_stats.currency }}</span>
+        {% endif %}
+        {% if api_stats.wc_version %}
+        <span class="badge bg-light text-dark border">WC {{ api_stats.wc_version }}</span>
+        {% endif %}
+    {% elif api.api_type == 'google_sheet' %}
+        {% if api_stats.sheet_title %}
+        <span class="badge bg-light text-dark border"><i class="fa-brands fa-google me-1 text-muted"></i>{{ api_stats.sheet_title }}</span>
+        {% endif %}
+        {% if api_stats.worksheet_name %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-table me-1 text-muted"></i>{{ api_stats.worksheet_name }}</span>
+        {% endif %}
+        {% if api_stats.column_count %}
+        <span class="badge bg-light text-dark border">{{ api_stats.column_count }} columns</span>
+        {% endif %}
+    {% endif %}
 
-        <div class="row g-3">
-            <!-- Config Summary -->
-            <div class="col-md-4">
-                <div class="woa__card h-100">
-                    <div class="woa__card-header">
-                        <i class="fa-solid fa-gear me-2 woa__icon-accent"></i>
-                        <span class="woa__section-label">Configuration</span>
-                    </div>
-                    <div class="woa__card-body small">
-                        <table class="table table-sm table-borderless mb-0">
-                            <tr><td class="text-muted">Seller</td><td class="fw-semibold">{{ api.business.business_name }}</td></tr>
-                            <tr><td class="text-muted">Platform</td><td>{{ api.api_type|title }}</td></tr>
-                            <tr><td class="text-muted">Store URL</td><td class="text-break">{{ api.site_api_url|default:'—' }}</td></tr>
-                            <tr><td class="text-muted">API Version</td><td>{{ api.api_version|default:'—' }}</td></tr>
-                            {% if api.api_type == 'shopify' and api_stats.shop_name %}
-                            <tr><td class="text-muted">Shop Name</td><td>{{ api_stats.shop_name }}</td></tr>
-                            {% endif %}
-                            <tr>
-                                <td class="text-muted">Status</td>
-                                <td>
-                                    {% if api.is_verify_api %}
-                                        <span class="badge bg-success">Approved</span>
-                                    {% else %}
-                                        <span class="badge bg-warning text-dark">Pending</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        </table>
-
-                        <hr>
-                        <div class="d-flex flex-column gap-2">
-                            <button type="button"
-                                    class="btn btn-sm {% if api.is_verify_api %}btn-outline-danger{% else %}btn-success{% endif %} wf-approve-btn"
-                                    data-api-id="{{ api.id }}"
-                                    id="wf_test_approve_btn">
-                                {% if api.is_verify_api %}
-                                    <i class="fa-solid fa-ban me-1"></i>Revoke Approval
-                                {% else %}
-                                    <i class="fa-solid fa-circle-check me-1"></i>Approve Integration
-                                {% endif %}
-                            </button>
-                            <div id="wf_test_approve_status" class="small"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Test Results -->
-            <div class="col-md-8">
-                {% if error_message %}
-                <div class="alert alert-danger">
-                    <i class="fa-solid fa-exclamation-triangle me-1"></i>
-                    <strong>Error:</strong> {{ error_message }}
-                </div>
-                {% endif %}
-
-                <!-- Orders -->
-                <div class="woa__card mb-3">
-                    <div class="woa__card-header d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="fa-solid fa-receipt me-2 woa__icon-accent"></i>
-                            <span class="woa__section-label">Latest Orders</span>
-                            {% if api_stats.order_count is not None %}
-                            <span class="badge bg-secondary ms-2">{{ api_stats.order_count }} total</span>
-                            {% endif %}
-                        </div>
-                        {% if order_status_code %}
-                        <span class="badge {% if order_status_code == 200 %}bg-success{% elif order_status_code == 0 %}bg-secondary{% else %}bg-danger{% endif %}">
-                            HTTP {{ order_status_code }}
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="woa__card-body">
-                        {% if order_response %}
-                        {% if api.api_type == 'shopify' %}
-                        <table class="table table-sm table-hover mb-0">
-                            <thead><tr><th>#</th><th>Name</th><th>Date</th><th>Financial</th><th>Fulfillment</th><th>Total</th></tr></thead>
-                            <tbody>
-                            {% for o in order_response %}
-                            <tr>
-                                <td class="text-muted small">{{ o.id }}</td>
-                                <td class="fw-semibold">{{ o.name }}</td>
-                                <td class="text-muted small">{{ o.created_at|default:'—' }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ o.financial_status|default:'—' }}</span></td>
-                                <td><span class="badge bg-light text-dark border">{{ o.fulfillment_status|default:'unfulfilled' }}</span></td>
-                                <td>{{ o.total_price }}</td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% elif api.api_type == 'woocommerce' %}
-                        <table class="table table-sm table-hover mb-0">
-                            <thead><tr><th>#</th><th>Order</th><th>Date</th><th>Status</th><th>Total</th><th>Currency</th></tr></thead>
-                            <tbody>
-                            {% for o in order_response %}
-                            <tr>
-                                <td class="text-muted small">{{ o.id }}</td>
-                                <td class="fw-semibold">#{{ o.number }}</td>
-                                <td class="text-muted small">{{ o.date_created|default:'—' }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ o.status }}</span></td>
-                                <td>{{ o.total }}</td>
-                                <td class="text-muted">{{ o.currency }}</td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        <pre class="bg-dark text-light p-3 rounded small" style="max-height:300px;overflow:auto;">{{ order_response|pprint }}</pre>
-                        {% endif %}
-                        {% elif not error_message %}
-                        <div class="text-muted small">No orders returned.</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Products -->
-                {% if product_response or api_stats.product_count is not None %}
-                <div class="woa__card">
-                    <div class="woa__card-header d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="fa-solid fa-box me-2 woa__icon-accent"></i>
-                            <span class="woa__section-label">Latest Products</span>
-                            {% if api_stats.product_count is not None %}
-                            <span class="badge bg-secondary ms-2">{{ api_stats.product_count }} total</span>
-                            {% endif %}
-                        </div>
-                        {% if product_status_code %}
-                        <span class="badge {% if product_status_code == 200 %}bg-success{% elif product_status_code == 0 %}bg-secondary{% else %}bg-danger{% endif %}">
-                            HTTP {{ product_status_code }}
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="woa__card-body">
-                        {% if product_response %}
-                        {% if api.api_type == 'shopify' %}
-                        <table class="table table-sm table-hover mb-0">
-                            <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Variants</th></tr></thead>
-                            <tbody>
-                            {% for p in product_response %}
-                            <tr>
-                                <td class="text-muted small">{{ p.id }}</td>
-                                <td>{{ p.title }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ p.status }}</span></td>
-                                <td class="text-muted">{{ p.variants }}</td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% elif api.api_type == 'woocommerce' %}
-                        <table class="table table-sm table-hover mb-0">
-                            <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Stock</th><th>Price</th></tr></thead>
-                            <tbody>
-                            {% for p in product_response %}
-                            <tr>
-                                <td class="text-muted small">{{ p.id }}</td>
-                                <td>{{ p.name }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ p.status }}</span></td>
-                                <td><span class="badge {% if p.stock_status == 'instock' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ p.stock_status }}</span></td>
-                                <td>{{ p.price }}</td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
-                        {% elif not error_message %}
-                        <div class="text-muted small">No products returned.</div>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+    <span class="badge bg-light text-muted border ms-auto"><i class="fa-solid fa-clock me-1"></i>{{ update_time }}</span>
 </div>
-{% endblock content %}
+{% else %}
+<div class="d-flex align-items-center gap-2 mb-3">
+    <span class="badge bg-danger"><i class="fa-solid fa-circle-xmark me-1"></i>Connection Failed</span>
+    <span class="badge bg-light text-muted border ms-auto"><i class="fa-solid fa-clock me-1"></i>{{ update_time }}</span>
+</div>
+{% endif %}
 
+{% if error_message %}
+<div class="alert alert-danger small">
+    <i class="fa-solid fa-exclamation-triangle me-1"></i>
+    <strong>Error:</strong> {{ error_message }}
+</div>
+{% endif %}
 
-{% block extra_js %}
-<script>
-(function() {
-    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
-             || document.querySelector('meta[name="csrf-token"]')?.content || '';
-    const btn = document.getElementById('wf_test_approve_btn');
-    const statusEl = document.getElementById('wf_test_approve_status');
-    if (!btn) return;
+<!-- Orders / Rows Preview -->
+{% if order_response %}
+<div class="mb-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-semibold small">
+            <i class="fa-solid fa-receipt me-1 text-muted"></i>
+            {% if api.api_type == 'google_sheet' %}Latest Rows{% else %}Latest Orders{% endif %}
+            {% if api_stats.order_count is not None %}
+            <span class="badge bg-secondary ms-1">{{ api_stats.order_count }} total</span>
+            {% endif %}
+        </span>
+        {% if order_status_code %}
+        <span class="badge {% if order_status_code == 200 %}bg-success{% else %}bg-danger{% endif %} small">HTTP {{ order_status_code }}</span>
+        {% endif %}
+    </div>
 
-    btn.addEventListener('click', async function() {
-        btn.disabled = true;
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        try {
-            const resp = await fetch('{% url "workforce:wf_approve_api_config" api.id %}', {
-                method: 'POST',
-                headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `csrfmiddlewaretoken=${csrf}`
-            });
-            const result = await resp.json();
-            if (result.success) {
-                const approved = result.is_approved;
-                btn.className = 'btn btn-sm wf-approve-btn ' + (approved ? 'btn-outline-danger' : 'btn-success');
-                btn.innerHTML = approved ? '<i class="fa-solid fa-ban me-1"></i>Revoke Approval' : '<i class="fa-solid fa-circle-check me-1"></i>Approve Integration';
-                statusEl.innerHTML = '<span class="' + (approved ? 'text-success' : 'text-muted') + '"><i class="fas fa-check me-1"></i>' + result.label + '</span>';
-            } else {
-                btn.innerHTML = orig;
-                statusEl.innerHTML = '<span class="text-danger">' + (result.error || 'Failed') + '</span>';
-            }
-        } catch(err) {
-            btn.innerHTML = orig;
-        } finally {
-            btn.disabled = false;
-        }
-    });
-})();
-</script>
-{% endblock extra_js %}
+    {% if api.api_type == 'shopify' %}
+    <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>#</th><th>Name</th><th>Date</th><th>Financial</th><th>Fulfillment</th><th>Total</th></tr></thead>
+        <tbody>
+        {% for o in order_response %}
+        <tr>
+            <td class="text-muted small">{{ o.id }}</td>
+            <td class="fw-semibold">{{ o.name }}</td>
+            <td class="text-muted small">{{ o.created_at|default:'—' }}</td>
+            <td><span class="badge bg-light text-dark border">{{ o.financial_status|default:'—' }}</span></td>
+            <td><span class="badge bg-light text-dark border">{{ o.fulfillment_status|default:'unfulfilled' }}</span></td>
+            <td>{{ o.total_price }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% elif api.api_type == 'woocommerce' %}
+    <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>#</th><th>Order</th><th>Date</th><th>Status</th><th>Total</th><th>Currency</th></tr></thead>
+        <tbody>
+        {% for o in order_response %}
+        <tr>
+            <td class="text-muted small">{{ o.id }}</td>
+            <td class="fw-semibold">#{{ o.number }}</td>
+            <td class="text-muted small">{{ o.date_created|default:'—' }}</td>
+            <td><span class="badge bg-light text-dark border">{{ o.status }}</span></td>
+            <td>{{ o.total }}</td>
+            <td class="text-muted">{{ o.currency }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% elif api.api_type == 'google_sheet' %}
+    <div class="small text-muted mb-1">Showing last {{ order_response|length }} rows</div>
+    <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+            <tr>
+                <th class="text-nowrap">Row</th>
+                {% for key, val in order_response.0.data.items %}
+                <th class="text-nowrap">{{ key }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for o in order_response %}
+        <tr>
+            <td class="text-muted small">{{ o.row_num }}</td>
+            {% for key, val in o.data.items %}
+            <td class="small">{{ val|default:'—' }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <pre class="bg-dark text-light p-3 rounded small" style="max-height:300px;overflow:auto;">{{ order_response|pprint }}</pre>
+    {% endif %}
+</div>
+{% elif not error_message %}
+<div class="text-muted small">No data returned.</div>
+{% endif %}
+
+<!-- Products -->
+{% if product_response %}
+<div class="mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-semibold small">
+            <i class="fa-solid fa-box me-1 text-muted"></i>Latest Products
+            {% if api_stats.product_count is not None %}
+            <span class="badge bg-secondary ms-1">{{ api_stats.product_count }} total</span>
+            {% endif %}
+        </span>
+        {% if product_status_code %}
+        <span class="badge {% if product_status_code == 200 %}bg-success{% else %}bg-danger{% endif %} small">HTTP {{ product_status_code }}</span>
+        {% endif %}
+    </div>
+
+    {% if api.api_type == 'shopify' %}
+    <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>ID</th><th>Title</th><th>Status</th><th>Variants</th></tr></thead>
+        <tbody>
+        {% for p in product_response %}
+        <tr>
+            <td class="text-muted small">{{ p.id }}</td>
+            <td>{{ p.title }}</td>
+            <td><span class="badge bg-light text-dark border">{{ p.status }}</span></td>
+            <td class="text-muted">{{ p.variants }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% elif api.api_type == 'woocommerce' %}
+    <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Status</th><th>Stock</th><th>Price</th></tr></thead>
+        <tbody>
+        {% for p in product_response %}
+        <tr>
+            <td class="text-muted small">{{ p.id }}</td>
+            <td>{{ p.name }}</td>
+            <td><span class="badge bg-light text-dark border">{{ p.status }}</span></td>
+            <td><span class="badge {% if p.stock_status == 'instock' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ p.stock_status }}</span></td>
+            <td>{{ p.price }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

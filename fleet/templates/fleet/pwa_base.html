@@ -19,9 +19,12 @@
 
     <!-- PWA Modern CSS -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260222e">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260308a">
     <!-- Fleet Component CSS - fth__ ffs__ fpm__ BEM blocks -->
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260226">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260308a">
+
+    <!-- AI Tools CSS (shared modal, results, progress) -->
+    <link rel="stylesheet" href="{% static 'ai_agent/css/ai-tools.css' %}?v=20260308a" type="text/css" />
 
     {% block extra_css %}{% endblock %}
 
@@ -37,6 +40,18 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; touch-action: pan-y; }
         html, body { overflow-x: hidden; position: relative; height: 100%; }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        /* GPS status dot on map icon */
+        .fleet-gps-dot {
+            position: absolute; top: 2px; right: 2px;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            border: 2px solid var(--brand-primary, #001f3f);
+        }
+        .fleet-gps-dot--green { background: #10b981; animation: gps-pulse 2s infinite; }
+        .fleet-gps-dot--red { background: #ef4444; }
+        .fleet-gps-dot--yellow { background: #f59e0b; }
+        .fleet-gps-dot--grey { background: #9ca3af; }
+        @keyframes gps-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
 </head>
 <body>
@@ -51,6 +66,10 @@
                 <h1 class="fleet-pwa__title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="fleet-pwa__header-actions">
                     {% block header_actions %}
+                    <a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon" title="Tasks Map" style="text-decoration:none; position:relative;">
+                        <i class="fa-solid fa-map-location-dot"></i>
+                        <span id="fleet_gps_status_dot" class="fleet-gps-dot fleet-gps-dot--grey" title="GPS: checking…"></span>
+                    </a>
                     <button type="button" class="fleet-btn-icon" id="fleet_pwa_install_btn" style="display:none;" title="Install App">
                         <i class="fa-solid fa-download"></i>
                     </button>
@@ -256,9 +275,22 @@
         var activeTaskId = null;
         var SEND_INTERVAL = 30000; // 30 seconds
         var MAX_ACCURACY = 100;    // ignore readings worse than 100m
+        var gpsState = 'grey';     // grey|green|red|yellow
 
         function getCsrf() {
             return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        }
+
+        function setGpsState(state, title) {
+            if (state === gpsState) return;
+            gpsState = state;
+            var dot = document.getElementById('fleet_gps_status_dot');
+            if (dot) {
+                dot.className = 'fleet-gps-dot fleet-gps-dot--' + state;
+                dot.title = 'GPS: ' + (title || state);
+            }
+            document.dispatchEvent(new CustomEvent('ezzy:gps-status', { detail: { state: state, title: title } }));
+            console.log('[EzzyGPS] Status:', state, '-', title);
         }
 
         function sendLocation() {
@@ -274,17 +306,25 @@
 
             fetch('/api/driver/location/', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCsrf()
                 },
                 body: JSON.stringify(body)
-            }).catch(function() { /* silent — offline is fine */ });
+            }).then(function(r) {
+                if (!r.ok) console.warn('[EzzyGPS] Ping failed:', r.status);
+                else console.log('[EzzyGPS] Ping sent OK — lat:', currentPos.lat.toFixed(5), 'lng:', currentPos.lng.toFixed(5), 'acc:', Math.round(currentPos.accuracy) + 'm');
+            }).catch(function(err) { console.warn('[EzzyGPS] Ping error:', err); });
         }
 
         function onPosition(pos) {
             var c = pos.coords;
-            if (c.accuracy > MAX_ACCURACY) return; // skip inaccurate
+            if (c.accuracy > MAX_ACCURACY) {
+                console.warn('[EzzyGPS] Skipped: accuracy', Math.round(c.accuracy) + 'm >', MAX_ACCURACY + 'm');
+                setGpsState('yellow', 'Poor accuracy (' + Math.round(c.accuracy) + 'm)');
+                return;
+            }
             currentPos = {
                 lat: c.latitude,
                 lng: c.longitude,
@@ -292,14 +332,21 @@
                 speed: c.speed,
                 heading: c.heading
             };
+            setGpsState('green', 'Active (' + Math.round(c.accuracy) + 'm)');
             document.dispatchEvent(new CustomEvent('ezzy:gps', { detail: currentPos }));
         }
 
         function onError(err) {
+            console.warn('[EzzyGPS] Error:', err.code, err.message);
             if (err.code === 1) { // PERMISSION_DENIED
+                setGpsState('red', 'Permission denied');
                 if (typeof showToast === 'function') {
                     showToast('Location permission denied. GPS tracking disabled.', 'warning', 5000);
                 }
+            } else if (err.code === 2) { // POSITION_UNAVAILABLE
+                setGpsState('red', 'Position unavailable');
+            } else if (err.code === 3) { // TIMEOUT
+                setGpsState('yellow', 'GPS timeout — retrying');
             }
         }
 
@@ -308,6 +355,7 @@
                 if (watchId !== null) return; // already running
                 activeTaskId = taskId || null;
                 if (!('geolocation' in navigator)) {
+                    setGpsState('grey', 'Not supported');
                     if (typeof showToast === 'function') {
                         showToast('GPS not supported on this device.', 'warning');
                     }
@@ -321,6 +369,7 @@
                 // Send first ping after 5s, then every 30s
                 sendTimer = setInterval(sendLocation, SEND_INTERVAL);
                 setTimeout(sendLocation, 5000);
+                console.log('[EzzyGPS] Started tracking' + (taskId ? ' for task ' + taskId : ''));
             },
             stop: function() {
                 if (watchId !== null) {
@@ -332,13 +381,25 @@
                     sendTimer = null;
                 }
                 activeTaskId = null;
+                setGpsState('grey', 'Stopped');
+                console.log('[EzzyGPS] Stopped tracking');
             },
             getPosition: function() {
                 return currentPos ? Object.assign({}, currentPos) : null;
+            },
+            getState: function() {
+                return gpsState;
             }
         };
+
+        // Auto-start GPS tracking for all driver pages
+        // Sends location pings every 30s so staff can see driver on live map
+        EzzyGPS.start();
     })();
     </script>
+
+    <!-- AI Address Parse (global utility) -->
+    <script src="{% static 'ai_agent/js/ai-address-parse.js' %}?v=20260308a"></script>
 
     {% block extra_js %}{% endblock %}
 </body>

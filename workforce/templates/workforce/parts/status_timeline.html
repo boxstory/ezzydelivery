@@ -8,10 +8,12 @@ Required context variables (passed directly, NOT via timeline_items):
   - verification_logs: QuerySet of OrderVerificationLog
   - delivery_task: DeliveryTask or None
   - timeline_count: int (event count)
+  - status_point_map: dict mapping "old__new" to TaskStatusPoint (optional)
 
 Usage:
   {% include "workforce/parts/status_timeline.html" %}
 {% endcomment %}
+{% load workforce_tags %}
 
 <div class="odp__tl-card">
     <div class="odp__tl-header">
@@ -48,13 +50,15 @@ Usage:
             {% for entry in status_history %}
                         <div class="odp__tl-item">
                 <div class="odp__tl-track">
-                    <div class="odp__tl-icon {% if entry.field_name == 'order_status' %}odp__tl-icon--order{% elif entry.field_name == 'verification_status' %}odp__tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}odp__tl-icon--task{% elif entry.field_name == 'cod_status_by_staff' %}odp__tl-icon--cod{% elif entry.field_name == 'dl_task_publish' %}odp__tl-icon--publish{% else %}odp__tl-icon--default{% endif %}">
+                    <div class="odp__tl-icon {% if entry.field_name == 'order_status' %}odp__tl-icon--order{% elif entry.field_name == 'verification_status' %}odp__tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}odp__tl-icon--task{% elif entry.field_name == 'cod_status_by_staff' %}odp__tl-icon--cod{% elif entry.field_name == 'dl_task_publish' %}odp__tl-icon--publish{% elif entry.field_name == 'order_edited' or entry.field_name == 'task_edited' %}odp__tl-icon--default{% elif entry.field_name == 'item_deleted' %}odp__tl-icon--default{% else %}odp__tl-icon--default{% endif %}">
                         {% if entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
                         {% elif entry.field_name == 'verification_status' %}<i class="fa-solid fa-shield-halved"></i>
                         {% elif entry.field_name == 'dl_task_status' %}<i class="fa-solid fa-truck-fast"></i>
                         {% elif entry.field_name == 'cod_status_by_staff' %}<i class="fa-solid fa-money-bill-wave"></i>
                         {% elif entry.field_name == 'dl_task_publish' %}<i class="fa-solid fa-paper-plane"></i>
                         {% elif entry.field_name == 'task_status' %}<i class="fa-solid fa-list-check"></i>
+                        {% elif entry.field_name == 'order_edited' or entry.field_name == 'task_edited' %}<i class="fa-solid fa-pen-to-square"></i>
+                        {% elif entry.field_name == 'item_deleted' %}<i class="fa-solid fa-trash-can"></i>
                         {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
                     </div>
                 </div>
@@ -76,6 +80,36 @@ Usage:
                         {% endif %}
                         {% if entry.changed_by %}
                         <div class="odp__tl-meta"><i class="fa-regular fa-user"></i> {{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</div>
+                        {% endif %}
+                        {% if entry.field_name == 'dl_task_status' and status_point_map %}
+                        {% with sp=status_point_map|get_status_point:entry %}
+                        {% if sp %}
+                        <div class="odp__tl-gps">
+                            {% if sp.latitude and sp.longitude %}
+                            <span class="odp__tl-gps__pin" title="Driver GPS at status change">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <a href="https://www.google.com/maps?q={{ sp.latitude }},{{ sp.longitude }}" target="_blank" rel="noopener">
+                                    {{ sp.latitude }}, {{ sp.longitude }}
+                                </a>
+                            </span>
+                            {% if sp.accuracy %}
+                            <span class="odp__tl-gps__acc" title="GPS accuracy">
+                                <i class="fa-solid fa-crosshairs"></i> ±{{ sp.accuracy|floatformat:0 }}m
+                            </span>
+                            {% endif %}
+                            {% else %}
+                            <span class="odp__tl-gps__none">
+                                <i class="fa-solid fa-location-crosshairs"></i> No GPS
+                            </span>
+                            {% endif %}
+                            {% if sp.distance_from_delivery is not None %}
+                            <span class="odp__tl-gps__dist {% if sp.distance_from_delivery > 5 %}odp__tl-gps__dist--far{% elif sp.distance_from_delivery < 0.5 %}odp__tl-gps__dist--near{% endif %}" title="Distance from delivery location">
+                                <i class="fa-solid fa-route"></i> {{ sp.distance_from_delivery|floatformat:2 }} km
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
                         {% endif %}
                     </div>
                 </div>

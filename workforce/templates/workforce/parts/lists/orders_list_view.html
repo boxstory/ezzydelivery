@@ -177,7 +177,7 @@
                     <div class="aim__status-menu" id="statusDropdownMenu">
                         <button type="button" onclick="bulkSetOrderStatus('to_review')"><span class="st-dot st-dot--warn"></span> Hold for Review</button>
                         <button type="button" onclick="bulkSetOrderStatus('ready_to_pickup')"><span class="st-dot st-dot--info"></span> Ready to Pickup</button>
-                        <button type="button" onclick="bulkSetOrderStatus('to_publish')"><span class="st-dot st-dot--info"></span> To Publish</button>
+                        <button type="button" onclick="bulkPublishOrders()"><span class="st-dot st-dot--ok"></span> Publish to Delivery</button>
                         <button type="button" onclick="bulkSetOrderStatus('delivered')"><span class="st-dot st-dot--ok"></span> Delivered</button>
                         <button type="button" onclick="bulkSetOrderStatus('cancelled')"><span class="st-dot st-dot--err"></span> Cancelled</button>
                         <button type="button" onclick="bulkSetOrderStatus('reported')"><span class="st-dot st-dot--err"></span> Reported</button>
@@ -244,6 +244,13 @@
                         {% endif %}
                     </div>
                     <div class="orc__cell orc__cell--items">
+                        {% if order.package_description %}
+                        <div class="orc__pkg-brief" title="{{ order.package_description }}">
+                            <i class="fa-solid fa-box-open orc__pkg-icon"></i>
+                            <span class="orc__pkg-text">{{ order.package_description|truncatechars:28 }}</span>
+                            {% if order.total_quantity %}<span class="orc__pkg-qty">x{{ order.total_quantity }}</span>{% endif %}
+                        </div>
+                        {% endif %}
                         <div class="orc__items">
                         {% for item in order.order_items.all %}
                         <div class="orc__pill">
@@ -251,7 +258,9 @@
                             <span class="orc__pill-qty">{{ item.quantity }}</span>
                         </div>
                         {% empty %}
+                        {% if not order.package_description %}
                         <span class="orc__pill--empty">—</span>
+                        {% endif %}
                         {% endfor %}
                         </div>
                     </div>
@@ -291,6 +300,9 @@
                         {% endif %}
                         {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
                         <button type="button" class="orc__btn orc__btn--err" title="Cancel" hx-post="{% url 'workforce:cancel_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML" hx-confirm="Cancel order?"><i class="fa-solid fa-times"></i></button>
+                        {% endif %}
+                        {% if user_profile.is_superadmin %}
+                        <button type="button" class="orc__btn orc__btn--err" title="Delete" hx-post="{% url 'workforce:delete_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML swap:200ms" hx-confirm="Permanently delete order {{ order.order_number|default:order.client_order_code }}? This cannot be undone."><i class="fa-solid fa-trash"></i></button>
                         {% endif %}
                         <a href="https://wa.me/{{ order.customer_phone|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="orc__btn orc__btn--wa" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
                         <button type="button" class="orc__btn orc__btn--ai" title="AI Tools" onclick="openAIToolsForOrder({{ order.id }}, '{{ order.order_number }}')"><i class="fa-solid fa-robot"></i></button>
@@ -785,7 +797,6 @@
         const statusLabels = {
             'to_review': 'Hold for Review',
             'ready_to_pickup': 'Ready to Pickup',
-            'to_publish': 'To Publish',
             'delivered': 'Delivered',
             'cancelled': 'Cancelled',
             'reported': 'Reported'
@@ -845,6 +856,35 @@
             console.error('Bulk status update error:', err);
             alert('Failed to update status. Check console for details.');
         }
+    }
+
+    async function bulkPublishOrders() {
+        document.getElementById('statusDropdownMenu').classList.remove('show');
+        if (selectedOrders.length === 0) {
+            alert('Please select at least one order');
+            return;
+        }
+        if (!confirm(`Publish ${selectedOrders.length} order(s) to delivery? This will create delivery tasks.`)) return;
+
+        let ok = 0, fail = 0;
+        for (const o of selectedOrders) {
+            try {
+                const resp = await fetch(`/workforce/orders/${o.id}/publish/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCSRFToken() },
+                    credentials: 'same-origin'
+                });
+                if (resp.ok) { ok++; } else { fail++; }
+            } catch { fail++; }
+        }
+        clearOrderSelection();
+        const toast = document.createElement('div');
+        toast.className = 'aim__bulk-toast';
+        toast.innerHTML = `<i class="fa-solid fa-check-circle"></i> Published ${ok} order(s)` + (fail ? `, ${fail} failed` : '');
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+        if (ok > 0) setTimeout(() => window.location.reload(), 1500);
     }
 
     function getStatusClass(status) {

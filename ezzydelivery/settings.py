@@ -178,8 +178,8 @@ ACCOUNT_FORMS = {
     'signup': 'core.forms.CustomSignupForm',
 }
 
-# Session Configuration - Auto logout after 1 hour of inactivity
-SESSION_COOKIE_AGE = 3600  # 1 hour in seconds (3600 seconds = 60 minutes)
+# Session Configuration - Auto logout after 1 day of inactivity
+SESSION_COOKIE_AGE = 86400  # 1 day in seconds (86400 seconds = 24 hours)
 SESSION_SAVE_EVERY_REQUEST = True  # Refresh session on every request (updates last activity)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session even after browser close
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)  # True in production with HTTPS

@@ -46,27 +46,30 @@ def generate_sequence_code(number):
 
 def generate_order_number(business, client_order_code):
     """
-    Generate order number in format: {business_code}-{YMMDD}-{sequence}
-    Example: BIZCODE-60113-AA001
+    Generate order number in format: {business_code}-{client_order_code}-{global_sequence}
+    Example: BZH092-3789-AA001
 
-    - YMMDD: Year(last digit) + Month(2 digits) + Day(2 digits)
-    - Sequence: AA001-AA999, AB001-AB999, ... never resets, continues globally per business
+    - client_order_code: full client order ID (or YMMDD fallback)
+    - Sequence: AA001-AA999, AB001-AB999, ... global across ALL orders (not per business)
     """
-    now = timezone.localtime()
+    # Use client_order_code as the middle part
+    if client_order_code and client_order_code not in ('ORD', ''):
+        code_part = str(client_order_code).strip()
+    else:
+        # Fallback to YMMDD date if no client order code
+        now = timezone.localtime()
+        year_digit = str(now.year)[-1]
+        code_part = f"{year_digit}{now.month:02d}{now.day:02d}"
 
-    # Format date as YMMDD (e.g., 60113 for Jan 13, 2026)
-    year_digit = str(now.year)[-1]  # Last digit of year
-    date_part = f"{year_digit}{now.month:02d}{now.day:02d}"
-
-    # Get total order count for this business (never resets)
-    total_orders = Order.objects.filter(business=business).count()
+    # Get total order count across ALL businesses (global sequence)
+    total_orders = Order.objects.count()
 
     # Generate sequence: AA001, AA002, ... AA999, AB001, etc.
     sequence = generate_sequence_code(total_orders + 1)
 
     # Build order number - use business_code, fallback to business_id or 'EZY'
     business_code = business.business_code if business.business_code else f"BIZ{business.business_id}"
-    order_number = f"{business_code}-{date_part}-{sequence}"
+    order_number = f"{business_code}-{code_part}-{sequence}"
 
     return order_number
 

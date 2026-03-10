@@ -10,10 +10,11 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from orders.models import Order, OrderBarcode
 from orders.signals import generate_sequence_code
+from delivery.models import DeliveryTask, DlAddressUpdate
 
 
 class Command(BaseCommand):
-    help = 'Update existing order numbers to new format: {business_code}-{client_order_code}-{YMMDD}-{sequence}'
+    help = 'Update existing order numbers to new format: {business_code}-{client_code_last6}-{sequence}'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -66,18 +67,21 @@ class Command(BaseCommand):
             business_counts[business.business_id] += 1
 
             # Generate new order number
-            # Use order's created_at date for YMMDD
-            order_date = order.created_at or timezone.now()
-            if timezone.is_aware(order_date):
-                order_date = timezone.localtime(order_date)
-
-            year_digit = str(order_date.year)[-1]
-            date_part = f"{year_digit}{order_date.month:02d}{order_date.day:02d}"
-
             sequence = generate_sequence_code(business_counts[business.business_id])
-            client_code = order.client_order_code or 'ORD'
+            client_code = order.client_order_code or ''
 
-            new_order_number = f"{business_code}-{client_code}-{date_part}-{sequence}"
+            # Use last 6 characters of client_order_code as middle part
+            if client_code and client_code != 'ORD':
+                code_part = str(client_code).strip()[-6:]
+            else:
+                # Fallback to YMMDD date
+                order_date = order.created_at or timezone.now()
+                if timezone.is_aware(order_date):
+                    order_date = timezone.localtime(order_date)
+                year_digit = str(order_date.year)[-1]
+                code_part = f"{year_digit}{order_date.month:02d}{order_date.day:02d}"
+
+            new_order_number = f"{business_code}-{code_part}-{sequence}"
 
             # Check if already in new format
             if order.order_number == new_order_number:
@@ -103,6 +107,17 @@ class Command(BaseCommand):
                 if not created:
                     barcode.order_number = new_order_number
                     barcode.save()  # This triggers barcode regeneration
+
+                # Update related DeliveryTask dl_task_number
+                DeliveryTask.objects.filter(order=order).update(
+                    dl_task_number=new_order_number,
+                    dl_task_description=f"Delivery for {new_order_number}",
+                )
+
+                # Update related DlAddressUpdate dl_task_number
+                DlAddressUpdate.objects.filter(order=order).update(
+                    dl_task_number=new_order_number,
+                )
 
                 updated_count += 1
 

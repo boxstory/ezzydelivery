@@ -85,6 +85,10 @@ class Order(models.Model):
         business_models.Business, on_delete=models.CASCADE, related_name='order', db_index=True)  # INDEX: Filtered in every order query
     client_order_code = models.CharField(max_length=64, unique=True, db_index=True)  # INDEX: Searched by clients
     order_notes = models.CharField(max_length=100, blank=True, null=True)
+    package_description = models.CharField(max_length=255, blank=True, default='',
+        help_text="Seller's package description e.g. 'Perfumes', 'Food items'")
+    total_quantity = models.PositiveIntegerField(default=0,
+        help_text="Total quantity for the product description")
     order_status = models.CharField(
         max_length=100, choices=ORDER_STATUS_BY_CLIENT, default='to_review', db_index=True  # INDEX: Filtered for pending/published orders
     )
@@ -434,6 +438,9 @@ class OrderStatusHistory(models.Model):
         ('cod_status_by_staff', 'COD Status'),
         ('dl_task_status', 'Delivery Task Status'),
         ('dl_task_publish', 'Published to Fleet'),
+        ('order_edited', 'Order Edited'),
+        ('task_edited', 'Task Edited'),
+        ('item_deleted', 'Item Deleted'),
     ]
 
     order = models.ForeignKey(
@@ -513,3 +520,77 @@ class AddressVerification(models.Model):
         from datetime import timedelta
         self.token_expires_at = timezone.now() + timedelta(days=7)  # Token valid for 7 days
         return self.verification_token
+
+
+class OneDriveSource(models.Model):
+    """OneDrive Excel file source for bulk order import."""
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.CASCADE,
+        related_name='onedrive_sources'
+    )
+    label = models.CharField(max_length=200, help_text="Friendly name for this source")
+    share_link = models.URLField(max_length=1000, help_text="OneDrive shared link to Excel file")
+    is_active = models.BooleanField(default=True)
+    last_import_at = models.DateTimeField(blank=True, null=True)
+    last_import_count = models.PositiveIntegerField(default=0)
+    last_import_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True
+    )
+    last_sheet_name = models.CharField(max_length=200, blank=True, default='')
+    last_start_row = models.PositiveIntegerField(default=2)
+    last_import_max_row = models.PositiveIntegerField(default=0)
+    last_imported_rows = models.JSONField(default=list, blank=True, help_text="List of row numbers imported in last batch")
+    last_column_mapping = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "OneDrive Sources"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.business.business_name} - {self.label}"
+
+    def get_download_url(self):
+        """Convert OneDrive share link to direct download URL.
+
+        Supported formats:
+        1. Short share link: https://1drv.ms/x/s!AbcDef...
+        2. OneDrive embed/view with resid+authkey
+        3. OneDrive edit.aspx with resid (needs encoding trick)
+        4. SharePoint guestaccess links
+        """
+        import base64
+        from urllib.parse import urlparse, parse_qs, quote
+
+        link = self.share_link.strip()
+
+        # Method 1: 1drv.ms short links — use sharing API
+        if '1drv.ms' in link:
+            encoded = base64.urlsafe_b64encode(link.encode()).decode().rstrip('=')
+            return f"https://api.onedrive.com/v1.0/shares/u!{encoded}/root/content"
+
+        # Method 2: onedrive.live.com with resid
+        elif 'onedrive.live.com' in link:
+            parsed = urlparse(link)
+            params = parse_qs(parsed.query)
+            resid = params.get('resid', [None])[0]
+            authkey = params.get('authkey', [None])[0]
+
+            if resid and authkey:
+                return f"https://onedrive.live.com/download?resid={resid}&authkey={authkey}"
+            elif resid:
+                # No authkey — use download endpoint with resid directly
+                # Also try the sharing API as fallback
+                return f"https://onedrive.live.com/download?resid={quote(resid)}"
+
+        # Method 3: SharePoint links
+        elif 'sharepoint.com' in link:
+            if 'guestaccess.aspx' in link:
+                return link.replace('guestaccess.aspx', 'download.aspx')
+            if '/:x:/' in link or '/:w:/' in link:
+                return link + ('&' if '?' in link else '?') + 'download=1'
+            encoded = base64.urlsafe_b64encode(link.encode()).decode().rstrip('=')
+            return f"https://api.onedrive.com/v1.0/shares/u!{encoded}/root/content"
+
+        return link

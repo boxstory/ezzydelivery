@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260215a">
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260310c3">
 Products - Table View
 {% endblock extra_head %}
 
@@ -76,128 +76,35 @@ Products - Table View
                         {% endif %}
                     </td>
 
-                    <!-- Product Name (Editable) -->
-                    <td class="plt__editable-cell" data-field="item_name" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value">{{ product.item_name }}</span>
-                        <div class="plt__edit-wrapper">
-                            <input type="text" class="plt__edit-input" value="{{ product.item_name }}">
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
+                    <!-- Product Name -->
+                    <td>{{ product.item_name }}</td>
+
+                    <!-- Brand -->
+                    <td>{{ product.brand_name|default:"-" }}</td>
+
+                    <!-- SKU -->
+                    <td>{{ product.item_sku|default:"-" }}</td>
+
+                    <!-- Category -->
+                    <td>
+                        {% if product.product_category %}
+                            <span class="plt__badge plt__badge-category">{{ product.product_category.category_name }}</span>
+                        {% else %}
+                            -
+                        {% endif %}
                     </td>
 
-                    <!-- Brand (Editable) -->
-                    <td class="plt__editable-cell" data-field="brand_name" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value">{{ product.brand_name|default:"-" }}</span>
-                        <div class="plt__edit-wrapper">
-                            <input type="text" class="plt__edit-input" value="{{ product.brand_name|default:'' }}">
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                    </td>
+                    <!-- Price -->
+                    <td class="plt__price-value">QAR {{ product.item_price|default:"0" }}</td>
 
-                    <!-- SKU (Editable) -->
-                    <td class="plt__editable-cell" data-field="item_sku" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value">{{ product.item_sku|default:"-" }}</span>
-                        <div class="plt__edit-wrapper">
-                            <input type="text" class="plt__edit-input" value="{{ product.item_sku|default:'' }}">
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                    </td>
+                    <!-- Size -->
+                    <td>{{ product.size|default:"-" }}</td>
 
-                    <!-- Category (Editable Dropdown) -->
-                    <td class="plt__editable-cell" data-field="product_category" data-type="select" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value">
-                            {% if product.product_category %}
-                                <span class="plt__badge plt__badge-category">{{ product.product_category.category_name }}</span>
-                            {% else %}
-                                -
-                            {% endif %}
-                        </span>
-                        <div class="plt__edit-wrapper">
-                            <select class="plt__edit-select">
-                                <option value="">-- None --</option>
-                                {% for cat in categories %}
-                                    <option value="{{ cat.id }}" {% if product.product_category and product.product_category.id == cat.id %}selected{% endif %}>
-                                        {{ cat.category_name }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                    </td>
+                    <!-- Color -->
+                    <td>{{ product.color.color_variant|default:"-" }}</td>
 
-                    <!-- Price (Editable) -->
-                    <td class="plt__editable-cell" data-field="item_price" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value plt__price-value">QAR {{ product.item_price|default:"0" }}</span>
-                        <div class="plt__edit-wrapper">
-                            <input type="number" class="plt__edit-input" value="{{ product.item_price|default:'0' }}" min="0">
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                    </td>
-
-                    <!-- Size (Editable) -->
-                    <td class="plt__editable-cell" data-field="size" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value">{{ product.size|default:"-" }}</span>
-                        <div class="plt__edit-wrapper">
-                            <input type="text" class="plt__edit-input" value="{{ product.size|default:'' }}">
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                    </td>
-
-                    <!-- Color (Editable Dropdown) -->
-                    <td class="plt__editable-cell" data-field="color" data-type="select" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value">{{ product.color.color_variant|default:"-" }}</span>
-                        <div class="plt__edit-wrapper">
-                            <select class="plt__edit-select">
-                                <option value="">-- None --</option>
-                                {% for color in colors %}
-                                    <option value="{{ color.id }}" {% if product.color and product.color.id == color.id %}selected{% endif %}>
-                                        {{ color.color_variant }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                    </td>
-
-                    <!-- Unit (Editable Dropdown) -->
-                    <td class="plt__editable-cell" data-field="unit" data-type="select" data-product-id="{{ product.id }}">
-                        <span class="plt__cell-value">{{ product.unit.unit_variant|default:"-" }}</span>
-                        <div class="plt__edit-wrapper">
-                            <select class="plt__edit-select">
-                                <option value="">-- None --</option>
-                                {% for unit in units %}
-                                    <option value="{{ unit.id }}" {% if product.unit and product.unit.id == unit.id %}selected{% endif %}>
-                                        {{ unit.unit_variant }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            <div class="plt__edit-actions">
-                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                    </td>
+                    <!-- Unit -->
+                    <td>{{ product.unit.unit_variant|default:"-" }}</td>
 
                     <!-- Actions -->
                     <td>
@@ -206,7 +113,7 @@ Products - Table View
                                class="plt__action-btn plt__action-btn-edit"
                                id="product_table_btn_edit_{{ product.id }}"
                                title="Edit product">
-                                <i class="fas fa-pen"></i> Edit
+                                <i class="fas fa-arrow-up-right-from-square"></i> Edit
                             </a>
                             <a href="{% url 'product:product_single_delete' product_id=product.id %}"
                                class="plt__action-btn plt__action-btn-delete"
@@ -221,12 +128,6 @@ Products - Table View
                 {% endfor %}
             </tbody>
         </table>
-    </div>
-
-    <!-- Table Info Callout -->
-    <div class="plt__hint">
-        <i class="fas fa-bolt"></i>
-        Click any cell to edit inline &middot; <strong>Enter</strong> to save &middot; <strong>Esc</strong> to cancel
     </div>
 
     {% else %}
@@ -258,138 +159,6 @@ Products - Table View
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const editableCells = document.querySelectorAll('.plt__editable-cell');
-
-    editableCells.forEach(cell => {
-        const cellValue = cell.querySelector('.plt__cell-value');
-        const input = cell.querySelector('.plt__edit-input, .plt__edit-select');
-        const saveBtn = cell.querySelector('.plt__edit-btn-save');
-        const cancelBtn = cell.querySelector('.plt__edit-btn-cancel');
-
-        // Store original value
-        let originalValue = input ? input.value : '';
-
-        // Click to edit
-        cellValue.addEventListener('click', function() {
-            if (!cell.classList.contains('editing') && !cell.classList.contains('loading')) {
-                cell.classList.add('editing');
-                input.focus();
-                if (input.tagName === 'INPUT') {
-                    input.select();
-                }
-            }
-        });
-
-        // Save on button click
-        if (saveBtn) {
-            saveBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                saveCell(cell, input);
-            });
-        }
-
-        // Cancel on button click
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                cancelEdit(cell, input, originalValue);
-            });
-        }
-
-        // Keyboard shortcuts
-        if (input) {
-            input.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    saveCell(cell, input);
-                } else if (e.key === 'Escape') {
-                    cancelEdit(cell, input, originalValue);
-                }
-            });
-
-            // Update original value after successful save
-            input.addEventListener('saved', function() {
-                originalValue = input.value;
-            });
-        }
-    });
-
-    function saveCell(cell, input) {
-        const productId = cell.dataset.productId;
-        const field = cell.dataset.field;
-        const value = input.value;
-        const cellValue = cell.querySelector('.plt__cell-value');
-
-        cell.classList.remove('editing');
-        cell.classList.add('loading');
-
-        fetch(`/product/${productId}/inline-update/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken()
-            },
-            body: JSON.stringify({
-                field: field,
-                value: value
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            cell.classList.remove('loading');
-
-            if (data.success) {
-                // Update display value
-                if (field === 'product_category' && value) {
-                    cellValue.innerHTML = `<span class="plt__badge plt__badge-category">${data.value}</span>`;
-                } else if (field === 'item_price') {
-                    cellValue.innerHTML = `<span class="plt__price-value">${data.value}</span>`;
-                } else {
-                    cellValue.textContent = data.value;
-                }
-
-                cell.classList.add('success');
-                setTimeout(() => cell.classList.remove('success'), 500);
-
-                // Trigger saved event
-                input.dispatchEvent(new Event('saved'));
-            } else {
-                cell.classList.add('error');
-                setTimeout(() => cell.classList.remove('error'), 500);
-                alert(data.message || 'Error updating product');
-            }
-        })
-        .catch(error => {
-            cell.classList.remove('loading');
-            cell.classList.add('error');
-            setTimeout(() => cell.classList.remove('error'), 500);
-            console.error('Error:', error);
-            alert('Error updating product');
-        });
-    }
-
-    function cancelEdit(cell, input, originalValue) {
-        cell.classList.remove('editing');
-        input.value = originalValue;
-    }
-
-    function getCSRFToken() {
-        // 1. Try meta tag (set in business_dashboard_base.html)
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        if (meta) return meta.getAttribute('content');
-        // 2. Try hidden input
-        const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
-        if (input) return input.value;
-        // 3. Fallback to cookie
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'csrftoken') return decodeURIComponent(value);
-        }
-        return '';
-    }
-});
 
 // Photo modal
 (function () {

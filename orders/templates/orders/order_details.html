@@ -383,82 +383,106 @@
               <div class="odt__route">
                 {% if order.pickup_location %}
                 <div class="odt__route__stop">
-                  <div class="odt__route__icon odt__route__icon--pickup">
-                    <i class="fa-solid fa-arrow-up"></i>
-                  </div>
-                  <div class="odt__route__info">
-                    <span class="odt__route__label">Pickup</span>
-                    <span class="odt__route__value">{{ order.pickup_location.pickup_location_title }}</span>
-                    {% if order.pickup_location.locality %}
-                    <span class="odt__route__addr">{{ order.pickup_location.locality }}</span>
-                    {% endif %}
-                    {% if order.pickup_location.pickup_lat and order.pickup_location.pickup_lon %}
-                    <a href="https://www.google.com/maps?q={{ order.pickup_location.pickup_lat }},{{ order.pickup_location.pickup_lon }}" target="_blank" class="odt__route__map-link" hx-boost="false">
-                      <i class="fa-solid fa-location-pin"></i> Pin
-                    </a>
-                    {% elif order.pickup_location.locality %}
-                    <a href="https://maps.google.com/?q={{ order.pickup_location.locality|urlencode }}" target="_blank" class="odt__route__map-link" hx-boost="false">
-                      <i class="fa-solid fa-location-pin"></i> Pin
-                    </a>
-                    {% endif %}
-                  </div>
+                  <span class="odt__route__label">
+                    <span class="odt__route__icon odt__route__icon--pickup"></span>
+                    Pickup
+                  </span>
+                  <span class="odt__route__value">{{ order.pickup_location.pickup_location_title }}</span>
+                  {% if order.pickup_location.locality %}
+                  <span class="odt__route__addr">{{ order.pickup_location.locality }}</span>
+                  {% endif %}
+                  {% if order.pickup_location.pickup_lat and order.pickup_location.pickup_lon %}
+                  <a href="https://www.google.com/maps?q={{ order.pickup_location.pickup_lat }},{{ order.pickup_location.pickup_lon }}" target="_blank" class="odt__route__map-link" hx-boost="false">
+                    <i class="fa-solid fa-location-pin"></i> Pin
+                  </a>
+                  {% elif order.pickup_location.locality %}
+                  <a href="https://maps.google.com/?q={{ order.pickup_location.locality|urlencode }}" target="_blank" class="odt__route__map-link" hx-boost="false">
+                    <i class="fa-solid fa-location-pin"></i> Pin
+                  </a>
+                  {% endif %}
                 </div>
                 <div class="odt__route__line"></div>
                 {% endif %}
                 <div class="odt__route__stop">
-                  <div class="odt__route__icon odt__route__icon--dropoff">
-                    <i class="fa-solid fa-arrow-down"></i>
-                  </div>
-                  <div class="odt__route__info">
-                    <span class="odt__route__label">Drop-off
+                  <span class="odt__route__label">
+                    <span class="odt__route__icon odt__route__icon--dropoff"></span>
+                    Drop-off
+                  </span>
+
+                  <!-- Address row + AI Parse + Map inline -->
+                  <div class="d-flex gap-2 align-items-start mt-1" style="padding-left:1rem;">
+                    <div class="flex-fill">
+                      <span class="odt__field__label d-block">Address</span>
+                      <span class="odt__field__value">{% if order.customer_address %}{{ order.customer_address }}{% else %}-{% endif %}</span>
+                    </div>
+                    <div class="d-flex flex-column gap-1 flex-shrink-0">
                       {% include "includes/components/_ai_parse_button.html" with address=order.customer_address zone=order.dl_zone street=order.dl_street building=order.dl_building order_id=order.id order_number=order.order_number show_map="true" title="Drop-off Location" %}
-                    </span>
-                    <span class="odt__route__value">
-                      {% if order.customer_address %}{{ order.customer_address }}{% else %}-{% endif %}
-                    </span>
-                    <div class="odt__field-row odt__field-row--mt">
+                      {% if order.latitude and order.longitude %}
+                      <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odt__route__map-link" title="Open in Google Maps">
+                        <i class="fa-solid fa-map-location-dot"></i> Map
+                      </a>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <!-- Zone / Street / Building row -->
+                  <div class="row g-0 mt-1" style="padding-left:1rem;">
+                    <div class="col-3">
                       <div class="odt__field odt__field--compact">
-                        <span class="odt__field__label">Zone #</span>
+                        <span class="odt__field__label">Zone</span>
                         <span class="odt__field__value odt__field__value--bold">{{ order.dl_zone|default:"-" }}</span>
                       </div>
-                      <div class="odt__field odt__field--compact odt__field--compact-wide">
-                        <span class="odt__field__label">Zone Name</span>
-                        <span class="odt__field__value odt__field__value--zone">{% get_zone_display order %}</span>
-                      </div>
+                    </div>
+                    <div class="col-3">
                       <div class="odt__field odt__field--compact">
                         <span class="odt__field__label">Street</span>
                         <span class="odt__field__value">{{ order.dl_street|default:"-" }}</span>
                       </div>
+                    </div>
+                    <div class="col-3">
                       <div class="odt__field odt__field--compact">
-                        <span class="odt__field__label">Bldg</span>
+                        <span class="odt__field__label">Building</span>
                         <span class="odt__field__value">{{ order.dl_building|default:"-" }}</span>
                       </div>
                     </div>
-                    {% if order.latitude and order.longitude %}
-                    <div class="odt__field-row odt__field-row--mt">
-                      <div class="odt__field odt__field--compact odt__field--compact-wide">
-                        <span class="odt__field__label"><i class="fa-solid fa-crosshairs fa-xs"></i> Lat / Lng</span>
-                        <span class="odt__field__value odt__field__value--mono">
-                          <a href="https://maps.google.com/?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odt__link" hx-boost="false">
-                            {{ order.latitude|floatformat:6 }}, {{ order.longitude|floatformat:6 }}
-                          </a>
-                        </span>
-                      </div>
-                      {% if order.coords_accuracy %}
+                    <div class="col-3">
                       <div class="odt__field odt__field--compact">
-                        <span class="odt__field__label"><i class="fa-solid fa-signal fa-xs"></i> Accuracy</span>
-                        <span class="odt__field__value">
-                          <span class="odt__coords-accuracy odt__coords-accuracy--{{ order.coords_accuracy }}">{{ order.coords_accuracy|capfirst }}</span>
-                        </span>
+                        <span class="odt__field__label">Zone Name</span>
+                        <span class="odt__field__value odt__field__value--zone">{% get_zone_display order %}</span>
                       </div>
+                    </div>
+                  </div>
+
+                  <!-- Lat / Lng / Accuracy row -->
+                  <div class="row g-1 mt-1 mx-0" style="padding-left:1rem;">
+                    <div class="col-4 ps-0">
+                      <label class="odt__field__label d-block mb-0" style="font-size:0.65rem;">Latitude</label>
+                      <input type="text" class="form-control form-control-sm" disabled
+                             value="{% if order.latitude %}{{ order.latitude|floatformat:6 }}{% endif %}"
+                             placeholder="Not set" style="font-size:0.75rem;font-family:monospace;">
+                    </div>
+                    <div class="col-4 px-1">
+                      <label class="odt__field__label d-block mb-0" style="font-size:0.65rem;">Longitude</label>
+                      <input type="text" class="form-control form-control-sm" disabled
+                             value="{% if order.longitude %}{{ order.longitude|floatformat:6 }}{% endif %}"
+                             placeholder="Not set" style="font-size:0.75rem;font-family:monospace;">
+                    </div>
+                    <div class="col-4 pe-0">
+                      <label class="odt__field__label d-block mb-0" style="font-size:0.65rem;">Accuracy</label>
+                      {% if order.coords_accuracy %}
+                      <span class="odt__coords-accuracy odt__coords-accuracy--{{ order.coords_accuracy }}">
+                        {% if order.coords_accuracy == 'exact' %}<i class="fa-solid fa-bullseye"></i>
+                        {% elif order.coords_accuracy == 'street' %}<i class="fa-solid fa-road"></i>
+                        {% elif order.coords_accuracy == 'landmark' %}<i class="fa-solid fa-map-marker-alt"></i>
+                        {% elif order.coords_accuracy == 'zone_center' %}<i class="fa-solid fa-draw-polygon"></i>
+                        {% elif order.coords_accuracy == 'ai_estimate' %}<i class="fa-solid fa-wand-magic-sparkles"></i>
+                        {% endif %}
+                        {{ order.coords_accuracy|capfirst }}
+                      </span>
+                      {% else %}
+                      <span class="odt__field__value" style="color:var(--brand-grey-400);font-style:italic;">—</span>
                       {% endif %}
                     </div>
-                    {% endif %}
-                    {% if order.customer_address %}
-                    <a href="https://maps.google.com/?q={{ order.customer_address|urlencode }}" target="_blank" class="odt__route__map-link" hx-boost="false">
-                      <i class="fa-solid fa-location-dot"></i> View on Map
-                    </a>
-                    {% endif %}
                   </div>
                 </div>
               </div>
@@ -523,14 +547,38 @@
             </div>
           </div>
 
-          <!-- Order Items -->
-          <div class="odt__card" id="order_details_card_items">
+          <!-- Package Description -->
+          {% if order.package_description or order_items or order.cod_amount %}
+          <div class="odt__card" id="order_details_card_package">
             <div class="odt__card__header">
               <i class="fa-solid fa-box-open"></i>
-              <span>Order Items{% if order_items %} ({{ order_items|length }}){% endif %}</span>
+              <span>Package Description</span>
             </div>
-            <div class="odt__card__body odt__card__body--flush">
+            <div class="odt__card__body">
+              <!-- Summary: Package / Qty / COD -->
+              <div class="d-flex flex-column gap-2 p-2 rounded mb-3" style="background:#fff8e1;border:1px solid #f5c542;">
+                {% if order.package_description %}
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fa-solid fa-box-open" style="color:#c49000;"></i>
+                  <span class="text-muted small" style="min-width:50px;">Package</span>
+                  <span class="fw-medium">{{ order.package_description }}</span>
+                </div>
+                {% endif %}
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
+                  <span class="text-muted small" style="min-width:50px;">Qty</span>
+                  <span class="fw-semibold">{% if order.total_quantity %}{{ order.total_quantity }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fa-solid fa-money-bill-wave text-success"></i>
+                  <span class="text-muted small" style="min-width:50px;">COD</span>
+                  <span class="fw-semibold">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+                </div>
+              </div>
+
+              <!-- Product Items -->
               {% if order_items %}
+              <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.65rem;">Product Items ({{ order_items|length }})</div>
               <div class="odt__items">
                 <div class="odt__items__head">
                   <span class="odt__items__head-name">Item</span>
@@ -545,14 +593,10 @@
                 </div>
                 {% endfor %}
               </div>
-              {% else %}
-              <div class="odt__items__empty">
-                <i class="fa-solid fa-cube"></i>
-                No items recorded
-              </div>
               {% endif %}
             </div>
           </div>
+          {% endif %}
 
           <!-- Notes -->
           {% if order.order_notes %}
@@ -597,9 +641,9 @@
                   <span class="odt__cod-hero__currency">QAR</span>
                   <span class="odt__cod-hero__value">{{ order.cod_amount }}</span>
                 </div>
-                <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
-                  <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
-                  {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
+                <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}collected{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+                  <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'cod_with_driver' %}fa-user-check{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}fa-building{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
+                  {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}With Driver{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}With Ezzy{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
                 </span>
               </div>
               {% endif %}

@@ -237,12 +237,49 @@
                     </div>
                 </div>
 
-                <!-- Order Items -->
+                <!-- Package Description (Editable) -->
+                <div class="dtd__card">
+                    <div class="dtd__card__head">
+                        <div class="dtd__card__head-left">
+                            <i class="fa-solid fa-box-open"></i> Package Description
+                        </div>
+                    </div>
+                    <div class="dtd__card__body">
+                        <div class="d-flex flex-column gap-2 p-2 rounded" style="background:#fff8e1;border:1px solid #f5c542;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-box-open" style="color:#c49000;"></i>
+                                <label class="text-muted small mb-0" style="min-width:50px;">Package</label>
+                                <input type="text" class="form-control form-control-sm" name="package_description"
+                                       value="{{ task.order.package_description|default:'' }}"
+                                       placeholder="Package description">
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
+                                <label class="text-muted small mb-0" style="min-width:50px;">Qty</label>
+                                <input type="number" class="form-control form-control-sm" name="total_quantity"
+                                       value="{{ task.order.total_quantity|default:0 }}"
+                                       min="0" style="max-width:100px;">
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-money-bill-wave text-success"></i>
+                                <label class="text-muted small mb-0" style="min-width:50px;">COD</label>
+                                <div class="input-group input-group-sm" style="max-width:180px;">
+                                    <input type="number" class="form-control form-control-sm" name="cod_amount"
+                                           value="{{ task.order.cod_amount|default:'' }}"
+                                           step="0.01" min="0" placeholder="0.00">
+                                    <span class="input-group-text">QR</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Items -->
                 {% if task.order and task.order.order_items.all %}
                 <div class="dtd__card">
                     <div class="dtd__card__head">
                         <div class="dtd__card__head-left">
-                            <i class="fa-solid fa-box-open"></i> Order Items
+                            <i class="fa-solid fa-cubes"></i> Product Items
                         </div>
                         <span class="dtd__card__head-count">{{ task.order.order_items.count }}</span>
                     </div>
@@ -253,12 +290,13 @@
                                     <th class="ps-3 fw-600">Product</th>
                                     <th class="text-center" style="width:90px;">Qty</th>
                                     <th class="text-end" style="width:100px;">Unit Price</th>
-                                    <th class="text-end pe-3" style="width:100px;">Total</th>
+                                    <th class="text-end" style="width:100px;">Total</th>
+                                    <th class="text-center pe-3" style="width:50px;"></th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="dtdItemsBody">
                                 {% for item in task.order.order_items.all %}
-                                <tr>
+                                <tr id="dtd_item_row_{{ item.id }}">
                                     <td class="ps-3 align-middle">
                                         <div class="fw-semibold" style="font-size:0.8rem;">{{ item.product.product_name|default:"—" }}</div>
                                         {% if item.notes %}<div style="font-size:0.7rem;color:var(--brand-grey-500);">{{ item.notes }}</div>{% endif %}
@@ -272,13 +310,18 @@
                                                onchange="recalcRow(this)">
                                     </td>
                                     <td class="text-end align-middle" style="color:var(--brand-grey-600);">{{ item.unit_price|default:0 }} QAR</td>
-                                    <td class="text-end pe-3 align-middle fw-semibold item-total-{{ item.id }}">{{ item.total_price|default:0 }} QAR</td>
+                                    <td class="text-end align-middle fw-semibold item-total-{{ item.id }}">{{ item.total_price|default:0 }} QAR</td>
+                                    <td class="text-center align-middle pe-3">
+                                        <button type="button" class="btn btn-sm btn-outline-danger dtd-item-del" data-item-id="{{ item.id }}" title="Delete">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                             <tfoot style="background:var(--brand-grey-100);">
                                 <tr>
-                                    <td colspan="3" class="text-end fw-bold ps-3" style="font-size:0.8rem;">Items Total:</td>
+                                    <td colspan="4" class="text-end fw-bold ps-3" style="font-size:0.8rem;">Items Total:</td>
                                     <td class="text-end pe-3 fw-bold" style="color:#059669;" id="itemsGrandTotal">—</td>
                                 </tr>
                             </tfoot>
@@ -440,6 +483,42 @@ function recalcGrandTotal() {
     if (el) el.textContent = grand.toFixed(2) + ' QAR';
 }
 document.addEventListener('DOMContentLoaded', recalcGrandTotal);
+
+// Delete item button
+document.getElementById('dtdItemsBody').addEventListener('click', function(e) {
+    var delBtn = e.target.closest('.dtd-item-del');
+    if (!delBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var itemId = delBtn.dataset.itemId;
+    var row = document.getElementById('dtd_item_row_' + itemId);
+    if (!confirm('Delete this item?')) return;
+    delBtn.disabled = true;
+    delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    var orderId = {{ task.order.id }};
+    fetch('/workforce/orders/' + orderId + '/items/' + itemId + '/delete/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            row.style.opacity = '0';
+            row.style.transition = 'opacity 0.2s';
+            setTimeout(function() { row.remove(); recalcGrandTotal(); }, 200);
+        } else {
+            alert('Error deleting item');
+            delBtn.disabled = false;
+            delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+        }
+    })
+    .catch(function() {
+        alert('Network error');
+        delBtn.disabled = false;
+        delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+    });
+});
 
 // Map link update when lat/lng change
 ['te_latitude','te_longitude'].forEach(function(id) {

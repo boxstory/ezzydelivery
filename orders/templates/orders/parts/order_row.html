@@ -26,6 +26,13 @@
         <span class="orc__addr">{{ order.customer_address }}</span>
     </div>
     <div class="orc__cell orc__cell--items">
+        {% if order.package_description %}
+        <div class="orc__pkg-brief" title="{{ order.package_description }}">
+            <i class="fa-solid fa-box-open orc__pkg-icon"></i>
+            <span class="orc__pkg-text">{{ order.package_description|truncatechars:28 }}</span>
+            {% if order.total_quantity %}<span class="orc__pkg-qty">x{{ order.total_quantity }}</span>{% endif %}
+        </div>
+        {% endif %}
         <div class="orc__items">
         {% for item in order.order_items.all %}
         <div class="orc__pill">
@@ -33,7 +40,9 @@
             <span class="orc__pill-qty">{{ item.quantity }}</span>
         </div>
         {% empty %}
+        {% if not order.package_description %}
         <span class="orc__pill--empty">—</span>
+        {% endif %}
         {% endfor %}
         </div>
     </div>

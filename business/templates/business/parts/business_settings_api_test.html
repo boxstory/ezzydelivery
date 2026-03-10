@@ -11,7 +11,7 @@
     <div class="bapi__test-header" id="client_api_test_section_header">
         <h1 id="client_api_test_title_main">
             <i class="fa-solid fa-flask"></i>
-            API Test Console
+            Connection Test Console
         </h1>
         <a href="{% url 'business:business_settings' business.business_id %}" class="bapi__back-link">
             <i class="fa-solid fa-arrow-left"></i>
@@ -27,7 +27,7 @@
                 <div class="bapi__config-header">
                     <h2 id="client_api_test_title_card">
                         <i class="fa-solid fa-plug-circle-check"></i>
-                        {{ api.api_type|upper }} API
+                        {{ api.api_type|upper }} {% if api.api_type == 'google_sheet' %}Integration{% else %}API{% endif %}
                     </h2>
                     {% if api.is_verify_api %}
                     <span class="bapi__status-badge bapi__status-badge--verified">
@@ -48,6 +48,14 @@
                         <span class="bapi__config-label">API Provider</span>
                         <div class="bapi__config-value">{{ api.api_type|upper }}</div>
                     </div>
+                    {% if api.api_type == 'google_sheet' %}
+                    <div class="bapi__config-item">
+                        <span class="bapi__config-label">Sheet URL</span>
+                        <div class="bapi__config-value bapi__config-value--monospace {% if not api.google_sheet_url and not api.site_api_url %}bapi__config-value--empty{% endif %}" style="word-break:break-all;">
+                            {{ api.google_sheet_url|default:api.site_api_url|default:"Not configured" }}
+                        </div>
+                    </div>
+                    {% else %}
                     <div class="bapi__config-item">
                         <span class="bapi__config-label">Orders Endpoint</span>
                         <div class="bapi__config-value bapi__config-value--monospace {% if not api.order_api_endpoint %}bapi__config-value--empty{% endif %}">
@@ -60,6 +68,7 @@
                             {{ api.product_api_endpoint|default:"Not configured" }}
                         </div>
                     </div>
+                    {% endif %}
                     {% if not api.is_verify_api %}
                     <div class="bapi__warning-alert">
                         <i class="fa-solid fa-triangle-exclamation"></i>
@@ -77,7 +86,7 @@
                        class="bapi__btn-run-test"
                        id="client_api_test_btn_run">
                         <i class="fa-solid fa-play"></i>
-                        Run API Test
+                        Test Connection
                     </a>
                     <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
                        class="bapi__btn-action bapi__btn-action--edit"
@@ -114,7 +123,7 @@
                                 <i class="fa-solid fa-satellite-dish"></i>
                             </div>
                             <h3>Ready to Test</h3>
-                            <p>Click "Run API Test" to execute and view the response</p>
+                            <p>Click "Test Connection" to execute and view the response</p>
                         </div>
                     </div>
                 </div>
@@ -128,8 +137,8 @@
             <i class="fa-solid fa-lightbulb"></i>
         </div>
         <div class="bapi__info-card-content">
-            <h4>API Integration Info</h4>
-            <p>Each store can have only one API integration configured. Test your connection to ensure proper communication with your e-commerce platform.</p>
+            <h4>Integration Info</h4>
+            <p>Each store can have only one integration configured. Test your connection to ensure proper communication with your e-commerce platform.</p>
         </div>
     </div>
 </div>

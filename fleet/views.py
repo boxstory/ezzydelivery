@@ -2821,3 +2821,69 @@ def fleet_task_navigation(request, task_id):
     except delivery_models.DeliveryTask.DoesNotExist:
         messages.error(request, "Task not found.")
         return redirect('fleet:driver_tasks')
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_tasks_map(request):
+    """Full-screen map view showing all active delivery task locations for the driver."""
+    from delivery import models as delivery_models
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+
+    active_statuses = [
+        'assigned', 'accepted', 'picked_up', 'start_ride',
+        'out_for_delivery', 'in_transit', 'contacted', 'non_reachable',
+    ]
+
+    tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'dl_to_address',
+    ).filter(
+        driver=driver,
+        dl_task_status__in=active_statuses,
+    ).exclude(order__order_status='cancelled')
+
+    pins = []
+    for t in tasks:
+        lat = None
+        lng = None
+        # Try order-level coords first, then dl_to_address
+        if t.order.latitude and t.order.longitude:
+            lat = float(t.order.latitude)
+            lng = float(t.order.longitude)
+        elif t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
+            lat = float(t.dl_to_address.dl_latitude)
+            lng = float(t.dl_to_address.dl_longitude)
+
+        pins.append({
+            'id': t.id,
+            'task_number': t.dl_task_number or str(t.id),
+            'status': t.dl_task_status,
+            'status_display': t.get_dl_task_status_display(),
+            'customer_name': t.order.customer_name or '',
+            'customer_phone': t.order.customer_phone or '',
+            'zone': t.order.dl_zone or '',
+            'street': t.order.dl_street or '',
+            'building': t.order.dl_building or '',
+            'address': t.order.customer_address or '',
+            'lat': lat,
+            'lng': lng,
+        })
+
+    import json
+    unread_notifications = fleet_models.DriverNotification.objects.filter(
+        driver=driver, is_read=False
+    ).count()
+
+    context = {
+        'driver': driver,
+        'pins_json': json.dumps(pins),
+        'pin_count': len([p for p in pins if p['lat']]),
+        'total_count': len(pins),
+        'unread_notifications': unread_notifications,
+    }
+    return render(request, 'fleet/tasks_map_pwa.html', context)

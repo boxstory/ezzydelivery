@@ -95,6 +95,19 @@
               <option value="1" {% if fulfillment_filter == '1' %}selected{% endif %}>Required</option>
             </select>
           </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small fw-semibold">Pipeline Status</label>
+            <select name="status" class="form-select form-select-sm">
+              <option value="">All</option>
+              <option value="new" {% if status_filter == 'new' %}selected{% endif %}>New</option>
+              <option value="contacted" {% if status_filter == 'contacted' %}selected{% endif %}>Contacted</option>
+              <option value="quoted" {% if status_filter == 'quoted' %}selected{% endif %}>Quoted</option>
+              <option value="negotiating" {% if status_filter == 'negotiating' %}selected{% endif %}>Negotiating</option>
+              <option value="converted" {% if status_filter == 'converted' %}selected{% endif %}>Converted</option>
+              <option value="lost" {% if status_filter == 'lost' %}selected{% endif %}>Lost</option>
+              <option value="on_hold" {% if status_filter == 'on_hold' %}selected{% endif %}>On Hold</option>
+            </select>
+          </div>
           <div class="col-12 col-md-4 d-flex gap-2">
             <button type="submit" class="btn btn-primary btn-sm">
               <i class="fa-solid fa-search me-1"></i>Filter
@@ -127,6 +140,7 @@
             <th class="small text-center text-nowrap" style="width:1%">Orders/Mo</th>
             <th class="small text-center text-nowrap" style="width:1%">COD</th>
             <th class="small text-center text-nowrap" style="width:1%">Fulfillment</th>
+            <th class="small text-nowrap" style="width:1%">Pipeline</th>
             <th class="small text-nowrap" style="width:1%">Date</th>
             <th style="width:1%"></th>
           </tr>
@@ -171,6 +185,11 @@
               <span class="badge bg-light text-muted">No</span>
               {% endif %}
             </td>
+            <td class="text-center">
+              <span class="pid__crm-pill pid__crm-pill--{{ inq.crm_status }}" style="font-size:0.7rem;padding:2px 8px;">
+                {{ inq.get_crm_status_display }}
+              </span>
+            </td>
             <td class="small text-muted text-nowrap">{{ inq.date_created|date:"d M Y" }}</td>
             <td class="text-nowrap" onclick="event.stopPropagation()">
               <a href="{% url 'workforce:pricing_inquiry_detail' inq.pk %}"
@@ -186,7 +205,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="9" class="text-center text-muted py-4">
+            <td colspan="10" class="text-center text-muted py-4">
               <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
               No pricing inquiries found.
             </td>
@@ -204,7 +223,7 @@
         <ul class="pagination pagination-sm mb-0">
           {% if page_obj.has_previous %}
           <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">
               <i class="fa-solid fa-chevron-left"></i>
             </a>
           </li>
@@ -214,13 +233,13 @@
             <li class="page-item active"><span class="page-link">{{ num }}</span></li>
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
             <li class="page-item">
-              <a class="page-link" href="?page={{ num }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}">{{ num }}</a>
+              <a class="page-link" href="?page={{ num }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">{{ num }}</a>
             </li>
             {% endif %}
           {% endfor %}
           {% if page_obj.has_next %}
           <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">
               <i class="fa-solid fa-chevron-right"></i>
             </a>
           </li>

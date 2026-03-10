@@ -391,10 +391,36 @@
               </div>
               {% endif %}
 
-              <!-- Order Products -->
+              <!-- Package Description -->
+              {% if card.order.package_description or card.order.order_items.all or card.order.cod_amount %}
+              <div class="mb-3">
+                <small class="text-muted d-block mb-2"><i class="fa-solid fa-box-open me-1"></i>Package Description</small>
+                <div class="d-flex flex-column gap-1 p-2 rounded" style="background:#fff8e1;border:1px solid #f5c542;">
+                  {% if card.order.package_description %}
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-box-open" style="color:#c49000;font-size:0.7rem;"></i>
+                    <span class="text-muted small" style="min-width:45px;">Package</span>
+                    <span class="fw-medium small">{{ card.order.package_description }}</span>
+                  </div>
+                  {% endif %}
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-cubes" style="color:#c49000;font-size:0.7rem;"></i>
+                    <span class="text-muted small" style="min-width:45px;">Qty</span>
+                    <span class="fw-semibold small">{% if card.order.total_quantity %}{{ card.order.total_quantity }}{% else %}{{ card.order.order_items.count }}{% endif %}</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-money-bill-wave text-success" style="font-size:0.7rem;"></i>
+                    <span class="text-muted small" style="min-width:45px;">COD</span>
+                    <span class="fw-semibold small">{% if card.order.cod_amount %}{{ card.order.cod_amount }} QR{% else %}—{% endif %}</span>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+
+              <!-- Product Items -->
               {% if card.order.order_items.all %}
               <div class="mb-3">
-                <small class="text-muted d-block mb-2"><i class="fa-solid fa-box me-1"></i>Products ({{ card.order.order_items.count }})</small>
+                <small class="text-muted d-block mb-2"><i class="fa-solid fa-cubes me-1"></i>Product Items ({{ card.order.order_items.count }})</small>
                 <div class="list-group list-group-flush" style="max-height: 150px; overflow-y: auto;">
                   {% for item in card.order.order_items.all %}
                   <div class="list-group-item px-0 py-2 bg-transparent">

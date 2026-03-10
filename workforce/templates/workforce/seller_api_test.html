@@ -1,0 +1,196 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Connection Test — {{ api.business.business_name }}{% endblock %}
+
+{% block content %}
+<div class="wftest__container p-3">
+    <!-- Header -->
+    <div class="wftest__header">
+        <h1><i class="fa-solid fa-flask me-2"></i>Connection Test Console</h1>
+        <a href="{% url 'workforce:wf_seller_api_configs' %}"
+           hx-get="{% url 'workforce:wf_seller_api_configs' %}"
+           hx-target="#main-content" hx-select="#main-content"
+           hx-swap="outerHTML" hx-push-url="true"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fa-solid fa-arrow-left me-1"></i>Back to API Configs
+        </a>
+    </div>
+
+    <div class="row g-3">
+        <!-- Config Panel -->
+        <div class="col-lg-5 col-12">
+            <div class="wftest__panel">
+                <div class="wftest__panel-header">
+                    <h2>
+                        <i class="fa-solid fa-plug-circle-check"></i>
+                        {{ api.api_type|upper }} {% if api.api_type == 'google_sheet' %}Integration{% else %}API{% endif %}
+                    </h2>
+                    {% if api.is_verify_api %}
+                    <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Approved</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Pending</span>
+                    {% endif %}
+                </div>
+                <div class="wftest__panel-body">
+                    <div class="wftest__config-item">
+                        <span class="wftest__config-label">Business</span>
+                        <span class="wftest__config-value">{{ api.business.business_name }}</span>
+                    </div>
+                    <div class="wftest__config-item">
+                        <span class="wftest__config-label">Platform</span>
+                        <span class="wftest__config-value">{{ api.api_type|upper }}</span>
+                    </div>
+                    {% if api.api_type == 'google_sheet' %}
+                    <div class="wftest__config-item">
+                        <span class="wftest__config-label">Sheet URL</span>
+                        <span class="wftest__config-value wftest__config-value--mono {% if not api.google_sheet_url and not api.site_api_url %}wftest__config-value--empty{% endif %}">
+                            {{ api.google_sheet_url|default:api.site_api_url|default:"Not configured" }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <div class="wftest__config-item">
+                        <span class="wftest__config-label">Store URL</span>
+                        <span class="wftest__config-value wftest__config-value--mono {% if not api.site_api_url %}wftest__config-value--empty{% endif %}">
+                            {{ api.site_api_url|default:"Not configured" }}
+                        </span>
+                    </div>
+                    <div class="wftest__config-item">
+                        <span class="wftest__config-label">Orders Endpoint</span>
+                        <span class="wftest__config-value wftest__config-value--mono {% if not api.order_api_endpoint %}wftest__config-value--empty{% endif %}">
+                            {{ api.order_api_endpoint|default:"Not configured" }}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    {% if not api.is_verify_api %}
+                    <div class="alert alert-warning small mt-3 mb-0">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                        This integration is pending approval.
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-3 d-flex flex-column gap-2">
+                        <a hx-get="{% url 'workforce:wf_test_api_config_result' api.id %}"
+                           hx-trigger="click"
+                           hx-target="#wf-test-response-div"
+                           hx-swap="innerHTML"
+                           class="wftest__btn-test"
+                           id="wf_test_btn_run">
+                            <i class="fa-solid fa-play"></i>
+                            Test Connection
+                        </a>
+                        <button type="button"
+                                class="btn btn-sm {% if api.is_verify_api %}btn-outline-danger{% else %}btn-success{% endif %} wf-approve-btn"
+                                data-api-id="{{ api.id }}"
+                                id="wf_test_approve_btn">
+                            {% if api.is_verify_api %}
+                                <i class="fa-solid fa-ban me-1"></i>Revoke Approval
+                            {% else %}
+                                <i class="fa-solid fa-circle-check me-1"></i>Approve Integration
+                            {% endif %}
+                        </button>
+                        <div id="wf_test_approve_status" class="small"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Panel -->
+        <div class="col-lg-7 col-12">
+            <div class="wftest__panel">
+                <div class="wftest__panel-header">
+                    <div class="wftest__response-header">
+                        <h2>
+                            <i class="fa-solid fa-terminal"></i>
+                            Response Output
+                        </h2>
+                    </div>
+                    <div id="wf-test-status-badge">
+                        <span class="wftest__dot wftest__dot--ready"></span>
+                        <span class="small text-muted" id="wf-test-status-text">Ready</span>
+                    </div>
+                </div>
+                <div class="wftest__panel-body">
+                    <div id="wf-test-response-div">
+                        <div class="wftest__placeholder">
+                            <i class="fa-solid fa-satellite-dish"></i>
+                            <h3>Ready to Test</h3>
+                            <p>Click "Test Connection" to execute and view the response</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+             || document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const statusDot = document.querySelector('#wf-test-status-badge .wftest__dot');
+    const statusText = document.getElementById('wf-test-status-text');
+
+    // Loading state
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        if (evt.detail.target && evt.detail.target.id === 'wf-test-response-div') {
+            statusDot.className = 'wftest__dot wftest__dot--loading';
+            statusText.textContent = 'Testing...';
+            statusText.className = 'small text-warning';
+        }
+    });
+
+    // Success/error after swap
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target && evt.detail.target.id === 'wf-test-response-div') {
+            setTimeout(function() {
+                const hasError = document.querySelector('#wf-test-response-div .alert-danger');
+                const hasSuccess = document.querySelector('#wf-test-response-div .wftest-result__badge--ok');
+                if (hasSuccess) {
+                    statusDot.className = 'wftest__dot wftest__dot--success';
+                    statusText.textContent = 'Connected';
+                    statusText.className = 'small text-success';
+                } else {
+                    statusDot.className = 'wftest__dot wftest__dot--error';
+                    statusText.textContent = 'Failed';
+                    statusText.className = 'small text-danger';
+                }
+            }, 50);
+        }
+    });
+
+    // Approve button
+    const btn = document.getElementById('wf_test_approve_btn');
+    const approveStatus = document.getElementById('wf_test_approve_status');
+    if (btn) {
+        btn.addEventListener('click', async function() {
+            btn.disabled = true;
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            try {
+                const resp = await fetch('{% url "workforce:wf_approve_api_config" api.id %}', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'csrfmiddlewaretoken=' + csrf
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    const approved = result.is_approved;
+                    btn.className = 'btn btn-sm wf-approve-btn ' + (approved ? 'btn-outline-danger' : 'btn-success');
+                    btn.innerHTML = approved ? '<i class="fa-solid fa-ban me-1"></i>Revoke Approval' : '<i class="fa-solid fa-circle-check me-1"></i>Approve Integration';
+                    approveStatus.innerHTML = '<span class="' + (approved ? 'text-success' : 'text-muted') + '"><i class="fas fa-check me-1"></i>' + result.label + '</span>';
+                } else {
+                    btn.innerHTML = orig;
+                    approveStatus.innerHTML = '<span class="text-danger">' + (result.error || 'Failed') + '</span>';
+                }
+            } catch(err) {
+                btn.innerHTML = orig;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    }
+})();
+</script>
+{% endblock content %}

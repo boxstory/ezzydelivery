@@ -456,30 +456,60 @@
 <!-- Tab: Vehicles -->
 <div id="panel-vehicles" class="wdd__panel" role="tabpanel">
     <div class="wdd__card">
-        <div class="wdd__card__header">
-            <i class="fa-solid fa-car"></i> Registered Vehicles
+        <div class="wdd__card__header d-flex justify-content-between align-items-center">
+            <span><i class="fa-solid fa-car"></i> Registered Vehicles</span>
+            <button type="button" class="wdd__add-btn" onclick="openVehicleModal()" aria-label="Add vehicle">
+                <i class="fa-solid fa-plus"></i> Add Vehicle
+            </button>
         </div>
         <div class="wdd__card__body">
             {% if vehicles %}
             <div class="wdd__vehicles-grid">
                 {% for vehicle in vehicles %}
                 <div class="wdd__vehicle">
-                    <div class="wdd__vehicle__icon">
-                        <i class="fa-solid {% if vehicle.vehicle_type == '2wheeler' %}fa-motorcycle{% elif vehicle.vehicle_type == '4wheeler' %}fa-car{% else %}fa-truck{% endif %}"></i>
+                    <div class="wdd__vehicle__head">
+                        <div class="wdd__vehicle__icon">
+                            <i class="fa-solid {% if vehicle.vehicle_type == 'bike' %}fa-motorcycle{% elif vehicle.vehicle_type == 'car' %}fa-car{% elif vehicle.vehicle_type == 'van' %}fa-van-shuttle{% else %}fa-truck{% endif %}"></i>
+                        </div>
+                        <div class="wdd__vehicle__title">
+                            <span class="wdd__vehicle__type">{{ vehicle.get_vehicle_type_display }}</span>
+                            {% if vehicle.vehicle_no %}
+                            <span class="wdd__vehicle__plate">{{ vehicle.vehicle_no }}</span>
+                            {% endif %}
+                        </div>
+                        <span class="wdd__status-pill wdd__status-pill--{% if vehicle.vehicle_status == 'active' %}green{% else %}grey{% endif %}">
+                            {{ vehicle.vehicle_status|title }}
+                        </span>
                     </div>
-                    <div class="wdd__vehicle__body">
-                        <div class="wdd__vehicle__top">
-                            <span class="wdd__vehicle__type">{{ vehicle.vehicle_type|title }}</span>
-                            <span class="wdd__status-pill wdd__status-pill--{% if vehicle.vehicle_status == 'active' %}green{% else %}grey{% endif %}">
-                                {{ vehicle.vehicle_status|title }}
-                            </span>
+                    <div class="wdd__vehicle__meta">
+                        <div class="wdd__vehicle__meta-item">
+                            <span class="wdd__vehicle__meta-label">Model</span>
+                            <span class="wdd__vehicle__meta-value">{{ vehicle.vehicle_model|default:"—" }}</span>
                         </div>
-                        <div class="wdd__vehicle__details">
-                            <span><i class="fa-solid fa-hashtag"></i> {{ vehicle.vehicle_no|default:"N/A" }}</span>
-                            <span><i class="fa-solid fa-car-side"></i> {{ vehicle.vehicle_model|default:"N/A" }}</span>
-                            <span><i class="fa-solid fa-palette"></i> {{ vehicle.vehicle_color|default:"N/A" }}</span>
-                            <span><i class="fa-solid fa-calendar"></i> {{ vehicle.created_at|date:"d M Y" }}</span>
+                        <div class="wdd__vehicle__meta-item">
+                            <span class="wdd__vehicle__meta-label">Color</span>
+                            <span class="wdd__vehicle__meta-value">{{ vehicle.vehicle_color|default:"—" }}</span>
                         </div>
+                        <div class="wdd__vehicle__meta-item">
+                            <span class="wdd__vehicle__meta-label">Plate No.</span>
+                            <span class="wdd__vehicle__meta-value">{{ vehicle.vehicle_no|default:"—" }}</span>
+                        </div>
+                        <div class="wdd__vehicle__meta-item">
+                            <span class="wdd__vehicle__meta-label">Registered</span>
+                            <span class="wdd__vehicle__meta-value">{{ vehicle.created_at|date:"d M Y" }}</span>
+                        </div>
+                    </div>
+                    <div class="wdd__vehicle__actions">
+                        <button type="button" class="wdd__vehicle__btn wdd__vehicle__btn--edit"
+                                onclick="openVehicleModal({{ vehicle.id }}, '{{ vehicle.vehicle_type }}', '{{ vehicle.vehicle_no|default_if_none:'' }}', '{{ vehicle.vehicle_model|default_if_none:'' }}', '{{ vehicle.vehicle_color|default_if_none:'' }}', '{{ vehicle.vehicle_status }}')"
+                                aria-label="Edit vehicle">
+                            <i class="fa-solid fa-pen-to-square"></i> Edit
+                        </button>
+                        <button type="button" class="wdd__vehicle__btn wdd__vehicle__btn--delete"
+                                onclick="deleteVehicle({{ vehicle.id }})"
+                                aria-label="Delete vehicle">
+                            <i class="fa-solid fa-trash-can"></i> Delete
+                        </button>
                     </div>
                 </div>
                 {% endfor %}
@@ -497,40 +527,67 @@
 <!-- Tab: Documents -->
 <div id="panel-documents" class="wdd__panel" role="tabpanel">
     <div class="wdd__card">
-        <div class="wdd__card__header">
-            <i class="fa-solid fa-folder-open"></i> Driver Documents
+        <div class="wdd__card__header d-flex justify-content-between align-items-center">
+            <span><i class="fa-solid fa-folder-open"></i> Driver Documents</span>
+            <button type="button" class="wdd__add-btn" onclick="openDocModal()" aria-label="Add document">
+                <i class="fa-solid fa-plus"></i> Add Document
+            </button>
         </div>
         <div class="wdd__card__body">
             {% if documents %}
             <div class="wdd__docs-grid">
                 {% for doc in documents %}
                 <div class="wdd__doc">
-                    <div class="wdd__doc__icon">
-                        <i class="fa-solid fa-id-card"></i>
+                    <div class="wdd__doc__head">
+                        <div class="wdd__doc__icon">
+                            <i class="fa-solid {% if doc.document_type == 'QID' %}fa-id-card{% elif doc.document_type == 'Driving License' %}fa-id-badge{% elif doc.document_type == 'Passport' %}fa-passport{% else %}fa-address-card{% endif %}"></i>
+                        </div>
+                        <div class="wdd__doc__title">
+                            <span class="wdd__doc__type">{{ doc.document_type|default:"Document" }}</span>
+                            <span class="wdd__doc__number">{{ doc.document_no }}</span>
+                        </div>
                     </div>
                     <div class="wdd__doc__body">
-                        <span class="wdd__doc__type">{{ doc.document_type|default:"Document" }}</span>
-                        <span class="wdd__doc__number">{{ doc.document_no }}</span>
-                        {% if doc.document_expiry_date %}
-                        <span class="wdd__doc__expiry">
-                            Expires: {{ doc.document_expiry_date|date:"d M Y" }}
-                            {% if doc.document_expiry_date < now %}
-                            <span class="wdd__status-pill wdd__status-pill--red" style="margin-left:4px;">Expired</span>
-                            {% endif %}
+                        {% if doc.document_issued_from %}
+                        <span class="wdd__doc__tag wdd__doc__tag--issued">
+                            <i class="fa-solid fa-location-dot"></i> {{ doc.document_issued_from }}
                         </span>
                         {% endif %}
+                        {% if doc.document_expiry_date %}
+                            {% if doc.document_expiry_date < now %}
+                            <span class="wdd__doc__tag wdd__doc__tag--expired">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Expired {{ doc.document_expiry_date|date:"d M Y" }}
+                            </span>
+                            {% else %}
+                            <span class="wdd__doc__tag wdd__doc__tag--expiry">
+                                <i class="fa-solid fa-calendar-check"></i> Expires {{ doc.document_expiry_date|date:"d M Y" }}
+                            </span>
+                            {% endif %}
+                        {% endif %}
                     </div>
-                    {% if doc.document_file and doc.document_file.name %}
-                    <button type="button" class="wdd__doc__view-btn wdd__doc__view-btn--available"
-                            data-doc-url="{{ doc.document_file.url }}"
-                            data-doc-title="{{ doc.document_type|default:'Document' }} - {{ doc.document_no }}">
-                        <i class="fa-solid fa-eye"></i> View
-                    </button>
-                    {% else %}
-                    <span class="wdd__doc__view-btn wdd__doc__view-btn--unavailable">
-                        <i class="fa-solid fa-eye-slash"></i> No File
-                    </span>
-                    {% endif %}
+                    <div class="wdd__doc__foot">
+                        {% if doc.document_file and doc.document_file.name %}
+                        <button type="button" class="wdd__doc__view-btn wdd__doc__view-btn--available"
+                                data-doc-url="{{ doc.document_file.url }}"
+                                data-doc-title="{{ doc.document_type|default:'Document' }} - {{ doc.document_no }}">
+                            <i class="fa-solid fa-eye"></i> View
+                        </button>
+                        {% else %}
+                        <span class="wdd__doc__view-btn wdd__doc__view-btn--unavailable">
+                            <i class="fa-solid fa-eye-slash"></i> No File
+                        </span>
+                        {% endif %}
+                        <button type="button" class="wdd__doc__btn wdd__doc__btn--edit"
+                                onclick="openDocModal({{ doc.id }}, '{{ doc.document_type|default_if_none:'' }}', '{{ doc.document_no|default_if_none:'' }}', '{{ doc.document_issued_from|default_if_none:'' }}', '{{ doc.document_expiry_date|date:'Y-m-d'|default_if_none:'' }}')"
+                                aria-label="Edit document">
+                            <i class="fa-solid fa-pen-to-square"></i> Edit
+                        </button>
+                        <button type="button" class="wdd__doc__btn wdd__doc__btn--delete"
+                                onclick="deleteDocument({{ doc.id }})"
+                                aria-label="Delete document">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -542,6 +599,114 @@
             {% endif %}
         </div>
     </div>
+</div>
+
+<!-- Vehicle Modal -->
+<div class="modal fade" id="vehicleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="vehicleForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="vehicleModalTitle"><i class="fa-solid fa-car me-2"></i>Add Vehicle</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="veh_id" value="">
+          <div class="mb-3">
+            <label class="form-label">Vehicle Type *</label>
+            <select class="form-select" name="vehicle_type" id="veh_type" required>
+              {% for val, label in vehicle_type_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Plate Number</label>
+            <input type="text" class="form-control" name="vehicle_no" id="veh_no" placeholder="e.g. 12345">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <label class="form-label">Model</label>
+              <input type="text" class="form-control" name="vehicle_model" id="veh_model" placeholder="e.g. Toyota HiAce">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Color</label>
+              <input type="text" class="form-control" name="vehicle_color" id="veh_color" placeholder="e.g. White">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select class="form-select" name="vehicle_status" id="veh_status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Photo</label>
+            <input type="file" class="form-control" name="vehicle_photo" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-save me-1"></i>Save Vehicle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Document Modal -->
+<div class="modal fade" id="docEditModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="docEditForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="docEditModalTitle"><i class="fa-solid fa-folder-open me-2"></i>Add Document</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="doc_edit_id" value="">
+          <div class="mb-3">
+            <label class="form-label">Document Type *</label>
+            <select class="form-select" name="document_type" id="doc_type" required>
+              <option value="">-- Select --</option>
+              {% for val, label in document_type_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Document Number *</label>
+            <input type="text" class="form-control" name="document_no" id="doc_no" required placeholder="e.g. 28412345678">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <label class="form-label">Issued From</label>
+              <input type="text" class="form-control" name="document_issued_from" id="doc_issued" placeholder="e.g. Qatar">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Expiry Date</label>
+              <input type="date" class="form-control" name="document_expiry_date" id="doc_expiry">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Document (Front)</label>
+            <input type="file" class="form-control" name="document_file" accept="image/*">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Document (Back)</label>
+            <input type="file" class="form-control" name="document_file_back" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-save me-1"></i>Save Document</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <!-- Document Modal -->
@@ -820,5 +985,88 @@ document.getElementById('workforce_driver_detail_form_update').addEventListener(
         validate();
     });
 })();
+
+// ─── Vehicle CRUD ───
+const DRIVER_ID = {{ driver.driver_id }};
+function getCSRF() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
+function openVehicleModal(id, type, no, model, color, status) {
+    document.getElementById('veh_id').value = id || '';
+    document.getElementById('veh_type').value = type || 'none';
+    document.getElementById('veh_no').value = no || '';
+    document.getElementById('veh_model').value = model || '';
+    document.getElementById('veh_color').value = color || '';
+    document.getElementById('veh_status').value = status || 'active';
+    document.getElementById('vehicleModalTitle').textContent = id ? 'Edit Vehicle' : 'Add Vehicle';
+    new bootstrap.Modal(document.getElementById('vehicleModal')).show();
+}
+
+document.getElementById('vehicleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const id = document.getElementById('veh_id').value;
+    const url = id
+        ? `/workforce/drivers/${DRIVER_ID}/vehicle/${id}/edit/`
+        : `/workforce/drivers/${DRIVER_ID}/vehicle/add/`;
+    const fd = new FormData(this);
+    fetch(url, { method: 'POST', body: fd, headers: { 'X-CSRFToken': getCSRF() } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { location.reload(); }
+            else { alert(data.error || 'Error saving vehicle'); }
+        })
+        .catch(() => alert('Error saving vehicle'));
+});
+
+function deleteVehicle(id) {
+    if (!confirm('Delete this vehicle?')) return;
+    fetch(`/workforce/drivers/${DRIVER_ID}/vehicle/${id}/delete/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRF(), 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); else alert(data.error); })
+    .catch(() => alert('Error deleting vehicle'));
+}
+
+// ─── Document CRUD ───
+function openDocModal(id, type, no, issued, expiry) {
+    document.getElementById('doc_edit_id').value = id || '';
+    document.getElementById('doc_type').value = type || '';
+    document.getElementById('doc_no').value = no || '';
+    document.getElementById('doc_issued').value = issued || '';
+    document.getElementById('doc_expiry').value = expiry || '';
+    document.getElementById('docEditModalTitle').textContent = id ? 'Edit Document' : 'Add Document';
+    new bootstrap.Modal(document.getElementById('docEditModal')).show();
+}
+
+document.getElementById('docEditForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const id = document.getElementById('doc_edit_id').value;
+    const url = id
+        ? `/workforce/drivers/${DRIVER_ID}/document/${id}/edit/`
+        : `/workforce/drivers/${DRIVER_ID}/document/add/`;
+    const fd = new FormData(this);
+    fetch(url, { method: 'POST', body: fd, headers: { 'X-CSRFToken': getCSRF() } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { location.reload(); }
+            else { alert(data.error || 'Error saving document'); }
+        })
+        .catch(() => alert('Error saving document'));
+});
+
+function deleteDocument(id) {
+    if (!confirm('Delete this document?')) return;
+    fetch(`/workforce/drivers/${DRIVER_ID}/document/${id}/delete/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRF(), 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); else alert(data.error); })
+    .catch(() => alert('Error deleting document'));
+}
 </script>
 {% endblock extra_js %}

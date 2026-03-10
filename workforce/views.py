@@ -1145,13 +1145,13 @@ def add_order(request):
                     )
                     items_created += 1
 
-            # Fallback: old plain product_name hidden field
+            # Fallback: old plain product_name → save as order description
             if items_created == 0:
                 product_name = request.POST.get('product_name', '').strip()
                 if product_name:
-                    orders_models.OrderItem.objects.create(
-                        order=order, quantity=1, notes=product_name
-                    )
+                    order.package_description = product_name[:255]
+                    order.total_quantity = safe_int(request.POST.get('quantity', '1')) or 1
+                    order.save(update_fields=['package_description', 'total_quantity'])
 
             messages.success(request, f'Order {order.order_number} created successfully.')
 
@@ -1224,6 +1224,244 @@ def bulk_transfer_api_orders(request):
         return JsonResponse({'success': True, 'updated': updated})
     except Exception as e:
         logger.exception('bulk_transfer_api_orders error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def preview_api_import(request):
+    """
+    POST: Return preview of mapped data for selected Google Sheet rows.
+    Used in the import wizard before actual import.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json as _json, re as _re
+    business_id = request.POST.get('business_id', '').strip()
+    platform_ids = request.POST.getlist('platform_ids[]')
+
+    if not business_id or not platform_ids:
+        return JsonResponse({'success': False, 'error': 'Missing business_id or platform_ids'}, status=400)
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+        api = business.business_settings_api.filter(is_verify_api=True).first()
+        if not api:
+            return JsonResponse({'success': False, 'error': 'No approved API config'}, status=400)
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+    if api.api_type != 'google_sheet':
+        # For Shopify/WooCommerce, just return the platform_ids as-is (preview not needed)
+        return JsonResponse({'success': True, 'preview': [], 'api_type': api.api_type})
+
+    try:
+        import gspread
+        from google.oauth2.credentials import Credentials as _GCreds
+        from google.auth.transport.requests import Request as _GReq
+        from django.conf import settings as django_settings
+        from pathlib import Path as _Path
+
+        sheet_url = api.google_sheet_url or api.site_api_url or ''
+        token_path = _Path(django_settings.BASE_DIR) / getattr(
+            django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+        )
+        if not token_path.exists():
+            return JsonResponse({'success': False, 'error': 'Google Sheets not authorized.'}, status=400)
+
+        _td = _json.loads(token_path.read_text())
+        creds = _GCreds(
+            token=_td.get('access_token'),
+            refresh_token=_td.get('refresh_token'),
+            token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+            client_id=_td.get('client_id'),
+            client_secret=_td.get('client_secret'),
+            scopes=_td.get('scope', '').split(),
+        )
+        if creds.expired and creds.refresh_token:
+            creds.refresh(_GReq())
+            _td['access_token'] = creds.token
+            token_path.write_text(_json.dumps(_td, indent=2))
+
+        gc = gspread.authorize(creds)
+        match = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+        if not match:
+            return JsonResponse({'success': False, 'error': 'Invalid Google Sheet URL.'}, status=400)
+        sheet_id = match.group(1)
+        gid_match = _re.search(r'gid=(\d+)', sheet_url)
+        gid = int(gid_match.group(1)) if gid_match else 0
+
+        spreadsheet = gc.open_by_key(sheet_id)
+        worksheet = None
+        for ws in spreadsheet.worksheets():
+            if ws.id == gid:
+                worksheet = ws
+                break
+        if worksheet is None:
+            worksheet = spreadsheet.sheet1
+
+        all_values = worksheet.get_all_values()
+        if len(all_values) <= 1:
+            for ws in spreadsheet.worksheets():
+                if ws.id == (worksheet.id if worksheet else -1):
+                    continue
+                candidate = ws.get_all_values()
+                if len(candidate) > 1:
+                    worksheet = ws
+                    all_values = candidate
+                    break
+
+        headers = all_values[0] if all_values else []
+        data_rows = all_values[1:] if all_values else []
+
+        saved_mapping = api.column_mapping or {}
+
+        def col_idx_by_header(header_name):
+            for j, h in enumerate(headers):
+                if h.strip() == header_name.strip():
+                    return j
+            return None
+
+        def col_idx_auto(*keys):
+            for k in keys:
+                for j, h in enumerate(headers):
+                    if h.strip().lower() == k.lower():
+                        return j
+            return None
+
+        def get_idx(field_name, *auto_keys):
+            if field_name in saved_mapping:
+                return col_idx_by_header(saved_mapping[field_name])
+            return col_idx_auto(*auto_keys)
+
+        idx_name = get_idx('customer_name', 'name', 'customer name', 'customer', 'client name')
+        idx_phone = get_idx('customer_phone', 'phone', 'mobile', 'phone number', 'contact')
+        idx_whatsapp = get_idx('customer_whatsapp', 'whatsapp', 'phone 2', 'alternate phone')
+        idx_email = get_idx('customer_email', 'email', 'e-mail', 'customer email')
+        idx_address = get_idx('customer_address', 'address', 'delivery address', 'location')
+        idx_landmark = get_idx('dl_landmark', 'city', 'landmark', 'customer city', 'area')
+        idx_building = get_idx('dl_building', 'building', 'villa', 'building no')
+        idx_street = get_idx('dl_street', 'street', 'street no', 'street number')
+        idx_zone = get_idx('dl_zone', 'zone', 'zone no', 'zone number')
+        idx_cod = get_idx('cod_amount', 'cod', 'amount', 'cod amount', 'price', 'total')
+        idx_dl_amount = get_idx('dl_amount', 'delivery fee', 'shipping fee', 'delivery amount')
+        idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id')
+        idx_product = get_idx('product_name', 'product', 'product name', 'item', 'items')
+        idx_sku = get_idx('sku', 'sku', 'product sku', 'item sku', 'article')
+        idx_qty = get_idx('quantity', 'qty', 'quantity', 'count')
+        idx_deadline = get_idx('deadline_date', 'deadline', 'delivery date', 'preferred', 'day')
+        idx_notes = get_idx('seller_notes', 'notes', 'seller notes', 'note', 'remarks', 'comment')
+        idx_internal = get_idx('internal_notes', 'internal notes', 'staff notes', 'notes by ezzy')
+
+        def cell(row, idx):
+            if idx is not None and idx < len(row):
+                v = row[idx]
+                return str(v).strip() if v is not None else ''
+            return ''
+
+        # Build all field indices with labels and mapped sheet column
+        all_fields = [
+            ('row_number', 'Row', None),
+            ('client_order_code', 'Order ID', idx_order),
+            ('customer_name', 'Customer Name', idx_name),
+            ('customer_phone', 'Phone 1', idx_phone),
+            ('customer_whatsapp', 'Phone 2 / WhatsApp', idx_whatsapp),
+            ('customer_email', 'Email', idx_email),
+            ('customer_address', 'Customer Address', idx_address),
+            ('dl_landmark', 'City / Landmark', idx_landmark),
+            ('dl_building', 'Villa / Building No', idx_building),
+            ('dl_street', 'Street No', idx_street),
+            ('dl_zone', 'Zone No', idx_zone),
+            ('cod_amount', 'Price / COD Amount', idx_cod),
+            ('dl_amount', 'Delivery Fee', idx_dl_amount),
+            ('product_name', 'Product Name', idx_product),
+            ('sku', 'SKU', idx_sku),
+            ('quantity', 'Quantity', idx_qty),
+            ('deadline_date', 'Day & Time', idx_deadline),
+            ('seller_notes', 'Seller Notes', idx_notes),
+            ('internal_notes', 'Internal Notes', idx_internal),
+        ]
+
+        # Only include fields that have a mapped column (non-None idx)
+        active_fields = [('row_number', 'Row', '')]  # always show row
+        for fname, flabel, fidx in all_fields:
+            if fname == 'row_number':
+                continue
+            if fidx is not None:
+                # Get the sheet column header name for display
+                sheet_col = headers[fidx] if fidx < len(headers) else ''
+                active_fields.append((fname, flabel, sheet_col))
+
+        preview_rows = []
+        already_imported = []
+        for pid in platform_ids:
+            parts = pid.split('_', 2)
+            if len(parts) < 2:
+                continue
+            row_idx = int(parts[1])
+            sheet_row = row_idx + 2
+
+            # Check if already imported
+            is_imported = orders_models.Order.objects.filter(
+                business=business,
+            ).filter(
+                Q(original_order_data__platform_id=pid) |
+                Q(original_order_data__row_number=sheet_row)
+            ).exists()
+            if is_imported:
+                already_imported.append(pid)
+                continue
+
+            if row_idx >= len(data_rows):
+                continue
+
+            row = data_rows[row_idx]
+            # Build row_data dynamically from active_fields
+            row_data = {'platform_id': pid}
+            field_idx_map = {
+                'row_number': None,
+                'client_order_code': idx_order,
+                'customer_name': idx_name,
+                'customer_phone': idx_phone,
+                'customer_whatsapp': idx_whatsapp,
+                'customer_email': idx_email,
+                'customer_address': idx_address,
+                'dl_landmark': idx_landmark,
+                'dl_building': idx_building,
+                'dl_street': idx_street,
+                'dl_zone': idx_zone,
+                'cod_amount': idx_cod,
+                'dl_amount': idx_dl_amount,
+                'product_name': idx_product,
+                'sku': idx_sku,
+                'quantity': idx_qty,
+                'deadline_date': idx_deadline,
+                'seller_notes': idx_notes,
+                'internal_notes': idx_internal,
+            }
+            for fname, flabel, scol in active_fields:
+                if fname == 'row_number':
+                    row_data['row_number'] = sheet_row
+                elif fname == 'customer_name':
+                    row_data['customer_name'] = cell(row, field_idx_map.get(fname)) or f'Row {sheet_row}'
+                elif fname == 'client_order_code':
+                    row_data['client_order_code'] = cell(row, field_idx_map.get(fname)) or str(sheet_row)
+                else:
+                    row_data[fname] = cell(row, field_idx_map.get(fname))
+            preview_rows.append(row_data)
+
+        return JsonResponse({
+            'success': True,
+            'api_type': 'google_sheet',
+            'preview': preview_rows,
+            'fields': [{'name': f[0], 'label': f[1], 'sheet_col': f[2]} for f in active_fields],
+            'already_imported': already_imported,
+            'has_mapping': bool(saved_mapping),
+            'mapping_fields': len(saved_mapping),
+        })
+    except Exception as e:
+        logger.exception('preview_api_import error: %s', e)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
@@ -1372,6 +1610,295 @@ def import_api_orders(request):
                     created += 1
                 except Exception as e:
                     errors.append(f"{pid}: {e}")
+        elif api.api_type == 'google_sheet':
+            import re as _re
+            import gspread
+            from google.oauth2.credentials import Credentials as _GCreds
+            from google.auth.transport.requests import Request as _GReq
+            from django.conf import settings as django_settings
+            from pathlib import Path as _Path
+            import json as _json
+
+            sheet_url = api.google_sheet_url or api.site_api_url or ''
+            token_path = _Path(django_settings.BASE_DIR) / getattr(
+                django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+            )
+            if not token_path.exists():
+                return JsonResponse({'success': False, 'error': 'Google Sheets not authorized.'}, status=400)
+
+            _td = _json.loads(token_path.read_text())
+            creds = _GCreds(
+                token=_td.get('access_token'),
+                refresh_token=_td.get('refresh_token'),
+                token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                client_id=_td.get('client_id'),
+                client_secret=_td.get('client_secret'),
+                scopes=_td.get('scope', '').split(),
+            )
+            if creds.expired and creds.refresh_token:
+                creds.refresh(_GReq())
+                _td['access_token'] = creds.token
+                token_path.write_text(_json.dumps(_td, indent=2))
+
+            gc = gspread.authorize(creds)
+            match = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+            if not match:
+                return JsonResponse({'success': False, 'error': 'Invalid Google Sheet URL.'}, status=400)
+            sheet_id = match.group(1)
+            gid_match = _re.search(r'gid=(\d+)', sheet_url)
+            gid = int(gid_match.group(1)) if gid_match else 0
+
+            spreadsheet = gc.open_by_key(sheet_id)
+            worksheet = None
+            for ws in spreadsheet.worksheets():
+                if ws.id == gid:
+                    worksheet = ws
+                    break
+            if worksheet is None:
+                worksheet = spreadsheet.sheet1
+
+            all_values = worksheet.get_all_values()
+            if len(all_values) <= 1:
+                for ws in spreadsheet.worksheets():
+                    if ws.id == (worksheet.id if worksheet else -1):
+                        continue
+                    candidate = ws.get_all_values()
+                    if len(candidate) > 1:
+                        worksheet = ws
+                        all_values = candidate
+                        break
+
+            headers = all_values[0] if all_values else []
+            data_rows = all_values[1:] if all_values else []
+
+            # Use saved column mapping if available
+            saved_mapping = api.column_mapping or {}
+
+            def col_idx_by_header(header_name):
+                for j, h in enumerate(headers):
+                    if h.strip() == header_name.strip():
+                        return j
+                return None
+
+            def col_idx_auto(*keys):
+                for k in keys:
+                    for j, h in enumerate(headers):
+                        if h.strip().lower() == k.lower():
+                            return j
+                return None
+
+            def get_idx(field_name, *auto_keys):
+                if field_name in saved_mapping:
+                    return col_idx_by_header(saved_mapping[field_name])
+                return col_idx_auto(*auto_keys)
+
+            idx_name = get_idx('customer_name', 'name', 'customer name', 'customer', 'client name', 'client', 'first name')
+            idx_phone = get_idx('customer_phone', 'phone', 'mobile', 'phone number', 'contact')
+            idx_whatsapp = get_idx('customer_whatsapp', 'whatsapp', 'phone 2', 'alternate phone')
+            idx_email = get_idx('customer_email', 'email', 'e-mail', 'customer email')
+            idx_address = get_idx('customer_address', 'address', 'delivery address', 'location', 'area', 'city')
+            idx_landmark = get_idx('dl_landmark', 'city', 'landmark', 'customer city', 'area')
+            idx_building = get_idx('dl_building', 'building', 'villa', 'building no', 'villa no')
+            idx_street = get_idx('dl_street', 'street', 'street no', 'street number')
+            idx_zone = get_idx('dl_zone', 'zone', 'zone no', 'zone number')
+            idx_location_link = get_idx('location_link', 'location link', 'google map', 'map link', 'gps')
+            idx_lat = get_idx('dl_latitude', 'latitude', 'lat')
+            idx_lng = get_idx('dl_longitude', 'longitude', 'lng', 'long')
+            idx_cod = get_idx('cod_amount', 'cod', 'amount', 'cod amount', 'price', 'total')
+            idx_dl_amount = get_idx('dl_amount', 'delivery fee', 'delivery amount', 'shipping')
+            idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id', 'ref', 'reference')
+            idx_date = get_idx('order_date', 'date', 'order date', 'created')
+            idx_deadline = get_idx('deadline_date', 'deadline', 'day', 'time', 'preferred', 'delivery date')
+            idx_product = get_idx('product_name', 'product', 'product name', 'item', 'items', 'description')
+            idx_sku = get_idx('sku', 'sku', 'product sku', 'item sku', 'article')
+            idx_product_url = get_idx('product_url', 'product url', 'url', 'product link')
+            idx_qty = get_idx('quantity', 'qty', 'quantity', 'count', 'pcs')
+            idx_seller_notes = get_idx('seller_notes', 'notes', 'seller notes', 'note', 'remarks', 'comment')
+            idx_internal_notes = get_idx('internal_notes', 'notes by ezzy', 'internal notes', 'staff notes')
+            # Additional product columns
+            idx_products = {}
+            for i in range(1, 6):
+                idx_products[f'product_{i}'] = get_idx(f'product_{i}', f'product {i}', f'product:{i}', f'item {i}')
+                idx_products[f'count_{i}'] = get_idx(f'count_{i}', f'count {i}', f'count:{i}', f'qty {i}')
+
+            def cell(row, idx):
+                if idx is not None and idx < len(row):
+                    v = row[idx]
+                    return str(v).strip() if v is not None else ''
+                return ''
+
+            def safe_int(val):
+                try:
+                    return int(float(val)) if val else 0
+                except (ValueError, TypeError):
+                    return 0
+
+            def safe_int_or_none(val):
+                try:
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        return None
+                    return int(float(val))
+                except (ValueError, TypeError):
+                    return None
+
+            def safe_decimal(val):
+                try:
+                    from decimal import Decimal
+                    return Decimal(str(val)) if val else None
+                except (ValueError, TypeError):
+                    return None
+
+            # Parse row indices from platform_ids (format: gs_{row_idx}_{order_num})
+            for pid in platform_ids:
+                try:
+                    parts = pid.split('_', 2)  # gs, row_idx, order_num
+                    if len(parts) < 2:
+                        errors.append(f"{pid}: invalid format")
+                        continue
+                    row_idx = int(parts[1])
+                    sheet_row = row_idx + 2  # +2 for header + 1-based
+
+                    # Check if already imported
+                    if orders_models.Order.objects.filter(
+                        business=business,
+                    ).filter(
+                        Q(original_order_data__platform_id=pid) |
+                        Q(original_order_data__row_number=sheet_row)
+                    ).exists():
+                        skipped += 1
+                        continue
+
+                    if row_idx >= len(data_rows):
+                        errors.append(f"Row {sheet_row}: out of range")
+                        continue
+
+                    row = data_rows[row_idx]
+                    customer = cell(row, idx_name) or f"Row {sheet_row}"
+                    phone = cell(row, idx_phone)
+                    whatsapp_raw = cell(row, idx_whatsapp)
+                    address = cell(row, idx_address)
+                    cod_val = cell(row, idx_cod)
+                    order_num = cell(row, idx_order) or str(sheet_row)
+                    product_desc = cell(row, idx_product)
+
+                    # Format WhatsApp
+                    if whatsapp_raw:
+                        customer_whatsapp = format_whatsapp_number(whatsapp_raw)
+                    elif phone:
+                        customer_whatsapp = format_whatsapp_number(phone)
+                    else:
+                        customer_whatsapp = ''
+
+                    # Parse COD amount
+                    try:
+                        cod_amount = float(_re.sub(r'[^\d.]', '', cod_val)) if cod_val else 0
+                    except (ValueError, TypeError):
+                        cod_amount = 0
+
+                    # Parse delivery amount
+                    dl_amount_val = cell(row, idx_dl_amount)
+                    try:
+                        dl_amount = float(_re.sub(r'[^\d.]', '', dl_amount_val)) if dl_amount_val else 0
+                    except (ValueError, TypeError):
+                        dl_amount = 0
+
+                    # Build notes
+                    notes_parts = []
+                    seller_notes = cell(row, idx_seller_notes)
+                    internal_notes = cell(row, idx_internal_notes)
+                    if seller_notes:
+                        notes_parts.append(f"Seller: {seller_notes}")
+                    if internal_notes:
+                        notes_parts.append(f"Staff: {internal_notes}")
+                    combined_notes = ' | '.join(notes_parts)
+
+                    original_data = {
+                        'source': 'google_sheet',
+                        'platform_id': pid,
+                        'row_number': sheet_row,
+                        'order_number': order_num,
+                        'import_data': {h: cell(row, i) for i, h in enumerate(headers)},
+                        'extra_fields': {
+                            'customer_email': cell(row, idx_email),
+                            'dl_landmark': cell(row, idx_landmark),
+                            'location_link': cell(row, idx_location_link),
+                            'dl_latitude': cell(row, idx_lat),
+                            'dl_longitude': cell(row, idx_lng),
+                            'product_name': product_desc,
+                            'sku': cell(row, idx_sku),
+                            'product_url': cell(row, idx_product_url),
+                            'quantity': cell(row, idx_qty),
+                            'seller_notes': seller_notes,
+                            'internal_notes': internal_notes,
+                        },
+                    }
+
+                    order = orders_models.Order.objects.create(
+                        business=business,
+                        client_order_code=order_num if order_num != str(sheet_row) else '',
+                        customer_name=customer,
+                        customer_phone=phone,
+                        customer_whatsapp=customer_whatsapp,
+                        customer_address=address,
+                        dl_zone=safe_int_or_none(cell(row, idx_zone)),
+                        dl_street=safe_int_or_none(cell(row, idx_street)),
+                        dl_building=safe_int_or_none(cell(row, idx_building)),
+                        cod_amount=cod_amount,
+                        dl_amount=dl_amount,
+                        package_description=product_desc[:255] if product_desc else '',
+                        total_quantity=safe_int(cell(row, idx_qty)) or 1,
+                        deadline_date=cell(row, idx_deadline),
+                        order_notes=combined_notes[:100] if combined_notes else '',
+                        order_status='to_review',
+                        verification_status='pending',
+                        is_transferred=False,
+                        original_order_data=original_data,
+                    )
+
+                    # Build package_description & total_quantity from all product fields
+                    desc_parts = []
+                    total_qty = 0
+                    sku_val = cell(row, idx_sku)
+                    main_qty = safe_int(cell(row, idx_qty)) or 1
+                    if product_desc:
+                        label = product_desc
+                        if sku_val:
+                            label += f" (SKU:{sku_val})"
+                        desc_parts.append(f"{label} x{main_qty}")
+                        total_qty += main_qty
+
+                    for i in range(1, 6):
+                        prod_name = cell(row, idx_products.get(f'product_{i}'))
+                        prod_count = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
+                        if prod_name:
+                            desc_parts.append(f"{prod_name} x{prod_count}")
+                            total_qty += prod_count
+
+                    if desc_parts:
+                        order.package_description = ', '.join(desc_parts)[:255]
+                        order.total_quantity = total_qty
+                        order.save(update_fields=['package_description', 'total_quantity'])
+
+                    # Create AddressVerification if lat/long provided
+                    lat = safe_decimal(cell(row, idx_lat))
+                    lng = safe_decimal(cell(row, idx_lng))
+                    if lat and lng:
+                        orders_models.AddressVerification.objects.create(
+                            order=order,
+                            original_address=address,
+                            latitude=lat,
+                            longitude=lng,
+                            zone_number=safe_int(cell(row, idx_zone)) or None,
+                            street_number=safe_int(cell(row, idx_street)) or None,
+                            building_number=safe_int(cell(row, idx_building)) or None,
+                            notes=f"Landmark: {cell(row, idx_landmark)} | Link: {cell(row, idx_location_link)}",
+                            verification_result='pending'
+                        )
+
+                    created += 1
+                except Exception as e:
+                    errors.append(f"{pid}: {e}")
+
         else:
             return JsonResponse({'success': False, 'error': f'Import not supported for {api.api_type}'}, status=400)
 
@@ -1385,6 +1912,121 @@ def import_api_orders(request):
         'skipped': skipped,
         'errors': errors,
     })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_sheet_headers(request):
+    """GET: Return the column headers from a business's Google Sheet config."""
+    business_id = request.GET.get('business_id', '').strip()
+    if not business_id:
+        return JsonResponse({'success': False, 'error': 'Missing business_id'}, status=400)
+
+    try:
+        api = business_models.BusinessApiSettings.objects.get(
+            business__business_id=business_id, api_type='google_sheet', is_verify_api=True
+        )
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No approved Google Sheet config'}, status=404)
+
+    import re as _re, json as _json, gspread
+    from google.oauth2.credentials import Credentials as _GCreds
+    from google.auth.transport.requests import Request as _GReq
+    from django.conf import settings as django_settings
+    from pathlib import Path as _Path
+
+    sheet_url = api.google_sheet_url or api.site_api_url or ''
+    token_path = _Path(django_settings.BASE_DIR) / getattr(
+        django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+    )
+    if not token_path.exists():
+        return JsonResponse({'success': False, 'error': 'Google Sheets not authorized.'}, status=400)
+
+    try:
+        _td = _json.loads(token_path.read_text())
+        creds = _GCreds(
+            token=_td.get('access_token'),
+            refresh_token=_td.get('refresh_token'),
+            token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+            client_id=_td.get('client_id'),
+            client_secret=_td.get('client_secret'),
+            scopes=_td.get('scope', '').split(),
+        )
+        if creds.expired and creds.refresh_token:
+            creds.refresh(_GReq())
+            _td['access_token'] = creds.token
+            token_path.write_text(_json.dumps(_td, indent=2))
+
+        gc = gspread.authorize(creds)
+        match = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+        if not match:
+            return JsonResponse({'success': False, 'error': 'Invalid Sheet URL'}, status=400)
+
+        spreadsheet = gc.open_by_key(match.group(1))
+        gid_match = _re.search(r'gid=(\d+)', sheet_url)
+        gid = int(gid_match.group(1)) if gid_match else 0
+
+        worksheet = None
+        for ws in spreadsheet.worksheets():
+            if ws.id == gid:
+                worksheet = ws
+                break
+        if worksheet is None:
+            worksheet = spreadsheet.sheet1
+
+        all_values = worksheet.get_all_values()
+        if len(all_values) <= 1:
+            for ws in spreadsheet.worksheets():
+                if ws.id == (worksheet.id if worksheet else -1):
+                    continue
+                candidate = ws.get_all_values()
+                if len(candidate) > 1:
+                    all_values = candidate
+                    break
+
+        headers = all_values[0] if all_values else []
+        # Also return sample data (first data row) for preview
+        sample = all_values[1] if len(all_values) > 1 else []
+
+        return JsonResponse({
+            'success': True,
+            'headers': headers,
+            'sample': sample,
+            'saved_mapping': api.column_mapping or {},
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_save_column_mapping(request):
+    """POST: Save column mapping for a business's Google Sheet config."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json
+    business_id = request.POST.get('business_id', '').strip()
+    mapping_json = request.POST.get('mapping', '{}')
+
+    if not business_id:
+        return JsonResponse({'success': False, 'error': 'Missing business_id'}, status=400)
+
+    try:
+        api = business_models.BusinessApiSettings.objects.get(
+            business__business_id=business_id, api_type='google_sheet', is_verify_api=True
+        )
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No approved Google Sheet config'}, status=404)
+
+    try:
+        mapping = json.loads(mapping_json)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    api.column_mapping = mapping
+    api.save(update_fields=['column_mapping'])
+    return JsonResponse({'success': True, 'mapping': mapping})
 
 
 @login_required(login_url='/accounts/login/')
@@ -1491,7 +2133,7 @@ def wf_api_orders(request):
                 from django.conf import settings as django_settings
                 from pathlib import Path
 
-                sheet_url = selected_api.google_sheet_url or ''
+                sheet_url = selected_api.google_sheet_url or selected_api.site_api_url or ''
                 token_path = Path(django_settings.BASE_DIR) / getattr(
                     django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
                 )
@@ -1534,41 +2176,91 @@ def wf_api_orders(request):
                 if worksheet is None:
                     worksheet = spreadsheet.sheet1
 
-                rows = worksheet.get_all_records(head=1)
-                live_total = len(rows)
-                headers = list(rows[0].keys()) if rows else []
+                all_values = worksheet.get_all_values()
+                if not all_values or len(all_values) <= 1:
+                    # Try other worksheets if current one is empty
+                    for ws in spreadsheet.worksheets():
+                        if ws.id == worksheet.id:
+                            continue
+                        candidate = ws.get_all_values()
+                        if len(candidate) > 1:
+                            worksheet = ws
+                            all_values = candidate
+                            break
 
-                # Map common column name variants (case-insensitive)
-                def col(row, *keys):
+                if not all_values or len(all_values) <= 1:
+                    raise Exception('Sheet is empty — no data rows found.')
+
+                headers = all_values[0]
+                data_rows = all_values[1:]
+                live_total = len(data_rows)
+
+                # Use saved column mapping if available, else auto-detect
+                saved_mapping = selected_api.column_mapping or {}
+
+                def col_idx_by_header(header_name):
+                    """Find column index by exact header name."""
+                    for j, h in enumerate(headers):
+                        if h.strip() == header_name.strip():
+                            return j
+                    return None
+
+                def col_idx_auto(*keys):
+                    """Auto-detect column index by common name variants."""
                     for k in keys:
-                        for h in headers:
+                        for j, h in enumerate(headers):
                             if h.strip().lower() == k.lower():
-                                v = row.get(h)
-                                return str(v).strip() if v is not None else ''
+                                return j
+                    return None
+
+                def get_idx(field_name, *auto_keys):
+                    """Get column index: saved mapping first, then auto-detect."""
+                    if field_name in saved_mapping:
+                        return col_idx_by_header(saved_mapping[field_name])
+                    return col_idx_auto(*auto_keys)
+
+                idx_name = get_idx('customer_name', 'name', 'customer name', 'customer', 'client name', 'client', 'first name')
+                idx_phone = get_idx('customer_phone', 'phone', 'mobile', 'phone number', 'contact')
+                idx_address = get_idx('customer_address', 'address', 'delivery address', 'location', 'area', 'city')
+                idx_cod = get_idx('cod_amount', 'cod', 'amount', 'cod amount', 'price', 'total')
+                idx_status = col_idx_auto('status', 'order status', 'state')
+                idx_date = get_idx('order_date', 'date', 'order date', 'created', 'created at')
+                idx_country = col_idx_auto('country', 'country code')
+                idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id', 'ref', 'reference')
+                idx_product = get_idx('product_name', 'product', 'product name', 'item', 'items')
+
+                def cell(row, idx):
+                    if idx is not None and idx < len(row):
+                        v = row[idx]
+                        return str(v).strip() if v is not None else ''
                     return ''
 
-                for i, row in enumerate(rows):
-                    name = col(row, 'name', 'customer name', 'customer', 'client name', 'client')
-                    phone = col(row, 'phone', 'mobile', 'phone number', 'contact')
-                    address = col(row, 'address', 'delivery address', 'location', 'area')
-                    cod = col(row, 'cod', 'amount', 'cod amount', 'price', 'total')
-                    status = col(row, 'status', 'order status', 'state')
-                    date = col(row, 'date', 'order date', 'created', 'created at')
-                    country = col(row, 'country', 'country code')
-                    order_num = col(row, 'order', 'order number', 'order #', 'order id', 'ref', 'reference') or str(i + 1)
+                # Build display headers: non-empty sheet headers
+                sheet_display_headers = [h for h in headers if h.strip()]
+
+                for i, row in enumerate(data_rows):
+                    sheet_row = i + 2  # +2 for header + 1-based
+                    order_num = cell(row, idx_order) or str(sheet_row)
+                    # Build all cell values keyed by header name
+                    all_cells = {}
+                    for j, h in enumerate(headers):
+                        if h.strip():
+                            all_cells[h.strip()] = cell(row, j)
                     live_orders.append({
                         'platform_id': f'gs_{i}_{order_num}',
                         'name': order_num,
-                        'customer': name,
-                        'phone': phone,
-                        'address': address,
-                        'country': country,
-                        'cod': cod,
+                        'customer': cell(row, idx_name),
+                        'phone': cell(row, idx_phone),
+                        'address': cell(row, idx_address),
+                        'country': cell(row, idx_country),
+                        'cod': cell(row, idx_cod),
                         'currency': '',
-                        'status': status or 'pending',
+                        'status': cell(row, idx_status) or 'pending',
                         'fulfillment': None,
-                        'date': date,
+                        'date': cell(row, idx_date),
                         'source': 'google_sheet',
+                        'row_number': sheet_row,
+                        'cells': all_cells,
                     })
 
         except Exception as e:
@@ -1576,24 +2268,54 @@ def wf_api_orders(request):
 
     # Annotate live_orders with import status from DB
     if live_orders and selected_business and selected_api:
-        platform_ids = [o['platform_id'] for o in live_orders]
-        imported_qs = orders_models.Order.objects.filter(
-            business=selected_business,
-            original_order_data__source=selected_api.api_type,
-            original_order_data__platform_id__in=platform_ids,
-        ).values('original_order_data__platform_id', 'id', 'order_number', 'client_order_code')
-        imported_map = {
-            str(r['original_order_data__platform_id']): {
-                'id': r['id'],
-                'number': r['order_number'] or r['client_order_code'] or f"#{r['id']}",
+        if selected_api.api_type == 'google_sheet':
+            # For Google Sheets, check by row_number stored in original_order_data
+            imported_qs = orders_models.Order.objects.filter(
+                business=selected_business,
+            ).filter(
+                Q(original_order_data__source='google_sheet') |
+                Q(original_order_data__source='onedrive')
+            ).values('original_order_data', 'id', 'order_number', 'client_order_code')
+
+            imported_by_row = {}
+            imported_by_pid = {}
+            for r in imported_qs:
+                od = r.get('original_order_data') or {}
+                info = {
+                    'id': r['id'],
+                    'number': r['order_number'] or r['client_order_code'] or f"#{r['id']}",
+                }
+                rn = od.get('row_number')
+                if rn is not None:
+                    imported_by_row[int(rn)] = info
+                pid = od.get('platform_id')
+                if pid:
+                    imported_by_pid[str(pid)] = info
+
+            for o in live_orders:
+                match = imported_by_row.get(o.get('row_number')) or imported_by_pid.get(str(o['platform_id']))
+                o['imported'] = bool(match)
+                o['imported_order_id'] = match['id'] if match else None
+                o['imported_order_number'] = match['number'] if match else None
+        else:
+            platform_ids = [o['platform_id'] for o in live_orders]
+            imported_qs = orders_models.Order.objects.filter(
+                business=selected_business,
+                original_order_data__source=selected_api.api_type,
+                original_order_data__platform_id__in=platform_ids,
+            ).values('original_order_data__platform_id', 'id', 'order_number', 'client_order_code')
+            imported_map = {
+                str(r['original_order_data__platform_id']): {
+                    'id': r['id'],
+                    'number': r['order_number'] or r['client_order_code'] or f"#{r['id']}",
+                }
+                for r in imported_qs
             }
-            for r in imported_qs
-        }
-        for o in live_orders:
-            match = imported_map.get(str(o['platform_id']))
-            o['imported'] = bool(match)
-            o['imported_order_id'] = match['id'] if match else None
-            o['imported_order_number'] = match['number'] if match else None
+            for o in live_orders:
+                match = imported_map.get(str(o['platform_id']))
+                o['imported'] = bool(match)
+                o['imported_order_id'] = match['id'] if match else None
+                o['imported_order_number'] = match['number'] if match else None
 
     # Apply import status filter
     if status_filter == 'imported':
@@ -1601,18 +2323,42 @@ def wf_api_orders(request):
     elif status_filter == 'not_imported':
         live_orders = [o for o in live_orders if not o.get('imported')]
 
+    # Find last imported row number for default "Go to row"
+    last_imported_row = 0
+    for o in live_orders:
+        if o.get('imported') and o.get('row_number'):
+            last_imported_row = max(last_imported_row, o['row_number'])
+    # Default goto row: last imported - 5 (min row 2)
+    default_goto_row = max(2, last_imported_row - 5) if last_imported_row else 0
+
     # Paginate live_orders (list, not queryset)
     from django.core.paginator import Paginator
     try:
-        per_page = max(1, min(200, int(request.GET.get('per_page', 50))))
+        per_page = max(1, min(200, int(request.GET.get('per_page', 25))))
     except (ValueError, TypeError):
-        per_page = 50
+        per_page = 25
     paginator = Paginator(live_orders, per_page)
-    try:
-        page_number = int(request.GET.get('page', 1))
-    except (ValueError, TypeError):
-        page_number = 1
+
+    # If no page param and we have a default_goto_row, auto-navigate to that page
+    explicit_page = request.GET.get('page')
+    if not explicit_page and default_goto_row and selected_api and selected_api.api_type == 'google_sheet':
+        # row_number is sheet_row (1-based, header=1), data index = row_number - 2
+        data_idx = default_goto_row - 2
+        page_number = max(1, (data_idx // per_page) + 1)
+    else:
+        try:
+            page_number = int(explicit_page or 1)
+        except (ValueError, TypeError):
+            page_number = 1
     page_obj = paginator.get_page(page_number)
+
+    # Sheet headers for Google Sheet dynamic columns
+    gs_headers = []
+    if selected_api and selected_api.api_type == 'google_sheet':
+        try:
+            gs_headers = sheet_display_headers
+        except NameError:
+            gs_headers = []
 
     context = {
         'api_businesses': api_businesses,
@@ -1626,6 +2372,8 @@ def wf_api_orders(request):
         'total_filtered': len(live_orders),
         'page_obj': page_obj,
         'per_page': per_page,
+        'gs_headers': gs_headers,
+        'default_goto_row': default_goto_row,
     }
     return render(request, 'workforce/orders_api.html', context)
 
@@ -6150,10 +6898,100 @@ def wf_save_google_sheet(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def google_sheets_auth_start(request):
+    """Start Google Sheets OAuth2 flow — redirects to Google consent screen."""
+    from google_auth_oauthlib.flow import Flow
+    from django.conf import settings as django_settings
+    from pathlib import Path
+
+    client_file = Path(django_settings.BASE_DIR) / 'google_sheets_client.json'
+    if not client_file.exists():
+        return HttpResponse('google_sheets_client.json not found on server.', status=500)
+
+    redirect_uri = request.build_absolute_uri('/workforce/google-sheets/auth/callback/')
+    flow = Flow.from_client_secrets_file(
+        str(client_file),
+        scopes=[
+            'https://www.googleapis.com/auth/spreadsheets.readonly',
+            'https://www.googleapis.com/auth/drive.readonly',
+        ],
+        redirect_uri=redirect_uri,
+    )
+    auth_url, state = flow.authorization_url(access_type='offline', prompt='consent')
+    request.session['google_sheets_oauth_state'] = state
+    request.session['google_sheets_code_verifier'] = flow.code_verifier
+    return redirect(auth_url)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def google_sheets_auth_callback(request):
+    """Handle Google OAuth2 callback — save token file."""
+    from google_auth_oauthlib.flow import Flow
+    from django.conf import settings as django_settings
+    from pathlib import Path
+    import json as _json
+
+    client_file = Path(django_settings.BASE_DIR) / 'google_sheets_client.json'
+    token_path = Path(django_settings.BASE_DIR) / getattr(
+        django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+    )
+
+    redirect_uri = request.build_absolute_uri('/workforce/google-sheets/auth/callback/')
+    flow = Flow.from_client_secrets_file(
+        str(client_file),
+        scopes=[
+            'https://www.googleapis.com/auth/spreadsheets.readonly',
+            'https://www.googleapis.com/auth/drive.readonly',
+        ],
+        redirect_uri=redirect_uri,
+    )
+    flow.code_verifier = request.session.pop('google_sheets_code_verifier', None)
+
+    try:
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+    except Exception as e:
+        return HttpResponse(f'OAuth error: {e}', status=400)
+
+    creds = flow.credentials
+    token_data = {
+        'access_token': creds.token,
+        'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri,
+        'client_id': creds.client_id,
+        'client_secret': creds.client_secret,
+        'scope': ' '.join(creds.scopes or []),
+    }
+    token_path.write_text(_json.dumps(token_data, indent=2))
+    return HttpResponse(
+        '<h2 style="font-family:sans-serif;margin:40px;">Google Sheets authorized successfully!</h2>'
+        '<p style="font-family:sans-serif;margin:40px;">Token saved. You can now test Google Sheet connections.</p>'
+        '<a href="/workforce/sellers/api-configs/" style="font-family:sans-serif;margin:40px;display:inline-block;">Back to API Configs</a>'
+    )
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def wf_test_api_config(request, api_id):
+    """Show the test console page with config panel and Test Connection button."""
+    try:
+        api = business_models.BusinessApiSettings.objects.select_related('business').get(pk=api_id)
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'API config not found'}, status=404)
+
+    context = {
+        'business': api.business,
+        'api': api,
+    }
+    return render(request, 'workforce/seller_api_test.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_test_api_config_result(request, api_id):
     """
     Staff proxy for testing a BusinessApiSettings (any business).
-    Fetches orders + products and returns a summary status line.
+    Fetches orders + products and returns an HTMX partial with results.
     """
     try:
         api = business_models.BusinessApiSettings.objects.select_related('business').get(pk=api_id)
@@ -6257,6 +7095,100 @@ def wf_test_api_config(request, api_id):
                     api_stats['currency'] = ss.get('settings', {}).get('currency')
             except Exception:
                 pass
+
+        elif api.api_type == 'google_sheet':
+            import re as _re
+            import gspread
+            from google.oauth2.credentials import Credentials as _GCreds
+            from google.auth.transport.requests import Request as _GReq
+            from django.conf import settings as django_settings
+            from pathlib import Path as _Path
+            import json as _json
+
+            sheet_url = api.google_sheet_url or api.site_api_url or ''
+            if not sheet_url:
+                raise Exception('No Google Sheet URL configured for this integration.')
+
+            token_path = _Path(django_settings.BASE_DIR) / getattr(
+                django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+            )
+            if not token_path.exists():
+                raise Exception(
+                    'Google Sheets not authorized yet. '
+                    'Run: python google_sheets_auth.py (one-time setup)'
+                )
+
+            _td = _json.loads(token_path.read_text())
+            creds = _GCreds(
+                token=_td.get('access_token'),
+                refresh_token=_td.get('refresh_token'),
+                token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                client_id=_td.get('client_id'),
+                client_secret=_td.get('client_secret'),
+                scopes=_td.get('scope', '').split(),
+            )
+            if creds.expired and creds.refresh_token:
+                creds.refresh(_GReq())
+                _td['access_token'] = creds.token
+                token_path.write_text(_json.dumps(_td, indent=2))
+
+            gc = gspread.authorize(creds)
+
+            match = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+            if not match:
+                raise Exception('Invalid Google Sheet URL.')
+            sheet_id = match.group(1)
+            gid_match = _re.search(r'gid=(\d+)', sheet_url)
+            gid = int(gid_match.group(1)) if gid_match else 0
+
+            spreadsheet = gc.open_by_key(sheet_id)
+            worksheet = None
+            for ws in spreadsheet.worksheets():
+                if ws.id == gid:
+                    worksheet = ws
+                    break
+            if worksheet is None:
+                worksheet = spreadsheet.sheet1
+
+            all_values = worksheet.get_all_values()
+
+            # If selected worksheet is empty, try to find one with data
+            if len(all_values) <= 1:
+                for ws in spreadsheet.worksheets():
+                    if ws.id == worksheet.id:
+                        continue
+                    candidate = ws.get_all_values()
+                    if len(candidate) > 1:
+                        worksheet = ws
+                        all_values = candidate
+                        break
+
+            if not all_values or len(all_values) <= 1:
+                raise Exception('Sheet is empty — no data rows found.')
+
+            headers = all_values[0]  # first row = headers
+            data_rows = all_values[1:]  # remaining rows = data
+            total_rows = len(data_rows)
+            order_status_code = 200
+
+            api_stats['order_count'] = total_rows
+            api_stats['sheet_title'] = spreadsheet.title
+            api_stats['worksheet_name'] = worksheet.title
+            api_stats['column_count'] = len(headers)
+
+            # Build preview of last 5 rows
+            preview_start = max(0, total_rows - 5)
+            preview_rows = data_rows[preview_start:]
+            order_response = []
+            for i, row in enumerate(preview_rows):
+                row_data = {}
+                for j, h in enumerate(headers):
+                    val = row[j] if j < len(row) else ''
+                    row_data[h or f'Col {j+1}'] = str(val)[:80]
+                order_response.append({
+                    'row_num': preview_start + i + 2,  # +2 for header row + 0-index
+                    'data': row_data,
+                })
 
         else:
             error_message = f"Test not implemented for api_type={api.api_type}"
@@ -6981,16 +7913,24 @@ def driver_detail(request, driver_id):
     documents = []
     for doc in raw_documents:
         doc_dict = {
+            'id': doc.id,
             'document_type': doc.document_type,
             'document_no': doc.document_no,
+            'document_issued_from': getattr(doc, 'document_issued_from', ''),
             'document_expiry_date': getattr(doc, 'document_expiry_date', None),
-            'document_file': None,  # Default to None
+            'document_file': None,
+            'document_file_back': None,
         }
-        # Check if file actually exists on disk
         if doc.document_file and doc.document_file.name:
             try:
                 if doc.document_file.storage.exists(doc.document_file.name):
                     doc_dict['document_file'] = doc.document_file
+            except Exception:
+                pass
+        if hasattr(doc, 'document_file_back') and doc.document_file_back and doc.document_file_back.name:
+            try:
+                if doc.document_file_back.storage.exists(doc.document_file_back.name):
+                    doc_dict['document_file_back'] = doc.document_file_back
             except Exception:
                 pass
         documents.append(doc_dict)
@@ -7097,9 +8037,87 @@ def driver_detail(request, driver_id):
         'recent_transactions': recent_transactions,
         'now': timezone.now(),
         'user_is_superadmin': user_is_superadmin,
+        'vehicle_type_choices': fleet_models.VEHICLE_CHOICES,
+        'document_type_choices': fleet_models.DriverDocument.document_choices,
     }
 
     return render(request, 'workforce/driver_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_vehicle_save(request, driver_id, vehicle_id=None):
+    """Add or edit a driver vehicle (AJAX POST)."""
+    driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    try:
+        if vehicle_id:
+            vehicle = get_object_or_404(fleet_models.DriverVehicle, id=vehicle_id, driver=driver)
+        else:
+            vehicle = fleet_models.DriverVehicle(driver=driver)
+        vehicle.vehicle_type = request.POST.get('vehicle_type', 'none')
+        vehicle.vehicle_no = request.POST.get('vehicle_no', '') or ''
+        vehicle.vehicle_model = request.POST.get('vehicle_model', '') or ''
+        vehicle.vehicle_color = request.POST.get('vehicle_color', '') or ''
+        vehicle.vehicle_status = request.POST.get('vehicle_status', 'active')
+        if request.FILES.get('vehicle_photo'):
+            vehicle.vehicle_photo = request.FILES['vehicle_photo']
+        vehicle.save()
+        return JsonResponse({'success': True, 'message': 'Vehicle saved successfully'})
+    except Exception as e:
+        logger.exception('driver_vehicle_save error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_vehicle_delete(request, driver_id, vehicle_id):
+    """Delete a driver vehicle (AJAX POST)."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    vehicle = get_object_or_404(fleet_models.DriverVehicle, id=vehicle_id, driver__driver_id=driver_id)
+    vehicle.delete()
+    return JsonResponse({'success': True, 'message': 'Vehicle deleted'})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_document_save(request, driver_id, document_id=None):
+    """Add or edit a driver document (AJAX POST)."""
+    driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    try:
+        if document_id:
+            doc = get_object_or_404(fleet_models.DriverDocument, id=document_id, driver=driver)
+        else:
+            doc = fleet_models.DriverDocument(driver=driver)
+        doc.document_type = request.POST.get('document_type', '')
+        doc.document_no = request.POST.get('document_no', '')
+        doc.document_issued_from = request.POST.get('document_issued_from', '') or ''
+        expiry = request.POST.get('document_expiry_date', '')
+        doc.document_expiry_date = expiry if expiry else None
+        if request.FILES.get('document_file'):
+            doc.document_file = request.FILES['document_file']
+        if request.FILES.get('document_file_back'):
+            doc.document_file_back = request.FILES['document_file_back']
+        doc.save()
+        return JsonResponse({'success': True, 'message': 'Document saved successfully'})
+    except Exception as e:
+        logger.exception('driver_document_save error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_document_delete(request, driver_id, document_id):
+    """Delete a driver document (AJAX POST)."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    doc = get_object_or_404(fleet_models.DriverDocument, id=document_id, driver__driver_id=driver_id)
+    doc.delete()
+    return JsonResponse({'success': True, 'message': 'Document deleted'})
 
 
 # =============================================================================
@@ -7298,6 +8316,18 @@ def delivery_task_edit(request, task_id):
             # Handle order fields if order exists
             if task.order:
                 order = task.order
+                from decimal import Decimal, InvalidOperation
+
+                # Snapshot old values
+                old_vals = {
+                    'customer_name': order.customer_name or '', 'customer_phone': order.customer_phone or '',
+                    'customer_whatsapp': order.customer_whatsapp or '', 'customer_address': order.customer_address or '',
+                    'dl_zone': order.dl_zone, 'dl_street': order.dl_street, 'dl_building': order.dl_building,
+                    'package_description': order.package_description or '', 'total_quantity': order.total_quantity or 0,
+                    'cod_amount': order.cod_amount or 0, 'dl_amount': order.dl_amount or 0,
+                    'order_notes': order.order_notes or '',
+                    'latitude': str(order.latitude or ''), 'longitude': str(order.longitude or ''),
+                }
 
                 # Customer details
                 order.customer_name = request.POST.get('customer_name', order.customer_name)
@@ -7317,15 +8347,25 @@ def delivery_task_edit(request, task_id):
                 # Order notes
                 order.order_notes = request.POST.get('order_notes', order.order_notes)
 
+                # Package details
+                product_desc = request.POST.get('package_description', '').strip()
+                if product_desc is not None:
+                    order.package_description = product_desc[:255]
+                total_qty = request.POST.get('total_quantity', '').strip()
+                if total_qty and total_qty.isdigit():
+                    order.total_quantity = int(total_qty)
+
                 # COD details
-                cod_amount = request.POST.get('cod_amount', '0')
-                order.cod_amount = int(cod_amount) if cod_amount and cod_amount.isdigit() else 0
+                cod_amount = request.POST.get('cod_amount', '0').strip()
+                try:
+                    order.cod_amount = Decimal(cod_amount) if cod_amount else 0
+                except (InvalidOperation, ValueError):
+                    order.cod_amount = 0
 
                 dl_amount = request.POST.get('dl_amount', '0')
                 order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
 
                 # Coordinates & accuracy
-                from decimal import Decimal, InvalidOperation
                 lat_raw = request.POST.get('latitude', '').strip()
                 lng_raw = request.POST.get('longitude', '').strip()
                 try:
@@ -7352,18 +8392,47 @@ def delivery_task_edit(request, task_id):
                             item = OrderItem.objects.get(id=item_id, order=order)
                             item.quantity = max(0, qty)
                             if item.unit_price:
-                                from decimal import Decimal as D
-                                item.total_price = D(item.unit_price) * item.quantity
+                                item.total_price = Decimal(str(item.unit_price)) * item.quantity
                             item.save()
                         except (ValueError, OrderItem.DoesNotExist):
                             pass
 
-                # Log the change
-                orders_models.OrderVerificationLog.objects.create(
+                # Build change summary
+                new_vals = {
+                    'customer_name': order.customer_name or '', 'customer_phone': order.customer_phone or '',
+                    'customer_whatsapp': order.customer_whatsapp or '', 'customer_address': order.customer_address or '',
+                    'dl_zone': order.dl_zone, 'dl_street': order.dl_street, 'dl_building': order.dl_building,
+                    'package_description': order.package_description or '', 'total_quantity': order.total_quantity or 0,
+                    'cod_amount': order.cod_amount or 0, 'dl_amount': order.dl_amount or 0,
+                    'order_notes': order.order_notes or '',
+                    'latitude': str(order.latitude or ''), 'longitude': str(order.longitude or ''),
+                }
+                field_labels = {
+                    'customer_name': 'Name', 'customer_phone': 'Phone', 'customer_whatsapp': 'WhatsApp',
+                    'customer_address': 'Address', 'dl_zone': 'Zone', 'dl_street': 'Street', 'dl_building': 'Building',
+                    'package_description': 'Package Desc', 'total_quantity': 'Qty', 'cod_amount': 'COD',
+                    'dl_amount': 'DL Amount', 'order_notes': 'Notes',
+                    'latitude': 'Lat', 'longitude': 'Lng',
+                }
+                changes = []
+                for k, old_v in old_vals.items():
+                    new_v = new_vals[k]
+                    if str(old_v) != str(new_v):
+                        label = field_labels.get(k, k)
+                        changes.append(f"{label}: {old_v or '—'} → {new_v or '—'}")
+
+                change_summary = ', '.join(changes) if changes else 'No changes'
+
+                # Log to timeline
+                orders_models.OrderStatusHistory.objects.create(
                     order=order,
-                    action='task_edited',
-                    verified_by=request.user,
-                    notes=f'Task and order edited by {request.user.username}'
+                    field_name='task_edited',
+                    old_value='',
+                    new_value='edited',
+                    old_display='',
+                    new_display=f'{len(changes)} field{"s" if len(changes) != 1 else ""} changed',
+                    changed_by=request.user,
+                    notes=change_summary[:255],
                 )
 
             messages.success(request, f'Task #{task.dl_task_number} updated successfully.')
@@ -7765,6 +8834,29 @@ def order_edit(request, order_id):
     if request.method == 'POST':
         # Handle form submission
         try:
+            from decimal import Decimal, InvalidOperation
+
+            # Snapshot old values for change tracking
+            old_vals = {
+                'customer_name': order.customer_name or '',
+                'customer_phone': order.customer_phone or '',
+                'customer_whatsapp': order.customer_whatsapp or '',
+                'customer_address': order.customer_address or '',
+                'dl_zone': order.dl_zone,
+                'dl_street': order.dl_street,
+                'dl_building': order.dl_building,
+                'package_description': order.package_description or '',
+                'total_quantity': order.total_quantity or 0,
+                'cod_amount': order.cod_amount or 0,
+                'dl_amount': order.dl_amount or 0,
+                'order_notes': order.order_notes or '',
+                'order_status': order.order_status or '',
+                'verification_status': order.verification_status or '',
+                'latitude': str(order.latitude or ''),
+                'longitude': str(order.longitude or ''),
+                'pickup_location_id': order.pickup_location_id,
+            }
+
             # Customer details
             order.customer_name = request.POST.get('customer_name', order.customer_name)
             order.customer_phone = request.POST.get('customer_phone', order.customer_phone)
@@ -7780,9 +8872,19 @@ def order_edit(request, order_id):
             order.dl_street = int(dl_street) if dl_street and dl_street.isdigit() else None
             order.dl_building = int(dl_building) if dl_building and dl_building.isdigit() else None
 
+            # Package details
+            product_desc = request.POST.get('package_description', '').strip()
+            order.package_description = product_desc[:255]
+            total_qty = request.POST.get('total_quantity', '').strip()
+            if total_qty and total_qty.isdigit():
+                order.total_quantity = int(total_qty)
+
             # COD details
-            cod_amount = request.POST.get('cod_amount', '0')
-            order.cod_amount = int(cod_amount) if cod_amount and cod_amount.isdigit() else 0
+            cod_amount = request.POST.get('cod_amount', '0').strip()
+            try:
+                order.cod_amount = Decimal(cod_amount) if cod_amount else 0
+            except (InvalidOperation, ValueError):
+                order.cod_amount = 0
             cod_status = request.POST.get('cod_status_by_client')
             if cod_status:
                 order.cod_status_by_client = cod_status
@@ -7798,6 +8900,18 @@ def order_edit(request, order_id):
             if pickup_id:
                 order.pickup_location_id = pickup_id
 
+            # Coordinates
+            lat_raw = request.POST.get('latitude', '').strip()
+            lng_raw = request.POST.get('longitude', '').strip()
+            try:
+                order.latitude = Decimal(lat_raw) if lat_raw else None
+            except (InvalidOperation, ValueError):
+                pass
+            try:
+                order.longitude = Decimal(lng_raw) if lng_raw else None
+            except (InvalidOperation, ValueError):
+                pass
+
             # Order notes
             order.order_notes = request.POST.get('order_notes', order.order_notes)
 
@@ -7807,12 +8921,53 @@ def order_edit(request, order_id):
 
             order.save()
 
-            # Log the change
-            orders_models.OrderVerificationLog.objects.create(
+            # Build change summary
+            new_vals = {
+                'customer_name': order.customer_name or '',
+                'customer_phone': order.customer_phone or '',
+                'customer_whatsapp': order.customer_whatsapp or '',
+                'customer_address': order.customer_address or '',
+                'dl_zone': order.dl_zone,
+                'dl_street': order.dl_street,
+                'dl_building': order.dl_building,
+                'package_description': order.package_description or '',
+                'total_quantity': order.total_quantity or 0,
+                'cod_amount': order.cod_amount or 0,
+                'dl_amount': order.dl_amount or 0,
+                'order_notes': order.order_notes or '',
+                'order_status': order.order_status or '',
+                'verification_status': order.verification_status or '',
+                'latitude': str(order.latitude or ''),
+                'longitude': str(order.longitude or ''),
+                'pickup_location_id': order.pickup_location_id,
+            }
+            field_labels = {
+                'customer_name': 'Name', 'customer_phone': 'Phone', 'customer_whatsapp': 'WhatsApp',
+                'customer_address': 'Address', 'dl_zone': 'Zone', 'dl_street': 'Street', 'dl_building': 'Building',
+                'package_description': 'Package Desc', 'total_quantity': 'Qty', 'cod_amount': 'COD',
+                'dl_amount': 'DL Amount', 'order_notes': 'Notes', 'order_status': 'Status',
+                'verification_status': 'Verification', 'latitude': 'Lat', 'longitude': 'Lng',
+                'pickup_location_id': 'Pickup Location',
+            }
+            changes = []
+            for k, old_v in old_vals.items():
+                new_v = new_vals[k]
+                if str(old_v) != str(new_v):
+                    label = field_labels.get(k, k)
+                    changes.append(f"{label}: {old_v or '—'} → {new_v or '—'}")
+
+            change_summary = ', '.join(changes) if changes else 'No changes'
+
+            # Log to timeline
+            orders_models.OrderStatusHistory.objects.create(
                 order=order,
-                action='order_edited',
-                verified_by=request.user,
-                notes=f'Order edited by {request.user.username}'
+                field_name='order_edited',
+                old_value='',
+                new_value='edited',
+                old_display='',
+                new_display=f'{len(changes)} field{"s" if len(changes) != 1 else ""} changed',
+                changed_by=request.user,
+                notes=change_summary[:255],
             )
 
             messages.success(request, f'Order {order.order_number} updated successfully.')
@@ -7940,7 +9095,21 @@ def order_item_update(request, order_id, item_id):
 def order_item_delete(request, order_id, item_id):
     """Delete an order item via AJAX."""
     item = get_object_or_404(orders_models.OrderItem, id=item_id, order_id=order_id)
+    item_name = item.product.item_name if item.product else (item.notes or 'Item')
+    item_qty = item.quantity
     item.delete()
+
+    # Log to timeline
+    orders_models.OrderStatusHistory.objects.create(
+        order_id=order_id,
+        field_name='item_deleted',
+        old_value=f'{item_name} x{item_qty}',
+        new_value='deleted',
+        old_display=f'{item_name} x{item_qty}',
+        new_display='Deleted',
+        changed_by=request.user,
+        notes=f'Item removed: {item_name} x{item_qty}',
+    )
     return JsonResponse({'success': True})
 
 
@@ -8260,6 +9429,10 @@ def pricing_inquiries_list(request):
             Q(is_required_fulfillment_service_for_make_hub_in_doha=True)
         )
 
+    status_filter = request.GET.get('status', '').strip()
+    if status_filter:
+        inquiries = inquiries.filter(crm_status=status_filter)
+
     total_count = webpages_models.PricingEnquiry.objects.count()
     cod_count = webpages_models.PricingEnquiry.objects.filter(is_required_COD_service=True).count()
     fulfillment_count = webpages_models.PricingEnquiry.objects.filter(
@@ -8275,6 +9448,7 @@ def pricing_inquiries_list(request):
         'search': search,
         'cod_filter': cod_filter,
         'fulfillment_filter': fulfillment_filter,
+        'status_filter': status_filter,
         'total_count': total_count,
         'cod_count': cod_count,
         'fulfillment_count': fulfillment_count,
@@ -8382,6 +9556,66 @@ def pricing_inquiry_update_status(request, inquiry_id):
         'crm_status_display': inquiry.get_crm_status_display(),
         'assigned_to': inquiry.assigned_to.get_full_name() or inquiry.assigned_to.username if inquiry.assigned_to else '',
     })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pricing_inquiry_edit(request, inquiry_id):
+    """AJAX: edit PricingEnquiry fields by staff."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    inquiry = get_object_or_404(webpages_models.PricingEnquiry, pk=inquiry_id)
+
+    # Editable fields (all model fields except CRM/meta)
+    EDITABLE_FIELDS = {
+        'full_name', 'business_name', 'business_contact_number', 'operation_team_contact_number',
+        'website_url', 'social_profile', 'product_category', 'average_order_value_qar',
+        'business_operating_age', 'business_location_country',
+        'avarage_number_of_order_last_week', 'avarage_number_of_order_done_last_month',
+        'avarage_number_of_order_expect_next_month', 'orders_expected_in_next_3_months_milestone',
+        'speed_delivery_offer_to_customers', 'preferred_delivery_time_window',
+        'typical_package_size', 'delivery_coverage', 'current_courier_provider',
+        'order_management_system', 'preferred_communication_channel',
+        'is_delivery_free_to_customers', 'preferred_start_date',
+        'type_of_pickup_location', 'pickup_Location_area_name',
+        'pickup_location_time_slab', 'number_of_pickup_times_in_day',
+    }
+    BOOL_FIELDS = {
+        'is_personalized_product', 'is_registered_company_in_qatar',
+        'is_located_in_qatar', 'is_team_available_in_qatar',
+        'is_required_COD_service', 'is_required_fulfillment_service_for_operate_from_outside_qatar',
+        'is_required_fulfillment_service_for_make_hub_in_doha',
+        'is_frequent_same_day_pick_and_delivery_required',
+        'is_special_handling_required', 'is_return_logistics_required',
+    }
+
+    changes = []
+    for field in EDITABLE_FIELDS:
+        if field in request.POST:
+            new_val = request.POST[field].strip()
+            old_val = getattr(inquiry, field) or ''
+            if str(old_val) != new_val:
+                setattr(inquiry, field, new_val or None)
+                changes.append(f'{field}: {old_val} → {new_val}')
+
+    for field in BOOL_FIELDS:
+        if field in request.POST:
+            new_val = request.POST[field] in ('true', '1', 'on', 'True')
+            old_val = getattr(inquiry, field)
+            if old_val != new_val:
+                setattr(inquiry, field, new_val)
+                changes.append(f'{field}: {old_val} → {new_val}')
+
+    if changes:
+        inquiry.save()
+        webpages_models.PricingEnquiryActivity.objects.create(
+            inquiry=inquiry,
+            activity_type=webpages_models.PricingEnquiryActivity.TYPE_STATUS_CHANGE,
+            body='Fields edited: ' + '; '.join(changes[:10]),
+            created_by=request.user,
+        )
+
+    return JsonResponse({'success': True, 'changes': len(changes)})
 
 
 @login_required(login_url='/accounts/login/')
@@ -8896,3 +10130,443 @@ def tasks_live_map(request):
         'driver_count': len(driver_locations),
     }
     return render(request, 'workforce/tasks_live_map.html', context)
+
+
+# =============================================================================
+# ONEDRIVE IMPORT SOURCES
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def onedrive_sources(request):
+    """List and manage OneDrive import sources."""
+    sources = orders_models.OneDriveSource.objects.select_related(
+        'business', 'last_import_by'
+    ).order_by('-created_at')
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    # Handle add source
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add':
+            business_id = request.POST.get('business_id')
+            label = request.POST.get('label', '').strip()
+            share_link = request.POST.get('share_link', '').strip()
+
+            if business_id and label and share_link:
+                try:
+                    business = business_models.Business.objects.get(business_id=business_id)
+                    orders_models.OneDriveSource.objects.create(
+                        business=business, label=label, share_link=share_link
+                    )
+                    return JsonResponse({'success': True, 'message': 'Source added'})
+                except business_models.Business.DoesNotExist:
+                    return JsonResponse({'success': False, 'error': 'Business not found'}, status=400)
+            return JsonResponse({'success': False, 'error': 'All fields required'}, status=400)
+
+        elif action == 'edit':
+            source_id = request.POST.get('source_id')
+            label = request.POST.get('label', '').strip()
+            share_link = request.POST.get('share_link', '').strip()
+            if source_id and label and share_link:
+                orders_models.OneDriveSource.objects.filter(id=source_id).update(
+                    label=label, share_link=share_link
+                )
+                return JsonResponse({'success': True, 'message': 'Source updated'})
+            return JsonResponse({'success': False, 'error': 'Label and link required'}, status=400)
+
+        elif action == 'delete':
+            source_id = request.POST.get('source_id')
+            orders_models.OneDriveSource.objects.filter(id=source_id).delete()
+            return JsonResponse({'success': True, 'message': 'Source deleted'})
+
+        elif action == 'toggle':
+            source_id = request.POST.get('source_id')
+            source = orders_models.OneDriveSource.objects.get(id=source_id)
+            source.is_active = not source.is_active
+            source.save()
+            return JsonResponse({'success': True, 'is_active': source.is_active})
+
+    import json as json_lib
+    # Serialize saved mappings and imported rows per source for JS
+    source_mappings = {}
+    source_imported_rows = {}
+    for s in sources:
+        source_mappings[s.id] = s.last_column_mapping or {}
+        source_imported_rows[s.id] = s.last_imported_rows or []
+
+    context = {
+        'page_title': 'OneDrive Import Sources',
+        'sources': sources,
+        'businesses': businesses,
+        'source_mappings_json': json_lib.dumps(source_mappings),
+        'source_imported_rows_json': json_lib.dumps(source_imported_rows),
+    }
+    return render(request, 'workforce/onedrive_sources.html', context)
+
+
+def _onedrive_download_file(source):
+    """Download Excel file from OneDrive source. Returns (bytes, error_msg)."""
+    import requests as http_requests
+
+    link = source.share_link.strip()
+
+    try:
+        # Strategy: Follow the share link without redirects to get the intermediate URL,
+        # then append &download=1 to force file download instead of web view.
+        resp1 = http_requests.get(link, timeout=30, allow_redirects=False)
+
+        if resp1.status_code in (301, 302, 307, 308):
+            redirect_url = resp1.headers.get('Location', '')
+            if redirect_url:
+                # Append download=1 to the redirect URL
+                sep = '&' if '?' in redirect_url else '?'
+                download_url = redirect_url + sep + 'download=1'
+                resp = http_requests.get(download_url, timeout=60, allow_redirects=True)
+                content_type = resp.headers.get('Content-Type', '')
+
+                if resp.status_code == 200 and 'text/html' not in content_type:
+                    return resp.content, None
+
+        # Fallback: try the model's get_download_url() method
+        download_url = source.get_download_url()
+        resp = http_requests.get(download_url, timeout=30, allow_redirects=True)
+        content_type = resp.headers.get('Content-Type', '')
+
+        if resp.status_code == 200 and 'text/html' not in content_type:
+            return resp.content, None
+
+        return None, 'Could not download the file. Make sure it is shared with "Anyone with the link" in OneDrive.'
+
+    except http_requests.exceptions.Timeout:
+        return None, 'Download timed out. The file may be too large or OneDrive is slow.'
+    except Exception as e:
+        return None, f'Download error: {str(e)}'
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def onedrive_fetch_sheets(request, source_id):
+    """Fetch Excel from OneDrive and return list of sheet names with row counts."""
+    import openpyxl
+    from io import BytesIO
+
+    source = get_object_or_404(orders_models.OneDriveSource, id=source_id)
+
+    try:
+        file_bytes, err = _onedrive_download_file(source)
+        if err:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+
+        try:
+            wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+        except Exception as parse_err:
+            return JsonResponse({
+                'success': False,
+                'error': f'Could not read Excel file: {str(parse_err)}. Make sure it is an .xlsx file.'
+            }, status=400)
+
+        sheets = []
+        for name in wb.sheetnames:
+            ws = wb[name]
+            row_count = 0
+            for _ in ws.iter_rows(values_only=True):
+                row_count += 1
+            sheets.append({'name': name, 'rows': max(0, row_count - 1)})  # exclude header
+        wb.close()
+
+        return JsonResponse({'success': True, 'sheets': sheets})
+
+    except Exception as e:
+        logger.exception("OneDrive fetch sheets error for source %s: %s", source_id, str(e))
+        return JsonResponse({'success': False, 'error': f'Error: {str(e)}'}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def onedrive_sheet_preview(request, source_id):
+    """Fetch Excel and return preview rows from a specific sheet. Paginates from the top."""
+    import openpyxl
+    from io import BytesIO
+
+    source = get_object_or_404(orders_models.OneDriveSource, id=source_id)
+    sheet_name = request.POST.get('sheet_name', '')
+    offset = int(request.POST.get('offset', 0))
+    limit = int(request.POST.get('limit', 10))
+
+    try:
+        file_bytes, err = _onedrive_download_file(source)
+        if err:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+
+        try:
+            wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+        except Exception as parse_err:
+            return JsonResponse({'success': False, 'error': str(parse_err)}, status=400)
+
+        if sheet_name not in wb.sheetnames:
+            wb.close()
+            return JsonResponse({'success': False, 'error': f'Sheet "{sheet_name}" not found'}, status=400)
+
+        ws = wb[sheet_name]
+        all_rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+
+        if not all_rows:
+            return JsonResponse({'success': True, 'headers': [], 'rows': [], 'total': 0, 'has_more': False})
+
+        # First row = headers
+        headers = [str(h).strip() if h else '' for h in all_rows[0]]
+        data_rows = all_rows[1:]
+        total = len(data_rows)
+
+        if total == 0:
+            return JsonResponse({'success': True, 'headers': headers, 'rows': [], 'total': 0, 'has_more': False})
+
+        # Paginate from top: offset=0 means rows 1-10, offset=10 means rows 11-20, etc.
+        start_idx = offset
+        end_idx = min(total, offset + limit)
+
+        if start_idx >= total:
+            return JsonResponse({'success': True, 'headers': headers, 'rows': [], 'total': total, 'has_more': False})
+
+        sliced = data_rows[start_idx:end_idx]
+        row_list = []
+        for i, row in enumerate(sliced):
+            row_num = start_idx + i + 2  # +2 for 1-indexed + header row
+            cells = [str(c).strip() if c is not None else '' for c in row]
+            row_list.append({'row_num': row_num, 'cells': cells})
+
+        has_more = end_idx < total
+
+        return JsonResponse({
+            'success': True,
+            'headers': headers,
+            'rows': row_list,
+            'total': total,
+            'has_more': has_more,
+            'next_offset': offset + limit,
+        })
+
+    except Exception as e:
+        logger.exception("OneDrive sheet preview error for source %s: %s", source_id, str(e))
+        return JsonResponse({'success': False, 'error': f'Error: {str(e)}'}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def onedrive_import_trigger(request, source_id):
+    """Import selected rows from OneDrive Excel using user-defined column mapping."""
+    import openpyxl
+    import uuid
+    import json as json_lib
+    from io import BytesIO
+    from core.utils import (
+        contains_arabic, translate_to_english,
+        convert_arabic_numerals, format_whatsapp_number
+    )
+
+    source = get_object_or_404(orders_models.OneDriveSource, id=source_id)
+    business = source.business
+
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+
+    sheet_name = body.get('sheet_name', '')
+    row_numbers = set(body.get('row_numbers', []))  # Excel row numbers to import
+    column_mapping = body.get('column_mapping', {})  # {col_idx_str: db_field}
+
+    if not row_numbers:
+        return JsonResponse({'success': False, 'error': 'No rows selected'}, status=400)
+    if not column_mapping:
+        return JsonResponse({'success': False, 'error': 'No column mapping provided'}, status=400)
+
+    # Build field_indices: {db_field: col_idx}
+    field_indices = {}
+    for col_idx_str, db_field in column_mapping.items():
+        if db_field:
+            field_indices[db_field] = int(col_idx_str)
+
+    # Check required
+    required = ['customer_name', 'customer_phone', 'customer_address']
+    missing = [f for f in required if f not in field_indices]
+    if missing:
+        return JsonResponse({
+            'success': False,
+            'error': f'Required fields not mapped: {", ".join(missing)}'
+        }, status=400)
+
+    try:
+        file_bytes, err = _onedrive_download_file(source)
+        if err:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+
+        try:
+            wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+        except Exception as parse_err:
+            return JsonResponse({'success': False, 'error': f'Could not read file: {str(parse_err)}'}, status=400)
+
+        if sheet_name and sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+        else:
+            ws = wb.active
+
+        rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+
+        def get_val(row_data, field):
+            idx = field_indices.get(field)
+            if idx is not None and idx < len(row_data):
+                val = row_data[idx]
+                return str(val).strip() if val is not None else ''
+            return ''
+
+        def safe_int(val):
+            try:
+                return int(float(val)) if val else 0
+            except (ValueError, TypeError):
+                return 0
+
+        def safe_int_or_none(val):
+            try:
+                if not val or (isinstance(val, str) and not val.strip()):
+                    return None
+                return int(float(val))
+            except (ValueError, TypeError):
+                return None
+
+        saved = 0
+        skipped = 0
+        errors = []
+        imported_rows_data = []
+        start_row = min(row_numbers) if row_numbers else 2
+
+        data_rows = rows[1:]  # skip header
+        for row_num, row_data in enumerate(data_rows, start=2):
+            if row_num not in row_numbers:
+                continue
+            if not any(row_data):
+                skipped += 1
+                continue
+
+            customer_name = get_val(row_data, 'customer_name')
+            customer_phone = get_val(row_data, 'customer_phone')
+            customer_address = get_val(row_data, 'customer_address')
+
+            if not customer_name or not customer_phone:
+                skipped += 1
+                continue
+
+            client_order_code = get_val(row_data, 'client_order_code')
+            if not client_order_code:
+                client_order_code = f"OD-{uuid.uuid4().hex[:8].upper()}"
+
+            if orders_models.Order.objects.filter(client_order_code=client_order_code).exists():
+                skipped += 1
+                errors.append(f"Row {row_num}: Duplicate '{client_order_code}'")
+                continue
+
+            try:
+                customer_phone = convert_arabic_numerals(customer_phone)
+                raw_whatsapp = get_val(row_data, 'customer_whatsapp')
+                customer_whatsapp = format_whatsapp_number(raw_whatsapp) if raw_whatsapp else format_whatsapp_number(customer_phone)
+
+                if contains_arabic(customer_name):
+                    customer_name = translate_to_english(customer_name)
+                if contains_arabic(customer_address):
+                    customer_address = translate_to_english(customer_address)
+
+                seller_notes = get_val(row_data, 'seller_notes')
+                internal_notes = get_val(row_data, 'internal_notes')
+                notes_parts = []
+                if seller_notes:
+                    notes_parts.append(f"Seller: {seller_notes}")
+                if internal_notes:
+                    notes_parts.append(f"Ezzy: {internal_notes}")
+                combined_notes = ' | '.join(notes_parts) if notes_parts else ''
+
+                order = orders_models.Order(
+                    business=business,
+                    client_order_code=client_order_code,
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
+                    customer_whatsapp=customer_whatsapp,
+                    customer_address=customer_address or '',
+                    dl_zone=safe_int_or_none(get_val(row_data, 'dl_zone')),
+                    dl_street=safe_int_or_none(get_val(row_data, 'dl_street')),
+                    dl_building=safe_int_or_none(get_val(row_data, 'dl_building')),
+                    cod_amount=safe_int(get_val(row_data, 'cod_amount')),
+                    dl_amount=safe_int(get_val(row_data, 'dl_amount') if 'dl_amount' in field_indices else '0'),
+                    order_notes=combined_notes[:100] if combined_notes else '',
+                    deadline_date=get_val(row_data, 'deadline_date'),
+                    order_status='to_review',
+                    verification_status='pending',
+                    original_order_data={
+                        'source': 'onedrive_import',
+                        'onedrive_source_id': source.id,
+                        'sheet_name': sheet_name,
+                        'row_number': row_num,
+                    },
+                )
+                # Save product description + total qty on order (not as items)
+                desc_parts = []
+                total_qty = 0
+                product_name = get_val(row_data, 'product_name')
+                if product_name:
+                    main_qty = safe_int(get_val(row_data, 'quantity')) or 1
+                    desc_parts.append(f"{product_name} x{main_qty}")
+                    total_qty += main_qty
+
+                for i in range(1, 6):
+                    pn = get_val(row_data, f'product_{i}')
+                    if pn:
+                        pc = safe_int(get_val(row_data, f'count_{i}')) or 1
+                        desc_parts.append(f"{pn} x{pc}")
+                        total_qty += pc
+
+                if desc_parts:
+                    order.package_description = ', '.join(desc_parts)[:255]
+                    order.total_quantity = total_qty
+
+                order.save()
+
+                imported_rows_data.append({'row': row_num, 'order': order.order_number})
+                saved += 1
+            except Exception as e:
+                errors.append(f"Row {row_num}: {str(e)}")
+
+        from django.utils import timezone
+        # Merge with previously imported rows (keep old + add new)
+        existing_imported = source.last_imported_rows or []
+        existing_imported.extend(imported_rows_data)
+        source.last_import_at = timezone.now()
+        source.last_import_count = saved
+        source.last_import_by = request.user
+        source.last_sheet_name = sheet_name
+        source.last_start_row = start_row
+        source.last_import_max_row = max(row_numbers) if row_numbers else 0
+        source.last_imported_rows = existing_imported
+        source.last_column_mapping = column_mapping
+        source.save()
+
+        return JsonResponse({
+            'success': True,
+            'saved': saved,
+            'skipped': skipped,
+            'errors': errors[:20],
+            'imported': imported_rows_data[:20],
+            'message': f'{saved} orders imported, {skipped} skipped'
+        })
+
+    except Exception as e:
+        logger.exception("OneDrive import error for source %s: %s", source_id, str(e))
+        return JsonResponse({'success': False, 'error': f'Import failed: {str(e)}'}, status=500)

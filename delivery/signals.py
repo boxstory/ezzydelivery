@@ -220,6 +220,68 @@ def _send_location_verification_on_publish(task):
         logger.error(f"Error sending location verification on publish for task {task.pk}: {e}", exc_info=True)
 
 
+def _create_task_status_point(task, old_status, new_status):
+    """Create a TaskStatusPoint with driver GPS and distance from delivery location."""
+    from fleet import models as fleet_models
+
+    driver_lat = driver_lng = accuracy = None
+    delivery_lat = delivery_lng = None
+    distance_km = None
+
+    # Get latest driver GPS location
+    if task.driver_id:
+        latest_loc = fleet_models.DriverLocation.objects.filter(
+            driver_id=task.driver_id
+        ).order_by('-created_at').first()
+        if latest_loc:
+            driver_lat = latest_loc.latitude
+            driver_lng = latest_loc.longitude
+            accuracy = latest_loc.accuracy
+
+    # Get delivery location coordinates
+    if task.order_id:
+        order = task.order
+        if order.latitude and order.longitude:
+            delivery_lat = order.latitude
+            delivery_lng = order.longitude
+        elif task.dl_to_address and task.dl_to_address.dl_latitude and task.dl_to_address.dl_longitude:
+            delivery_lat = task.dl_to_address.dl_latitude
+            delivery_lng = task.dl_to_address.dl_longitude
+
+    # Calculate distance if both points available
+    if driver_lat and driver_lng and delivery_lat and delivery_lng:
+        distance_km = round(
+            delivery_models.TaskStatusPoint.haversine_km(
+                driver_lat, driver_lng, delivery_lat, delivery_lng
+            ), 3
+        )
+
+    # Also populate completion_latitude/longitude when delivered
+    if new_status == 'delivered' and driver_lat and driver_lng:
+        DeliveryTask.objects.filter(pk=task.pk).update(
+            completion_latitude=driver_lat,
+            completion_longitude=driver_lng,
+        )
+
+    delivery_models.TaskStatusPoint.objects.create(
+        task=task,
+        driver=task.driver,
+        old_status=old_status,
+        new_status=new_status,
+        latitude=driver_lat,
+        longitude=driver_lng,
+        accuracy=accuracy,
+        distance_from_delivery=distance_km,
+        delivery_latitude=delivery_lat,
+        delivery_longitude=delivery_lng,
+    )
+    logger.info(
+        f"TaskStatusPoint: task {task.dl_task_number} "
+        f"{old_status} → {new_status} "
+        f"(driver GPS: {driver_lat},{driver_lng}, dist: {distance_km} km)"
+    )
+
+
 @receiver(post_save, sender=DeliveryTask)
 def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs):
     """Handle delivery task creation/update side effects"""
@@ -259,6 +321,16 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                 log_delivery_task_status_change(instance, 'dl_task_status', old_dl, new_dl, DL_STATUS_DISPLAY, notes=status_notes)
         except Exception as e:
             logger.error(f"Error logging delivery task status history: {e}")
+
+    # Capture GPS point on every status change
+    if not created:
+        old_status = getattr(instance, '_old_dl_task_status', None)
+        new_status = instance.dl_task_status
+        if old_status is not None and old_status != new_status:
+            try:
+                _create_task_status_point(instance, old_status, new_status)
+            except Exception as e:
+                logger.error(f"Error creating TaskStatusPoint for task {instance.pk}: {e}")
 
     # Sync delivery task status → order status (for all non-creation saves)
     if not created:

@@ -240,17 +240,41 @@
                 </div>
             </div>
 
-            <!-- Order Items -->
-            {% if order_items %}
+            <!-- Package Description -->
+            {% if order.package_description or order_items or order.cod_amount %}
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fa-solid fa-box me-2"></i>
-                        Order Items
+                        <i class="fa-solid fa-box-open me-2"></i>
+                        Package Description
                     </h5>
                 </div>
-                <div class="card-body p-0">
-                    <table class="table table-hover mb-0">
+                <div class="card-body">
+                    <!-- Summary: Package / Qty / COD -->
+                    <div class="d-flex flex-column gap-2 p-3 rounded mb-3" style="background:#fff8e1;border:1px solid #f5c542;">
+                        {% if order.package_description %}
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-box-open" style="color:#c49000;"></i>
+                            <span class="text-muted" style="min-width:60px;">Package</span>
+                            <span class="fw-semibold">{{ order.package_description }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
+                            <span class="text-muted" style="min-width:60px;">Qty</span>
+                            <span class="fw-semibold">{% if order.total_quantity %}{{ order.total_quantity }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-money-bill-wave text-success"></i>
+                            <span class="text-muted" style="min-width:60px;">COD</span>
+                            <span class="fw-semibold">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+                        </div>
+                    </div>
+
+                    <!-- Product Items -->
+                    {% if order_items %}
+                    <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.7rem;">Product Items ({{ order_items|length }})</div>
+                    <table class="table table-hover table-sm mb-0">
                         <thead class="table-light">
                             <tr>
                                 <th>Product</th>
@@ -270,6 +294,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}

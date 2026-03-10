@@ -1,0 +1,593 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block content %}
+<!-- Inline styles inside content so HTMX swap picks them up -->
+<style>
+    #wf-live-map {
+        width: 100%;
+        height: calc(100vh - 70px);
+        min-height: 500px;
+    }
+    .leaflet-pane { z-index: 2 !important; }
+    .leaflet-top, .leaflet-bottom { z-index: 3 !important; }
+
+    .map-bar {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 400;
+        display: flex;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .map-bar__chip {
+        background: var(--brand-primary, #001f3f);
+        color: #fff;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        white-space: nowrap;
+    }
+    .map-bar__chip--drivers { background: #3b82f6; }
+    .map-bar__num {
+        background: rgba(255,255,255,0.25);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .map-legend {
+        position: absolute;
+        bottom: 20px;
+        left: 12px;
+        z-index: 400;
+        background: #fff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        font-size: 11px;
+        line-height: 1.8;
+    }
+    .map-legend__item { display: flex; align-items: center; gap: 6px; }
+    .map-legend__dot {
+        width: 12px; height: 12px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 3px rgba(0,0,0,0.2);
+        flex-shrink: 0;
+    }
+
+    .map-filters {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 400;
+        display: flex;
+        gap: 6px;
+    }
+    .map-filters__btn {
+        background: #fff;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        color: #374151;
+        transition: all 0.15s;
+    }
+    .map-filters__btn:hover { background: #f3f4f6; }
+    .map-filters__btn.active { background: var(--brand-primary, #001f3f); color: #fff; }
+    .map-filters__dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 4px;
+    }
+    .map-filters__btn.active .map-filters__dot { box-shadow: 0 0 0 2px rgba(255,255,255,0.5); }
+
+    .map-live-toggle {
+        position: absolute;
+        top: 50px;
+        right: 12px;
+        z-index: 400;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fff;
+        padding: 6px 14px;
+        border-radius: 20px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+    }
+    .map-live-toggle__switch {
+        position: relative;
+        width: 36px; height: 20px;
+        background: #d1d5db;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .map-live-toggle__switch.on { background: #10b981; }
+    .map-live-toggle__switch::after {
+        content: '';
+        position: absolute;
+        top: 2px; left: 2px;
+        width: 16px; height: 16px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .map-live-toggle__switch.on::after { transform: translateX(16px); }
+    .map-live-toggle__dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #d1d5db;
+    }
+    .map-live-toggle__dot.on { background: #10b981; animation: wf-blink 1.5s infinite; }
+    @keyframes wf-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .wf-marker {
+        display: flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        border: 2px solid #fff;
+    }
+    .wf-marker__inner { transform: rotate(45deg); font-size: 11px; font-weight: 800; color: #fff; }
+    .wf-marker--new       { background: #8b5cf6; }
+    .wf-marker--assigned  { background: #6366f1; }
+    .wf-marker--accepted  { background: #3b82f6; }
+    .wf-marker--picked    { background: #fb923c; }
+    .wf-marker--transit   { background: #f59e0b; }
+    .wf-marker--issue     { background: #ef4444; }
+    .wf-marker--delivered { background: #22c55e; }
+    .wf-marker--cancelled { background: #6b7280; }
+
+    .wf-driver-marker { position: relative; width: 34px; height: 34px; }
+    .wf-driver-marker__dot {
+        width: 20px; height: 20px;
+        background: #800020;
+        border: 3px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 8px rgba(128,0,32,0.5);
+        position: absolute; top: 7px; left: 7px;
+    }
+    .wf-driver-marker__pulse {
+        width: 34px; height: 34px;
+        background: rgba(128,0,32,0.25);
+        border-radius: 50%;
+        position: absolute; top: 0; left: 0;
+        animation: wf-pulse 2s ease-out infinite;
+    }
+    .wf-driver-marker--stale .wf-driver-marker__dot { background: #9ca3af; box-shadow: 0 0 8px rgba(156,163,175,0.4); }
+    .wf-driver-marker--stale .wf-driver-marker__pulse { background: rgba(156,163,175,0.2); }
+    .wf-driver-marker--no-gps .wf-driver-marker__dot { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5); }
+    .wf-driver-marker--no-gps .wf-driver-marker__pulse { background: rgba(245,158,11,0.2); animation: none; }
+    @keyframes wf-pulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.5); opacity: 0; } }
+
+    .wf-popup { min-width: 220px; font-family: inherit; }
+    .wf-popup__header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 2px solid #f3f4f6; }
+    .wf-popup__task-num { font-size: 14px; font-weight: 800; color: #001f3f; }
+    .wf-popup__badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
+    .wf-popup__badge--assigned    { background: #e0e7ff; color: #4338ca; }
+    .wf-popup__badge--accepted    { background: #dbeafe; color: #2563eb; }
+    .wf-popup__badge--picked_up   { background: #fef3c7; color: #92400e; }
+    .wf-popup__badge--out_for_delivery,
+    .wf-popup__badge--in_transit,
+    .wf-popup__badge--start_ride  { background: #d1fae5; color: #065f46; }
+    .wf-popup__badge--for_review   { background: #ede9fe; color: #6d28d9; }
+    .wf-popup__badge--pending      { background: #ede9fe; color: #6d28d9; }
+    .wf-popup__badge--contacted   { background: #dbeafe; color: #1e40af; }
+    .wf-popup__badge--non_reachable { background: #fee2e2; color: #991b1b; }
+    .wf-popup__badge--delivered   { background: #dcfce7; color: #166534; }
+    .wf-popup__badge--failed      { background: #fee2e2; color: #991b1b; }
+    .wf-popup__badge--rejected    { background: #fee2e2; color: #991b1b; }
+    .wf-popup__badge--cancelled   { background: #f3f4f6; color: #374151; }
+    .wf-popup__row { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px; color: #374151; }
+    .wf-popup__row i { width: 14px; text-align: center; color: #9ca3af; font-size: 11px; }
+    .wf-popup__row a { color: #3b82f6; text-decoration: none; font-weight: 600; }
+    .wf-popup__link {
+        display: block; margin-top: 8px; padding: 7px;
+        background: #001f3f; color: #fff !important;
+        border-radius: 6px; text-align: center;
+        text-decoration: none !important; font-weight: 700; font-size: 12px;
+    }
+    .wf-popup__link:hover { background: #003366; }
+
+    .wf-dpopup { min-width: 180px; }
+    .wf-dpopup__name { font-size: 14px; font-weight: 800; color: #001f3f; margin-bottom: 4px; }
+    .wf-dpopup__meta { font-size: 12px; color: #6b7280; }
+    .wf-dpopup__meta--stale { color: #ef4444; }
+
+    .map-recenter {
+        position: absolute; bottom: 20px; right: 12px; z-index: 400;
+        width: 40px; height: 40px; border-radius: 50%;
+        background: #fff; border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px; color: #001f3f; cursor: pointer;
+    }
+    .map-recenter:active { background: #f3f4f6; }
+</style>
+
+<div style="position: relative;">
+    <!-- Summary chips -->
+    <div class="map-bar">
+        <div class="map-bar__chip">
+            <span class="map-bar__num">{{ pin_count }}</span>
+            deliveries
+        </div>
+        <div class="map-bar__chip map-bar__chip--drivers">
+            <span class="map-bar__num">{{ driver_count }}</span>
+            drivers
+        </div>
+    </div>
+
+    <!-- Toggle filters -->
+    <div class="map-filters">
+        <button class="map-filters__btn" data-filter="all" onclick="filterTasks('all', this)">All</button>
+        <button class="map-filters__btn active" data-filter="new" onclick="filterTasks('new', this)">
+            <span class="map-filters__dot" style="background:#8b5cf6;"></span>New
+        </button>
+        <button class="map-filters__btn active" data-filter="active" onclick="filterTasks('active', this)">
+            <span class="map-filters__dot" style="background:#3b82f6;"></span>Active
+        </button>
+        <button class="map-filters__btn active" data-filter="transit" onclick="filterTasks('transit', this)">
+            <span class="map-filters__dot" style="background:#f59e0b;"></span>In Transit
+        </button>
+        <button class="map-filters__btn" data-filter="delivered" onclick="filterTasks('delivered', this)">
+            <span class="map-filters__dot" style="background:#22c55e;"></span>Delivered
+        </button>
+        <button class="map-filters__btn" data-filter="issue" onclick="filterTasks('issue', this)">
+            <span class="map-filters__dot" style="background:#ef4444;"></span>Issue
+        </button>
+        <button class="map-filters__btn active" data-filter="drivers" onclick="toggleLayer('drivers', this)">
+            <i class="fa-solid fa-car me-1"></i>Drivers
+        </button>
+    </div>
+
+    <!-- Live tracking toggle -->
+    <div class="map-live-toggle" id="wf-live-toggle">
+        <span class="map-live-toggle__dot on" id="wf-live-dot"></span>
+        <span id="wf-live-label">Live</span>
+        <div class="map-live-toggle__switch on" id="wf-live-switch" onclick="toggleLiveTracking()"></div>
+    </div>
+
+    <!-- Map container -->
+    <div id="wf-live-map"></div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#8b5cf6;"></span> New</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#6366f1;"></span> Assigned</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#3b82f6;"></span> Accepted</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#fb923c;"></span> Picked Up</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#f59e0b;"></span> In Transit</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#ef4444;"></span> Issue</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#22c55e;"></span> Delivered</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#6b7280;"></span> Cancelled</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#800020; box-shadow: 0 0 6px rgba(128,0,32,0.6);"></span> Driver (live)</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#9ca3af;"></span> Driver (stale)</div>
+        <div class="map-legend__item"><span class="map-legend__dot" style="background:#f59e0b;"></span> Driver (no GPS)</div>
+    </div>
+
+    <!-- Recenter -->
+    <button type="button" class="map-recenter" onclick="recenterMap()" title="Fit all">
+        <i class="fa-solid fa-crosshairs"></i>
+    </button>
+</div>
+
+<!-- Map initialization script — Leaflet is preloaded in wf_dashboard_base.html -->
+<script>
+(function() {
+    var _pins = {{ pins_json|safe }};
+    var _drivers = {{ drivers_json|safe }};
+
+    function initMap() {
+        var mapEl = document.getElementById('wf-live-map');
+        if (mapEl && mapEl._leaflet_id) {
+            mapEl._leaflet_id = null;
+            mapEl.innerHTML = '';
+        }
+        if (window._wfMapRefreshTimer) {
+            clearInterval(window._wfMapRefreshTimer);
+            window._wfMapRefreshTimer = null;
+        }
+
+        var pins = _pins;
+        var drivers = _drivers;
+        var DOHA = [25.2854, 51.5310];
+        var isLive = true;
+
+        var map = L.map('wf-live-map', {
+            center: DOHA,
+            zoom: 11,
+            zoomControl: false,
+            attributionControl: false
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+        var bounds = L.latLngBounds();
+        var taskLayerGroup = L.layerGroup().addTo(map);
+        var driverLayerGroup = L.layerGroup().addTo(map);
+        var allPins = [];
+        // Active filters — multi-select. Initial: new + active + transit on, delivered + issue off
+        var activeFilters = { new: true, active: true, transit: true, delivered: false, issue: false };
+
+        // Status groups for filtering
+        var newStatuses = ['for_review', 'pending'];
+        var activeStatuses = ['assigned', 'accepted', 'picked_up'];
+        var transitStatuses = ['start_ride', 'out_for_delivery', 'in_transit', 'contacted'];
+        var issueStatuses = ['non_reachable', 'failed', 'rejected', 'cancelled'];
+
+        function statusGroup(status) {
+            if (newStatuses.indexOf(status) !== -1) return 'new';
+            if (transitStatuses.indexOf(status) !== -1) return 'transit';
+            if (issueStatuses.indexOf(status) !== -1) return 'issue';
+            if (status === 'delivered') return 'delivered';
+            return 'active';
+        }
+
+        function matchesFilter(status) {
+            return activeFilters[statusGroup(status)];
+        }
+
+        function markerClass(status) {
+            if (status === 'for_review' || status === 'pending') return 'wf-marker--new';
+            if (status === 'assigned') return 'wf-marker--assigned';
+            if (status === 'picked_up') return 'wf-marker--picked';
+            if (status === 'delivered') return 'wf-marker--delivered';
+            if (status === 'cancelled') return 'wf-marker--cancelled';
+            if (['failed','rejected','non_reachable'].indexOf(status) !== -1) return 'wf-marker--issue';
+            if (['out_for_delivery','in_transit','start_ride','contacted'].indexOf(status) !== -1) return 'wf-marker--transit';
+            return 'wf-marker--accepted';
+        }
+
+        function addrLine(p) {
+            var parts = [];
+            if (p.zone) parts.push('Z' + p.zone);
+            if (p.street) parts.push('S' + p.street);
+            if (p.building) parts.push('B' + p.building);
+            return parts.length ? parts.join('/') : (p.address || 'No address');
+        }
+
+        function taskPopup(p) {
+            var h = '<div class="wf-popup">';
+            h += '<div class="wf-popup__header">';
+            h += '<span class="wf-popup__task-num">#' + p.task_number + '</span>';
+            h += '<span class="wf-popup__badge wf-popup__badge--' + p.status + '">' + p.status_display + '</span>';
+            h += '</div>';
+            h += '<div class="wf-popup__row"><i class="fa-solid fa-user-tie"></i><strong>' + p.driver_name + '</strong></div>';
+            if (p.customer_name) h += '<div class="wf-popup__row"><i class="fa-solid fa-user"></i>' + p.customer_name + '</div>';
+            if (p.customer_phone) h += '<div class="wf-popup__row"><i class="fa-solid fa-phone"></i><a href="tel:' + p.customer_phone + '">' + p.customer_phone + '</a></div>';
+            h += '<div class="wf-popup__row"><i class="fa-solid fa-location-dot"></i>' + addrLine(p) + '</div>';
+            if (p.business_name) h += '<div class="wf-popup__row"><i class="fa-solid fa-store"></i>' + p.business_name + '</div>';
+            h += '<a href="/workforce/delivery-task/' + p.id + '/" class="wf-popup__link"><i class="fa-solid fa-eye me-1"></i>View Task</a>';
+            h += '</div>';
+            return h;
+        }
+
+        function renderTasks(taskList, storeAsPins) {
+            if (storeAsPins) allPins = taskList;
+            taskLayerGroup.clearLayers();
+            var filtered = taskList.filter(function(p) {
+                return p.lat && p.lng && matchesFilter(p.status);
+            });
+            filtered.forEach(function(p) {
+                var markerIcon = p.status === 'delivered' ? 'fa-circle-check' : p.status === 'cancelled' ? 'fa-ban' : (p.status === 'for_review' || p.status === 'pending') ? 'fa-sparkles' : 'fa-box-open';
+                var icon = L.divIcon({
+                    className: '',
+                    html: '<div class="wf-marker ' + markerClass(p.status) + '"><span class="wf-marker__inner"><i class="fa-solid ' + markerIcon + '" style="font-size:11px;"></i></span></div>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 28],
+                    popupAnchor: [0, -24]
+                });
+                L.marker([p.lat, p.lng], { icon: icon })
+                    .bindPopup(taskPopup(p), { maxWidth: 280 })
+                    .addTo(taskLayerGroup);
+                bounds.extend([p.lat, p.lng]);
+            });
+            // Update task count chip
+            var chipEl = document.querySelectorAll('.map-bar__num')[0];
+            if (chipEl) chipEl.textContent = filtered.length;
+        }
+
+        function driverPopup(d) {
+            var noGps = !d.has_gps;
+            var stale = d.has_gps && d.minutes_ago > 10;
+            var h = '<div class="wf-dpopup">';
+            h += '<div class="wf-dpopup__name"><i class="fa-solid fa-car me-1"></i>' + d.driver_name + '</div>';
+            if (noGps) {
+                h += '<div class="wf-dpopup__meta wf-dpopup__meta--stale"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS pings received</div>';
+                h += '<div class="wf-dpopup__meta" style="color:#9ca3af;font-size:11px;"><i class="fa-solid fa-location-dot me-1"></i>Shown at task location (fallback)</div>';
+                if (d.last_status) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-circle-info me-1"></i>' + d.last_status + '</div>';
+                if (d.last_task_number) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-hashtag me-1"></i>Task #' + d.last_task_number + '</div>';
+                if (d.task_count) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-list-check me-1"></i>' + d.task_count + ' active task' + (d.task_count > 1 ? 's' : '') + '</div>';
+                if (d.updated) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-clock me-1"></i>Updated ' + d.updated + '</div>';
+            } else {
+                h += '<div class="wf-dpopup__meta' + (stale ? ' wf-dpopup__meta--stale' : '') + '">';
+                h += '<i class="fa-solid fa-satellite-dish me-1"></i>';
+                if (d.minutes_ago < 1) h += 'GPS: Just now';
+                else if (d.minutes_ago < 60) h += 'GPS: ' + d.minutes_ago + ' min ago';
+                else h += 'GPS: ' + Math.floor(d.minutes_ago / 60) + 'h ' + (d.minutes_ago % 60) + 'm ago';
+                h += '</div>';
+                if (d.task_count > 0) {
+                    h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-list-check me-1"></i>' + d.task_count + ' active task' + (d.task_count > 1 ? 's' : '') + '</div>';
+                } else {
+                    h += '<div class="wf-dpopup__meta" style="color:#10b981;"><i class="fa-solid fa-wifi me-1"></i>Online — no tasks</div>';
+                }
+                if (d.speed !== null && d.speed > 0) {
+                    h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-gauge me-1"></i>' + Math.round(d.speed * 3.6) + ' km/h</div>';
+                }
+            }
+            h += '</div>';
+            return h;
+        }
+
+        function renderDrivers(driverList) {
+            driverLayerGroup.clearLayers();
+            driverList.forEach(function(d) {
+                if (!d.lat || !d.lng) return;
+                var noGps = !d.has_gps;
+                var stale = d.has_gps && d.minutes_ago > 10;
+                var cssClass = noGps ? ' wf-driver-marker--no-gps' : (stale ? ' wf-driver-marker--stale' : '');
+                var icon = L.divIcon({
+                    className: '',
+                    html: '<div class="wf-driver-marker' + cssClass + '"><div class="wf-driver-marker__pulse"></div><div class="wf-driver-marker__dot"></div></div>',
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 17],
+                    popupAnchor: [0, -14]
+                });
+                L.marker([d.lat, d.lng], { icon: icon, zIndexOffset: 1000 })
+                    .bindPopup(driverPopup(d), { maxWidth: 220 })
+                    .addTo(driverLayerGroup);
+                bounds.extend([d.lat, d.lng]);
+            });
+        }
+
+        // Fetch data from server (live or static mode)
+        function refreshData() {
+            var mode = isLive ? 'live' : 'static';
+            fetch('/workforce/tasks/live-map/?mode=' + mode, {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                renderDrivers(data.drivers || []);
+                renderTasks(data.pins || [], true);
+                var chipEls = document.querySelectorAll('.map-bar__num');
+                if (chipEls[0]) chipEls[0].textContent = data.pin_count || 0;
+                if (chipEls[1]) chipEls[1].textContent = data.driver_count || 0;
+            })
+            .catch(function() {});
+        }
+
+        function startAutoRefresh() {
+            if (window._wfMapRefreshTimer) clearInterval(window._wfMapRefreshTimer);
+            window._wfMapRefreshTimer = setInterval(refreshData, 30000);
+        }
+
+        function stopAutoRefresh() {
+            if (window._wfMapRefreshTimer) {
+                clearInterval(window._wfMapRefreshTimer);
+                window._wfMapRefreshTimer = null;
+            }
+        }
+
+        // Initial render
+        renderTasks(pins, true);
+        renderDrivers(drivers);
+
+        if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+        }
+
+        setTimeout(function() { map.invalidateSize(); }, 200);
+
+        window.recenterMap = function() {
+            if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+        };
+
+        window.toggleLayer = function(layer, btn) {
+            btn.classList.toggle('active');
+            var group = layer === 'tasks' ? taskLayerGroup : driverLayerGroup;
+            if (map.hasLayer(group)) map.removeLayer(group);
+            else map.addLayer(group);
+        };
+
+        window.filterTasks = function(filter, btn) {
+            var taskBtns = document.querySelectorAll('.map-filters__btn[data-filter]');
+            var allBtn = document.querySelector('.map-filters__btn[data-filter="all"]');
+            var groupKeys = ['new', 'active', 'transit', 'delivered', 'issue'];
+
+            if (filter === 'all') {
+                // "All" toggles everything on/off
+                var allOn = groupKeys.every(function(k) { return activeFilters[k]; });
+                groupKeys.forEach(function(k) { activeFilters[k] = !allOn; });
+            } else {
+                // Toggle individual filter
+                activeFilters[filter] = !activeFilters[filter];
+            }
+
+            // Update button active states
+            groupKeys.forEach(function(k) {
+                var b = document.querySelector('.map-filters__btn[data-filter="' + k + '"]');
+                if (b) {
+                    if (activeFilters[k]) b.classList.add('active');
+                    else b.classList.remove('active');
+                }
+            });
+
+            // Update "All" button — active only when all are on
+            var allActive = groupKeys.every(function(k) { return activeFilters[k]; });
+            if (allActive) allBtn.classList.add('active');
+            else allBtn.classList.remove('active');
+
+            // Ensure task layer is visible
+            if (!map.hasLayer(taskLayerGroup)) map.addLayer(taskLayerGroup);
+            renderTasks(allPins, false);
+        };
+
+        // Live tracking toggle
+        window.toggleLiveTracking = function() {
+            isLive = !isLive;
+            var sw = document.getElementById('wf-live-switch');
+            var dot = document.getElementById('wf-live-dot');
+            var label = document.getElementById('wf-live-label');
+
+            if (isLive) {
+                sw.classList.add('on');
+                dot.classList.add('on');
+                label.textContent = 'Live';
+                startAutoRefresh();
+                refreshData(); // immediate refresh
+            } else {
+                sw.classList.remove('on');
+                dot.classList.remove('on');
+                label.textContent = 'Static';
+                stopAutoRefresh();
+                refreshData(); // fetch static positions once
+            }
+        };
+
+        // Start live auto-refresh
+        startAutoRefresh();
+
+        // Stop refresh when navigating away via HTMX
+        document.body.addEventListener('htmx:beforeSwap', function() {
+            stopAutoRefresh();
+        }, { once: true });
+    } // end initMap
+
+    if (typeof L !== 'undefined') {
+        initMap();
+    } else {
+        window.addEventListener('load', initMap);
+    }
+})();
+</script>
+{% endblock content %}

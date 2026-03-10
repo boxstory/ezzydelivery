@@ -18,7 +18,10 @@ urlpatterns = [
     path('sellers/api-configs/', workforce_views.wf_seller_api_configs, name='wf_seller_api_configs'),
     path('sellers/api-configs/<int:api_id>/approve/', workforce_views.wf_approve_api_config, name='wf_approve_api_config'),
     path('sellers/api-configs/<int:api_id>/test/', workforce_views.wf_test_api_config, name='wf_test_api_config'),
+    path('sellers/api-configs/<int:api_id>/test/result/', workforce_views.wf_test_api_config_result, name='wf_test_api_config_result'),
     path('sellers/api-configs/google-sheet/save/', workforce_views.wf_save_google_sheet, name='wf_save_google_sheet'),
+    path('google-sheets/auth/', workforce_views.google_sheets_auth_start, name='google_sheets_auth_start'),
+    path('google-sheets/auth/callback/', workforce_views.google_sheets_auth_callback, name='google_sheets_auth_callback'),
     path('sellers/<int:business_id>/', workforce_views.seller_detail, name='seller_detail'),
     path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
 
@@ -28,6 +31,12 @@ urlpatterns = [
     path('drivers/active/', workforce_views.drivers_active, name='drivers_active'),
     path('drivers/inactive/', workforce_views.drivers_inactive, name='drivers_inactive'),
     path('drivers/<int:driver_id>/', workforce_views.driver_detail, name='driver_detail'),
+    path('drivers/<int:driver_id>/vehicle/add/', workforce_views.driver_vehicle_save, name='driver_vehicle_add'),
+    path('drivers/<int:driver_id>/vehicle/<int:vehicle_id>/edit/', workforce_views.driver_vehicle_save, name='driver_vehicle_edit'),
+    path('drivers/<int:driver_id>/vehicle/<int:vehicle_id>/delete/', workforce_views.driver_vehicle_delete, name='driver_vehicle_delete'),
+    path('drivers/<int:driver_id>/document/add/', workforce_views.driver_document_save, name='driver_document_add'),
+    path('drivers/<int:driver_id>/document/<int:document_id>/edit/', workforce_views.driver_document_save, name='driver_document_edit'),
+    path('drivers/<int:driver_id>/document/<int:document_id>/delete/', workforce_views.driver_document_delete, name='driver_document_delete'),
     path('drivers/export/', workforce_views.export_drivers_csv, name='export_drivers_csv'),
 
     #Orders sections urls -------------------------------------------------------------------
@@ -39,6 +48,9 @@ urlpatterns = [
     path('orders/api-orders/', workforce_views.wf_api_orders, name='wf_api_orders'),
     path('orders/api-orders/bulk-transfer/', workforce_views.bulk_transfer_api_orders, name='bulk_transfer_api_orders'),
     path('orders/api-orders/import/', workforce_views.import_api_orders, name='import_api_orders'),
+    path('orders/api-orders/preview/', workforce_views.preview_api_import, name='preview_api_import'),
+    path('orders/api-orders/sheet-headers/', workforce_views.wf_sheet_headers, name='wf_sheet_headers'),
+    path('orders/api-orders/save-mapping/', workforce_views.wf_save_column_mapping, name='wf_save_column_mapping'),
     path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
     path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
@@ -220,10 +232,17 @@ urlpatterns = [
     path('forms/pricing-inquiries/', workforce_views.pricing_inquiries_list, name='pricing_inquiries_list'),
     path('forms/pricing-inquiries/<int:inquiry_id>/', workforce_views.pricing_inquiry_detail, name='pricing_inquiry_detail'),
     path('forms/pricing-inquiries/<int:inquiry_id>/update-status/', workforce_views.pricing_inquiry_update_status, name='pricing_inquiry_update_status'),
+    path('forms/pricing-inquiries/<int:inquiry_id>/edit/', workforce_views.pricing_inquiry_edit, name='pricing_inquiry_edit'),
     path('forms/pricing-inquiries/<int:inquiry_id>/add-activity/', workforce_views.pricing_inquiry_add_activity, name='pricing_inquiry_add_activity'),
     path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
+
+    # OneDrive Import Sources
+    path('onedrive-sources/', workforce_views.onedrive_sources, name='onedrive_sources'),
+    path('onedrive-sources/<int:source_id>/sheets/', workforce_views.onedrive_fetch_sheets, name='onedrive_fetch_sheets'),
+    path('onedrive-sources/<int:source_id>/preview/', workforce_views.onedrive_sheet_preview, name='onedrive_sheet_preview'),
+    path('onedrive-sources/<int:source_id>/import/', workforce_views.onedrive_import_trigger, name='onedrive_import_trigger'),
 
     # Hub Operations
     path('hub/batches/', workforce_views.hub_batch_list, name='hub_batch_list'),

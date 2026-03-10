@@ -143,7 +143,27 @@ Each task should have:
                     </div>
                     <!-- Products Section (Left side) -->
                     <div class="col-12 col-md-9 order-md-1">
-                        <span class="fw-bold d-block mb-2">Order Products</span>
+                        <span class="fw-bold d-block mb-2">Package Description</span>
+                        <div class="d-flex flex-column gap-1 p-2 mb-2 rounded" style="background:#fff8e1;border:1px solid #f5c542;">
+                            {% if dl.order.package_description %}
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-box-open" style="color:#c49000;font-size:0.7rem;"></i>
+                                <span class="text-muted small" style="min-width:45px;">Package</span>
+                                <span class="small fw-medium">{{ dl.order.package_description }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-cubes" style="color:#c49000;font-size:0.7rem;"></i>
+                                <span class="text-muted small" style="min-width:45px;">Qty</span>
+                                <span class="small fw-semibold">{% if dl.order.total_quantity %}{{ dl.order.total_quantity }}{% else %}{{ dl.order.order_items.count }}{% endif %}</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-money-bill-wave text-success" style="font-size:0.7rem;"></i>
+                                <span class="text-muted small" style="min-width:45px;">COD</span>
+                                <span class="small fw-semibold">{% if dl.order.cod_amount %}{{ dl.order.cod_amount }} QR{% else %}—{% endif %}</span>
+                            </div>
+                        </div>
+                        <span class="fw-bold d-block mb-2">Product Items</span>
                         {% if dl.order.order_items.all %}
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered mb-0">

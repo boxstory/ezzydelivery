@@ -154,9 +154,9 @@
         <span class="odp__cod-value">{{ order.cod_amount }}</span>
       </div>
       <div class="odp__cod-status">
-        <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
-          <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
-          {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
+        <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}collected{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+          <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'cod_with_driver' %}fa-user-check{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}fa-building{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
+          {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}With Driver{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}With Ezzy{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
         </span>
         {% if order.dl_amount %}
         <span class="odp__cod-fee">
@@ -168,13 +168,36 @@
   </div>
   {% endif %}
 
-  <!-- Order Items -->
-  {% if order_items %}
+  <!-- Package Description -->
+  {% if order.package_description or order_items or order.cod_amount %}
   <div class="odp__section">
     <div class="odp__section-head">
       <i class="fa-solid fa-box-open"></i>
-      <span>Items ({{ order_items|length }})</span>
+      <span>Package Description</span>
     </div>
+    <!-- Summary: Package / Qty / COD -->
+    <div class="d-flex flex-column gap-1 p-2 rounded mb-2" style="background:#fff8e1;border:1px solid #f5c542;">
+      {% if order.package_description %}
+      <div class="d-flex align-items-center gap-2">
+        <i class="fa-solid fa-box-open" style="color:#c49000;font-size:0.7rem;"></i>
+        <span class="text-muted small" style="min-width:45px;">Package</span>
+        <span class="fw-medium small">{{ order.package_description }}</span>
+      </div>
+      {% endif %}
+      <div class="d-flex align-items-center gap-2">
+        <i class="fa-solid fa-cubes" style="color:#c49000;font-size:0.7rem;"></i>
+        <span class="text-muted small" style="min-width:45px;">Qty</span>
+        <span class="fw-semibold small">{% if order.total_quantity %}{{ order.total_quantity }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <i class="fa-solid fa-money-bill-wave text-success" style="font-size:0.7rem;"></i>
+        <span class="text-muted small" style="min-width:45px;">COD</span>
+        <span class="fw-semibold small">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+      </div>
+    </div>
+    <!-- Product Items -->
+    {% if order_items %}
+    <div class="small text-muted fw-semibold text-uppercase mb-1" style="letter-spacing:0.04em;font-size:0.6rem;">Product Items ({{ order_items|length }})</div>
     <div class="odp__items">
       {% for item in order_items %}
       <div class="odp__item">
@@ -186,6 +209,7 @@
       </div>
       {% endfor %}
     </div>
+    {% endif %}
   </div>
   {% endif %}
 

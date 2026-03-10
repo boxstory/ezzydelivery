@@ -167,14 +167,38 @@ Parameters:
     </div>
 </div>
 
-<!-- Order Items -->
-{% if order_items %}
+<!-- Package Description -->
+{% if order.package_description or order_items or order.cod_amount %}
 <div class="odp__card">
     <div class="odp__card__header">
-        <i class="fa-solid fa-box"></i>
-        Order Items
+        <i class="fa-solid fa-box-open"></i>
+        Package Description
     </div>
-    <div class="odp__card__body odp__card__body--flush">
+    <div class="odp__card__body">
+        <!-- Summary: Package / Qty / COD -->
+        <div class="d-flex flex-column gap-2 p-2 rounded mb-3" style="background:#fff8e1;border:1px solid #f5c542;">
+            {% if order.package_description %}
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-box-open" style="color:#c49000;"></i>
+                <span class="text-muted small" style="min-width:50px;">Package</span>
+                <span class="fw-medium">{{ order.package_description }}</span>
+            </div>
+            {% endif %}
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
+                <span class="text-muted small" style="min-width:50px;">Qty</span>
+                <span class="fw-semibold">{% if order.total_quantity %}{{ order.total_quantity }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-money-bill-wave text-success"></i>
+                <span class="text-muted small" style="min-width:50px;">COD</span>
+                <span class="fw-semibold">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+            </div>
+        </div>
+
+        <!-- Product Items -->
+        {% if order_items %}
+        <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.65rem;">Product Items ({{ order_items|length }})</div>
         <table class="odp__table">
             <thead>
                 <tr>
@@ -195,6 +219,7 @@ Parameters:
                 {% endfor %}
             </tbody>
         </table>
+        {% endif %}
     </div>
 </div>
 {% endif %}

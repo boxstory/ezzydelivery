@@ -136,10 +136,38 @@
           </div>
         </div>
 
+        <!-- Package Description -->
+        <div class="ou__card">
+          <div class="ou__card-head" style="background:#fff8e1;border-left:3px solid #f5c542;">
+            <span><i class="fa-solid fa-box-open me-1" style="color:#c49000;"></i> Package Description</span>
+          </div>
+          <div class="p-2">
+            <div class="d-flex flex-column gap-1 p-2 rounded" style="background:#fff8e1;">
+              {% if order.package_description %}
+              <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-box-open" style="color:#c49000;font-size:0.7rem;"></i>
+                <span class="text-muted small" style="min-width:45px;">Package</span>
+                <span class="fw-medium small">{{ order.package_description }}</span>
+              </div>
+              {% endif %}
+              <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-cubes" style="color:#c49000;font-size:0.7rem;"></i>
+                <span class="text-muted small" style="min-width:45px;">Qty</span>
+                <span class="fw-semibold small">{% if order.total_quantity %}{{ order.total_quantity }}{% elif order_items %}{{ order_items.count }}{% else %}—{% endif %}</span>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-money-bill-wave text-success" style="font-size:0.7rem;"></i>
+                <span class="text-muted small" style="min-width:45px;">COD</span>
+                <span class="fw-semibold small">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Items Card (inline in form column) -->
         <div class="ou__card ou__card--items">
           <div class="ou__card-head">
-            <span><i class="fa-solid fa-boxes-stacked me-1"></i> Items (<span id="ou_items_count">{{ order_items.count }}</span>)</span>
+            <span><i class="fa-solid fa-cubes me-1"></i> Product Items (<span id="ou_items_count">{{ order_items.count }}</span>)</span>
             {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
             <button type="button" class="ou__card-action" id="orders_update_btn_add_product">
               <i class="fa-solid fa-plus"></i> Add

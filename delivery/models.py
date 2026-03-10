@@ -487,6 +487,67 @@ class DeliveryTask(models.Model):
         verbose_name_plural = "Delivery Task"
 
 
+class TaskStatusPoint(models.Model):
+    """
+    GPS snapshot captured each time a delivery task changes status.
+    Records driver location and distance from delivery address.
+    """
+    task = models.ForeignKey(
+        DeliveryTask, on_delete=models.CASCADE, related_name='status_points'
+    )
+    driver = models.ForeignKey(
+        'fleet.Driver', on_delete=models.SET_NULL, null=True, blank=True
+    )
+    old_status = models.CharField(max_length=100, blank=True)
+    new_status = models.CharField(max_length=100)
+    latitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        help_text="Driver GPS latitude at status change"
+    )
+    longitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        help_text="Driver GPS longitude at status change"
+    )
+    accuracy = models.FloatField(
+        null=True, blank=True, help_text="GPS accuracy in metres"
+    )
+    distance_from_delivery = models.FloatField(
+        null=True, blank=True,
+        help_text="Distance from delivery location in km (Haversine)"
+    )
+    delivery_latitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        help_text="Delivery address latitude at time of status change"
+    )
+    delivery_longitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        help_text="Delivery address longitude at time of status change"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @staticmethod
+    def haversine_km(lat1, lon1, lat2, lon2):
+        """Calculate great-circle distance between two points in km."""
+        from math import radians, cos, sin, asin, sqrt
+        lat1, lon1, lat2, lon2 = map(float, [lat1, lon1, lat2, lon2])
+        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+        return 2 * asin(sqrt(a)) * 6371
+
+    def __str__(self):
+        return f"Task {self.task_id} | {self.old_status} → {self.new_status} @ {self.created_at:%H:%M}"
+
+    class Meta:
+        verbose_name = "Task Status Point"
+        verbose_name_plural = "Task Status Points"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['task', '-created_at'], name='tsp_task_ts_idx'),
+        ]
+
+
 class DeliveryTaskQRCode(models.Model):
     """
     QR Code for delivery tasks.

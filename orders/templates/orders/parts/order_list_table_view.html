@@ -71,8 +71,10 @@
           {% if order.cod_amount %}
           <div class="oal__table-cod-cell">
             <span class="oal__table-cod-value">{{ order.cod_amount }} QR</span>
-            <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+            <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}collected{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
               {% if order.cod_status_by_staff == 'fully_paid' %}<i class="fa-solid fa-check"></i> Collected
+              {% elif order.cod_status_by_staff == 'cod_with_driver' %}<i class="fa-solid fa-user-check"></i> With Driver
+              {% elif order.cod_status_by_staff == 'cod_with_ezzy' %}<i class="fa-solid fa-building"></i> With Ezzy
               {% elif order.cod_status_by_staff == 'partially_collected' %}<i class="fa-solid fa-adjust"></i> Partial
               {% elif order.cod_status_by_staff == 'cod_settled_with_business' %}<i class="fa-solid fa-handshake"></i> Settled
               {% else %}<i class="fa-solid fa-hourglass-half"></i> Pending

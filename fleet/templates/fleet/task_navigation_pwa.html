@@ -120,6 +120,49 @@
             </div>
             {% endif %}
         </div>
+
+        <!-- Lat / Lng / Accuracy Row -->
+        <div class="fleet-info-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top:var(--spacing-sm);">
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Latitude</div>
+                <div class="fleet-info-item__value" id="nav-lat-val">{{ dropoff.dl_latitude|default:"—" }}</div>
+            </div>
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Longitude</div>
+                <div class="fleet-info-item__value" id="nav-lng-val">{{ dropoff.dl_longitude|default:"—" }}</div>
+            </div>
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Accuracy</div>
+                <div class="fleet-info-item__value" id="nav-acc-val">
+                    {% if task.order.coords_accuracy %}
+                    <span class="fleet-badge {% if task.order.coords_accuracy == 'exact' %}fleet-badge--success{% elif task.order.coords_accuracy == 'street' %}fleet-badge--info{% elif task.order.coords_accuracy == 'landmark' %}fleet-badge--warning{% else %}fleet-badge--danger{% endif %}" style="font-size:var(--font-size-xs);">
+                        {{ task.order.get_coords_accuracy_display|default:task.order.coords_accuracy }}
+                    </span>
+                    {% else %}
+                    —
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Parse Button -->
+        <div style="margin-top:var(--spacing-sm);">
+            <button type="button" class="fleet-btn fleet-btn--outline fleet-btn--block"
+                style="border-color:var(--fleet-primary); color:var(--fleet-primary);"
+                onclick="haptic([5]); EzzyAIParse.parse({
+                    address: '{{ task.order.customer_address|default:""|escapejs }}',
+                    zone: '{{ dropoff.dl_zone|default:task.order.dl_zone|default:"" }}',
+                    street: '{{ dropoff.dl_street|default:task.order.dl_street|default:"" }}',
+                    building: '{{ dropoff.dl_building|default:task.order.dl_building|default:"" }}',
+                    lat: '{{ dropoff.dl_latitude|default:"" }}',
+                    lng: '{{ dropoff.dl_longitude|default:"" }}',
+                    orderId: '{{ task.order.id }}',
+                    orderNumber: '{{ task.order.order_number|default:task.dl_task_number|escapejs }}',
+                    showMap: true
+                })">
+                <i class="fa-solid fa-wand-magic-sparkles me-2"></i>AI Parse Location
+            </button>
+        </div>
     </div>
 </div>
 
@@ -143,139 +186,8 @@
     {% endwith %}
     <button type="button" id="btn-open-maps" class="fleet-btn fleet-btn--dark" style="flex:2;"
             onclick="haptic([10])">
-        <i class="fa-solid fa-diamond-turn-right me-2"></i>Navigate
+        <i class="fa-solid fa-diamond-turn-right me-2"></i>Start Ride
     </button>
-</div>
-
-{% if task.dl_task_status not in 'delivered,failed,cancelled' %}
-<!-- Update Status Button -->
-<button type="button" class="fleet-btn fleet-btn--dark fleet-btn--block"
-        onclick="openStatusSheet(); haptic([10]);"
-        style="background: var(--fleet-dark);">
-    <i class="fa-solid fa-circle-check me-2"></i>Update Task Status
-</button>
-{% endif %}
-
-<!-- Status Update Bottom Sheet Overlay -->
-<div id="statusOverlay" class="fleet-filter-overlay" onclick="closeStatusSheet()"></div>
-
-<!-- Status Update Bottom Sheet -->
-<div id="statusSheet" class="fleet-filter-modal">
-    <div class="fleet-filter-modal__handle"></div>
-    <div class="fleet-filter-modal__header">
-        <h3 class="fleet-filter-modal__title">
-            <i class="fa-solid fa-list-check me-2"></i>Update Status
-        </h3>
-        <button type="button" onclick="closeStatusSheet()" class="fleet-btn-icon" style="width:32px;height:32px;">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-    </div>
-
-    <!-- Current status indicator -->
-    <div style="text-align:center; margin-bottom:var(--spacing-lg);">
-        <span style="font-size:var(--font-size-xs); color:var(--fleet-grey-500); font-weight:600; text-transform:uppercase;">Current Status</span>
-        <div style="font-size:var(--font-size-base); font-weight:800; color:var(--fleet-dark); margin-top:4px;">
-            {{ task.get_dl_task_status_display }}
-        </div>
-    </div>
-
-    <!-- Status buttons -->
-    <div style="display:flex; flex-direction:column; gap:var(--spacing-sm);">
-
-        <!-- Picked Up -->
-        {% if task.dl_task_status in 'picked_up,start_ride,out_for_delivery,in_transit,contacted,non_reachable' %}
-        <button type="button" class="fleet-btn" disabled
-                style="background:var(--fleet-success-light); color:var(--fleet-success); border:none; justify-content:space-between;">
-            <span><i class="fa-solid fa-box me-2"></i>Picked Up</span>
-            <i class="fa-solid fa-circle-check"></i>
-        </button>
-        {% else %}
-        <button type="button" id="btn-picked-up" data-task-id="{{ task.id }}"
-                class="fleet-btn fleet-btn--outline"
-                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'picked_up', 'picked_up')">
-            <i class="fa-solid fa-box me-2"></i>Picked Up
-        </button>
-        {% endif %}
-
-        <!-- Start Ride -->
-        {% if task.dl_task_status in 'start_ride,out_for_delivery,in_transit,contacted,non_reachable' %}
-        <button type="button" class="fleet-btn" disabled
-                style="background:var(--fleet-success-light); color:var(--fleet-success); border:none; justify-content:space-between;">
-            <span><i class="fa-solid fa-play me-2"></i>Start Ride</span>
-            <i class="fa-solid fa-circle-check"></i>
-        </button>
-        {% else %}
-        <button type="button" id="btn-start-ride" data-task-id="{{ task.id }}"
-                class="fleet-btn fleet-btn--outline"
-                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'out_for_delivery', 'out_for_delivery', '1')">
-            <i class="fa-solid fa-play me-2"></i>Start Ride
-        </button>
-        {% endif %}
-
-        <!-- Contacted -->
-        {% if task.dl_task_status == 'contacted' %}
-        <button type="button" class="fleet-btn" disabled
-                style="background:var(--fleet-success-light); color:var(--fleet-success); border:none; justify-content:space-between;">
-            <span><i class="fa-solid fa-phone-volume me-2"></i>Contacted & Confirmed</span>
-            <i class="fa-solid fa-circle-check"></i>
-        </button>
-        {% else %}
-        <button type="button" id="btn-contacted" data-task-id="{{ task.id }}"
-                class="fleet-btn fleet-btn--outline"
-                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'contacted', 'contacted')">
-            <i class="fa-solid fa-phone-volume me-2"></i>Contacted & Confirmed
-        </button>
-        {% endif %}
-
-        <!-- Non Reachable -->
-        {% if task.dl_task_status == 'non_reachable' %}
-        <button type="button" class="fleet-btn" disabled
-                style="background:var(--fleet-warning-light); color:var(--fleet-warning); border:none; justify-content:space-between;">
-            <span><i class="fa-solid fa-phone-slash me-2"></i>Non Reachable</span>
-            <i class="fa-solid fa-circle-check"></i>
-        </button>
-        {% else %}
-        <button type="button" id="btn-non-reachable" data-task-id="{{ task.id }}"
-                class="fleet-btn fleet-btn--outline"
-                style="border-color:var(--fleet-warning); color:var(--fleet-warning);"
-                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'non_reachable', 'non_reachable')">
-            <i class="fa-solid fa-phone-slash me-2"></i>Non Reachable
-        </button>
-        {% endif %}
-
-        <div style="height:1px; background:var(--fleet-grey-100); margin: var(--spacing-xs) 0;"></div>
-
-        <!-- Delivered -->
-        {% if task.dl_task_status == 'delivered' %}
-        <button type="button" class="fleet-btn" disabled
-                style="background:var(--fleet-success); color:#fff; border:none; justify-content:space-between;">
-            <span><i class="fa-solid fa-check me-2"></i>Delivered</span>
-            <i class="fa-solid fa-circle-check"></i>
-        </button>
-        {% else %}
-        <button type="button" id="btn-delivered" data-task-id="{{ task.id }}"
-                class="fleet-btn" style="background:var(--fleet-success); color:#fff; border:none;"
-                onclick="haptic([10,50,10]); confirmComplete('{{ task.id }}', 'delivered')">
-            <i class="fa-solid fa-check me-2"></i>Mark as Delivered
-        </button>
-        {% endif %}
-
-        <!-- Failed -->
-        {% if task.dl_task_status == 'failed' %}
-        <button type="button" class="fleet-btn" disabled
-                style="background:var(--fleet-danger-light); color:var(--fleet-danger); border:none; justify-content:space-between;">
-            <span><i class="fa-solid fa-xmark me-2"></i>Failed</span>
-            <i class="fa-solid fa-circle-check"></i>
-        </button>
-        {% else %}
-        <button type="button" id="btn-failed" data-task-id="{{ task.id }}"
-                class="fleet-btn fleet-btn--outline"
-                style="border-color:var(--fleet-danger); color:var(--fleet-danger);"
-                onclick="haptic([5]); confirmComplete('{{ task.id }}', 'failed')">
-            <i class="fa-solid fa-xmark me-2"></i>Mark as Failed
-        </button>
-        {% endif %}
-    </div>
 </div>
 
 <!-- Task Activity Log -->
@@ -532,7 +444,7 @@
         window.open(url, '_blank');
     });
 
-    // WhatsApp location share
+    // WhatsApp delivery reminder
     var waBtn = document.getElementById('btn-whatsapp');
     if (waBtn) {
         waBtn.addEventListener('click', function() {
@@ -541,7 +453,25 @@
             var locUrl = hasDropoff
                 ? 'https://www.google.com/maps?q=' + dropoffLat + ',' + dropoffLng
                 : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
-            var msg = 'Hello! I am your EzzyDelivery driver. Your delivery location: ' + locUrl;
+            var customerName = '{{ dropoff.full_name|default:task.order.customer_name|default:""|escapejs }}';
+            var orderNum = '{{ task.order.order_number|default:task.dl_task_number|escapejs }}';
+            var codAmount = '{{ task.order.cod_amount|default:""|escapejs }}';
+            var greeting = customerName ? ('Dear ' + customerName + ',\n\n') : 'Dear Customer,\n\n';
+            var msg = greeting
+                + 'This is a reminder from *EzzyDelivery* 🚚\n\n'
+                + 'Your order *#' + orderNum + '* is on the way to your location.\n\n'
+                + '📍 Delivery Location:\n' + addressText + '\n'
+                + locUrl + '\n';
+            if (codAmount && parseFloat(codAmount) > 0) {
+                msg += '\n💰 COD Amount: *' + parseFloat(codAmount).toFixed(2) + ' QR*\nPlease keep the exact amount ready.\n';
+            }
+            var accLevel = '{{ task.order.coords_accuracy|default:""|escapejs }}';
+            if (hasDropoff) {
+                msg += '\n📌 Lat: ' + dropoffLat + ', Lng: ' + dropoffLng;
+                if (accLevel) msg += ' (Accuracy: ' + accLevel.replace('_', ' ') + ')';
+                msg += '\n';
+            }
+            msg += '\nPlease make sure someone is available to receive the delivery.\n\nThank you! 🙏';
             window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
         });
     }
@@ -551,101 +481,6 @@ function getCsrf() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 
-function openStatusSheet() {
-    document.getElementById('statusSheet').classList.add('open');
-    document.getElementById('statusOverlay').classList.add('open');
-}
-function closeStatusSheet() {
-    document.getElementById('statusSheet').classList.remove('open');
-    document.getElementById('statusOverlay').classList.remove('open');
-}
-
-function updateStatus(btn, taskId, status, displayStatus, dmsStatus) {
-    btn.disabled = true;
-    var origHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating...';
-
-    var body = { status: status };
-    if (dmsStatus) body.dms_status = dmsStatus;
-
-    fetch('/api/driver/tasks/' + taskId + '/status/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrf()
-        },
-        body: JSON.stringify(body)
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success !== false) {
-            haptic([10, 50, 10]);
-            showToast('Status updated!', 'success');
-            closeStatusSheet();
-            setTimeout(() => location.reload(), 800);
-        } else {
-            showToast(data.error || 'Could not update status', 'error');
-            btn.disabled = false;
-            btn.innerHTML = origHtml;
-        }
-    })
-    .catch(() => {
-        showToast('Network error. Please try again.', 'error');
-        btn.disabled = false;
-        btn.innerHTML = origHtml;
-    });
-}
-
-function confirmComplete(taskId, status) {
-    var msg = status === 'delivered'
-        ? 'Mark this delivery as Delivered?'
-        : 'Mark this delivery as Failed?';
-    if (!confirm(msg)) return;
-
-    var btn = document.getElementById(status === 'delivered' ? 'btn-delivered' : 'btn-failed');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating...';
-
-    // Build body with GPS proof-of-delivery coordinates
-    var body = { status: status };
-    if (typeof EzzyGPS !== 'undefined') {
-        var gps = EzzyGPS.getPosition();
-        if (gps) {
-            body.completion_latitude = gps.lat;
-            body.completion_longitude = gps.lng;
-        }
-    }
-
-    fetch('/api/driver/tasks/' + taskId + '/complete/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrf()
-        },
-        body: JSON.stringify(body)
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success !== false) {
-            // Stop GPS tracking after completion
-            if (typeof EzzyGPS !== 'undefined') EzzyGPS.stop();
-            haptic([10, 50, 10]);
-            showToast(status === 'delivered' ? 'Delivery completed!' : 'Delivery marked failed', status === 'delivered' ? 'success' : 'warning');
-            closeStatusSheet();
-            setTimeout(() => { window.location.href = '{% url "fleet:driver_tasks" %}?tab=history'; }, 1500);
-        } else {
-            showToast(data.error || 'Could not complete task', 'error');
-            btn.disabled = false;
-            btn.innerHTML = status === 'delivered'
-                ? '<i class="fa-solid fa-check me-2"></i>Mark as Delivered'
-                : '<i class="fa-solid fa-xmark me-2"></i>Mark as Failed';
-        }
-    })
-    .catch(() => {
-        showToast('Network error. Please try again.', 'error');
-        btn.disabled = false;
-    });
-}
 </script>
 
 {% endblock %}

@@ -1,0 +1,773 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}OneDrive Import Sources{% endblock title %}
+
+{% block content %}
+<div class="p-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0"><i class="fa-solid fa-cloud-arrow-down me-2"></i>OneDrive Import Sources</h4>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSourceModal">
+            <i class="fa-solid fa-plus me-1"></i> Add Source
+        </button>
+    </div>
+
+    {% if sources %}
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Business</th>
+                    <th>Label</th>
+                    <th>Share Link</th>
+                    <th>Status</th>
+                    <th>Last Import</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in sources %}
+                <tr id="source-row-{{ source.id }}">
+                    <td>
+                        <strong>{{ source.business.business_name }}</strong>
+                        <div class="small text-muted">{{ source.business.business_code }}</div>
+                    </td>
+                    <td>{{ source.label }}</td>
+                    <td>
+                        <a href="{{ source.share_link }}" target="_blank" class="small text-truncate d-inline-block" style="max-width:200px;">
+                            {{ source.share_link }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge {{ source.is_active|yesno:'bg-success,bg-secondary' }}" id="status-{{ source.id }}">
+                            {{ source.is_active|yesno:'Active,Inactive' }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if source.last_import_at %}
+                            <div class="small">{{ source.last_import_at|date:"d M Y H:i" }}</div>
+                            <div class="small text-muted">{{ source.last_import_count }} orders{% if source.last_import_by %} by {{ source.last_import_by.username }}{% endif %}</div>
+                        {% else %}
+                            <span class="text-muted small">Never</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-info btn-sm" data-saved-sheet="{{ source.last_sheet_name|escapejs }}" data-saved-row="{{ source.last_start_row }}" data-saved-maxrow="{{ source.last_import_max_row }}" onclick="fetchSheets({{ source.id }}, this)" title="Browse Sheets" {% if not source.is_active %}disabled{% endif %}>
+                                <i class="fa-solid fa-table-list me-1"></i> Browse
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="editSource({{ source.id }}, '{{ source.label|escapejs }}', '{{ source.share_link|escapejs }}')" title="Edit Link">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="toggleSource({{ source.id }})" title="Toggle Active">
+                                <i class="fa-solid fa-power-off"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteSource({{ source.id }})" title="Delete">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% for source in sources %}
+    <div id="sheets-row-{{ source.id }}" class="d-none">
+        <div id="sheets-panel-{{ source.id }}" class="bg-light border rounded p-3 mb-3"></div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="text-center text-muted py-5">
+        <i class="fa-solid fa-cloud fa-3x mb-3 d-block"></i>
+        <p>No OneDrive sources configured yet.</p>
+        <p class="small">Add a OneDrive shared Excel link to start importing orders.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Source Modal -->
+<div class="modal fade" id="addSourceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-plus me-2"></i>Add OneDrive Source</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Business</label>
+                    <select id="addBusiness" class="form-select">
+                        <option value="">Select Business...</option>
+                        {% for biz in businesses %}
+                        <option value="{{ biz.business_id }}">{{ biz.business_name }} ({{ biz.business_code }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Label</label>
+                    <input type="text" id="addLabel" class="form-control" placeholder="e.g., Daily Orders Sheet">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">OneDrive Share Link</label>
+                    <input type="url" id="addLink" class="form-control" placeholder="https://1drv.ms/x/...">
+                    <div class="form-text">Share the Excel file with "Anyone with the link" and paste the link here.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Expected Columns</label>
+                    <div class="small text-muted">
+                        The Excel file should have these column headers (case-insensitive):<br>
+                        <strong>Required:</strong> Customer Name, Phone, Address<br>
+                        <strong>Optional:</strong> Order ID, Zone, Street, Building, COD Amount, Product, Quantity, Notes, Location Link, WhatsApp
+                    </div>
+                </div>
+                <div id="addMsg" class="small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addSource()">
+                    <i class="fa-solid fa-plus me-1"></i> Add Source
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Edit Source Modal -->
+<div class="modal fade" id="editSourceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-pen me-2"></i>Edit Source</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editSourceId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Label</label>
+                    <input type="text" id="editLabel" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">OneDrive Share Link</label>
+                    <input type="url" id="editLink" class="form-control" placeholder="https://1drv.ms/x/...">
+                    <div class="form-text">Paste the new "Anyone with the link" share URL here.</div>
+                </div>
+                <div id="editMsg" class="small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveSource()">
+                    <i class="fa-solid fa-save me-1"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const baseUrl = '{% url "workforce:onedrive_sources" %}';
+var _allSavedMappings = {{ source_mappings_json|safe }};
+var _allImportedRows = {{ source_imported_rows_json|safe }};
+
+function addSource() {
+    const business_id = document.getElementById('addBusiness').value;
+    const label = document.getElementById('addLabel').value.trim();
+    const share_link = document.getElementById('addLink').value.trim();
+    const msg = document.getElementById('addMsg');
+
+    if (!business_id || !label || !share_link) {
+        msg.innerHTML = '<span class="text-danger">All fields are required.</span>';
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('action', 'add');
+    fd.append('business_id', business_id);
+    fd.append('label', label);
+    fd.append('share_link', share_link);
+    fd.append('csrfmiddlewaretoken', csrfToken);
+
+    fetch('', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else msg.innerHTML = '<span class="text-danger">' + data.error + '</span>';
+    });
+}
+
+function deleteSource(id) {
+    if (!confirm('Delete this source?')) return;
+    const fd = new FormData();
+    fd.append('action', 'delete');
+    fd.append('source_id', id);
+    fd.append('csrfmiddlewaretoken', csrfToken);
+    fetch('', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); });
+}
+
+function editSource(id, label, link) {
+    document.getElementById('editSourceId').value = id;
+    document.getElementById('editLabel').value = label;
+    document.getElementById('editLink').value = link;
+    document.getElementById('editMsg').innerHTML = '';
+    new bootstrap.Modal(document.getElementById('editSourceModal')).show();
+}
+
+function saveSource() {
+    const id = document.getElementById('editSourceId').value;
+    const label = document.getElementById('editLabel').value.trim();
+    const share_link = document.getElementById('editLink').value.trim();
+    const msg = document.getElementById('editMsg');
+
+    if (!label || !share_link) {
+        msg.innerHTML = '<span class="text-danger">Label and link are required.</span>';
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('action', 'edit');
+    fd.append('source_id', id);
+    fd.append('label', label);
+    fd.append('share_link', share_link);
+    fd.append('csrfmiddlewaretoken', csrfToken);
+
+    fetch('', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else msg.innerHTML = '<span class="text-danger">' + data.error + '</span>';
+    });
+}
+
+function toggleSource(id) {
+    const fd = new FormData();
+    fd.append('action', 'toggle');
+    fd.append('source_id', id);
+    fd.append('csrfmiddlewaretoken', csrfToken);
+    fetch('', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); });
+}
+
+/* ─── Step 1: Fetch sheet list ─── */
+var _savedMapping = {};  // {sourceId: {col_idx: db_field}}
+var _savedImportedRows = {};   // {sourceId: [row_nums]}
+var _savedMaxRow = {};   // {sourceId: int} fallback when imported rows list is empty
+
+function fetchSheets(sourceId, btn) {
+    var savedSheet = btn.getAttribute('data-saved-sheet') || '';
+    var savedRow = parseInt(btn.getAttribute('data-saved-row')) || 2;
+    var savedMaxRow = parseInt(btn.getAttribute('data-saved-maxrow')) || 0;
+    _savedMapping[sourceId] = _allSavedMappings[sourceId] || {};
+    _savedImportedRows[sourceId] = _allImportedRows[sourceId] || [];
+    _savedMaxRow[sourceId] = savedMaxRow;
+
+    var sheetsRow = document.getElementById('sheets-row-' + sourceId);
+    var panel = document.getElementById('sheets-panel-' + sourceId);
+
+    if (!sheetsRow.classList.contains('d-none')) {
+        sheetsRow.classList.add('d-none');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading...';
+    sheetsRow.classList.remove('d-none');
+    panel.innerHTML = '<div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Fetching sheets from OneDrive...</div>';
+
+    fetch(baseUrl + sourceId + '/sheets/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-table-list me-1"></i> Browse';
+
+        if (!data.success) {
+            panel.innerHTML = '<div class="alert alert-danger py-2 mb-0"><i class="fa-solid fa-exclamation-triangle me-1"></i> ' + data.error + '</div>';
+            return;
+        }
+
+        if (!data.sheets.length) {
+            panel.innerHTML = '<div class="text-muted">No sheets found in this file.</div>';
+            return;
+        }
+
+        let html = '<div class="mb-2 fw-semibold"><i class="fa-solid fa-file-excel me-1 text-success"></i> Sheets found:</div>';
+        html += '<div class="d-flex flex-wrap gap-2 align-items-center mb-2">';
+        data.sheets.forEach(function(s) {
+            var isDefault = savedSheet && s.name === savedSheet;
+            html += '<button class="btn btn-sm ' + (isDefault ? 'btn-primary' : 'btn-outline-primary') + '" onclick="selectSheet(' + sourceId + ', \'' + s.name.replace(/'/g, "\\'") + '\', ' + s.rows + ')">';
+            html += '<i class="fa-solid fa-table me-1"></i> ' + s.name + ' <span class="badge ' + (isDefault ? 'bg-light text-dark' : 'bg-secondary') + ' ms-1">' + s.rows + ' rows</span>';
+            if (isDefault) html += ' <i class="fa-solid fa-star ms-1" title="Last imported"></i>';
+            html += '</button>';
+        });
+        html += '</div>';
+        html += '<div id="row-nav-' + sourceId + '" class="d-none d-flex align-items-center gap-2 mb-2 flex-wrap">';
+        html += '<label class="small fw-semibold mb-0 text-nowrap">Go to row:</label>';
+        html += '<input type="number" id="goto-row-' + sourceId + '" class="form-control form-control-sm" style="width:90px" min="2" value="2" placeholder="Row #" onkeydown="if(event.key===\'Enter\'){goToRow(' + sourceId + ')}">';
+        html += '<button class="btn btn-sm btn-outline-primary" onclick="goToRow(' + sourceId + ')"><i class="fa-solid fa-arrow-right me-1"></i> Show</button>';
+        html += '<span id="row-info-' + sourceId + '" class="small text-muted"></span>';
+        html += '</div>';
+        html += '<div id="preview-area-' + sourceId + '"></div>';
+        panel.innerHTML = html;
+
+        // Auto-select saved sheet if available
+        if (savedSheet) {
+            var match = data.sheets.find(function(s) { return s.name === savedSheet; });
+            if (match) {
+                var startRow = (savedMaxRow && savedMaxRow > 1) ? Math.max(2, savedMaxRow + 1 - 5) : (savedRow && savedRow > 1) ? savedRow : 2;
+                _currentSheet[sourceId] = { name: savedSheet, total: match.rows };
+                var nav = document.getElementById('row-nav-' + sourceId);
+                nav.classList.remove('d-none');
+                var input = document.getElementById('goto-row-' + sourceId);
+                input.max = match.rows + 1;
+                input.value = startRow;
+                document.getElementById('row-info-' + sourceId).textContent = savedSheet + ' — ' + match.rows + ' data rows (row 1 = header)';
+                var offset = Math.max(0, startRow - 2);
+                loadSheetPreview(sourceId, savedSheet, offset, true);
+            }
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-table-list me-1"></i> Browse';
+        panel.innerHTML = '<div class="alert alert-danger py-2 mb-0">Network error: ' + err.message + '</div>';
+    });
+}
+
+/* ─── Step 2: Select sheet & navigate by row ─── */
+var _currentSheet = {};   // {sourceId: {name, total}}
+var _previewHeaders = {}; // {sourceId: ['col1','col2',...]}
+var _previewRows = {};    // {sourceId: [{row_num, cells}, ...]}
+
+// DB fields for column mapping
+var DB_FIELDS = [
+    {value: '', label: '— Skip —'},
+    {value: 'client_order_code', label: 'Order ID'},
+    {value: 'order_date', label: 'Order Date'},
+    {value: 'customer_name', label: 'Customer Name *'},
+    {value: 'customer_phone', label: 'Phone 1 *'},
+    {value: 'customer_whatsapp', label: 'Phone 2 / WhatsApp'},
+    {value: 'customer_email', label: 'Email'},
+    {value: 'customer_address', label: 'Customer Address *'},
+    {value: 'dl_landmark', label: 'City / Landmark'},
+    {value: 'dl_building', label: 'Villa / Building No'},
+    {value: 'dl_street', label: 'Street No'},
+    {value: 'dl_zone', label: 'Zone No'},
+    {value: 'location_link', label: 'Location Link'},
+    {value: 'dl_latitude', label: 'Latitude'},
+    {value: 'dl_longitude', label: 'Longitude'},
+    {value: 'deadline_date', label: 'Day & Time Preference'},
+    {value: 'product_name', label: 'Product Name'},
+    {value: 'quantity', label: 'Qty'},
+    {value: 'cod_amount', label: 'Price / COD Amount'},
+    {value: 'product_1', label: 'Product 1'},
+    {value: 'count_1', label: 'Count 1'},
+    {value: 'product_2', label: 'Product 2'},
+    {value: 'count_2', label: 'Count 2'},
+    {value: 'product_3', label: 'Product 3'},
+    {value: 'count_3', label: 'Count 3'},
+    {value: 'seller_notes', label: 'Notes By Seller'},
+    {value: 'internal_notes', label: 'Notes By Ezzy'},
+];
+
+// Auto-map patterns (same as bulk import)
+var MAP_PATTERNS = {
+    'client_order_code': ['order id','order no','order number','order code','order'],
+    'order_date': ['date','order date','created'],
+    'customer_name': ['customer name','name','customer','full name','client name','recipient'],
+    'customer_phone': ['phone','phone 1','mobile','contact','tel','phone number','mobile no'],
+    'customer_whatsapp': ['phone 2','whatsapp','alternate phone'],
+    'customer_email': ['email','e-mail','customer email'],
+    'customer_address': ['address','customer address','delivery address','full address','shipping address'],
+    'dl_landmark': ['city','landmark','area','locality'],
+    'dl_building': ['building','villa','building no','villa no','house','flat','apartment'],
+    'dl_street': ['street','street no','street number','road'],
+    'dl_zone': ['zone','zone no','zone number','postal'],
+    'location_link': ['location','google map','map link','location link','google link','map'],
+    'dl_latitude': ['latitude','lat'],
+    'dl_longitude': ['longitude','lng','long'],
+    'deadline_date': ['day','time','deadline','delivery date','preferred time'],
+    'product_name': ['product name','product','item','item name','description'],
+    'quantity': ['qty','quantity','count','units','pcs'],
+    'cod_amount': ['price','cod','amount','cod amount','total','value','payment','cash'],
+    'product_1': ['product 1','item 1'],
+    'count_1': ['count 1','qty 1'],
+    'product_2': ['product 2','item 2'],
+    'count_2': ['count 2','qty 2'],
+    'product_3': ['product 3','item 3'],
+    'count_3': ['count 3','qty 3'],
+    'seller_notes': ['notes by seller','seller notes','notes','remarks','comment','instructions'],
+    'internal_notes': ['notes by ezzy','internal notes','staff notes'],
+};
+
+function autoMapColumn(colName) {
+    var cn = colName.toLowerCase().replace(/[\/\-_&():,.#]/g, ' ').replace(/\s+/g, ' ').trim();
+    for (var field in MAP_PATTERNS) {
+        for (var i = 0; i < MAP_PATTERNS[field].length; i++) {
+            if (cn === MAP_PATTERNS[field][i]) return field;
+        }
+    }
+    // Fuzzy: check if pattern words are subset
+    var cnWords = cn.split(' ');
+    for (var field in MAP_PATTERNS) {
+        for (var i = 0; i < MAP_PATTERNS[field].length; i++) {
+            var pWords = MAP_PATTERNS[field][i].split(' ');
+            if (pWords.length > 0 && pWords.every(function(w) { return cnWords.indexOf(w) >= 0; })) return field;
+        }
+    }
+    return '';
+}
+
+function selectSheet(sourceId, sheetName, totalRows) {
+    _currentSheet[sourceId] = { name: sheetName, total: totalRows };
+    _previewRows[sourceId] = [];
+    var nav = document.getElementById('row-nav-' + sourceId);
+    nav.classList.remove('d-none');
+    var input = document.getElementById('goto-row-' + sourceId);
+    input.max = totalRows + 1;
+    input.value = 2;
+    document.getElementById('row-info-' + sourceId).textContent = sheetName + ' — ' + totalRows + ' data rows (row 1 = header)';
+    loadSheetPreview(sourceId, sheetName, 0);
+}
+
+function goToRow(sourceId) {
+    var info = _currentSheet[sourceId];
+    if (!info) return;
+    var rowNum = parseInt(document.getElementById('goto-row-' + sourceId).value) || 2;
+    var offset = Math.max(0, rowNum - 2);
+    _previewRows[sourceId] = [];
+    loadSheetPreview(sourceId, info.name, offset, true);
+}
+
+function loadSheetPreview(sourceId, sheetName, offset, reset) {
+    var previewArea = document.getElementById('preview-area-' + sourceId);
+    if (!_currentSheet[sourceId] || typeof _currentSheet[sourceId] === 'string') {
+        _currentSheet[sourceId] = { name: sheetName, total: 0 };
+    }
+
+    if (offset === 0 || reset) {
+        previewArea.innerHTML = '<div class="text-muted mt-2"><span class="spinner-border spinner-border-sm me-1"></span> Loading rows from row ' + (offset + 2) + '...</div>';
+    }
+
+    var fd = new FormData();
+    fd.append('sheet_name', sheetName);
+    fd.append('offset', offset);
+    fd.append('limit', 10);
+
+    fetch(baseUrl + sourceId + '/preview/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: fd,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) {
+            previewArea.innerHTML = '<div class="alert alert-danger py-2 mt-2">' + data.error + '</div>';
+            return;
+        }
+
+        _previewHeaders[sourceId] = data.headers;
+        var startRowVal = offset + 2;
+
+        if (offset === 0 || reset) {
+            _previewRows[sourceId] = [];
+            var sn = sheetName.replace(/'/g, "\\'");
+            var html = '<div class="d-flex align-items-center justify-content-between mt-3 mb-2 flex-wrap gap-2">';
+            html += '<div class="fw-semibold"><i class="fa-solid fa-eye me-1"></i> ' + sheetName + ' <span class="text-muted small">(from row ' + startRowVal + ', ' + data.total + ' total)</span></div>';
+            html += '<div class="d-flex align-items-center gap-2">';
+            html += '<span id="sel-count-' + sourceId + '" class="badge bg-primary">0 selected</span>';
+            html += '<button class="btn btn-success btn-sm text-nowrap" onclick="showColumnMapping(' + sourceId + ')">';
+            html += '<i class="fa-solid fa-arrow-right me-1"></i> Next: Map Columns</button>';
+            html += '</div></div>';
+
+            html += '<div class="table-responsive" style="max-height:70vh;overflow:auto"><table class="table table-sm table-bordered table-striped small mb-2" style="width:max-content;min-width:100%">';
+            html += '<thead class="table-dark"><tr>';
+            html += '<th class="text-center" style="width:40px"><input type="checkbox" id="sel-all-' + sourceId + '" onchange="toggleAllRows(' + sourceId + ')" checked></th>';
+            html += '<th class="text-center" style="width:50px">#</th>';
+            data.headers.forEach(function(h) {
+                html += '<th>' + (h || '<em class="text-muted">—</em>') + '</th>';
+            });
+            html += '</tr></thead>';
+            // Previous rows button (above table)
+            var prevOffset = Math.max(0, offset - 10);
+            if (offset > 0) {
+                html += '<div id="preview-prev-' + sourceId + '" class="text-center mb-2" data-current="' + offset + '">';
+                html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadPrevRows(' + sourceId + ', \'' + sn + '\')">';
+                html += '<i class="fa-solid fa-arrow-up me-1"></i> Load +10 previous rows</button></div>';
+            } else {
+                html += '<div id="preview-prev-' + sourceId + '" class="text-center mb-2 d-none" data-current="' + offset + '"></div>';
+            }
+
+            html += '<tbody id="preview-tbody-' + sourceId + '"></tbody>';
+            html += '</table></div>';
+
+            if (data.has_more) {
+                html += '<div id="preview-more-' + sourceId + '" class="text-center mb-2">';
+                html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadMoreRows(' + sourceId + ', \'' + sn + '\', ' + data.next_offset + ')">';
+                html += '<i class="fa-solid fa-arrow-down me-1"></i> Load +10 more rows</button></div>';
+            } else {
+                html += '<div id="preview-more-' + sourceId + '" class="text-center mb-2"><span class="text-muted small">All rows loaded</span></div>';
+            }
+
+            html += '<div id="mapping-area-' + sourceId + '"></div>';
+            html += '<div id="import-result-' + sourceId + '"></div>';
+            previewArea.innerHTML = html;
+        }
+
+        // Store rows and append to tbody
+        data.rows.forEach(function(r) { _previewRows[sourceId].push(r); });
+        var tbody = document.getElementById('preview-tbody-' + sourceId);
+        if (tbody) {
+            tbody.innerHTML = _buildRowsHtml(sourceId, data.rows);
+            updateSelCount(sourceId);
+        }
+    })
+    .catch(function(err) {
+        previewArea.innerHTML = '<div class="alert alert-danger py-2 mt-2">Network error: ' + err.message + '</div>';
+    });
+}
+
+function toggleAllRows(sourceId) {
+    var checked = document.getElementById('sel-all-' + sourceId).checked;
+    document.querySelectorAll('.row-chk-' + sourceId).forEach(function(cb) { cb.checked = checked; });
+    updateSelCount(sourceId);
+}
+
+function updateSelCount(sourceId) {
+    var count = document.querySelectorAll('.row-chk-' + sourceId + ':checked').length;
+    var badge = document.getElementById('sel-count-' + sourceId);
+    if (badge) badge.textContent = count + ' selected';
+}
+
+function _buildRowsHtml(sourceId, rows) {
+    var importedRows = _savedImportedRows[sourceId] || [];
+    var maxRow = _savedMaxRow[sourceId] || 0;
+    // Build lookup: row_num -> order_number
+    var importedMap = {};
+    var hasDetailedList = importedRows.length > 0;
+    if (hasDetailedList) {
+        importedRows.forEach(function(item) {
+            if (typeof item === 'object' && item.row) {
+                importedMap[item.row] = item.order || '';
+            } else {
+                importedMap[item] = '';
+            }
+        });
+    }
+    var html = '';
+    rows.forEach(function(r) {
+        var wasImported = hasDetailedList ? (r.row_num in importedMap) : (maxRow > 0 && r.row_num <= maxRow);
+        var orderNum = hasDetailedList && wasImported ? (importedMap[r.row_num] || '') : '';
+        html += '<tr' + (wasImported ? ' class="table-warning"' : '') + '>';
+        html += '<td class="text-center"><input type="checkbox" class="row-chk-' + sourceId + '" value="' + r.row_num + '"' + (wasImported ? '' : ' checked') + ' onchange="updateSelCount(' + sourceId + ')"></td>';
+        html += '<td class="text-center text-muted">' + r.row_num + (wasImported ? ' <i class="fa-solid fa-check-circle text-success" title="Imported: ' + orderNum + '"></i> <small class="text-success">' + orderNum + '</small>' : '') + '</td>';
+        r.cells.forEach(function(c) {
+            var display = c.length > 120 ? c.substring(0, 120) + '...' : c;
+            html += '<td>' + (display || '<span class="text-muted">—</span>') + '</td>';
+        });
+        html += '</tr>';
+    });
+    return html;
+}
+
+function loadMoreRows(sourceId, sheetName, nextOffset) {
+    var fd = new FormData();
+    fd.append('sheet_name', sheetName);
+    fd.append('offset', nextOffset);
+    fd.append('limit', 10);
+
+    var moreDiv = document.getElementById('preview-more-' + sourceId);
+    moreDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading...';
+
+    fetch(baseUrl + sourceId + '/preview/', {
+        method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd,
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.success) return;
+        var tbody = document.getElementById('preview-tbody-' + sourceId);
+        tbody.insertAdjacentHTML('beforeend', _buildRowsHtml(sourceId, data.rows));
+        data.rows.forEach(function(r) { _previewRows[sourceId].push(r); });
+        var sn = sheetName.replace(/'/g, "\\'");
+        if (data.has_more) {
+            moreDiv.innerHTML = '<button class="btn btn-outline-secondary btn-sm" onclick="loadMoreRows(' + sourceId + ', \'' + sn + '\', ' + data.next_offset + ')"><i class="fa-solid fa-arrow-down me-1"></i> Load +10 more rows</button>';
+        } else {
+            moreDiv.innerHTML = '<span class="text-muted small">All rows loaded</span>';
+        }
+        updateSelCount(sourceId);
+    });
+}
+
+function loadPrevRows(sourceId, sheetName) {
+    var prevDiv = document.getElementById('preview-prev-' + sourceId);
+    var currentStart = parseInt(prevDiv.getAttribute('data-current')) || 0;
+    var newStart = Math.max(0, currentStart - 10);
+    var limit = currentStart - newStart;
+    if (limit <= 0) return;
+
+    var fd = new FormData();
+    fd.append('sheet_name', sheetName);
+    fd.append('offset', newStart);
+    fd.append('limit', limit);
+
+    prevDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading...';
+
+    fetch(baseUrl + sourceId + '/preview/', {
+        method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd,
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.success) return;
+        var tbody = document.getElementById('preview-tbody-' + sourceId);
+        tbody.insertAdjacentHTML('afterbegin', _buildRowsHtml(sourceId, data.rows));
+        data.rows.forEach(function(r) { _previewRows[sourceId].unshift(r); });
+        prevDiv.setAttribute('data-current', newStart);
+        var sn = sheetName.replace(/'/g, "\\'");
+        if (newStart > 0) {
+            prevDiv.innerHTML = '<button class="btn btn-outline-secondary btn-sm" onclick="loadPrevRows(' + sourceId + ', \'' + sn + '\')"><i class="fa-solid fa-arrow-up me-1"></i> Load +10 previous rows</button>';
+        } else {
+            prevDiv.innerHTML = '<span class="text-muted small">At the beginning</span>';
+        }
+        updateSelCount(sourceId);
+    });
+}
+
+function getSelectedRowNums(sourceId) {
+    var nums = [];
+    document.querySelectorAll('.row-chk-' + sourceId + ':checked').forEach(function(cb) {
+        nums.push(parseInt(cb.value));
+    });
+    return nums;
+}
+
+/* ─── Step 3: Column mapping ─── */
+function showColumnMapping(sourceId) {
+    var selectedNums = getSelectedRowNums(sourceId);
+    if (selectedNums.length === 0) {
+        alert('Please select at least one row to import.');
+        return;
+    }
+
+    var headers = _previewHeaders[sourceId] || [];
+    var mappingArea = document.getElementById('mapping-area-' + sourceId);
+    var sn = (_currentSheet[sourceId] || {}).name || '';
+
+    var hasSaved = Object.keys(_savedMapping[sourceId] || {}).length > 0;
+    var html = '<div class="mt-3 mb-2 d-flex align-items-center justify-content-between">';
+    html += '<div class="fw-semibold"><i class="fa-solid fa-columns me-1"></i> Map Columns <span class="badge bg-primary ms-1">' + selectedNums.length + ' rows</span>';
+    if (hasSaved) html += ' <span class="badge bg-success ms-1"><i class="fa-solid fa-save me-1"></i>Saved mapping loaded</span>';
+    html += '</div>';
+    html += '<div class="d-flex gap-2">';
+    html += '<button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById(\'mapping-area-' + sourceId + '\').innerHTML=\'\'"><i class="fa-solid fa-arrow-left me-1"></i> Back</button>';
+    html += '<button class="btn btn-success btn-sm" onclick="doMappedImport(' + sourceId + ', \'' + sn.replace(/'/g, "\\'") + '\', this)">';
+    html += '<i class="fa-solid fa-download me-1"></i> Import ' + selectedNums.length + ' Orders</button>';
+    html += '</div></div>';
+
+    html += '<table class="table table-sm table-bordered small align-middle mb-2" style="max-width:500px">';
+    html += '<thead class="table-light"><tr><th>Excel Column</th><th>Map To</th></tr></thead><tbody>';
+
+    var saved = _savedMapping[sourceId] || {};
+    headers.forEach(function(h, idx) {
+        if (!h) return;  // skip empty columns
+        // Use saved mapping first, then auto-map
+        var fieldVal = saved[String(idx)] || autoMapColumn(h);
+        var mapped = fieldVal ? ' class="table-success"' : '';
+        html += '<tr' + mapped + '>';
+        html += '<td class="fw-semibold">' + h + '</td>';
+        html += '<td><select class="form-select form-select-sm col-map-' + sourceId + '" data-col-idx="' + idx + '">';
+        DB_FIELDS.forEach(function(f) {
+            var sel = (f.value === fieldVal) ? ' selected' : '';
+            var optLabel = f.value ? f.label + '  (' + f.value + ')' : f.label;
+            html += '<option value="' + f.value + '"' + sel + '>' + optLabel + '</option>';
+        });
+        html += '</select></td></tr>';
+    });
+
+    html += '</tbody></table>';
+
+    mappingArea.innerHTML = html;
+    mappingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ─── Step 4: Import with mapped columns ─── */
+function doMappedImport(sourceId, sheetName, btn) {
+    var selectedNums = getSelectedRowNums(sourceId);
+    if (!selectedNums.length) { alert('No rows selected.'); return; }
+
+    // Build column mapping: {col_idx: db_field}
+    var mapping = {};
+    document.querySelectorAll('.col-map-' + sourceId).forEach(function(sel) {
+        var idx = sel.getAttribute('data-col-idx');
+        if (sel.value) mapping[idx] = sel.value;
+    });
+
+    // Check required fields mapped
+    var mappedFields = Object.values(mapping);
+    var missing = [];
+    if (mappedFields.indexOf('customer_name') < 0) missing.push('Customer Name');
+    if (mappedFields.indexOf('customer_phone') < 0) missing.push('Phone');
+    if (mappedFields.indexOf('customer_address') < 0) missing.push('Address');
+    if (missing.length) {
+        alert('Required fields not mapped: ' + missing.join(', '));
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Importing...';
+
+    var resultDiv = document.getElementById('import-result-' + sourceId);
+    resultDiv.innerHTML = '<div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Importing ' + selectedNums.length + ' orders...</div>';
+
+    fetch(baseUrl + sourceId + '/import/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sheet_name: sheetName,
+            row_numbers: selectedNums,
+            column_mapping: mapping,
+        }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> Import';
+
+        if (data.success) {
+            var html = '<div class="alert alert-success py-2 mb-1 mt-2"><i class="fa-solid fa-check me-1"></i> <strong>' + data.saved + ' orders imported</strong>';
+            if (data.skipped) html += ', ' + data.skipped + ' skipped';
+            html += ' <a href="{% url "workforce:wf_orders_all" %}" class="alert-link ms-2"><i class="fa-solid fa-arrow-right me-1"></i>View All Orders</a>';
+            html += '</div>';
+            if (data.imported && data.imported.length) {
+                html += '<div class="small text-muted mt-1">';
+                data.imported.forEach(function(item) {
+                    html += '<span class="badge bg-light text-dark me-1 mb-1">Row ' + item.row + ' → ' + item.order + '</span>';
+                });
+                html += '</div>';
+            }
+            if (data.errors && data.errors.length) {
+                html += '<div class="alert alert-warning py-2 mb-0"><strong>Notes:</strong><ul class="mb-0 ps-3">';
+                data.errors.forEach(function(e) { html += '<li>' + e + '</li>'; });
+                html += '</ul></div>';
+            }
+            resultDiv.innerHTML = html;
+            // Update imported rows cache for highlighting
+            if (data.imported && data.imported.length) {
+                if (!_savedImportedRows[sourceId]) _savedImportedRows[sourceId] = [];
+                data.imported.forEach(function(item) {
+                    _savedImportedRows[sourceId].push(item);
+                });
+            }
+        } else {
+            resultDiv.innerHTML = '<div class="alert alert-danger py-2 mb-0 mt-2"><i class="fa-solid fa-exclamation-triangle me-1"></i> ' + data.error + '</div>';
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> Import';
+        resultDiv.innerHTML = '<div class="alert alert-danger py-2 mb-0 mt-2">Network error: ' + err.message + '</div>';
+    });
+}
+</script>
+{% endblock extra_js %}

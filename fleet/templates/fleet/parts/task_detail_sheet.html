@@ -108,6 +108,31 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                         <i class="fa-solid fa-map" style="color:#34a853; font-size: 1.1rem;"></i> Maps
                     </a>
                 </div>
+                <!-- AI Parse Location Button -->
+                <div id="tdAiParseBtn" style="display:none; margin-top: 10px;">
+                    <button type="button" class="task-card__contact-pill"
+                        style="color:var(--fleet-primary, #2563eb); border-color:var(--fleet-primary, #2563eb); width:100%; justify-content:center; padding: 8px 12px;"
+                        onclick="tdAiParse()">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="font-size:1rem;"></i> AI Parse Location
+                    </button>
+                </div>
+                <!-- Lat / Lng / Accuracy Row -->
+                <div id="tdLatLngRow" style="display:none; margin-top: 10px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+                        <div style="background:var(--fleet-grey-50,#f8fafc); border-radius:8px; padding:6px 8px; border:1px solid var(--fleet-grey-100,#e2e8f0);">
+                            <div style="font-size:0.65rem; color:var(--fleet-grey-500,#64748b); font-weight:600; text-transform:uppercase;">Lat</div>
+                            <div id="tdLatVal" style="font-size:0.75rem; font-weight:700; color:var(--fleet-dark,#0f172a);">—</div>
+                        </div>
+                        <div style="background:var(--fleet-grey-50,#f8fafc); border-radius:8px; padding:6px 8px; border:1px solid var(--fleet-grey-100,#e2e8f0);">
+                            <div style="font-size:0.65rem; color:var(--fleet-grey-500,#64748b); font-weight:600; text-transform:uppercase;">Lng</div>
+                            <div id="tdLngVal" style="font-size:0.75rem; font-weight:700; color:var(--fleet-dark,#0f172a);">—</div>
+                        </div>
+                        <div style="background:var(--fleet-grey-50,#f8fafc); border-radius:8px; padding:6px 8px; border:1px solid var(--fleet-grey-100,#e2e8f0);">
+                            <div style="font-size:0.65rem; color:var(--fleet-grey-500,#64748b); font-weight:600; text-transform:uppercase;">Accuracy</div>
+                            <div id="tdAccVal" style="font-size:0.75rem; font-weight:700;">—</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -139,7 +164,14 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             <span id="tdNotes"></span>
         </div>
 
-        <!-- Products -->
+        <!-- Product Description (summary from import) -->
+        <div id="tdProductDescBox" class="td-notes" style="display:none;">
+            <i class="fa-solid fa-tag"></i>
+            <span id="tdProductDesc"></span>
+            <strong id="tdProductQty" class="ms-2"></strong>
+        </div>
+
+        <!-- Products (individual items) -->
         <div id="tdProductsBox" style="display:none;">
             <div class="td-divider"></div>
             <div class="td-products-header">
@@ -493,6 +525,18 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         if (d.notes) { document.getElementById('tdNotes').textContent = d.notes; notesBox.style.display = ''; }
         else         { notesBox.style.display = 'none'; }
 
+        // Product Description (summary)
+        const pdBox = document.getElementById('tdProductDescBox');
+        const pdDesc = card.dataset.productDesc || '';
+        const pdQty = card.dataset.productQty || '';
+        if (pdDesc) {
+            document.getElementById('tdProductDesc').textContent = pdDesc;
+            document.getElementById('tdProductQty').textContent = pdQty ? 'x ' + pdQty : '';
+            pdBox.style.display = '';
+        } else {
+            pdBox.style.display = 'none';
+        }
+
         // Address Verification
         const addrBox    = document.getElementById('tdAddrVerifyBox');
         const addrBadge  = document.getElementById('tdAddrVerifyBadge');
@@ -572,6 +616,47 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             navButtons.style.display = 'flex';
         } else {
             navButtons.style.display = 'none';
+        }
+
+        // Lat / Lng / Accuracy row
+        const latLngRow = document.getElementById('tdLatLngRow');
+        const tdLatVal = document.getElementById('tdLatVal');
+        const tdLngVal = document.getElementById('tdLngVal');
+        const tdAccVal = document.getElementById('tdAccVal');
+        if (bestLat && bestLng && parseFloat(bestLat) !== 0) {
+            tdLatVal.textContent = parseFloat(bestLat).toFixed(6);
+            tdLngVal.textContent = parseFloat(bestLng).toFixed(6);
+            const accKey = av.coords_accuracy || d.coordsAccuracy;
+            const accMeta = accKey && ACCURACY_LABEL[accKey];
+            if (accMeta) {
+                tdAccVal.innerHTML = `<span style="background:${accMeta.color}18;color:${accMeta.color};border:1px solid ${accMeta.color}40;border-radius:6px;padding:1px 6px;font-size:0.65rem;">${accMeta.label.split(' ')[0]}</span>`;
+            } else {
+                tdAccVal.textContent = '—';
+            }
+            latLngRow.style.display = '';
+        } else {
+            tdLatVal.textContent = '—';
+            tdLngVal.textContent = '—';
+            tdAccVal.textContent = '—';
+            latLngRow.style.display = '';
+        }
+
+        // AI Parse button — store data for tdAiParse()
+        const aiParseBtn = document.getElementById('tdAiParseBtn');
+        window._tdAiParseData = {
+            address: d.address || '',
+            zone: d.zone || '',
+            street: d.street || '',
+            building: d.building || '',
+            lat: bestLat || '',
+            lng: bestLng || '',
+            orderId: d.orderId || '',
+            orderNumber: d.order || d.tasknum || ''
+        };
+        if (typeof EzzyAIParse !== 'undefined') {
+            aiParseBtn.style.display = '';
+        } else {
+            aiParseBtn.style.display = 'none';
         }
 
         if (bestLat && bestLng && parseFloat(bestLat) !== 0) {
@@ -1061,6 +1146,26 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         document.getElementById('taskDetailOverlay').classList.remove('open');
         document.getElementById('taskDetailSheet').classList.remove('open');
         document.body.style.overflow = '';
+    };
+
+    // AI Parse Location from task detail sheet
+    window.tdAiParse = function() {
+        if (typeof EzzyAIParse === 'undefined') {
+            if (typeof showToast === 'function') showToast('AI Parse not available', 'warning');
+            return;
+        }
+        var p = window._tdAiParseData || {};
+        EzzyAIParse.parse({
+            address: p.address,
+            zone: p.zone,
+            street: p.street,
+            building: p.building,
+            lat: p.lat,
+            lng: p.lng,
+            orderId: p.orderId,
+            orderNumber: p.orderNumber,
+            showMap: true
+        });
     };
 
     // Swipe-down handle/header to close

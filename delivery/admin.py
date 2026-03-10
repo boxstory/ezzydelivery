@@ -90,6 +90,17 @@ class DeliveryTaskAdmin(admin.ModelAdmin):
     readonly_fields = ('completion_latitude', 'completion_longitude', 'completed_at')
 
 
+@admin.register(delivery_models.TaskStatusPoint)
+class TaskStatusPointAdmin(admin.ModelAdmin):
+    list_display = ('task', 'driver', 'old_status', 'new_status', 'latitude', 'longitude', 'distance_from_delivery', 'created_at')
+    list_filter = ('new_status', 'created_at')
+    search_fields = ('task__dl_task_number',)
+    readonly_fields = ('task', 'driver', 'old_status', 'new_status', 'latitude', 'longitude', 'accuracy', 'distance_from_delivery', 'delivery_latitude', 'delivery_longitude', 'created_at')
+    raw_id_fields = ('task', 'driver')
+    list_select_related = ('task', 'driver')
+    ordering = ('-created_at',)
+
+
 @admin.register(delivery_models.DlAddressUpdate)
 class DlAddressUpdateAdmin(admin.ModelAdmin):
     list_display = ('full_name', 'dl_zone', 'dl_street', 'dl_building')

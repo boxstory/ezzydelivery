@@ -12,6 +12,50 @@
     // Reduce history cache size to prevent localStorage quota errors
     htmx.config.historyCacheSize = 5; // Default is 10, reduce to 5
     htmx.config.refreshOnHistoryMiss = true; // Refresh page if cache miss
+    htmx.config.allowScriptTags = true; // Execute <script> tags in swapped content
+  });
+
+  // ─── Inject missing CSS from HTMX responses ───
+  // When HTMX swaps #main-content, page-specific CSS in <head> is not included.
+  // This handler parses the full response to extract and inject missing stylesheets.
+  document.body.addEventListener("htmx:afterRequest", function(evt) {
+    var xhr = evt.detail.xhr;
+    if (!xhr || !xhr.responseText || xhr.status !== 200) return;
+
+    // Only process navigation requests (not form submissions, etc.)
+    var target = evt.detail.target;
+    if (!target || target.id !== 'main-content') return;
+
+    try {
+      // Parse the full response HTML
+      var doc = new DOMParser().parseFromString(xhr.responseText, 'text/html');
+      var responseLinks = doc.querySelectorAll('head link[rel="stylesheet"]');
+
+      // Get currently loaded stylesheets
+      var currentHrefs = new Set();
+      document.querySelectorAll('head link[rel="stylesheet"]').forEach(function(link) {
+        // Normalize: strip query params for comparison
+        var href = link.getAttribute('href');
+        if (href) currentHrefs.add(href.split('?')[0]);
+      });
+
+      // Inject any missing stylesheets
+      responseLinks.forEach(function(link) {
+        var href = link.getAttribute('href');
+        if (!href) return;
+        var hrefBase = href.split('?')[0];
+        if (!currentHrefs.has(hrefBase)) {
+          var newLink = document.createElement('link');
+          newLink.rel = 'stylesheet';
+          newLink.type = 'text/css';
+          newLink.href = href;
+          document.head.appendChild(newLink);
+          currentHrefs.add(hrefBase);
+        }
+      });
+    } catch(e) {
+      console.warn('CSS injection from HTMX response failed:', e);
+    }
   });
 
   document.body.addEventListener("htmx:configRequest", (event) => {
@@ -68,6 +112,42 @@
         jQuery(selectEl).select2();
       });
     }
+  });
+
+  // ─── Auto-enhance sidebar links with HTMX ───
+  // Catches clicks on any sidebar link (desktop or mobile) that doesn't
+  // already have hx-get, and loads content via htmx.ajax().
+  document.addEventListener('DOMContentLoaded', function() {
+    // Selectors for sidebar nav links (desktop + mobile)
+    var sidebarSelectors = [
+      '.wf-sidebar__submenu-link',
+      '.wsm__nav-link',
+      '.wsm__nav-single a',
+      '.wsm__dashboard-btn'
+    ].join(',');
+
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest(sidebarSelectors);
+      if (!link || !link.href) return;
+
+      // Skip if already has hx-get (HTMX-enhanced) or external/admin links
+      if (link.hasAttribute('hx-get')) return;
+      var href = link.getAttribute('href');
+      if (!href || href === '#' || href.startsWith('http') || href.includes('/admin/')) return;
+
+      e.preventDefault();
+
+      // Use htmx.ajax to load content
+      htmx.ajax('GET', href, {
+        target: '#main-content',
+        swap: 'outerHTML',
+        select: '#main-content',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+      }).then(function() {
+        // Push URL to browser history
+        history.pushState({}, '', href);
+      });
+    });
   });
 </script>
 <!-- <script src="{% static 'volte/js/volte.js' %}"></script> -->
@@ -312,8 +392,12 @@
       let targetDropdownId = null;
 
       // ========== WORKFORCE DASHBOARD DROPDOWNS ==========
+      // Zone & QNAS URLs
+      if (currentPath.includes('/delivery/zone') || currentPath.includes('/delivery/qnas') || (currentPath.includes('/workforce/') && currentPath.includes('qnas'))) {
+        targetDropdownId = 'submenu-zones';
+      }
       // Warehouse URLs
-      if (currentPath.includes('/warehouse/')) {
+      else if (currentPath.includes('/warehouse/')) {
         targetDropdownId = 'submenu-warehouse';
       }
       // Workforce-specific orders URLs
@@ -354,6 +438,22 @@
       // Sellers URLs
       else if (currentPath.includes('/workforce/') && currentPath.includes('seller')) {
         targetDropdownId = 'submenu-sellers';
+      }
+      // Verification URLs
+      else if (currentPath.includes('/workforce/') && currentPath.includes('verification')) {
+        targetDropdownId = 'submenu-verifications';
+      }
+      // Finance URLs
+      else if (currentPath.includes('/workforce/') && (currentPath.includes('finance') || currentPath.includes('cod-settlement'))) {
+        targetDropdownId = 'submenu-finance';
+      }
+      // Forms URLs
+      else if (currentPath.includes('/workforce/') && (currentPath.includes('inquir') || currentPath.includes('whatsapp'))) {
+        targetDropdownId = 'submenu-forms';
+      }
+      // Dispatch URLs
+      else if (currentPath.includes('/workforce/') && currentPath.includes('dispatch')) {
+        targetDropdownId = 'submenu-dispatch';
       }
       // ========== BUSINESS DASHBOARD DROPDOWNS ==========
       // Settings-related URLs (most specific)
@@ -429,6 +529,26 @@
           }
         });
       }
+      // STEP 6: Update mobile sidebar active states
+      document.querySelectorAll('.wsm__nav-link, .wsm__nav-single a, .wsm__dashboard-btn').forEach(function(link) {
+        link.classList.remove('active');
+        var href = link.getAttribute('href');
+        if (href) {
+          var hrefPath = href.split('?')[0];
+          if (currentPath === hrefPath || currentPath.startsWith(hrefPath + '/')) {
+            link.classList.add('active');
+            var submenu = link.closest('.wsm__nav-submenu');
+            if (submenu) {
+              submenu.classList.add('show');
+              var header = submenu.previousElementSibling;
+              if (header) {
+                header.classList.add('active');
+                header.dataset.hasActivePage = '1';
+              }
+            }
+          }
+        }
+      });
     }, 100); // Increased to 100ms for better reliability with redirects
   });
 </script>

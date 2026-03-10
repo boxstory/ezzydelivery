@@ -1,5 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
-{% load static %}
+{% load static workforce_tags %}
 
 {% block title %}Order Auto/API — Staff Dashboard{% endblock %}
 
@@ -58,6 +58,21 @@
         </div>
 
         {% if selected_business and selected_api %}
+
+        {% if selected_api.api_type == 'google_sheet' %}
+        <!-- Column Mapping Setup -->
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="wfapi_mapping_btn" onclick="openMappingModal()">
+                <i class="fa-solid fa-columns me-1"></i>Setup Column Mapping
+            </button>
+            {% if selected_api.column_mapping %}
+            <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Mapping saved ({{ selected_api.column_mapping|length }} fields)</span>
+            {% else %}
+            <span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No mapping configured — using auto-detect</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <!-- Live API Orders (fetched directly from platform) -->
 
         {% if live_error %}
@@ -106,6 +121,12 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="width:36px;"></th>
+                                {% if selected_api.api_type == 'google_sheet' and gs_headers %}
+                                <th class="text-muted">Row</th>
+                                {% for h in gs_headers %}
+                                <th class="small">{{ h }}</th>
+                                {% endfor %}
+                                {% else %}
                                 <th>Order #</th>
                                 <th>Customer</th>
                                 <th>Phone</th>
@@ -115,12 +136,13 @@
                                 <th>Status</th>
                                 {% if selected_api.api_type == 'shopify' %}<th>Fulfillment</th>{% endif %}
                                 <th>Date</th>
+                                {% endif %}
                                 <th>Imported</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for o in live_orders %}
-                            <tr class="{% if o.imported %}table-success{% endif %}">
+                            <tr id="row-{{ o.row_number }}" class="{% if o.imported %}table-success{% endif %}">
                                 <td>
                                     {% if not o.imported %}
                                     <input type="checkbox" class="wfapi-check form-check-input" value="{{ o.platform_id }}" data-source="{{ o.source }}">
@@ -128,6 +150,12 @@
                                     <i class="fa-solid fa-circle-check text-success"></i>
                                     {% endif %}
                                 </td>
+                                {% if selected_api.api_type == 'google_sheet' and gs_headers %}
+                                <td class="text-muted small">{{ o.row_number }}</td>
+                                {% for h in gs_headers %}
+                                <td class="small text-truncate" style="max-width:160px;" title="{{ o.cells|get_item:h }}">{{ o.cells|get_item:h }}</td>
+                                {% endfor %}
+                                {% else %}
                                 <td class="fw-semibold">{{ o.name }}</td>
                                 <td>{{ o.customer|default:'—'|truncatechars:20 }}</td>
                                 <td class="text-muted small">{{ o.phone|default:'—' }}</td>
@@ -137,6 +165,7 @@
                                 <td><span class="badge bg-light text-dark border">{{ o.status|default:'—' }}</span></td>
                                 {% if selected_api.api_type == 'shopify' %}<td><span class="badge bg-light text-dark border">{{ o.fulfillment|default:'—' }}</span></td>{% endif %}
                                 <td class="text-muted small">{{ o.date|default:'—' }}</td>
+                                {% endif %}
                                 <td>
                                     {% if o.imported %}
                                     <a href="{% url 'workforce:order_detail' o.imported_order_id %}"
@@ -173,36 +202,38 @@
             <div class="d-flex align-items-center gap-2">
                 <select class="form-select form-select-sm" style="width:auto;"
                         onchange="window.location.href='?business={{ selected_business_id }}&status={{ status_filter }}&per_page='+this.value+'&page=1'">
+                    <option value="10"  {% if per_page == 10  %}selected{% endif %}>10 / page</option>
                     <option value="25"  {% if per_page == 25  %}selected{% endif %}>25 / page</option>
                     <option value="50"  {% if per_page == 50  %}selected{% endif %}>50 / page</option>
                     <option value="100" {% if per_page == 100 %}selected{% endif %}>100 / page</option>
-                    <option value="200" {% if per_page == 200 %}selected{% endif %}>200 / page</option>
                 </select>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">‹</a>
-                        </li>
-                        {% endif %}
-                        {% for p in page_obj.paginator.page_range %}
-                        {% if p == page_obj.number %}
-                        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
-                        {% elif p == 1 or p == page_obj.paginator.num_pages or p >= page_obj.number|add:"-2" and p <= page_obj.number|add:"2" %}
-                        <li class="page-item">
-                            <a class="page-link" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ p }}">{{ p }}</a>
-                        </li>
-                        {% elif p == page_obj.number|add:"-3" or p == page_obj.number|add:"3" %}
-                        <li class="page-item disabled"><span class="page-link">…</span></li>
-                        {% endif %}
-                        {% endfor %}
-                        {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}">›</a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                </nav>
+                {% if page_obj.has_previous %}
+                <a class="btn btn-sm btn-outline-primary" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">
+                    <i class="fa-solid fa-chevron-left me-1"></i>Previous {{ per_page }}
+                </a>
+                {% else %}
+                <button class="btn btn-sm btn-outline-secondary" disabled>
+                    <i class="fa-solid fa-chevron-left me-1"></i>Previous {{ per_page }}
+                </button>
+                {% endif %}
+                <span class="badge bg-primary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                <a class="btn btn-sm btn-outline-primary" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}">
+                    Next {{ per_page }} <i class="fa-solid fa-chevron-right ms-1"></i>
+                </a>
+                {% else %}
+                <button class="btn btn-sm btn-outline-secondary" disabled>
+                    Next {{ per_page }} <i class="fa-solid fa-chevron-right ms-1"></i>
+                </button>
+                {% endif %}
+                <span class="text-muted mx-1">|</span>
+                <div class="d-flex align-items-center gap-1">
+                    <label class="small text-muted text-nowrap mb-0">Go to row:</label>
+                    <input type="number" id="wfapi_goto_row" class="form-control form-control-sm" style="width:70px;" min="2" max="{{ total_filtered|add:1 }}" placeholder="Row" {% if default_goto_row %}value="{{ default_goto_row }}"{% endif %}>
+                    <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="goToRow()">
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -221,10 +252,236 @@
         {% endif %}
     </div>
 </div>
+{% if selected_api.api_type == 'google_sheet' %}
+<!-- Column Mapping Modal -->
+<div class="modal fade" id="mappingModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-columns me-2"></i>Column Mapping — {{ selected_business.business_name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info small mb-3">
+          <i class="fa-solid fa-info-circle me-1"></i>
+          Map your Google Sheet columns to order fields. This mapping is saved per business and used for all future imports.
+        </div>
+        <div id="wfapi_mapping_loading" class="text-center py-4">
+          <span class="spinner-border spinner-border-sm me-1"></span>Loading sheet headers...
+        </div>
+        <div id="wfapi_mapping_error" class="alert alert-danger d-none"></div>
+        <div id="wfapi_mapping_content" class="d-none">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-info" id="wfapi_header_count">0 columns</span>
+            <span class="badge bg-success" id="wfapi_mapped_count">0 mapped</span>
+          </div>
+          <!-- Mapping header -->
+          <div class="d-flex gap-2 p-2 fw-semibold small" style="background:#f8f9fa; border-radius:0.5rem;">
+            <div style="flex:1;">Order Field</div>
+            <div style="width:30px;text-align:center;"><i class="fa-solid fa-arrow-left text-muted"></i></div>
+            <div style="flex:1;">Sheet Column</div>
+          </div>
+          <div id="wfapi_mapping_rows"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="wfapi_save_mapping_btn" onclick="saveMapping()">
+          <i class="fa-solid fa-save me-1"></i>Save Mapping
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if selected_api %}
+{% if selected_api.column_mapping %}
+{{ selected_api.column_mapping|json_script:"wiz_saved_mapping_data" }}
+{% endif %}
+<!-- Import Wizard Modal -->
+<div class="modal fade" id="importWizardModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-file-import me-2"></i>Import Orders — {{ selected_business.business_name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Wizard Steps -->
+        <div class="d-flex border-bottom" id="wiz_steps">
+          <div class="wiz-step active flex-fill text-center py-2 border-end" data-step="1">
+            <span class="badge bg-primary rounded-circle me-1">1</span>
+            <span class="small fw-semibold">Select</span>
+          </div>
+          {% if selected_api.api_type == 'google_sheet' %}
+          <div class="wiz-step flex-fill text-center py-2 border-end" data-step="2">
+            <span class="badge bg-secondary rounded-circle me-1">2</span>
+            <span class="small fw-semibold">Mapping</span>
+          </div>
+          <div class="wiz-step flex-fill text-center py-2 border-end" data-step="3">
+            <span class="badge bg-secondary rounded-circle me-1">3</span>
+            <span class="small fw-semibold">Verify</span>
+          </div>
+          <div class="wiz-step flex-fill text-center py-2" data-step="4">
+            <span class="badge bg-secondary rounded-circle me-1">4</span>
+            <span class="small fw-semibold">Confirm</span>
+          </div>
+          {% else %}
+          <div class="wiz-step flex-fill text-center py-2 border-end" data-step="3">
+            <span class="badge bg-secondary rounded-circle me-1">2</span>
+            <span class="small fw-semibold">Verify</span>
+          </div>
+          <div class="wiz-step flex-fill text-center py-2" data-step="4">
+            <span class="badge bg-secondary rounded-circle me-1">3</span>
+            <span class="small fw-semibold">Confirm</span>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Step 1: Selected Orders -->
+        <div class="wiz-content p-3" id="wiz_step_1">
+          <div class="alert alert-info small mb-3">
+            <i class="fa-solid fa-info-circle me-1"></i>
+            Review the selected orders below before proceeding to import.
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  {% if selected_api.api_type == 'google_sheet' %}<th class="text-muted">Row</th>{% endif %}
+                  <th>Order #</th>
+                  <th>Customer</th>
+                  <th>Phone</th>
+                  <th>Address</th>
+                  <th>COD</th>
+                </tr>
+              </thead>
+              <tbody id="wiz_selected_body"></tbody>
+            </table>
+          </div>
+          <div id="wiz_step1_count" class="small text-muted mt-2"></div>
+        </div>
+
+        {% if selected_api.api_type == 'google_sheet' %}
+        <!-- Step 2: Mapping -->
+        <div class="wiz-content p-3 d-none" id="wiz_step_2">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            {% if selected_api.column_mapping %}
+            <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Mapping saved ({{ selected_api.column_mapping|length }} fields)</span>
+            <span class="text-muted small">Your saved mapping will be used for import.</span>
+            {% else %}
+            <span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No mapping saved</span>
+            <span class="text-muted small">Auto-detect will be used. Setup mapping for better accuracy.</span>
+            {% endif %}
+          </div>
+          <div id="wiz_mapping_preview">
+            <div class="small fw-semibold mb-2">Current field mapping:</div>
+            <div id="wiz_mapping_fields" class="d-flex flex-wrap gap-2"></div>
+          </div>
+          <div class="mt-3">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="openMappingModal()">
+              <i class="fa-solid fa-columns me-1"></i>Edit Column Mapping
+            </button>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Step 3: Verify / Preview -->
+        <div class="wiz-content p-3 d-none" id="wiz_step_3">
+          <div id="wiz_verify_loading" class="text-center py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span>Loading preview...
+          </div>
+          <div id="wiz_verify_error" class="alert alert-danger d-none"></div>
+          <div id="wiz_verify_content" class="d-none">
+            <div class="alert alert-info small mb-3">
+              <i class="fa-solid fa-eye me-1"></i>
+              Preview of how the data will be imported. Verify the mapped fields are correct.
+            </div>
+            <div id="wiz_already_imported" class="alert alert-warning small d-none mb-3">
+              <i class="fa-solid fa-exclamation-triangle me-1"></i>
+              <span id="wiz_already_count">0</span> order(s) already imported — they will be skipped.
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light" id="wiz_verify_head"></thead>
+                <tbody id="wiz_verify_body"></tbody>
+              </table>
+            </div>
+            <div id="wiz_verify_count" class="small text-muted mt-2"></div>
+          </div>
+        </div>
+
+        <!-- Step 4: Confirm / Result -->
+        <div class="wiz-content p-3 d-none" id="wiz_step_4">
+          <div id="wiz_import_loading" class="text-center py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span>Importing orders...
+          </div>
+          <div id="wiz_import_result" class="d-none">
+            <div id="wiz_import_success" class="d-none">
+              <div class="text-center py-3">
+                <i class="fa-solid fa-circle-check text-success" style="font-size:3rem;"></i>
+                <h4 class="mt-3">Import Complete!</h4>
+                <p class="text-muted" id="wiz_result_summary"></p>
+              </div>
+              <div id="wiz_result_errors" class="alert alert-warning small d-none mt-3"></div>
+            </div>
+            <div id="wiz_import_error" class="d-none">
+              <div class="text-center py-3">
+                <i class="fa-solid fa-circle-xmark text-danger" style="font-size:3rem;"></i>
+                <h4 class="mt-3">Import Failed</h4>
+                <p class="text-danger" id="wiz_error_msg"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" id="wiz_footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" id="wiz_btn_cancel">Cancel</button>
+        <button type="button" class="btn btn-outline-primary btn-sm d-none" id="wiz_btn_back" onclick="wizBack()">
+          <i class="fa-solid fa-arrow-left me-1"></i>Back
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" id="wiz_btn_next" onclick="wizNext()">
+          Next <i class="fa-solid fa-arrow-right ms-1"></i>
+        </button>
+        <button type="button" class="btn btn-success btn-sm d-none" id="wiz_btn_import" onclick="wizImport()">
+          <i class="fa-solid fa-file-import me-1"></i>Confirm Import
+        </button>
+        <button type="button" class="btn btn-primary btn-sm d-none" id="wiz_btn_done" data-bs-dismiss="modal" onclick="location.reload()">
+          <i class="fa-solid fa-check me-1"></i>Done
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock content %}
 
 {% block extra_js %}
 <script>
+// Go to Row — calculates which page contains the given sheet row number
+function goToRow() {
+    const inp = document.getElementById('wfapi_goto_row');
+    const rowNum = parseInt(inp.value);
+    if (!rowNum || rowNum < 2) { inp.focus(); return; }
+    const perPage = {{ per_page }};
+    const totalRows = {{ total_filtered }};
+    // Row 2 in sheet = data row index 0 (row 1 is header)
+    const dataIdx = rowNum - 2;
+    if (dataIdx < 0 || dataIdx >= totalRows) {
+        inp.classList.add('is-invalid');
+        setTimeout(() => inp.classList.remove('is-invalid'), 1500);
+        return;
+    }
+    const page = Math.floor(dataIdx / perPage) + 1;
+    window.location.href = '?business={{ selected_business_id }}&status={{ status_filter }}&per_page=' + perPage + '&page=' + page + '#row-' + rowNum;
+}
+// Allow Enter key in the input
+document.addEventListener('DOMContentLoaded', function() {
+    const inp = document.getElementById('wfapi_goto_row');
+    if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); goToRow(); } });
+});
+
 (function() {
     const selectAll = document.getElementById('wfapi_select_all');
     const bulkBar  = document.getElementById('wfapi_bulk_bar');
@@ -264,49 +521,557 @@
         });
     }
 
+    // Open Import Wizard instead of direct import
     if (transferBtn) {
-        transferBtn.addEventListener('click', async function() {
+        transferBtn.addEventListener('click', function() {
             const checked = getChecked();
             if (!checked.length) return;
-
-            transferBtn.disabled = true;
-            statusEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Importing...</span>';
-
-            const body = new URLSearchParams();
-            body.append('csrfmiddlewaretoken', csrf);
-            body.append('business_id', '{{ selected_business_id }}');
-            body.append('source', checked[0].dataset.source || '');
-            checked.forEach(cb => body.append('platform_ids[]', cb.value));
-
-            try {
-                const resp = await fetch('{% url "workforce:import_api_orders" %}', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrf },
-                    body: body
-                });
-                const result = await resp.json();
-                if (result.success) {
-                    let msg = result.created + ' order(s) imported';
-                    if (result.skipped) msg += ', ' + result.skipped + ' already existed';
-                    if (result.errors && result.errors.length) msg += ' (' + result.errors.length + ' errors)';
-                    statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + msg + '</span>';
-                    checked.forEach(cb => {
-                        const row = cb.closest('tr');
-                        if (row) row.classList.add('table-success');
-                        cb.disabled = true;
-                    });
-                    if (selectAll) selectAll.checked = false;
-                    updateBar();
-                } else {
-                    statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>' + (result.error || 'Failed') + '</span>';
-                }
-            } catch(err) {
-                statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>Network error</span>';
-            } finally {
-                transferBtn.disabled = false;
-            }
+            openImportWizard(checked);
         });
     }
 })();
+
+{% if selected_api %}
+// ─── Import Wizard ───
+let _wizStep = 1;
+let _wizChecked = [];
+let _wizPreviewData = null;
+const IS_GSHEET = '{{ selected_api.api_type }}' === 'google_sheet';
+const WIZ_STEPS = IS_GSHEET ? [1,2,3,4] : [1,3,4];
+
+function openImportWizard(checked) {
+    _wizChecked = checked;
+    _wizStep = WIZ_STEPS[0];
+    _wizPreviewData = null;
+
+    // Populate step 1: selected orders table
+    const body = document.getElementById('wiz_selected_body');
+    body.innerHTML = '';
+    checked.forEach(cb => {
+        const tr = cb.closest('tr');
+        if (!tr) return;
+        const cells = tr.querySelectorAll('td');
+        const newRow = document.createElement('tr');
+        // Copy relevant cells (skip checkbox col)
+        for (let i = 1; i < cells.length; i++) {
+            // Only show first 6 cols: row(opt), order#, customer, phone, address, cod
+            if (i <= 6) {
+                const td = document.createElement('td');
+                td.innerHTML = cells[i].innerHTML;
+                td.className = cells[i].className;
+                newRow.appendChild(td);
+            }
+        }
+        body.appendChild(newRow);
+    });
+    document.getElementById('wiz_step1_count').textContent = checked.length + ' order(s) selected for import';
+
+    {% if selected_api.api_type == 'google_sheet' %}
+    // Populate mapping preview in step 2
+    const mappingDiv = document.getElementById('wiz_mapping_fields');
+    mappingDiv.innerHTML = '';
+    {% if selected_api.column_mapping %}
+    const savedMapEl = document.getElementById('wiz_saved_mapping_data');
+    const savedMap = savedMapEl ? JSON.parse(savedMapEl.textContent) : {};
+    for (const [field, col] of Object.entries(savedMap)) {
+        const fLabel = MAPPING_FIELDS.find(f => f.name === field)?.label || field;
+        mappingDiv.innerHTML += `<span class="badge bg-light text-dark border">${col} → <strong>${fLabel}</strong></span>`;
+    }
+    {% else %}
+    mappingDiv.innerHTML = '<span class="text-muted small">Auto-detect mode — no saved mapping</span>';
+    {% endif %}
+    {% endif %}
+
+    // Show modal, set initial step
+    showWizStep(_wizStep);
+    const modal = new bootstrap.Modal(document.getElementById('importWizardModal'));
+    modal.show();
+}
+
+function showWizStep(step) {
+    _wizStep = step;
+    // Hide all step contents
+    document.querySelectorAll('.wiz-content').forEach(el => el.classList.add('d-none'));
+    document.getElementById('wiz_step_' + step)?.classList.remove('d-none');
+
+    // Update step indicators
+    document.querySelectorAll('.wiz-step').forEach(el => {
+        const s = parseInt(el.dataset.step);
+        const badge = el.querySelector('.badge');
+        if (s === step) {
+            el.classList.add('active');
+            badge.className = 'badge bg-primary rounded-circle me-1';
+        } else if (WIZ_STEPS.indexOf(s) < WIZ_STEPS.indexOf(step)) {
+            el.classList.remove('active');
+            badge.className = 'badge bg-success rounded-circle me-1';
+        } else {
+            el.classList.remove('active');
+            badge.className = 'badge bg-secondary rounded-circle me-1';
+        }
+    });
+
+    // Update footer buttons
+    const isFirst = WIZ_STEPS.indexOf(step) === 0;
+    const isLast = step === 4;
+    const isVerify = step === 3;
+    const isConfirm = step === 4;
+
+    document.getElementById('wiz_btn_back').classList.toggle('d-none', isFirst);
+    document.getElementById('wiz_btn_next').classList.toggle('d-none', isVerify || isConfirm);
+    document.getElementById('wiz_btn_import').classList.toggle('d-none', !isVerify);
+    document.getElementById('wiz_btn_done').classList.add('d-none');
+    document.getElementById('wiz_btn_cancel').classList.toggle('d-none', isConfirm);
+}
+
+function wizNext() {
+    const curIdx = WIZ_STEPS.indexOf(_wizStep);
+    if (curIdx < WIZ_STEPS.length - 1) {
+        const nextStep = WIZ_STEPS[curIdx + 1];
+        if (nextStep === 3) {
+            // Load preview before showing step 3
+            loadPreview();
+        }
+        showWizStep(nextStep);
+    }
+}
+
+function wizBack() {
+    const curIdx = WIZ_STEPS.indexOf(_wizStep);
+    if (curIdx > 0) {
+        showWizStep(WIZ_STEPS[curIdx - 1]);
+    }
+}
+
+function loadPreview() {
+    const loading = document.getElementById('wiz_verify_loading');
+    const errorEl = document.getElementById('wiz_verify_error');
+    const content = document.getElementById('wiz_verify_content');
+    loading.classList.remove('d-none');
+    errorEl.classList.add('d-none');
+    content.classList.add('d-none');
+
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+              || document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', csrf);
+    body.append('business_id', '{{ selected_business_id }}');
+    _wizChecked.forEach(cb => body.append('platform_ids[]', cb.value));
+
+    fetch('{% url "workforce:preview_api_import" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf },
+        body: body
+    })
+    .then(r => r.json())
+    .then(data => {
+        loading.classList.add('d-none');
+        if (!data.success) {
+            errorEl.textContent = data.error;
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        _wizPreviewData = data;
+        const thead = document.getElementById('wiz_verify_head');
+        const tbody = document.getElementById('wiz_verify_body');
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+
+        // Build dynamic headers — DB field name + sheet column source
+        const fields = data.fields || [];
+        if (fields.length) {
+            const headerRow = document.createElement('tr');
+            fields.forEach(f => {
+                const th = document.createElement('th');
+                th.style.lineHeight = '1.2';
+                if (f.name === 'row_number') {
+                    th.className = 'text-muted small';
+                    th.textContent = f.label;
+                } else {
+                    th.innerHTML = `<div class="fw-semibold">${f.label}</div>` +
+                        (f.sheet_col ? `<div class="text-muted fw-normal" style="font-size:0.7rem;">← ${f.sheet_col}</div>` : '');
+                }
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+        }
+
+        // Build data rows
+        if (data.preview && data.preview.length) {
+            data.preview.forEach(row => {
+                const tr = document.createElement('tr');
+                fields.forEach(f => {
+                    const td = document.createElement('td');
+                    const val = row[f.name] || '—';
+                    if (f.name === 'row_number') {
+                        td.className = 'text-muted small';
+                        td.textContent = val;
+                    } else if (f.name === 'client_order_code' || f.name === 'cod_amount') {
+                        td.className = 'fw-semibold';
+                        td.textContent = val;
+                    } else if (f.name === 'customer_name') {
+                        td.textContent = val;
+                    } else {
+                        td.className = 'text-muted small';
+                        td.textContent = typeof val === 'string' && val.length > 30 ? val.substring(0, 30) + '…' : val;
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Already imported warning
+        const alreadyDiv = document.getElementById('wiz_already_imported');
+        if (data.already_imported && data.already_imported.length > 0) {
+            document.getElementById('wiz_already_count').textContent = data.already_imported.length;
+            alreadyDiv.classList.remove('d-none');
+        } else {
+            alreadyDiv.classList.add('d-none');
+        }
+
+        document.getElementById('wiz_verify_count').textContent =
+            data.preview.length + ' order(s) ready to import' +
+            (data.already_imported?.length ? ', ' + data.already_imported.length + ' will be skipped' : '');
+
+        content.classList.remove('d-none');
+    })
+    .catch(err => {
+        loading.classList.add('d-none');
+        errorEl.textContent = 'Failed to load preview: ' + err.message;
+        errorEl.classList.remove('d-none');
+    });
+}
+
+function wizImport() {
+    showWizStep(4);
+    const loading = document.getElementById('wiz_import_loading');
+    const result = document.getElementById('wiz_import_result');
+    loading.classList.remove('d-none');
+    result.classList.add('d-none');
+
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+              || document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', csrf);
+    body.append('business_id', '{{ selected_business_id }}');
+    body.append('source', _wizChecked[0]?.dataset?.source || '');
+    _wizChecked.forEach(cb => body.append('platform_ids[]', cb.value));
+
+    fetch('{% url "workforce:import_api_orders" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf },
+        body: body
+    })
+    .then(r => r.json())
+    .then(data => {
+        loading.classList.add('d-none');
+        result.classList.remove('d-none');
+
+        if (data.success) {
+            document.getElementById('wiz_import_success').classList.remove('d-none');
+            document.getElementById('wiz_import_error').classList.add('d-none');
+
+            let msg = `<strong>${data.created}</strong> order(s) imported successfully`;
+            if (data.skipped) msg += `, <strong>${data.skipped}</strong> already existed (skipped)`;
+            document.getElementById('wiz_result_summary').innerHTML = msg;
+
+            if (data.errors && data.errors.length) {
+                const errDiv = document.getElementById('wiz_result_errors');
+                errDiv.innerHTML = '<strong>Errors:</strong><ul class="mb-0 mt-1">' +
+                    data.errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+                errDiv.classList.remove('d-none');
+            }
+
+            // Mark imported rows in the table
+            _wizChecked.forEach(cb => {
+                const row = cb.closest('tr');
+                if (row) row.classList.add('table-success');
+                cb.disabled = true;
+            });
+        } else {
+            document.getElementById('wiz_import_success').classList.add('d-none');
+            document.getElementById('wiz_import_error').classList.remove('d-none');
+            document.getElementById('wiz_error_msg').textContent = data.error || 'Unknown error';
+        }
+
+        // Show Done button, hide others
+        document.getElementById('wiz_btn_back').classList.add('d-none');
+        document.getElementById('wiz_btn_next').classList.add('d-none');
+        document.getElementById('wiz_btn_import').classList.add('d-none');
+        document.getElementById('wiz_btn_cancel').classList.add('d-none');
+        document.getElementById('wiz_btn_done').classList.remove('d-none');
+    })
+    .catch(err => {
+        loading.classList.add('d-none');
+        result.classList.remove('d-none');
+        document.getElementById('wiz_import_success').classList.add('d-none');
+        document.getElementById('wiz_import_error').classList.remove('d-none');
+        document.getElementById('wiz_error_msg').textContent = 'Network error: ' + err.message;
+
+        document.getElementById('wiz_btn_back').classList.add('d-none');
+        document.getElementById('wiz_btn_next').classList.add('d-none');
+        document.getElementById('wiz_btn_import').classList.add('d-none');
+        document.getElementById('wiz_btn_cancel').classList.add('d-none');
+        document.getElementById('wiz_btn_done').classList.remove('d-none');
+    });
+}
+
+{% endif %}
+
+{% if selected_api.api_type == 'google_sheet' %}
+// Column Mapping
+const MAPPING_FIELDS = [
+    // Order Info
+    { name: 'client_order_code', label: 'Order ID', group: 'Order Info' },
+    { name: 'order_date', label: 'Order Date', group: 'Order Info' },
+    // Customer
+    { name: 'customer_name', label: 'Customer Name', required: true, group: 'Customer' },
+    { name: 'customer_phone', label: 'Phone 1', required: true, group: 'Customer' },
+    { name: 'customer_whatsapp', label: 'Phone 2 / WhatsApp', group: 'Customer' },
+    { name: 'customer_email', label: 'Email', group: 'Customer' },
+    // Address
+    { name: 'customer_address', label: 'Customer Address', required: true, group: 'Address' },
+    { name: 'dl_landmark', label: 'City / Landmark', group: 'Address' },
+    { name: 'dl_building', label: 'Villa / Building No', group: 'Address' },
+    { name: 'dl_street', label: 'Street No', group: 'Address' },
+    { name: 'dl_zone', label: 'Zone No', group: 'Address' },
+    { name: 'location_link', label: 'Location Link', group: 'Address' },
+    { name: 'dl_latitude', label: 'Latitude', group: 'Address' },
+    { name: 'dl_longitude', label: 'Longitude', group: 'Address' },
+    // Delivery
+    { name: 'deadline_date', label: 'Preferred Day & Time', group: 'Delivery' },
+    // Product & SKU
+    { name: 'product_name', label: 'Product Name / Item', group: 'Product' },
+    { name: 'sku', label: 'SKU', group: 'Product' },
+    { name: 'product_url', label: 'Product URL', group: 'Product' },
+    { name: 'quantity', label: 'Quantity', group: 'Product' },
+    // Payment
+    { name: 'cod_amount', label: 'Price / COD Amount', group: 'Payment' },
+    { name: 'dl_amount', label: 'Delivery Fee', group: 'Payment' },
+    // Notes
+    { name: 'seller_notes', label: 'Seller Notes', group: 'Notes' },
+    { name: 'internal_notes', label: 'Internal Notes', group: 'Notes' },
+    // Additional Products (Items 1-5)
+    { name: 'product_1', label: 'Product Item 1', group: 'Additional Products' },
+    { name: 'count_1', label: 'Count 1', group: 'Additional Products' },
+    { name: 'product_2', label: 'Product Item 2', group: 'Additional Products' },
+    { name: 'count_2', label: 'Count 2', group: 'Additional Products' },
+    { name: 'product_3', label: 'Product Item 3', group: 'Additional Products' },
+    { name: 'count_3', label: 'Count 3', group: 'Additional Products' },
+    { name: 'product_4', label: 'Product Item 4', group: 'Additional Products' },
+    { name: 'count_4', label: 'Count 4', group: 'Additional Products' },
+    { name: 'product_5', label: 'Product Item 5', group: 'Additional Products' },
+    { name: 'count_5', label: 'Count 5', group: 'Additional Products' },
+];
+
+let _sheetHeaders = [];
+let _sampleRow = [];
+let _savedMapping = {};
+
+function openMappingModal() {
+    const modal = new bootstrap.Modal(document.getElementById('mappingModal'));
+    modal.show();
+
+    document.getElementById('wfapi_mapping_loading').classList.remove('d-none');
+    document.getElementById('wfapi_mapping_content').classList.add('d-none');
+    document.getElementById('wfapi_mapping_error').classList.add('d-none');
+
+    fetch('{% url "workforce:wf_sheet_headers" %}?business_id={{ selected_business_id }}')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('wfapi_mapping_loading').classList.add('d-none');
+            if (!data.success) {
+                document.getElementById('wfapi_mapping_error').textContent = data.error;
+                document.getElementById('wfapi_mapping_error').classList.remove('d-none');
+                return;
+            }
+            _sheetHeaders = data.headers || [];
+            _sampleRow = data.sample || [];
+            _savedMapping = data.saved_mapping || {};
+            buildMappingRows();
+            document.getElementById('wfapi_mapping_content').classList.remove('d-none');
+        })
+        .catch(err => {
+            document.getElementById('wfapi_mapping_loading').classList.add('d-none');
+            document.getElementById('wfapi_mapping_error').textContent = 'Failed to load: ' + err.message;
+            document.getElementById('wfapi_mapping_error').classList.remove('d-none');
+        });
+}
+
+function buildMappingRows() {
+    const container = document.getElementById('wfapi_mapping_rows');
+    container.innerHTML = '';
+    document.getElementById('wfapi_header_count').textContent = _sheetHeaders.length + ' columns';
+
+    // Build sheet column options (used for each field's dropdown)
+    const sheetColOptions = '<option value="">-- Not mapped --</option>' +
+        _sheetHeaders.map((h, i) => {
+            if (!h.trim()) return '';
+            const sample = i < _sampleRow.length ? _sampleRow[i] : '';
+            const sampleHint = sample ? ` (${sample.substring(0, 20)})` : '';
+            return `<option value="${h}">${h}${sampleHint}</option>`;
+        }).join('');
+
+    // For each ORDER FIELD, show a row with a sheet-column dropdown
+    let lastGroup = '';
+    MAPPING_FIELDS.forEach(f => {
+        // Group header
+        if (f.group !== lastGroup) {
+            lastGroup = f.group;
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'py-2 mt-2 fw-bold small text-uppercase text-muted';
+            groupDiv.style.borderBottom = '2px solid #dee2e6';
+            groupDiv.textContent = f.group;
+            container.appendChild(groupDiv);
+        }
+
+        // Find saved or auto-detected sheet column for this field
+        let mappedCol = '';
+        if (_savedMapping[f.name]) {
+            mappedCol = _savedMapping[f.name];
+        } else if (Object.keys(_savedMapping).length === 0) {
+            // Auto-detect: find which sheet header matches this field
+            for (let i = 0; i < _sheetHeaders.length; i++) {
+                if (autoDetectField(_sheetHeaders[i]) === f.name) {
+                    mappedCol = _sheetHeaders[i];
+                    break;
+                }
+            }
+        }
+
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 align-items-center py-2 border-bottom';
+
+        const req = f.required ? '<span class="text-danger ms-1">*</span>' : '';
+
+        // Build select with the matched column pre-selected
+        let selectHtml = sheetColOptions.replace(
+            `value="${mappedCol}"`,
+            `value="${mappedCol}" selected`
+        );
+
+        row.innerHTML = `
+            <div style="flex:1;" class="small">
+                <span class="fw-semibold">${f.label}</span>${req}
+            </div>
+            <div style="width:30px;text-align:center;"><i class="fa-solid fa-arrow-left text-muted"></i></div>
+            <div style="flex:1;">
+                <select class="form-select form-select-sm wfapi-map-field" data-field="${f.name}">
+                    ${selectHtml}
+                </select>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    // Update count
+    updateMappedCount();
+    container.querySelectorAll('.wfapi-map-field').forEach(s => s.addEventListener('change', updateMappedCount));
+}
+
+function autoDetectField(header) {
+    const h = header.trim().toLowerCase();
+    // Exact match first
+    const map = {
+        'order': 'client_order_code', 'order id': 'client_order_code', 'order number': 'client_order_code', 'order #': 'client_order_code', 'ref': 'client_order_code', 'reference': 'client_order_code',
+        'order date': 'order_date', 'date': 'order_date', 'created': 'order_date', 'created at': 'order_date',
+        'name': 'customer_name', 'customer name': 'customer_name', 'customer': 'customer_name', 'client name': 'customer_name', 'client': 'customer_name', 'first name': 'customer_name',
+        'phone': 'customer_phone', 'mobile': 'customer_phone', 'phone number': 'customer_phone', 'contact': 'customer_phone', 'phone 1': 'customer_phone',
+        'whatsapp': 'customer_whatsapp', 'phone 2': 'customer_whatsapp', 'alternate phone': 'customer_whatsapp',
+        'email': 'customer_email', 'e-mail': 'customer_email', 'customer email': 'customer_email',
+        'address': 'customer_address', 'delivery address': 'customer_address', 'location': 'customer_address', 'shipping address': 'customer_address',
+        'city': 'dl_landmark', 'area': 'dl_landmark', 'landmark': 'dl_landmark',
+        'building': 'dl_building', 'villa': 'dl_building', 'building no': 'dl_building', 'villa no': 'dl_building',
+        'street': 'dl_street', 'street no': 'dl_street', 'street number': 'dl_street',
+        'zone': 'dl_zone', 'zone no': 'dl_zone', 'zone number': 'dl_zone',
+        'location link': 'location_link', 'google map': 'location_link', 'map link': 'location_link', 'gps': 'location_link',
+        'latitude': 'dl_latitude', 'lat': 'dl_latitude',
+        'longitude': 'dl_longitude', 'lng': 'dl_longitude', 'long': 'dl_longitude',
+        'deadline': 'deadline_date', 'preferred time': 'deadline_date', 'delivery date': 'deadline_date', 'day time': 'deadline_date',
+        'product': 'product_name', 'product name': 'product_name', 'item': 'product_name', 'items': 'product_name', 'item name': 'product_name', 'description': 'product_name',
+        'sku': 'sku', 'product sku': 'sku', 'item sku': 'sku', 'article': 'sku',
+        'product url': 'product_url', 'url': 'product_url', 'product link': 'product_url',
+        'quantity': 'quantity', 'qty': 'quantity', 'count': 'quantity', 'pcs': 'quantity',
+        'cod': 'cod_amount', 'amount': 'cod_amount', 'cod amount': 'cod_amount', 'price': 'cod_amount', 'total': 'cod_amount',
+        'delivery fee': 'dl_amount', 'shipping fee': 'dl_amount', 'delivery amount': 'dl_amount',
+        'notes': 'seller_notes', 'seller notes': 'seller_notes', 'note': 'seller_notes', 'remarks': 'seller_notes', 'comment': 'seller_notes', 'comments': 'seller_notes',
+        'internal notes': 'internal_notes', 'staff notes': 'internal_notes', 'notes by ezzy': 'internal_notes',
+        // Product items 1-5
+        'product 1': 'product_1', 'product:1': 'product_1', 'item 1': 'product_1', 'product1': 'product_1',
+        'count 1': 'count_1', 'count:1': 'count_1', 'qty 1': 'count_1', 'count1': 'count_1',
+        'product 2': 'product_2', 'product:2': 'product_2', 'item 2': 'product_2', 'product2': 'product_2',
+        'count 2': 'count_2', 'count:2': 'count_2', 'qty 2': 'count_2', 'count2': 'count_2',
+        'product 3': 'product_3', 'product:3': 'product_3', 'item 3': 'product_3', 'product3': 'product_3',
+        'count 3': 'count_3', 'count:3': 'count_3', 'qty 3': 'count_3', 'count3': 'count_3',
+        'product 4': 'product_4', 'product:4': 'product_4', 'item 4': 'product_4', 'product4': 'product_4',
+        'count 4': 'count_4', 'count:4': 'count_4', 'qty 4': 'count_4', 'count4': 'count_4',
+        'product 5': 'product_5', 'product:5': 'product_5', 'item 5': 'product_5', 'product5': 'product_5',
+        'count 5': 'count_5', 'count:5': 'count_5', 'qty 5': 'count_5', 'count5': 'count_5',
+    };
+    if (map[h]) return map[h];
+
+    // Fuzzy: numbered product/count columns
+    const prodMatch = h.match(/^(product|item)\s*(\d+)$/);
+    if (prodMatch && parseInt(prodMatch[2]) <= 5) return 'product_' + prodMatch[2];
+    const countMatch = h.match(/^(count|qty|quantity)\s*(\d+)$/);
+    if (countMatch && parseInt(countMatch[2]) <= 5) return 'count_' + countMatch[2];
+
+    return '';
+}
+
+function updateMappedCount() {
+    const mapped = document.querySelectorAll('.wfapi-map-field');
+    let count = 0;
+    mapped.forEach(s => { if (s.value) count++; });
+    document.getElementById('wfapi_mapped_count').textContent = count + ' mapped';
+}
+
+function saveMapping() {
+    const mapping = {};
+    document.querySelectorAll('.wfapi-map-field').forEach(s => {
+        if (s.value) {
+            // field_name -> sheet_column_header
+            mapping[s.dataset.field] = s.value;
+        }
+    });
+
+    const btn = document.getElementById('wfapi_save_mapping_btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+              || document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', csrf);
+    body.append('business_id', '{{ selected_business_id }}');
+    body.append('mapping', JSON.stringify(mapping));
+
+    fetch('{% url "workforce:wf_save_column_mapping" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf },
+        body: body
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        if (data.success) {
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Saved!';
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('mappingModal')).hide();
+                location.reload();
+            }, 800);
+        } else {
+            btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping';
+            alert(data.error || 'Failed to save');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping';
+        alert('Network error');
+    });
+}
+{% endif %}
 </script>
 {% endblock extra_js %}

@@ -178,22 +178,14 @@
 
                         <!-- Actions -->
                         <div class="d-flex gap-2 flex-wrap">
-                            {% if api.api_type == 'google_sheet' %}
-                            <!-- View live sheet orders -->
-                            <a href="{% url 'workforce:wf_api_orders' %}?business={{ api.business.business_id }}"
-                               class="btn btn-sm btn-outline-danger">
-                                <i class="fa-brands fa-google me-1"></i>View Orders
-                            </a>
-                            {% else %}
-                            <!-- Test -->
+                            <!-- Test Connection -->
                             <a href="{% url 'workforce:wf_test_api_config' api.id %}"
                                hx-get="{% url 'workforce:wf_test_api_config' api.id %}"
                                hx-target="#main-content" hx-select="#main-content"
                                hx-swap="outerHTML" hx-push-url="true"
                                class="btn btn-sm btn-outline-info">
-                                <i class="fa-solid fa-vial me-1"></i>Test API
+                                <i class="fa-solid fa-vial me-1"></i>Test Connection
                             </a>
-                            {% endif %}
 
                             <!-- Approve/Revoke toggle -->
                             <button type="button"

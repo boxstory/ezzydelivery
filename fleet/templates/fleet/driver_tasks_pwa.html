@@ -5,6 +5,9 @@
 {% block page_title %}My Tasks{% endblock %}
 
 {% block header_actions %}
+<a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon" title="Tasks Map" style="text-decoration:none;">
+    <i class="fa-solid fa-map-location-dot"></i>
+</a>
 <a href="{% url 'fleet:driver_tasks' %}?area=all" class="fleet-btn-icon" title="Refresh">
     <i class="fa-solid fa-rotate-right"></i>
 </a>
@@ -131,6 +134,8 @@
     data-timeslot="{% if addr %}{{ addr.time_slot|default:'' }}{% endif %}"
     data-cod="{{ card.order.cod_amount|default:'' }}"
     data-items="{{ card.order.order_items.count }}"
+    data-product-desc="{{ card.order.package_description|default:'' }}"
+    data-product-qty="{{ card.order.total_quantity|default:'' }}"
     data-earn="{{ card.driver_earnings|default:'' }}"
     data-notes="{{ card.order.order_notes|default:'' }}"
     data-address="{{ card.order.customer_address|default:'' }}"
@@ -138,6 +143,7 @@
     data-lat="{{ card.order.latitude|default:'' }}{% if not card.order.latitude and addr %}{{ addr.dl_latitude|default:'' }}{% endif %}"
     data-lng="{{ card.order.longitude|default:'' }}{% if not card.order.longitude and addr %}{{ addr.dl_longitude|default:'' }}{% endif %}"
     data-coords-accuracy="{{ card.order.coords_accuracy|default:'' }}"
+    data-order-id="{{ card.order.id }}"
 >
 <script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{% if item.product %}{{ item.product.item_name|escapejs }}{% else %}{{ item.notes|default:'Item'|escapejs }}{% endif %}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
 </script>
@@ -338,10 +344,10 @@
                 <i class="fa-solid fa-check"></i> Accept
             </button>
             {% elif current_tab == 'accepted' %}
-            <button class="task-card__action-btn task-card__action-btn--nav"
-                    onclick="event.stopPropagation(); openNav(this)">
+            <a href="{% url 'fleet:fleet_task_navigation' card.id %}" class="task-card__action-btn task-card__action-btn--nav"
+               onclick="event.stopPropagation();">
                 <i class="fa-solid fa-map"></i> Navigate
-            </button>
+            </a>
             {% if card.dl_task_status == 'accepted' %}
             <button class="task-card__action-btn task-card__action-btn--start"
                     onclick="event.stopPropagation(); startRide({{ card.id }}, this)">
@@ -559,8 +565,8 @@
         .then(data => {
             if (data.success) {
                 haptic([10, 50, 10]);
-                showToast('Task accepted! Moving to Active...', 'success');
-                setTimeout(() => switchTab('accepted'), 1200);
+                showToast('Task accepted!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast(data.error || 'Could not accept this task', 'error');
                 btn.disabled = false;
@@ -796,12 +802,12 @@
         bar.style.animation = 'countdown-shrink 3s linear forwards';
 
         document.getElementById('takeScanSuccess').style.display = 'block';
-        showToast('Task accepted! Moving to Active…', 'success');
+        showToast('Task accepted!', 'success');
 
-        // After 3 seconds: close modal and switch to accepted tab
+        // After 3 seconds: close modal and reload same page
         setTimeout(() => {
             closeTakeScanner();
-            switchTab('accepted');
+            window.location.reload();
         }, 3000);
     }
 </script>
