@@ -239,8 +239,9 @@ urlpatterns = [
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
 
-    # Import History
+    # Import History & Temp Orders
     path('import-history/', workforce_views.import_history, name='import_history'),
+    path('orders/temp/', workforce_views.temp_orders, name='temp_orders'),
 
     # OneDrive Import Sources
     path('onedrive-sources/', workforce_views.onedrive_sources, name='onedrive_sources'),

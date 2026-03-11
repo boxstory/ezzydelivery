@@ -10235,6 +10235,91 @@ def import_history(request):
     })
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_orders(request):
+    """Dedicated page for temp orders (to_review) across all businesses."""
+    from django.db.models import Count, Sum
+
+    orders = orders_models.Order.objects.filter(
+        order_status='to_review',
+    ).select_related(
+        'business', 'pickup_location'
+    ).prefetch_related('order_items').order_by('-created_at')
+
+    # Filters
+    search = request.GET.get('search', '').strip()
+    business_id = request.GET.get('business', '').strip()
+    verification = request.GET.get('verification', '').strip()
+    date_from = request.GET.get('dateFrom', '').strip()
+    date_to = request.GET.get('dateTo', '').strip()
+
+    if business_id:
+        orders = orders.filter(business_id=business_id)
+    if search:
+        orders = orders.filter(
+            Q(customer_name__icontains=search) |
+            Q(customer_phone__icontains=search) |
+            Q(order_number__icontains=search) |
+            Q(client_order_code__icontains=search)
+        )
+    if verification:
+        orders = orders.filter(verification_status=verification)
+    if date_from:
+        orders = orders.filter(created_at__date__gte=date_from)
+    if date_to:
+        orders = orders.filter(created_at__date__lte=date_to)
+
+    # Summary stats
+    all_temp = orders_models.Order.objects.filter(order_status='to_review')
+    biz_counts = all_temp.values(
+        'business_id', 'business__business_name'
+    ).annotate(count=Count('id')).order_by('-count')
+
+    total_count = orders.count()
+    total_cod = orders.aggregate(total=Sum('cod_amount'))['total'] or 0
+
+    # Paginate
+    orders = paginate_queryset(request, orders)
+
+    # All businesses for filter dropdown
+    all_businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    # Build filter_params for pagination
+    filter_params_list = []
+    if search:
+        filter_params_list.append(f'search={search}')
+    if business_id:
+        filter_params_list.append(f'business={business_id}')
+    if verification:
+        filter_params_list.append(f'verification={verification}')
+    if date_from:
+        filter_params_list.append(f'dateFrom={date_from}')
+    if date_to:
+        filter_params_list.append(f'dateTo={date_to}')
+    filter_params = '&'.join(filter_params_list)
+
+    context = {
+        'orders': orders,
+        'all_businesses': all_businesses,
+        'biz_counts': biz_counts,
+        'total_count': total_count,
+        'total_cod': total_cod,
+        'filters': {
+            'search': search,
+            'business': business_id,
+            'verification': verification,
+            'dateFrom': date_from,
+            'dateTo': date_to,
+        },
+        'filter_params': filter_params,
+        'per_page': request.GET.get('per_page', '25'),
+    }
+    return render(request, 'workforce/temp_orders.html', context)
+
+
 # =============================================================================
 # ONEDRIVE IMPORT SOURCES
 # =============================================================================
