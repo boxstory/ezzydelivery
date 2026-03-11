@@ -1980,48 +1980,48 @@ def business_cod_statement(request):
 
 
 @login_required(login_url='/accounts/login/')
-@business_required
 def inbound_requests_list(request):
     """
-    List all inbound product requests for current business.
+    List all inbound product requests.
 
-    Inbound requests are for sending products TO the warehouse.
-    Only available for businesses with fulfillment service enabled.
+    Staff sees all requests; business users see only their own.
     """
-    from business.decorators import business_permission_required
-    from business.permissions import BusinessPermissions
     from warehouse.models import InboundProductRequest
     from django.core.paginator import Paginator
 
+    is_staff = request.user.is_staff or request.user.is_superuser
     business = get_cached_business(request)
-    if not business:
-        messages.error(request, "No business associated with your account")
-        return redirect('core:main_dashboard')
 
-    # Check if fulfillment is enabled
-    if not business.fulfillment_service_enabled:
-        messages.warning(request, "Fulfillment service is not enabled for your business.")
-        return redirect('business:business_dashboard')
+    if is_staff:
+        requests_qs = InboundProductRequest.objects.all()
+        stats_qs = InboundProductRequest.objects.all()
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
+        if not business.fulfillment_service_enabled:
+            messages.warning(request, "Fulfillment service is not enabled for your business.")
+            return redirect('business:business_dashboard')
+        requests_qs = InboundProductRequest.objects.filter(business=business)
+        stats_qs = requests_qs
 
-    # Get requests for this business
-    requests_qs = InboundProductRequest.objects.filter(
-        business=business
-    ).select_related('warehouse', 'created_by', 'approved_by', 'completed_by').prefetch_related('items__product')
+    requests_qs = requests_qs.select_related(
+        'warehouse', 'business', 'created_by', 'approved_by', 'completed_by'
+    ).prefetch_related('items__product')
 
     # Apply filters
     status_filter = request.GET.get('status', '')
     if status_filter:
         requests_qs = requests_qs.filter(status=status_filter)
 
-    # Stats - single aggregate query instead of 4 separate COUNT queries
+    # Stats
     from django.db.models import Count, Case, When, IntegerField
-    stats_agg = InboundProductRequest.objects.filter(business=business).aggregate(
+    stats = stats_qs.aggregate(
         total=Count('id'),
         pending=Count(Case(When(status='pending', then=1), output_field=IntegerField())),
         approved=Count(Case(When(status='approved', then=1), output_field=IntegerField())),
         completed=Count(Case(When(status='completed', then=1), output_field=IntegerField())),
     )
-    stats = stats_agg
 
     # Pagination
     paginator = Paginator(requests_qs, 20)
@@ -2034,8 +2034,167 @@ def inbound_requests_list(request):
         'page_obj': page_obj,
         'stats': stats,
         'status_filter': status_filter,
+        'is_staff': is_staff,
     }
     return render(request, 'business/inbound_requests_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def inbound_request_detail(request, pk):
+    """Detail view for a single inbound product request."""
+    from warehouse.models import InboundProductRequest
+
+    is_staff = request.user.is_staff or request.user.is_superuser
+    business = get_cached_business(request)
+
+    qs = InboundProductRequest.objects.select_related(
+        'warehouse', 'business', 'created_by', 'approved_by', 'completed_by'
+    ).prefetch_related('items__product')
+
+    if is_staff:
+        inbound_request = get_object_or_404(qs, pk=pk)
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
+        inbound_request = get_object_or_404(qs, pk=pk, business=business)
+
+    context = {
+        'page_title': f'Request {inbound_request.request_number}',
+        'business': inbound_request.business,
+        'inbound_request': inbound_request,
+    }
+    return render(request, 'business/inbound_request_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def inbound_request_create(request):
+    """Create a new inbound product request."""
+    from warehouse.models import InboundProductRequest, ProductRequestItem, SellerWarehouseLink, Warehouse
+    from product.models import Product
+    from business.models import Business
+
+    is_staff = request.user.is_staff or request.user.is_superuser
+    business = get_cached_business(request)
+
+    if is_staff:
+        # Staff: show all warehouses, all businesses, products filtered by business
+        warehouses = Warehouse.objects.filter(is_active=True)
+        businesses = Business.objects.filter(business_status='active').order_by('business_name')
+        selected_business_id = request.GET.get('business', '') or request.POST.get('business', '')
+        if selected_business_id:
+            products = Product.objects.filter(business_id=selected_business_id).order_by('item_name')
+        else:
+            products = Product.objects.none()
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
+        if not business.fulfillment_service_enabled:
+            messages.warning(request, "Fulfillment service is not enabled for your business.")
+            return redirect('business:business_dashboard')
+        # Business user: linked warehouses only
+        linked_warehouse_ids = SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        warehouses = Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
+        products = Product.objects.filter(business=business).order_by('item_name')
+        businesses = None
+        selected_business_id = ''
+
+    if request.method == 'POST':
+        warehouse_id = request.POST.get('warehouse')
+        expected_date = request.POST.get('expected_delivery_date', '')
+        notes = request.POST.get('notes', '')
+        product_ids = request.POST.getlist('products[]')
+        quantities = request.POST.getlist('quantities[]')
+        item_notes = request.POST.getlist('item_notes[]')
+
+        # Determine the business for this request
+        if is_staff:
+            post_business_id = request.POST.get('business', '')
+            if not post_business_id:
+                messages.error(request, "Please select a business.")
+            else:
+                try:
+                    req_business = Business.objects.get(pk=post_business_id)
+                except Business.DoesNotExist:
+                    messages.error(request, "Invalid business selected.")
+                    req_business = None
+        else:
+            req_business = business
+            post_business_id = str(business.pk) if business else ''
+
+        if not warehouse_id:
+            messages.error(request, "Please select a warehouse.")
+        elif not product_ids or not any(product_ids):
+            messages.error(request, "Please add at least one product.")
+        elif is_staff and not post_business_id:
+            pass  # error already set above
+        else:
+            try:
+                warehouse = Warehouse.objects.get(pk=warehouse_id)
+
+                if not is_staff:
+                    # Validate warehouse access for non-staff
+                    if not SellerWarehouseLink.objects.filter(
+                        business=business, warehouse_id=warehouse_id, is_active=True
+                    ).exists():
+                        raise ValueError("Warehouse is not linked to your business")
+
+                # Create the inbound request
+                inbound_req = InboundProductRequest.objects.create(
+                    business=req_business,
+                    warehouse=warehouse,
+                    notes=notes,
+                    created_by=request.user,
+                    expected_delivery_date=expected_date if expected_date else None,
+                )
+
+                # Create items
+                items_created = 0
+                for i, (pid, qty_str) in enumerate(zip(product_ids, quantities)):
+                    if not pid or not qty_str:
+                        continue
+                    qty = int(qty_str)
+                    if qty <= 0:
+                        continue
+
+                    if is_staff:
+                        product = Product.objects.get(pk=pid)
+                    else:
+                        product = Product.objects.get(pk=pid, business=business)
+                    item_note = item_notes[i] if i < len(item_notes) else ''
+
+                    ProductRequestItem.objects.create(
+                        inbound_request=inbound_req,
+                        product=product,
+                        quantity_requested=qty,
+                        notes=item_note,
+                    )
+                    items_created += 1
+
+                if items_created == 0:
+                    inbound_req.delete()
+                    messages.error(request, "No valid products were added.")
+                else:
+                    messages.success(request, f"Inbound request {inbound_req.request_number} created with {items_created} item(s).")
+                    return redirect('business:inbound_request_detail', pk=inbound_req.pk)
+
+            except Exception as e:
+                logger.exception(f"Error creating inbound request: {e}")
+                messages.error(request, f"Error creating request: {e}")
+
+    context = {
+        'page_title': 'New Inbound Request',
+        'business': business,
+        'warehouses': warehouses,
+        'products': products,
+        'is_staff': is_staff,
+        'businesses': businesses,
+        'selected_business_id': selected_business_id,
+    }
+    return render(request, 'business/inbound_request_create.html', context)
 
 
 @login_required(login_url='/accounts/login/')

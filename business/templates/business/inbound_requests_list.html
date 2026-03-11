@@ -20,7 +20,7 @@
         <p class="bir__subtitle">Send products to warehouse for storage and fulfillment</p>
       </div>
       <div class="bir__header-actions">
-        <a href="#" class="bir__btn bir__btn--primary">
+        <a href="{% url 'business:inbound_request_create' %}" class="bir__btn bir__btn--primary">
           <i class="fa-solid fa-plus"></i>
           <span>New Request</span>
         </a>
@@ -119,6 +119,7 @@
           <thead>
             <tr>
               <th class="bir__th">Request Number</th>
+              {% if is_staff %}<th class="bir__th">Business</th>{% endif %}
               <th class="bir__th">Warehouse</th>
               <th class="bir__th">Items</th>
               <th class="bir__th">Status</th>
@@ -128,62 +129,65 @@
             </tr>
           </thead>
           <tbody>
-            {% for request in page_obj %}
-            <tr class="bir__row">
+            {% for req in page_obj %}
+            <tr class="bir__row" style="cursor:pointer" onclick="window.location='{% url 'business:inbound_request_detail' pk=req.pk %}'">
               <td class="bir__td">
-                <code class="bir__req-num">{{ request.request_number }}</code>
+                <code class="bir__req-num">{{ req.request_number }}</code>
               </td>
+              {% if is_staff %}
+              <td class="bir__td">{{ req.business.business_name }}</td>
+              {% endif %}
               <td class="bir__td">
                 <div class="bir__warehouse-info">
                   <i class="fa-solid fa-warehouse"></i>
-                  <span>{{ request.warehouse.name }}</span>
+                  <span>{{ req.warehouse.name }}</span>
                 </div>
               </td>
               <td class="bir__td">
-                <span class="bir__item-count">{{ request.items.count }} item{{ request.items.count|pluralize }}</span>
+                <span class="bir__item-count">{{ req.items.count }} item{{ req.items.count|pluralize }}</span>
               </td>
               <td class="bir__td">
-                {% if request.status == 'pending' %}
+                {% if req.status == 'pending' %}
                 <span class="bir__badge bir__badge--warning">
                   <i class="fa-solid fa-clock"></i>
                   Pending
                 </span>
-                {% elif request.status == 'approved' %}
+                {% elif req.status == 'approved' %}
                 <span class="bir__badge bir__badge--info">
                   <i class="fa-solid fa-circle-check"></i>
                   Approved
                 </span>
-                {% elif request.status == 'completed' %}
+                {% elif req.status == 'completed' %}
                 <span class="bir__badge bir__badge--success">
                   <i class="fa-solid fa-box-check"></i>
                   Completed
                 </span>
-                {% elif request.status == 'cancelled' %}
+                {% elif req.status == 'cancelled' %}
                 <span class="bir__badge bir__badge--danger">
                   <i class="fa-solid fa-circle-xmark"></i>
                   Cancelled
                 </span>
                 {% else %}
                 <span class="bir__badge bir__badge--neutral">
-                  {{ request.status|title }}
+                  {{ req.status|title }}
                 </span>
                 {% endif %}
               </td>
               <td class="bir__td">
-                <span class="bir__date">{{ request.created_at|date:"d M Y" }}</span>
+                <span class="bir__date">{{ req.created_at|date:"d M Y" }}</span>
               </td>
               <td class="bir__td">
-                {% if request.expected_delivery_date %}
-                <span class="bir__date">{{ request.expected_delivery_date|date:"d M Y" }}</span>
+                {% if req.expected_delivery_date %}
+                <span class="bir__date">{{ req.expected_delivery_date|date:"d M Y" }}</span>
                 {% else %}
                 <span class="text-muted">—</span>
                 {% endif %}
               </td>
               <td class="bir__td">
                 <div class="bir__actions">
-                  <button class="bir__btn-icon bir__btn-icon--view" title="View Details">
+                  <a class="bir__btn-icon bir__btn-icon--view" href="{% url 'business:inbound_request_detail' pk=req.pk %}" title="View Details" onclick="event.stopPropagation()">
                     <i class="fa-solid fa-eye"></i>
-                  </button>
+                  </a>
                 </div>
               </td>
             </tr>
@@ -196,7 +200,7 @@
         <i class="fa-solid fa-inbox"></i>
         <p class="bir__empty-title">No inbound requests found</p>
         <p class="bir__empty-text">Start by creating a new inbound request to send products to the warehouse</p>
-        <a href="#" class="bir__btn bir__btn--primary">
+        <a href="{% url 'business:inbound_request_create' %}" class="bir__btn bir__btn--primary">
           <i class="fa-solid fa-plus"></i>
           Create First Request
         </a>

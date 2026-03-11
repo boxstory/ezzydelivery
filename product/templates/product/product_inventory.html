@@ -73,7 +73,7 @@
           <th class="piv__th">SKU</th>
           <th class="piv__th piv__th--center">Category</th>
           <th class="piv__th piv__th--center">Price</th>
-          <th class="piv__th piv__th--center">Stock Qty</th>
+          <th class="piv__th piv__th--center">Stock</th>
           <th class="piv__th piv__th--center">Status</th>
         </tr>
       </thead>
@@ -127,39 +127,17 @@
             <span class="piv__price">QAR {{ product.item_price }}</span>
           </td>
 
-          <!-- Stock Qty (inline editable) -->
+          <!-- Stock -->
           <td class="piv__td piv__td--center">
-            <div class="piv__qty-wrap" id="product_inventory_qty_wrap_{{ product.id }}">
-              <button type="button" class="piv__qty-btn piv__qty-btn--minus"
-                      data-product-id="{{ product.id }}"
-                      id="product_inventory_btn_minus_{{ product.id }}">
-                <i class="fas fa-minus"></i>
-              </button>
-              <input type="number" class="piv__qty-input"
-                     value="{{ product.qty|default:0 }}"
-                     min="0" max="99999"
-                     data-product-id="{{ product.id }}"
-                     data-original="{{ product.qty|default:0 }}"
-                     id="product_inventory_qty_{{ product.id }}">
-              <button type="button" class="piv__qty-btn piv__qty-btn--plus"
-                      data-product-id="{{ product.id }}"
-                      id="product_inventory_btn_plus_{{ product.id }}">
-                <i class="fas fa-plus"></i>
-              </button>
-              <button type="button" class="piv__qty-save" style="display:none"
-                      data-product-id="{{ product.id }}"
-                      id="product_inventory_btn_save_{{ product.id }}">
-                <i class="fas fa-check"></i>
-              </button>
-            </div>
+            <span class="piv__qty-display">{{ product.warehouse_stock|default:0 }}</span>
           </td>
 
-          <!-- Status badge -->
+          <!-- Status badge (based on warehouse stock) -->
           <td class="piv__td piv__td--center">
-            {% with qty=product.qty|default:0 %}
-            {% if qty <= 0 %}
+            {% with ws=product.warehouse_stock|default:0 %}
+            {% if ws <= 0 %}
             <span class="piv__badge piv__badge--out">Out of Stock</span>
-            {% elif qty <= 5 %}
+            {% elif ws <= 5 %}
             <span class="piv__badge piv__badge--low">Low Stock</span>
             {% else %}
             <span class="piv__badge piv__badge--ok">In Stock</span>
@@ -234,79 +212,6 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    function getCsrf() {
-        var c = null;
-        document.cookie.split(';').forEach(function (x) {
-            x = x.trim();
-            if (x.startsWith('csrftoken=')) c = decodeURIComponent(x.split('=')[1]);
-        });
-        return c;
-    }
-
-    // Show save button when qty changes
-    document.querySelectorAll('.piv__qty-input').forEach(function (inp) {
-        inp.addEventListener('input', function () {
-            var pid = this.dataset.productId;
-            var saveBtn = document.getElementById('product_inventory_btn_save_' + pid);
-            if (saveBtn) saveBtn.style.display = this.value !== this.dataset.original ? '' : 'none';
-        });
-    });
-
-    // +/- buttons
-    document.querySelectorAll('.piv__qty-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var pid = this.dataset.productId;
-            var inp = document.getElementById('product_inventory_qty_' + pid);
-            var saveBtn = document.getElementById('product_inventory_btn_save_' + pid);
-            var current = parseInt(inp.value) || 0;
-            if (this.classList.contains('piv__qty-btn--plus')) {
-                inp.value = current + 1;
-            } else {
-                inp.value = Math.max(0, current - 1);
-            }
-            if (saveBtn) saveBtn.style.display = inp.value !== inp.dataset.original ? '' : 'none';
-        });
-    });
-
-    // Save quantity via AJAX
-    document.querySelectorAll('.piv__qty-save').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var pid = this.dataset.productId;
-            var inp = document.getElementById('product_inventory_qty_' + pid);
-            var qty = parseInt(inp.value);
-            if (isNaN(qty) || qty < 0) return;
-
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
-
-            fetch('/product/' + pid + '/inventory/update/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-                credentials: 'same-origin',
-                body: JSON.stringify({ qty: qty })
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.success) {
-                    inp.dataset.original = data.qty;
-                    btn.style.display = 'none';
-                    btn.innerHTML = '<i class="fas fa-check"></i>';
-                    btn.disabled = false;
-                    // Update status badge
-                    updateStatusBadge(pid, data.qty);
-                } else {
-                    alert(data.error || 'Failed to update');
-                    btn.innerHTML = '<i class="fas fa-check"></i>';
-                    btn.disabled = false;
-                }
-            })
-            .catch(function () {
-                btn.innerHTML = '<i class="fas fa-check"></i>';
-                btn.disabled = false;
-            });
-        });
-    });
-
     // Photo modal
     var modal    = document.getElementById('product_inventory_photo_modal');
     var modalImg = document.getElementById('product_inventory_modal_img');
@@ -331,23 +236,6 @@ document.addEventListener('DOMContentLoaded', function () {
     closeBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
-
-    function updateStatusBadge(pid, qty) {
-        var row = document.getElementById('product_inventory_row_' + pid);
-        if (!row) return;
-        var badge = row.querySelector('.piv__badge:not(.piv__badge--cat)');
-        if (!badge) return;
-        if (qty <= 0) {
-            badge.className = 'piv__badge piv__badge--out';
-            badge.textContent = 'Out of Stock';
-        } else if (qty <= 5) {
-            badge.className = 'piv__badge piv__badge--low';
-            badge.textContent = 'Low Stock';
-        } else {
-            badge.className = 'piv__badge piv__badge--ok';
-            badge.textContent = 'In Stock';
-        }
-    }
 });
 </script>
 {% endblock extra_js %}

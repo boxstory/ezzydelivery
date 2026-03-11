@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import Sum, F, Q
 from django.http import JsonResponse
 from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 
 from warehouse import models as warehouse_models
 from business import models as business_models
@@ -388,7 +389,7 @@ def transaction_list(request):
 
 @login_required(login_url='account_login')
 def receive_stock(request):
-    """Receive new stock into warehouse"""
+    """Receive new stock into warehouse — from inbound request or manual entry"""
     business, is_staff = get_business_filter(request)
 
     if not is_staff and not business:
@@ -396,13 +397,13 @@ def receive_stock(request):
         return redirect('business:business_dashboard')
 
     if request.method == 'POST':
-        # Handle stock receipt (now supports multiple products)
         warehouse_id = request.POST.get('warehouse')
         location_id = request.POST.get('location')
         reference = request.POST.get('reference', '')
         notes = request.POST.get('notes', '')
+        receive_date = request.POST.get('receive_date', '')
+        inbound_request_id = request.POST.get('inbound_request_id', '')
 
-        # Get arrays of products and quantities
         product_ids = request.POST.getlist('products[]')
         quantities = request.POST.getlist('quantities[]')
 
@@ -411,7 +412,6 @@ def receive_stock(request):
             if is_staff:
                 warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id)
             else:
-                # Verify warehouse is linked to this business
                 if not warehouse_models.SellerWarehouseLink.objects.filter(
                     business=business, warehouse_id=warehouse_id, is_active=True
                 ).exists():
@@ -425,9 +425,21 @@ def receive_stock(request):
                     pk=location_id, warehouse=warehouse
                 )
 
+            # If receiving from inbound request, load it
+            inbound_req = None
+            if inbound_request_id:
+                inbound_req = warehouse_models.InboundProductRequest.objects.get(
+                    pk=inbound_request_id, status__in=['pending', 'approved']
+                )
+
+            # Build reference note for inbound request
+            if inbound_req and not reference:
+                reference = inbound_req.request_number
+
             # Process each product
             received_products = []
             total_items = 0
+            fulfilled_items = {}  # product_id → qty for updating request items
 
             for product_id, quantity_str in zip(product_ids, quantities):
                 if not product_id or not quantity_str:
@@ -456,9 +468,14 @@ def receive_stock(request):
                 stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
 
                 # Build transaction notes
-                transaction_notes = notes
+                parts = []
+                if receive_date:
+                    parts.append(f"Received: {receive_date}")
                 if reference:
-                    transaction_notes = f"Ref: {reference}" + (f" | {notes}" if notes else "")
+                    parts.append(f"Ref: {reference}")
+                if notes:
+                    parts.append(notes)
+                transaction_notes = " | ".join(parts)
 
                 # Create transaction record
                 warehouse_models.InventoryTransaction.objects.create(
@@ -469,21 +486,59 @@ def receive_stock(request):
                     quantity=quantity,
                     quantity_before=old_quantity,
                     quantity_after=stock_level.quantity_on_hand,
+                    reference_type='inbound_request' if inbound_req else '',
+                    reference_id=str(inbound_req.pk) if inbound_req else '',
                     notes=transaction_notes,
                     created_by=request.user
                 )
 
                 received_products.append(f"{product.item_name} ({quantity} units)")
                 total_items += quantity
+                fulfilled_items[int(product_id)] = quantity
+
+            # If from inbound request, update fulfilled quantities
+            # Supports partial fulfillment — only mark completed when ALL items fully received
+            if inbound_req and received_products:
+                for item in inbound_req.items.all():
+                    qty = fulfilled_items.get(item.product_id, 0)
+                    if qty > 0:
+                        item.quantity_fulfilled += qty
+                        item.save(update_fields=['quantity_fulfilled', 'updated_at'])
+
+                # Approve if still pending
+                if inbound_req.status == 'pending':
+                    inbound_req.status = 'approved'
+                    inbound_req.approved_by = request.user
+                    inbound_req.approved_at = timezone.now()
+                    inbound_req.save(update_fields=['status', 'approved_by', 'approved_at', 'updated_at'])
+
+                # Check if all items are fully fulfilled
+                all_fulfilled = all(
+                    item.is_fully_fulfilled
+                    for item in inbound_req.items.all()
+                )
+                if all_fulfilled:
+                    inbound_req.status = 'completed'
+                    inbound_req.completed_by = request.user
+                    inbound_req.completed_at = timezone.now()
+                    inbound_req.save(update_fields=['status', 'completed_by', 'completed_at', 'updated_at'])
 
             # Success message
             if len(received_products) == 1:
-                messages.success(request, f"Received {received_products[0]}")
+                msg = f"Received {received_products[0]}"
             else:
                 summary = ", ".join(received_products[:3])
                 if len(received_products) > 3:
                     summary += f" and {len(received_products) - 3} more"
-                messages.success(request, f"Received {len(received_products)} products ({total_items} total items): {summary}")
+                msg = f"Received {len(received_products)} products ({total_items} total items): {summary}"
+
+            if inbound_req:
+                inbound_req.refresh_from_db()
+                if inbound_req.status == 'completed':
+                    msg += f" — Inbound request {inbound_req.request_number} fully completed."
+                else:
+                    msg += f" — Inbound request {inbound_req.request_number} partially received (still open)."
+            messages.success(request, msg)
 
             return redirect('warehouse:inventory_list')
 
@@ -491,21 +546,38 @@ def receive_stock(request):
             logger.exception(f"Error receiving stock: {str(e)}")
             messages.error(request, f"Error receiving stock: {str(e)}")
 
+    # GET — build context
+    # Pending/approved inbound requests for the top section
+    inbound_requests = warehouse_models.InboundProductRequest.objects.filter(
+        status__in=['pending', 'approved']
+    ).select_related('business', 'warehouse').order_by('-created_at')
+
     if is_staff:
         warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
-        products = product_models.Product.objects.all()
+        businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+        selected_business_id = request.GET.get('business', '')
+        if selected_business_id:
+            products = product_models.Product.objects.filter(business_id=selected_business_id)
+        else:
+            products = product_models.Product.objects.none()
     else:
-        # Get warehouses linked to this business
         linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
             business=business, is_active=True
         ).values_list('warehouse_id', flat=True)
         warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
         products = product_models.Product.objects.filter(business=business)
+        businesses = None
+        selected_business_id = ''
+        # Non-staff only sees their own inbound requests
+        inbound_requests = inbound_requests.filter(business=business)
 
     context = {
         'warehouses': warehouses,
         'products': products,
         'is_staff': is_staff,
+        'businesses': businesses,
+        'selected_business_id': selected_business_id,
+        'inbound_requests': inbound_requests,
     }
     return render(request, 'warehouse/receive_stock.html', context)
 
@@ -628,6 +700,101 @@ def assign_pick_list(request, pk):
         messages.success(request, f"Pick list {pick_list.pick_number} assigned to you")
 
     return redirect('warehouse:pick_list_detail', pk=pk)
+
+
+@login_required(login_url='account_login')
+@require_http_methods(["POST"])
+def start_pick_list(request, pk):
+    """Start picking — changes status to in_progress"""
+    pick_list = get_object_or_404(warehouse_models.PickList, pk=pk)
+
+    if pick_list.status not in ('pending', 'assigned'):
+        return JsonResponse({'error': 'Pick list cannot be started'}, status=400)
+
+    # Auto-assign if not yet assigned
+    if not pick_list.assigned_to:
+        pick_list.assigned_to = request.user
+        pick_list.assigned_at = timezone.now()
+
+    pick_list.status = 'in_progress'
+    pick_list.started_at = timezone.now()
+    pick_list.save(update_fields=['status', 'started_at', 'assigned_to', 'assigned_at', 'updated_at'])
+    messages.success(request, f"Picking started for {pick_list.pick_number}")
+    return redirect('warehouse:pick_list_detail', pk=pk)
+
+
+@login_required(login_url='account_login')
+@require_http_methods(["POST"])
+def pick_item(request, pk, item_id):
+    """AJAX: Mark a single pick list item as picked (or update quantity)"""
+    pick_list = get_object_or_404(warehouse_models.PickList, pk=pk)
+    item = get_object_or_404(warehouse_models.PickListItem, pk=item_id, pick_list=pick_list)
+
+    qty = request.POST.get('quantity', '')
+    if qty and qty.isdigit():
+        item.quantity_picked = min(int(qty), item.quantity_to_pick)
+    else:
+        # Toggle: full pick
+        item.quantity_picked = item.quantity_to_pick
+
+    item.is_picked = item.quantity_picked >= item.quantity_to_pick
+    item.picked_at = timezone.now()
+    item.picked_by = request.user
+    item.save(update_fields=['quantity_picked', 'is_picked', 'picked_at', 'picked_by'])
+
+    # Update pick list counters
+    all_items = pick_list.items.all()
+    pick_list.picked_items = all_items.filter(is_picked=True).count()
+    pick_list.save(update_fields=['picked_items', 'updated_at'])
+
+    # Auto-complete if all picked
+    if pick_list.picked_items >= pick_list.total_items and pick_list.total_items > 0:
+        pick_list.status = 'completed'
+        pick_list.completed_at = timezone.now()
+        pick_list.save(update_fields=['status', 'completed_at', 'updated_at'])
+
+    return JsonResponse({
+        'success': True,
+        'item_id': item.id,
+        'quantity_picked': item.quantity_picked,
+        'quantity_to_pick': item.quantity_to_pick,
+        'is_picked': item.is_picked,
+        'picked_items': pick_list.picked_items,
+        'total_items': pick_list.total_items,
+        'progress': pick_list.progress_percentage,
+        'pick_list_status': pick_list.status,
+    })
+
+
+@login_required(login_url='account_login')
+@require_http_methods(["POST"])
+def unpick_item(request, pk, item_id):
+    """AJAX: Reset a picked item back to pending"""
+    pick_list = get_object_or_404(warehouse_models.PickList, pk=pk)
+    item = get_object_or_404(warehouse_models.PickListItem, pk=item_id, pick_list=pick_list)
+
+    item.quantity_picked = 0
+    item.is_picked = False
+    item.picked_at = None
+    item.picked_by = None
+    item.save(update_fields=['quantity_picked', 'is_picked', 'picked_at', 'picked_by'])
+
+    # Update counters
+    pick_list.picked_items = pick_list.items.filter(is_picked=True).count()
+    if pick_list.status == 'completed':
+        pick_list.status = 'in_progress'
+        pick_list.completed_at = None
+    pick_list.save(update_fields=['picked_items', 'status', 'completed_at', 'updated_at'])
+
+    return JsonResponse({
+        'success': True,
+        'item_id': item.id,
+        'quantity_to_pick': item.quantity_to_pick,
+        'picked_items': pick_list.picked_items,
+        'total_items': pick_list.total_items,
+        'progress': pick_list.progress_percentage,
+        'pick_list_status': pick_list.status,
+    })
 
 
 # =============================================================================
@@ -1529,6 +1696,63 @@ def api_storage_locations(request, warehouse_id):
         return JsonResponse(locations_data, safe=False)
     except Exception as e:
         logger.error(f"Error fetching storage locations: {e}")
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required(login_url='account_login')
+def api_business_products(request, business_id):
+    """API endpoint to get products for a specific business."""
+    try:
+        products = product_models.Product.objects.filter(
+            business_id=business_id
+        ).order_by('item_name')
+        products_data = [
+            {
+                'id': p.id,
+                'name': p.item_name,
+                'sku': p.item_sku or '',
+            }
+            for p in products
+        ]
+        return JsonResponse(products_data, safe=False)
+    except Exception as e:
+        logger.error(f"Error fetching business products: {e}")
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required(login_url='account_login')
+def api_inbound_request_items(request, request_id):
+    """API endpoint to get items for a specific inbound request (for receive stock page)."""
+    try:
+        inbound_req = warehouse_models.InboundProductRequest.objects.select_related(
+            'business', 'warehouse'
+        ).get(pk=request_id)
+
+        items = inbound_req.items.select_related('product').all()
+        items_data = [
+            {
+                'product_id': item.product.id,
+                'name': item.product.item_name,
+                'sku': item.product.item_sku or '',
+                'quantity_requested': item.quantity_requested,
+                'quantity_fulfilled': item.quantity_fulfilled,
+                'remaining': item.remaining_quantity,
+            }
+            for item in items
+        ]
+        return JsonResponse({
+            'request_number': inbound_req.request_number,
+            'business_name': inbound_req.business.business_name,
+            'business_id': str(inbound_req.business.pk),
+            'warehouse_id': inbound_req.warehouse.id,
+            'status': inbound_req.status,
+            'notes': inbound_req.notes,
+            'items': items_data,
+        })
+    except warehouse_models.InboundProductRequest.DoesNotExist:
+        return JsonResponse({'error': 'Request not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Error fetching inbound request items: {e}")
         return JsonResponse({'error': str(e)}, status=400)
 
 

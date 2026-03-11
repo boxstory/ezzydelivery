@@ -21,6 +21,9 @@ urlpatterns = [
     path('pick-lists/create/', warehouse_views.create_pick_list, name='create_pick_list'),
     path('pick-lists/<int:pk>/', warehouse_views.pick_list_detail, name='pick_list_detail'),
     path('pick-lists/<int:pk>/assign/', warehouse_views.assign_pick_list, name='assign_pick_list'),
+    path('pick-lists/<int:pk>/start/', warehouse_views.start_pick_list, name='start_pick_list'),
+    path('pick-lists/<int:pk>/items/<int:item_id>/pick/', warehouse_views.pick_item, name='pick_item'),
+    path('pick-lists/<int:pk>/items/<int:item_id>/unpick/', warehouse_views.unpick_item, name='unpick_item'),
 
     # Cycle Counting
     path('cycle-counts/', warehouse_views.cycle_count_list, name='cycle_count_list'),
@@ -60,4 +63,6 @@ urlpatterns = [
     # API Endpoints
     path('api/warehouses/<int:warehouse_id>/locations/', warehouse_views.api_warehouse_locations, name='api_warehouse_locations'),
     path('api/warehouses/<int:warehouse_id>/storage-locations/', warehouse_views.api_storage_locations, name='api_storage_locations'),
+    path('api/business/<int:business_id>/products/', warehouse_views.api_business_products, name='api_business_products'),
+    path('api/inbound-request/<int:request_id>/items/', warehouse_views.api_inbound_request_items, name='api_inbound_request_items'),
 ]

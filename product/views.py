@@ -219,7 +219,7 @@ def product_inventory(request):
     ).select_related(
         'color', 'unit', 'product_category'
     ).annotate(
-        qty=Sum('product_inventory__item_quantity')
+        warehouse_stock=Sum('stock_levels__quantity_on_hand')
     ).order_by('-created_at')
 
     if search_q:
@@ -231,15 +231,15 @@ def product_inventory(request):
         )
 
     if show_low:
-        # Low stock: qty is None (no inventory record) or qty <= 5
-        qs = qs.filter(Q(qty__isnull=True) | Q(qty__lte=5))
+        # Low stock: no warehouse stock or <= 5
+        qs = qs.filter(Q(warehouse_stock__isnull=True) | Q(warehouse_stock__lte=5))
 
     total_products = qs.count()
-    total_in_stock = qs.filter(qty__gt=0).count()
+    total_in_stock = qs.filter(warehouse_stock__gt=0).count()
     low_stock_count = product_models.Product.objects.filter(
         business=business
-    ).annotate(qty=Sum('product_inventory__item_quantity')).filter(
-        Q(qty__isnull=True) | Q(qty__lte=5)
+    ).annotate(warehouse_stock=Sum('stock_levels__quantity_on_hand')).filter(
+        Q(warehouse_stock__isnull=True) | Q(warehouse_stock__lte=5)
     ).count()
 
     paginator = Paginator(qs, 20)

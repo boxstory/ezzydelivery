@@ -1,0 +1,162 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}{{ inbound_request.request_number }}{% endblock %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'business/css/business-inbound-requests.css' %}?v=20260226a" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="bir">
+  <!-- Breadcrumb -->
+  <nav class="bir__breadcrumb">
+    <a href="{% url 'business:inbound_requests_list' %}">Inbound Requests</a>
+    <span class="bir__breadcrumb-sep">/</span>
+    <span>{{ inbound_request.request_number }}</span>
+  </nav>
+
+  <!-- Hero Header -->
+  <div class="bir__detail-hero">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div>
+        <h1 class="bir__detail-title">
+          <code>{{ inbound_request.request_number }}</code>
+        </h1>
+        <p class="bir__detail-subtitle">
+          <i class="fa-solid fa-warehouse"></i> {{ inbound_request.warehouse.name }}
+          {% if inbound_request.expected_delivery_date %}
+          <span class="mx-2">|</span>
+          <i class="fa-solid fa-calendar"></i> Expected: {{ inbound_request.expected_delivery_date|date:"d M Y" }}
+          {% endif %}
+        </p>
+      </div>
+      <div class="ms-auto">
+        {% if inbound_request.status == 'pending' %}
+        <span class="bir__badge bir__badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
+        {% elif inbound_request.status == 'approved' %}
+        <span class="bir__badge bir__badge--info"><i class="fa-solid fa-circle-check"></i> Approved</span>
+        {% elif inbound_request.status == 'completed' %}
+        <span class="bir__badge bir__badge--success"><i class="fa-solid fa-check"></i> Completed</span>
+        {% elif inbound_request.status == 'cancelled' %}
+        <span class="bir__badge bir__badge--danger"><i class="fa-solid fa-circle-xmark"></i> Cancelled</span>
+        {% else %}
+        <span class="bir__badge bir__badge--neutral">{{ inbound_request.status|title }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <!-- Request Info Card -->
+    <div class="col-12 col-md-4">
+      <div class="bir__card">
+        <div class="bir__card-header">
+          <h2 class="bir__card-title"><i class="fa-solid fa-info-circle"></i> Request Info</h2>
+        </div>
+        <div class="bir__card-body">
+          <div class="bir__info-row">
+            <span class="bir__info-label">Created</span>
+            <span class="bir__info-value">{{ inbound_request.created_at|date:"d M Y, H:i" }}</span>
+          </div>
+          {% if inbound_request.created_by %}
+          <div class="bir__info-row">
+            <span class="bir__info-label">Created By</span>
+            <span class="bir__info-value">{{ inbound_request.created_by.get_full_name|default:inbound_request.created_by.username }}</span>
+          </div>
+          {% endif %}
+          {% if inbound_request.approved_by %}
+          <div class="bir__info-row">
+            <span class="bir__info-label">Approved By</span>
+            <span class="bir__info-value">{{ inbound_request.approved_by.get_full_name|default:inbound_request.approved_by.username }}</span>
+          </div>
+          <div class="bir__info-row">
+            <span class="bir__info-label">Approved At</span>
+            <span class="bir__info-value">{{ inbound_request.approved_at|date:"d M Y, H:i" }}</span>
+          </div>
+          {% endif %}
+          {% if inbound_request.completed_by %}
+          <div class="bir__info-row">
+            <span class="bir__info-label">Completed By</span>
+            <span class="bir__info-value">{{ inbound_request.completed_by.get_full_name|default:inbound_request.completed_by.username }}</span>
+          </div>
+          <div class="bir__info-row">
+            <span class="bir__info-label">Completed At</span>
+            <span class="bir__info-value">{{ inbound_request.completed_at|date:"d M Y, H:i" }}</span>
+          </div>
+          {% endif %}
+          {% if inbound_request.notes %}
+          <div class="bir__info-row">
+            <span class="bir__info-label">Notes</span>
+            <span class="bir__info-value">{{ inbound_request.notes }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Items Card -->
+    <div class="col-12 col-md-8">
+      <div class="bir__card">
+        <div class="bir__card-header">
+          <h2 class="bir__card-title"><i class="fa-solid fa-boxes-stacked"></i> Items ({{ inbound_request.items.count }})</h2>
+        </div>
+        <div class="bir__card-body">
+          {% if inbound_request.items.all %}
+          <div class="bir__table-wrap">
+            <table class="bir__table">
+              <thead>
+                <tr>
+                  <th class="bir__th">#</th>
+                  <th class="bir__th">Product</th>
+                  <th class="bir__th">SKU</th>
+                  <th class="bir__th">Requested</th>
+                  <th class="bir__th">Fulfilled</th>
+                  <th class="bir__th">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in inbound_request.items.all %}
+                <tr class="bir__row">
+                  <td class="bir__td">{{ forloop.counter }}</td>
+                  <td class="bir__td">
+                    <span class="fw-semibold">{{ item.product.item_name }}</span>
+                  </td>
+                  <td class="bir__td">
+                    <code>{{ item.product.item_sku|default:"—" }}</code>
+                  </td>
+                  <td class="bir__td">{{ item.quantity_requested }}</td>
+                  <td class="bir__td">{{ item.quantity_fulfilled }}</td>
+                  <td class="bir__td">
+                    {% if item.is_fully_fulfilled %}
+                    <span class="bir__badge bir__badge--success"><i class="fa-solid fa-check"></i> Fulfilled</span>
+                    {% elif item.quantity_fulfilled > 0 %}
+                    <span class="bir__badge bir__badge--warning"><i class="fa-solid fa-clock"></i> Partial</span>
+                    {% else %}
+                    <span class="bir__badge bir__badge--neutral"><i class="fa-solid fa-hourglass"></i> Pending</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="bir__empty">
+            <i class="fa-solid fa-inbox"></i>
+            <p class="bir__empty-title">No items in this request</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Back button -->
+  <div class="mt-3">
+    <a href="{% url 'business:inbound_requests_list' %}" class="bir__btn bir__btn--secondary">
+      <i class="fa-solid fa-arrow-left"></i> Back to Requests
+    </a>
+  </div>
+</div>
+{% endblock %}

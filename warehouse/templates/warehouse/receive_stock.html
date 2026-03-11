@@ -3,91 +3,8 @@
 
 {% block title %}Receive Stock{% endblock %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var rowCounter = 1;
-
-    document.getElementById('add-product-row').addEventListener('click', function() {
-        var tbody = document.getElementById('products-tbody');
-        var newRow = createProductRow(rowCounter++);
-        tbody.appendChild(newRow);
-        updateRowNumbers();
-    });
-
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-row-btn') || e.target.closest('.remove-row-btn')) {
-            var btn = e.target.classList.contains('remove-row-btn') ? e.target : e.target.closest('.remove-row-btn');
-            btn.closest('tr').remove();
-            updateRowNumbers();
-        }
-    });
-
-    var warehouseSelect = document.getElementById('warehouse');
-    var locationSelect = document.getElementById('location');
-
-    warehouseSelect.addEventListener('change', function() {
-        var warehouseId = this.value;
-        if (!warehouseId) {
-            locationSelect.innerHTML = '<option value="">Default Location</option>';
-            locationSelect.disabled = true;
-            return;
-        }
-        locationSelect.innerHTML = '<option value="">Loading...</option>';
-        locationSelect.disabled = true;
-        fetch('/workforce/warehouse/api/warehouses/' + warehouseId + '/storage-locations/')
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                locationSelect.innerHTML = '<option value="">Default Location</option>';
-                if (data.length > 0) {
-                    data.forEach(function(location) {
-                        var option = document.createElement('option');
-                        option.value = location.id;
-                        option.textContent = location.name;
-                        if (location.is_default) option.textContent += ' (Default)';
-                        locationSelect.appendChild(option);
-                    });
-                }
-                locationSelect.disabled = false;
-            })
-            .catch(function(error) {
-                console.error('Error loading locations:', error);
-                locationSelect.innerHTML = '<option value="">Error loading locations</option>';
-                locationSelect.disabled = true;
-            });
-    });
-
-    function createProductRow(index) {
-        var tr = document.createElement('tr');
-        tr.className = 'wrs__product-row';
-        tr.innerHTML = '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + index + '</span></td>' +
-            '<td class="wh__td"><select name="products[]" class="wha__select" required><option value="">Select Product</option>{% for p in products %}<option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>{% endfor %}</select></td>' +
-            '<td class="wh__td"><input type="number" name="quantities[]" class="wha__input" min="1" required placeholder="0"></td>' +
-            '<td class="wh__td wh__td--center"><button type="button" class="wh__action-btn wh__action-btn--danger remove-row-btn"><i class="fas fa-trash"></i></button></td>';
-        return tr;
-    }
-
-    function updateRowNumbers() {
-        var rows = document.querySelectorAll('#products-tbody tr');
-        rows.forEach(function(row, index) {
-            var badge = row.querySelector('.wrs__row-num');
-            if (badge) badge.textContent = index + 1;
-        });
-        var removeButtons = document.querySelectorAll('.remove-row-btn');
-        if (rows.length === 1) {
-            removeButtons.forEach(function(btn) { btn.style.display = 'none'; });
-        } else {
-            removeButtons.forEach(function(btn) { btn.style.display = 'inline-flex'; });
-        }
-    }
-
-    updateRowNumbers();
-});
-</script>
-{% endblock %}
-
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219c" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260310c" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -106,10 +23,69 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="wrs__hero-icon"><i class="fas fa-truck-loading"></i></div>
         <div>
             <h1 class="wrs__hero-title">Receive Stock</h1>
-            <p class="wrs__hero-subtitle">Add new inventory to your warehouse</p>
+            <p class="wrs__hero-subtitle">Verify and add incoming inventory to your warehouse</p>
         </div>
     </div>
 
+    <!-- ═══════════ INBOUND REQUESTS SECTION ═══════════ -->
+    {% if inbound_requests %}
+    <div class="wh__card" style="margin-bottom:1.25rem" id="inbound-requests-section">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fas fa-arrow-right-to-bracket" style="color:var(--brand-primary)"></i>
+                <span>PENDING INBOUND REQUESTS</span>
+            </div>
+            <span style="font-size:0.75rem;color:var(--brand-grey-400)">{{ inbound_requests|length }} request{{ inbound_requests|length|pluralize }}</span>
+        </div>
+        <div class="wh__card-body" style="padding:0">
+            <div class="wh__table-wrap">
+                <table class="wh__table" id="inbound-requests-table">
+                    <thead>
+                        <tr>
+                            <th class="wh__th" width="40"></th>
+                            <th class="wh__th">Request #</th>
+                            <th class="wh__th">Business</th>
+                            <th class="wh__th">Warehouse</th>
+                            <th class="wh__th">Items</th>
+                            <th class="wh__th">Status</th>
+                            <th class="wh__th">Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in inbound_requests %}
+                        <tr class="wrs__inbound-row" data-request-id="{{ req.pk }}" style="cursor:pointer">
+                            <td class="wh__td wh__td--center">
+                                <input type="radio" name="select_inbound" value="{{ req.pk }}" class="form-check-input" id="inbound_{{ req.pk }}">
+                            </td>
+                            <td class="wh__td"><code style="font-weight:700;color:var(--brand-grey-800)">{{ req.request_number }}</code></td>
+                            <td class="wh__td">{{ req.business.business_name }}</td>
+                            <td class="wh__td"><i class="fas fa-warehouse" style="color:var(--brand-grey-400);margin-right:0.25rem"></i> {{ req.warehouse.name }}</td>
+                            <td class="wh__td"><strong>{{ req.items.count }}</strong> item{{ req.items.count|pluralize }}</td>
+                            <td class="wh__td">
+                                {% if req.status == 'pending' %}
+                                <span style="display:inline-flex;align-items:center;gap:0.25rem;font-size:0.7rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:999px;background:#fef3c7;color:#92400e">
+                                    <i class="fas fa-clock"></i> Pending
+                                </span>
+                                {% elif req.status == 'approved' %}
+                                <span style="display:inline-flex;align-items:center;gap:0.25rem;font-size:0.7rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:999px;background:#dcfce7;color:#15803d">
+                                    <i class="fas fa-check"></i> Approved
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="wh__td" style="font-size:0.75rem;color:var(--brand-grey-400)">{{ req.created_at|date:"d M Y" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div style="padding:0.5rem 1rem;border-top:1px solid var(--brand-grey-200);display:flex;align-items:center;gap:0.75rem">
+                <span style="font-size:0.7rem;color:var(--brand-grey-400)"><i class="fas fa-hand-pointer"></i> Click a request to load its products into the form below</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══════════ MANUAL / FORM SECTION ═══════════ -->
     <div class="wrs__layout">
         <!-- Main Form -->
         <div class="wrs__main">
@@ -119,10 +95,39 @@ document.addEventListener('DOMContentLoaded', function() {
                         <i class="fas fa-file-invoice"></i>
                         <span>STOCK RECEIPT FORM</span>
                     </div>
+                    <span id="form-mode-badge" style="display:none;font-size:0.7rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:999px;background:#eff6ff;color:#2563eb">
+                        <i class="fas fa-link"></i> From Inbound Request: <span id="form-mode-reqnum"></span>
+                    </span>
                 </div>
                 <div class="wh__card-body">
                     <form method="POST" id="receive-stock-form" novalidate>
                         {% csrf_token %}
+                        <input type="hidden" name="inbound_request_id" id="inbound_request_id" value="">
+
+                        {% if is_staff and businesses %}
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="business" class="wha__label"><i class="fas fa-store"></i> Business <span class="wha__required">*</span></label>
+                                <select name="business" id="business" class="wha__select" required>
+                                    <option value="">Select Business</option>
+                                    {% for b in businesses %}
+                                    <option value="{{ b.pk }}" {% if selected_business_id == b.pk|stringformat:"d" %}selected{% endif %}>{{ b.business_name }} ({{ b.business_code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="wha__field">
+                                <label for="receive_date" class="wha__label"><i class="fas fa-calendar-day"></i> Receive Date <span class="wha__required">*</span></label>
+                                <input type="date" class="wha__input" id="receive_date" name="receive_date" required>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="receive_date" class="wha__label"><i class="fas fa-calendar-day"></i> Receive Date <span class="wha__required">*</span></label>
+                                <input type="date" class="wha__input" id="receive_date" name="receive_date" required>
+                            </div>
+                        </div>
+                        {% endif %}
 
                         <div class="wha__row">
                             <div class="wha__field">
@@ -130,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <select name="warehouse" id="warehouse" class="wha__select" required>
                                     <option value="">Select Warehouse</option>
                                     {% for wh in warehouses %}
-                                    <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+                                    <option value="{{ wh.id }}" {% if wh.is_default %}selected{% endif %}>{{ wh.name }} ({{ wh.code }})</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -156,12 +161,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         <div class="wha__divider"></div>
 
-                        <!-- Products Table -->
+                        <!-- Products Table (flat list) -->
                         <div class="wrs__products-header">
                             <div class="wha__section-label"><i class="fas fa-boxes wha__section-icon"></i> PRODUCTS TO RECEIVE <span class="wha__required">*</span></div>
-                            <button type="button" id="add-product-row" class="wh__btn wh__btn--secondary wrs__add-btn">
-                                <i class="fas fa-plus"></i> Add Product Row
-                            </button>
+                            <span id="products-count" style="font-size:0.75rem;color:var(--brand-grey-400)"></span>
                         </div>
 
                         <div class="wh__table-wrap wrs__table-wrap">
@@ -170,40 +173,52 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <tr>
                                         <th class="wh__th wh__th--center" width="50">#</th>
                                         <th class="wh__th">Product</th>
-                                        <th class="wh__th" width="150">Quantity</th>
-                                        <th class="wh__th wh__th--center" width="80">Action</th>
+                                        <th class="wh__th">SKU</th>
+                                        <th class="wh__th" width="100">Requested</th>
+                                        <th class="wh__th" width="120">Receive Qty</th>
                                     </tr>
                                 </thead>
                                 <tbody id="products-tbody">
-                                    <tr class="wrs__product-row">
-                                        <td class="wh__td wh__td--center"><span class="wrs__row-num">1</span></td>
-                                        <td class="wh__td">
-                                            <select name="products[]" class="wha__select" required>
-                                                <option value="">Select Product</option>
-                                                {% for p in products %}
-                                                <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td class="wh__td">
-                                            <input type="number" name="quantities[]" class="wha__input" min="1" required placeholder="0">
-                                        </td>
-                                        <td class="wh__td wh__td--center">
-                                            <button type="button" class="wh__action-btn wh__action-btn--danger remove-row-btn">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
+                                    {% if is_staff %}
+                                    <tr id="no-products-row">
+                                        <td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">
+                                            <i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>
+                                            Select an inbound request above — or select a business to add products manually
                                         </td>
                                     </tr>
+                                    {% else %}
+                                    {% for p in products %}
+                                    <tr class="wrs__product-row">
+                                        <td class="wh__td wh__td--center"><span class="wrs__row-num">{{ forloop.counter }}</span></td>
+                                        <td class="wh__td">
+                                            <span class="fw-semibold">{{ p.item_name }}</span>
+                                            <input type="hidden" name="products[]" value="{{ p.id }}">
+                                        </td>
+                                        <td class="wh__td"><code>{{ p.item_sku|default:"—" }}</code></td>
+                                        <td class="wh__td" style="color:var(--brand-grey-400)">—</td>
+                                        <td class="wh__td">
+                                            <input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="0" placeholder="0">
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No products found</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
-                        <span class="wha__hint"><i class="fas fa-info-circle"></i> Click "Add Product Row" to receive multiple products at once</span>
+                        <span class="wha__hint"><i class="fas fa-info-circle"></i> Enter quantity for products you want to receive. Only qty &gt; 0 will be processed.</span>
 
                         <div class="wha__divider"></div>
 
                         <div class="wha__actions">
-                            <button type="submit" class="wh__btn wh__btn--primary">
+                            <button type="submit" class="wh__btn wh__btn--primary" id="submit-btn">
                                 <i class="fas fa-check"></i> Receive All Products
+                            </button>
+                            <button type="button" id="clear-inbound-btn" class="wh__btn wh__btn--secondary" style="display:none">
+                                <i class="fas fa-xmark"></i> Clear & Manual Entry
                             </button>
                             <a href="{% url 'warehouse:inventory_list' %}" class="wh__btn wh__btn--secondary"
                                hx-get="{% url 'warehouse:inventory_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
@@ -221,23 +236,253 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="wh__card-header wrs__tips-header">
                     <div class="wh__card-header-left">
                         <i class="fas fa-lightbulb"></i>
-                        <span>QUICK TIPS</span>
+                        <span>HOW IT WORKS</span>
                     </div>
                 </div>
                 <div class="wh__card-body">
-                    <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-desc">Select warehouse and location (applies to all products)</div></div></div>
-                    <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-desc">Add product rows using the "+ Add Product Row" button</div></div></div>
-                    <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-desc">Select products and enter quantities</div></div></div>
-                    <div class="wh__step"><span class="wh__step-number wh__step-number--success">&#10003;</span><div><div class="wh__step-desc">Submit once to receive all products</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-desc">Seller creates an <strong>Inbound Request</strong> with products they're sending</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-desc">Products arrive at warehouse</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-desc">Staff selects the request above and verifies quantities</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number wh__step-number--success">&#10003;</span><div><div class="wh__step-desc">Submit to <strong>receive into inventory</strong> and auto-complete the request</div></div></div>
                 </div>
             </div>
 
             <div class="wrs__info-card">
-                <div class="wrs__info-icon"><i class="fas fa-boxes"></i></div>
-                <h6 class="wrs__info-title">Multiple Products</h6>
-                <p class="wrs__info-text">You can now receive multiple products in a single submission!</p>
+                <div class="wrs__info-icon"><i class="fas fa-hand-pointer"></i></div>
+                <h6 class="wrs__info-title">From Inbound Request</h6>
+                <p class="wrs__info-text">Select a pending request at the top to auto-fill products. Adjust quantities if needed, then submit.</p>
+            </div>
+
+            <div class="wrs__info-card">
+                <div class="wrs__info-icon"><i class="fas fa-pen-to-square"></i></div>
+                <h6 class="wrs__info-title">Manual Entry</h6>
+                <p class="wrs__info-text">No request? Select a business to load all products and enter quantities manually.</p>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default date to today
+    var dateInput = document.getElementById('receive_date');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    var warehouseSelect = document.getElementById('warehouse');
+    var locationSelect = document.getElementById('location');
+    var businessSelect = document.getElementById('business');
+    var tbody = document.getElementById('products-tbody');
+    var countEl = document.getElementById('products-count');
+    var inboundIdInput = document.getElementById('inbound_request_id');
+    var formModeBadge = document.getElementById('form-mode-badge');
+    var formModeReqnum = document.getElementById('form-mode-reqnum');
+    var clearBtn = document.getElementById('clear-inbound-btn');
+    var submitBtn = document.getElementById('submit-btn');
+    var inboundRows = document.querySelectorAll('.wrs__inbound-row');
+
+    // ── Warehouse → storage locations ──
+    if (warehouseSelect) {
+        warehouseSelect.addEventListener('change', function() {
+            var warehouseId = this.value;
+            if (!warehouseId) {
+                locationSelect.innerHTML = '<option value="">Default Location</option>';
+                locationSelect.disabled = true;
+                return;
+            }
+            locationSelect.innerHTML = '<option value="">Loading...</option>';
+            locationSelect.disabled = true;
+            fetch('/workforce/warehouse/api/warehouses/' + warehouseId + '/storage-locations/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    locationSelect.innerHTML = '<option value="">Default Location</option>';
+                    data.forEach(function(loc) {
+                        var opt = document.createElement('option');
+                        opt.value = loc.id;
+                        opt.textContent = loc.name;
+                        if (loc.is_default) opt.textContent += ' (Default)';
+                        locationSelect.appendChild(opt);
+                    });
+                    locationSelect.disabled = false;
+                })
+                .catch(function() {
+                    locationSelect.innerHTML = '<option value="">Error loading</option>';
+                    locationSelect.disabled = true;
+                });
+        });
+    }
+
+    // ── Load inbound request function ──
+    function loadInboundRequest(reqId, clickedRow) {
+        // Highlight selected row
+        inboundRows.forEach(function(r) { r.style.background = ''; });
+        if (clickedRow) clickedRow.style.background = 'rgba(247,192,0,0.08)';
+        var radio = clickedRow ? clickedRow.querySelector('input[type="radio"]') : null;
+        if (radio) radio.checked = true;
+
+        // Show loading in products area
+        tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:1.5rem;color:var(--brand-grey-400)"><i class="fa-solid fa-spinner fa-spin"></i> Loading request items...</td></tr>';
+
+        fetch('/workforce/warehouse/api/inbound-request/' + reqId + '/items/')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fas fa-exclamation-triangle" style="color:#dc2626"></i> ' + data.error + '</td></tr>';
+                    return;
+                }
+
+                // Set hidden inbound_request_id
+                inboundIdInput.value = reqId;
+
+                // Show badge
+                formModeBadge.style.display = 'inline-flex';
+                formModeReqnum.textContent = data.request_number;
+
+                // Set warehouse
+                if (warehouseSelect) {
+                    warehouseSelect.value = data.warehouse_id;
+                    warehouseSelect.dispatchEvent(new Event('change'));
+                }
+
+                // Set business (staff only)
+                if (businessSelect && data.business_id) {
+                    businessSelect.value = data.business_id;
+                }
+
+                // Set reference
+                var refInput = document.getElementById('reference');
+                if (refInput) refInput.value = data.request_number;
+
+                // Set notes
+                var notesInput = document.getElementById('notes');
+                if (notesInput && data.notes) notesInput.value = data.notes;
+
+                // Fill products table from request items (supports partial fulfillment)
+                if (!data.items.length) {
+                    tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No items in this request</td></tr>';
+                    if (countEl) countEl.textContent = '';
+                } else {
+                    var html = '';
+                    var hasRemaining = false;
+                    data.items.forEach(function(item, i) {
+                        var remaining = item.remaining;
+                        var reqLabel = item.quantity_requested;
+                        if (item.quantity_fulfilled > 0) {
+                            reqLabel = item.quantity_requested + ' <span style="font-size:0.7rem;color:var(--brand-grey-400)">(received ' + item.quantity_fulfilled + ')</span>';
+                        }
+                        if (remaining > 0) hasRemaining = true;
+                        html += '<tr class="wrs__product-row">' +
+                            '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + (i+1) + '</span></td>' +
+                            '<td class="wh__td"><span class="fw-semibold">' + item.name + '</span><input type="hidden" name="products[]" value="' + item.product_id + '"></td>' +
+                            '<td class="wh__td"><code>' + (item.sku || '—') + '</code></td>' +
+                            '<td class="wh__td" style="font-weight:600;color:var(--brand-grey-500)">' + reqLabel + '</td>' +
+                            '<td class="wh__td"><input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="' + remaining + '" placeholder="0"></td>' +
+                            '</tr>';
+                    });
+                    tbody.innerHTML = html;
+                    if (countEl) {
+                        if (hasRemaining) {
+                            countEl.textContent = data.items.length + ' products from ' + data.request_number;
+                        } else {
+                            countEl.innerHTML = '<span style="color:#15803d"><i class="fas fa-check-circle"></i> All items already received</span>';
+                        }
+                    }
+                }
+
+                // Update submit button
+                submitBtn.innerHTML = '<i class="fas fa-check-double"></i> Receive & Complete Request';
+                clearBtn.style.display = 'inline-flex';
+
+                // Scroll to form
+                document.getElementById('receive-stock-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            })
+            .catch(function(err) {
+                console.error('Error:', err);
+                tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">Error loading request items</td></tr>';
+            });
+    }
+
+    // ── Click row → immediately load request ──
+    inboundRows.forEach(function(row) {
+        row.addEventListener('click', function() {
+            var reqId = row.getAttribute('data-request-id');
+            loadInboundRequest(reqId, row);
+        });
+    });
+
+    // ── Clear inbound mode → back to manual ──
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            inboundIdInput.value = '';
+            formModeBadge.style.display = 'none';
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> Receive All Products';
+            clearBtn.style.display = 'none';
+
+            // Deselect radio + unhighlight
+            var checked = document.querySelector('input[name="select_inbound"]:checked');
+            if (checked) checked.checked = false;
+            inboundRows.forEach(function(r) { r.style.background = ''; });
+
+            // Clear reference & notes
+            var refInput = document.getElementById('reference');
+            if (refInput) refInput.value = '';
+            var notesInput = document.getElementById('notes');
+            if (notesInput) notesInput.value = '';
+
+            // Reset products area
+            if (businessSelect) {
+                tbody.innerHTML = '<tr id="no-products-row"><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>Select an inbound request above — or select a business to add products manually</td></tr>';
+                if (countEl) countEl.textContent = '';
+            }
+        });
+    }
+
+    // ── Staff: business change → load all products (manual mode only) ──
+    if (businessSelect) {
+        businessSelect.addEventListener('change', function() {
+            if (inboundIdInput.value) return;
+
+            var bid = this.value;
+            if (!bid) {
+                tbody.innerHTML = '<tr id="no-products-row"><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>Select an inbound request above — or select a business to add products manually</td></tr>';
+                if (countEl) countEl.textContent = '';
+                return;
+            }
+            tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:1.5rem;color:var(--brand-grey-400)"><i class="fa-solid fa-spinner fa-spin"></i> Loading products...</td></tr>';
+            fetch('/workforce/warehouse/api/business/' + bid + '/products/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.length) {
+                        tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No products found for this business</td></tr>';
+                        if (countEl) countEl.textContent = '';
+                        return;
+                    }
+                    var html = '';
+                    data.forEach(function(p, i) {
+                        html += '<tr class="wrs__product-row">' +
+                            '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + (i+1) + '</span></td>' +
+                            '<td class="wh__td"><span class="fw-semibold">' + p.name + '</span><input type="hidden" name="products[]" value="' + p.id + '"></td>' +
+                            '<td class="wh__td"><code>' + (p.sku || '—') + '</code></td>' +
+                            '<td class="wh__td" style="color:var(--brand-grey-400)">—</td>' +
+                            '<td class="wh__td"><input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="0" placeholder="0"></td>' +
+                            '</tr>';
+                    });
+                    tbody.innerHTML = html;
+                    if (countEl) countEl.textContent = data.length + ' products';
+                })
+                .catch(function(err) {
+                    console.error('Error:', err);
+                    tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">Error loading products</td></tr>';
+                });
+        });
+        // Trigger on load if business is pre-selected (only if no inbound mode)
+        if (businessSelect.value && !inboundIdInput.value) {
+            businessSelect.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
 {% endblock %}

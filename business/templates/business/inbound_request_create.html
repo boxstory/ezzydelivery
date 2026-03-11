@@ -1,0 +1,236 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}New Inbound Request{% endblock %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'business/css/business-inbound-requests.css' %}?v=20260310b" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="bir">
+  <!-- Breadcrumb -->
+  <nav class="bir__breadcrumb">
+    <a href="{% url 'business:inbound_requests_list' %}">Inbound Requests</a>
+    <span class="bir__breadcrumb-sep">/</span>
+    <span>New Request</span>
+  </nav>
+
+  <!-- Hero Header -->
+  <div class="bir__detail-hero">
+    <div class="d-flex align-items-center gap-3">
+      <div>
+        <h1 class="bir__detail-title">New Inbound Request</h1>
+        <p class="bir__detail-subtitle">Send products to warehouse for storage and fulfillment</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="POST" id="inbound-create-form" class="mt-3">
+    {% csrf_token %}
+
+    <div class="row g-3">
+      <!-- Left: Main Form -->
+      <div class="col-12 col-lg-8">
+        <div class="bir__card">
+          <div class="bir__card-header">
+            <h2 class="bir__card-title"><i class="fa-solid fa-warehouse"></i> Request Details</h2>
+          </div>
+          <div class="bir__card-body">
+            {% if is_staff and businesses %}
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-4">
+                <label for="business" class="bir__form-label">Business <span class="text-danger">*</span></label>
+                <select name="business" id="business" class="form-select" required>
+                  <option value="">Select Business</option>
+                  {% for b in businesses %}
+                  <option value="{{ b.pk }}" {% if selected_business_id == b.pk|stringformat:"d" %}selected{% endif %}>{{ b.business_name }} ({{ b.business_code }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="warehouse" class="bir__form-label">Warehouse <span class="text-danger">*</span></label>
+                <select name="warehouse" id="warehouse" class="form-select" required>
+                  <option value="">Select Warehouse</option>
+                  {% for wh in warehouses %}
+                  <option value="{{ wh.id }}" {% if wh.is_default %}selected{% endif %}>{{ wh.name }} ({{ wh.code }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="expected_delivery_date" class="bir__form-label">Expected Delivery Date</label>
+                <input type="date" class="form-control" id="expected_delivery_date" name="expected_delivery_date">
+              </div>
+            </div>
+            {% else %}
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label for="warehouse" class="bir__form-label">Warehouse <span class="text-danger">*</span></label>
+                <select name="warehouse" id="warehouse" class="form-select" required>
+                  <option value="">Select Warehouse</option>
+                  {% for wh in warehouses %}
+                  <option value="{{ wh.id }}" {% if wh.is_default %}selected{% endif %}>{{ wh.name }} ({{ wh.code }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="expected_delivery_date" class="bir__form-label">Expected Delivery Date</label>
+                <input type="date" class="form-control" id="expected_delivery_date" name="expected_delivery_date">
+              </div>
+            </div>
+            {% endif %}
+            <div class="mb-3">
+              <label for="notes" class="bir__form-label">Notes / Special Instructions</label>
+              <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="Any special handling instructions, supplier info, etc."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Products List -->
+        <div class="bir__card mt-3">
+          <div class="bir__card-header">
+            <h2 class="bir__card-title"><i class="fa-solid fa-boxes-stacked"></i> Products</h2>
+            <span class="bir__card-meta" id="products-count"></span>
+          </div>
+          <div class="bir__card-body p-0">
+            <div class="bir__table-wrap">
+              <table class="bir__table" id="products-table">
+                <thead>
+                  <tr>
+                    <th class="bir__th" width="40">#</th>
+                    <th class="bir__th">Product</th>
+                    <th class="bir__th">SKU</th>
+                    <th class="bir__th" width="120">Qty</th>
+                  </tr>
+                </thead>
+                <tbody id="products-tbody">
+                  {% if is_staff %}
+                  <!-- Staff: products loaded via AJAX after business selection -->
+                  <tr id="no-products-row">
+                    <td class="bir__td text-center" colspan="4" style="padding:2rem;color:var(--brand-grey-400)">
+                      <i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>
+                      Select a business to load products
+                    </td>
+                  </tr>
+                  {% else %}
+                  {% for p in products %}
+                  <tr class="bir__product-row">
+                    <td class="bir__td"><span class="bir__row-num">{{ forloop.counter }}</span></td>
+                    <td class="bir__td">
+                      <span class="fw-semibold">{{ p.item_name }}</span>
+                      <input type="hidden" name="products[]" value="{{ p.id }}">
+                    </td>
+                    <td class="bir__td"><code>{{ p.item_sku|default:"—" }}</code></td>
+                    <td class="bir__td">
+                      <input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="0" placeholder="0">
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td class="bir__td text-center" colspan="4" style="padding:2rem;color:var(--brand-grey-400)">No products found</td>
+                  </tr>
+                  {% endfor %}
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="d-flex gap-2 mt-3">
+          <button type="submit" class="bir__btn bir__btn--primary">
+            <i class="fa-solid fa-paper-plane"></i> Submit Request
+          </button>
+          <a href="{% url 'business:inbound_requests_list' %}" class="bir__btn bir__btn--secondary">
+            Cancel
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: Tips -->
+      <div class="col-12 col-lg-4">
+        <div class="bir__card">
+          <div class="bir__card-header">
+            <h2 class="bir__card-title"><i class="fa-solid fa-lightbulb"></i> How It Works</h2>
+          </div>
+          <div class="bir__card-body">
+            <div class="bir__tip">
+              <div class="bir__tip-num">1</div>
+              <div class="bir__tip-text">Select business and warehouse</div>
+            </div>
+            <div class="bir__tip">
+              <div class="bir__tip-num">2</div>
+              <div class="bir__tip-text">Enter quantities for products you want to send</div>
+            </div>
+            <div class="bir__tip">
+              <div class="bir__tip-num">3</div>
+              <div class="bir__tip-text">Only products with qty > 0 will be included</div>
+            </div>
+            <div class="bir__tip">
+              <div class="bir__tip-num">4</div>
+              <div class="bir__tip-text">Submit for warehouse approval</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default date to today
+    var dateInput = document.getElementById('expected_delivery_date');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Staff: business change → load all products as rows
+    var businessSelect = document.getElementById('business');
+    if (businessSelect) {
+        businessSelect.addEventListener('change', function() {
+            var bid = this.value;
+            var tbody = document.getElementById('products-tbody');
+            var countEl = document.getElementById('products-count');
+            if (!bid) {
+                tbody.innerHTML = '<tr id="no-products-row"><td class="bir__td text-center" colspan="4" style="padding:2rem;color:var(--brand-grey-400)"><i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>Select a business to load products</td></tr>';
+                if (countEl) countEl.textContent = '';
+                return;
+            }
+            tbody.innerHTML = '<tr><td class="bir__td text-center" colspan="4" style="padding:1.5rem;color:var(--brand-grey-400)"><i class="fa-solid fa-spinner fa-spin"></i> Loading products...</td></tr>';
+            fetch('/workforce/warehouse/api/business/' + bid + '/products/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.length) {
+                        tbody.innerHTML = '<tr><td class="bir__td text-center" colspan="4" style="padding:2rem;color:var(--brand-grey-400)">No products found for this business</td></tr>';
+                        if (countEl) countEl.textContent = '';
+                        return;
+                    }
+                    var html = '';
+                    data.forEach(function(p, i) {
+                        html += '<tr class="bir__product-row">' +
+                            '<td class="bir__td"><span class="bir__row-num">' + (i+1) + '</span></td>' +
+                            '<td class="bir__td"><span class="fw-semibold">' + p.name + '</span><input type="hidden" name="products[]" value="' + p.id + '"></td>' +
+                            '<td class="bir__td"><code>' + (p.sku || '—') + '</code></td>' +
+                            '<td class="bir__td"><input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="0" placeholder="0"></td>' +
+                            '</tr>';
+                    });
+                    tbody.innerHTML = html;
+                    if (countEl) countEl.textContent = data.length + ' products';
+                })
+                .catch(function(err) {
+                    console.error('Error:', err);
+                    tbody.innerHTML = '<tr><td class="bir__td text-center" colspan="4" style="padding:2rem;color:var(--brand-grey-400)">Error loading products</td></tr>';
+                });
+        });
+        // Trigger on load if business is pre-selected
+        if (businessSelect.value) {
+            businessSelect.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
+{% endblock %}

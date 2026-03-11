@@ -15,18 +15,37 @@ def reserve_stock_for_order(order):
     """
     Reserve stock for all items in an order.
     Called when order status changes to 'ready_to_pickup'.
+
+    Uses SellerWarehouseLink to find the correct warehouse for the business,
+    since Warehouse model has no direct business FK.
     """
-    from warehouse.models import StockLevel, StockReservation, InventoryTransaction
+    from warehouse.models import StockLevel, StockReservation, InventoryTransaction, SellerWarehouseLink
     from orders.models import OrderItem
 
     try:
         order_items = OrderItem.objects.filter(order=order).select_related('product')
 
+        # Get warehouse IDs linked to this business
+        linked_warehouse_ids = SellerWarehouseLink.objects.filter(
+            business=order.business,
+            is_active=True
+        ).values_list('warehouse_id', flat=True)
+
+        if not linked_warehouse_ids:
+            logger.warning(
+                f"No warehouse linked to business {order.business.business_name} "
+                f"for order {order.order_number} — skipping reservation"
+            )
+            return
+
         for item in order_items:
-            # Find available stock for this product
+            if not item.product:
+                continue
+
+            # Find available stock in linked warehouses
             stock_levels = StockLevel.objects.filter(
                 product=item.product,
-                warehouse__business=order.business,
+                warehouse_id__in=linked_warehouse_ids,
                 quantity_on_hand__gt=0
             ).select_for_update().order_by('-quantity_on_hand')
 
@@ -91,6 +110,7 @@ def reserve_stock_for_order(order):
 def release_stock_reservation(order):
     """
     Release stock reservations when order is cancelled.
+    Also resets stock_reserved flag so stock can be re-reserved if order is reopened.
     """
     from warehouse.models import StockReservation, InventoryTransaction
 
@@ -105,7 +125,7 @@ def release_stock_reservation(order):
             old_reserved = stock_level.quantity_reserved
 
             # Update stock level
-            stock_level.quantity_reserved -= reservation.quantity
+            stock_level.quantity_reserved = max(0, stock_level.quantity_reserved - reservation.quantity)
             stock_level.save(update_fields=['quantity_reserved', 'updated_at'])
 
             # Update reservation status
@@ -127,6 +147,10 @@ def release_stock_reservation(order):
                 notes=f"Released reservation for cancelled order {order.order_number}"
             )
 
+        # Reset stock_reserved flag so it can be re-reserved if order is reopened
+        order.stock_reserved = False
+        order.save(update_fields=['stock_reserved'])
+
         logger.info(f"Stock reservations released for order {order.order_number}")
 
     except Exception as e:
@@ -136,9 +160,13 @@ def release_stock_reservation(order):
 def fulfill_stock_reservation(order):
     """
     Fulfill (deduct) stock when delivery is successful.
-    Converts reserved stock to shipped.
+
+    Two paths:
+    1. If active reservations exist → convert reserved stock to shipped
+    2. If NO reservations exist (order bypassed ready_to_pickup) → direct deduction
     """
-    from warehouse.models import StockReservation, InventoryTransaction
+    from warehouse.models import StockLevel, StockReservation, InventoryTransaction, SellerWarehouseLink
+    from orders.models import OrderItem
 
     try:
         reservations = StockReservation.objects.filter(
@@ -146,42 +174,261 @@ def fulfill_stock_reservation(order):
             status='active'
         ).select_related('stock_level', 'order_item__product')
 
-        for reservation in reservations:
-            stock_level = reservation.stock_level
+        if reservations.exists():
+            # Path 1: Fulfill existing reservations
+            for reservation in reservations:
+                stock_level = reservation.stock_level
+                old_on_hand = stock_level.quantity_on_hand
+                old_reserved = stock_level.quantity_reserved
+
+                # Deduct from on_hand and reserved (prevent negative)
+                stock_level.quantity_on_hand = max(0, stock_level.quantity_on_hand - reservation.quantity)
+                stock_level.quantity_reserved = max(0, stock_level.quantity_reserved - reservation.quantity)
+                stock_level.save(update_fields=['quantity_on_hand', 'quantity_reserved', 'updated_at'])
+
+                # Update reservation status
+                reservation.status = 'fulfilled'
+                reservation.released_at = timezone.now()
+                reservation.save(update_fields=['status', 'released_at', 'updated_at'])
+
+                # Log transaction
+                InventoryTransaction.objects.create(
+                    product=reservation.order_item.product,
+                    warehouse=stock_level.warehouse,
+                    location=stock_level.location,
+                    transaction_type='ship',
+                    quantity=-reservation.quantity,
+                    quantity_before=old_on_hand,
+                    quantity_after=stock_level.quantity_on_hand,
+                    reference_type='order',
+                    reference_id=order.order_number,
+                    notes=f"Shipped for order {order.order_number}"
+                )
+
+                check_and_create_low_stock_alert(stock_level)
+
+            logger.info(f"Stock fulfilled (reserved path) for order {order.order_number}")
+        else:
+            # Path 2: Direct deduction — order bypassed ready_to_pickup
+            # (e.g. to_review → publish → delivered)
+            _direct_deduct_stock(order)
+
+    except Exception as e:
+        logger.exception(f"Error fulfilling stock for order {order.order_number}: {str(e)}")
+
+
+def _direct_deduct_stock(order):
+    """
+    Directly deduct stock for an order that had no prior reservation.
+    Finds the linked warehouse via SellerWarehouseLink and deducts quantity_on_hand.
+    """
+    from warehouse.models import StockLevel, InventoryTransaction, SellerWarehouseLink
+    from orders.models import OrderItem
+
+    order_items = OrderItem.objects.filter(order=order).select_related('product')
+
+    linked_warehouse_ids = list(
+        SellerWarehouseLink.objects.filter(
+            business=order.business,
+            is_active=True
+        ).values_list('warehouse_id', flat=True)
+    )
+
+    if not linked_warehouse_ids:
+        logger.warning(
+            f"No warehouse linked to business {order.business.business_name} "
+            f"for order {order.order_number} — skipping direct deduction"
+        )
+        return
+
+    for item in order_items:
+        if not item.product:
+            continue
+
+        stock_levels = StockLevel.objects.filter(
+            product=item.product,
+            warehouse_id__in=linked_warehouse_ids,
+            quantity_on_hand__gt=0
+        ).select_for_update().order_by('-quantity_on_hand')
+
+        remaining_qty = item.quantity
+
+        for stock_level in stock_levels:
+            if remaining_qty <= 0:
+                break
+
+            deduct_qty = min(remaining_qty, stock_level.quantity_on_hand)
             old_on_hand = stock_level.quantity_on_hand
-            old_reserved = stock_level.quantity_reserved
 
-            # Deduct from on_hand and reserved
-            stock_level.quantity_on_hand -= reservation.quantity
-            stock_level.quantity_reserved -= reservation.quantity
-            stock_level.save(update_fields=['quantity_on_hand', 'quantity_reserved', 'updated_at'])
+            stock_level.quantity_on_hand = max(0, stock_level.quantity_on_hand - deduct_qty)
+            stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
 
-            # Update reservation status
-            reservation.status = 'fulfilled'
-            reservation.released_at = timezone.now()
-            reservation.save(update_fields=['status', 'released_at', 'updated_at'])
-
-            # Log transaction
             InventoryTransaction.objects.create(
-                product=reservation.order_item.product,
+                product=item.product,
                 warehouse=stock_level.warehouse,
                 location=stock_level.location,
                 transaction_type='ship',
-                quantity=-reservation.quantity,
+                quantity=-deduct_qty,
                 quantity_before=old_on_hand,
                 quantity_after=stock_level.quantity_on_hand,
                 reference_type='order',
                 reference_id=order.order_number,
-                notes=f"Shipped for order {order.order_number}"
+                notes=f"Direct deduction for delivered order {order.order_number} (no reservation)"
             )
 
-            # Check for low stock alert
+            check_and_create_low_stock_alert(stock_level)
+            remaining_qty -= deduct_qty
+
+        if remaining_qty > 0:
+            logger.warning(
+                f"Insufficient stock for direct deduction: order {order.order_number}, "
+                f"product {item.product.item_sku}, short by {remaining_qty}"
+            )
+
+    logger.info(f"Stock fulfilled (direct deduction) for order {order.order_number}")
+
+
+def return_stock_on_failed_delivery(order):
+    """
+    Return reserved/fulfilled stock when delivery fails.
+    Handles both reservation-based and direct-deduction paths.
+    """
+    from warehouse.models import StockLevel, StockReservation, InventoryTransaction
+
+    try:
+        has_reservations = False
+
+        # Return active reservations (reserved but not yet fulfilled)
+        active_reservations = StockReservation.objects.filter(
+            order=order,
+            status='active'
+        ).select_related('stock_level', 'order_item__product')
+
+        for reservation in active_reservations:
+            has_reservations = True
+            stock_level = reservation.stock_level
+            old_reserved = stock_level.quantity_reserved
+
+            stock_level.quantity_reserved = max(0, stock_level.quantity_reserved - reservation.quantity)
+            stock_level.save(update_fields=['quantity_reserved', 'updated_at'])
+
+            reservation.status = 'cancelled'
+            reservation.released_at = timezone.now()
+            reservation.save(update_fields=['status', 'released_at', 'updated_at'])
+
+            InventoryTransaction.objects.create(
+                product=reservation.order_item.product,
+                warehouse=stock_level.warehouse,
+                location=stock_level.location,
+                transaction_type='return',
+                quantity=reservation.quantity,
+                quantity_before=old_reserved,
+                quantity_after=stock_level.quantity_reserved,
+                reference_type='order',
+                reference_id=order.order_number,
+                notes=f"Returned to stock - delivery failed for order {order.order_number}"
+            )
+
+        # Return fulfilled reservations (stock already deducted from on_hand)
+        fulfilled_reservations = StockReservation.objects.filter(
+            order=order,
+            status='fulfilled'
+        ).select_related('stock_level', 'order_item__product')
+
+        for reservation in fulfilled_reservations:
+            has_reservations = True
+            stock_level = reservation.stock_level
+            old_on_hand = stock_level.quantity_on_hand
+
+            stock_level.quantity_on_hand += reservation.quantity
+            stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+            reservation.status = 'returned'
+            reservation.released_at = timezone.now()
+            reservation.save(update_fields=['status', 'released_at', 'updated_at'])
+
+            InventoryTransaction.objects.create(
+                product=reservation.order_item.product,
+                warehouse=stock_level.warehouse,
+                location=stock_level.location,
+                transaction_type='return',
+                quantity=reservation.quantity,
+                quantity_before=old_on_hand,
+                quantity_after=stock_level.quantity_on_hand,
+                reference_type='order',
+                reference_id=order.order_number,
+                notes=f"Returned to stock - delivery failed for order {order.order_number}"
+            )
+
             check_and_create_low_stock_alert(stock_level)
 
-        logger.info(f"Stock fulfilled for order {order.order_number}")
+        # If no reservations existed, reverse direct deduction transactions
+        if not has_reservations:
+            _reverse_direct_deductions(order)
+
+        # Reset stock_reserved so it can be re-reserved on retry
+        order.stock_reserved = False
+        order.save(update_fields=['stock_reserved'])
+
+        logger.info(f"Stock returned for failed delivery of order {order.order_number}")
 
     except Exception as e:
-        logger.exception(f"Error fulfilling stock for order {order.order_number}: {str(e)}")
+        logger.exception(f"Error returning stock for order {order.order_number}: {str(e)}")
+
+
+def _reverse_direct_deductions(order):
+    """
+    Reverse direct stock deductions (ship transactions with no reservation).
+    Used when a delivery fails after stock was deducted via _direct_deduct_stock.
+    """
+    from warehouse.models import StockLevel, InventoryTransaction
+
+    ship_txns = InventoryTransaction.objects.filter(
+        reference_type='order',
+        reference_id=order.order_number,
+        transaction_type='ship'
+    ).select_related('product', 'warehouse', 'location')
+
+    # Check we haven't already reversed these
+    return_count = InventoryTransaction.objects.filter(
+        reference_type='order',
+        reference_id=order.order_number,
+        transaction_type='return'
+    ).count()
+
+    if return_count > 0:
+        logger.info(f"Direct deductions already reversed for order {order.order_number}")
+        return
+
+    for txn in ship_txns:
+        return_qty = abs(txn.quantity)
+        stock_level = StockLevel.objects.filter(
+            product=txn.product,
+            warehouse=txn.warehouse,
+            location=txn.location
+        ).select_for_update().first()
+
+        if stock_level:
+            old_on_hand = stock_level.quantity_on_hand
+            stock_level.quantity_on_hand += return_qty
+            stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+            InventoryTransaction.objects.create(
+                product=txn.product,
+                warehouse=txn.warehouse,
+                location=txn.location,
+                transaction_type='return',
+                quantity=return_qty,
+                quantity_before=old_on_hand,
+                quantity_after=stock_level.quantity_on_hand,
+                reference_type='order',
+                reference_id=order.order_number,
+                notes=f"Reversed direct deduction - delivery failed for order {order.order_number}"
+            )
+
+            check_and_create_low_stock_alert(stock_level)
+
+    logger.info(f"Direct deductions reversed for order {order.order_number}")
 
 
 def check_and_create_low_stock_alert(stock_level):
@@ -212,6 +459,77 @@ def check_and_create_low_stock_alert(stock_level):
             )
 
 
+def create_pick_list_for_order(order):
+    """
+    Auto-create a PickList + PickListItems when a delivery task is created.
+    Resolves the warehouse via SellerWarehouseLink and finds stock locations.
+    Skips if order has no product items or no linked warehouse.
+    """
+    from warehouse.models import (
+        PickList, PickListItem, StockLevel, SellerWarehouseLink
+    )
+    from orders.models import OrderItem
+
+    order_items = OrderItem.objects.filter(
+        order=order, product__isnull=False
+    ).select_related('product')
+
+    if not order_items.exists():
+        logger.info(f"No product items for order {order.order_number} — skipping pick list")
+        return
+
+    # Already has a pick list?
+    existing = PickListItem.objects.filter(order=order).exists()
+    if existing:
+        logger.info(f"Pick list already exists for order {order.order_number}")
+        return
+
+    # Find linked warehouse
+    wh_link = SellerWarehouseLink.objects.filter(
+        business=order.business,
+        is_active=True
+    ).select_related('warehouse').first()
+
+    if not wh_link:
+        logger.warning(
+            f"No warehouse linked to business {order.business.business_name} "
+            f"for order {order.order_number} — skipping pick list"
+        )
+        return
+
+    warehouse = wh_link.warehouse
+
+    # Create pick list
+    pick_list = PickList.objects.create(
+        warehouse=warehouse,
+        total_items=order_items.count(),
+    )
+
+    # Create pick list items — resolve storage location from StockLevel
+    for item in order_items:
+        stock_level = StockLevel.objects.filter(
+            product=item.product,
+            warehouse=warehouse,
+            quantity_on_hand__gt=0
+        ).select_related('location').order_by('-quantity_on_hand').first()
+
+        PickListItem.objects.create(
+            pick_list=pick_list,
+            order=order,
+            order_item=item,
+            product=item.product,
+            location=stock_level.location if stock_level else None,
+            quantity_to_pick=item.quantity,
+        )
+
+    logger.info(
+        f"Pick list {pick_list.pick_number} created for order {order.order_number} "
+        f"({order_items.count()} items) at warehouse {warehouse.code}"
+    )
+
+    return pick_list
+
+
 # =============================================================================
 # SIGNAL RECEIVERS
 # =============================================================================
@@ -232,21 +550,23 @@ def order_pre_save_handler(sender, instance, *args, **kwargs):
 def order_post_save_handler(sender, instance, created, *args, **kwargs):
     """
     Handle order status changes for stock reservation/release.
-    """
-    if created:
-        return
 
+    - New order created as ready_to_pickup → reserve stock
+    - Existing order changed to ready_to_pickup → reserve stock
+    - Order cancelled → release reservations + reset stock_reserved flag
+    """
     old_status = _old_order_status.pop(instance.pk, None)
 
     # Reserve stock when order is ready for pickup
-    if (old_status != 'ready_to_pickup' and
-            instance.order_status == 'ready_to_pickup' and
-            not getattr(instance, 'stock_reserved', False)):
-        with transaction.atomic():
-            reserve_stock_for_order(instance)
+    # Works for both: newly created orders AND status changes to ready_to_pickup
+    if instance.order_status == 'ready_to_pickup' and not instance.stock_reserved:
+        if created or (old_status and old_status != 'ready_to_pickup'):
+            with transaction.atomic():
+                reserve_stock_for_order(instance)
 
     # Release stock when order is cancelled
-    elif (old_status != 'cancelled' and
+    elif (not created and old_status and
+          old_status != 'cancelled' and
           instance.order_status == 'cancelled'):
         with transaction.atomic():
             release_stock_reservation(instance)
@@ -267,18 +587,34 @@ def delivery_task_pre_save_handler(sender, instance, *args, **kwargs):
 @receiver(post_save, sender='delivery.DeliveryTask')
 def delivery_task_post_save_handler(sender, instance, created, *args, **kwargs):
     """
-    Handle delivery completion for stock fulfillment.
+    Handle delivery task lifecycle for warehouse operations.
+
+    created   → auto-create pick list for the order
+    delivered → deduct reserved stock from on_hand (fulfill)
+    failed    → return reserved/fulfilled stock back to on_hand
     """
+    if not instance.order:
+        return
+
     if created:
+        # Auto-create pick list when delivery task is created
+        try:
+            create_pick_list_for_order(instance.order)
+        except Exception as e:
+            logger.exception(f"Error creating pick list for order {instance.order.order_number}: {e}")
         return
 
     old_status = _old_delivery_status.pop(instance.pk, None)
 
     # Fulfill stock when delivery is successful
     if old_status != 'delivered' and instance.dl_task_status == 'delivered':
-        if instance.order:
-            with transaction.atomic():
-                fulfill_stock_reservation(instance.order)
+        with transaction.atomic():
+            fulfill_stock_reservation(instance.order)
+
+    # Return stock when delivery fails
+    elif instance.dl_task_status == 'failed' and old_status not in (None, 'failed'):
+        with transaction.atomic():
+            return_stock_on_failed_delivery(instance.order)
 
 
 @receiver(post_save, sender='warehouse.StockLevel')

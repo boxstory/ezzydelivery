@@ -103,6 +103,8 @@ urlpatterns = [
 
     # Product Requests (Fulfillment Service)
     path('inbound-requests/', business_views.inbound_requests_list, name='inbound_requests_list'),
+    path('inbound-requests/create/', business_views.inbound_request_create, name='inbound_request_create'),
+    path('inbound-requests/<int:pk>/', business_views.inbound_request_detail, name='inbound_request_detail'),
     path('outbound-requests/', business_views.outbound_requests_list, name='outbound_requests_list'),
 
 ]

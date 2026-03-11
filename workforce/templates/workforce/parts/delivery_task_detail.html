@@ -272,6 +272,76 @@
             </div>
             {% endif %}
 
+            <!-- Pick List -->
+            {% if pick_list %}
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                        Pick List
+                    </div>
+                    <span style="font-size:0.7rem;font-weight:600;padding:0.2rem 0.5rem;border-radius:0.375rem;
+                        {% if pick_list.status == 'completed' %}background:#dcfce7;color:#15803d;
+                        {% elif pick_list.status == 'in_progress' %}background:#eff6ff;color:#2563eb;
+                        {% elif pick_list.status == 'assigned' %}background:#eff6ff;color:#2563eb;
+                        {% else %}background:#fef3c7;color:#92400e;{% endif %}">
+                        {{ pick_list.get_status_display }}
+                    </span>
+                </div>
+                <div class="dtd__card__body">
+                    <div class="d-flex justify-content-between align-items-center mb-2" style="font-size:0.75rem;color:var(--brand-grey-500);">
+                        <span><i class="fa-solid fa-hashtag me-1"></i><code style="font-size:0.8rem;color:var(--brand-grey-700);">{{ pick_list.pick_number }}</code></span>
+                        <span><i class="fa-solid fa-warehouse me-1"></i>{{ pick_list.warehouse.name }}</span>
+                    </div>
+                    {% if pick_list.assigned_to %}
+                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.75rem;color:var(--brand-grey-500);">
+                        <i class="fa-solid fa-user"></i>
+                        <span>Assigned to <strong style="color:var(--brand-grey-700);">{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}</strong></span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Progress bar -->
+                    {% if pick_list.total_items > 0 %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--brand-grey-500);margin-bottom:0.25rem;">
+                            <span>Progress</span>
+                            <span>{{ pick_list.picked_items }}/{{ pick_list.total_items }}</span>
+                        </div>
+                        <div style="height:6px;background:var(--brand-grey-200);border-radius:3px;overflow:hidden;">
+                            <div style="height:100%;width:{{ pick_list.progress_percentage }}%;background:{% if pick_list.progress_percentage == 100 %}#15803d{% else %}var(--brand-primary){% endif %};border-radius:3px;transition:width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Items table -->
+                    <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--brand-grey-500);font-weight:600;margin-bottom:0.375rem;">Items to Pick</div>
+                    {% for item in pick_list_items %}
+                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}" style="font-size:0.8rem;">
+                        <span class="badge bg-light text-dark" style="min-width:28px;">{{ item.quantity_to_pick }}</span>
+                        <span class="flex-grow-1">{{ item.product.item_name }}</span>
+                        {% if item.location %}
+                        <code style="font-size:0.7rem;color:var(--brand-grey-500);">{{ item.location.code }}</code>
+                        {% endif %}
+                        {% if item.is_picked %}
+                        <i class="fa-solid fa-circle-check" style="color:#15803d;"></i>
+                        {% elif item.quantity_picked > 0 %}
+                        <span style="font-size:0.7rem;color:#92400e;">{{ item.quantity_picked }}/{{ item.quantity_to_pick }}</span>
+                        {% else %}
+                        <i class="fa-solid fa-circle" style="color:var(--brand-grey-300);font-size:0.6rem;"></i>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+
+                    <div class="mt-2 text-end">
+                        <a href="{% url 'warehouse:pick_list_detail' pick_list.pk %}"
+                           style="font-size:0.75rem;color:var(--brand-navy);text-decoration:none;font-weight:600;">
+                            View Full Pick List <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Driver App Updates -->
             <div class="dtd__card">
                 <div class="dtd__card__head">

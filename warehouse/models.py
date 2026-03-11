@@ -71,6 +71,7 @@ RESERVATION_STATUS_CHOICES = [
     ('active', 'Active'),
     ('released', 'Released'),
     ('fulfilled', 'Fulfilled'),
+    ('returned', 'Returned'),
     ('cancelled', 'Cancelled'),
 ]
 

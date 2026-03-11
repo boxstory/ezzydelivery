@@ -49,16 +49,16 @@
             {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
             <button type="button"
                     class="wod__btn wod__btn--info"
-                    hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
-                    hx-confirm="Publish this order?">
+                    id="wod_btn_publish"
+                    onclick="wodPublishOrder(this, '{% url 'workforce:publish_order_to_delivery' order.id %}')">
                 <i class="fa-solid fa-paper-plane me-1"></i> Publish
             </button>
             {% endif %}
             {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
             <button type="button"
                     class="wod__btn wod__btn--danger"
-                    hx-post="{% url 'workforce:cancel_order' order.id %}"
-                    hx-confirm="Cancel this order?">
+                    id="wod_btn_cancel"
+                    onclick="wodCancelOrder(this, '{% url 'workforce:cancel_order' order.id %}')">
                 <i class="fa-solid fa-times me-1"></i> Cancel
             </button>
             {% endif %}
@@ -445,6 +445,72 @@
 
 {% block extra_js %}
 <script>
+// ===== Publish / Cancel with toast popup =====
+(function() {
+    var s = document.createElement('style');
+    s.textContent = '@keyframes wodToastIn{from{opacity:0;transform:translateX(1rem)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+})();
+
+function wodShowToast(message, type) {
+    var container = document.getElementById('wod-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'wod-toast-container';
+        container.style.cssText = 'position:fixed;top:1.5rem;right:1.5rem;z-index:11000;display:flex;flex-direction:column;gap:0.5rem;';
+        document.body.appendChild(container);
+    }
+    var icon = type === 'success' ? 'fa-circle-check' : type === 'danger' ? 'fa-circle-xmark' : 'fa-circle-info';
+    var bg = type === 'success' ? '#dcfce7' : type === 'danger' ? '#fef2f2' : '#eff6ff';
+    var color = type === 'success' ? '#15803d' : type === 'danger' ? '#dc2626' : '#2563eb';
+    var toast = document.createElement('div');
+    toast.style.cssText = 'background:' + bg + ';color:' + color + ';padding:0.75rem 1.25rem;border-radius:0.5rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:0.875rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;animation:wodToastIn 0.3s ease;min-width:200px;';
+    toast.innerHTML = '<i class="fa-solid ' + icon + '"></i> ' + message;
+    container.appendChild(toast);
+    setTimeout(function() {
+        toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(1rem)';
+        setTimeout(function() { toast.remove(); }, 300);
+    }, 4000);
+}
+
+function wodPostAction(btn, url, confirmMsg, successMsg) {
+    if (!confirm(confirmMsg)) return;
+    var origHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing…';
+    var csrfToken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            wodShowToast(successMsg || data.message || 'Done!', 'success');
+            setTimeout(function() { location.reload(); }, 1200);
+        } else {
+            wodShowToast(data.error || 'Something went wrong', 'danger');
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+        }
+    })
+    .catch(function() {
+        wodShowToast('Network error. Please try again.', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = origHTML;
+    });
+}
+
+function wodPublishOrder(btn, url) {
+    wodPostAction(btn, url, 'Publish this order to delivery?', 'Order published successfully!');
+}
+
+function wodCancelOrder(btn, url) {
+    wodPostAction(btn, url, 'Are you sure you want to cancel this order?', 'Order cancelled.');
+}
+
 // Get CSRF token - multiple fallback methods
 function getCookie(name) {
     let cookieValue = null;

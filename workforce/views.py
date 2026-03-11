@@ -3787,6 +3787,20 @@ def delivery_task_detail(request, task_id):
         key = f"{sp.old_status}__{sp.new_status}"
         status_point_map[key] = sp
 
+    # Pick list for this order
+    from warehouse.models import PickList, PickListItem
+    pick_list = None
+    pick_list_items = []
+    if task.order:
+        pick_item = PickListItem.objects.filter(
+            order=task.order
+        ).select_related('pick_list').first()
+        if pick_item:
+            pick_list = pick_item.pick_list
+            pick_list_items = pick_list.items.select_related(
+                'product', 'location', 'order_item'
+            ).order_by('location__code')
+
     context = {
         'page_title': f'Delivery Task #{task.dl_task_number}',
         'task': task,
@@ -3798,6 +3812,8 @@ def delivery_task_detail(request, task_id):
         'approved_drivers': approved_drivers,
         'status_points': status_points,
         'status_point_map': status_point_map,
+        'pick_list': pick_list,
+        'pick_list_items': pick_list_items,
     }
 
     return render(request, 'workforce/parts/delivery_task_detail.html', context)
@@ -8281,7 +8297,7 @@ def delivery_task_edit(request, task_id):
     task = get_object_or_404(
         delivery_models.DeliveryTask.objects.select_related(
             'order', 'order__business', 'driver', 'business', 'pickup_location'
-        ),
+        ).prefetch_related('order__order_items__product'),
         id=task_id
     )
 

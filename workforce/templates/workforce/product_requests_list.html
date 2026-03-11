@@ -1,147 +1,155 @@
-{% extends "workforce/wf_base_dashboard.html" %}
+{% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}Product Requests Management{% endblock %}
+{% block title %}Product Requests{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/product-requests.css' %}?v=20260310a" type="text/css" />
+{% endblock extra_css %}
 
 {% block content %}
-<div class="container-fluid py-3">
-  <!-- Hero Header -->
+<div class="prl">
+  <!-- Hero -->
   <div class="prl__hero">
-    <div class="prl__hero-content">
-      <h1 class="prl__hero-title">
-        <i class="fa-solid fa-inbox prl__hero-icon"></i>Product Requests
-      </h1>
-      <p class="prl__hero-subtitle">Manage inbound and outbound warehouse requests</p>
+    <div class="prl__hero-left">
+      <h1 class="prl__hero-title"><i class="fa-solid fa-inbox"></i> Product Requests</h1>
+      <p class="prl__hero-sub">Manage inbound and outbound warehouse requests</p>
+    </div>
+    <div class="prl__hero-right">
+      <a href="{% url 'business:inbound_request_create' %}" class="prl__btn prl__btn--primary">
+        <i class="fa-solid fa-plus"></i> New Inbound Request
+      </a>
     </div>
   </div>
 
-  <!-- Stats Cards -->
-  <div class="row mb-4 g-3">
-    <div class="col-md-3 col-6">
-      <div class="prl__stat-card prl__stat-card--warning">
-        <div class="prl__stat-icon"><i class="fa-solid fa-clock"></i></div>
-        <h6 class="prl__stat-label">Pending Inbound</h6>
-        <h3 class="prl__stat-value">{{ stats.pending_inbound }}</h3>
+  <!-- Stats -->
+  <div class="prl__stats">
+    <div class="prl__stat prl__stat--warning">
+      <div class="prl__stat-icon"><i class="fa-solid fa-arrow-right-to-bracket"></i></div>
+      <div class="prl__stat-body">
+        <span class="prl__stat-value">{{ stats.pending_inbound }}</span>
+        <span class="prl__stat-label">Pending Inbound</span>
       </div>
     </div>
-    <div class="col-md-3 col-6">
-      <div class="prl__stat-card prl__stat-card--info">
-        <div class="prl__stat-icon"><i class="fa-solid fa-arrow-right-from-bracket"></i></div>
-        <h6 class="prl__stat-label">Pending Outbound</h6>
-        <h3 class="prl__stat-value">{{ stats.pending_outbound }}</h3>
+    <div class="prl__stat prl__stat--info">
+      <div class="prl__stat-icon"><i class="fa-solid fa-arrow-right-from-bracket"></i></div>
+      <div class="prl__stat-body">
+        <span class="prl__stat-value">{{ stats.pending_outbound }}</span>
+        <span class="prl__stat-label">Pending Outbound</span>
       </div>
     </div>
-    <div class="col-md-3 col-6">
-      <div class="prl__stat-card prl__stat-card--primary">
-        <div class="prl__stat-icon"><i class="fa-solid fa-check"></i></div>
-        <h6 class="prl__stat-label">Approved</h6>
-        <h3 class="prl__stat-value">{{ stats.approved }}</h3>
+    <div class="prl__stat prl__stat--primary">
+      <div class="prl__stat-icon"><i class="fa-solid fa-check"></i></div>
+      <div class="prl__stat-body">
+        <span class="prl__stat-value">{{ stats.approved }}</span>
+        <span class="prl__stat-label">Approved</span>
       </div>
     </div>
-    <div class="col-md-3 col-6">
-      <div class="prl__stat-card prl__stat-card--success">
-        <div class="prl__stat-icon"><i class="fa-solid fa-check-double"></i></div>
-        <h6 class="prl__stat-label">Completed</h6>
-        <h3 class="prl__stat-value">{{ stats.completed }}</h3>
+    <div class="prl__stat prl__stat--success">
+      <div class="prl__stat-icon"><i class="fa-solid fa-check-double"></i></div>
+      <div class="prl__stat-body">
+        <span class="prl__stat-value">{{ stats.completed }}</span>
+        <span class="prl__stat-label">Completed</span>
       </div>
     </div>
   </div>
 
   <!-- Filters -->
-  <div class="prl__filter-card">
-    <form method="GET" class="row g-3 align-items-end">
-      <div class="col-md-3">
-        <label class="prl__filter-label"><i class="fa-solid fa-filter"></i> Request Type</label>
-        <select name="type" class="form-select">
-          <option value="all" {% if request_type == 'all' %}selected{% endif %}>All Types</option>
-          <option value="inbound" {% if request_type == 'inbound' %}selected{% endif %}>Inbound</option>
-          <option value="outbound" {% if request_type == 'outbound' %}selected{% endif %}>Outbound</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="prl__filter-label"><i class="fa-solid fa-circle-check"></i> Status</label>
-        <select name="status" class="form-select">
-          <option value="">All Status</option>
-          <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
-          <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
-          <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
-          <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="prl__filter-label"><i class="fa-solid fa-store"></i> Business</label>
-        <select name="business" class="form-select">
-          <option value="">All Businesses</option>
-          {% for biz in businesses %}
-          <option value="{{ biz.business_id }}" {% if business_id == biz.business_id|stringformat:"s" %}selected{% endif %}>
-            {{ biz.business_name }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-2">
-        <button type="submit" class="prl__filter-btn">
-          <i class="fa-solid fa-filter"></i> Apply
-        </button>
-      </div>
-    </form>
-  </div>
+  <form method="GET" class="prl__filters">
+    <div class="prl__filter-group">
+      <label class="prl__filter-label">Type</label>
+      <select name="type" class="form-select form-select-sm">
+        <option value="all" {% if request_type == 'all' %}selected{% endif %}>All</option>
+        <option value="inbound" {% if request_type == 'inbound' %}selected{% endif %}>Inbound</option>
+        <option value="outbound" {% if request_type == 'outbound' %}selected{% endif %}>Outbound</option>
+      </select>
+    </div>
+    <div class="prl__filter-group">
+      <label class="prl__filter-label">Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All</option>
+        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+      </select>
+    </div>
+    <div class="prl__filter-group prl__filter-group--wide">
+      <label class="prl__filter-label">Business</label>
+      <select name="business" class="form-select form-select-sm">
+        <option value="">All Businesses</option>
+        {% for biz in businesses %}
+        <option value="{{ biz.business_id }}" {% if business_id == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="prl__filter-group prl__filter-group--action">
+      <button type="submit" class="prl__btn prl__btn--filter"><i class="fa-solid fa-filter"></i> Filter</button>
+    </div>
+  </form>
 
-  <!-- Requests Table -->
-  <div class="prl__table-card">
-    <div class="table-responsive">
+  <!-- Table -->
+  <div class="prl__card">
+    <div class="prl__card-header">
+      <span class="prl__card-title"><i class="fa-solid fa-list"></i> Requests</span>
+      <span class="prl__card-meta">{{ stats.total }} total</span>
+    </div>
+    <div class="prl__table-wrap">
       <table class="prl__table">
         <thead>
           <tr>
-            <th>Request #</th>
-            <th>Type</th>
-            <th>Business</th>
-            <th>Warehouse</th>
-            <th>Items</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Actions</th>
+            <th class="prl__th">Request #</th>
+            <th class="prl__th">Type</th>
+            <th class="prl__th">Business</th>
+            <th class="prl__th">Warehouse</th>
+            <th class="prl__th">Items</th>
+            <th class="prl__th">Status</th>
+            <th class="prl__th">Created</th>
+            <th class="prl__th">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for req in page_obj %}
-          <tr>
-            <td><code class="prl__req-code">{{ req.request_number }}</code></td>
-            <td>
+          <tr class="prl__row" onclick="window.location='{% url 'business:inbound_request_detail' pk=req.pk %}'" style="cursor:pointer">
+            <td class="prl__td" data-label="Request #"><code class="prl__code">{{ req.request_number }}</code></td>
+            <td class="prl__td" data-label="Type">
               {% if req.request_type == 'inbound' %}
-              <span class="prl__type-badge prl__type-badge--inbound">
-                <i class="fa-solid fa-arrow-right-to-bracket"></i> Inbound
-              </span>
+              <span class="prl__type prl__type--in"><i class="fa-solid fa-arrow-right-to-bracket"></i> Inbound</span>
               {% else %}
-              <span class="prl__type-badge prl__type-badge--outbound">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Outbound
-              </span>
+              <span class="prl__type prl__type--out"><i class="fa-solid fa-arrow-right-from-bracket"></i> Outbound</span>
               {% endif %}
             </td>
-            <td>{{ req.business.business_name }}</td>
-            <td>{{ req.warehouse.name }}</td>
-            <td><strong>{{ req.items.count }}</strong> item{{ req.items.count|pluralize }}</td>
-            <td>
-              <span class="prl__status-badge prl__status-badge--{{ req.status }}">{{ req.status|title }}</span>
+            <td class="prl__td" data-label="Business">{{ req.business.business_name }}</td>
+            <td class="prl__td" data-label="Warehouse">{{ req.warehouse.name }}</td>
+            <td class="prl__td" data-label="Items"><strong>{{ req.items.count }}</strong> item{{ req.items.count|pluralize }}</td>
+            <td class="prl__td" data-label="Status">
+              <span class="prl__badge prl__badge--{{ req.status }}">
+                {% if req.status == 'pending' %}<i class="fa-solid fa-clock"></i>
+                {% elif req.status == 'approved' %}<i class="fa-solid fa-check"></i>
+                {% elif req.status == 'completed' %}<i class="fa-solid fa-check-double"></i>
+                {% elif req.status == 'cancelled' %}<i class="fa-solid fa-xmark"></i>
+                {% endif %}
+                {{ req.status|title }}
+              </span>
             </td>
-            <td>{{ req.created_at|date:"d M Y" }}</td>
-            <td>
+            <td class="prl__td" data-label="Created">{{ req.created_at|date:"d M Y" }}</td>
+            <td class="prl__td" data-label="Actions" onclick="event.stopPropagation()">
               {% if req.status == 'pending' %}
-              <form method="POST" action="{% url 'workforce:approve_product_request' req.id req.request_type %}" class="d-inline" novalidate>
+              <form method="POST" action="{% url 'workforce:approve_product_request' req.pk req.request_type %}" class="d-inline" novalidate>
                 {% csrf_token %}
-                <button type="submit" class="prl__action-btn prl__action-btn--approve" title="Approve Request">
+                <button type="submit" class="prl__action prl__action--approve" title="Approve">
                   <i class="fa-solid fa-check"></i>
                 </button>
               </form>
               {% elif req.status == 'approved' %}
-              <form method="POST" action="{% url 'workforce:complete_product_request' req.id req.request_type %}" class="d-inline" novalidate>
+              <form method="POST" action="{% url 'workforce:complete_product_request' req.pk req.request_type %}" class="d-inline" novalidate>
                 {% csrf_token %}
-                <button type="submit" class="prl__action-btn prl__action-btn--complete" title="Mark as Completed">
+                <button type="submit" class="prl__action prl__action--complete" title="Complete">
                   <i class="fa-solid fa-check-double"></i>
                 </button>
               </form>
               {% else %}
-              <span class="text-muted">-</span>
+              <span class="text-muted">—</span>
               {% endif %}
             </td>
           </tr>
@@ -150,8 +158,8 @@
             <td colspan="8">
               <div class="prl__empty">
                 <i class="fa-solid fa-inbox"></i>
-                <p>No product requests found</p>
-                <small class="text-muted">Try adjusting your filters to find what you're looking for</small>
+                <p class="prl__empty-title">No product requests found</p>
+                <p class="prl__empty-text">Adjust filters or create a new request</p>
               </div>
             </td>
           </tr>
@@ -162,27 +170,17 @@
 
     {% if page_obj.has_other_pages %}
     <div class="prl__pagination">
-      <nav aria-label="Product requests pagination">
-        <ul class="pagination justify-content-center mb-0">
-          {% if page_obj.has_previous %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request_type != 'all' %}&type={{ request_type }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if business_id %}&business={{ business_id }}{% endif %}">
-              <i class="fa-solid fa-chevron-left me-1"></i>Previous
-            </a>
-          </li>
-          {% endif %}
-          <li class="page-item active">
-            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-          </li>
-          {% if page_obj.has_next %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request_type != 'all' %}&type={{ request_type }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if business_id %}&business={{ business_id }}{% endif %}">
-              Next<i class="fa-solid fa-chevron-right ms-1"></i>
-            </a>
-          </li>
-          {% endif %}
-        </ul>
-      </nav>
+      {% if page_obj.has_previous %}
+      <a class="prl__page-btn" href="?page={{ page_obj.previous_page_number }}{% if request_type != 'all' %}&type={{ request_type }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if business_id %}&business={{ business_id }}{% endif %}">
+        <i class="fa-solid fa-chevron-left"></i> Prev
+      </a>
+      {% endif %}
+      <span class="prl__page-info">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+      <a class="prl__page-btn" href="?page={{ page_obj.next_page_number }}{% if request_type != 'all' %}&type={{ request_type }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if business_id %}&business={{ business_id }}{% endif %}">
+        Next <i class="fa-solid fa-chevron-right"></i>
+      </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>
