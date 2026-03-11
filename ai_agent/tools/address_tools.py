@@ -371,6 +371,61 @@ class ParseAddressTool(BaseTool):
         # Cap confidence at 1.0
         result['confidence'] = min(1.0, result['confidence'])
 
+        # Inline validation (merged from ValidateAddressTool)
+        issues = []
+        warnings = []
+        is_valid = True
+
+        if not result['zone_number']:
+            is_valid = False
+            issues.append({
+                'field': 'zone_number',
+                'issue': 'Zone number not identified',
+                'suggestion': 'Include zone number (1-99) in the address'
+            })
+
+        if not result['building_number']:
+            is_valid = False
+            issues.append({
+                'field': 'building_number',
+                'issue': 'Building number is required for delivery',
+                'suggestion': 'Please provide building or villa number'
+            })
+
+        if not result['street_number']:
+            warnings.append({
+                'field': 'street_number',
+                'issue': 'Street number not provided',
+                'suggestion': 'Adding street number improves delivery accuracy'
+            })
+
+        # Completeness score
+        fields_provided = sum([
+            result['zone_number'] is not None,
+            result['street_number'] is not None,
+            result['building_number'] is not None,
+            bool(result['area_name']),
+        ])
+        result['is_valid'] = is_valid
+        result['completeness_score'] = fields_provided / 4.0
+        result['issues'] = issues
+        result['warnings'] = warnings
+
+        # Formatted address if valid
+        if is_valid:
+            parts = []
+            if result['building_number']:
+                parts.append(f"Building {result['building_number']}")
+            if result['street_number']:
+                parts.append(f"Street {result['street_number']}")
+            if result['zone_number']:
+                parts.append(f"Zone {result['zone_number']}")
+            if result['zone_name']:
+                parts.append(result['zone_name'])
+            elif result['area_name']:
+                parts.append(result['area_name'])
+            result['formatted_address'] = ', '.join(parts)
+
         return result
 
     def _find_zone_from_training_data(self, address: str) -> Optional[Dict[str, Any]]:
@@ -827,9 +882,13 @@ class LookupZoneTool(BaseTool):
     - Zone group (e.g., West Doha, Industrial Area)
     - Neighboring zones
 
+    Set fuzzy_match=true (with area_name) to get multiple suggestions
+    when the exact zone is unclear. Returns ranked matches with confidence.
+
     Examples:
     - lookup_zone(zone_number=44) -> West Bay zone details
     - lookup_zone(area_name="Al Sadd") -> Zone containing Al Sadd
+    - lookup_zone(area_name="west", fuzzy_match=true) -> suggests West Bay, West Doha zones
     '''
 
     parameters_schema = {
@@ -842,19 +901,35 @@ class LookupZoneTool(BaseTool):
             'area_name': {
                 'type': 'string',
                 'description': 'Area or neighborhood name to search'
-            }
+            },
+            'fuzzy_match': {
+                'type': 'boolean',
+                'description': 'Return multiple suggestions instead of exact match (default false)',
+                'default': False,
+            },
+            'limit': {
+                'type': 'integer',
+                'description': 'Max suggestions when fuzzy_match=true (default 5)',
+                'default': 5,
+            },
         },
     }
 
     def execute(
         self,
         zone_number: Optional[int] = None,
-        area_name: Optional[str] = None
+        area_name: Optional[str] = None,
+        fuzzy_match: bool = False,
+        limit: int = 5,
     ) -> Dict[str, Any]:
-        from delivery.models import ZoneName, ZoneArea
+        from delivery.models import ZoneName, ZoneArea, ZoneGroup
 
         if not zone_number and not area_name:
             raise ToolError('Provide zone_number or area_name', 'MISSING_PARAM')
+
+        # Fuzzy suggestion mode (merged from SuggestZoneTool)
+        if fuzzy_match and area_name:
+            return self._fuzzy_search(area_name, limit)
 
         zone = None
 
@@ -912,180 +987,8 @@ class LookupZoneTool(BaseTool):
             'has_polygon': bool(zone.polygon),
         }
 
-
-@register_tool
-class ValidateAddressTool(BaseTool):
-    """
-    Validate a structured address for completeness and correctness.
-    """
-
-    name = 'validate_address'
-    description = '''Validate a Qatar address for completeness and correctness.
-
-    Checks:
-    - Zone number is valid (exists in system)
-    - Street number format is valid
-    - Building number is provided
-    - All required fields are present
-
-    Returns validation status and any issues found.
-    '''
-
-    parameters_schema = {
-        'type': 'object',
-        'properties': {
-            'zone_number': {
-                'type': 'integer',
-                'description': 'Zone number'
-            },
-            'street_number': {
-                'type': 'integer',
-                'description': 'Street number'
-            },
-            'building_number': {
-                'type': 'integer',
-                'description': 'Building/villa number'
-            },
-            'area_name': {
-                'type': 'string',
-                'description': 'Area name (optional)'
-            }
-        },
-        'required': ['zone_number']
-    }
-
-    def execute(
-        self,
-        zone_number: int,
-        street_number: Optional[int] = None,
-        building_number: Optional[int] = None,
-        area_name: Optional[str] = None
-    ) -> Dict[str, Any]:
-        from delivery.models import ZoneName
-
-        issues = []
-        warnings = []
-        is_valid = True
-
-        # Validate zone
-        try:
-            zone = ZoneName.objects.get(zone_number=zone_number, is_active=True)
-            zone_info = {
-                'zone_number': zone.zone_number,
-                'zone_name': zone.zone_name,
-            }
-        except ZoneName.DoesNotExist:
-            is_valid = False
-            issues.append({
-                'field': 'zone_number',
-                'issue': f'Zone {zone_number} not found in system',
-                'suggestion': 'Please verify the zone number'
-            })
-            zone_info = None
-
-        # Validate street number
-        if street_number:
-            if street_number < 1 or street_number > 9999:
-                warnings.append({
-                    'field': 'street_number',
-                    'issue': f'Street number {street_number} seems unusual',
-                    'suggestion': 'Qatar streets are typically 1-999'
-                })
-        else:
-            warnings.append({
-                'field': 'street_number',
-                'issue': 'Street number not provided',
-                'suggestion': 'Adding street number improves delivery accuracy'
-            })
-
-        # Validate building number
-        if not building_number:
-            is_valid = False
-            issues.append({
-                'field': 'building_number',
-                'issue': 'Building number is required for delivery',
-                'suggestion': 'Please provide building or villa number'
-            })
-
-        # Calculate completeness score
-        fields_provided = sum([
-            zone_number is not None,
-            street_number is not None,
-            building_number is not None,
-            bool(area_name),
-        ])
-        completeness = fields_provided / 4.0
-
-        return {
-            'is_valid': is_valid,
-            'completeness_score': completeness,
-            'zone_info': zone_info,
-            'issues': issues,
-            'warnings': warnings,
-            'formatted_address': self._format_address(
-                zone_number, street_number, building_number, area_name, zone_info
-            ) if is_valid else None
-        }
-
-    def _format_address(
-        self,
-        zone_number: int,
-        street_number: Optional[int],
-        building_number: Optional[int],
-        area_name: Optional[str],
-        zone_info: Optional[Dict]
-    ) -> str:
-        """Format address into standard Qatar format."""
-        parts = []
-
-        if building_number:
-            parts.append(f'Building {building_number}')
-
-        if street_number:
-            parts.append(f'Street {street_number}')
-
-        parts.append(f'Zone {zone_number}')
-
-        if zone_info and zone_info.get('zone_name'):
-            parts.append(zone_info['zone_name'])
-        elif area_name:
-            parts.append(area_name)
-
-        return ', '.join(parts)
-
-
-@register_tool
-class SuggestZoneTool(BaseTool):
-    """
-    Suggest possible zones based on partial or ambiguous input.
-    """
-
-    name = 'suggest_zone'
-    description = '''Suggest possible Qatar zones based on partial input.
-
-    Useful when the exact zone is unclear. Returns a list of possible
-    matches with confidence scores.
-
-    Example: "west" -> suggests West Bay (Zone 44), West Doha zones, etc.
-    '''
-
-    parameters_schema = {
-        'type': 'object',
-        'properties': {
-            'query': {
-                'type': 'string',
-                'description': 'Partial zone name, area name, or landmark'
-            },
-            'limit': {
-                'type': 'integer',
-                'description': 'Maximum number of suggestions (default 5)',
-                'default': 5
-            }
-        },
-        'required': ['query']
-    }
-
-    def execute(self, query: str, limit: int = 5) -> Dict[str, Any]:
+    def _fuzzy_search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+        """Fuzzy search for zone suggestions (merged from SuggestZoneTool)."""
         from delivery.models import ZoneName, ZoneArea, ZoneGroup
 
         if len(query.strip()) < 2:
@@ -1118,7 +1021,6 @@ class SuggestZoneTool(BaseTool):
             ).select_related('zone')[:limit - len(suggestions)]
 
             for area in areas:
-                # Avoid duplicates
                 if not any(s['zone_number'] == area.zone.zone_number for s in suggestions):
                     suggestions.append({
                         'zone_number': area.zone.zone_number,
@@ -1173,3 +1075,5 @@ class SuggestZoneTool(BaseTool):
             'suggestions': suggestions[:limit],
             'count': len(suggestions[:limit]),
         }
+
+

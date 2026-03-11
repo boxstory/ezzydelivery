@@ -18,10 +18,6 @@ urlpatterns = [
 
     # Direct tool endpoints
     path('tools/parse-address/', views.ParseAddressAPIView.as_view(), name='parse_address'),
-    path('tools/verify-order/', views.VerifyOrderAPIView.as_view(), name='verify_order'),
-    path('tools/cod-risk/', views.CODRiskAPIView.as_view(), name='cod_risk'),
-    path('tools/estimate-delivery/', views.EstimateDeliveryAPIView.as_view(), name='estimate_delivery'),
-    path('tools/suggest-driver/', views.SuggestDriverAPIView.as_view(), name='suggest_driver'),
     path('tools/extract-order/', views.ExtractOrderAPIView.as_view(), name='extract_order'),
 
     # Webhooks

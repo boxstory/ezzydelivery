@@ -17,20 +17,13 @@ from ai_agent.tools.base import (
 from ai_agent.tools.address_tools import (
     ParseAddressTool,
     LookupZoneTool,
-    ValidateAddressTool,
-    SuggestZoneTool,
 )
 
 from ai_agent.tools.order_tools import (
     LookupOrderTool,
-    VerifyOrderTool,
-    AssessCODRiskTool,
-    SearchOrdersTool,
 )
 
 from ai_agent.tools.delivery_tools import (
-    EstimateDeliveryTool,
-    SuggestDriverTool,
     GetDriverStatusTool,
 )
 
@@ -40,7 +33,6 @@ from ai_agent.tools.business_tools import (
     GetBusinessDeliveriesTool,
     GetBusinessCODSummaryTool,
     GetBusinessCustomersTool,
-    GetBusinessPickupLocationsTool,
 )
 
 __all__ = [
@@ -52,16 +44,9 @@ __all__ = [
     # Address tools
     'ParseAddressTool',
     'LookupZoneTool',
-    'ValidateAddressTool',
-    'SuggestZoneTool',
     # Order tools
     'LookupOrderTool',
-    'VerifyOrderTool',
-    'AssessCODRiskTool',
-    'SearchOrdersTool',
     # Delivery tools
-    'EstimateDeliveryTool',
-    'SuggestDriverTool',
     'GetDriverStatusTool',
     # Business tools
     'GetBusinessDashboardTool',
@@ -69,5 +54,4 @@ __all__ = [
     'GetBusinessDeliveriesTool',
     'GetBusinessCODSummaryTool',
     'GetBusinessCustomersTool',
-    'GetBusinessPickupLocationsTool',
 ]

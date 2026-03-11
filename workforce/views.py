@@ -1048,8 +1048,8 @@ def add_order(request):
                     'address_was_translated': customer_address_original != customer_address_en,
                     'dl_landmark': request.POST.get('dl_landmark', '').strip(),
                     'location_link': request.POST.get('location_link', '').strip(),
-                    'product_name': request.POST.get('product_name', '').strip(),
-                    'quantity': request.POST.get('quantity', '1'),
+                    'package_desc': request.POST.get('package_desc', '').strip(),
+                    'package_qty': request.POST.get('package_qty', '1'),
                     'seller_notes': seller_notes,
                     'internal_notes': request.POST.get('internal_notes', '').strip(),
                 }
@@ -1145,13 +1145,13 @@ def add_order(request):
                     )
                     items_created += 1
 
-            # Fallback: old plain product_name → save as order description
+            # Fallback: old plain package_desc → save as order description
             if items_created == 0:
-                product_name = request.POST.get('product_name', '').strip()
-                if product_name:
-                    order.package_description = product_name[:255]
-                    order.total_quantity = safe_int(request.POST.get('quantity', '1')) or 1
-                    order.save(update_fields=['package_description', 'total_quantity'])
+                package_desc = request.POST.get('package_desc', '').strip()
+                if package_desc:
+                    order.package_description = package_desc[:255]
+                    order.package_qty = safe_int(request.POST.get('package_qty', '1')) or 1
+                    order.save(update_fields=['package_description', 'package_qty'])
 
             messages.success(request, f'Order {order.order_number} created successfully.')
 
@@ -1347,9 +1347,9 @@ def preview_api_import(request):
         idx_cod = get_idx('cod_amount', 'cod', 'amount', 'cod amount', 'price', 'total')
         idx_dl_amount = get_idx('dl_amount', 'delivery fee', 'shipping fee', 'delivery amount')
         idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id')
-        idx_product = get_idx('product_name', 'product', 'product name', 'item', 'items')
+        idx_product = get_idx('package_desc', 'product', 'product name', 'item', 'items', 'package desc')
         idx_sku = get_idx('sku', 'sku', 'product sku', 'item sku', 'article')
-        idx_qty = get_idx('quantity', 'qty', 'quantity', 'count')
+        idx_qty = get_idx('package_qty', 'qty', 'quantity', 'count', 'package qty')
         idx_deadline = get_idx('deadline_date', 'deadline', 'delivery date', 'preferred', 'day')
         idx_notes = get_idx('seller_notes', 'notes', 'seller notes', 'note', 'remarks', 'comment')
         idx_internal = get_idx('internal_notes', 'internal notes', 'staff notes', 'notes by ezzy')
@@ -1375,9 +1375,9 @@ def preview_api_import(request):
             ('dl_zone', 'Zone No', idx_zone),
             ('cod_amount', 'Price / COD Amount', idx_cod),
             ('dl_amount', 'Delivery Fee', idx_dl_amount),
-            ('product_name', 'Product Name', idx_product),
+            ('package_desc', 'Package Desc', idx_product),
             ('sku', 'SKU', idx_sku),
-            ('quantity', 'Quantity', idx_qty),
+            ('package_qty', 'Package Qty', idx_qty),
             ('deadline_date', 'Day & Time', idx_deadline),
             ('seller_notes', 'Seller Notes', idx_notes),
             ('internal_notes', 'Internal Notes', idx_internal),
@@ -1433,9 +1433,9 @@ def preview_api_import(request):
                 'dl_zone': idx_zone,
                 'cod_amount': idx_cod,
                 'dl_amount': idx_dl_amount,
-                'product_name': idx_product,
+                'package_desc': idx_product,
                 'sku': idx_sku,
-                'quantity': idx_qty,
+                'package_qty': idx_qty,
                 'deadline_date': idx_deadline,
                 'seller_notes': idx_notes,
                 'internal_notes': idx_internal,
@@ -1497,6 +1497,23 @@ def import_api_orders(request):
     created = 0
     skipped = 0
     errors = []
+    created_orders = []
+
+    # Determine ImportLog source type
+    log_source_map = {'shopify': 'shopify', 'woocommerce': 'woocommerce', 'google_sheet': 'google_sheet'}
+    import_log = orders_models.ImportLog.objects.create(
+        business=business,
+        source=log_source_map.get(api.api_type, api.api_type),
+        status='processing',
+        initiated_by=request.user,
+        total_rows=len(platform_ids),
+        source_meta={
+            'api_type': api.api_type,
+            'api_settings_id': api.id,
+            'platform_ids': platform_ids,
+            'site_url': api.site_api_url or '',
+        },
+    )
 
     try:
         if api.api_type == 'shopify':
@@ -1538,7 +1555,7 @@ def import_api_orders(request):
                         'created_at': str(o.created_at),
                     }
 
-                    orders_models.Order.objects.create(
+                    order = orders_models.Order.objects.create(
                         business=business,
                         customer_name=customer_name or o.name,
                         customer_phone=phone,
@@ -1548,6 +1565,7 @@ def import_api_orders(request):
                         is_transferred=False,
                         original_order_data=original_data,
                     )
+                    created_orders.append(order)
                     created += 1
                 except Exception as e:
                     errors.append(f"{pid}: {e}")
@@ -1597,7 +1615,7 @@ def import_api_orders(request):
                         'date_created': o.get('date_created'),
                     }
 
-                    orders_models.Order.objects.create(
+                    order = orders_models.Order.objects.create(
                         business=business,
                         customer_name=customer_name or f"#{o.get('number')}",
                         customer_phone=billing.get('phone', ''),
@@ -1607,6 +1625,7 @@ def import_api_orders(request):
                         is_transferred=False,
                         original_order_data=original_data,
                     )
+                    created_orders.append(order)
                     created += 1
                 except Exception as e:
                     errors.append(f"{pid}: {e}")
@@ -1709,10 +1728,10 @@ def import_api_orders(request):
             idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id', 'ref', 'reference')
             idx_date = get_idx('order_date', 'date', 'order date', 'created')
             idx_deadline = get_idx('deadline_date', 'deadline', 'day', 'time', 'preferred', 'delivery date')
-            idx_product = get_idx('product_name', 'product', 'product name', 'item', 'items', 'description')
+            idx_product = get_idx('package_desc', 'product', 'product name', 'item', 'items', 'description', 'package desc')
             idx_sku = get_idx('sku', 'sku', 'product sku', 'item sku', 'article')
             idx_product_url = get_idx('product_url', 'product url', 'url', 'product link')
-            idx_qty = get_idx('quantity', 'qty', 'quantity', 'count', 'pcs')
+            idx_qty = get_idx('package_qty', 'qty', 'quantity', 'count', 'pcs', 'package qty')
             idx_seller_notes = get_idx('seller_notes', 'notes', 'seller notes', 'note', 'remarks', 'comment')
             idx_internal_notes = get_idx('internal_notes', 'notes by ezzy', 'internal notes', 'staff notes')
             # Additional product columns
@@ -1824,10 +1843,10 @@ def import_api_orders(request):
                             'location_link': cell(row, idx_location_link),
                             'dl_latitude': cell(row, idx_lat),
                             'dl_longitude': cell(row, idx_lng),
-                            'product_name': product_desc,
+                            'package_desc': product_desc,
                             'sku': cell(row, idx_sku),
                             'product_url': cell(row, idx_product_url),
-                            'quantity': cell(row, idx_qty),
+                            'package_qty': cell(row, idx_qty),
                             'seller_notes': seller_notes,
                             'internal_notes': internal_notes,
                         },
@@ -1846,7 +1865,7 @@ def import_api_orders(request):
                         cod_amount=cod_amount,
                         dl_amount=dl_amount,
                         package_description=product_desc[:255] if product_desc else '',
-                        total_quantity=safe_int(cell(row, idx_qty)) or 1,
+                        package_qty=safe_int(cell(row, idx_qty)) or 1,
                         deadline_date=cell(row, idx_deadline),
                         order_notes=combined_notes[:100] if combined_notes else '',
                         order_status='to_review',
@@ -1855,29 +1874,57 @@ def import_api_orders(request):
                         original_order_data=original_data,
                     )
 
-                    # Build package_description & total_quantity from all product fields
-                    desc_parts = []
-                    total_qty = 0
-                    sku_val = cell(row, idx_sku)
-                    main_qty = safe_int(cell(row, idx_qty)) or 1
+                    # Set package_description & package_qty
                     if product_desc:
-                        label = product_desc
-                        if sku_val:
-                            label += f" (SKU:{sku_val})"
-                        desc_parts.append(f"{label} x{main_qty}")
-                        total_qty += main_qty
+                        # Use package_desc directly — no summary needed
+                        sku_val = cell(row, idx_sku)
+                        label = f"{product_desc} (SKU:{sku_val})" if sku_val else product_desc
+                        order.package_description = label[:255]
+                        order.package_qty = safe_int(cell(row, idx_qty)) or 1
+                    else:
+                        # Build from product_1..5 columns
+                        desc_parts = []
+                        total_qty = 0
+                        for i in range(1, 6):
+                            prod_name = cell(row, idx_products.get(f'product_{i}'))
+                            prod_count = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
+                            if prod_name:
+                                desc_parts.append(f"{prod_name} x{prod_count}")
+                                total_qty += prod_count
+                        if desc_parts:
+                            order.package_description = ', '.join(desc_parts)[:255]
+                            order.package_qty = total_qty
 
+                    order.save(update_fields=['package_description', 'package_qty'])
+
+                    # Match product columns to actual Product records → create OrderItems
+                    from product.models import Product as ProductModel
+                    product_names = []
+                    if product_desc:
+                        product_names.append((product_desc, safe_int(cell(row, idx_qty)) or 1))
                     for i in range(1, 6):
-                        prod_name = cell(row, idx_products.get(f'product_{i}'))
-                        prod_count = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
-                        if prod_name:
-                            desc_parts.append(f"{prod_name} x{prod_count}")
-                            total_qty += prod_count
-
-                    if desc_parts:
-                        order.package_description = ', '.join(desc_parts)[:255]
-                        order.total_quantity = total_qty
-                        order.save(update_fields=['package_description', 'total_quantity'])
+                        pn = cell(row, idx_products.get(f'product_{i}'))
+                        if pn:
+                            pc = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
+                            product_names.append((pn, pc))
+                    for pname, pqty in product_names:
+                        matched = ProductModel.objects.filter(
+                            business=business, item_name__iexact=pname.strip()
+                        ).first()
+                        if not matched:
+                            matched = ProductModel.objects.filter(
+                                business=business, item_sku__iexact=pname.strip()
+                            ).first()
+                        if not matched:
+                            matched = ProductModel.objects.filter(
+                                business=business, barcode__iexact=pname.strip()
+                            ).first()
+                        if matched:
+                            orders_models.OrderItem.objects.create(
+                                order=order, product=matched, quantity=pqty,
+                                unit_price=matched.item_price or 0,
+                                notes=matched.item_name
+                            )
 
                     # Create AddressVerification if lat/long provided
                     lat = safe_decimal(cell(row, idx_lat))
@@ -1895,16 +1942,31 @@ def import_api_orders(request):
                             verification_result='pending'
                         )
 
+                    created_orders.append(order)
                     created += 1
                 except Exception as e:
                     errors.append(f"{pid}: {e}")
 
         else:
+            import_log.mark_failed(f'Import not supported for {api.api_type}')
             return JsonResponse({'success': False, 'error': f'Import not supported for {api.api_type}'}, status=400)
 
     except Exception as e:
         logger.exception('import_api_orders error: %s', e)
+        try:
+            import_log.mark_failed(str(e))
+        except Exception:
+            pass
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    # Finalize ImportLog
+    if created_orders:
+        import_log.orders.add(*created_orders)
+    import_log.orders_created = created
+    import_log.orders_skipped = skipped
+    import_log.orders_failed = len([e for e in errors if e])
+    import_log.errors = errors[:50] if errors else []
+    import_log.mark_completed()
 
     return JsonResponse({
         'success': True,
@@ -2227,7 +2289,7 @@ def wf_api_orders(request):
                 idx_date = get_idx('order_date', 'date', 'order date', 'created', 'created at')
                 idx_country = col_idx_auto('country', 'country code')
                 idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id', 'ref', 'reference')
-                idx_product = get_idx('product_name', 'product', 'product name', 'item', 'items')
+                idx_product = get_idx('package_desc', 'product', 'product name', 'item', 'items', 'package desc')
 
                 def cell(row, idx):
                     if idx is not None and idx < len(row):
@@ -8339,7 +8401,7 @@ def delivery_task_edit(request, task_id):
                     'customer_name': order.customer_name or '', 'customer_phone': order.customer_phone or '',
                     'customer_whatsapp': order.customer_whatsapp or '', 'customer_address': order.customer_address or '',
                     'dl_zone': order.dl_zone, 'dl_street': order.dl_street, 'dl_building': order.dl_building,
-                    'package_description': order.package_description or '', 'total_quantity': order.total_quantity or 0,
+                    'package_description': order.package_description or '', 'package_qty': order.package_qty or 0,
                     'cod_amount': order.cod_amount or 0, 'dl_amount': order.dl_amount or 0,
                     'order_notes': order.order_notes or '',
                     'latitude': str(order.latitude or ''), 'longitude': str(order.longitude or ''),
@@ -8367,9 +8429,9 @@ def delivery_task_edit(request, task_id):
                 product_desc = request.POST.get('package_description', '').strip()
                 if product_desc is not None:
                     order.package_description = product_desc[:255]
-                total_qty = request.POST.get('total_quantity', '').strip()
+                total_qty = request.POST.get('package_qty', '').strip()
                 if total_qty and total_qty.isdigit():
-                    order.total_quantity = int(total_qty)
+                    order.package_qty = int(total_qty)
 
                 # COD details
                 cod_amount = request.POST.get('cod_amount', '0').strip()
@@ -8418,7 +8480,7 @@ def delivery_task_edit(request, task_id):
                     'customer_name': order.customer_name or '', 'customer_phone': order.customer_phone or '',
                     'customer_whatsapp': order.customer_whatsapp or '', 'customer_address': order.customer_address or '',
                     'dl_zone': order.dl_zone, 'dl_street': order.dl_street, 'dl_building': order.dl_building,
-                    'package_description': order.package_description or '', 'total_quantity': order.total_quantity or 0,
+                    'package_description': order.package_description or '', 'package_qty': order.package_qty or 0,
                     'cod_amount': order.cod_amount or 0, 'dl_amount': order.dl_amount or 0,
                     'order_notes': order.order_notes or '',
                     'latitude': str(order.latitude or ''), 'longitude': str(order.longitude or ''),
@@ -8426,7 +8488,7 @@ def delivery_task_edit(request, task_id):
                 field_labels = {
                     'customer_name': 'Name', 'customer_phone': 'Phone', 'customer_whatsapp': 'WhatsApp',
                     'customer_address': 'Address', 'dl_zone': 'Zone', 'dl_street': 'Street', 'dl_building': 'Building',
-                    'package_description': 'Package Desc', 'total_quantity': 'Qty', 'cod_amount': 'COD',
+                    'package_description': 'Package Desc', 'package_qty': 'Qty', 'cod_amount': 'COD',
                     'dl_amount': 'DL Amount', 'order_notes': 'Notes',
                     'latitude': 'Lat', 'longitude': 'Lng',
                 }
@@ -8862,7 +8924,7 @@ def order_edit(request, order_id):
                 'dl_street': order.dl_street,
                 'dl_building': order.dl_building,
                 'package_description': order.package_description or '',
-                'total_quantity': order.total_quantity or 0,
+                'package_qty': order.package_qty or 0,
                 'cod_amount': order.cod_amount or 0,
                 'dl_amount': order.dl_amount or 0,
                 'order_notes': order.order_notes or '',
@@ -8891,9 +8953,9 @@ def order_edit(request, order_id):
             # Package details
             product_desc = request.POST.get('package_description', '').strip()
             order.package_description = product_desc[:255]
-            total_qty = request.POST.get('total_quantity', '').strip()
+            total_qty = request.POST.get('package_qty', '').strip()
             if total_qty and total_qty.isdigit():
-                order.total_quantity = int(total_qty)
+                order.package_qty = int(total_qty)
 
             # COD details
             cod_amount = request.POST.get('cod_amount', '0').strip()
@@ -8947,7 +9009,7 @@ def order_edit(request, order_id):
                 'dl_street': order.dl_street,
                 'dl_building': order.dl_building,
                 'package_description': order.package_description or '',
-                'total_quantity': order.total_quantity or 0,
+                'package_qty': order.package_qty or 0,
                 'cod_amount': order.cod_amount or 0,
                 'dl_amount': order.dl_amount or 0,
                 'order_notes': order.order_notes or '',
@@ -8960,7 +9022,7 @@ def order_edit(request, order_id):
             field_labels = {
                 'customer_name': 'Name', 'customer_phone': 'Phone', 'customer_whatsapp': 'WhatsApp',
                 'customer_address': 'Address', 'dl_zone': 'Zone', 'dl_street': 'Street', 'dl_building': 'Building',
-                'package_description': 'Package Desc', 'total_quantity': 'Qty', 'cod_amount': 'COD',
+                'package_description': 'Package Desc', 'package_qty': 'Qty', 'cod_amount': 'COD',
                 'dl_amount': 'DL Amount', 'order_notes': 'Notes', 'order_status': 'Status',
                 'verification_status': 'Verification', 'latitude': 'Lat', 'longitude': 'Lng',
                 'pickup_location_id': 'Pickup Location',
@@ -10149,6 +10211,31 @@ def tasks_live_map(request):
 
 
 # =============================================================================
+# IMPORT HISTORY
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def import_history(request):
+    """Show import history log for all sources."""
+    source_filter = request.GET.get('source', '')
+    logs = orders_models.ImportLog.objects.select_related(
+        'business', 'initiated_by', 'onedrive_source'
+    ).order_by('-started_at')
+
+    if source_filter:
+        logs = logs.filter(source=source_filter)
+
+    logs = logs[:100]
+
+    return render(request, 'workforce/import_history.html', {
+        'logs': logs,
+        'source_filter': source_filter,
+        'source_choices': orders_models.ImportLog.SOURCE_CHOICES,
+    })
+
+
+# =============================================================================
 # ONEDRIVE IMPORT SOURCES
 # =============================================================================
 
@@ -10264,6 +10351,24 @@ def _onedrive_download_file(source):
         return None, f'Download error: {str(e)}'
 
 
+def _safe_load_workbook(file_bytes):
+    """Load Excel workbook, falling back to no-stylesheet mode for corrupted files."""
+    import openpyxl
+    from io import BytesIO
+    try:
+        return openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+    except Exception as e:
+        if 'stylesheet' in str(e).lower():
+            from openpyxl.reader import excel as openpyxl_excel
+            orig = openpyxl_excel.apply_stylesheet
+            openpyxl_excel.apply_stylesheet = lambda *a, **kw: None
+            try:
+                return openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+            finally:
+                openpyxl_excel.apply_stylesheet = orig
+        raise
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 @require_POST
@@ -10280,7 +10385,7 @@ def onedrive_fetch_sheets(request, source_id):
             return JsonResponse({'success': False, 'error': err}, status=400)
 
         try:
-            wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+            wb = _safe_load_workbook(file_bytes)
         except Exception as parse_err:
             return JsonResponse({
                 'success': False,
@@ -10322,7 +10427,7 @@ def onedrive_sheet_preview(request, source_id):
             return JsonResponse({'success': False, 'error': err}, status=400)
 
         try:
-            wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+            wb = _safe_load_workbook(file_bytes)
         except Exception as parse_err:
             return JsonResponse({'success': False, 'error': str(parse_err)}, status=400)
 
@@ -10345,12 +10450,35 @@ def onedrive_sheet_preview(request, source_id):
         if total == 0:
             return JsonResponse({'success': True, 'headers': headers, 'rows': [], 'total': 0, 'has_more': False})
 
+        # Auto-detect first row with customer name + phone data
+        first_data_row = None
+        if offset == 0:
+            # Find header indices for name/phone using auto-map patterns
+            name_idx = None
+            phone_idx = None
+            name_keys = ['name', 'customer name', 'customer', 'full name', 'client name', 'recipient']
+            phone_keys = ['phone', 'phone 1', 'mobile', 'contact', 'tel', 'phone number', 'mobile no']
+            for j, h in enumerate(headers):
+                hl = h.lower().strip()
+                if not name_idx and hl in name_keys:
+                    name_idx = j
+                if not phone_idx and hl in phone_keys:
+                    phone_idx = j
+            if name_idx is not None and phone_idx is not None:
+                for ri, row in enumerate(data_rows):
+                    cells = [str(c).strip() if c is not None else '' for c in row]
+                    has_name = name_idx < len(cells) and cells[name_idx]
+                    has_phone = phone_idx < len(cells) and cells[phone_idx]
+                    if has_name and has_phone:
+                        first_data_row = ri + 2  # +2 for 1-indexed + header
+                        break
+
         # Paginate from top: offset=0 means rows 1-10, offset=10 means rows 11-20, etc.
         start_idx = offset
         end_idx = min(total, offset + limit)
 
         if start_idx >= total:
-            return JsonResponse({'success': True, 'headers': headers, 'rows': [], 'total': total, 'has_more': False})
+            return JsonResponse({'success': True, 'headers': headers, 'rows': [], 'total': total, 'has_more': False, 'first_data_row': first_data_row})
 
         sliced = data_rows[start_idx:end_idx]
         row_list = []
@@ -10368,6 +10496,7 @@ def onedrive_sheet_preview(request, source_id):
             'total': total,
             'has_more': has_more,
             'next_offset': offset + limit,
+            'first_data_row': first_data_row,
         })
 
     except Exception as e:
@@ -10427,7 +10556,7 @@ def onedrive_import_trigger(request, source_id):
             return JsonResponse({'success': False, 'error': err}, status=400)
 
         try:
-            wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+            wb = _safe_load_workbook(file_bytes)
         except Exception as parse_err:
             return JsonResponse({'success': False, 'error': f'Could not read file: {str(parse_err)}'}, status=400)
 
@@ -10464,7 +10593,32 @@ def onedrive_import_trigger(request, source_id):
         skipped = 0
         errors = []
         imported_rows_data = []
+        created_orders = []
         start_row = min(row_numbers) if row_numbers else 2
+
+        # Build raw data for ImportLog (selected rows before mapping)
+        raw_rows_for_log = []
+        header_row = [str(c).strip() if c else '' for c in rows[0]] if rows else []
+        for rn, rd in enumerate(rows[1:], start=2):
+            if rn in row_numbers:
+                raw_rows_for_log.append({header_row[i]: (str(c).strip() if c is not None else '') for i, c in enumerate(rd) if i < len(header_row)})
+
+        import_log = orders_models.ImportLog.objects.create(
+            business=business,
+            source='onedrive',
+            status='processing',
+            initiated_by=request.user,
+            total_rows=len(row_numbers),
+            raw_data=raw_rows_for_log,
+            column_mapping=column_mapping,
+            onedrive_source=source,
+            source_meta={
+                'source_label': source.label,
+                'share_link': source.share_link,
+                'sheet_name': sheet_name,
+                'row_numbers': sorted(row_numbers),
+            },
+        )
 
         data_rows = rows[1:]  # skip header
         for row_num, row_data in enumerate(data_rows, start=2):
@@ -10533,32 +10687,71 @@ def onedrive_import_trigger(request, source_id):
                         'row_number': row_num,
                     },
                 )
-                # Save product description + total qty on order (not as items)
-                desc_parts = []
-                total_qty = 0
-                product_name = get_val(row_data, 'product_name')
-                if product_name:
-                    main_qty = safe_int(get_val(row_data, 'quantity')) or 1
-                    desc_parts.append(f"{product_name} x{main_qty}")
-                    total_qty += main_qty
+                # Save package description & qty, and match products
+                package_desc_val = get_val(row_data, 'package_desc')
+                if package_desc_val:
+                    # Use package_desc directly — no summary needed
+                    order.package_description = package_desc_val[:255]
+                    order.package_qty = safe_int(get_val(row_data, 'package_qty')) or 1
+                else:
+                    # Build from product_1..5 columns
+                    desc_parts = []
+                    total_qty = 0
+                    for i in range(1, 6):
+                        pn = get_val(row_data, f'product_{i}')
+                        if pn:
+                            pc = safe_int(get_val(row_data, f'count_{i}')) or 1
+                            desc_parts.append(f"{pn} x{pc}")
+                            total_qty += pc
+                    if desc_parts:
+                        order.package_description = ', '.join(desc_parts)[:255]
+                        order.package_qty = total_qty
 
+                order.save()
+
+                # Match product columns to actual Product records → create OrderItems
+                from product.models import Product as ProductModel
+                product_names = []
+                if package_desc_val:
+                    product_names.append((package_desc_val, safe_int(get_val(row_data, 'package_qty')) or 1))
                 for i in range(1, 6):
                     pn = get_val(row_data, f'product_{i}')
                     if pn:
                         pc = safe_int(get_val(row_data, f'count_{i}')) or 1
-                        desc_parts.append(f"{pn} x{pc}")
-                        total_qty += pc
-
-                if desc_parts:
-                    order.package_description = ', '.join(desc_parts)[:255]
-                    order.total_quantity = total_qty
-
-                order.save()
+                        product_names.append((pn, pc))
+                for pname, pqty in product_names:
+                    matched = ProductModel.objects.filter(
+                        business=business, item_name__iexact=pname.strip()
+                    ).first()
+                    if not matched:
+                        matched = ProductModel.objects.filter(
+                            business=business, item_sku__iexact=pname.strip()
+                        ).first()
+                    if not matched:
+                        matched = ProductModel.objects.filter(
+                            business=business, barcode__iexact=pname.strip()
+                        ).first()
+                    if matched:
+                        orders_models.OrderItem.objects.create(
+                            order=order, product=matched, quantity=pqty,
+                            unit_price=matched.item_price or 0,
+                            notes=matched.item_name
+                        )
 
                 imported_rows_data.append({'row': row_num, 'order': order.order_number})
+                created_orders.append(order)
                 saved += 1
             except Exception as e:
                 errors.append(f"Row {row_num}: {str(e)}")
+
+        # Update ImportLog
+        if created_orders:
+            import_log.orders.add(*created_orders)
+        import_log.orders_created = saved
+        import_log.orders_skipped = skipped
+        import_log.orders_failed = len([e for e in errors if e])
+        import_log.errors = errors[:50] if errors else []
+        import_log.mark_completed()
 
         from django.utils import timezone
         # Merge with previously imported rows (keep old + add new)
@@ -10585,4 +10778,8 @@ def onedrive_import_trigger(request, source_id):
 
     except Exception as e:
         logger.exception("OneDrive import error for source %s: %s", source_id, str(e))
+        try:
+            import_log.mark_failed(str(e))
+        except Exception:
+            pass
         return JsonResponse({'success': False, 'error': f'Import failed: {str(e)}'}, status=500)

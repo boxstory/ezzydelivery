@@ -1025,6 +1025,27 @@
             '</div>'
         );
 
+        // Helper to render a single bulk step row
+        function _bulkStepHtml(title, status, statusText) {
+            var indicator = status === 'completed' ? '<i class="fa-solid fa-check"></i>' :
+                status === 'error' ? '<i class="fa-solid fa-times"></i>' :
+                status === 'active' ? '<i class="fa-solid fa-gear fa-spin"></i>' :
+                '<i class="fa-solid fa-hourglass text-muted"></i>';
+            var stText = status === 'active' ? '<span class="aim__step-spinner"></span>' + _escapeHtml(statusText || 'Processing...') :
+                status === 'completed' ? '<i class="fa-solid fa-check text-success me-1"></i>' + _escapeHtml(statusText || 'Done') :
+                status === 'error' ? '<i class="fa-solid fa-times text-danger me-1"></i>' + _escapeHtml(statusText || 'Error') :
+                _escapeHtml(statusText || 'Waiting...');
+            return '<div class="aim__process-step ' + status + '">' +
+                '<div class="aim__step-indicator">' + indicator + '</div>' +
+                '<div class="aim__step-content">' +
+                    '<div class="aim__step-title">' + _escapeHtml(title) + '</div>' +
+                    '<div class="aim__step-status">' + stText + '</div>' +
+                '</div></div>';
+        }
+
+        // Track completed order steps to show history
+        var completedStepsHtml = '';
+
         for (var i = 0; i < orders.length; i++) {
             var order = orders[i];
             var pct = Math.round(((i + 1) / orders.length) * 100);
@@ -1037,48 +1058,111 @@
             if (pctEl) pctEl.textContent = pct + '%';
 
             var stepsEl = document.getElementById('ezzyBulkSteps');
-            if (stepsEl) {
-                stepsEl.innerHTML = '<div class="aim__process-step active">' +
+
+            // Sub-steps for current order
+            var subSteps = [
+                { key: 'parse', title: 'AI Parse', status: 'pending', text: 'Waiting...' },
+                { key: 'qnas', title: 'QNAS Lookup', status: 'pending', text: 'Waiting...' },
+                { key: 'save', title: 'Save to Order', status: 'pending', text: 'Waiting...' }
+            ];
+
+            function _renderBulkSteps() {
+                if (!stepsEl) return;
+                var currentHtml = '<div class="aim__process-step active" style="border-left-width:4px">' +
                     '<div class="aim__step-indicator"><i class="fa-solid fa-gear fa-spin"></i></div>' +
                     '<div class="aim__step-content">' +
-                        '<div class="aim__step-title">' + _escapeHtml(order.orderNumber) + '</div>' +
-                        '<div class="aim__step-status"><span class="aim__step-spinner"></span>Parsing address...</div>' +
+                        '<div class="aim__step-title fw-semibold">' + _escapeHtml(order.orderNumber) + '</div>' +
+                        '<div class="aim__step-status small">' +
+                            subSteps.map(function(ss) {
+                                var icon = ss.status === 'completed' ? '<i class="fa-solid fa-check text-success me-1"></i>' :
+                                    ss.status === 'error' ? '<i class="fa-solid fa-times text-danger me-1"></i>' :
+                                    ss.status === 'active' ? '<i class="fa-solid fa-gear fa-spin me-1" style="font-size:0.7rem"></i>' :
+                                    '<i class="fa-solid fa-circle text-muted me-1" style="font-size:0.4rem;vertical-align:middle"></i>';
+                                var cls = ss.status === 'completed' ? 'text-success' :
+                                    ss.status === 'error' ? 'text-danger' :
+                                    ss.status === 'active' ? '' : 'text-muted';
+                                return '<span class="me-3 ' + cls + '">' + icon + _escapeHtml(ss.title) +
+                                    (ss.status === 'active' ? ' <span class="text-muted">(' + _escapeHtml(ss.text) + ')</span>' : '') +
+                                    '</span>';
+                            }).join('') +
+                        '</div>' +
                     '</div></div>';
+                stepsEl.innerHTML = completedStepsHtml + currentHtml;
+                // Auto-scroll to bottom of steps
+                stepsEl.scrollTop = stepsEl.scrollHeight;
             }
 
+            // Show initial state
+            _renderBulkSteps();
+
             if (!order.address || !order.address.trim()) {
+                subSteps[0].status = 'error'; subSteps[0].text = 'No address';
+                subSteps[1].status = 'error'; subSteps[1].text = 'Skipped';
+                subSteps[2].status = 'error'; subSteps[2].text = 'Skipped';
+                _renderBulkSteps();
+                await _delay(200);
+                completedStepsHtml += _bulkStepHtml(order.orderNumber, 'error', 'No address');
                 results.push({ order: order, success: false, error: 'No address', html: '' });
                 errorCount++;
                 continue;
             }
 
             try {
-                // AI Parse
+                // Sub-step 1: AI Parse
+                subSteps[0].status = 'active'; subSteps[0].text = 'Parsing...';
+                _renderBulkSteps();
+
                 var data = await _fetchParse(order.address.trim());
                 if (data.success && data.data) {
                     var r = data.data;
+                    subSteps[0].status = 'completed';
+                    subSteps[0].text = 'Zone ' + (r.zone_number || '?') + ', St ' + (r.street_number || '?') + ' (' + Math.round(r.confidence * 100) + '%)';
+                    _renderBulkSteps();
 
-                    // Try QNAS for coordinates if zone+street found
+                    // Sub-step 2: QNAS Lookup
                     var qc = null;
                     if (r.zone_number && r.street_number) {
+                        subSteps[1].status = 'active'; subSteps[1].text = 'Z' + r.zone_number + ' St' + r.street_number;
+                        _renderBulkSteps();
+
                         qc = await _lookupQNASCoords(r.zone_number, r.street_number, r.building_number);
                         if (qc) {
                             r.coordinates = { latitude: qc.latitude, longitude: qc.longitude };
                             r._qnasMatch = true;
                             r._qnasExactMatch = qc.exact_match || false;
+                            subSteps[1].status = 'completed'; subSteps[1].text = 'Coords found';
+                        } else {
+                            subSteps[1].status = 'completed'; subSteps[1].text = 'No coords';
                         }
+                    } else {
+                        subSteps[1].status = 'completed'; subSteps[1].text = 'Skipped (no zone/street)';
                     }
+                    _renderBulkSteps();
 
-                    // Auto-save to order if we have zone data
+                    // Sub-step 3: Save to Order
                     var saved = false;
                     if (order.id && r.zone_number) {
+                        subSteps[2].status = 'active'; subSteps[2].text = 'Saving...';
+                        _renderBulkSteps();
+
                         try {
                             await _saveToOrderSilent(order.id, r);
                             saved = true;
+                            subSteps[2].status = 'completed'; subSteps[2].text = 'Saved';
                         } catch (saveErr) {
                             console.error('[BulkParse] Save error for ' + order.orderNumber + ':', saveErr);
+                            subSteps[2].status = 'error'; subSteps[2].text = 'Save failed';
                         }
+                    } else {
+                        subSteps[2].status = 'completed'; subSteps[2].text = r.zone_number ? 'No order ID' : 'No zone data';
                     }
+                    _renderBulkSteps();
+                    await _delay(150);
+
+                    // Mark order completed and add to history
+                    var summaryText = 'Z' + (r.zone_number || '?') + ' St' + (r.street_number || '?') +
+                        (saved ? ' — Saved' : '') + ' (' + Math.round(r.confidence * 100) + '%)';
+                    completedStepsHtml += _bulkStepHtml(order.orderNumber, 'completed', summaryText);
 
                     var cardHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
                         '<i class="fa-solid fa-location-dot"></i><strong>' + _escapeHtml(order.orderNumber) + '</strong>' +
@@ -1093,11 +1177,9 @@
                         '<div class="aim__result-item"><span class="label">Area</span><span class="value">' + _escapeHtml(r.area_name || '-') + '</span></div>' +
                         '</div>';
 
-                    // Show QNAS result
                     if (qc) {
                         cardHtml += '<div class="mt-2 small text-success"><i class="fa-solid fa-map-pin me-1"></i>QNAS: ' + qc.latitude.toFixed(6) + ', ' + qc.longitude.toFixed(6) + ' (' + _escapeHtml(qc.source) + ')</div>';
                     }
-
                     if (r.landmarks && r.landmarks.length > 0) {
                         cardHtml += '<div class="mt-2"><strong class="small">Landmarks:</strong> <span class="text-muted small">' + _escapeHtml(r.landmarks.join(', ')) + '</span></div>';
                     }
@@ -1105,10 +1187,20 @@
                     results.push({ order: order, success: true, data: r, saved: saved, html: cardHtml });
                     successCount++;
                 } else {
+                    subSteps[0].status = 'error'; subSteps[0].text = data.error || 'Failed';
+                    subSteps[1].status = 'error'; subSteps[1].text = 'Skipped';
+                    subSteps[2].status = 'error'; subSteps[2].text = 'Skipped';
+                    _renderBulkSteps();
+                    await _delay(200);
+                    completedStepsHtml += _bulkStepHtml(order.orderNumber, 'error', data.error || 'Parse failed');
                     results.push({ order: order, success: false, error: data.error || 'Failed', html: '' });
                     errorCount++;
                 }
             } catch (err) {
+                subSteps[0].status = 'error'; subSteps[0].text = err.message;
+                _renderBulkSteps();
+                await _delay(200);
+                completedStepsHtml += _bulkStepHtml(order.orderNumber, 'error', err.message);
                 results.push({ order: order, success: false, error: err.message, html: '' });
                 errorCount++;
             }

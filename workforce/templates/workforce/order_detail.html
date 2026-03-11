@@ -37,6 +37,15 @@
             <p class="wod__hero-sub">Order {{ order.order_number }}</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'workforce:wf_orders_all' %}"
+               class="wod__btn wod__btn--light"
+               hx-get="{% url 'workforce:wf_orders_all' %}"
+               hx-target="#main-content"
+               hx-select="#main-content"
+               hx-swap="outerHTML"
+               hx-push-url="true">
+                <i class="fa-solid fa-arrow-left me-1"></i> All Orders
+            </a>
             <a href="{% url 'workforce:order_edit' order.id %}"
                class="wod__btn wod__btn--light"
                hx-get="{% url 'workforce:order_edit' order.id %}"
@@ -262,7 +271,7 @@
                         <div class="d-flex align-items-center gap-2">
                             <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
                             <span class="text-muted" style="min-width:60px;">Qty</span>
-                            <span class="fw-semibold">{% if order.total_quantity %}{{ order.total_quantity }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
+                            <span class="fw-semibold">{% if order.package_qty %}{{ order.package_qty }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <i class="fa-solid fa-money-bill-wave text-success"></i>

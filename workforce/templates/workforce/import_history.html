@@ -1,0 +1,205 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Import History{% endblock title %}
+
+{% block content %}
+<div class="p-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0"><i class="fa-solid fa-clock-rotate-left me-2"></i>Import History</h4>
+        <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" style="width:auto;" onchange="window.location='?source='+this.value">
+                <option value="">All Sources</option>
+                {% for val, label in source_choices %}
+                <option value="{{ val }}" {% if source_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    {% if logs %}
+    <div class="d-flex flex-column gap-2">
+        {% for log in logs %}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <!-- Main row -->
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <!-- Date -->
+                    <span class="text-muted small text-nowrap">{{ log.started_at|date:"d M H:i" }}</span>
+
+                    <!-- Source badge -->
+                    {% if log.source == 'csv_upload' %}
+                    <span class="badge bg-info text-dark"><i class="fa-solid fa-file-csv me-1"></i>CSV/Excel</span>
+                    {% elif log.source == 'onedrive' %}
+                    <span class="badge bg-primary"><i class="fa-solid fa-cloud me-1"></i>OneDrive</span>
+                    {% elif log.source == 'shopify' %}
+                    <span class="badge bg-success"><i class="fa-brands fa-shopify me-1"></i>Shopify</span>
+                    {% elif log.source == 'woocommerce' %}
+                    <span class="badge" style="background:#7f54b3"><i class="fa-brands fa-wordpress me-1"></i>WooCommerce</span>
+                    {% elif log.source == 'google_sheet' %}
+                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-table me-1"></i>Google Sheet</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ log.get_source_display }}</span>
+                    {% endif %}
+
+                    <!-- Status badge -->
+                    {% if log.status == 'completed' %}
+                    <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Done</span>
+                    {% elif log.status == 'completed_with_errors' %}
+                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>Partial</span>
+                    {% elif log.status == 'failed' %}
+                    <span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>Failed</span>
+                    {% elif log.status == 'processing' %}
+                    <span class="badge bg-info text-dark"><i class="fa-solid fa-spinner fa-spin me-1"></i>In Progress</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ log.get_status_display }}</span>
+                    {% endif %}
+
+                    <!-- Total rows bubble -->
+                    <span class="badge rounded-pill bg-dark" title="Total rows">{{ log.total_rows }} rows</span>
+
+                    <!-- Business -->
+                    <span class="fw-semibold">{{ log.business.business_name }}</span>
+
+                    <span class="flex-grow-1"></span>
+
+                    <!-- Stats -->
+                    <div class="d-flex gap-3 small">
+                        {% if log.orders_created > 0 %}
+                        <span class="text-success" title="Created"><i class="fa-solid fa-check me-1"></i>{{ log.orders_created }}</span>
+                        {% endif %}
+                        {% if log.orders_skipped > 0 %}
+                        <span class="text-muted" title="Skipped"><i class="fa-solid fa-forward me-1"></i>{{ log.orders_skipped }}</span>
+                        {% endif %}
+                        {% if log.orders_failed > 0 %}
+                        <span class="text-danger" title="Failed"><i class="fa-solid fa-xmark me-1"></i>{{ log.orders_failed }}</span>
+                        {% endif %}
+                    </div>
+
+                    {% if log.initiated_by %}
+                    <span class="text-muted small">by {{ log.initiated_by.get_short_name|default:log.initiated_by.username }}</span>
+                    {% endif %}
+
+                    <!-- Toggle -->
+                    <button class="btn btn-outline-secondary btn-sm py-0 px-1" style="min-height:1.5rem" onclick="toggleDetails({{ log.id }})">
+                        <i class="fa-solid fa-chevron-down" id="icon_{{ log.id }}"></i>
+                    </button>
+                </div>
+
+                <!-- Expandable details -->
+                <div id="details_{{ log.id }}" style="display:none" class="mt-3 pt-3 border-top">
+                    <div class="row g-3">
+                        <!-- Source Info -->
+                        <div class="col-md-4">
+                            <strong class="d-block mb-2 small text-uppercase text-muted">Source Info</strong>
+                            <table class="table table-sm table-borderless mb-0 small">
+                                <tbody>
+                                    {% for item in log.source_meta_display %}
+                                    <tr>
+                                        <td class="text-muted fw-semibold ps-0" style="width:120px">{{ item.label }}</td>
+                                        <td class="ps-0">{{ item.value }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    <tr>
+                                        <td class="text-muted fw-semibold ps-0">Started</td>
+                                        <td class="ps-0">{{ log.started_at|date:"d M Y H:i:s" }}</td>
+                                    </tr>
+                                    {% if log.completed_at %}
+                                    <tr>
+                                        <td class="text-muted fw-semibold ps-0">Completed</td>
+                                        <td class="ps-0">{{ log.completed_at|date:"d M Y H:i:s" }}</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Column Mapping -->
+                        {% if log.column_mapping %}
+                        <div class="col-md-4">
+                            <strong class="d-block mb-2 small text-uppercase text-muted">Column Mapping ({{ log.mapping_count }} fields)</strong>
+                            <table class="table table-sm table-borderless mb-0 small">
+                                <tbody>
+                                    {% for item in log.mapping_display %}
+                                    <tr>
+                                        <td class="text-muted ps-0" style="width:100px">{{ item.col }}</td>
+                                        <td class="ps-0"><i class="fa-solid fa-arrow-right text-muted me-1" style="font-size:0.6rem"></i>{{ item.field }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+
+                        <!-- Errors -->
+                        {% if log.errors %}
+                        <div class="col-md-4">
+                            <strong class="d-block mb-2 small text-uppercase text-danger">Errors ({{ log.errors|length }})</strong>
+                            <div class="small" style="max-height:200px;overflow-y:auto">
+                                {% for err in log.errors %}
+                                <div class="text-danger mb-1">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Raw Data Table -->
+                    {% if log.raw_data_preview %}
+                    <div class="mt-3">
+                        <strong class="d-block mb-2 small text-uppercase text-muted">
+                            Raw Data (showing {{ log.raw_data_preview|length }} of {{ log.raw_data_count }} rows)
+                        </strong>
+                        <div class="table-responsive" style="max-height:350px;overflow:auto">
+                            <table class="table table-sm table-bordered table-striped small mb-0">
+                                {% if log.raw_data_headers %}
+                                <thead class="table-dark" style="position:sticky;top:0;z-index:1">
+                                    <tr>
+                                        <th class="text-nowrap">#</th>
+                                        {% for h in log.raw_data_headers %}
+                                        <th class="text-nowrap">{{ h }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                {% endif %}
+                                <tbody>
+                                    {% for row in log.raw_data_preview %}
+                                    <tr>
+                                        <td class="text-muted">{{ forloop.counter }}</td>
+                                        {% for cell in row %}
+                                        <td class="text-nowrap">{{ cell|default:"-" }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+        <i class="fa-solid fa-inbox fa-3x mb-3 d-block"></i>
+        <p>No import logs yet. Logs will appear here after you import orders.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function toggleDetails(id) {
+    const row = document.getElementById('details_' + id);
+    const icon = document.getElementById('icon_' + id);
+    if (row.style.display === 'none') {
+        row.style.display = '';
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+    } else {
+        row.style.display = 'none';
+        icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+    }
+}
+</script>
+{% endblock content %}

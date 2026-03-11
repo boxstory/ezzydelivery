@@ -168,18 +168,34 @@ class GetBusinessDashboardTool(BaseTool):
                 'to': date_to,
             }
 
+        # Include pickup locations summary
+        from business.models import PickupLocation
+        locations = PickupLocation.objects.filter(business=_business)
+        result['pickup_locations'] = [
+            {
+                'title': loc.pickup_location_title,
+                'zone': loc.pickup_zone_no,
+                'status': loc.pickup_status,
+            }
+            for loc in locations
+        ]
+
         return result
 
 
 @register_tool
 class SearchBusinessOrdersTool(BaseTool):
     """
-    Search and list orders for the business with filters.
+    Search and list orders with filters. Role-aware: business users see only
+    their own orders; staff users see all orders (or filter by business).
     """
 
-    name = 'search_business_orders'
-    allowed_roles = ['business']
-    description = '''Search and list your business orders with filters.
+    name = 'search_orders'
+    allowed_roles = ['staff', 'business']
+    description = '''Search and list orders with filters.
+
+    Business users: automatically scoped to your business orders.
+    Staff users: searches all orders (no business restriction).
 
     Can filter by:
     - Order status: to_review, ready_to_pickup, publish, delivered, fulfilled, cancelled
@@ -265,10 +281,11 @@ class SearchBusinessOrdersTool(BaseTool):
     ) -> Dict[str, Any]:
         from orders.models import Order
 
-        if not _business:
-            raise ToolError('Business context required', 'NO_BUSINESS')
+        queryset = Order.objects.select_related('pickup_location', 'business')
 
-        queryset = Order.objects.filter(business=_business).select_related('pickup_location')
+        # Business users see only their orders; staff see all
+        if _business:
+            queryset = queryset.filter(business=_business)
 
         # Apply filters
         if order_status:
@@ -755,60 +772,3 @@ class GetBusinessCustomersTool(BaseTool):
         }
 
 
-@register_tool
-class GetBusinessPickupLocationsTool(BaseTool):
-    """
-    Get pickup locations for the business.
-    """
-
-    name = 'get_business_pickup_locations'
-    allowed_roles = ['business']
-    description = '''Get all pickup locations for your business.
-
-    Returns each location with:
-    - Title, address, zone
-    - Status (active/inactive)
-    - Order count for that location
-    '''
-
-    parameters_schema = {
-        'type': 'object',
-        'properties': {},
-    }
-
-    def run(self, params, user=None, business=None):
-        if business:
-            params = dict(params)
-            params['_business'] = business
-        return super().run(params, user=user, business=business)
-
-    def execute(self, _business=None) -> Dict[str, Any]:
-        from business.models import PickupLocation
-        from orders.models import Order
-
-        if not _business:
-            raise ToolError('Business context required', 'NO_BUSINESS')
-
-        locations = PickupLocation.objects.filter(business=_business)
-
-        results = []
-        for loc in locations:
-            order_count = Order.objects.filter(
-                business=_business,
-                pickup_location=loc
-            ).count()
-
-            results.append({
-                'title': loc.pickup_location_title,
-                'locality': loc.locality,
-                'zone': loc.pickup_zone_no,
-                'street': loc.pickup_street_no,
-                'building': loc.pickup_building_no,
-                'status': loc.pickup_status,
-                'order_count': order_count,
-            })
-
-        return {
-            'total_locations': len(results),
-            'locations': results,
-        }

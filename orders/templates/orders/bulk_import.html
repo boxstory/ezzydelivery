@@ -23,6 +23,13 @@
                 </h1>
                 <p class="bim__subtitle">Upload and import multiple orders at once</p>
             </div>
+            {% if request.user.is_staff %}
+            <div class="bim__hero-right">
+                <a href="{% url 'workforce:import_history' %}?source=csv_upload" class="btn btn-outline-light btn-sm">
+                    <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -358,8 +365,8 @@ const targetFields = [
     { name: 'dl_longitude', label: 'Longitude', required: false, group: 'Address' },
     { name: 'deadline_date', label: 'Day & Time Preference', required: false, group: 'Delivery' },
     { name: 'product_url', label: 'Product URL', required: false, group: 'Product' },
-    { name: 'product_name', label: 'Product Name', required: false, group: 'Product' },
-    { name: 'quantity', label: 'Qty', required: false, group: 'Product' },
+    { name: 'package_desc', label: 'Package Desc', required: false, group: 'Product' },
+    { name: 'package_qty', label: 'Package Qty', required: false, group: 'Product' },
     { name: 'cod_amount', label: 'Price / COD Amount', required: false, group: 'Product' },
     { name: 'product_1', label: 'Product:1', required: false, group: 'Product' },
     { name: 'count_1', label: 'Count:1', required: false, group: 'Product' },
@@ -522,6 +529,7 @@ function uploadFile() {
 
         uploadedData.columns = data.columns;
         uploadedData.rows = data.rows;
+        uploadedData.import_log_id = data.import_log_id || null;
         // Server returns auto_mapping with column -> field mapping
         // We need to reverse it to field -> column for our UI
         const autoMapping = data.auto_mapping || {};
@@ -714,7 +722,8 @@ async function saveOrders() {
                 body: JSON.stringify({
                     row: row,
                     row_index: i,
-                    business_id: businessId
+                    business_id: businessId,
+                    import_log_id: uploadedData.import_log_id
                 })
             });
 
@@ -739,6 +748,23 @@ async function saveOrders() {
     }
 
     addLog('info', `Import complete: ${successCount} success, ${errorCount} failed`);
+
+    // Finalize ImportLog
+    if (uploadedData.import_log_id) {
+        try {
+            await fetch('{% url "orders:bulk_import_finalize" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    import_log_id: uploadedData.import_log_id,
+                    column_mapping: uploadedData.mappings || {}
+                })
+            });
+        } catch (e) { console.warn('ImportLog finalize failed:', e); }
+    }
 
     setTimeout(() => {
         hideProgressModal();
@@ -885,7 +911,8 @@ async function retryFailedOrders() {
                 body: JSON.stringify({
                     row: row,
                     row_index: row._originalIndex,
-                    business_id: businessId
+                    business_id: businessId,
+                    import_log_id: uploadedData.import_log_id
                 })
             });
 

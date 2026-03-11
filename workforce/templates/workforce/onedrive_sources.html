@@ -7,9 +7,14 @@
 <div class="p-3">
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h4 class="mb-0"><i class="fa-solid fa-cloud-arrow-down me-2"></i>OneDrive Import Sources</h4>
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSourceModal">
-            <i class="fa-solid fa-plus me-1"></i> Add Source
-        </button>
+        <div class="d-flex gap-2">
+            <a href="{% url 'workforce:import_history' %}?source=onedrive" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
+            </a>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSourceModal">
+                <i class="fa-solid fa-plus me-1"></i> Add Source
+            </button>
+        </div>
     </div>
 
     {% if sources %}
@@ -363,8 +368,8 @@ var DB_FIELDS = [
     {value: 'dl_latitude', label: 'Latitude'},
     {value: 'dl_longitude', label: 'Longitude'},
     {value: 'deadline_date', label: 'Day & Time Preference'},
-    {value: 'product_name', label: 'Product Name'},
-    {value: 'quantity', label: 'Qty'},
+    {value: 'package_desc', label: 'Package Desc'},
+    {value: 'package_qty', label: 'Package Qty'},
     {value: 'cod_amount', label: 'Price / COD Amount'},
     {value: 'product_1', label: 'Product 1'},
     {value: 'count_1', label: 'Count 1'},
@@ -393,8 +398,8 @@ var MAP_PATTERNS = {
     'dl_latitude': ['latitude','lat'],
     'dl_longitude': ['longitude','lng','long'],
     'deadline_date': ['day','time','deadline','delivery date','preferred time'],
-    'product_name': ['product name','product','item','item name','description'],
-    'quantity': ['qty','quantity','count','units','pcs'],
+    'package_desc': ['product name','product','item','item name','description','package desc','package description'],
+    'package_qty': ['qty','quantity','count','units','pcs','package qty'],
     'cod_amount': ['price','cod','amount','cod amount','total','value','payment','cash'],
     'product_1': ['product 1','item 1'],
     'count_1': ['count 1','qty 1'],
@@ -431,9 +436,32 @@ function selectSheet(sourceId, sheetName, totalRows) {
     nav.classList.remove('d-none');
     var input = document.getElementById('goto-row-' + sourceId);
     input.max = totalRows + 1;
-    input.value = 2;
     document.getElementById('row-info-' + sourceId).textContent = sheetName + ' — ' + totalRows + ' data rows (row 1 = header)';
-    loadSheetPreview(sourceId, sheetName, 0);
+
+    // First call at offset 0 to get first_data_row, then jump to row-5
+    var fd = new FormData();
+    fd.append('sheet_name', sheetName);
+    fd.append('offset', 0);
+    fd.append('limit', 1);  // minimal fetch just to detect first_data_row
+    fetch(baseUrl + sourceId + '/preview/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: fd,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var startRow = 2;
+        if (data.success && data.first_data_row) {
+            startRow = Math.max(2, data.first_data_row - 5);
+        }
+        input.value = startRow;
+        var offset = Math.max(0, startRow - 2);
+        loadSheetPreview(sourceId, sheetName, offset, true);
+    })
+    .catch(function() {
+        input.value = 2;
+        loadSheetPreview(sourceId, sheetName, 0);
+    });
 }
 
 function goToRow(sourceId) {

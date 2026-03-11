@@ -202,7 +202,7 @@
                     <div class="orc__hcell orc__hcell--items">Items</div>
                     <div class="orc__hcell orc__hcell--right">COD</div>
                     <div class="orc__hcell orc__hcell--center">Date</div>
-                    <div class="orc__hcell">Status</div>
+                    <div class="orc__hcell">Order / DL Status</div>
                     <div class="orc__hcell orc__hcell--right"></div>
                 </div>
                 <!-- Rows -->
@@ -248,7 +248,7 @@
                         <div class="orc__pkg-brief" title="{{ order.package_description }}">
                             <i class="fa-solid fa-box-open orc__pkg-icon"></i>
                             <span class="orc__pkg-text">{{ order.package_description|truncatechars:28 }}</span>
-                            {% if order.total_quantity %}<span class="orc__pkg-qty">x{{ order.total_quantity }}</span>{% endif %}
+                            {% if order.package_qty %}<span class="orc__pkg-qty">x{{ order.package_qty }}</span>{% endif %}
                         </div>
                         {% endif %}
                         <div class="orc__items">
@@ -265,13 +265,13 @@
                         </div>
                     </div>
                     <div class="orc__cell orc__cell--cod">
-                        {% if order.cod_amount %}<span class="orc__cod-val">{{ order.cod_amount }}</span><span class="orc__cod-cur">QR</span>{% else %}<span class="orc__cod-nil">—</span>{% endif %}
+                        {% if order.cod_amount != None %}<span class="orc__cod-val">{{ order.cod_amount }}</span><span class="orc__cod-cur">QR</span>{% else %}<span class="orc__cod-nil">—</span>{% endif %}
                     </div>
                     <div class="orc__cell orc__cell--date"><span class="orc__date">{{ order.order_date|date:"d M" }}</span></div>
                     <div class="orc__cell orc__cell--status">
                         <div class="orc__statuses">
                             <div class="orc__st-row">
-                                <span class="orc__st-label">Order</span>
+                                <span class="orc__st-label">OD</span>
                                 {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
                                 {% elif order.order_status == 'to_publish' %}<span class="st st-info">To Publish</span>
                                 {% elif order.order_status == 'ready_to_pickup' %}<span class="st st-info">Ready</span>
@@ -285,7 +285,7 @@
                             {% with task=order.delivery_task.all.0 %}
                             {% if task %}
                             <div class="orc__st-row">
-                                <span class="orc__st-label">Delivery</span>
+                                <span class="orc__st-label">DL</span>
                                 <span class="st st-task">{{ task.get_dl_task_status_display }}</span>
                             </div>
                             {% endif %}
@@ -305,7 +305,6 @@
                         <button type="button" class="orc__btn orc__btn--err" title="Delete" hx-post="{% url 'workforce:delete_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML swap:200ms" hx-confirm="Permanently delete order {{ order.order_number|default:order.client_order_code }}? This cannot be undone."><i class="fa-solid fa-trash"></i></button>
                         {% endif %}
                         <a href="https://wa.me/{{ order.customer_phone|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="orc__btn orc__btn--wa" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-                        <button type="button" class="orc__btn orc__btn--ai" title="AI Tools" onclick="openAIToolsForOrder({{ order.id }}, '{{ order.order_number }}')"><i class="fa-solid fa-robot"></i></button>
                     </div>
                 </div>
                 {% endfor %}

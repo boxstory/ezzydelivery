@@ -70,3 +70,12 @@ class AddressVerificationAdmin(ImportExportModelAdmin):
     search_fields = ('order__order_number', 'original_address', 'verified_address', 'notes')
     readonly_fields = ('created_at', 'updated_at')
     date_hierarchy = 'created_at'
+
+
+@admin.register(orders_models.ImportLog)
+class ImportLogAdmin(admin.ModelAdmin):
+    list_display = ('business', 'source', 'status', 'total_rows', 'orders_created', 'orders_skipped', 'orders_failed', 'initiated_by', 'started_at')
+    list_filter = ('source', 'status', 'started_at')
+    search_fields = ('business__business_name',)
+    readonly_fields = ('started_at', 'completed_at', 'raw_data', 'source_meta', 'errors', 'column_mapping')
+    date_hierarchy = 'started_at'

@@ -17,6 +17,11 @@
             </h1>
             <p class="obi__hero-sub">Import multiple orders from CSV or Excel files</p>
         </div>
+        <div class="p-3">
+            <a href="{% url 'workforce:import_history' %}?source=csv_upload" class="btn btn-outline-light btn-sm">
+                <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
+            </a>
+        </div>
     </div>
 
 <div class="p-3">
@@ -387,9 +392,9 @@ var targetFields = [
     // Delivery Preferences
     { name: 'deadline_date', label: 'Preferred Day & Time', required: false, group: 'Delivery' },
     // Product Info
-    { name: 'product_name', label: 'Product Name', required: false, group: 'Product' },
+    { name: 'package_desc', label: 'Package Desc', required: false, group: 'Product' },
     { name: 'product_url', label: 'Product URL', required: false, group: 'Product' },
-    { name: 'quantity', label: 'Quantity', required: false, group: 'Product' },
+    { name: 'package_qty', label: 'Package Qty', required: false, group: 'Product' },
     // Payment
     { name: 'cod_amount', label: 'Price / COD Amount', required: false, group: 'Payment' },
     { name: 'dl_amount', label: 'Delivery Fee', required: false, group: 'Payment' },
@@ -523,6 +528,7 @@ function uploadFile() {
 
         uploadedData.columns = data.columns;
         uploadedData.rows = data.rows;
+        uploadedData.import_log_id = data.import_log_id || null;
         // Server returns auto_mapping with column -> field mapping
         // We need to reverse it to field -> column for our UI
         const autoMapping = data.auto_mapping || {};
@@ -754,7 +760,8 @@ async function startImport() {
                 body: JSON.stringify({
                     business_id: businessId,
                     row: row,
-                    row_index: i
+                    row_index: i,
+                    import_log_id: uploadedData.import_log_id
                 })
             });
 
@@ -791,6 +798,23 @@ async function startImport() {
 
     // Complete
     addLog('info', `Import complete! ${successCount} success, ${failCount} failed.`);
+
+    // Finalize ImportLog
+    if (uploadedData.import_log_id) {
+        try {
+            await fetch('{% url "workforce:wf_orders_bulk_finalize" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    import_log_id: uploadedData.import_log_id,
+                    column_mapping: uploadedData.mappings || {}
+                })
+            });
+        } catch (e) { console.warn('ImportLog finalize failed:', e); }
+    }
 
     setTimeout(() => {
         hideProgressModal();
@@ -838,7 +862,8 @@ async function retryFailedRows() {
                 body: JSON.stringify({
                     business_id: businessId,
                     row: row,
-                    row_index: i
+                    row_index: i,
+                    import_log_id: uploadedData.import_log_id
                 })
             });
 

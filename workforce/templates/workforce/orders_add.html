@@ -231,7 +231,7 @@
                         </div>
 
                         <!-- fallback hidden field for plain product name (filled by JS if no product selected) -->
-                        <input type="hidden" id="product_name" name="product_name" value="">
+                        <input type="hidden" id="package_desc" name="package_desc" value="">
                         <input type="hidden" id="warehouse_product_id" name="warehouse_product_id" value="">
                     </div>
 
@@ -580,13 +580,13 @@ function _initInlineProducts() {
         initSelect2(row);
     });
 
-    // On form submit — populate hidden product_name from first selected product
+    // On form submit — populate hidden package_desc from first selected product
     document.getElementById('workforce_orders_add_form_order').addEventListener('submit', function() {
         const firstSel = container.querySelector('.woa__inline-product-sel');
         const selectedText = firstSel && firstSel.options[firstSel.selectedIndex] ? firstSel.options[firstSel.selectedIndex].text : '';
-        const productNameField = document.getElementById('product_name');
-        if (productNameField && !productNameField.value && selectedText) {
-            productNameField.value = selectedText;
+        const packageDescField = document.getElementById('package_desc');
+        if (packageDescField && !packageDescField.value && selectedText) {
+            packageDescField.value = selectedText;
         }
     });
 }

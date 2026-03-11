@@ -688,13 +688,13 @@ def bulk_order_entry(request):
                 order.save()
 
                 # Add products if provided
-                product_name = request.POST.get(f'data[{i}][product_name]', '')
+                package_desc = request.POST.get(f'data[{i}][package_desc]', '')
                 qty = request.POST.get(f'data[{i}][qty]', '1')
                 price = request.POST.get(f'data[{i}][price]', '0')
 
-                if product_name:
+                if package_desc:
                     # Store product info in order notes for now
-                    order.order_notes = f"{order.order_notes} | Product: {product_name}, Qty: {qty}, Price: {price}".strip(' |')
+                    order.order_notes = f"{order.order_notes} | Product: {package_desc}, Qty: {qty}, Price: {price}".strip(' |')
                     order.save()
 
                 success_count += 1
@@ -2546,8 +2546,8 @@ def bulk_import_orders(request):
 
         # Product
         {'name': 'product_url', 'label': 'Product URL', 'required': False, 'group': 'Product'},
-        {'name': 'product_name', 'label': 'Product Name', 'required': False, 'group': 'Product'},
-        {'name': 'quantity', 'label': 'Qty', 'required': False, 'group': 'Product'},
+        {'name': 'package_desc', 'label': 'Package Desc', 'required': False, 'group': 'Product'},
+        {'name': 'package_qty', 'label': 'Package Qty', 'required': False, 'group': 'Product'},
         {'name': 'cod_amount', 'label': 'Price / COD Amount', 'required': False, 'group': 'Product'},
         {'name': 'product_1', 'label': 'Product:1', 'required': False, 'group': 'Product'},
         {'name': 'count_1', 'label': 'Count:1', 'required': False, 'group': 'Product'},
@@ -2703,8 +2703,8 @@ def bulk_import_preview(request):
             'dl_longitude': 'Longitude',
             'deadline_date': 'Day & Time Preference',
             'product_url': 'Product URL',
-            'product_name': 'Product Name',
-            'quantity': 'Qty',
+            'package_desc': 'Package Desc',
+            'package_qty': 'Package Qty',
             'cod_amount': 'Price / COD Amount',
             'product_1': 'Product 1',
             'count_1': 'Count 1',
@@ -2737,8 +2737,8 @@ def bulk_import_preview(request):
             'dl_longitude': ['longitude', 'lng', 'long', 'geo long'],
             'deadline_date': ['day', 'time', 'day time', 'preferred', 'deadline', 'delivery date', 'day time if them have demand', 'expected', 'eta', 'delivery time', 'preferred time', 'slot'],
             'product_url': ['product url', 'url', 'product link', 'item url', 'link'],
-            'product_name': ['product name', 'product', 'item', 'item name', 'description', 'product description', 'productname', 'itemname', 'goods', 'items'],
-            'quantity': ['qty', 'quantity', 'count', 'units', 'pcs', 'pieces', 'no of items'],
+            'package_desc': ['product name', 'product', 'item', 'item name', 'description', 'product description', 'productname', 'itemname', 'goods', 'items', 'package desc', 'package description'],
+            'package_qty': ['qty', 'quantity', 'count', 'units', 'pcs', 'pieces', 'no of items', 'package qty'],
             'cod_amount': ['price', 'cod', 'amount', 'cod amount', 'total', 'value', 'order value', 'payment', 'cash', 'collect', 'collection'],
             'product_1': ['product 1', 'product:1', 'item 1', 'product1', 'product  1', 'additional products', 'additional product'],
             'count_1': ['count 1', 'count:1', 'qty 1', 'quantity 1', 'count1', 'qty1'],
@@ -2810,11 +2810,39 @@ def bulk_import_preview(request):
 
         logger.info(f'Total auto-mappings: {len(auto_mapping)} - {auto_mapping}')
 
+        # Create ImportLog with raw data before mapping
+        business = None
+        business_id = request.POST.get('business_id', '').strip()
+        if request.user.is_staff and business_id:
+            try:
+                business = business_models.Business.objects.get(business_id=business_id)
+            except business_models.Business.DoesNotExist:
+                pass
+        if not business:
+            business = get_cached_business(request)
+
+        import_log_id = None
+        if business:
+            import_log = orders_models.ImportLog.objects.create(
+                business=business,
+                source='csv_upload',
+                status='started',
+                initiated_by=request.user,
+                total_rows=len(rows),
+                raw_data=rows[:5000],  # cap to avoid huge JSON
+                source_meta={
+                    'file_name': uploaded_file.name,
+                    'file_size': uploaded_file.size,
+                },
+            )
+            import_log_id = import_log.id
+
         return JsonResponse({
             'columns': columns,
             'rows': rows[:100],  # Limit preview rows
             'total_rows': len(rows),
-            'auto_mapping': auto_mapping
+            'auto_mapping': auto_mapping,
+            'import_log_id': import_log_id,
         })
 
     except Exception as e:
@@ -2837,6 +2865,7 @@ def bulk_import_save(request):
         row = data.get('row')
         row_index = data.get('row_index', 0)
         business_id = data.get('business_id')
+        import_log_id = data.get('import_log_id')
 
         # Determine business based on user type
         if request.user.is_staff and business_id:
@@ -2958,9 +2987,9 @@ def bulk_import_save(request):
                     'location_link': str(row.get('location_link', '')),
                     'dl_latitude': str(row.get('dl_latitude', '')),
                     'dl_longitude': str(row.get('dl_longitude', '')),
-                    'product_name': str(row.get('product_name', '')),
+                    'package_desc': str(row.get('package_desc', '')),
                     'product_url': str(row.get('product_url', '')),
-                    'quantity': str(row.get('quantity', '')),
+                    'package_qty': str(row.get('package_qty', '')),
                     'stock_status': str(row.get('stock_status', '')),
                     'invoice_number': str(row.get('invoice_number', '')),
                     'seller_notes': str(row.get('seller_notes', '')),
@@ -2989,26 +3018,53 @@ def bulk_import_save(request):
             )
             order.save()
 
-            # Create OrderItems
-            items_created = 0
-            product_name = str(row.get('product_name', '')).strip()
-            if product_name:
-                orders_models.OrderItem.objects.create(
-                    order=order,
-                    quantity=safe_int(row.get('quantity')) or 1,
-                    unit_price=safe_decimal(row.get('cod_amount')),
-                    notes=f"{product_name} | URL: {row.get('product_url', '')}" if row.get('product_url') else product_name
-                )
-                items_created += 1
+            # Set package_description & package_qty
+            package_desc_val = str(row.get('package_desc', '')).strip()
+            if package_desc_val:
+                order.package_description = package_desc_val[:255]
+                order.package_qty = safe_int(row.get('package_qty')) or 1
+            else:
+                desc_parts = []
+                total_qty = 0
+                for i in range(1, 6):
+                    pn = str(row.get(f'product_{i}', '')).strip()
+                    if pn:
+                        pc = safe_int(row.get(f'count_{i}')) or 1
+                        desc_parts.append(f"{pn} x{pc}")
+                        total_qty += pc
+                if desc_parts:
+                    order.package_description = ', '.join(desc_parts)[:255]
+                    order.package_qty = total_qty
+            order.save(update_fields=['package_description', 'package_qty'])
 
+            # Match product columns to actual Product records → create OrderItems
+            from product.models import Product as ProductModel
+            items_created = 0
+            product_names = []
+            if package_desc_val:
+                product_names.append((package_desc_val, safe_int(row.get('package_qty')) or 1))
             for i in range(1, 6):
-                prod_name = str(row.get(f'product_{i}', '')).strip()
-                prod_count = safe_int(row.get(f'count_{i}')) or 1
-                if prod_name:
+                pn = str(row.get(f'product_{i}', '')).strip()
+                if pn:
+                    pc = safe_int(row.get(f'count_{i}')) or 1
+                    product_names.append((pn, pc))
+            for pname, pqty in product_names:
+                matched = ProductModel.objects.filter(
+                    business=business, item_name__iexact=pname.strip()
+                ).first()
+                if not matched:
+                    matched = ProductModel.objects.filter(
+                        business=business, item_sku__iexact=pname.strip()
+                    ).first()
+                if not matched:
+                    matched = ProductModel.objects.filter(
+                        business=business, barcode__iexact=pname.strip()
+                    ).first()
+                if matched:
                     orders_models.OrderItem.objects.create(
-                        order=order,
-                        quantity=prod_count,
-                        notes=prod_name
+                        order=order, product=matched, quantity=pqty,
+                        unit_price=matched.item_price or 0,
+                        notes=matched.item_name
                     )
                     items_created += 1
 
@@ -3028,6 +3084,17 @@ def bulk_import_save(request):
                     verification_result='pending'
                 )
 
+            # Update ImportLog
+            if import_log_id:
+                try:
+                    il = orders_models.ImportLog.objects.get(id=import_log_id)
+                    il.orders.add(order)
+                    il.orders_created = (il.orders_created or 0) + 1
+                    il.status = 'processing'
+                    il.save(update_fields=['orders_created', 'status'])
+                except orders_models.ImportLog.DoesNotExist:
+                    pass
+
             return JsonResponse({
                 'success': True,
                 'row_index': row_index,
@@ -3038,6 +3105,17 @@ def bulk_import_save(request):
             })
 
         except Exception as e:
+            # Track failed row in ImportLog
+            if import_log_id:
+                try:
+                    il = orders_models.ImportLog.objects.get(id=import_log_id)
+                    il.orders_failed = (il.orders_failed or 0) + 1
+                    current_errors = il.errors or []
+                    current_errors.append({'row': row_index, 'error': str(e)})
+                    il.errors = current_errors
+                    il.save(update_fields=['orders_failed', 'errors'])
+                except orders_models.ImportLog.DoesNotExist:
+                    pass
             return JsonResponse({
                 'success': False,
                 'row_index': row_index,
@@ -3048,4 +3126,27 @@ def bulk_import_save(request):
         return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
         logger.error(f'Error saving bulk import row: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def bulk_import_finalize(request):
+    """Finalize an ImportLog after all rows have been processed."""
+    try:
+        data = json.loads(request.body)
+        import_log_id = data.get('import_log_id')
+        column_mapping = data.get('column_mapping', {})
+
+        if not import_log_id:
+            return JsonResponse({'success': False, 'error': 'No import_log_id'}, status=400)
+
+        il = orders_models.ImportLog.objects.get(id=import_log_id)
+        if column_mapping:
+            il.column_mapping = column_mapping
+        il.mark_completed()
+        return JsonResponse({'success': True})
+    except orders_models.ImportLog.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'ImportLog not found'}, status=404)
+    except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

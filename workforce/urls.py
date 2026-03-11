@@ -45,6 +45,7 @@ urlpatterns = [
     path('orders/bulk-import/', orders_views.bulk_import_orders, name='wf_orders_bulk_import'),
     path('orders/bulk-import/preview/', orders_views.bulk_import_preview, name='wf_orders_bulk_preview'),
     path('orders/bulk-import/save/', orders_views.bulk_import_save, name='wf_orders_bulk_save'),
+    path('orders/bulk-import/finalize/', orders_views.bulk_import_finalize, name='wf_orders_bulk_finalize'),
     path('orders/api-orders/', workforce_views.wf_api_orders, name='wf_api_orders'),
     path('orders/api-orders/bulk-transfer/', workforce_views.bulk_transfer_api_orders, name='bulk_transfer_api_orders'),
     path('orders/api-orders/import/', workforce_views.import_api_orders, name='import_api_orders'),
@@ -237,6 +238,9 @@ urlpatterns = [
     path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
+
+    # Import History
+    path('import-history/', workforce_views.import_history, name='import_history'),
 
     # OneDrive Import Sources
     path('onedrive-sources/', workforce_views.onedrive_sources, name='onedrive_sources'),

@@ -10,7 +10,6 @@ from ai_agent.models import (
     AgentTool,
     UsageLog,
     ZoneTrainingData,
-    CODRiskScore,
 )
 
 
@@ -134,52 +133,3 @@ class ZoneTrainingDataAdmin(admin.ModelAdmin):
     autocomplete_fields = ['zone']
 
 
-@admin.register(CODRiskScore)
-class CODRiskScoreAdmin(admin.ModelAdmin):
-    list_display = [
-        'phone_number',
-        'risk_score_display',
-        'total_orders',
-        'delivered_orders',
-        'cod_refused_orders',
-        'delivery_rate_display',
-        'last_order_at',
-    ]
-    list_filter = ['last_calculated', 'primary_zone']
-    search_fields = ['phone_number']
-    readonly_fields = [
-        'risk_factors',
-        'delivery_rate',
-        'cod_collection_rate',
-        'last_calculated',
-        'created_at',
-    ]
-
-    def risk_score_display(self, obj):
-        score = obj.risk_score
-        if score < 0.3:
-            color = 'green'
-            label = 'Low'
-        elif score < 0.5:
-            color = 'blue'
-            label = 'Normal'
-        elif score < 0.7:
-            color = 'orange'
-            label = 'Elevated'
-        else:
-            color = 'red'
-            label = 'High'
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{:.2f} ({})</span>',
-            color, score, label
-        )
-    risk_score_display.short_description = 'Risk Score'
-
-    def delivery_rate_display(self, obj):
-        rate = obj.delivery_rate
-        color = 'green' if rate >= 0.9 else 'orange' if rate >= 0.7 else 'red'
-        return format_html(
-            '<span style="color: {};">{:.0%}</span>',
-            color, rate
-        )
-    delivery_rate_display.short_description = 'Delivery Rate'

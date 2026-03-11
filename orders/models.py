@@ -87,8 +87,8 @@ class Order(models.Model):
     order_notes = models.CharField(max_length=100, blank=True, null=True)
     package_description = models.CharField(max_length=255, blank=True, default='',
         help_text="Seller's package description e.g. 'Perfumes', 'Food items'")
-    total_quantity = models.PositiveIntegerField(default=0,
-        help_text="Total quantity for the product description")
+    package_qty = models.PositiveIntegerField(default=0,
+        help_text="Package quantity for the product description")
     order_status = models.CharField(
         max_length=100, choices=ORDER_STATUS_BY_CLIENT, default='to_review', db_index=True  # INDEX: Filtered for pending/published orders
     )
@@ -594,3 +594,172 @@ class OneDriveSource(models.Model):
             return f"https://api.onedrive.com/v1.0/shares/u!{encoded}/root/content"
 
         return link
+
+
+class ImportLog(models.Model):
+    """Unified log for every batch import, regardless of source channel."""
+
+    SOURCE_CHOICES = [
+        ('csv_upload', 'CSV / Excel Upload'),
+        ('onedrive', 'OneDrive'),
+        ('shopify', 'Shopify'),
+        ('woocommerce', 'WooCommerce'),
+        ('google_sheet', 'Google Sheet'),
+    ]
+
+    STATUS_CHOICES = [
+        ('started', 'Started'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('completed_with_errors', 'Completed with Errors'),
+        ('failed', 'Failed'),
+    ]
+
+    business = models.ForeignKey(
+        'business.Business', on_delete=models.CASCADE,
+        related_name='import_logs', db_index=True,
+    )
+    source = models.CharField(max_length=30, choices=SOURCE_CHOICES, db_index=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='started')
+    initiated_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+    )
+
+    # Counts
+    total_rows = models.PositiveIntegerField(default=0)
+    orders_created = models.PositiveIntegerField(default=0)
+    orders_skipped = models.PositiveIntegerField(default=0)
+    orders_failed = models.PositiveIntegerField(default=0)
+
+    # Raw data BEFORE mapping — the audit trail
+    raw_data = models.JSONField(default=list, blank=True)
+
+    # Column mapping used (for CSV/Excel/OneDrive/Google Sheets)
+    column_mapping = models.JSONField(default=dict, blank=True)
+
+    # Source-specific metadata (file_name, sheet_name, share_link, shop_name, etc.)
+    source_meta = models.JSONField(default=dict, blank=True)
+
+    # Error details: [{row: N, error: "msg"}, ...]
+    errors = models.JSONField(default=list, blank=True)
+
+    # Link to created orders
+    orders = models.ManyToManyField('orders.Order', blank=True, related_name='import_logs')
+
+    # Optional FK to OneDriveSource
+    onedrive_source = models.ForeignKey(
+        'orders.OneDriveSource', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='import_logs',
+    )
+
+    # Timestamps
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['business', 'source', '-started_at'], name='implog_biz_src_dt_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.business} | {self.get_source_display()} | {self.started_at:%Y-%m-%d %H:%M} | {self.orders_created} orders"
+
+    def mark_completed(self):
+        from django.utils import timezone
+        self.status = 'completed_with_errors' if self.errors else 'completed'
+        self.completed_at = timezone.now()
+        self.save(update_fields=['status', 'completed_at'])
+
+    def mark_failed(self, error_msg=''):
+        from django.utils import timezone
+        if error_msg:
+            current_errors = self.errors or []
+            current_errors.append(error_msg)
+            self.errors = current_errors
+        self.status = 'failed'
+        self.completed_at = timezone.now()
+        self.save(update_fields=['status', 'errors', 'completed_at'])
+
+    @property
+    def source_meta_display(self):
+        """Format source_meta for template display — clean labels, skip internal IDs."""
+        meta = self.source_meta or {}
+        label_map = {
+            'source_label': 'Source',
+            'sheet_name': 'Sheet',
+            'share_link': 'Link',
+            'file_name': 'File',
+            'file_size': 'Size',
+            'site_url': 'Site URL',
+            'api_type': 'Type',
+            'shop_name': 'Shop',
+            'spreadsheet_name': 'Spreadsheet',
+            'sheet_url': 'Sheet URL',
+        }
+        skip_keys = {'api_settings_id', 'row_numbers', 'platform_ids'}
+        result = []
+        for key, val in meta.items():
+            if key in skip_keys or not val:
+                continue
+            label = label_map.get(key, key.replace('_', ' ').title())
+            if key == 'file_size' and isinstance(val, (int, float)):
+                val = f"{val / 1024:.1f} KB" if val < 1048576 else f"{val / 1048576:.1f} MB"
+            result.append({'label': label, 'value': val})
+        # Add row count from row_numbers
+        row_nums = meta.get('row_numbers') or meta.get('platform_ids')
+        if row_nums and isinstance(row_nums, list):
+            result.append({'label': 'Selected items', 'value': f"{len(row_nums)} rows"})
+        return result
+
+    @property
+    def mapping_display(self):
+        """Format column_mapping for compact badge display."""
+        mapping = self.column_mapping or {}
+        seen_fields = set()
+        result = []
+        for col, field in mapping.items():
+            if field and field not in seen_fields:
+                seen_fields.add(field)
+                col_label = col if not col.isdigit() else f"Col {col}"
+                field_label = field.replace('_', ' ').title()
+                result.append({'col': col_label, 'field': field_label})
+        return result
+
+    @property
+    def mapping_count(self):
+        mapping = self.column_mapping or {}
+        return len(set(v for v in mapping.values() if v))
+
+    @property
+    def raw_data_count(self):
+        return len(self.raw_data) if self.raw_data else 0
+
+    @property
+    def raw_data_headers(self):
+        """Get column headers from first raw data row."""
+        if not self.raw_data:
+            return []
+        first = self.raw_data[0]
+        if isinstance(first, dict):
+            return list(first.keys())
+        if isinstance(first, list):
+            return [f"Col {i+1}" for i in range(len(first))]
+        return []
+
+    @property
+    def raw_data_preview(self):
+        """Get first 5 rows of raw data as list of cell values."""
+        if not self.raw_data:
+            return []
+        rows = self.raw_data[:5]
+        result = []
+        for row in rows:
+            if isinstance(row, dict):
+                cells = list(row.values())
+            elif isinstance(row, list):
+                cells = row
+            else:
+                cells = [str(row)]
+            result.append([str(c) if c else '' for c in cells])
+        return result
