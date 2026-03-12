@@ -52,9 +52,13 @@ def generate_order_number(business, client_order_code):
     - client_order_code: full client order ID (or YMMDD fallback)
     - Sequence: AA001-AA999, AB001-AB999, ... global across ALL orders (not per business)
     """
-    # Use client_order_code as the middle part
+    # Use client_order_code as the middle part — last 5 digits, stripped of separators
     if client_order_code and client_order_code not in ('ORD', ''):
-        code_part = str(client_order_code).strip()
+        import re
+        # Remove separators: . - _ #
+        cleaned = re.sub(r'[.\-_#]', '', str(client_order_code).strip())
+        # Take last 5 characters if longer than 5
+        code_part = cleaned[-5:] if len(cleaned) > 5 else cleaned
     else:
         # Fallback to YMMDD date if no client order code
         now = timezone.localtime()

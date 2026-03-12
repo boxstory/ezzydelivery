@@ -32,10 +32,13 @@ def workforce_sidebar_counts(request):
     if hasattr(request, '_cached_workforce_counts'):
         return request._cached_workforce_counts
 
-    from orders.models import Order
+    from orders.models import Order, TempOrder
     from delivery.models import DeliveryTask
 
     counts = {
+        # New (unimported) temp orders count for sidebar badge
+        'temp_orders_count': TempOrder.objects.filter(status='new').count(),
+
         # Orders verified but not yet published to task
         'pending_publish_count': Order.objects.filter(
             verification_status='verified',

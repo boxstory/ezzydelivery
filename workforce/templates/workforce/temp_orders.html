@@ -1,0 +1,896 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div style="min-width:0;max-width:100%">
+    <!-- Page Header -->
+    <header class="oli__hero">
+        <div class="oli__hero__left">
+            <h2><i class="fa-solid fa-cloud-arrow-down me-1"></i>Temp Orders</h2>
+            <span class="oli__hero__subtitle">| Synced from external sources (last 25 per source)</span>
+        </div>
+        <div class="oli__hero__right d-flex align-items-center gap-3">
+            {% if last_sync %}
+            <span class="text-muted small" title="Last sync">
+                <i class="fa-regular fa-clock me-1"></i>{{ last_sync|timesince }} ago
+            </span>
+            {% endif %}
+            <button type="button" class="btn btn-outline-primary btn-sm" id="syncBtn" onclick="syncAllSources()">
+                <i class="fa-solid fa-sync me-1"></i>Sync Now
+            </button>
+            <button type="button" class="btn btn-outline-dark btn-sm" onclick="openPublicLinkModal()">
+                <i class="fa-solid fa-link me-1"></i>Public Links
+            </button>
+            <button type="button" class="btn btn-success btn-sm d-none" id="importBtn" onclick="openPreview()">
+                <i class="fa-solid fa-file-import me-1"></i>Import <span id="importBtnCount"></span>
+            </button>
+            <div class="oli__hero__count">
+                <span class="oli__hero__count-value">{{ total_count|default:"0" }}</span>
+                <span class="oli__hero__count-label">rows</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Source Type Tabs -->
+    <div class="d-flex flex-wrap gap-2 mb-2 px-2">
+        <a href="{% url 'workforce:temp_orders' %}{% if filters.business %}?business={{ filters.business }}{% endif %}{% if filters.status %}{% if filters.business %}&{% else %}?{% endif %}status={{ filters.status }}{% endif %}"
+           class="badge rounded-pill {% if not filters.source_type %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            <i class="fa-solid fa-layer-group me-1"></i>All
+        </a>
+        {% if source_type_counts.onedrive %}
+        <a href="?source_type=onedrive{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
+           class="badge rounded-pill {% if filters.source_type == 'onedrive' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            <i class="fa-solid fa-cloud me-1"></i>OneDrive {{ source_type_counts.onedrive }}
+        </a>
+        {% endif %}
+        {% if source_type_counts.google_sheet %}
+        <a href="?source_type=google_sheet{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
+           class="badge rounded-pill {% if filters.source_type == 'google_sheet' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            <i class="fa-solid fa-table me-1"></i>Google Sheet {{ source_type_counts.google_sheet }}
+        </a>
+        {% endif %}
+        {% if source_type_counts.shopify %}
+        <a href="?source_type=shopify{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
+           class="badge rounded-pill {% if filters.source_type == 'shopify' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            <i class="fa-brands fa-shopify me-1"></i>Shopify {{ source_type_counts.shopify }}
+        </a>
+        {% endif %}
+        {% if source_type_counts.woocommerce %}
+        <a href="?source_type=woocommerce{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
+           class="badge rounded-pill {% if filters.source_type == 'woocommerce' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            <i class="fa-brands fa-wordpress me-1"></i>WooCommerce {{ source_type_counts.woocommerce }}
+        </a>
+        {% endif %}
+        {% if source_type_counts.public_link %}
+        <a href="?source_type=public_link{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
+           class="badge rounded-pill {% if filters.source_type == 'public_link' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            <i class="fa-solid fa-link me-1"></i>Public Link {{ source_type_counts.public_link }}
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Status Tabs -->
+    <div class="d-flex flex-wrap gap-2 mb-2 px-2">
+        <a href="{% url 'workforce:temp_orders' %}{% if filters.business %}?business={{ filters.business }}{% endif %}{% if filters.source_type %}{% if filters.business %}&{% else %}?{% endif %}source_type={{ filters.source_type }}{% endif %}"
+           class="badge rounded-pill {% if not filters.status %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
+            All {{ total_count|default:"0" }}
+        </a>
+        {% if status_counts.new %}
+        <a href="?status=new{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
+           class="badge rounded-pill {% if filters.status == 'new' %}bg-warning text-dark{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
+            New {{ status_counts.new }}
+        </a>
+        {% endif %}
+        {% if status_counts.imported %}
+        <a href="?status=imported{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
+           class="badge rounded-pill {% if filters.status == 'imported' %}bg-success{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
+            Imported {{ status_counts.imported }}
+        </a>
+        {% endif %}
+        {% if status_counts.skipped %}
+        <a href="?status=skipped{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
+           class="badge rounded-pill {% if filters.status == 'skipped' %}bg-secondary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
+            Skipped {{ status_counts.skipped }}
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Business Breakdown Pills -->
+    {% if biz_counts %}
+    <div class="d-flex flex-wrap gap-2 mb-3 px-2">
+        {% for bc in biz_counts %}
+        <a href="?business={{ bc.business_id }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
+           class="badge rounded-pill {% if filters.business == bc.business_id|stringformat:'s' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            {{ bc.business_name }} <span class="fw-bold">{{ bc.count }}</span>
+        </a>
+        {% endfor %}
+        {% if filters.business %}
+        <a href="{% url 'workforce:temp_orders' %}{% if filters.status %}?status={{ filters.status }}{% endif %}{% if filters.source_type %}{% if filters.status %}&{% else %}?{% endif %}source_type={{ filters.source_type }}{% endif %}"
+           class="badge rounded-pill bg-outline-secondary text-dark border text-decoration-none"
+           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
+            <i class="fa-solid fa-times me-1"></i>Clear
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% csrf_token %}
+    <!-- Filter -->
+    <div class="pg-filter">
+        <form id="filterForm" method="get" action="{{ request.path }}">
+            {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+            {% if filters.source_type %}<input type="hidden" name="source_type" value="{{ filters.source_type }}">{% endif %}
+            {% if filters.sort %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+            <div class="pg-filter__row mb-2">
+                <select class="form-select form-select-sm pg-filter__select-biz" name="business" id="pgf_business" onchange="this.form.submit()">
+                    <option value="">All Businesses</option>
+                    {% for biz in all_businesses %}
+                    <option value="{{ biz.business_id }}"
+                            {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>
+                        {{ biz.business_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Temp Orders Table -->
+    {% if temp_rows %}
+    <div class="table-responsive px-2">
+        <table class="table table-sm table-hover align-middle small">
+            <thead class="table-dark" style="position:sticky;top:0;z-index:1">
+                <tr>
+                    <th style="width:30px">
+                        <input type="checkbox" class="form-check-input" id="selectAllRows" onchange="toggleSelectAll(this)">
+                    </th>
+                    <th>
+                        <a href="?sort={% if filters.sort == 'date_desc' %}date_asc{% else %}date_desc{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
+                           class="text-white text-decoration-none">
+                            Date {% if filters.sort == 'date_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>{% elif filters.sort == 'date_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>{% else %}<i class="fa-solid fa-sort ms-1 opacity-50"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if filters.sort == 'business_asc' %}business_desc{% else %}business_asc{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
+                           class="text-white text-decoration-none">
+                            Business {% if filters.sort == 'business_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>{% elif filters.sort == 'business_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>{% else %}<i class="fa-solid fa-sort ms-1 opacity-50"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th>Source</th>
+                    <th>Row</th>
+                    <th>Order Code</th>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                    <th>Zone</th>
+                    <th>COD</th>
+                    <th>Package</th>
+                    <th>
+                        <a href="?sort={% if filters.sort == 'status_asc' %}status_desc{% else %}status_asc{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
+                           class="text-white text-decoration-none">
+                            Status {% if filters.sort == 'status_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>{% elif filters.sort == 'status_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>{% else %}<i class="fa-solid fa-sort ms-1 opacity-50"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th style="width:30px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in temp_rows %}
+                <tr class="{% if row.status == 'imported' %}table-secondary{% elif row.status == 'skipped' %}table-light{% endif %}"
+                    data-temp-id="{{ row.id }}">
+                    <td>
+                        <input type="checkbox" class="form-check-input row-checkbox"
+                               data-temp-id="{{ row.id }}"
+                               onchange="updateSelectedCount()">
+                    </td>
+                    <td class="text-muted text-nowrap">{{ row.order_date|default:"—" }}</td>
+                    <td>
+                        <span class="badge bg-dark" style="font-size:0.65rem;">{{ row.business.business_name|truncatechars:18 }}</span>
+                    </td>
+                    <td>
+                        {% if row.source_type == 'onedrive' %}
+                        <span class="badge bg-info text-dark" style="font-size:0.55rem;"><i class="fa-solid fa-cloud me-1"></i>OD</span>
+                        {% elif row.source_type == 'google_sheet' %}
+                        <span class="badge bg-success" style="font-size:0.55rem;"><i class="fa-solid fa-table me-1"></i>GS</span>
+                        {% elif row.source_type == 'shopify' %}
+                        <span class="badge bg-dark" style="font-size:0.55rem;"><i class="fa-brands fa-shopify me-1"></i>SP</span>
+                        {% elif row.source_type == 'woocommerce' %}
+                        <span class="badge text-white" style="font-size:0.55rem;background:#7f54b3;"><i class="fa-brands fa-wordpress me-1"></i>WC</span>
+                        {% elif row.source_type == 'public_link' %}
+                        <span class="badge bg-primary" style="font-size:0.55rem;"><i class="fa-solid fa-link me-1"></i>PL</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">{% if row.row_num %}{{ row.row_num }}{% else %}—{% endif %}</td>
+                    <td class="fw-semibold text-nowrap">{{ row.client_order_code|truncatechars:15|default:"—" }}</td>
+                    <td>{{ row.customer_name|truncatechars:18|default:"—" }}</td>
+                    <td class="text-nowrap">{{ row.customer_phone|default:"—" }}</td>
+                    <td title="{{ row.customer_address }}">{{ row.customer_address|truncatechars:25|default:"—" }}</td>
+                    <td>
+                        {% if row.dl_zone %}
+                        <span class="badge bg-info text-dark" style="font-size:0.6rem;">Z{{ row.dl_zone }}{% if row.dl_street %}/S{{ row.dl_street }}{% endif %}{% if row.dl_building %}/B{{ row.dl_building }}{% endif %}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{% if row.cod_amount and row.cod_amount != '0' %}<span class="fw-semibold">{{ row.cod_amount }}</span>{% else %}—{% endif %}</td>
+                    <td>{{ row.package_desc|truncatechars:15|default:"—" }}</td>
+                    <td>
+                        {% if row.status == 'imported' %}
+                        <span class="badge bg-success" style="font-size:0.6rem;">Imported</span>
+                        {% elif row.status == 'skipped' %}
+                        <span class="badge bg-secondary" style="font-size:0.6rem;">Skipped</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark" style="font-size:0.6rem;">New</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="showDetail(this)" title="View details"
+                            data-id="{{ row.id }}"
+                            data-source-type="{{ row.source_type }}"
+                            data-source-label="{{ row.source_label }}"
+                            data-business="{{ row.business.business_name }}"
+                            data-sheet="{{ row.sheet_name }}"
+                            data-row-num="{{ row.row_num }}"
+                            data-platform-id="{{ row.platform_id }}"
+                            data-client-order-code="{{ row.client_order_code }}"
+                            data-customer-name="{{ row.customer_name }}"
+                            data-customer-phone="{{ row.customer_phone }}"
+                            data-customer-address="{{ row.customer_address }}"
+                            data-dl-zone="{{ row.dl_zone }}"
+                            data-dl-street="{{ row.dl_street }}"
+                            data-dl-building="{{ row.dl_building }}"
+                            data-cod-amount="{{ row.cod_amount }}"
+                            data-order-date="{{ row.order_date }}"
+                            data-package-desc="{{ row.package_desc }}"
+                            data-status="{{ row.status }}"
+                            data-synced-at="{{ row.synced_at|date:'Y-m-d H:i' }}"
+                            data-created-at="{{ row.created_at|date:'Y-m-d H:i' }}"
+                            data-raw-row="{{ row.raw_row|safe }}">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Bulk Action Bar -->
+    <div class="px-2 py-2 d-flex align-items-center gap-2 bg-light border-top" id="bulkImportBar" style="display:none !important;position:sticky;bottom:0;z-index:10;">
+        <span class="fw-semibold small"><span id="selectedCount">0</span> selected</span>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openPreview()">
+            <i class="fa-solid fa-eye me-1"></i>Preview &amp; Import
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSelection()">
+            <i class="fa-solid fa-times me-1"></i>Clear
+        </button>
+    </div>
+
+    {% else %}
+    <div class="text-center text-muted py-5">
+        <i class="fa-solid fa-cloud-arrow-down fa-3x mb-3 d-block"></i>
+        <p>No temp orders found. Click <strong>Sync Now</strong> to fetch rows from all external sources.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Detail Modal (single row view) -->
+<div class="modal fade" id="tempOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title"><i class="fa-solid fa-file-lines me-2"></i>Temp Order Detail</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3" id="tempOrderModalBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview & Transfer Modal (multi-step) -->
+<div class="modal fade" id="previewModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title">
+                    <span id="previewStep1Title"><i class="fa-solid fa-magnifying-glass me-2"></i>Step 1: Preview Mapping</span>
+                    <span id="previewStep2Title" class="d-none"><i class="fa-solid fa-check-double me-2"></i>Step 2: Verify &amp; Transfer</span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="previewModalBody">
+                <div class="text-center py-5">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2 text-muted">Loading preview...</p>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <span class="me-auto small text-muted" id="previewCount"></span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnGoVerify" onclick="goToVerify()">
+                    <i class="fa-solid fa-arrow-right me-1"></i>Verify Fields
+                </button>
+                <button type="button" class="btn btn-success btn-sm d-none" id="btnTransfer" onclick="transferOrders()">
+                    <i class="fa-solid fa-paper-plane me-1"></i>Transfer to Orders
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Public Link Sources Modal -->
+<div class="modal fade" id="publicLinkModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title"><i class="fa-solid fa-link me-2"></i>Public Link Sources</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <!-- Add form -->
+                <div class="border rounded p-3 mb-3 bg-light">
+                    <h6 class="fw-semibold mb-2"><i class="fa-solid fa-plus me-1"></i>Add New Public Link</h6>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <select class="form-select form-select-sm" id="plBusiness">
+                                <option value="">Select Business</option>
+                                {% for biz in all_businesses %}
+                                <option value="{{ biz.business_id }}">{{ biz.business_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="plLabel" placeholder="Label (optional)">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="url" class="form-control form-control-sm" id="plUrl" placeholder="https://example.com/orders.html">
+                        </div>
+                        <div class="col-md-1">
+                            <button class="btn btn-primary btn-sm w-100" onclick="addPublicLink()">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="plAddResult" class="mt-2"></div>
+                </div>
+                <!-- Existing sources list -->
+                <div id="plSourcesList">
+                    <div class="text-center text-muted py-3">
+                        <i class="fa-solid fa-spinner fa-spin me-1"></i>Loading sources...
+                    </div>
+                </div>
+                <!-- Mapping area (shown when editing a source) -->
+                <div id="plMappingArea"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CSRF = (() => { const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken=')); return c ? c.split('=')[1] : ''; })();
+let previewRows = [];
+
+// ─── Detail Modal (single row) ───
+function showDetail(btn) {
+    const d = btn.dataset;
+    const statusBadge = d.status === 'imported' ? '<span class="badge bg-success">Imported</span>'
+        : d.status === 'skipped' ? '<span class="badge bg-secondary">Skipped</span>'
+        : '<span class="badge bg-warning text-dark">New</span>';
+    const srcIcon = { onedrive:'<i class="fa-solid fa-cloud me-1"></i>OneDrive', google_sheet:'<i class="fa-solid fa-table me-1"></i>Google Sheet',
+        shopify:'<i class="fa-brands fa-shopify me-1"></i>Shopify', woocommerce:'<i class="fa-brands fa-wordpress me-1"></i>WooCommerce',
+        public_link:'<i class="fa-solid fa-link me-1"></i>Public Link' }[d.sourceType] || d.sourceType;
+
+    let rawHtml = '';
+    try {
+        const raw = JSON.parse(d.rawRow.replace(/'/g, '"'));
+        if (Array.isArray(raw) && raw.length) {
+            rawHtml = '<div class="mt-3"><h6 class="fw-semibold mb-2"><i class="fa-solid fa-database me-1"></i>Raw Row Data</h6><div class="table-responsive"><table class="table table-sm table-bordered small mb-0"><tbody>';
+            raw.forEach((cell, i) => { if (cell) rawHtml += `<tr><td class="text-muted" style="width:60px">Col ${i+1}</td><td>${escHtml(cell)}</td></tr>`; });
+            rawHtml += '</tbody></table></div></div>';
+        }
+    } catch(e) {}
+
+    document.getElementById('tempOrderModalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><table class="table table-sm small mb-0"><tbody>
+                <tr><td class="text-muted fw-semibold" style="width:130px">Status</td><td>${statusBadge}</td></tr>
+                <tr><td class="text-muted fw-semibold">Source</td><td>${srcIcon} <span class="text-muted small">${escHtml(d.sourceLabel||'')}</span></td></tr>
+                <tr><td class="text-muted fw-semibold">Business</td><td>${escHtml(d.business)}</td></tr>
+                <tr><td class="text-muted fw-semibold">Sheet</td><td>${escHtml(d.sheet||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Row #</td><td>${d.rowNum||'—'}</td></tr>
+                <tr><td class="text-muted fw-semibold">Platform ID</td><td>${escHtml(d.platformId||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Order Code</td><td class="fw-semibold">${escHtml(d.clientOrderCode||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Order Date</td><td>${escHtml(d.orderDate||'—')}</td></tr>
+            </tbody></table></div>
+            <div class="col-md-6"><table class="table table-sm small mb-0"><tbody>
+                <tr><td class="text-muted fw-semibold" style="width:130px">Customer</td><td>${escHtml(d.customerName||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Phone</td><td>${escHtml(d.customerPhone||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Address</td><td>${escHtml(d.customerAddress||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Zone</td><td>${escHtml(d.dlZone||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Street</td><td>${escHtml(d.dlStreet||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Building</td><td>${escHtml(d.dlBuilding||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">COD</td><td class="fw-semibold">${escHtml(d.codAmount||'—')}</td></tr>
+                <tr><td class="text-muted fw-semibold">Package</td><td>${escHtml(d.packageDesc||'—')}</td></tr>
+            </tbody></table></div>
+        </div>
+        <div class="d-flex gap-3 mt-2 small text-muted">
+            <span><i class="fa-regular fa-clock me-1"></i>Synced: ${d.syncedAt}</span>
+            <span><i class="fa-regular fa-calendar me-1"></i>Created: ${d.createdAt}</span>
+        </div>${rawHtml}`;
+    new bootstrap.Modal(document.getElementById('tempOrderModal')).show();
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ─── Selection ───
+function toggleSelectAll(cb) { document.querySelectorAll('.row-checkbox').forEach(c => c.checked = cb.checked); updateSelectedCount(); }
+function updateSelectedCount() {
+    const n = document.querySelectorAll('.row-checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = n;
+    const bar = document.getElementById('bulkImportBar');
+    bar.style.setProperty('display', n > 0 ? 'flex' : 'none', 'important');
+    const hdrBtn = document.getElementById('importBtn');
+    if (n > 0) { hdrBtn.classList.remove('d-none'); document.getElementById('importBtnCount').textContent = `(${n})`; }
+    else { hdrBtn.classList.add('d-none'); }
+}
+function clearSelection() { document.querySelectorAll('.row-checkbox').forEach(c => c.checked = false); document.getElementById('selectAllRows').checked = false; updateSelectedCount(); }
+
+// ─── Step 1: Preview ───
+async function openPreview() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (!checked.length) return;
+    const ids = [...checked].map(c => parseInt(c.dataset.tempId));
+
+    // Reset modal state
+    document.getElementById('previewStep1Title').classList.remove('d-none');
+    document.getElementById('previewStep2Title').classList.add('d-none');
+    document.getElementById('btnGoVerify').classList.remove('d-none');
+    document.getElementById('btnTransfer').classList.add('d-none');
+    document.getElementById('previewModalBody').innerHTML = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2 text-muted">Loading preview...</p></div>';
+    document.getElementById('previewCount').textContent = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+
+    try {
+        const resp = await fetch('{% url "workforce:temp_orders_preview" %}', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ ids })
+        });
+        const data = await resp.json();
+        if (!data.success) { document.getElementById('previewModalBody').innerHTML = `<div class="p-3 text-danger">${data.error}</div>`; return; }
+
+        previewRows = data.rows;
+        renderPreviewTable();
+    } catch(e) {
+        document.getElementById('previewModalBody').innerHTML = `<div class="p-3 text-danger">Error: ${e.message}</div>`;
+    }
+}
+
+// All DB fields matching the OneDrive mapping UI
+const DB_FIELDS = [
+    {key: 'client_order_code', label: 'Order ID', group: 'Order'},
+    {key: 'order_date', label: 'Order Date', group: 'Order'},
+    {key: 'customer_name', label: 'Customer Name *', group: 'Customer'},
+    {key: 'customer_phone', label: 'Phone 1 *', group: 'Customer'},
+    {key: 'customer_whatsapp', label: 'Phone 2 / WhatsApp', group: 'Customer'},
+    {key: 'customer_email', label: 'Email', group: 'Customer'},
+    {key: 'customer_address', label: 'Customer Address *', group: 'Address'},
+    {key: 'dl_landmark', label: 'City / Landmark', group: 'Address'},
+    {key: 'dl_building', label: 'Villa / Building No', group: 'Address'},
+    {key: 'dl_street', label: 'Street No', group: 'Address'},
+    {key: 'dl_zone', label: 'Zone No', group: 'Address'},
+    {key: 'location_link', label: 'Location Link', group: 'Address'},
+    {key: 'dl_latitude', label: 'Latitude', group: 'Address'},
+    {key: 'dl_longitude', label: 'Longitude', group: 'Address'},
+    {key: 'deadline_date', label: 'Day & Time Preference', group: 'Delivery'},
+    {key: 'package_desc', label: 'Package Desc', group: 'Package'},
+    {key: 'package_qty', label: 'Package Qty', group: 'Package'},
+    {key: 'cod_amount', label: 'Price / COD Amount', group: 'Package'},
+    {key: 'product_1', label: 'Product 1', group: 'Products'},
+    {key: 'count_1', label: 'Count 1', group: 'Products'},
+    {key: 'product_2', label: 'Product 2', group: 'Products'},
+    {key: 'count_2', label: 'Count 2', group: 'Products'},
+    {key: 'product_3', label: 'Product 3', group: 'Products'},
+    {key: 'count_3', label: 'Count 3', group: 'Products'},
+    {key: 'seller_notes', label: 'Notes By Seller', group: 'Notes'},
+    {key: 'internal_notes', label: 'Notes By Ezzy', group: 'Notes'},
+];
+
+function renderPreviewTable() {
+    const srcLabel = { onedrive:'OneDrive', google_sheet:'Google Sheet', shopify:'Shopify', woocommerce:'WooCommerce', public_link:'Public Link' };
+    let html = '';
+
+    previewRows.forEach((r, i) => {
+        const sBadge = r.status === 'imported' ? '<span class="badge bg-success">Imported</span>'
+            : r.status === 'skipped' ? '<span class="badge bg-secondary">Skipped</span>'
+            : '<span class="badge bg-warning text-dark">New</span>';
+
+        html += `<div class="border rounded mb-3 mx-2">`;
+        html += `<div class="d-flex align-items-center justify-content-between px-3 py-2 bg-light border-bottom">`;
+        html += `<div><span class="fw-semibold">#${i+1}</span> <span class="badge bg-dark ms-1" style="font-size:0.65rem">${escHtml(r.business_name)}</span> <span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">${srcLabel[r.source_type]||r.source_type}</span> ${sBadge}</div>`;
+        html += `<button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removePreviewRow(${i})" title="Remove"><i class="fa-solid fa-trash-can"></i></button>`;
+        html += `</div>`;
+
+        html += `<div class="table-responsive"><table class="table table-sm table-bordered small align-middle mb-0">`;
+        html += `<thead class="table-light"><tr><th style="width:200px">Field</th><th>Mapped Value</th></tr></thead><tbody>`;
+
+        let lastGroup = '';
+        DB_FIELDS.forEach(f => {
+            const val = r[f.key] || '';
+            const hasVal = val && val.trim() !== '';
+            if (f.group !== lastGroup) {
+                html += `<tr class="table-secondary"><td colspan="2" class="fw-semibold text-muted" style="font-size:0.7rem"><i class="fa-solid fa-folder me-1"></i>${f.group}</td></tr>`;
+                lastGroup = f.group;
+            }
+            html += `<tr${hasVal ? ' class="table-success"' : ''}>`;
+            html += `<td class="fw-semibold text-nowrap">${f.label}</td>`;
+            html += `<td>${hasVal ? escHtml(val) : '<span class="text-muted">—</span>'}</td>`;
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table></div></div>`;
+    });
+
+    document.getElementById('previewModalBody').innerHTML = html;
+    document.getElementById('previewCount').textContent = `${previewRows.length} row(s)`;
+}
+
+// ─── Step 2: Verify (editable) — mapping-style per row ───
+function goToVerify() {
+    document.getElementById('previewStep1Title').classList.add('d-none');
+    document.getElementById('previewStep2Title').classList.remove('d-none');
+    document.getElementById('btnGoVerify').classList.add('d-none');
+    document.getElementById('btnTransfer').classList.remove('d-none');
+
+    const srcLabel = { onedrive:'OneDrive', google_sheet:'Google Sheet', shopify:'Shopify', woocommerce:'WooCommerce', public_link:'Public Link' };
+    let html = '';
+
+    previewRows.forEach((r, i) => {
+        html += `<div class="border rounded mb-3 mx-2">`;
+        html += `<div class="d-flex align-items-center justify-content-between px-3 py-2 bg-light border-bottom">`;
+        html += `<div><span class="fw-semibold">#${i+1}</span> <span class="badge bg-dark ms-1" style="font-size:0.65rem">${escHtml(r.business_name)}</span> <span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">${srcLabel[r.source_type]||r.source_type}</span></div>`;
+        html += `<button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removePreviewRow(${i})" title="Remove"><i class="fa-solid fa-trash-can"></i></button>`;
+        html += `</div>`;
+
+        html += `<div class="table-responsive"><table class="table table-sm table-bordered small align-middle mb-0">`;
+        html += `<thead class="table-light"><tr><th style="width:200px">Field</th><th>Value (editable)</th></tr></thead><tbody>`;
+
+        let lastGroup = '';
+        DB_FIELDS.forEach(f => {
+            if (f.group !== lastGroup) {
+                html += `<tr class="table-secondary"><td colspan="2" class="fw-semibold text-muted" style="font-size:0.7rem"><i class="fa-solid fa-folder me-1"></i>${f.group}</td></tr>`;
+                lastGroup = f.group;
+            }
+            const val = r[f.key] || '';
+            const isRequired = f.label.includes('*');
+            html += `<tr>`;
+            html += `<td class="fw-semibold text-nowrap">${f.label}</td>`;
+            html += `<td><input type="text" class="form-control form-control-sm py-0" style="font-size:0.75rem" data-field="${f.key}" data-idx="${i}" value="${escHtml(val)}"${isRequired ? ' required' : ''}></td>`;
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table></div></div>`;
+    });
+
+    document.getElementById('previewModalBody').innerHTML = html;
+    document.getElementById('previewCount').textContent = `${previewRows.length} row(s) — edit fields then click Transfer`;
+}
+
+function removePreviewRow(idx) {
+    previewRows.splice(idx, 1);
+    goToVerify(); // re-render
+}
+
+// ─── Step 3: Transfer ───
+async function transferOrders() {
+    // Collect edited values from inputs
+    const inputs = document.querySelectorAll('#previewModalBody input[data-field]');
+    inputs.forEach(inp => {
+        const idx = parseInt(inp.dataset.idx);
+        const field = inp.dataset.field;
+        if (previewRows[idx]) previewRows[idx][field] = inp.value;
+    });
+
+    if (!previewRows.length) { alert('No rows to transfer'); return; }
+    if (!confirm(`Transfer ${previewRows.length} row(s) to main orders?`)) return;
+
+    const btn = document.getElementById('btnTransfer');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Transferring...';
+
+    try {
+        const resp = await fetch('{% url "workforce:temp_orders_transfer" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ rows: previewRows })
+        });
+        const result = await resp.json();
+
+        let msg = `${result.saved || 0} order(s) created`;
+        if (result.skipped) msg += `, ${result.skipped} skipped`;
+        if (result.errors && result.errors.length) {
+            msg += `<br><small class="text-danger">${result.errors.slice(0,5).join('<br>')}</small>`;
+        }
+
+        document.getElementById('previewModalBody').innerHTML = `
+            <div class="text-center py-4">
+                <i class="fa-solid fa-circle-check fa-3x text-success mb-3"></i>
+                <h5>Transfer Complete</h5>
+                <p>${msg}</p>
+            </div>`;
+        document.getElementById('btnTransfer').classList.add('d-none');
+        document.getElementById('previewCount').textContent = '';
+
+        if (result.saved > 0) setTimeout(() => window.location.reload(), 2000);
+    } catch(e) {
+        showToast('Transfer error: ' + e.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i>Transfer to Orders';
+    }
+}
+
+// ─── Sync ───
+function syncAllSources() {
+    const btn = document.getElementById('syncBtn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Syncing...';
+    fetch('{% url "workforce:temp_orders_sync" %}', { method:'POST', headers:{ 'X-CSRFToken':CSRF, 'Content-Type':'application/x-www-form-urlencoded' } })
+    .then(r => r.json()).then(d => {
+        if (d.success) { showToast(`Synced: ${d.created} new, ${d.updated} updated`, 'success'); setTimeout(() => location.reload(), 1000); }
+        else { showToast('Sync failed: '+(d.error||'Unknown'), 'danger'); btn.disabled=false; btn.innerHTML=orig; }
+    }).catch(e => { showToast('Error: '+e.message, 'danger'); btn.disabled=false; btn.innerHTML=orig; });
+}
+
+function showToast(msg, type) {
+    const t = document.createElement('div'); t.className = 'aim__bulk-toast';
+    t.style.background = type==='danger' ? '#dc3545' : '#198754';
+    t.innerHTML = `<i class="fa-solid fa-${type==='danger'?'exclamation-circle':'check-circle'}"></i> ${msg}`;
+    document.body.appendChild(t); setTimeout(() => t.classList.add('show'), 10);
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+// ─── Public Link Sources ───
+const PL_DB_FIELDS = [
+    {value: '', label: '— Skip —'},
+    {value: 'client_order_code', label: 'Order ID'},
+    {value: 'order_date', label: 'Order Date'},
+    {value: 'customer_name', label: 'Customer Name *'},
+    {value: 'customer_phone', label: 'Phone 1 *'},
+    {value: 'customer_whatsapp', label: 'Phone 2 / WhatsApp'},
+    {value: 'customer_email', label: 'Email'},
+    {value: 'customer_address', label: 'Customer Address *'},
+    {value: 'dl_landmark', label: 'City / Landmark'},
+    {value: 'dl_building', label: 'Villa / Building No'},
+    {value: 'dl_street', label: 'Street No'},
+    {value: 'dl_zone', label: 'Zone No'},
+    {value: 'location_link', label: 'Location Link'},
+    {value: 'dl_latitude', label: 'Latitude'},
+    {value: 'dl_longitude', label: 'Longitude'},
+    {value: 'deadline_date', label: 'Day & Time Preference'},
+    {value: 'package_desc', label: 'Package Desc'},
+    {value: 'package_qty', label: 'Package Qty'},
+    {value: 'cod_amount', label: 'Price / COD Amount'},
+    {value: 'product_1', label: 'Product 1'},
+    {value: 'count_1', label: 'Count 1'},
+    {value: 'product_2', label: 'Product 2'},
+    {value: 'count_2', label: 'Count 2'},
+    {value: 'product_3', label: 'Product 3'},
+    {value: 'count_3', label: 'Count 3'},
+    {value: 'seller_notes', label: 'Notes By Seller'},
+    {value: 'internal_notes', label: 'Notes By Ezzy'},
+];
+
+let _plSourcesCache = [];
+
+function openPublicLinkModal() {
+    document.getElementById('plMappingArea').innerHTML = '';
+    new bootstrap.Modal(document.getElementById('publicLinkModal')).show();
+    loadPublicLinkSources();
+}
+
+async function loadPublicLinkSources() {
+    try {
+        const resp = await fetch('{% url "workforce:public_link_sources" %}');
+        const data = await resp.json();
+        if (!data.success) { document.getElementById('plSourcesList').innerHTML = `<p class="text-danger">${data.error}</p>`; return; }
+
+        _plSourcesCache = data.sources;
+
+        if (!data.sources.length) {
+            document.getElementById('plSourcesList').innerHTML = '<p class="text-muted text-center">No public link sources yet. Add one above.</p>';
+            return;
+        }
+
+        let html = '<table class="table table-sm table-bordered small align-middle mb-0">';
+        html += '<thead class="table-light"><tr><th>Label</th><th>Business</th><th>URL</th><th>Last Sync</th><th>Rows</th><th>Mapping</th><th></th></tr></thead><tbody>';
+        data.sources.forEach(s => {
+            const mappedCount = s.mapping ? Object.values(s.mapping).filter(v => v).length : 0;
+            const mappingBadge = mappedCount > 0
+                ? `<span class="badge bg-success" style="font-size:0.6rem"><i class="fa-solid fa-check me-1"></i>${mappedCount} fields</span>`
+                : `<span class="badge bg-warning text-dark" style="font-size:0.6rem">Not mapped</span>`;
+            html += `<tr>
+                <td class="fw-semibold">${escHtml(s.label)}</td>
+                <td><span class="badge bg-dark" style="font-size:0.6rem">${escHtml(s.business_name)}</span></td>
+                <td><a href="${escHtml(s.url)}" target="_blank" class="text-truncate d-inline-block" style="max-width:180px">${escHtml(s.url)}</a></td>
+                <td class="text-muted text-nowrap">${s.last_sync_at || '—'}</td>
+                <td>${s.last_sync_count}</td>
+                <td>
+                    ${mappingBadge}
+                    <button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" onclick="showPlMapping(${s.id})" title="Edit Mapping">
+                        <i class="fa-solid fa-columns"></i>
+                    </button>
+                </td>
+                <td><button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deletePublicLink(${s.id})" title="Delete"><i class="fa-solid fa-trash-can"></i></button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('plSourcesList').innerHTML = html;
+    } catch(e) {
+        document.getElementById('plSourcesList').innerHTML = `<p class="text-danger">Error: ${e.message}</p>`;
+    }
+}
+
+function showPlMapping(sourceId) {
+    const source = _plSourcesCache.find(s => s.id === sourceId);
+    if (!source) return;
+
+    const headers = source.headers || [];
+    const saved = source.mapping || {};
+    const area = document.getElementById('plMappingArea');
+
+    if (!headers.length) {
+        area.innerHTML = '<div class="alert alert-warning small mt-2"><i class="fa-solid fa-exclamation-triangle me-1"></i>No headers detected. Sync the source first.</div>';
+        return;
+    }
+
+    let html = '<div class="border rounded p-3 mt-3">';
+    html += '<div class="d-flex align-items-center justify-content-between mb-2">';
+    html += `<div class="fw-semibold"><i class="fa-solid fa-columns me-1"></i> Map Columns — ${escHtml(source.label)} <span class="badge bg-primary ms-1">${headers.length} cols</span>`;
+    if (Object.keys(saved).length) html += ' <span class="badge bg-success ms-1"><i class="fa-solid fa-save me-1"></i>Saved mapping</span>';
+    html += '</div>';
+    html += '<div class="d-flex gap-2">';
+    html += `<button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('plMappingArea').innerHTML=''"><i class="fa-solid fa-times me-1"></i>Close</button>`;
+    html += `<button class="btn btn-success btn-sm" onclick="savePlMapping(${sourceId})"><i class="fa-solid fa-save me-1"></i>Save Mapping & Re-sync</button>`;
+    html += '</div></div>';
+
+    html += '<table class="table table-sm table-bordered small align-middle mb-0" style="max-width:500px">';
+    html += '<thead class="table-light"><tr><th>Source Column</th><th>Map To</th></tr></thead><tbody>';
+
+    headers.forEach((h, idx) => {
+        if (!h) return;
+        const fieldVal = saved[String(idx)] || '';
+        const mapped = fieldVal ? ' class="table-success"' : '';
+        html += `<tr${mapped}>`;
+        html += `<td class="fw-semibold">${escHtml(h)}</td>`;
+        html += `<td><select class="form-select form-select-sm pl-col-map" data-col-idx="${idx}">`;
+        PL_DB_FIELDS.forEach(f => {
+            const sel = (f.value === fieldVal) ? ' selected' : '';
+            const optLabel = f.value ? f.label + '  (' + f.value + ')' : f.label;
+            html += `<option value="${f.value}"${sel}>${optLabel}</option>`;
+        });
+        html += '</select></td></tr>';
+    });
+
+    html += '</tbody></table></div>';
+    area.innerHTML = html;
+    area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function savePlMapping(sourceId) {
+    const mapping = {};
+    document.querySelectorAll('.pl-col-map').forEach(sel => {
+        const idx = sel.getAttribute('data-col-idx');
+        if (sel.value) mapping[idx] = sel.value;
+    });
+
+    // Check required fields
+    const mappedFields = Object.values(mapping);
+    const missing = [];
+    if (!mappedFields.includes('customer_name')) missing.push('Customer Name');
+    if (!mappedFields.includes('customer_phone')) missing.push('Phone');
+    if (!mappedFields.includes('customer_address')) missing.push('Address');
+    if (missing.length) {
+        alert('Required fields not mapped: ' + missing.join(', '));
+        return;
+    }
+
+    const area = document.getElementById('plMappingArea');
+    const btn = area.querySelector('.btn-success');
+    const origBtn = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...';
+
+    try {
+        const resp = await fetch(`/workforce/orders/temp/public-links/${sourceId}/save-mapping/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ mapping }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            area.innerHTML = '';
+            loadPublicLinkSources();
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast(data.error || 'Save failed', 'danger');
+            btn.disabled = false;
+            btn.innerHTML = origBtn;
+        }
+    } catch(e) {
+        showToast('Error: ' + e.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = origBtn;
+    }
+}
+
+async function addPublicLink() {
+    const business_id = document.getElementById('plBusiness').value;
+    const label = document.getElementById('plLabel').value.trim();
+    const url = document.getElementById('plUrl').value.trim();
+    const resultDiv = document.getElementById('plAddResult');
+
+    if (!business_id) { resultDiv.innerHTML = '<span class="text-danger small">Select a business</span>'; return; }
+    if (!url) { resultDiv.innerHTML = '<span class="text-danger small">Enter a URL</span>'; return; }
+
+    resultDiv.innerHTML = '<span class="text-muted small"><i class="fa-solid fa-spinner fa-spin me-1"></i>Adding & syncing...</span>';
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'add');
+        formData.append('business_id', business_id);
+        formData.append('label', label);
+        formData.append('url', url);
+
+        const resp = await fetch('{% url "workforce:public_link_sources" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF },
+            body: formData,
+        });
+        const data = await resp.json();
+        if (data.success) {
+            resultDiv.innerHTML = `<span class="text-success small"><i class="fa-solid fa-check me-1"></i>${data.message}</span>`;
+            document.getElementById('plUrl').value = '';
+            document.getElementById('plLabel').value = '';
+            loadPublicLinkSources();
+            // Auto-open mapping for the new source
+            if (data.source_id) {
+                setTimeout(() => showPlMapping(data.source_id), 500);
+            }
+        } else {
+            resultDiv.innerHTML = `<span class="text-danger small">${data.error}</span>`;
+        }
+    } catch(e) {
+        resultDiv.innerHTML = `<span class="text-danger small">Error: ${e.message}</span>`;
+    }
+}
+
+async function deletePublicLink(sourceId) {
+    if (!confirm('Delete this source and all its temp orders?')) return;
+    try {
+        const resp = await fetch(`/workforce/orders/temp/public-links/${sourceId}/delete/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF },
+        });
+        const data = await resp.json();
+        if (data.success) { showToast('Source deleted', 'success'); document.getElementById('plMappingArea').innerHTML = ''; loadPublicLinkSources(); setTimeout(() => location.reload(), 1000); }
+        else showToast(data.error, 'danger');
+    } catch(e) { showToast('Error: ' + e.message, 'danger'); }
+}
+</script>
+{% endblock content %}

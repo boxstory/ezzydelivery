@@ -242,6 +242,12 @@ urlpatterns = [
     # Import History & Temp Orders
     path('import-history/', workforce_views.import_history, name='import_history'),
     path('orders/temp/', workforce_views.temp_orders, name='temp_orders'),
+    path('orders/temp/sync/', workforce_views.temp_orders_sync, name='temp_orders_sync'),
+    path('orders/temp/preview/', workforce_views.temp_orders_preview, name='temp_orders_preview'),
+    path('orders/temp/transfer/', workforce_views.temp_orders_transfer, name='temp_orders_transfer'),
+    path('orders/temp/public-links/', workforce_views.public_link_sources, name='public_link_sources'),
+    path('orders/temp/public-links/<int:source_id>/delete/', workforce_views.public_link_source_delete, name='public_link_source_delete'),
+    path('orders/temp/public-links/<int:source_id>/save-mapping/', workforce_views.public_link_save_mapping, name='public_link_save_mapping'),
 
     # OneDrive Import Sources
     path('onedrive-sources/', workforce_views.onedrive_sources, name='onedrive_sources'),

@@ -21,7 +21,7 @@
           <span>Orders</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,wf_api_orders,onedrive_sources,order_detail' %}show{% endif %}" id="submenu-orders">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,wf_api_orders,onedrive_sources,order_detail,order_edit,temp_orders' %}show{% endif %}" id="submenu-orders">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_wf_orders_add" class="nav-link btn wf-sidebar__submenu-link wf-sidebar__submenu-link--highlight {% if request.resolver_match.url_name == 'wf_orders_add' %}active{% endif %}"
@@ -52,10 +52,18 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_wf_orders_all" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'wf_orders_all' or request.resolver_match.url_name == 'order_detail' %}active{% endif %}"
+              <a id="workforce_sidebar_link_wf_orders_all" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name in 'wf_orders_all,order_detail,order_edit' %}active{% endif %}"
                  href="{% url 'workforce:wf_orders_all' %}">
                 <i class="fa-solid fa-list me-2"></i>
                 All Orders List
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_temp_orders" class="nav-link btn wf-sidebar__submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}"
+                 href="{% url 'workforce:temp_orders' %}">
+                <i class="fa-solid fa-inbox me-2"></i>
+                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Temp Orders</span>
+                {% if temp_orders_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.5rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders">{{ temp_orders_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -83,8 +91,8 @@
               <a id="workforce_sidebar_link_wf_orders_to_publish" class="nav-link btn wf-sidebar__submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'wf_orders_to_publish' %}active{% endif %}"
                  href="{% url 'workforce:wf_orders_to_publish' %}">
                 <i class="fa-solid fa-spinner me-2"></i>
-                <span class="flex-grow-1">Publish to Task</span>
-                {% if pending_publish_count %}<span class="badge badge-warning ms-auto" data-badge="pending_publish">{{ pending_publish_count }}</span>{% endif %}
+                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Publish to Task</span>
+                {% if pending_publish_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.5rem;font-size:0.6rem;line-height:1.2;" data-badge="pending_publish">{{ pending_publish_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -112,10 +120,10 @@
           <span>Tasks</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_reported,tasks_live_map,delivery_task_detail' %}show{% endif %}" id="submenu-deliveries">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_reported,tasks_live_map,delivery_task_detail,delivery_task_edit' %}show{% endif %}" id="submenu-deliveries">
           <ul class="nav flex-column">
             <li class="nav-item">
-              <a id="workforce_sidebar_link_all_tasks" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'dl_list_all' or request.resolver_match.url_name == 'delivery_task_detail' %}active{% endif %}"
+              <a id="workforce_sidebar_link_all_tasks" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name in 'dl_list_all,delivery_task_detail,delivery_task_edit' %}active{% endif %}"
                  href="{% url 'workforce:dl_list_all' %}">
                 <i class="fa-solid fa-list me-2"></i>
                 All Tasks List
@@ -139,8 +147,8 @@
               <a id="workforce_sidebar_link_tasks_unpublished" class="nav-link btn wf-sidebar__submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'dl_list_ready_to_published_to_dms' %}active{% endif %}"
                  href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}">
                 <i class="fa-solid fa-spinner me-2"></i>
-                <span class="flex-grow-1">Unpublished Tasks</span>
-                {% if unpublished_tasks_count %}<span class="badge badge-info ms-auto" data-badge="unpublished_tasks">{{ unpublished_tasks_count }}</span>{% endif %}
+                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Unpublished Tasks</span>
+                {% if unpublished_tasks_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.5rem;font-size:0.6rem;line-height:1.2;" data-badge="unpublished_tasks">{{ unpublished_tasks_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -154,8 +162,8 @@
               <a id="workforce_sidebar_link_tasks_followup" class="nav-link btn wf-sidebar__submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'tasks_followup_list' %}active{% endif %}"
                  href="{% url 'workforce:tasks_followup_list' %}">
                 <i class="fa-solid fa-phone me-2"></i>
-                <span class="flex-grow-1">FollowUp List</span>
-                {% if followup_count %}<span class="badge badge-error ms-auto" data-badge="followup">{{ followup_count }}</span>{% endif %}
+                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">FollowUp List</span>
+                {% if followup_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.5rem;font-size:0.6rem;line-height:1.2;" data-badge="followup">{{ followup_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">

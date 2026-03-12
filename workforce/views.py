@@ -61,7 +61,7 @@ import csv
 from django.contrib.auth.decorators import login_required
 from core.decorators import staff_required
 from django.views.decorators.http import require_http_methods, require_POST
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 import json
 import logging
 from django.core.paginator import (
@@ -2914,12 +2914,16 @@ def dl_list_published_to_dms(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def dl_list_ready_to_published_to_dms(request):
-    """List orders ready to be published to DMS (task_created=False)"""
+    """List orders with unpublished delivery tasks (dl_task_publish=False)"""
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
     ).prefetch_related(
         'delivery_task'
-    ).filter(task_created=False).order_by('-created_at')
+    ).filter(
+        delivery_task__dl_task_publish=False,
+    ).exclude(
+        delivery_task__dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
+    ).distinct().order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     data = {
@@ -10238,86 +10242,600 @@ def import_history(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def temp_orders(request):
-    """Dedicated page for temp orders (to_review) across all businesses."""
-    from django.db.models import Count, Sum
+    """Show temp orders from DB (synced from OneDrive).
 
-    orders = orders_models.Order.objects.filter(
-        order_status='to_review',
-    ).select_related(
-        'business', 'pickup_location'
-    ).prefetch_related('order_items').order_by('-created_at')
-
-    # Filters
-    search = request.GET.get('search', '').strip()
+    Data is loaded from TempOrder model instead of live OneDrive fetch.
+    Staff can trigger a manual sync or rely on the daily Celery task.
+    """
     business_id = request.GET.get('business', '').strip()
-    verification = request.GET.get('verification', '').strip()
-    date_from = request.GET.get('dateFrom', '').strip()
-    date_to = request.GET.get('dateTo', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    source_type_filter = request.GET.get('source_type', '').strip()
+    sort = request.GET.get('sort', '').strip()
+
+    from django.db.models import Count
+
+    qs = orders_models.TempOrder.objects.select_related(
+        'business', 'onedrive_source', 'api_settings', 'public_link_source'
+    )
 
     if business_id:
-        orders = orders.filter(business_id=business_id)
-    if search:
-        orders = orders.filter(
-            Q(customer_name__icontains=search) |
-            Q(customer_phone__icontains=search) |
-            Q(order_number__icontains=search) |
-            Q(client_order_code__icontains=search)
-        )
-    if verification:
-        orders = orders.filter(verification_status=verification)
-    if date_from:
-        orders = orders.filter(created_at__date__gte=date_from)
-    if date_to:
-        orders = orders.filter(created_at__date__lte=date_to)
+        qs = qs.filter(business_id=business_id)
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if source_type_filter:
+        qs = qs.filter(source_type=source_type_filter)
 
-    # Summary stats
-    all_temp = orders_models.Order.objects.filter(order_status='to_review')
-    biz_counts = all_temp.values(
+    # Get the last 25 rows per source group (onedrive_source, api_settings, or public_link_source)
+    keep_ids = []
+    od_source_ids = qs.filter(source_type='onedrive').values_list('onedrive_source_id', flat=True).distinct()
+    for sid in od_source_ids:
+        ids = list(
+            qs.filter(onedrive_source_id=sid).order_by('-row_num').values_list('id', flat=True)[:25]
+        )
+        keep_ids.extend(ids)
+    api_groups = qs.filter(source_type__in=['google_sheet', 'shopify', 'woocommerce']).values_list('api_settings_id', 'source_type').distinct()
+    for api_id, st in api_groups:
+        ids = list(
+            qs.filter(api_settings_id=api_id, source_type=st).order_by('-row_num').values_list('id', flat=True)[:25]
+        )
+        keep_ids.extend(ids)
+    pl_source_ids = qs.filter(source_type='public_link').values_list('public_link_source_id', flat=True).distinct()
+    for sid in pl_source_ids:
+        ids = list(
+            qs.filter(public_link_source_id=sid).order_by('-row_num').values_list('id', flat=True)[:25]
+        )
+        keep_ids.extend(ids)
+
+    # Sort options
+    SORT_OPTIONS = {
+        'date_desc': '-order_date',
+        'date_asc': 'order_date',
+        'business_asc': 'business__business_name',
+        'business_desc': '-business__business_name',
+        'status_asc': 'status',
+        'status_desc': '-status',
+    }
+    order_by = SORT_OPTIONS.get(sort, '-order_date')
+    if isinstance(order_by, str):
+        order_by = (order_by,)
+
+    temp_rows = qs.filter(id__in=keep_ids).order_by(*order_by)
+
+    # Business counts (all, not filtered by status)
+    from django.db.models import Count
+    biz_qs = orders_models.TempOrder.objects.values(
         'business_id', 'business__business_name'
     ).annotate(count=Count('id')).order_by('-count')
+    biz_counts_list = [
+        {'business_id': b['business_id'], 'business_name': b['business__business_name'], 'count': b['count']}
+        for b in biz_qs
+    ]
 
-    total_count = orders.count()
-    total_cod = orders.aggregate(total=Sum('cod_amount'))['total'] or 0
+    # Status counts
+    status_counts = dict(
+        orders_models.TempOrder.objects.values_list('status').annotate(Count('id')).order_by()
+    )
 
-    # Paginate
-    orders = paginate_queryset(request, orders)
+    # Source type counts
+    source_type_counts = dict(
+        orders_models.TempOrder.objects.values_list('source_type').annotate(Count('id')).order_by()
+    )
+
+    # Last sync time
+    last_sync = orders_models.TempOrder.objects.order_by('-synced_at').values_list('synced_at', flat=True).first()
 
     # All businesses for filter dropdown
     all_businesses = business_models.Business.objects.filter(
         business_status='active'
     ).order_by('business_name')
 
-    # Build filter_params for pagination
-    filter_params_list = []
-    if search:
-        filter_params_list.append(f'search={search}')
-    if business_id:
-        filter_params_list.append(f'business={business_id}')
-    if verification:
-        filter_params_list.append(f'verification={verification}')
-    if date_from:
-        filter_params_list.append(f'dateFrom={date_from}')
-    if date_to:
-        filter_params_list.append(f'dateTo={date_to}')
-    filter_params = '&'.join(filter_params_list)
+    # Active sources
+    sources = orders_models.OneDriveSource.objects.filter(
+        is_active=True,
+    ).exclude(
+        last_column_mapping={},
+    ).select_related('business').order_by('business__business_name')
 
     context = {
-        'orders': orders,
+        'temp_rows': temp_rows,
+        'total_count': temp_rows.count(),
+        'biz_counts': biz_counts_list,
+        'status_counts': status_counts,
+        'source_type_counts': source_type_counts,
+        'last_sync': last_sync,
+        'sources': sources,
         'all_businesses': all_businesses,
-        'biz_counts': biz_counts,
-        'total_count': total_count,
-        'total_cod': total_cod,
         'filters': {
-            'search': search,
             'business': business_id,
-            'verification': verification,
-            'dateFrom': date_from,
-            'dateTo': date_to,
+            'status': status_filter,
+            'source_type': source_type_filter,
+            'sort': sort,
         },
-        'filter_params': filter_params,
-        'per_page': request.GET.get('per_page', '25'),
     }
     return render(request, 'workforce/temp_orders.html', context)
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+def temp_orders_sync(request):
+    """Manual trigger to sync all external sources into TempOrder table."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    source_type = request.POST.get('source_type') or None
+    source_id = request.POST.get('source_id') or None
+    if source_id:
+        source_id = int(source_id)
+
+    from orders.tasks import sync_all_temp_orders
+    try:
+        result = sync_all_temp_orders(source_type=source_type, source_id=source_id)
+        return JsonResponse({
+            'success': True,
+            'created': result.get('created', 0),
+            'updated': result.get('updated', 0),
+            'errors': result.get('errors', []),
+        })
+    except Exception as e:
+        logger.exception("Manual sync error")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+def temp_orders_preview(request):
+    """Return JSON detail for selected TempOrder IDs for the preview modal."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    ids = body.get('ids', [])
+    if not ids:
+        return JsonResponse({'success': False, 'error': 'No rows selected'}, status=400)
+
+    rows = orders_models.TempOrder.objects.filter(
+        id__in=ids
+    ).select_related('business', 'onedrive_source', 'api_settings', 'public_link_source').order_by('-order_date')
+
+    # All mappable DB fields (same as OneDrive mapping UI)
+    ALL_DB_FIELDS = [
+        'client_order_code', 'order_date', 'customer_name', 'customer_phone',
+        'customer_whatsapp', 'customer_email', 'customer_address', 'dl_landmark',
+        'dl_building', 'dl_street', 'dl_zone', 'location_link', 'dl_latitude',
+        'dl_longitude', 'deadline_date', 'package_desc', 'package_qty',
+        'cod_amount', 'product_1', 'count_1', 'product_2', 'count_2',
+        'product_3', 'count_3', 'seller_notes', 'internal_notes',
+    ]
+
+    # Fields stored directly on TempOrder model
+    DIRECT_FIELDS = {
+        'client_order_code', 'customer_name', 'customer_phone',
+        'customer_address', 'dl_zone', 'dl_street', 'dl_building',
+        'cod_amount', 'order_date', 'package_desc',
+    }
+
+    data = []
+    for r in rows:
+        # Start with direct model fields
+        row_data = {
+            'id': r.id,
+            'source_type': r.source_type,
+            'source_label': r.source_label,
+            'business_id': str(r.business_id),
+            'business_name': r.business.business_name,
+            'sheet_name': r.sheet_name,
+            'row_num': r.row_num,
+            'platform_id': r.platform_id,
+            'status': r.status,
+            'raw_row': r.raw_row,
+        }
+
+        # Set direct fields
+        for f in DIRECT_FIELDS:
+            row_data[f] = getattr(r, f, '')
+
+        # Extract extra fields from raw_row using saved column mapping
+        col_mapping = {}
+        if r.onedrive_source and hasattr(r.onedrive_source, 'last_column_mapping'):
+            col_mapping = r.onedrive_source.last_column_mapping or {}
+        elif r.api_settings and hasattr(r.api_settings, 'column_mapping'):
+            col_mapping = r.api_settings.column_mapping or {}
+        elif r.public_link_source and hasattr(r.public_link_source, 'last_column_mapping'):
+            col_mapping = r.public_link_source.last_column_mapping or {}
+
+        # Build reverse mapping: db_field -> col_index
+        reverse_map = {}
+        for col_idx, db_field in col_mapping.items():
+            if db_field:
+                reverse_map[db_field] = int(col_idx)
+
+        # Fill in extra fields from raw_row
+        raw = r.raw_row if isinstance(r.raw_row, list) else []
+        for f in ALL_DB_FIELDS:
+            if f not in DIRECT_FIELDS and f not in row_data:
+                if f in reverse_map and reverse_map[f] < len(raw):
+                    row_data[f] = str(raw[reverse_map[f]] or '')
+                else:
+                    row_data[f] = ''
+
+        # Also get column headers from the source for display
+        raw_headers = []
+        if r.onedrive_source and hasattr(r.onedrive_source, 'last_headers'):
+            raw_headers = r.onedrive_source.last_headers or []
+
+        row_data['raw_headers'] = raw_headers
+        row_data['col_mapping'] = col_mapping
+
+        data.append(row_data)
+
+    return JsonResponse({'success': True, 'rows': data})
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+def temp_orders_transfer(request):
+    """Transfer selected TempOrder rows into real Order records.
+
+    Accepts JSON body with a list of rows, each optionally edited by staff.
+    Creates Order objects and marks TempOrder as imported.
+    """
+    import json as json_lib
+    import uuid
+    from django.utils import timezone
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    rows = body.get('rows', [])
+    if not rows:
+        return JsonResponse({'success': False, 'error': 'No rows provided'}, status=400)
+
+    def safe_int(val):
+        if not val:
+            return 0
+        try:
+            return int(float(str(val).replace(',', '').strip()))
+        except (ValueError, TypeError):
+            return 0
+
+    def safe_int_or_none(val):
+        v = safe_int(val)
+        return v if v else None
+
+    saved = 0
+    skipped = 0
+    errors = []
+    created_orders = []
+
+    for row_data in rows:
+        temp_id = row_data.get('id')
+        try:
+            temp_order = orders_models.TempOrder.objects.select_related('business').get(id=temp_id)
+        except orders_models.TempOrder.DoesNotExist:
+            errors.append(f"TempOrder {temp_id} not found")
+            continue
+
+        business = temp_order.business
+
+        # Use edited values from the preview, falling back to stored values
+        client_order_code = row_data.get('client_order_code', temp_order.client_order_code).strip()
+        customer_name = row_data.get('customer_name', temp_order.customer_name).strip()
+        customer_phone = row_data.get('customer_phone', temp_order.customer_phone).strip()
+        customer_address = row_data.get('customer_address', temp_order.customer_address).strip()
+
+        if not customer_name and not customer_phone:
+            errors.append(f"Row {temp_id}: Missing name and phone")
+            skipped += 1
+            continue
+
+        # Generate client_order_code if empty
+        if not client_order_code:
+            client_order_code = f"OD-{uuid.uuid4().hex[:8].upper()}"
+
+        # Check duplicate
+        if orders_models.Order.objects.filter(client_order_code=client_order_code).exists():
+            errors.append(f"Row {temp_id}: Duplicate order code '{client_order_code}'")
+            skipped += 1
+            # Mark as imported since it already exists
+            temp_order.status = 'imported'
+            temp_order.save(update_fields=['status'])
+            continue
+
+        # Clean phone
+        customer_phone = convert_arabic_numerals(customer_phone)
+        # Use provided whatsapp or derive from phone
+        customer_whatsapp = row_data.get('customer_whatsapp', '').strip()
+        if not customer_whatsapp:
+            customer_whatsapp = format_whatsapp_number(customer_phone)
+
+        # Translate Arabic
+        if contains_arabic(customer_name):
+            customer_name = translate_to_english(customer_name)
+        if contains_arabic(customer_address):
+            customer_address = translate_to_english(customer_address)
+
+        cod_amount = safe_int(row_data.get('cod_amount', temp_order.cod_amount))
+        dl_zone = safe_int_or_none(row_data.get('dl_zone', temp_order.dl_zone))
+        dl_street = safe_int_or_none(row_data.get('dl_street', temp_order.dl_street))
+        dl_building = safe_int_or_none(row_data.get('dl_building', temp_order.dl_building))
+        package_desc = row_data.get('package_desc', temp_order.package_desc).strip()
+        package_qty = safe_int(row_data.get('package_qty', '1')) or 1
+        deadline_date = row_data.get('deadline_date', '').strip()
+        seller_notes = row_data.get('seller_notes', '').strip()
+        internal_notes = row_data.get('internal_notes', '').strip()
+        dl_landmark = row_data.get('dl_landmark', '').strip()
+        location_link = row_data.get('location_link', '').strip()
+
+        # Latitude / longitude
+        dl_latitude = None
+        dl_longitude = None
+        try:
+            lat_str = row_data.get('dl_latitude', '').strip()
+            if lat_str:
+                dl_latitude = float(lat_str)
+        except (ValueError, TypeError):
+            pass
+        try:
+            lng_str = row_data.get('dl_longitude', '').strip()
+            if lng_str:
+                dl_longitude = float(lng_str)
+        except (ValueError, TypeError):
+            pass
+
+        # Build order notes from seller_notes + internal_notes + landmark + location_link
+        notes_parts = []
+        if seller_notes:
+            notes_parts.append(f"Seller: {seller_notes}")
+        if internal_notes:
+            notes_parts.append(f"Ezzy: {internal_notes}")
+        if dl_landmark:
+            notes_parts.append(f"Landmark: {dl_landmark}")
+        if location_link:
+            notes_parts.append(f"Link: {location_link}")
+        order_notes = ' | '.join(notes_parts)
+
+        # Build product list from product_1..3 columns
+        products = []
+        for i in range(1, 4):
+            pname = row_data.get(f'product_{i}', '').strip()
+            pcount = safe_int(row_data.get(f'count_{i}', '')) or 1
+            if pname:
+                products.append({'name': pname, 'qty': pcount})
+
+        # Build package_description from products if not already set
+        if not package_desc and products:
+            desc_parts = [f"{p['name']} x{p['qty']}" for p in products]
+            package_desc = ', '.join(desc_parts)
+            package_qty = sum(p['qty'] for p in products)
+
+        try:
+            order = orders_models.Order(
+                business=business,
+                client_order_code=client_order_code,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_whatsapp=customer_whatsapp,
+                customer_address=customer_address,
+                dl_zone=dl_zone,
+                dl_street=dl_street,
+                dl_building=dl_building,
+                cod_amount=cod_amount,
+                deadline_date=deadline_date[:100] if deadline_date else '',
+                latitude=dl_latitude,
+                longitude=dl_longitude,
+                order_notes=order_notes[:100] if order_notes else '',
+                order_status='to_review',
+                verification_status='pending',
+                package_description=package_desc[:255] if package_desc else '',
+                package_qty=package_qty,
+                original_order_data={
+                    'source': f'{temp_order.source_type}_import',
+                    'temp_order_id': temp_order.id,
+                    'source_type': temp_order.source_type,
+                    'sheet_name': temp_order.sheet_name,
+                    'row_number': temp_order.row_num,
+                    'platform_id': temp_order.platform_id,
+                    'customer_email': row_data.get('customer_email', ''),
+                    'location_link': location_link,
+                    'dl_landmark': dl_landmark,
+                    'products': [{'name': p['name'], 'qty': str(p['qty'])} for p in products],
+                    'seller_notes': seller_notes,
+                    'internal_notes': internal_notes,
+                },
+            )
+            order.save()
+            created_orders.append(order)
+
+            # Match product names to Product records → create OrderItems
+            from product.models import Product as ProductModel
+            for p in products:
+                pname = p['name']
+                pqty = p['qty']
+                matched = ProductModel.objects.filter(
+                    business=business, item_name__iexact=pname.strip()
+                ).first()
+                if not matched:
+                    matched = ProductModel.objects.filter(
+                        business=business, item_sku__iexact=pname.strip()
+                    ).first()
+                if not matched:
+                    matched = ProductModel.objects.filter(
+                        business=business, barcode__iexact=pname.strip()
+                    ).first()
+                if matched:
+                    orders_models.OrderItem.objects.create(
+                        order=order, product=matched, quantity=pqty,
+                        unit_price=matched.item_price or 0,
+                        notes=matched.item_name
+                    )
+
+            # Mark temp order as imported
+            temp_order.status = 'imported'
+            temp_order.imported_order = order
+            temp_order.save(update_fields=['status', 'imported_order'])
+
+            saved += 1
+
+        except Exception as e:
+            logger.exception("Transfer error for temp_order %s", temp_id)
+            errors.append(f"Row {temp_id}: {str(e)}")
+
+    return JsonResponse({
+        'success': True,
+        'saved': saved,
+        'skipped': skipped,
+        'errors': errors[:20],
+        'message': f'{saved} orders created, {skipped} skipped',
+    })
+
+
+# =============================================================================
+# PUBLIC LINK SOURCES
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def public_link_sources(request):
+    """List and add public link import sources (inline on temp orders page)."""
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add':
+            business_id = request.POST.get('business_id')
+            label = request.POST.get('label', '').strip()
+            url = request.POST.get('url', '').strip()
+
+            if not business_id or not url:
+                return JsonResponse({'success': False, 'error': 'Business and URL are required'}, status=400)
+
+            try:
+                business = business_models.Business.objects.get(business_id=business_id)
+            except business_models.Business.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+            if not label:
+                label = f"Public Link - {business.business_name}"
+
+            source = orders_models.PublicLinkSource.objects.create(
+                business=business,
+                label=label,
+                url=url,
+                is_active=True,
+            )
+
+            # Run initial sync
+            try:
+                from orders.tasks import _sync_public_link_source
+                created, updated = _sync_public_link_source(source)
+                return JsonResponse({
+                    'success': True,
+                    'source_id': source.id,
+                    'created': created,
+                    'updated': updated,
+                    'message': f'Source added. {created} orders synced.',
+                })
+            except Exception as e:
+                return JsonResponse({
+                    'success': True,
+                    'source_id': source.id,
+                    'created': 0,
+                    'updated': 0,
+                    'message': f'Source added but sync failed: {e}',
+                })
+
+    # GET — return list
+    sources = orders_models.PublicLinkSource.objects.select_related('business').order_by('-created_at')
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    data = []
+    for s in sources:
+        data.append({
+            'id': s.id,
+            'label': s.label,
+            'url': s.url,
+            'business_name': s.business.business_name,
+            'business_id': s.business.business_id,
+            'is_active': s.is_active,
+            'last_sync_at': s.last_sync_at.strftime('%Y-%m-%d %H:%M') if s.last_sync_at else None,
+            'last_sync_count': s.last_sync_count,
+            'headers': s.last_headers or [],
+            'mapping': s.last_column_mapping or {},
+        })
+
+    return JsonResponse({
+        'success': True,
+        'sources': data,
+        'businesses': [{'id': b.business_id, 'name': b.business_name} for b in businesses],
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def public_link_source_delete(request, source_id):
+    """Delete a public link source and its temp orders."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        source = orders_models.PublicLinkSource.objects.get(id=source_id)
+        orders_models.TempOrder.objects.filter(public_link_source=source).delete()
+        source.delete()
+        return JsonResponse({'success': True})
+    except orders_models.PublicLinkSource.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Source not found'}, status=404)
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+def public_link_save_mapping(request, source_id):
+    """Save column mapping for a public link source and re-sync."""
+    import json as json_lib
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        source = orders_models.PublicLinkSource.objects.get(id=source_id)
+    except orders_models.PublicLinkSource.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Source not found'}, status=404)
+
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    mapping = body.get('mapping', {})
+    source.last_column_mapping = mapping
+    source.save(update_fields=['last_column_mapping', 'updated_at'])
+
+    # Re-sync with new mapping: delete old temp orders and re-sync
+    orders_models.TempOrder.objects.filter(public_link_source=source, status='new').delete()
+    try:
+        from orders.tasks import _sync_public_link_source
+        created, updated = _sync_public_link_source(source)
+        return JsonResponse({
+            'success': True,
+            'created': created,
+            'updated': updated,
+            'message': f'Mapping saved. Re-synced: {created} created, {updated} updated.',
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': True,
+            'message': f'Mapping saved but re-sync failed: {e}',
+        })
 
 
 # =============================================================================
@@ -10617,6 +11135,13 @@ def onedrive_import_trigger(request, source_id):
 
     if not row_numbers:
         return JsonResponse({'success': False, 'error': 'No rows selected'}, status=400)
+
+    # Support 'use_saved' to use the source's saved column mapping
+    if column_mapping == 'use_saved':
+        column_mapping = source.last_column_mapping or {}
+        if not sheet_name:
+            sheet_name = source.last_sheet_name or ''
+
     if not column_mapping:
         return JsonResponse({'success': False, 'error': 'No column mapping provided'}, status=400)
 
@@ -10851,6 +11376,12 @@ def onedrive_import_trigger(request, source_id):
         source.last_imported_rows = existing_imported
         source.last_column_mapping = column_mapping
         source.save()
+
+        # Mark corresponding TempOrder rows as imported
+        if row_numbers:
+            orders_models.TempOrder.objects.filter(
+                onedrive_source=source, row_num__in=row_numbers
+            ).update(status='imported')
 
         return JsonResponse({
             'success': True,

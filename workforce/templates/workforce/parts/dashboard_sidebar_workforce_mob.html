@@ -70,6 +70,9 @@
                 <a id="workforce_sidebar_mob_link_all_orders" href="{% url 'workforce:wf_orders_all' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Orders</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_temp_orders" href="{% url 'workforce:temp_orders' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-inbox"></i><span>Temp Orders{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-store"></i><span>By Seller</span>
                 </a>
@@ -510,9 +513,16 @@ function closeMobileSidebarOnNav() {
 document.addEventListener('DOMContentLoaded', function() {
     const currentPath = window.location.pathname;
 
+    // Check if current page is an order detail/edit page (expand Orders section)
+    const isOrderSubpage = /^\/workforce\/orders\/\d+/.test(currentPath);
+    const isTaskSubpage = /^\/workforce\/delivery-task\/\d+/.test(currentPath);
+
     document.querySelectorAll('.wsm__nav-link, .wsm__nav-single a, .wsm__dashboard-btn').forEach(function(link) {
         const linkPath = new URL(link.href, window.location.origin).pathname;
-        if (currentPath === linkPath) {
+        const isMatch = currentPath === linkPath ||
+            (isOrderSubpage && link.id === 'workforce_sidebar_mob_link_all_orders') ||
+            (isTaskSubpage && link.id === 'workforce_sidebar_mob_link_all_tasks');
+        if (isMatch) {
             link.classList.add('active');
 
             // Auto-open parent submenu

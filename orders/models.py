@@ -596,6 +596,115 @@ class OneDriveSource(models.Model):
         return link
 
 
+class PublicLinkSource(models.Model):
+    """Public URL source for importing orders from HTML tables."""
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.CASCADE,
+        related_name='public_link_sources'
+    )
+    label = models.CharField(max_length=200, help_text="Friendly name for this source")
+    url = models.URLField(max_length=1000, help_text="Public URL to HTML page with order table")
+    is_active = models.BooleanField(default=True)
+    last_sync_at = models.DateTimeField(blank=True, null=True)
+    last_sync_count = models.PositiveIntegerField(default=0)
+    last_column_mapping = models.JSONField(default=dict, blank=True,
+        help_text="Auto-detected column mapping: {col_idx: db_field}")
+    last_headers = models.JSONField(default=list, blank=True,
+        help_text="Column headers from last sync")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Public Link Sources"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.business.business_name} - {self.label}"
+
+
+class TempOrder(models.Model):
+    """Cached row from external sources (OneDrive, Google Sheet, API, Public Link), synced periodically or manually.
+
+    These rows are displayed on the Temp Orders page. When staff imports
+    a row into a real Order, the status flips to 'imported'.
+    """
+    STATUS_CHOICES = [
+        ('new', 'New'),
+        ('imported', 'Imported'),
+        ('skipped', 'Skipped'),
+    ]
+    SOURCE_TYPE_CHOICES = [
+        ('onedrive', 'OneDrive'),
+        ('google_sheet', 'Google Sheet'),
+        ('shopify', 'Shopify'),
+        ('woocommerce', 'WooCommerce'),
+        ('public_link', 'Public Link'),
+    ]
+
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default='onedrive', db_index=True)
+    onedrive_source = models.ForeignKey(
+        'orders.OneDriveSource', on_delete=models.CASCADE,
+        related_name='temp_orders', null=True, blank=True,
+    )
+    api_settings = models.ForeignKey(
+        'business.BusinessApiSettings', on_delete=models.CASCADE,
+        related_name='temp_orders', null=True, blank=True,
+    )
+    public_link_source = models.ForeignKey(
+        'orders.PublicLinkSource', on_delete=models.CASCADE,
+        related_name='temp_orders', null=True, blank=True,
+    )
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.CASCADE,
+        related_name='temp_orders', db_index=True,
+    )
+    sheet_name = models.CharField(max_length=200, blank=True, default='')
+    row_num = models.PositiveIntegerField(default=0, help_text="Row number (1-indexed) or 0 for API orders")
+    platform_id = models.CharField(max_length=100, blank=True, default='', help_text="Platform order ID for API sources")
+
+    # Mapped fields
+    client_order_code = models.CharField(max_length=100, blank=True, default='')
+    customer_name = models.CharField(max_length=200, blank=True, default='')
+    customer_phone = models.CharField(max_length=100, blank=True, default='')
+    customer_address = models.CharField(max_length=500, blank=True, default='')
+    dl_zone = models.CharField(max_length=20, blank=True, default='')
+    dl_street = models.CharField(max_length=20, blank=True, default='')
+    dl_building = models.CharField(max_length=20, blank=True, default='')
+    cod_amount = models.CharField(max_length=30, blank=True, default='')
+    order_date = models.CharField(max_length=50, blank=True, default='')
+    package_desc = models.CharField(max_length=500, blank=True, default='')
+
+    # Raw row data for reference
+    raw_row = models.JSONField(default=list, blank=True)
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='new', db_index=True)
+    imported_order = models.ForeignKey(
+        'orders.Order', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='source_temp_order',
+    )
+
+    synced_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-row_num']
+        verbose_name = "Temp Order"
+        verbose_name_plural = "Temp Orders"
+
+    def __str__(self):
+        return f"{self.business} - {self.source_type} Row {self.row_num} ({self.status})"
+
+    @property
+    def source_label(self):
+        if self.onedrive_source:
+            return self.onedrive_source.label
+        if self.api_settings:
+            return f"{self.api_settings.get_api_type_display()}"
+        if self.public_link_source:
+            return self.public_link_source.label
+        return self.get_source_type_display()
+
+
 class ImportLog(models.Model):
     """Unified log for every batch import, regardless of source channel."""
 
