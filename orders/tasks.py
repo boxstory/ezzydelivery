@@ -9,6 +9,101 @@ from celery import shared_task
 logger = logging.getLogger(__name__)
 
 
+def _convert_excel_date(value):
+    """Convert various date formats to readable date strings.
+
+    Handles:
+    - Python datetime objects (from openpyxl)
+    - Excel serial date numbers: 45911.53475694444 → '2025-09-11 12:50:03'
+    - DD/MM text dates: '22/01' → '2025-01-22' (infers current year)
+    - DD/MM/YY or DD/MM/YYYY: '22/01/25' → '2025-01-22'
+    - Short text: '32 dec', '30 no' → best effort parse
+    """
+    import re
+    from datetime import datetime, timedelta
+
+    if value is None:
+        return ''
+
+    # Handle Python datetime objects directly (openpyxl returns these)
+    if isinstance(value, datetime):
+        if value.hour == 0 and value.minute == 0 and value.second == 0:
+            return value.strftime('%Y-%m-%d')
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Handle date objects
+    try:
+        from datetime import date
+        if isinstance(value, date) and not isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d')
+    except Exception:
+        pass
+
+    s = str(value).strip()
+    if not s:
+        return ''
+
+    # Already a proper date string (YYYY-MM-DD or ISO format)
+    if re.match(r'^\d{4}-\d{2}-\d{2}', s):
+        return s
+
+    # Excel serial date number
+    try:
+        num = float(s)
+        if 1 < num < 100000 and ('.' in s or (s.isdigit() and 100 < num < 100000)):
+            dt = datetime(1899, 12, 30) + timedelta(days=num)
+            return dt.strftime('%Y-%m-%d %H:%M:%S') if num != int(num) else dt.strftime('%Y-%m-%d')
+    except (ValueError, TypeError, OverflowError):
+        pass
+
+    # DD/MM/YYYY or DD/MM/YY
+    m = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{2,4})$', s)
+    if m:
+        day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if year < 100:
+            year += 2000
+        try:
+            return datetime(year, month, day).strftime('%Y-%m-%d')
+        except ValueError:
+            pass
+
+    # DD/MM (no year — infer current year)
+    m = re.match(r'^(\d{1,2})/(\d{1,2})$', s)
+    if m:
+        day, month = int(m.group(1)), int(m.group(2))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            year = datetime.now().year
+            try:
+                return datetime(year, month, day).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+
+    # "DD mon" or "DD month" text like "32 dec", "30 no"
+    month_map = {
+        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+        'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+        'ja': 1, 'fe': 2, 'ma': 3, 'ap': 4, 'ju': 6,
+        'au': 8, 'se': 9, 'oc': 10, 'no': 11, 'de': 12,
+    }
+    m = re.match(r'^(\d{1,2})\s+([a-zA-Z]{2,})$', s)
+    if m:
+        day = int(m.group(1))
+        mon_str = m.group(2).lower()[:3]
+        month = month_map.get(mon_str) or month_map.get(mon_str[:2])
+        if month:
+            # Clamp day to valid range
+            import calendar
+            year = datetime.now().year
+            max_day = calendar.monthrange(year, month)[1]
+            day = min(day, max_day)
+            try:
+                return datetime(year, month, day).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+
+    return s
+
+
 @shared_task(bind=True, max_retries=2, default_retry_delay=60)
 def sync_all_temp_orders(self, source_type=None, source_id=None):
     """Sync rows from all external sources into TempOrder table.
@@ -130,6 +225,13 @@ def _sync_onedrive_source(source):
                 return str(val).strip() if val is not None else ''
         return ''
 
+    def get_cell_raw(row_data, field_name):
+        """Return raw cell value (preserves datetime objects)."""
+        for idx, f in field_map.items():
+            if f == field_name and idx < len(row_data):
+                return row_data[idx]
+        return ''
+
     existing = {
         to.row_num: to
         for to in TempOrder.objects.filter(source_type='onedrive', onedrive_source=source)
@@ -185,7 +287,7 @@ def _sync_onedrive_source(source):
             'dl_street': get_cell(row_data, 'dl_street'),
             'dl_building': get_cell(row_data, 'dl_building'),
             'cod_amount': get_cell(row_data, 'cod_amount'),
-            'order_date': get_cell(row_data, 'order_date'),
+            'order_date': _convert_excel_date(get_cell_raw(row_data, 'order_date')),
             'package_desc': get_cell(row_data, 'package_desc'),
             'raw_row': raw_row,
             'status': status,
@@ -394,7 +496,7 @@ def _sync_google_sheet_source(api_settings):
             'customer_phone': customer_phone,
             'customer_address': cell(row, idx_address),
             'cod_amount': cell(row, idx_cod),
-            'order_date': cell(row, idx_date),
+            'order_date': _convert_excel_date(cell(row, idx_date)),
             'package_desc': cell(row, idx_product),
             'raw_row': raw_row,
             'status': status,
@@ -503,7 +605,7 @@ def _sync_api_source(api_settings):
             'customer_phone': o.get('phone', ''),
             'customer_address': o.get('address', ''),
             'cod_amount': str(o.get('cod', '')) if o.get('cod') else '',
-            'order_date': str(o.get('date', '')),
+            'order_date': _convert_excel_date(o.get('date', '')),
             'package_desc': '',
             'raw_row': o,
             'status': status,
@@ -807,7 +909,7 @@ def _sync_public_link_source(source):
             'dl_street': get_cell(row_data, 'dl_street'),
             'dl_building': get_cell(row_data, 'dl_building'),
             'cod_amount': get_cell(row_data, 'cod_amount'),
-            'order_date': get_cell(row_data, 'order_date'),
+            'order_date': _convert_excel_date(get_cell(row_data, 'order_date')),
             'package_desc': package_desc,
             'raw_row': raw_row,
             'status': status,

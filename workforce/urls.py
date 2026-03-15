@@ -242,6 +242,7 @@ urlpatterns = [
     # Import History & Temp Orders
     path('import-history/', workforce_views.import_history, name='import_history'),
     path('orders/temp/', workforce_views.temp_orders, name='temp_orders'),
+    path('orders/temp/by-date/', workforce_views.temp_orders_by_date, name='temp_orders_by_date'),
     path('orders/temp/sync/', workforce_views.temp_orders_sync, name='temp_orders_sync'),
     path('orders/temp/preview/', workforce_views.temp_orders_preview, name='temp_orders_preview'),
     path('orders/temp/transfer/', workforce_views.temp_orders_transfer, name='temp_orders_transfer'),

@@ -10252,10 +10252,16 @@ def temp_orders(request):
     source_type_filter = request.GET.get('source_type', '').strip()
     sort = request.GET.get('sort', '').strip()
 
-    from django.db.models import Count
+    from django.db.models import Count, Q
 
     qs = orders_models.TempOrder.objects.select_related(
         'business', 'onedrive_source', 'api_settings', 'public_link_source'
+    ).exclude(
+        # Exclude orphaned records with no source FK
+        Q(source_type='onedrive', onedrive_source__isnull=True) |
+        Q(source_type='google_sheet', api_settings__isnull=True) |
+        Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True) |
+        Q(source_type='public_link', public_link_source__isnull=True)
     )
 
     if business_id:
@@ -10353,6 +10359,125 @@ def temp_orders(request):
         },
     }
     return render(request, 'workforce/temp_orders.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def temp_orders_by_date(request):
+    """Fetch orders from all import sources (OneDrive, Google Sheets, APIs)
+    then display results filtered by date range.
+
+    On Fetch: triggers a fresh sync from all external sources, then filters.
+    """
+    from django.db.models import Count, Q
+    from django.core.paginator import Paginator
+
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    business_id = request.GET.get('business', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    source_type_filter = request.GET.get('source_type', '').strip()
+    do_sync = request.GET.get('sync', '').strip()
+
+    sync_result = None
+
+    # Auto-sync when fetching with dates or explicit sync request
+    if do_sync == '1' or (date_from and request.GET.get('page', '') == ''):
+        try:
+            from orders.tasks import sync_all_temp_orders
+            # Run synchronously (not via Celery) for immediate results
+            result = sync_all_temp_orders.apply(kwargs={
+                'source_type': source_type_filter or None,
+            }).get(timeout=120)
+            sync_result = result
+        except Exception as exc:
+            logger.exception("Sync error in fetch by date")
+            sync_result = {'error': str(exc)}
+
+    qs = orders_models.TempOrder.objects.select_related(
+        'business', 'onedrive_source', 'api_settings', 'public_link_source'
+    ).exclude(
+        Q(source_type='onedrive', onedrive_source__isnull=True) |
+        Q(source_type='google_sheet', api_settings__isnull=True) |
+        Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True) |
+        Q(source_type='public_link', public_link_source__isnull=True)
+    )
+
+    if business_id:
+        qs = qs.filter(business_id=business_id)
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if source_type_filter:
+        qs = qs.filter(source_type=source_type_filter)
+
+    # Date filtering on the order_date CharField (YYYY-MM-DD format)
+    if date_from:
+        qs = qs.filter(order_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(Q(order_date__lte=date_to + ' 23:59:59') | Q(order_date__startswith=date_to))
+
+    qs = qs.order_by('-order_date')
+
+    # Paginate
+    paginator = Paginator(qs, 100)
+    page_num = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_num)
+
+    # Status counts for this filtered set
+    base_qs = orders_models.TempOrder.objects.all()
+    if date_from:
+        base_qs = base_qs.filter(order_date__gte=date_from)
+    if date_to:
+        base_qs = base_qs.filter(Q(order_date__lte=date_to + ' 23:59:59') | Q(order_date__startswith=date_to))
+    status_counts = dict(base_qs.values_list('status').annotate(Count('id')).order_by())
+
+    # Source type counts
+    source_type_counts = dict(base_qs.values_list('source_type').annotate(Count('id')).order_by())
+
+    # Business counts
+    biz_counts_list = list(
+        base_qs.values('business_id', 'business__business_name')
+        .annotate(count=Count('id')).order_by('-count')
+    )
+
+    # All businesses for filter
+    all_businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    # Build filter_params for pagination links
+    filter_params = ''
+    params = []
+    if date_from:
+        params.append(f'date_from={date_from}')
+    if date_to:
+        params.append(f'date_to={date_to}')
+    if business_id:
+        params.append(f'business={business_id}')
+    if status_filter:
+        params.append(f'status={status_filter}')
+    if source_type_filter:
+        params.append(f'source_type={source_type_filter}')
+    if params:
+        filter_params = '&'.join(params)
+
+    context = {
+        'page_obj': page_obj,
+        'total_count': paginator.count,
+        'status_counts': status_counts,
+        'source_type_counts': source_type_counts,
+        'biz_counts': biz_counts_list,
+        'all_businesses': all_businesses,
+        'filter_params': filter_params,
+        'sync_result': sync_result,
+        'filters': {
+            'date_from': date_from,
+            'date_to': date_to,
+            'business': business_id,
+            'status': status_filter,
+            'source_type': source_type_filter,
+        },
+    }
+    return render(request, 'workforce/temp_orders_by_date.html', context)
 
 
 @csrf_exempt
