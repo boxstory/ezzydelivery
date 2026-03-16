@@ -383,6 +383,30 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        {% if delivery_task %}
+                        <div class="mb-3">
+                            <label for="preferred_time" class="woe__form-label">Preferred Delivery Time</label>
+                            <select class="woe__form-input" id="preferred_time" name="preferred_time">
+                                <option value="">— Not specified —</option>
+                                {% for value, label in preferred_time_choices %}
+                                <option value="{{ value }}" {% if delivery_task.preferred_time == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="payment_method" class="woe__form-label">Payment Method</label>
+                            <select class="woe__form-input" id="payment_method" name="payment_method">
+                                <option value="">— Not specified —</option>
+                                {% for value, label in payment_method_choices %}
+                                <option value="{{ value }}" {% if delivery_task.payment_method == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
 

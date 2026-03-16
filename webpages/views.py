@@ -147,6 +147,8 @@ def _save_step3_to_db(inquiry, data):
     inquiry.order_management_system = data.get('order_management_system', '')
     inquiry.preferred_communication_channel = data.get('preferred_communication_channel', '')
     inquiry.is_delivery_free_to_customers = data.get('is_delivery_free_to_customers', '')
+    inquiry.preferred_pickup_time = data.get('preferred_pickup_time', '')
+    inquiry.preferred_payment_method = data.get('preferred_payment_method', '')
     inquiry.save()
 
 

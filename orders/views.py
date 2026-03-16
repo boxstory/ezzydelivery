@@ -2420,7 +2420,7 @@ def update_location(request):
                         addr_verify.customer_verified_at = timezone.now()
                         addr_verify.save()
 
-                        # Update DlAddressUpdate if exists
+                        # Update DlAddressUpdate (always update, create if missing)
                         dl_update_fields = {}
                         if zone_number is not None:
                             dl_update_fields['dl_zone'] = zone_number
@@ -2432,18 +2432,58 @@ def update_location(request):
                             dl_update_fields['dl_latitude'] = latitude
                         if longitude:
                             dl_update_fields['dl_longitude'] = longitude
-                        if dl_update_fields:
-                            DlAddressUpdate.objects.filter(order=order).update(**dl_update_fields)
+                        if verified_address:
+                            dl_update_fields['area_name'] = verified_address[:100]
 
-                        # Save preferred delivery time to DeliveryTask
+                        from decimal import Decimal as _D
+                        dl_addr, _ = DlAddressUpdate.objects.get_or_create(
+                            order=order,
+                            defaults={
+                                'full_name': order.customer_name or '',
+                                'mobile_no': order.customer_phone or '',
+                                'dl_task_number': order.order_number,
+                                'dl_latitude': _D('0'),
+                                'dl_longitude': _D('0'),
+                                'dl_unit': '0',
+                            }
+                        )
+                        for attr, val in dl_update_fields.items():
+                            setattr(dl_addr, attr, val)
+                        dl_addr.save()
+
+                        # Save preferred delivery time and payment method
                         preferred_times = request.POST.getlist('preferred_time')
-                        if preferred_times:
-                            order.delivery_task.all().update(preferred_time=','.join(preferred_times))
-
-                        # Save payment method to DeliveryTask
                         payment_method = request.POST.get('payment_method', '')
-                        if payment_method:
-                            order.delivery_task.all().update(payment_method=payment_method)
+
+                        # Get or auto-create delivery task
+                        from delivery.models import DeliveryTask as _DlTask
+                        from orders.signals import _create_delivery_task_from_order
+                        delivery_task = order.delivery_task.first()
+                        if delivery_task is None:
+                            delivery_task = _create_delivery_task_from_order(order)
+                            if delivery_task:
+                                # Auto-publish so drivers can see it
+                                delivery_task.dl_task_publish = True
+                                delivery_task.save(update_fields=['dl_task_publish'])
+
+                        if delivery_task:
+                            # Mirror all address fields onto the task's DlAddressUpdate
+                            task_addr = delivery_task.dl_address_update or dl_addr
+                            for attr, val in dl_update_fields.items():
+                                setattr(task_addr, attr, val)
+                            task_addr.save()
+
+                            # Update task itself
+                            task_fields_to_save = ['address_accuracy', 'dl_address_update']
+                            delivery_task.address_accuracy = 'by_customer'
+                            delivery_task.dl_address_update = task_addr
+                            if preferred_times:
+                                delivery_task.preferred_time = ','.join(preferred_times)
+                                task_fields_to_save.append('preferred_time')
+                            if payment_method:
+                                delivery_task.payment_method = payment_method
+                                task_fields_to_save.append('payment_method')
+                            delivery_task.save(update_fields=task_fields_to_save)
 
                         step = 'success'
                         success = True

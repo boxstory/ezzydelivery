@@ -122,6 +122,7 @@ class Order(models.Model):
         ('address_verified', 'Address Verified'),
         ('address_needs_update', 'Address Needs Update'),
         ('customer_contacted', 'Customer Contacted'),
+        ('verified_by_customer', 'Verified by Customer'),
         ('verified', 'Verified'),
         ('rejected', 'Rejected'),
     )

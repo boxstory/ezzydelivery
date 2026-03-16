@@ -204,6 +204,8 @@ class PricingEnquiry(models.Model):
     order_management_system = models.CharField(max_length=200, blank=True, null=True)  # Shopify / WooCommerce / etc.
     preferred_communication_channel = models.CharField(max_length=100, blank=True, null=True)  # WhatsApp / Email / Phone
     is_delivery_free_to_customers = models.CharField(max_length=50, blank=True, null=True)  # Free / Paid / Mixed
+    preferred_pickup_time = models.CharField(max_length=100, blank=True, null=True)  # e.g. "Morning", "Afternoon", "Evening", "Flexible"
+    preferred_payment_method = models.CharField(max_length=100, blank=True, null=True)  # e.g. "Cash", "Bank Transfer", "Card", "Mixed"
 
     # Completion status — False for partial (in-progress), True for fully submitted
     is_complete = models.BooleanField(default=False)

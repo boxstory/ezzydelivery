@@ -147,7 +147,7 @@
         </div>
         <div class="pid__panel__body">
           <div class="pid__field">
-            <span class="pid__field__lbl">Full Name</span>
+            <span class="pid__field__lbl">Contact Person Name</span>
             <span class="pid__field__val pid-view">{{ inquiry.full_name }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="full_name" value="{{ inquiry.full_name|default:'' }}">
           </div>
@@ -157,22 +157,22 @@
             <input class="form-control form-control-sm pid-edit d-none" name="business_name" value="{{ inquiry.business_name|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Primary Contact</span>
+            <span class="pid__field__lbl">Business Contact Number</span>
             <span class="pid__field__val pid-view">{{ inquiry.business_contact_number }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="business_contact_number" value="{{ inquiry.business_contact_number|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Ops Team Contact</span>
+            <span class="pid__field__lbl">Operations Team Contact</span>
             <span class="pid__field__val pid-view">{{ inquiry.operation_team_contact_number|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="operation_team_contact_number" value="{{ inquiry.operation_team_contact_number|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Website</span>
+            <span class="pid__field__lbl">Website URL</span>
             <span class="pid__field__val pid-view">{{ inquiry.website_url|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="website_url" value="{{ inquiry.website_url|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Social Profile</span>
+            <span class="pid__field__lbl">Social Media Profile</span>
             <span class="pid__field__val pid-view">{{ inquiry.social_profile|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="social_profile" value="{{ inquiry.social_profile|default:'' }}">
           </div>
@@ -180,20 +180,12 @@
           <div class="pid__divider"></div>
 
           <div class="pid__field">
-            <span class="pid__field__lbl">Business Age</span>
+            <span class="pid__field__lbl">How long have you been operating?</span>
             <span class="pid__field__val pid-view">{{ inquiry.business_operating_age|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="business_operating_age" value="{{ inquiry.business_operating_age|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Registered in Qatar</span>
-            <span class="pid__field__val pid-view">{% if inquiry.is_registered_company_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
-            <select class="form-select form-select-sm pid-edit d-none" name="is_registered_company_in_qatar">
-              <option value="true" {% if inquiry.is_registered_company_in_qatar %}selected{% endif %}>Yes</option>
-              <option value="false" {% if not inquiry.is_registered_company_in_qatar %}selected{% endif %}>No</option>
-            </select>
-          </div>
-          <div class="pid__field">
-            <span class="pid__field__lbl">Located in Qatar</span>
+            <span class="pid__field__lbl">Is your business located in Qatar?</span>
             <span class="pid__field__val pid-view">{% if inquiry.is_located_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
             <select class="form-select form-select-sm pid-edit d-none" name="is_located_in_qatar">
               <option value="true" {% if inquiry.is_located_in_qatar %}selected{% endif %}>Yes</option>
@@ -201,7 +193,15 @@
             </select>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Team in Qatar</span>
+            <span class="pid__field__lbl">Is your company registered in Qatar?</span>
+            <span class="pid__field__val pid-view">{% if inquiry.is_registered_company_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
+            <select class="form-select form-select-sm pid-edit d-none" name="is_registered_company_in_qatar">
+              <option value="true" {% if inquiry.is_registered_company_in_qatar %}selected{% endif %}>Yes</option>
+              <option value="false" {% if not inquiry.is_registered_company_in_qatar %}selected{% endif %}>No</option>
+            </select>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Do you have a team available in Qatar?</span>
             <span class="pid__field__val pid-view">{% if inquiry.is_team_available_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
             <select class="form-select form-select-sm pid-edit d-none" name="is_team_available_in_qatar">
               <option value="true" {% if inquiry.is_team_available_in_qatar %}selected{% endif %}>Yes</option>
@@ -209,7 +209,7 @@
             </select>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Based In</span>
+            <span class="pid__field__lbl">Where is your business located?</span>
             <span class="pid__field__val pid-view">{{ inquiry.business_location_country|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="business_location_country" value="{{ inquiry.business_location_country|default:'' }}">
           </div>
@@ -229,12 +229,12 @@
             <input class="form-control form-control-sm pid-edit d-none" name="product_category" value="{{ inquiry.product_category|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Avg Order Value (QAR)</span>
+            <span class="pid__field__lbl">Average Order Value (QAR)</span>
             <span class="pid__field__val pid-view">{{ inquiry.average_order_value_qar|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="average_order_value_qar" value="{{ inquiry.average_order_value_qar|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Personalized Product</span>
+            <span class="pid__field__lbl">Is this a personalized product?</span>
             <span class="pid__field__val pid-view">{% if inquiry.is_personalized_product %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
             <select class="form-select form-select-sm pid-edit d-none" name="is_personalized_product">
               <option value="true" {% if inquiry.is_personalized_product %}selected{% endif %}>Yes</option>
@@ -248,7 +248,7 @@
           <div class="pid__services">
             <div class="pid__service {% if inquiry.is_required_COD_service %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-money-bill-wave"></i></div>
-              <span>COD Service</span>
+              <span>Do you require COD (Cash on Delivery)?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_required_COD_service %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
               <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_required_COD_service">
                 <option value="true" {% if inquiry.is_required_COD_service %}selected{% endif %}>Yes</option>
@@ -257,7 +257,7 @@
             </div>
             <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-plane-departure"></i></div>
-              <span>Fulfillment (Outside Qatar)</span>
+              <span>Fulfillment to operate from outside Qatar?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
               <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_required_fulfillment_service_for_operate_from_outside_qatar">
                 <option value="true" {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}selected{% endif %}>Yes</option>
@@ -266,7 +266,7 @@
             </div>
             <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-warehouse"></i></div>
-              <span>Fulfillment Hub in Doha</span>
+              <span>Fulfillment hub in Doha?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
               <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_required_fulfillment_service_for_make_hub_in_doha">
                 <option value="true" {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}selected{% endif %}>Yes</option>
@@ -275,7 +275,7 @@
             </div>
             <div class="pid__service {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-bolt"></i></div>
-              <span>Same-Day Delivery</span>
+              <span>Frequent same-day pick & delivery required?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
               <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_frequent_same_day_pick_and_delivery_required">
                 <option value="true" {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}selected{% endif %}>Yes</option>
@@ -284,7 +284,7 @@
             </div>
             <div class="pid__service {% if inquiry.is_special_handling_required %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-hand-holding-box"></i></div>
-              <span>Special Handling</span>
+              <span>Special handling required?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_special_handling_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
               <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_special_handling_required">
                 <option value="true" {% if inquiry.is_special_handling_required %}selected{% endif %}>Yes</option>
@@ -293,7 +293,7 @@
             </div>
             <div class="pid__service {% if inquiry.is_return_logistics_required %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-rotate-left"></i></div>
-              <span>Return Logistics</span>
+              <span>Return / reverse logistics required?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_return_logistics_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
               <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_return_logistics_required">
                 <option value="true" {% if inquiry.is_return_logistics_required %}selected{% endif %}>Yes</option>
@@ -322,12 +322,12 @@
             <input class="form-control form-control-sm pid-edit d-none" name="avarage_number_of_order_done_last_month" value="{{ inquiry.avarage_number_of_order_done_last_month|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Expected Next Month</span>
+            <span class="pid__field__lbl">Expected Orders Next Month</span>
             <span class="pid__field__val pid__field__val--num pid-view">{{ inquiry.avarage_number_of_order_expect_next_month|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="avarage_number_of_order_expect_next_month" value="{{ inquiry.avarage_number_of_order_expect_next_month|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">3-Month Milestone</span>
+            <span class="pid__field__lbl">3-Month Growth Milestone</span>
             <span class="pid__field__val pid__field__val--num pid-view">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="orders_expected_in_next_3_months_milestone" value="{{ inquiry.orders_expected_in_next_3_months_milestone|default:'' }}">
           </div>
@@ -342,22 +342,22 @@
         </div>
         <div class="pid__panel__body">
           <div class="pid__field">
-            <span class="pid__field__lbl">Delivery Speed Offered</span>
+            <span class="pid__field__lbl">Delivery Speed Offered to Customers</span>
             <span class="pid__field__val pid-view">{{ inquiry.speed_delivery_offer_to_customers|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="speed_delivery_offer_to_customers" value="{{ inquiry.speed_delivery_offer_to_customers|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Time Window</span>
+            <span class="pid__field__lbl">Preferred Delivery Time Window</span>
             <span class="pid__field__val pid-view">{{ inquiry.preferred_delivery_time_window|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="preferred_delivery_time_window" value="{{ inquiry.preferred_delivery_time_window|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Package Size</span>
+            <span class="pid__field__lbl">Typical Package Size</span>
             <span class="pid__field__val pid-view">{{ inquiry.typical_package_size|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="typical_package_size" value="{{ inquiry.typical_package_size|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Delivery Cost to Customers</span>
+            <span class="pid__field__lbl">Do you provide free delivery to customers?</span>
             <span class="pid__field__val pid-view">
               {% if inquiry.is_delivery_free_to_customers == 'Free' %}<span class="pid__chip pid__chip--yes">Free</span>
               {% elif inquiry.is_delivery_free_to_customers == 'Paid' %}<span class="pid__chip pid__chip--no">Paid</span>
@@ -372,22 +372,22 @@
             </select>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Coverage</span>
+            <span class="pid__field__lbl">Delivery Coverage</span>
             <span class="pid__field__val pid-view">{{ inquiry.delivery_coverage|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="delivery_coverage" value="{{ inquiry.delivery_coverage|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Current Provider</span>
+            <span class="pid__field__lbl">Current Courier / 3PL Provider</span>
             <span class="pid__field__val pid-view">{{ inquiry.current_courier_provider|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="current_courier_provider" value="{{ inquiry.current_courier_provider|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Order Management System</span>
+            <span class="pid__field__lbl">How do you manage orders?</span>
             <span class="pid__field__val pid-view">{{ inquiry.order_management_system|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="order_management_system" value="{{ inquiry.order_management_system|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Preferred Contact</span>
+            <span class="pid__field__lbl">Preferred Communication Channel</span>
             <span class="pid__field__val pid-view">
               {% if inquiry.preferred_communication_channel %}
                 {% if inquiry.preferred_communication_channel == 'WhatsApp' %}<i class="fa-brands fa-whatsapp" style="color:#25d366"></i>&nbsp;{% endif %}
@@ -404,12 +404,23 @@
             </select>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Preferred Start Date</span>
+            <span class="pid__field__lbl">When do you want to start?</span>
             <span class="pid__field__val pid-view {% if inquiry.preferred_start_date == 'Immediately' %}pid__field__val--urgent{% endif %}">
               {% if inquiry.preferred_start_date == 'Immediately' %}<i class="fa-solid fa-bolt me-1"></i>{% endif %}
               {{ inquiry.preferred_start_date|default:"—" }}
             </span>
             <input class="form-control form-control-sm pid-edit d-none" name="preferred_start_date" value="{{ inquiry.preferred_start_date|default:'' }}">
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Preferred Payment Method</span>
+            <span class="pid__field__val pid-view">{{ inquiry.preferred_payment_method|default:"—" }}</span>
+            <select class="form-select form-select-sm pid-edit d-none" name="preferred_payment_method">
+              <option value="">—</option>
+              <option value="Cash" {% if inquiry.preferred_payment_method == 'Cash' %}selected{% endif %}>Cash</option>
+              <option value="Bank Transfer" {% if inquiry.preferred_payment_method == 'Bank Transfer' %}selected{% endif %}>Bank Transfer</option>
+              <option value="Card" {% if inquiry.preferred_payment_method == 'Card' %}selected{% endif %}>Card</option>
+              <option value="Mixed" {% if inquiry.preferred_payment_method == 'Mixed' %}selected{% endif %}>Mixed</option>
+            </select>
           </div>
         </div>
       </div>
@@ -422,22 +433,33 @@
         </div>
         <div class="pid__panel__body">
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickup Type</span>
+            <span class="pid__field__lbl">Type of Pickup Location</span>
             <span class="pid__field__val pid-view">{{ inquiry.type_of_pickup_location|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="type_of_pickup_location" value="{{ inquiry.type_of_pickup_location|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickup Area</span>
+            <span class="pid__field__lbl">Pickup Location Area</span>
             <span class="pid__field__val pid-view">{{ inquiry.pickup_Location_area_name|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="pickup_Location_area_name" value="{{ inquiry.pickup_Location_area_name|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickup Time Slab</span>
+            <span class="pid__field__lbl">Preferred Pickup Time</span>
+            <span class="pid__field__val pid-view">{{ inquiry.preferred_pickup_time|default:"—" }}</span>
+            <select class="form-select form-select-sm pid-edit d-none" name="preferred_pickup_time">
+              <option value="">—</option>
+              <option value="Morning (8am–12pm)" {% if inquiry.preferred_pickup_time == 'Morning (8am–12pm)' %}selected{% endif %}>Morning (8am–12pm)</option>
+              <option value="Afternoon (12pm–4pm)" {% if inquiry.preferred_pickup_time == 'Afternoon (12pm–4pm)' %}selected{% endif %}>Afternoon (12pm–4pm)</option>
+              <option value="Evening (4pm–8pm)" {% if inquiry.preferred_pickup_time == 'Evening (4pm–8pm)' %}selected{% endif %}>Evening (4pm–8pm)</option>
+              <option value="Flexible" {% if inquiry.preferred_pickup_time == 'Flexible' %}selected{% endif %}>Flexible</option>
+            </select>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Pickup Time Slot</span>
             <span class="pid__field__val pid-view">{{ inquiry.pickup_location_time_slab|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="pickup_location_time_slab" value="{{ inquiry.pickup_location_time_slab|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickups per Day</span>
+            <span class="pid__field__lbl">Number of Pickups Per Day</span>
             <span class="pid__field__val pid__field__val--num pid-view">{{ inquiry.number_of_pickup_times_in_day|default:"1" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="number_of_pickup_times_in_day" value="{{ inquiry.number_of_pickup_times_in_day|default:'1' }}">
           </div>
@@ -466,7 +488,7 @@
             <a href="tel:{{ inquiry.business_contact_number }}" class="pid__contact__item">
               <i class="fa-solid fa-phone"></i>
               <div>
-                <div class="pid__contact__label">Primary Contact</div>
+                <div class="pid__contact__label">Business Contact Number</div>
                 <div class="pid__contact__val">{{ inquiry.business_contact_number }}</div>
               </div>
             </a>
@@ -474,7 +496,7 @@
             <a href="tel:{{ inquiry.operation_team_contact_number }}" class="pid__contact__item">
               <i class="fa-solid fa-headset"></i>
               <div>
-                <div class="pid__contact__label">Ops Team</div>
+                <div class="pid__contact__label">Operations Team Contact</div>
                 <div class="pid__contact__val">{{ inquiry.operation_team_contact_number }}</div>
               </div>
             </a>
@@ -483,7 +505,7 @@
             <a href="{{ inquiry.website_url }}" target="_blank" class="pid__contact__item">
               <i class="fa-solid fa-globe"></i>
               <div>
-                <div class="pid__contact__label">Website</div>
+                <div class="pid__contact__label">Website URL</div>
                 <div class="pid__contact__val">{{ inquiry.website_url|truncatechars:45 }}</div>
               </div>
             </a>
@@ -492,7 +514,7 @@
             <a href="{{ inquiry.social_profile }}" target="_blank" class="pid__contact__item">
               <i class="fa-solid fa-share-nodes"></i>
               <div>
-                <div class="pid__contact__label">Social Profile</div>
+                <div class="pid__contact__label">Social Media Profile</div>
                 <div class="pid__contact__val">{{ inquiry.social_profile|truncatechars:45 }}</div>
               </div>
             </a>
@@ -502,24 +524,24 @@
           <div class="pid__divider"></div>
 
           <div class="pid__field">
-            <span class="pid__field__lbl">Business Age</span>
+            <span class="pid__field__lbl">How long have you been operating?</span>
             <span class="pid__field__val">{{ inquiry.business_operating_age|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Registered in Qatar</span>
-            <span class="pid__field__val">{% if inquiry.is_registered_company_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
-          </div>
-          <div class="pid__field">
-            <span class="pid__field__lbl">Located in Qatar</span>
+            <span class="pid__field__lbl">Is your business located in Qatar?</span>
             <span class="pid__field__val">{% if inquiry.is_located_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Team in Qatar</span>
+            <span class="pid__field__lbl">Is your company registered in Qatar?</span>
+            <span class="pid__field__val">{% if inquiry.is_registered_company_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Do you have a team available in Qatar?</span>
             <span class="pid__field__val">{% if inquiry.is_team_available_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
           </div>
           {% if inquiry.business_location_country %}
           <div class="pid__field">
-            <span class="pid__field__lbl">Based In</span>
+            <span class="pid__field__lbl">Where is your business located?</span>
             <span class="pid__field__val">{{ inquiry.business_location_country }}</span>
           </div>
           {% endif %}
@@ -538,39 +560,43 @@
             <span class="pid__field__val pid__field__val--primary">{{ inquiry.product_category }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Personalized Product</span>
+            <span class="pid__field__lbl">Average Order Value (QAR)</span>
+            <span class="pid__field__val">{{ inquiry.average_order_value_qar|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Is this a personalized product?</span>
             <span class="pid__field__val">{% if inquiry.is_personalized_product %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
           </div>
           <div class="pid__divider"></div>
           <div class="pid__services">
             <div class="pid__service {% if inquiry.is_required_COD_service %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-money-bill-wave"></i></div>
-              <span>COD Service</span>
+              <span>Do you require COD (Cash on Delivery)?</span>
               <i class="fa-solid {% if inquiry.is_required_COD_service %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
             </div>
             <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-plane-departure"></i></div>
-              <span>Fulfillment (Outside Qatar)</span>
+              <span>Fulfillment to operate from outside Qatar?</span>
               <i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
             </div>
             <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-warehouse"></i></div>
-              <span>Fulfillment Hub in Doha</span>
+              <span>Fulfillment hub in Doha?</span>
               <i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
             </div>
             <div class="pid__service {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-bolt"></i></div>
-              <span>Same-Day Delivery</span>
+              <span>Frequent same-day pick & delivery required?</span>
               <i class="fa-solid {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
             </div>
             <div class="pid__service {% if inquiry.is_special_handling_required %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-hand-holding-box"></i></div>
-              <span>Special Handling</span>
+              <span>Special handling required?</span>
               <i class="fa-solid {% if inquiry.is_special_handling_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
             </div>
             <div class="pid__service {% if inquiry.is_return_logistics_required %}pid__service--on{% endif %}">
               <div class="pid__service__icon"><i class="fa-solid fa-rotate-left"></i></div>
-              <span>Return Logistics</span>
+              <span>Return / reverse logistics required?</span>
               <i class="fa-solid {% if inquiry.is_return_logistics_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
             </div>
           </div>
@@ -593,11 +619,11 @@
             <span class="pid__field__val pid__field__val--num">{{ inquiry.avarage_number_of_order_done_last_month|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Expected Next Month</span>
+            <span class="pid__field__lbl">Expected Orders Next Month</span>
             <span class="pid__field__val pid__field__val--num">{{ inquiry.avarage_number_of_order_expect_next_month|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">3-Month Milestone</span>
+            <span class="pid__field__lbl">3-Month Growth Milestone</span>
             <span class="pid__field__val pid__field__val--num">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"—" }}</span>
           </div>
         </div>
@@ -611,19 +637,19 @@
         </div>
         <div class="pid__panel__body">
           <div class="pid__field">
-            <span class="pid__field__lbl">Delivery Speed Offered</span>
+            <span class="pid__field__lbl">Delivery Speed Offered to Customers</span>
             <span class="pid__field__val">{{ inquiry.speed_delivery_offer_to_customers|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Time Window</span>
+            <span class="pid__field__lbl">Preferred Delivery Time Window</span>
             <span class="pid__field__val">{{ inquiry.preferred_delivery_time_window|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Package Size</span>
+            <span class="pid__field__lbl">Typical Package Size</span>
             <span class="pid__field__val">{{ inquiry.typical_package_size|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Delivery Cost to Customers</span>
+            <span class="pid__field__lbl">Do you provide free delivery to customers?</span>
             <span class="pid__field__val">
               {% if inquiry.is_delivery_free_to_customers == 'Free' %}<span class="pid__chip pid__chip--yes">Free</span>
               {% elif inquiry.is_delivery_free_to_customers == 'Paid' %}<span class="pid__chip pid__chip--no">Paid</span>
@@ -632,19 +658,19 @@
             </span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Coverage</span>
+            <span class="pid__field__lbl">Delivery Coverage</span>
             <span class="pid__field__val">{{ inquiry.delivery_coverage|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Current Provider</span>
+            <span class="pid__field__lbl">Current Courier / 3PL Provider</span>
             <span class="pid__field__val">{{ inquiry.current_courier_provider|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Order Management System</span>
+            <span class="pid__field__lbl">How do you manage orders?</span>
             <span class="pid__field__val">{{ inquiry.order_management_system|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Preferred Contact</span>
+            <span class="pid__field__lbl">Preferred Communication Channel</span>
             <span class="pid__field__val">
               {% if inquiry.preferred_communication_channel %}
                 {% if inquiry.preferred_communication_channel == 'WhatsApp' %}<i class="fa-brands fa-whatsapp" style="color:#25d366"></i>&nbsp;{% endif %}
@@ -655,11 +681,15 @@
             </span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Preferred Start Date</span>
+            <span class="pid__field__lbl">When do you want to start?</span>
             <span class="pid__field__val {% if inquiry.preferred_start_date == 'Immediately' %}pid__field__val--urgent{% endif %}">
               {% if inquiry.preferred_start_date == 'Immediately' %}<i class="fa-solid fa-bolt me-1"></i>{% endif %}
               {{ inquiry.preferred_start_date|default:"—" }}
             </span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Preferred Payment Method</span>
+            <span class="pid__field__val">{{ inquiry.preferred_payment_method|default:"—" }}</span>
           </div>
         </div>
       </div>
@@ -672,19 +702,23 @@
         </div>
         <div class="pid__panel__body">
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickup Type</span>
+            <span class="pid__field__lbl">Type of Pickup Location</span>
             <span class="pid__field__val">{{ inquiry.type_of_pickup_location|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickup Area</span>
+            <span class="pid__field__lbl">Pickup Location Area</span>
             <span class="pid__field__val">{{ inquiry.pickup_Location_area_name|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickup Time Slab</span>
+            <span class="pid__field__lbl">Preferred Pickup Time</span>
+            <span class="pid__field__val">{{ inquiry.preferred_pickup_time|default:"—" }}</span>
+          </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl">Pickup Time Slot</span>
             <span class="pid__field__val">{{ inquiry.pickup_location_time_slab|default:"—" }}</span>
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Pickups per Day</span>
+            <span class="pid__field__lbl">Number of Pickups Per Day</span>
             <span class="pid__field__val pid__field__val--num">{{ inquiry.number_of_pickup_times_in_day|default:"1" }}</span>
           </div>
         </div>

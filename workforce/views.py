@@ -227,6 +227,10 @@ def wf_dashboard(request):
     active_sellers = seller_stats['active']
     pending_sellers = seller_stats['pending']
 
+    # Temp orders pending import
+    from orders.models import TempOrder
+    temp_orders_new = TempOrder.objects.filter(status='new').count()
+
     # Recent orders (last 10 updated)
     orders = Order.objects.select_related('business').order_by('-updated_at')[:10]
 
@@ -270,6 +274,8 @@ def wf_dashboard(request):
         'active_sellers': active_sellers,
         'pending_sellers': pending_sellers,
         'cod_in_hand': cod_in_hand,
+        # Temp orders
+        'temp_orders_new': temp_orders_new,
         # Recent data
         'orders': orders,
         'orders_trend': orders_trend,
@@ -1449,6 +1455,36 @@ def preview_api_import(request):
                     row_data['client_order_code'] = cell(row, field_idx_map.get(fname)) or str(sheet_row)
                 else:
                     row_data[fname] = cell(row, field_idx_map.get(fname))
+
+            # Build product match preview for verify step
+            idx_products_preview = {}
+            for i in range(1, 6):
+                idx_products_preview[f'product_{i}'] = get_idx(f'product_{i}', f'product {i}', f'product:{i}', f'item {i}')
+                idx_products_preview[f'count_{i}'] = get_idx(f'count_{i}', f'count {i}', f'count:{i}', f'qty {i}')
+            product_matches = []
+            # Single package_desc column
+            pn0 = cell(row, field_idx_map.get('package_desc'))
+            if pn0:
+                matched0, mtype0 = match_product(business, pn0)
+                product_matches.append({
+                    'raw': pn0,
+                    'qty': 1,
+                    'matched_name': matched0.item_name if matched0 else None,
+                    'match_type': mtype0,
+                })
+            # product_1..5 columns
+            for i in range(1, 6):
+                pn = cell(row, idx_products_preview.get(f'product_{i}'))
+                if pn:
+                    pqty = int(cell(row, idx_products_preview.get(f'count_{i}')) or 1) if idx_products_preview.get(f'count_{i}') is not None else 1
+                    matched, mtype = match_product(business, pn)
+                    product_matches.append({
+                        'raw': pn,
+                        'qty': pqty,
+                        'matched_name': matched.item_name if matched else None,
+                        'match_type': mtype,
+                    })
+            row_data['product_matches'] = product_matches
             preview_rows.append(row_data)
 
         return JsonResponse({
@@ -1463,6 +1499,53 @@ def preview_api_import(request):
     except Exception as e:
         logger.exception('preview_api_import error: %s', e)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+def match_product(business, pname):
+    """
+    Cascading product name match for import.
+    Returns (Product|None, match_type_str).
+    match_type: 'exact' | 'sku' | 'barcode' | 'alias' | 'fuzzy' | 'unmatched'
+    """
+    name = pname.strip()
+    if not name:
+        return None, 'unmatched'
+    # 1. Exact item_name
+    p = product_models.Product.objects.filter(business=business, item_name__iexact=name).first()
+    if p:
+        return p, 'exact'
+    # 2. Exact SKU
+    p = product_models.Product.objects.filter(business=business, item_sku__iexact=name).first()
+    if p:
+        return p, 'sku'
+    # 3. Exact barcode
+    p = product_models.Product.objects.filter(business=business, barcode__iexact=name).first()
+    if p:
+        return p, 'barcode'
+    # 4. Client aliases (client_names comma-separated field)
+    for prod in product_models.Product.objects.filter(business=business).exclude(client_names__isnull=True).exclude(client_names=''):
+        for alias in prod.get_client_names_list():
+            if alias.lower() == name.lower():
+                return prod, 'alias'
+    # 5. Substring: item_name contains pname
+    p = product_models.Product.objects.filter(business=business, item_name__icontains=name).first()
+    if p:
+        return p, 'fuzzy'
+    # 6. Word-overlap: ≥2 shared tokens, ≥50% score
+    tokens = set(name.lower().split())
+    if len(tokens) >= 2:
+        best, best_score = None, 0
+        for prod in product_models.Product.objects.filter(business=business):
+            prod_tokens = set(prod.item_name.lower().split())
+            overlap = len(tokens & prod_tokens)
+            if overlap < 2:
+                continue
+            score = overlap / max(len(tokens), len(prod_tokens))
+            if score >= 0.5 and score > best_score:
+                best, best_score = prod, score
+        if best:
+            return best, 'fuzzy'
+    return None, 'unmatched'
 
 
 @login_required(login_url='/accounts/login/')
@@ -1897,8 +1980,7 @@ def import_api_orders(request):
 
                     order.save(update_fields=['package_description', 'package_qty'])
 
-                    # Match product columns to actual Product records → create OrderItems
-                    from product.models import Product as ProductModel
+                    # Match product columns to Product records → create OrderItems
                     product_names = []
                     if product_desc:
                         product_names.append((product_desc, safe_int(cell(row, idx_qty)) or 1))
@@ -1908,23 +1990,17 @@ def import_api_orders(request):
                             pc = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
                             product_names.append((pn, pc))
                     for pname, pqty in product_names:
-                        matched = ProductModel.objects.filter(
-                            business=business, item_name__iexact=pname.strip()
-                        ).first()
-                        if not matched:
-                            matched = ProductModel.objects.filter(
-                                business=business, item_sku__iexact=pname.strip()
-                            ).first()
-                        if not matched:
-                            matched = ProductModel.objects.filter(
-                                business=business, barcode__iexact=pname.strip()
-                            ).first()
-                        if matched:
-                            orders_models.OrderItem.objects.create(
-                                order=order, product=matched, quantity=pqty,
-                                unit_price=matched.item_price or 0,
-                                notes=matched.item_name
-                            )
+                        matched, mtype = match_product(business, pname)
+                        orders_models.OrderItem.objects.create(
+                            order=order,
+                            product=matched,
+                            quantity=pqty,
+                            unit_price=matched.item_price if matched else 0,
+                            notes=pname if not matched else matched.item_name,
+                        )
+                        # Auto-save fuzzy-matched client name as alias for next import
+                        if matched and mtype == 'fuzzy':
+                            matched.add_client_name(pname)
 
                     # Create AddressVerification if lat/long provided
                     lat = safe_decimal(cell(row, idx_lat))
@@ -9003,6 +9079,17 @@ def order_edit(request, order_id):
 
             order.save()
 
+            # Update delivery task fields if present
+            preferred_time = request.POST.get('preferred_time', '')
+            payment_method = request.POST.get('payment_method', '')
+            task_updates = {}
+            if preferred_time:
+                task_updates['preferred_time'] = preferred_time
+            if payment_method:
+                task_updates['payment_method'] = payment_method
+            if task_updates:
+                order.delivery_task.all().update(**task_updates)
+
             # Build change summary
             new_vals = {
                 'customer_name': order.customer_name or '',
@@ -9074,6 +9161,8 @@ def order_edit(request, order_id):
         order=order
     ).select_related('product').order_by('id')
 
+    delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+
     context = {
         'page_title': f'Edit Order - {order.order_number}',
         'order': order,
@@ -9083,6 +9172,9 @@ def order_edit(request, order_id):
         'verification_statuses': orders_models.Order.VERIFICATION_STATUS,
         'cod_statuses': orders_models.COD_STATUS_BY_CLIENT,
         'zone_name': zone_name,
+        'delivery_task': delivery_task,
+        'preferred_time_choices': delivery_models.DeliveryTask.PREFERRED_TIME_CHOICES,
+        'payment_method_choices': delivery_models.DeliveryTask.PAYMENT_METHOD_CHOICES,
     }
 
     return render(request, 'workforce/order_edit.html', context)
@@ -9659,6 +9751,7 @@ def pricing_inquiry_edit(request, inquiry_id):
         'typical_package_size', 'delivery_coverage', 'current_courier_provider',
         'order_management_system', 'preferred_communication_channel',
         'is_delivery_free_to_customers', 'preferred_start_date',
+        'preferred_pickup_time', 'preferred_payment_method',
         'type_of_pickup_location', 'pickup_Location_area_name',
         'pickup_location_time_slab', 'number_of_pickup_times_in_day',
     }
@@ -10242,9 +10335,9 @@ def import_history(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def temp_orders(request):
-    """Show temp orders from DB (synced from OneDrive).
+    """Show temp orders from DB (synced from external sources).
 
-    Data is loaded from TempOrder model instead of live OneDrive fetch.
+    Data is loaded from TempOrder model instead of live fetch.
     Staff can trigger a manual sync or rely on the daily Celery task.
     """
     business_id = request.GET.get('business', '').strip()
@@ -10255,7 +10348,7 @@ def temp_orders(request):
     from django.db.models import Count, Q
 
     qs = orders_models.TempOrder.objects.select_related(
-        'business', 'onedrive_source', 'api_settings', 'public_link_source'
+        'business', 'onedrive_source', 'api_settings', 'public_link_source', 'imported_order'
     ).exclude(
         # Exclude orphaned records with no source FK
         Q(source_type='onedrive', onedrive_source__isnull=True) |
@@ -10821,6 +10914,310 @@ def temp_orders_transfer(request):
         'skipped': skipped,
         'errors': errors[:20],
         'message': f'{saved} orders created, {skipped} skipped',
+    })
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+def temp_orders_auto_import(request):
+    """Automated pipeline: import selected TempOrder rows into Orders,
+    auto-assign pickup location, QNAS geocode, and publish to fleet
+    if all checks pass.
+
+    Accepts JSON body: { "ids": [1, 2, 3] }
+    Returns per-row status: fully_automated / needs_review / failed
+    """
+    import json as json_lib
+    import re
+    import uuid
+    from django.conf import settings
+    from django.db import transaction
+    from product.models import Product as ProductModel
+    from delivery import models as delivery_models
+    from business.models import PickupLocation
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    ids = body.get('ids', [])
+    if not ids:
+        return JsonResponse({'success': False, 'error': 'No IDs provided'}, status=400)
+
+    def safe_int(val):
+        if not val:
+            return 0
+        try:
+            return int(float(str(val).replace(',', '').strip()))
+        except (ValueError, TypeError):
+            return 0
+
+    def safe_int_or_none(val):
+        v = safe_int(val)
+        return v if v else None
+
+    def parse_products_from_desc(desc):
+        """Parse 'Name x2, OtherName x1' or 'Name' into product list."""
+        if not desc:
+            return []
+        products = []
+        for part in re.split(r',\s*', desc.strip()):
+            m = re.match(r'^(.+?)\s+[xX×](\d+)$', part.strip())
+            if m:
+                products.append({'name': m.group(1).strip(), 'qty': int(m.group(2))})
+            elif part.strip():
+                products.append({'name': part.strip(), 'qty': 1})
+        return products
+
+    fully_automated = 0
+    needs_review = 0
+    failed = 0
+    row_results = []
+
+    for temp_id in ids:
+        result_entry = {'id': temp_id, 'status': None, 'warnings': [], 'order_number': None}
+        row_warnings = result_entry['warnings']
+
+        # --- Fetch TempOrder ---
+        try:
+            temp_order = orders_models.TempOrder.objects.select_related('business').get(id=temp_id)
+        except orders_models.TempOrder.DoesNotExist:
+            result_entry['status'] = 'failed'
+            result_entry['error'] = f'TempOrder {temp_id} not found'
+            failed += 1
+            row_results.append(result_entry)
+            continue
+
+        business = temp_order.business
+
+        # --- Field extraction ---
+        client_order_code = (temp_order.client_order_code or '').strip()
+        customer_name = (temp_order.customer_name or '').strip()
+        customer_phone = (temp_order.customer_phone or '').strip()
+        customer_address = (temp_order.customer_address or '').strip()
+
+        if not customer_name and not customer_phone:
+            result_entry['status'] = 'failed'
+            result_entry['error'] = 'Missing customer name and phone'
+            failed += 1
+            row_results.append(result_entry)
+            continue
+
+        if not client_order_code:
+            client_order_code = f"OD-{uuid.uuid4().hex[:8].upper()}"
+
+        if orders_models.Order.objects.filter(client_order_code=client_order_code).exists():
+            temp_order.status = 'imported'
+            temp_order.save(update_fields=['status'])
+            result_entry['status'] = 'failed'
+            result_entry['error'] = f"Duplicate order code '{client_order_code}'"
+            failed += 1
+            row_results.append(result_entry)
+            continue
+
+        # --- Clean fields ---
+        customer_phone = convert_arabic_numerals(customer_phone)
+        customer_whatsapp = format_whatsapp_number(customer_phone)
+        if contains_arabic(customer_name):
+            customer_name = translate_to_english(customer_name)
+        if contains_arabic(customer_address):
+            customer_address = translate_to_english(customer_address)
+
+        cod_amount = safe_int(temp_order.cod_amount)
+        dl_zone = safe_int_or_none(temp_order.dl_zone)
+        dl_street = safe_int_or_none(temp_order.dl_street)
+        dl_building = safe_int_or_none(temp_order.dl_building)
+        package_desc = (temp_order.package_desc or '').strip()
+
+        # --- Product matching ---
+        products = parse_products_from_desc(package_desc)
+        matched_items = []
+        unmatched_names = []
+        for p in products:
+            pname = p['name']
+            pqty = p['qty']
+            matched = ProductModel.objects.filter(
+                business=business, item_name__iexact=pname.strip()
+            ).first()
+            if not matched:
+                matched = ProductModel.objects.filter(
+                    business=business, item_sku__iexact=pname.strip()
+                ).first()
+            if not matched:
+                matched = ProductModel.objects.filter(
+                    business=business, barcode__iexact=pname.strip()
+                ).first()
+            if matched:
+                matched_items.append({'product': matched, 'qty': pqty})
+            else:
+                unmatched_names.append(f"{pname} x{pqty}")
+
+        if unmatched_names:
+            row_warnings.append(f"Unmatched products: {', '.join(unmatched_names)}")
+
+        # --- Pickup location auto-assignment ---
+        pickup_location = None
+        if business.fulfillment_service_enabled and business.fulfillment_service_status == 'active':
+            pickup_location = PickupLocation.objects.filter(
+                business=business, pickup_status='active', is_fulfilment_center=True
+            ).first()
+        if not pickup_location:
+            pickup_location = PickupLocation.objects.filter(
+                business=business, pickup_status='active', is_default=True
+            ).first()
+        if not pickup_location:
+            active_locs = PickupLocation.objects.filter(business=business, pickup_status='active')
+            if active_locs.count() == 1:
+                pickup_location = active_locs.first()
+
+        if not pickup_location:
+            row_warnings.append('No default pickup location found — manual assignment required')
+
+        # --- Build order_notes (unmatched items) ---
+        auto_notes = ''
+        if unmatched_names:
+            note_str = f"[Auto] Unmatched: {', '.join(unmatched_names)}"
+            auto_notes = note_str[:97] + '...' if len(note_str) > 100 else note_str
+
+        # --- Create Order ---
+        try:
+            with transaction.atomic():
+                order = orders_models.Order(
+                    business=business,
+                    client_order_code=client_order_code,
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
+                    customer_whatsapp=customer_whatsapp,
+                    customer_address=customer_address,
+                    dl_zone=dl_zone,
+                    dl_street=dl_street,
+                    dl_building=dl_building,
+                    cod_amount=cod_amount,
+                    pickup_location=pickup_location,
+                    order_notes=auto_notes,
+                    order_status='to_review',
+                    verification_status='pending',
+                    package_description=package_desc[:255] if package_desc else '',
+                    package_qty=max(sum(p['qty'] for p in products), 1) if products else 1,
+                    original_order_data={
+                        'source': f'{temp_order.source_type}_auto_import',
+                        'temp_order_id': temp_order.id,
+                        'source_type': temp_order.source_type,
+                        'sheet_name': temp_order.sheet_name,
+                        'row_number': temp_order.row_num,
+                        'platform_id': temp_order.platform_id,
+                        'auto_imported': True,
+                        'products': [{'name': p['name'], 'qty': str(p['qty'])} for p in products],
+                    },
+                )
+                order.save()
+
+                # Create OrderItems for matched products
+                for item in matched_items:
+                    orders_models.OrderItem.objects.create(
+                        order=order,
+                        product=item['product'],
+                        quantity=item['qty'],
+                        unit_price=item['product'].item_price or 0,
+                        notes=item['product'].item_name,
+                    )
+
+                # Mark temp order imported
+                temp_order.status = 'imported'
+                temp_order.imported_order = order
+                temp_order.save(update_fields=['status', 'imported_order'])
+
+        except Exception as e:
+            logger.exception('Auto-import order creation error for temp_order %s', temp_id)
+            result_entry['status'] = 'failed'
+            result_entry['error'] = str(e)
+            failed += 1
+            row_results.append(result_entry)
+            continue
+
+        result_entry['order_number'] = order.order_number
+
+        # --- QNAS geocoding & address verification ---
+        address_verified = False
+
+        if getattr(settings, 'DISPATCH_BATCHING_ENABLED', False):
+            row_warnings.append('Batch dispatch mode — address geocoding deferred to queue')
+        elif dl_zone and dl_street:
+            try:
+                # Trigger signal: _create_delivery_task_from_order → QNAS geocode → DeliveryTask
+                order.order_status = 'publish'
+                order.save(update_fields=['order_status'])
+
+                order.refresh_from_db()
+                try:
+                    addr_upd = delivery_models.DlAddressUpdate.objects.get(order=order)
+                    geocoded = (
+                        addr_upd.dl_latitude is not None
+                        and addr_upd.dl_longitude is not None
+                        and addr_upd.dl_latitude != 0
+                        and addr_upd.dl_longitude != 0
+                    )
+                    if geocoded:
+                        address_verified = True
+                        order.verification_status = 'address_verified'
+                        order.save(update_fields=['verification_status'])
+                    else:
+                        row_warnings.append('QNAS returned no coordinates — manual address review needed')
+                except delivery_models.DlAddressUpdate.DoesNotExist:
+                    row_warnings.append('Address update record not created — manual review needed')
+            except Exception as e:
+                logger.exception('Auto-import geocode error for order %s', order.order_number)
+                row_warnings.append(f'Geocoding error: {str(e)}')
+        else:
+            row_warnings.append('Zone or street number missing — manual address review needed')
+
+        # --- Auto-publish to fleet if all checks pass ---
+        if pickup_location and address_verified:
+            try:
+                task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+                if task:
+                    task.dl_task_status = 'pending'
+                    task.dl_task_publish = True
+                    task._status_actor = 'staff'
+                    task.save()
+                    orders_models.OrderStatusHistory.objects.create(
+                        order=order,
+                        field_name='dl_task_publish',
+                        old_value='False',
+                        new_value='True',
+                        old_display='Not Published',
+                        new_display='Published to Fleet (Auto-Import)',
+                        changed_by=request.user,
+                    )
+                    result_entry['status'] = 'fully_automated'
+                    fully_automated += 1
+                else:
+                    row_warnings.append('DeliveryTask not created — cannot auto-publish')
+                    result_entry['status'] = 'needs_review'
+                    needs_review += 1
+            except Exception as e:
+                logger.exception('Auto-import publish error for order %s', order.order_number)
+                row_warnings.append(f'Publish error: {str(e)}')
+                result_entry['status'] = 'needs_review'
+                needs_review += 1
+        else:
+            result_entry['status'] = 'needs_review'
+            needs_review += 1
+
+        row_results.append(result_entry)
+
+    return JsonResponse({
+        'success': True,
+        'fully_automated': fully_automated,
+        'needs_review': needs_review,
+        'failed': failed,
+        'total': len(ids),
+        'message': f'{fully_automated} fully automated, {needs_review} need review, {failed} failed',
+        'rows': row_results,
     })
 
 

@@ -435,6 +435,18 @@ class DeliveryTask(models.Model):
         help_text="Hub warehouse this delivery leg originates from (for hub_delivery tasks)."
     )
 
+    # --- Address Accuracy ---
+    ADDRESS_ACCURACY_CHOICES = [
+        ('by_customer', 'Confirmed by Customer'),
+        ('by_staff', 'Updated by Staff'),
+        ('geocoded', 'Auto-Geocoded'),
+        ('unverified', 'Unverified'),
+    ]
+    address_accuracy = models.CharField(
+        max_length=20, choices=ADDRESS_ACCURACY_CHOICES, default='unverified', blank=True,
+        help_text="Who provided/confirmed the delivery address coordinates"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

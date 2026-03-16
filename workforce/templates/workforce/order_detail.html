@@ -386,8 +386,18 @@
                         <span class="badge badge-info">{{ delivery_task.dl_task_status }}</span>
                     </p>
                     {% if delivery_task.driver %}
-                    <p class="mb-0">
+                    <p class="mb-2">
                         <strong>Driver:</strong> {{ delivery_task.driver.profile.first_name }}
+                    </p>
+                    {% endif %}
+                    {% if delivery_task.preferred_time %}
+                    <p class="mb-2">
+                        <strong>Preferred Time:</strong> {{ delivery_task.get_preferred_time_display }}
+                    </p>
+                    {% endif %}
+                    {% if delivery_task.payment_method %}
+                    <p class="mb-2">
+                        <strong>Payment Method:</strong> {{ delivery_task.get_payment_method_display }}
                     </p>
                     {% endif %}
                     <hr>
