@@ -487,17 +487,28 @@ class ParseAddressTool(BaseTool):
         }
 
         # Build search terms including variants
-        search_terms = set(words)
-        # Also try the full address as a search term (e.g. "al rayan")
+        # Clean words: strip commas, punctuation
+        clean_words = [w.replace(',', '').replace('.', '').strip() for w in words if w.strip()]
+        clean_words = [w for w in clean_words if w]
+
+        search_terms = set(clean_words)
+        # Full address as search term
         search_terms.add(address_lower.replace(',', ' ').strip())
-        for word in words:
-            word_clean = word.replace(',', '').strip()
-            if word_clean in spelling_variants:
-                search_terms.update(spelling_variants[word_clean])
+
+        # Build multi-word n-grams (bigrams, trigrams, 4-grams) to catch
+        # area names like "Umm Salal Ali", "Al Wakrah", "West Bay" etc.
+        for n in range(2, min(5, len(clean_words) + 1)):
+            for i in range(len(clean_words) - n + 1):
+                ngram = ' '.join(clean_words[i:i + n])
+                search_terms.add(ngram)
+
+        for word in clean_words:
+            if word in spelling_variants:
+                search_terms.update(spelling_variants[word])
             # Partial matches only for words long enough to be meaningful (>3 chars)
-            if len(word_clean) > 3:
+            if len(word) > 3:
                 for key, variants in spelling_variants.items():
-                    if key in word_clean or word_clean in key:
+                    if key in word or word in key:
                         search_terms.add(key)
                         search_terms.update(variants)
 
@@ -509,6 +520,7 @@ class ParseAddressTool(BaseTool):
 
         # Search with all terms — collect candidates and pick best match
         candidates = []
+        seen_areas = set()  # avoid duplicate DB hits
         for term in sorted_terms:
             # Search in ZoneArea
             area_matches = ZoneArea.objects.filter(
@@ -517,18 +529,23 @@ class ParseAddressTool(BaseTool):
             ).select_related('zone')[:5]
 
             for area_match in area_matches:
+                if area_match.id in seen_areas:
+                    continue
+                seen_areas.add(area_match.id)
                 # Score: how much of the area name is covered by our search
                 area_lower = area_match.area_name.lower()
                 score = len(term) / max(len(area_lower), 1)
-                # Bonus if full address appears in area name or vice versa
-                if address_lower in area_lower or area_lower in address_lower:
+                # Bonus if area name appears in the address text
+                if area_lower in address_lower:
+                    score += 0.8
+                elif address_lower in area_lower:
                     score += 0.5
                 candidates.append((score, {
                     'zone_number': area_match.zone.zone_number,
                     'zone_name': area_match.zone.zone_name,
                     'area_name': area_match.area_name,
-                    'latitude': float(area_match.zone.latitude) if area_match.zone.latitude else None,
-                    'longitude': float(area_match.zone.longitude) if area_match.zone.longitude else None,
+                    'latitude': float(area_match.latitude) if area_match.latitude else (float(area_match.zone.latitude) if area_match.zone.latitude else None),
+                    'longitude': float(area_match.longitude) if area_match.longitude else (float(area_match.zone.longitude) if area_match.zone.longitude else None),
                 }))
 
             # Search in ZoneName
@@ -540,7 +557,9 @@ class ParseAddressTool(BaseTool):
             for zone_match in zone_matches:
                 zone_lower = zone_match.zone_name.lower()
                 score = len(term) / max(len(zone_lower), 1)
-                if address_lower in zone_lower or zone_lower in address_lower:
+                if zone_lower in address_lower:
+                    score += 0.8
+                elif address_lower in zone_lower:
                     score += 0.5
                 candidates.append((score, {
                     'zone_number': zone_match.zone_number,
@@ -549,6 +568,21 @@ class ParseAddressTool(BaseTool):
                     'latitude': float(zone_match.latitude) if zone_match.latitude else None,
                     'longitude': float(zone_match.longitude) if zone_match.longitude else None,
                 }))
+
+        # Reverse search: check if any ZoneArea area_name exists within the address
+        if not candidates:
+            all_areas = ZoneArea.objects.select_related('zone').filter(is_active=True)
+            for area in all_areas:
+                area_lower = area.area_name.lower()
+                if len(area_lower) >= 4 and area_lower in address_lower:
+                    score = len(area_lower) / max(len(address_lower), 1) + 0.8
+                    candidates.append((score, {
+                        'zone_number': area.zone.zone_number,
+                        'zone_name': area.zone.zone_name,
+                        'area_name': area.area_name,
+                        'latitude': float(area.latitude) if area.latitude else (float(area.zone.latitude) if area.zone.latitude else None),
+                        'longitude': float(area.longitude) if area.longitude else (float(area.zone.longitude) if area.zone.longitude else None),
+                    }))
 
         if candidates:
             # Return highest-scoring match

@@ -2119,7 +2119,7 @@ def verify_location(request, token):
             
             # Update order verification status and accuracy
             order.verification_status = 'address_verified'
-            order.coords_accuracy = 'exact'
+            order.coords_accuracy = 'by_customer'
             if latitude and longitude:
                 order.latitude = latitude
                 order.longitude = longitude
@@ -2479,7 +2479,7 @@ def update_location(request):
                         if verified_address:
                             order.customer_address = verified_address[:100]
                         order.verification_status = 'address_verified'
-                        order.coords_accuracy = 'exact'
+                        order.coords_accuracy = 'by_customer'
                         order.address_verified = True
                         order.address_verified_at = timezone.now()
                         if latitude:

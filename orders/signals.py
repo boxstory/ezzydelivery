@@ -243,7 +243,7 @@ def _resolve_zone_number(zone, area_name=None):
     for term in search_terms:
         if not term:
             continue
-        # Try ZoneName (zone_name or zone_name_arabic)
+        # Try ZoneName (zone_name or zone_name_arabic) - exact first, then contains
         zone_obj = delivery_models.ZoneName.objects.filter(
             Q(zone_name__iexact=term) | Q(zone_name_arabic__iexact=term)
         ).first()
@@ -251,13 +251,40 @@ def _resolve_zone_number(zone, area_name=None):
             logger.info(f"Resolved zone name '{term}' -> zone {zone_obj.zone_number}")
             return zone_obj.zone_number
 
-        # Try ZoneArea (area_name or area_name_arabic)
+        # Try ZoneArea (area_name or area_name_arabic) - exact first, then contains
         area_obj = delivery_models.ZoneArea.objects.select_related('zone').filter(
             Q(area_name__iexact=term) | Q(area_name_arabic__iexact=term)
         ).first()
         if area_obj:
             logger.info(f"Resolved area name '{term}' -> zone {area_obj.zone.zone_number}")
             return area_obj.zone.zone_number
+
+    # Fallback: check if any area_name appears within the search terms
+    for term in search_terms:
+        if not term or len(term) < 4:
+            continue
+        # icontains match
+        zone_obj = delivery_models.ZoneName.objects.filter(
+            Q(zone_name__icontains=term) | Q(zone_name_arabic__icontains=term)
+        ).first()
+        if zone_obj:
+            logger.info(f"Resolved zone name (partial) '{term}' -> zone {zone_obj.zone_number}")
+            return zone_obj.zone_number
+
+        area_obj = delivery_models.ZoneArea.objects.select_related('zone').filter(
+            Q(area_name__icontains=term) | Q(area_name_arabic__icontains=term)
+        ).first()
+        if area_obj:
+            logger.info(f"Resolved area name (partial) '{term}' -> zone {area_obj.zone.zone_number}")
+            return area_obj.zone.zone_number
+
+    # Reverse: check if any ZoneArea area_name exists within the full address
+    full_text = ' '.join(t for t in search_terms if t).lower()
+    if len(full_text) >= 4:
+        for area in delivery_models.ZoneArea.objects.select_related('zone').filter(is_active=True):
+            if area.area_name.lower() in full_text:
+                logger.info(f"Resolved area name (reverse) '{area.area_name}' -> zone {area.zone.zone_number}")
+                return area.zone.zone_number
 
     return None
 

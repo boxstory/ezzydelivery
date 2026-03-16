@@ -174,6 +174,7 @@ class Order(models.Model):
     ]
     qnas_status = models.CharField(max_length=15, choices=QNAS_STATUS, default='not_checked', blank=True)
     COORDS_ACCURACY = [
+        ('by_customer', 'By Customer'),
         ('exact', 'Exact (Building)'),
         ('street', 'Street Level'),
         ('landmark', 'Landmark/Area'),
