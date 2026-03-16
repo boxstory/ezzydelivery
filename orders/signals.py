@@ -358,15 +358,16 @@ def _create_delivery_task_from_order(order):
             DlAddressUpdate.objects.get_or_create(
                 order=order,
                 defaults={
-                    'full_name': order.customer_name,
+                    'full_name': order.customer_name or '',
                     'dl_task_number': order.order_number,
-                    'mobile_no': order.customer_phone,
+                    'mobile_no': order.customer_phone or '',
                     'dl_zone': order.dl_zone,
                     'dl_street': order.dl_street,
                     'dl_building': order.dl_building,
-                    'dl_longitude': Decimal('0'),
-                    'dl_latitude': Decimal('0'),
+                    'dl_latitude': order.latitude or Decimal('0'),
+                    'dl_longitude': order.longitude or Decimal('0'),
                     'dl_unit': '0',
+                    'area_name': order.customer_address or '',
                 }
             )
             logger.info(
@@ -378,37 +379,92 @@ def _create_delivery_task_from_order(order):
             order.save(update_fields=['task_created', 'task_status'])
             return None
 
-        # Get or create address update
+        # Get or create address update — seed with all available order coords
         address_update, created = DlAddressUpdate.objects.get_or_create(
             order=order,
             defaults={
-                'full_name': order.customer_name,
+                'full_name': order.customer_name or '',
                 'dl_task_number': order.order_number,
-                'mobile_no': order.customer_phone,
+                'mobile_no': order.customer_phone or '',
                 'dl_zone': order.dl_zone,
                 'dl_street': order.dl_street,
                 'dl_building': order.dl_building,
-                'dl_longitude': Decimal('0'),
-                'dl_latitude': Decimal('0'),
+                'dl_latitude': order.latitude or Decimal('0'),
+                'dl_longitude': order.longitude or Decimal('0'),
                 'dl_unit': '0',
+                'area_name': order.customer_address or '',
             }
         )
 
-        # Auto-geocode via QNAS if any address info is available
-        if order.dl_zone or order.dl_street or address_update.area_name:
-            lat, lng = _geocode_address_from_qnas(
-                order.dl_zone, order.dl_street, order.dl_building,
-                area_name=address_update.area_name
-            )
-            if lat is not None and lng is not None:
-                address_update.dl_latitude = lat
-                address_update.dl_longitude = lng
-                address_update.save(update_fields=['dl_latitude', 'dl_longitude'])
+        # If record already existed, sync any updated order coords into it
+        if not created:
+            addr_dirty = False
+            if order.dl_zone is not None and address_update.dl_zone != order.dl_zone:
+                address_update.dl_zone = order.dl_zone
+                addr_dirty = True
+            if order.dl_street is not None and address_update.dl_street != order.dl_street:
+                address_update.dl_street = order.dl_street
+                addr_dirty = True
+            if order.dl_building is not None and address_update.dl_building != order.dl_building:
+                address_update.dl_building = order.dl_building
+                addr_dirty = True
+            if order.latitude and (not address_update.dl_latitude or address_update.dl_latitude == Decimal('0')):
+                address_update.dl_latitude = order.latitude
+                addr_dirty = True
+            if order.longitude and (not address_update.dl_longitude or address_update.dl_longitude == Decimal('0')):
+                address_update.dl_longitude = order.longitude
+                addr_dirty = True
+            if addr_dirty:
+                address_update.save()
 
-        # Create delivery task
+        # Auto-geocode via QNAS if no coords yet
+        if not address_update.dl_latitude or address_update.dl_latitude == Decimal('0'):
+            if order.dl_zone or order.dl_street or address_update.area_name:
+                lat, lng = _geocode_address_from_qnas(
+                    order.dl_zone, order.dl_street, order.dl_building,
+                    area_name=address_update.area_name
+                )
+                if lat is not None and lng is not None:
+                    address_update.dl_latitude = lat
+                    address_update.dl_longitude = lng
+                    address_update.save(update_fields=['dl_latitude', 'dl_longitude'])
+
+        # Map order_type → dl_speed
+        order_type_to_speed = {
+            'normal_delivery': 'Normal',
+            'pick_and_drop': 'Normal',
+        }
+        dl_speed = order_type_to_speed.get(order.order_type or '', 'Normal')
+        if order.scheduled_delivery:
+            dl_speed = 'Same Day'
+
+        # Map coords_accuracy → address_accuracy
+        coords_to_accuracy = {
+            'high': 'by_customer',
+            'medium': 'geocoded',
+            'low': 'geocoded',
+        }
+        address_accuracy = coords_to_accuracy.get(order.coords_accuracy or '', 'unverified')
+
+        # Task date: use scheduled date if set, else today
+        import datetime as _dt
+        task_date = order.scheduled_date if order.scheduled_delivery and order.scheduled_date else _dt.date.today()
+
+        # Preferred time: use scheduled_time if set
+        preferred_time = ''
+        if order.scheduled_delivery and order.scheduled_time:
+            hour = order.scheduled_time.hour
+            if hour < 13:
+                preferred_time = '9am-1pm'
+            elif hour < 18:
+                preferred_time = '2pm-6pm'
+            else:
+                preferred_time = '6pm-10pm'
+
+        # Create delivery task with all mapped fields
         delivery_task = DeliveryTask.objects.create(
             dl_task_number=order.order_number,
-            dl_task_description=f"Delivery for {order.order_number}",
+            dl_task_description=(order.package_description or f"Delivery for {order.order_number}")[:100],
             order=order,
             business=order.business,
             dl_address_update=address_update,
@@ -416,6 +472,12 @@ def _create_delivery_task_from_order(order):
             dl_task_status_client='for_review',
             pickup_location=order.pickup_location,
             task_leg='single',
+            dl_task_date=task_date,
+            dl_price=order.dl_amount or 0,
+            dl_waight=order.package_qty or 1,
+            dl_speed=dl_speed,
+            preferred_time=preferred_time,
+            address_accuracy=address_accuracy,
         )
 
         # Update order
