@@ -437,9 +437,9 @@ class DeliveryTask(models.Model):
 
     # --- Address Accuracy ---
     ADDRESS_ACCURACY_CHOICES = [
-        ('by_customer', 'Confirmed by Customer'),
-        ('by_staff', 'Updated by Staff'),
-        ('geocoded', 'Auto-Geocoded'),
+        ('by_customer', 'By Customer'),
+        ('by_staff', 'By Staff'),
+        ('geocoded', 'Geocoded'),
         ('unverified', 'Unverified'),
     ]
     address_accuracy = models.CharField(

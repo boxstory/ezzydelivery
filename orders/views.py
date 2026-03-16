@@ -2117,19 +2117,107 @@ def verify_location(request, token):
             address_verification.customer_verified_at = timezone.now()
             address_verification.save()
             
-            # Update order verification status
+            # Update order verification status and accuracy
             order.verification_status = 'address_verified'
+            order.coords_accuracy = 'exact'
+            if latitude and longitude:
+                order.latitude = latitude
+                order.longitude = longitude
+            if zone_number:
+                order.zone_number = zone_number
+            if street_number:
+                order.street_number = street_number
+            if building_number:
+                order.building_number = building_number
             order.save()
-            
+
+            # Update DeliveryTask with coordinates and accuracy
+            delivery_task = order.delivery_task.first()
+            if delivery_task:
+                from delivery.models import DlAddressUpdate
+                from decimal import Decimal as _D
+                dl_update_fields = {}
+                if latitude and longitude:
+                    dl_update_fields['dl_latitude'] = _D(str(latitude))
+                    dl_update_fields['dl_longitude'] = _D(str(longitude))
+                if zone_number:
+                    dl_update_fields['Zone'] = int(zone_number)
+                if street_number:
+                    dl_update_fields['street'] = int(street_number)
+                if building_number:
+                    dl_update_fields['building'] = int(building_number)
+
+                if dl_update_fields:
+                    # Update or create DlAddressUpdate
+                    dl_addr = delivery_task.dl_address_update
+                    if not dl_addr:
+                        dl_addr, _ = DlAddressUpdate.objects.get_or_create(
+                            order=order,
+                            defaults={
+                                'full_name': order.customer_name or '',
+                                'mobile_no': order.customer_phone or '',
+                                'dl_task_number': order.order_number,
+                                'dl_latitude': _D('0'),
+                                'dl_longitude': _D('0'),
+                                'dl_unit': '0',
+                            }
+                        )
+                    for attr, val in dl_update_fields.items():
+                        setattr(dl_addr, attr, val)
+                    dl_addr.save()
+
+                    delivery_task.dl_address_update = dl_addr
+
+                delivery_task.address_accuracy = 'by_customer'
+                delivery_task.save(update_fields=['address_accuracy', 'dl_address_update'])
+
             return render(request, 'orders/verification_success.html', {
                 'order': order
             })
         
         # GET request - show verification form with map
+        # Fallback chain: DlAddressUpdate → Order → ZoneName/ZoneArea → None
+        existing_lat = None
+        existing_lng = None
+
+        # 1. Check delivery task's DlAddressUpdate
+        delivery_task = order.delivery_task.select_related('dl_address_update').first()
+        if delivery_task and delivery_task.dl_address_update:
+            dl_addr = delivery_task.dl_address_update
+            if dl_addr.dl_latitude and dl_addr.dl_longitude and dl_addr.dl_latitude != 0 and dl_addr.dl_longitude != 0:
+                existing_lat = float(dl_addr.dl_latitude)
+                existing_lng = float(dl_addr.dl_longitude)
+
+        # 2. Check order lat/long
+        if existing_lat is None and order.latitude and order.longitude:
+            existing_lat = float(order.latitude)
+            existing_lng = float(order.longitude)
+
+        # 3. Look up zone in ZoneName/ZoneArea tables
+        if existing_lat is None and order.dl_zone:
+            from delivery.models import ZoneName
+            try:
+                zone = ZoneName.objects.filter(zone_number=order.dl_zone).first()
+                if zone:
+                    # Try ZoneArea first (more precise)
+                    area = zone.areas.filter(
+                        is_active=True, latitude__isnull=False, longitude__isnull=False
+                    ).first()
+                    if area:
+                        existing_lat = float(area.latitude)
+                        existing_lng = float(area.longitude)
+                    elif zone.latitude and zone.longitude:
+                        existing_lat = float(zone.latitude)
+                        existing_lng = float(zone.longitude)
+            except Exception:
+                pass
+
         context = {
             'order': order,
             'address_verification': address_verification,
             'google_maps_api_key': config('GOOGLE_MAPS_API_KEY', default=''),
+            'existing_lat': existing_lat,
+            'existing_lng': existing_lng,
         }
         
         return render(request, 'orders/verify_location.html', context)
@@ -2391,8 +2479,13 @@ def update_location(request):
                         if verified_address:
                             order.customer_address = verified_address[:100]
                         order.verification_status = 'address_verified'
+                        order.coords_accuracy = 'exact'
                         order.address_verified = True
                         order.address_verified_at = timezone.now()
+                        if latitude:
+                            order.latitude = latitude
+                        if longitude:
+                            order.longitude = longitude
                         if notes:
                             order.verification_notes = notes
                         order.save()
