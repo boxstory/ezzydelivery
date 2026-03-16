@@ -53,6 +53,8 @@ urlpatterns = [
           fleet_views.driver_earnings, name='driver_earnings'),
      path('transactions/',
           fleet_views.transaction_history, name='transaction_history'),
+     path('transactions/<str:txn_code>/',
+          fleet_views.transaction_detail_page, name='transaction_detail_page'),
      path('finance/',
           fleet_views.fleet_finance_summary, name='fleet_finance_summary'),
 

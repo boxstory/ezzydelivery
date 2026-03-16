@@ -56,7 +56,7 @@
     <div class="fleet-card__body" style="padding: 0;">
         {% for txn in transactions %}
         {% with ttype=txn.transaction_type %}
-        <div class="fth__row {% if not forloop.last %}fth__row--border{% endif %}">
+        <a href="{% url 'fleet:transaction_detail_page' txn.transaction_code %}" class="fth__row fth__row--link {% if not forloop.last %}fth__row--border{% endif %}">
             <div class="fth__row-icon fth__row-icon--{% if ttype == 'earning' %}green{% elif ttype == 'bonus' %}blue{% elif ttype == 'cod_collection' or ttype == 'cod_return' %}orange{% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}yellow{% elif ttype == 'settlement' %}purple{% elif ttype == 'deduction' %}red{% elif ttype == 'delivery_charge' or ttype == 'fulfillment_charge' %}blue{% else %}grey{% endif %}">
                 {% if ttype == 'earning' %}<i class="fa-solid fa-coins"></i>
                 {% elif ttype == 'bonus' %}<i class="fa-solid fa-gift"></i>
@@ -80,7 +80,7 @@
             <div class="fth__row-amount {% if txn.amount >= 0 %}fth__row-amount--plus{% else %}fth__row-amount--minus{% endif %}">
                 {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }}<small> QR</small>
             </div>
-        </div>
+        </a>
         {% endwith %}
         {% endfor %}
     </div>

@@ -545,14 +545,49 @@ def cod_submission(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
 
-        # Redirect GET requests to cod_collection (consolidated page)
+        # GET request: show submission form with COD in hand data
         if request.method == 'GET':
-            return redirect('fleet:cod_collection')
+            cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
+                driver=driver,
+                cod_collected=True,
+                cod_settled=False,
+                dl_task_status='delivered'
+            ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
+
+            from django.db.models import Sum
+            cod_in_hand_total = cod_in_hand_list.aggregate(
+                total=Sum('cod_collected_amount')
+            )['total'] or 0
+
+            if not cod_in_hand_list.exists():
+                messages.info(request, 'No COD to submit.')
+                return redirect('fleet:cod_collection')
+
+            from orders.models import Order
+            selected_orders = Order.objects.filter(
+                id__in=cod_in_hand_list.values_list('order_id', flat=True)
+            ).prefetch_related('delivery_task').order_by('-created_at')
+
+            # Build delivery_ids string and order→delivery_id mapping
+            delivery_ids_str = ','.join(str(t.id) for t in cod_in_hand_list)
+            order_to_delivery = {t.order_id: t.id for t in cod_in_hand_list}
+
+            context = {
+                'driver': driver,
+                'total_cod_amount': cod_in_hand_total,
+                'selected_orders': selected_orders,
+                'delivery_ids_str': delivery_ids_str,
+                'order_to_delivery': order_to_delivery,
+            }
+            return render(request, 'fleet/cod_submission_pwa.html', context)
 
         if request.method == 'POST':
             amount = request.POST.get('amount')
+            received_by = request.POST.get('received_by', '').strip()
             reference_number = request.POST.get('reference_number', '')
             notes = request.POST.get('notes', '')
+            if received_by:
+                notes = f'Received by: {received_by}' + (f' | {notes}' if notes else '')
             payment_method = request.POST.get('payment_method', 'cash')
             delivery_ids_str = request.POST.get('delivery_ids', '')
 
@@ -621,6 +656,9 @@ def cod_submission(request):
             id__in=cod_in_hand_list.values_list('order_id', flat=True)
         ).prefetch_related('delivery_task').order_by('-created_at')
 
+        delivery_ids_str = ','.join(str(t.id) for t in cod_in_hand_list)
+        order_to_delivery = {t.order_id: t.id for t in cod_in_hand_list}
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
@@ -630,6 +668,8 @@ def cod_submission(request):
             'auto_reference': auto_reference,
             'recent_submissions': recent_submissions,
             'selected_orders': selected_orders,
+            'delivery_ids_str': delivery_ids_str,
+            'order_to_delivery': order_to_delivery,
         }
 
         return render(request, 'fleet/cod_submission_pwa.html', context)
@@ -1297,6 +1337,64 @@ def driver_earnings(request):
 
         return render(request, 'fleet/driver_earnings_pwa.html', context)
 
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+# Transaction Detail ----------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+@driver_required
+def transaction_detail_page(request, txn_code):
+    """Render detail page for a single transaction with related orders"""
+    from datetime import timedelta
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        txn = fleet_models.DriverTransaction.objects.select_related(
+            'delivery_task', 'delivery_task__order', 'delivery_task__order__business',
+            'delivery_task__dl_to_address', 'settlement', 'business', 'created_by'
+        ).get(transaction_code=txn_code, driver=driver)
+
+        orders = []
+
+        if txn.transaction_type == 'cod_collection' and txn.delivery_task:
+            d = txn.delivery_task
+            orders.append(d)
+        elif txn.transaction_type in ['cod_deposit', 'cod_driver_settle']:
+            window = timedelta(seconds=5)
+            orders = list(delivery_models.DeliveryTask.objects.filter(
+                driver=driver,
+                cod_collected=True,
+                cod_settled=True,
+                cod_settled_at__gte=txn.created_at - window,
+                cod_settled_at__lte=txn.created_at + window,
+            ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at'))
+        elif txn.transaction_type == 'earning' and txn.delivery_task:
+            orders.append(txn.delivery_task)
+        elif txn.transaction_type == 'settlement' and txn.settlement:
+            # Get all transactions in this settlement that have delivery tasks
+            settlement_txns = fleet_models.DriverTransaction.objects.filter(
+                settlement=txn.settlement,
+                delivery_task__isnull=False,
+            ).select_related(
+                'delivery_task', 'delivery_task__order', 'delivery_task__order__business',
+                'delivery_task__dl_to_address'
+            ).exclude(pk=txn.pk)
+            orders = [t.delivery_task for t in settlement_txns if t.delivery_task]
+
+        context = {
+            'driver': driver,
+            'txn': txn,
+            'orders': orders,
+            'orders_count': len(orders),
+        }
+
+        return render(request, 'fleet/parts/transaction_detail_page.html', context)
+
+    except fleet_models.DriverTransaction.DoesNotExist:
+        messages.error(request, 'Transaction not found.')
+        return redirect('fleet:transaction_history')
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, 'Driver profile not found.')
         return redirect('core:main_dashboard')

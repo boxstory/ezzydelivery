@@ -1,0 +1,196 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Transaction Detail{% endblock %}
+{% block page_title %}Transaction{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'fleet:transaction_history' %}" class="fleet-btn-icon" style="text-decoration:none;">
+    <i class="fa-solid fa-arrow-left"></i>
+</a>
+{% endblock %}
+
+{% block content %}
+
+{% with ttype=txn.transaction_type %}
+<!-- Transaction Header Card -->
+<div class="fleet-card fleet-fade-in">
+    <div class="fleet-card__body" style="padding: var(--spacing-lg, 1.25rem);">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="fth__row-icon fth__row-icon--{% if ttype == 'earning' %}green{% elif ttype == 'bonus' %}blue{% elif ttype == 'cod_collection' or ttype == 'cod_return' %}orange{% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}yellow{% elif ttype == 'settlement' %}purple{% elif ttype == 'deduction' %}red{% elif ttype == 'delivery_charge' or ttype == 'fulfillment_charge' %}blue{% else %}grey{% endif %}" style="width:48px; height:48px; font-size:1.25rem;">
+                {% if ttype == 'earning' %}<i class="fa-solid fa-coins"></i>
+                {% elif ttype == 'bonus' %}<i class="fa-solid fa-gift"></i>
+                {% elif ttype == 'cod_collection' %}<i class="fa-solid fa-arrow-down"></i>
+                {% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}<i class="fa-solid fa-arrow-up"></i>
+                {% elif ttype == 'cod_return' %}<i class="fa-solid fa-rotate-left"></i>
+                {% elif ttype == 'cod_client_settle' %}<i class="fa-solid fa-handshake"></i>
+                {% elif ttype == 'settlement' %}<i class="fa-solid fa-building-columns"></i>
+                {% elif ttype == 'deduction' %}<i class="fa-solid fa-minus"></i>
+                {% elif ttype == 'delivery_charge' %}<i class="fa-solid fa-truck"></i>
+                {% elif ttype == 'fulfillment_charge' %}<i class="fa-solid fa-box"></i>
+                {% else %}<i class="fa-solid fa-arrow-right-arrow-left"></i>{% endif %}
+            </div>
+            <div>
+                <div style="font-size: var(--font-size-base, 1rem); font-weight: 700; color: var(--fleet-dark, #212529);">
+                    {{ txn.get_transaction_type_display }}
+                </div>
+                <div style="font-size: var(--font-size-xs, 0.75rem); color: var(--fleet-grey-500, #6c757d);">
+                    {{ txn.created_at|date:"d M Y, H:i" }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Amount -->
+        <div class="d-flex justify-content-center mb-3" style="padding: var(--spacing-md, 1rem) 0;">
+            <span style="font-size: 2rem; font-weight: 800; {% if txn.amount >= 0 %}color: var(--fleet-success, #28a745);{% else %}color: var(--fleet-danger, #dc3545);{% endif %}">
+                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small style="font-size: 1rem; font-weight: 500;">QR</small>
+            </span>
+        </div>
+
+        <!-- Details Grid -->
+        <div class="ftd__details">
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label">Transaction Code</span>
+                <span class="ftd__detail-value ftd__detail-value--mono">{{ txn.transaction_code }}</span>
+            </div>
+            {% if txn.description %}
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label">Description</span>
+                <span class="ftd__detail-value">{{ txn.description }}</span>
+            </div>
+            {% endif %}
+            {% if txn.reference_number %}
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label">Reference</span>
+                <span class="ftd__detail-value">{{ txn.reference_number }}</span>
+            </div>
+            {% endif %}
+            {% if txn.payment_method %}
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label">Payment Method</span>
+                <span class="ftd__detail-value">{{ txn.get_payment_method_display }}</span>
+            </div>
+            {% endif %}
+            {% if txn.business %}
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label">Business</span>
+                <span class="ftd__detail-value">{{ txn.business.business_name }}</span>
+            </div>
+            {% endif %}
+            {% if txn.notes %}
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label">Notes</span>
+                <span class="ftd__detail-value">{{ txn.notes }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Balances After Transaction -->
+<div class="fleet-card fleet-slide-up">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">Balances After</h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        <div class="fth__hero" style="border-radius:0;">
+            <div class="fth__hero-item">
+                <span class="fth__hero-label">Wallet</span>
+                <span class="fth__hero-val fth__hero-val--green">QR {{ txn.wallet_balance_after|floatformat:0 }}</span>
+            </div>
+            <div class="fth__hero-divider"></div>
+            <div class="fth__hero-item">
+                <span class="fth__hero-label">COD In-Hand</span>
+                <span class="fth__hero-val fth__hero-val--orange">QR {{ txn.cod_in_hand_after|floatformat:0 }}</span>
+            </div>
+            <div class="fth__hero-divider"></div>
+            <div class="fth__hero-item">
+                <span class="fth__hero-label">Pending</span>
+                <span class="fth__hero-val">QR {{ txn.pending_earnings_after|floatformat:0 }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Related Orders -->
+{% if orders %}
+<div class="fleet-card fleet-slide-up">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">{{ orders_count }} Order{{ orders_count|pluralize }}</h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        {% for task in orders %}
+        <div class="ftd__order {% if not forloop.last %}ftd__order--border{% endif %}">
+            <div class="ftd__order-header">
+                <span class="ftd__order-num">
+                    <i class="fa-solid fa-box-open"></i>
+                    {{ task.dl_task_number|default:"-" }}
+                </span>
+                {% if task.cod_collected_amount %}
+                <span class="ftd__order-amount">{{ task.cod_collected_amount|floatformat:0 }} QR</span>
+                {% elif task.driver_earnings %}
+                <span class="ftd__order-amount">{{ task.driver_earnings|floatformat:0 }} QR</span>
+                {% endif %}
+            </div>
+            <div class="ftd__order-details">
+                {% if task.order and task.order.business %}
+                <div class="ftd__order-info">
+                    <i class="fa-solid fa-store"></i>
+                    <span>{{ task.order.business.business_name }}</span>
+                </div>
+                {% endif %}
+                {% if task.order %}
+                <div class="ftd__order-info">
+                    <i class="fa-solid fa-user"></i>
+                    <span>{{ task.order.customer_name|default:"-" }}</span>
+                </div>
+                {% endif %}
+                {% if task.dl_to_address %}
+                <div class="ftd__order-info">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span>{{ task.dl_to_address.area_name|default:"-" }}</span>
+                </div>
+                {% endif %}
+                {% if task.completed_at %}
+                <div class="ftd__order-info">
+                    <i class="fa-solid fa-clock"></i>
+                    <span>{{ task.completed_at|date:"d M Y, H:i" }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="ftd__order-status">
+                <span class="ftd__badge ftd__badge--{{ task.dl_task_status }}">{{ task.get_dl_task_status_display }}</span>
+                {% if task.cod_collected %}
+                <span class="ftd__badge ftd__badge--cod">COD Collected</span>
+                {% endif %}
+                {% if task.cod_settled %}
+                <span class="ftd__badge ftd__badge--settled">COD Settled</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="fleet-card fleet-slide-up">
+    <div class="fleet-card__body">
+        <div class="fleet-empty" style="padding: var(--spacing-lg) 0;">
+            <div style="font-size:2rem; color:var(--fleet-grey-300); margin-bottom:var(--spacing-sm);">
+                <i class="fa-solid fa-inbox"></i>
+            </div>
+            <p class="fleet-empty__title">No linked orders</p>
+            <p class="fleet-empty__text">This transaction has no associated delivery orders</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Back Button -->
+<div class="d-flex justify-content-center mt-3 mb-4">
+    <a href="{% url 'fleet:transaction_history' %}" class="fleet-btn fleet-btn--outline" style="text-decoration:none; gap:var(--spacing-xs);">
+        <i class="fa-solid fa-arrow-left"></i> Back to Transactions
+    </a>
+</div>
+
+{% endwith %}
+{% endblock %}
