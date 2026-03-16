@@ -246,6 +246,7 @@ urlpatterns = [
     path('orders/temp/sync/', workforce_views.temp_orders_sync, name='temp_orders_sync'),
     path('orders/temp/preview/', workforce_views.temp_orders_preview, name='temp_orders_preview'),
     path('orders/temp/transfer/', workforce_views.temp_orders_transfer, name='temp_orders_transfer'),
+    path('orders/temp/auto-import/', workforce_views.temp_orders_auto_import, name='temp_orders_auto_import'),
     path('orders/temp/public-links/', workforce_views.public_link_sources, name='public_link_sources'),
     path('orders/temp/public-links/<int:source_id>/delete/', workforce_views.public_link_source_delete, name='public_link_source_delete'),
     path('orders/temp/public-links/<int:source_id>/save-mapping/', workforce_views.public_link_save_mapping, name='public_link_save_mapping'),

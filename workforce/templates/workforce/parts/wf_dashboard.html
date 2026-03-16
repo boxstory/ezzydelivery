@@ -175,6 +175,19 @@
               </div>
             </a>
 
+            <a href="{% url 'workforce:temp_orders' %}" class="wf-status-item {% if temp_orders_new %}wf-status-item--warning{% else %}wf-status-item--primary{% endif %}" id="wf_dashboard_link_temp_orders">
+              <div class="wf-status-item__icon">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+              </div>
+              <div class="wf-status-item__content">
+                <span class="wf-status-item__label">Temp Orders (New)</span>
+                <span class="wf-status-item__value">{{ temp_orders_new|default:0 }}</span>
+              </div>
+              <div class="wf-status-item__arrow">
+                <i class="fa-solid fa-chevron-right"></i>
+              </div>
+            </a>
+
           </div>
         </div>
       </div>
@@ -324,6 +337,13 @@
                 <i class="fa-solid fa-file-arrow-up"></i>
               </div>
               <span class="wf-quick-action__label">Bulk Import</span>
+            </a>
+
+            <a href="{% url 'workforce:temp_orders' %}" class="wf-quick-action {% if temp_orders_new %}wf-quick-action--warning{% else %}wf-quick-action--primary{% endif %}" id="wf_dashboard_action_temp_orders">
+              <div class="wf-quick-action__icon">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+              </div>
+              <span class="wf-quick-action__label">Temp Orders{% if temp_orders_new %} ({{ temp_orders_new }}){% endif %}</span>
             </a>
 
             <a href="{% url 'workforce:dispatch_dashboard' %}" class="wf-quick-action wf-quick-action--success" id="wf_dashboard_action_dispatch">

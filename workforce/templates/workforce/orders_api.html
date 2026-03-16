@@ -400,20 +400,40 @@
           <div id="wiz_verify_error" class="alert alert-danger d-none"></div>
           <div id="wiz_verify_content" class="d-none">
             <div class="alert alert-info small mb-3">
-              <i class="fa-solid fa-eye me-1"></i>
-              Preview of how the data will be imported. Verify the mapped fields are correct.
+              <i class="fa-solid fa-database me-1"></i>
+              <strong>Data to be saved:</strong> Each column below shows the <strong>database field name</strong> (bold) and the source sheet column it reads from (grey arrow). Verify values look correct before confirming import.
             </div>
             <div id="wiz_already_imported" class="alert alert-warning small d-none mb-3">
               <i class="fa-solid fa-exclamation-triangle me-1"></i>
               <span id="wiz_already_count">0</span> order(s) already imported — they will be skipped.
             </div>
             <div class="table-responsive">
-              <table class="table table-sm table-hover mb-0">
-                <thead class="table-light" id="wiz_verify_head"></thead>
+              <table class="table table-sm table-hover table-bordered mb-0" style="font-size:0.8rem;">
+                <thead class="table-dark" id="wiz_verify_head"></thead>
                 <tbody id="wiz_verify_body"></tbody>
               </table>
             </div>
             <div id="wiz_verify_count" class="small text-muted mt-2"></div>
+
+            <!-- Product Matching Preview -->
+            <div id="wiz_product_match_section" class="mt-3 d-none">
+              <h6 class="fw-semibold mb-1"><i class="fa-solid fa-box me-1"></i>Product Matching Preview</h6>
+              <p class="text-muted small mb-2">Showing product matches from the first order row. Fuzzy matches auto-save as aliases for next import.</p>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" style="font-size:0.78rem;">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>#</th>
+                      <th>Client Name (Sheet)</th>
+                      <th>Qty</th>
+                      <th>Matched DB Product</th>
+                      <th>Match Type</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wiz_product_match_tbody"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -684,20 +704,36 @@ function loadPreview() {
         // Build dynamic headers — DB field name + sheet column source
         const fields = data.fields || [];
         if (fields.length) {
-            const headerRow = document.createElement('tr');
+            // Row 1: DB field labels
+            const labelRow = document.createElement('tr');
+            // Row 2: Sheet column source
+            const sourceRow = document.createElement('tr');
             fields.forEach(f => {
-                const th = document.createElement('th');
-                th.style.lineHeight = '1.2';
+                const th1 = document.createElement('th');
+                const th2 = document.createElement('th');
+                th1.style.whiteSpace = 'nowrap';
+                th2.style.whiteSpace = 'nowrap';
                 if (f.name === 'row_number') {
-                    th.className = 'text-muted small';
-                    th.textContent = f.label;
+                    th1.className = 'text-center';
+                    th1.innerHTML = `<span class="text-warning">#</span>`;
+                    th2.className = 'text-center text-muted fw-normal';
+                    th2.style.fontSize = '0.65rem';
+                    th2.textContent = 'Row';
                 } else {
-                    th.innerHTML = `<div class="fw-semibold">${f.label}</div>` +
-                        (f.sheet_col ? `<div class="text-muted fw-normal" style="font-size:0.7rem;">← ${f.sheet_col}</div>` : '');
+                    th1.innerHTML = `<span class="text-warning fw-bold">${f.label}</span>`;
+                    th2.className = 'fw-normal';
+                    th2.style.fontSize = '0.65rem';
+                    th2.innerHTML = f.sheet_col
+                        ? `<span class="badge bg-secondary" style="font-size:0.6rem;font-weight:normal;">← ${f.sheet_col}</span>`
+                        : `<span class="text-muted">—</span>`;
+                    // DB field name as code hint
+                    th1.title = `DB column: ${f.name}`;
                 }
-                headerRow.appendChild(th);
+                labelRow.appendChild(th1);
+                sourceRow.appendChild(th2);
             });
-            thead.appendChild(headerRow);
+            thead.appendChild(labelRow);
+            thead.appendChild(sourceRow);
         }
 
         // Build data rows
@@ -739,6 +775,38 @@ function loadPreview() {
             (data.already_imported?.length ? ', ' + data.already_imported.length + ' will be skipped' : '');
 
         content.classList.remove('d-none');
+
+        // Render product matching preview from first row
+        const matchSection = document.getElementById('wiz_product_match_section');
+        const matchTbody = document.getElementById('wiz_product_match_tbody');
+        matchTbody.innerHTML = '';
+        const firstRowMatches = (data.preview && data.preview.length && data.preview[0].product_matches) ? data.preview[0].product_matches : [];
+        if (firstRowMatches.length) {
+            firstRowMatches.forEach((pm, idx) => {
+                const tr = document.createElement('tr');
+                let badgeHtml;
+                if (pm.match_type === 'exact' || pm.match_type === 'sku' || pm.match_type === 'barcode') {
+                    badgeHtml = `<span class="badge bg-success">${pm.match_type === 'exact' ? 'Exact' : pm.match_type.toUpperCase()}</span>`;
+                } else if (pm.match_type === 'alias') {
+                    badgeHtml = `<span class="badge bg-info">Alias</span>`;
+                } else if (pm.match_type === 'fuzzy') {
+                    badgeHtml = `<span class="badge bg-warning text-dark">Fuzzy</span>`;
+                } else {
+                    badgeHtml = `<span class="badge bg-danger">No Match</span>`;
+                }
+                tr.innerHTML = `
+                    <td class="text-muted">${idx + 1}</td>
+                    <td>${pm.raw}</td>
+                    <td>${pm.qty}</td>
+                    <td>${pm.matched_name ? `<span class="text-success">${pm.matched_name}</span>` : '<span class="text-muted fst-italic">raw name saved in notes</span>'}</td>
+                    <td>${badgeHtml}</td>
+                `;
+                matchTbody.appendChild(tr);
+            });
+            matchSection.classList.remove('d-none');
+        } else {
+            matchSection.classList.add('d-none');
+        }
     })
     .catch(err => {
         loading.classList.add('d-none');

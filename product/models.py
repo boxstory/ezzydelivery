@@ -129,6 +129,10 @@ class Product(models.Model):
         UnitVariant, on_delete=models.SET_NULL, null=True, blank=True)
     item_price = models.PositiveIntegerField(_("Price"), default=0)
     item_discription = models.CharField(max_length=100, null=True, blank=True)
+    client_names = models.TextField(
+        blank=True, null=True,
+        help_text="Comma-separated alternate names clients use for this product (e.g. 'Oud 50ml, special oud')"
+    )
 
     brand_logo = models.ImageField(
         upload_to='product_images/brand_logo', null=True, blank=True)
@@ -143,6 +147,20 @@ class Product(models.Model):
 
     def __str__(self):
         return self.brand_name + " " + self.item_name
+
+    def get_client_names_list(self):
+        """Return list of stripped client alias names."""
+        if not self.client_names:
+            return []
+        return [n.strip() for n in self.client_names.split(',') if n.strip()]
+
+    def add_client_name(self, name):
+        """Append a new alias if not already present (case-insensitive)."""
+        existing = self.get_client_names_list()
+        if name.strip().lower() not in [e.lower() for e in existing]:
+            existing.append(name.strip())
+            self.client_names = ', '.join(existing)
+            self.save(update_fields=['client_names'])
 
     def save(self, *args, **kwargs):
         """

@@ -19,7 +19,7 @@
                 <i class="fa-regular fa-clock me-1"></i>{{ last_sync|timesince }} ago
             </span>
             {% endif %}
-            <button type="button" class="btn btn-outline-primary btn-sm" id="syncBtn" onclick="syncAllSources()">
+            <button type="button" class="btn btn-dark btn-sm" id="syncBtn" onclick="syncAllSources()">
                 <i class="fa-solid fa-sync me-1"></i>Sync Now
             </button>
             <button type="button" class="btn btn-outline-dark btn-sm" onclick="openPublicLinkModal()">
@@ -27,6 +27,9 @@
             </button>
             <button type="button" class="btn btn-success btn-sm d-none" id="importBtn" onclick="openPreview()">
                 <i class="fa-solid fa-file-import me-1"></i>Import <span id="importBtnCount"></span>
+            </button>
+            <button type="button" class="btn btn-warning btn-sm d-none" id="autoImportBtn" onclick="openAutoImport()">
+                <i class="fa-solid fa-bolt me-1"></i>Auto-Import <span id="autoImportBtnCount"></span>
             </button>
             <div class="oli__hero__count">
                 <span class="oli__hero__count-value">{{ total_count|default:"0" }}</span>
@@ -229,7 +232,13 @@
                     <td>{{ row.package_desc|truncatechars:15|default:"—" }}</td>
                     <td>
                         {% if row.status == 'imported' %}
-                        <span class="badge bg-success" style="font-size:0.6rem;">Imported</span>
+                            {% if row.imported_order %}
+                            <a href="{% url 'workforce:order_detail' row.imported_order.id %}" class="badge bg-success text-decoration-none" style="font-size:0.6rem;" title="View imported order">
+                                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Imported
+                            </a>
+                            {% else %}
+                            <span class="badge bg-success" style="font-size:0.6rem;">Imported</span>
+                            {% endif %}
                         {% elif row.status == 'skipped' %}
                         <span class="badge bg-secondary" style="font-size:0.6rem;">Skipped</span>
                         {% else %}
@@ -239,6 +248,8 @@
                     <td>
                         <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="showDetail(this)" title="View details"
                             data-id="{{ row.id }}"
+                            data-imported-order-id="{% if row.imported_order %}{{ row.imported_order.id }}{% endif %}"
+                            data-imported-order-no="{% if row.imported_order %}{{ row.imported_order.order_number }}{% endif %}"
                             data-source-type="{{ row.source_type }}"
                             data-source-label="{{ row.source_label }}"
                             data-business="{{ row.business.business_name }}"
@@ -273,6 +284,9 @@
         <span class="fw-semibold small"><span id="selectedCount">0</span> selected</span>
         <button type="button" class="btn btn-primary btn-sm" onclick="openPreview()">
             <i class="fa-solid fa-eye me-1"></i>Preview &amp; Import
+        </button>
+        <button type="button" class="btn btn-warning btn-sm" onclick="openAutoImport()">
+            <i class="fa-solid fa-bolt me-1"></i>Auto-Import
         </button>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSelection()">
             <i class="fa-solid fa-times me-1"></i>Clear
@@ -331,6 +345,30 @@
     </div>
 </div>
 
+<!-- Auto-Import Result Modal -->
+<div class="modal fade" id="autoImportModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title">
+                    <i class="fa-solid fa-bolt me-2"></i>Auto-Import Results
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3" id="autoImportModalBody">
+                <div class="text-center py-5">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2 text-muted">Running auto-import pipeline...</p>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"
+                        id="autoImportCloseBtn">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Public Link Sources Modal -->
 <div class="modal fade" id="publicLinkModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -380,7 +418,13 @@
 </div>
 
 <script>
-const CSRF = (() => { const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken=')); return c ? c.split('=')[1] : ''; })();
+const CSRF = (() => {
+    // Prefer hidden input (always present), fallback to cookie
+    const inp = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (inp) return inp.value;
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return c ? c.split('=')[1].trim() : '';
+})();
 let previewRows = [];
 
 // ─── Detail Modal (single row) ───
@@ -392,6 +436,18 @@ function showDetail(btn) {
     const srcIcon = { onedrive:'<i class="fa-solid fa-cloud me-1"></i>OneDrive', google_sheet:'<i class="fa-solid fa-table me-1"></i>Google Sheet',
         shopify:'<i class="fa-brands fa-shopify me-1"></i>Shopify', woocommerce:'<i class="fa-brands fa-wordpress me-1"></i>WooCommerce',
         public_link:'<i class="fa-solid fa-link me-1"></i>Public Link' }[d.sourceType] || d.sourceType;
+
+    let importedOrderHtml = '';
+    if (d.status === 'imported' && d.importedOrderNo) {
+        const viewUrl = `/workforce/orders/${d.importedOrderId}/`;
+        importedOrderHtml = `<div class="d-flex align-items-center gap-2 mt-2 mb-1">
+            <span class="badge bg-success">Imported</span>
+            <span class="fw-semibold">${escHtml(d.importedOrderNo)}</span>
+            <a href="${viewUrl}" class="btn btn-sm btn-outline-primary py-0 px-2" target="_blank">
+                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>View Order
+            </a>
+        </div>`;
+    }
 
     let rawHtml = '';
     try {
@@ -426,6 +482,7 @@ function showDetail(btn) {
                 <tr><td class="text-muted fw-semibold">Package</td><td>${escHtml(d.packageDesc||'—')}</td></tr>
             </tbody></table></div>
         </div>
+        ${importedOrderHtml}
         <div class="d-flex gap-3 mt-2 small text-muted">
             <span><i class="fa-regular fa-clock me-1"></i>Synced: ${d.syncedAt}</span>
             <span><i class="fa-regular fa-calendar me-1"></i>Created: ${d.createdAt}</span>
@@ -445,8 +502,93 @@ function updateSelectedCount() {
     const hdrBtn = document.getElementById('importBtn');
     if (n > 0) { hdrBtn.classList.remove('d-none'); document.getElementById('importBtnCount').textContent = `(${n})`; }
     else { hdrBtn.classList.add('d-none'); }
+    const autoHdrBtn = document.getElementById('autoImportBtn');
+    if (n > 0) { autoHdrBtn.classList.remove('d-none'); document.getElementById('autoImportBtnCount').textContent = `(${n})`; }
+    else { autoHdrBtn.classList.add('d-none'); }
 }
 function clearSelection() { document.querySelectorAll('.row-checkbox').forEach(c => c.checked = false); document.getElementById('selectAllRows').checked = false; updateSelectedCount(); }
+
+// ─── Auto-Import ───
+async function openAutoImport() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (!checked.length) { alert('Select rows first'); return; }
+    const ids = [...checked].map(c => parseInt(c.dataset.tempId));
+    if (!confirm(`Auto-import ${ids.length} row(s)? This will create orders, geocode addresses, and publish tasks to drivers where all checks pass.`)) return;
+
+    const spinnerHtml = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2 text-muted">Running auto-import pipeline...</p></div>';
+    document.getElementById('autoImportModalBody').innerHTML = spinnerHtml;
+    document.getElementById('autoImportCloseBtn').disabled = true;
+
+    const modal = new bootstrap.Modal(document.getElementById('autoImportModal'));
+    modal.show();
+
+    try {
+        const resp = await fetch('{% url "workforce:temp_orders_auto_import" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ ids })
+        });
+        const result = await resp.json();
+
+        const statusIcon = {
+            fully_automated: '<i class="fa-solid fa-circle-check text-success"></i>',
+            needs_review: '<i class="fa-solid fa-triangle-exclamation text-warning"></i>',
+            failed: '<i class="fa-solid fa-circle-xmark text-danger"></i>',
+        };
+        const statusLabel = {
+            fully_automated: 'Fully Automated',
+            needs_review: 'Needs Review',
+            failed: 'Failed',
+        };
+        const badgeCls = {
+            fully_automated: 'bg-success',
+            needs_review: 'bg-warning text-dark',
+            failed: 'bg-danger',
+        };
+
+        let summaryHtml = `<div class="row g-3 mb-3 text-center">
+            <div class="col-4"><div class="fs-3 fw-bold text-success">${result.fully_automated || 0}</div><div class="small text-muted">Fully Automated</div></div>
+            <div class="col-4"><div class="fs-3 fw-bold text-warning">${result.needs_review || 0}</div><div class="small text-muted">Needs Review</div></div>
+            <div class="col-4"><div class="fs-3 fw-bold text-danger">${result.failed || 0}</div><div class="small text-muted">Failed</div></div>
+        </div>`;
+
+        let rowsHtml = '';
+        if (result.rows && result.rows.length) {
+            rowsHtml = '<div class="border rounded"><table class="table table-sm small mb-0"><tbody>';
+            result.rows.forEach(r => {
+                const icon = statusIcon[r.status] || '';
+                const label = statusLabel[r.status] || r.status;
+                const bCls = badgeCls[r.status] || 'bg-secondary';
+                const orderRef = r.order_number ? `<span class="badge bg-dark ms-2">${escHtml(r.order_number)}</span>` : '';
+                const warnings = (r.warnings || []).map(w =>
+                    `<div class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escHtml(w)}</div>`
+                ).join('');
+                const error = r.error ? `<div class="text-danger"><i class="fa-solid fa-circle-xmark me-1"></i>${escHtml(r.error)}</div>` : '';
+                rowsHtml += `<tr>
+                    <td class="text-center" style="width:32px">${icon}</td>
+                    <td>
+                        <span class="fw-semibold">Row #${r.id}</span>${orderRef}
+                        <span class="badge ${bCls} ms-2" style="font-size:0.6rem">${label}</span>
+                        ${warnings}${error}
+                    </td>
+                </tr>`;
+            });
+            rowsHtml += '</tbody></table></div>';
+        }
+
+        document.getElementById('autoImportModalBody').innerHTML = summaryHtml + rowsHtml;
+        document.getElementById('autoImportCloseBtn').disabled = false;
+
+        const anyCreated = (result.fully_automated || 0) + (result.needs_review || 0);
+        if (anyCreated > 0) {
+            setTimeout(() => window.location.reload(), 4000);
+        }
+    } catch(e) {
+        document.getElementById('autoImportModalBody').innerHTML =
+            `<div class="text-danger p-3"><i class="fa-solid fa-circle-xmark me-2"></i>Error: ${escHtml(e.message)}</div>`;
+        document.getElementById('autoImportCloseBtn').disabled = false;
+    }
+}
 
 // ─── Step 1: Preview ───
 async function openPreview() {
@@ -741,7 +883,7 @@ async function loadPublicLinkSources() {
         html += '</tbody></table>';
         document.getElementById('plSourcesList').innerHTML = html;
     } catch(e) {
-        document.getElementById('plSourcesList').innerHTML = `<p class="text-danger">Error: ${e.message}</p>`;
+        document.getElementById('plSourcesList').innerHTML = `<p class="text-danger small">Error loading sources: ${e.message}. Try refreshing the page.</p>`;
     }
 }
 
@@ -862,6 +1004,10 @@ async function addPublicLink() {
             headers: { 'X-CSRFToken': CSRF },
             body: formData,
         });
+        if (!resp.ok) {
+            resultDiv.innerHTML = `<span class="text-danger small">Server error ${resp.status}. Try refreshing the page.</span>`;
+            return;
+        }
         const data = await resp.json();
         if (data.success) {
             resultDiv.innerHTML = `<span class="text-success small"><i class="fa-solid fa-check me-1"></i>${data.message}</span>`;

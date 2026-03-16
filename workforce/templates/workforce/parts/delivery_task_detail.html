@@ -696,6 +696,41 @@
                 </div>
             </div>
 
+            <!-- Order Reference Card -->
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-box"></i>
+                        Order
+                    </div>
+                    <a href="{% url 'workforce:order_detail' task.order.id %}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.7rem;">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>View Order
+                    </a>
+                </div>
+                <div class="dtd__card__body">
+                    <div class="dtd__fields">
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-hashtag"></i> Order Number</span>
+                            <span class="dtd__field__value fw-semibold">{{ task.order.order_number }}</span>
+                        </div>
+                        {% if task.order.client_order_code %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-tag"></i> Client Code</span>
+                            <span class="dtd__field__value">{{ task.order.client_order_code }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-store"></i> Business</span>
+                            <span class="dtd__field__value">{{ task.order.business.business_name }}</span>
+                        </div>
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-calendar"></i> Order Date</span>
+                            <span class="dtd__field__value">{{ task.order.order_date }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 

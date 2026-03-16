@@ -12,6 +12,10 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = ('product_id', 'brand_name', 'item_name', 'item_sku', 'business',
                     'product_category')
     readonly_fields = ('product_id',)  # Make product_id read-only in admin
+    search_fields = ('item_name', 'item_sku', 'barcode', 'client_names')
+    fields = ('product_id', 'brand_name', 'item_name', 'item_sku', 'barcode',
+              'client_names', 'color', 'size', 'unit', 'item_price', 'item_discription',
+              'brand_logo', 'product_image', 'business', 'product_category')
 
 
 @admin.register(product_models.ProductInventory)
