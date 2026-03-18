@@ -144,6 +144,7 @@
     data-lng="{{ card.order.longitude|default:'' }}{% if not card.order.longitude and addr %}{{ addr.dl_longitude|default:'' }}{% endif %}"
     data-coords-accuracy="{{ card.order.coords_accuracy|default:'' }}"
     data-order-id="{{ card.order.id }}"
+    data-verify-url="{% with av=card.order.address_verifications.first %}{% with phone=addr.mobile_no|default:card.order.customer_phone|default:'' %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url 'verify_location_short' phone av.verification_token %}{% endif %}{% endwith %}{% endwith %}"
 >
 <script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{% if item.product %}{{ item.product.item_name|escapejs }}{% else %}{{ item.notes|default:'Item'|escapejs }}{% endif %}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
 </script>
@@ -215,16 +216,17 @@
 
     <!-- Business + Customer Row -->
     <div class="task-card__body">
-        <div class="task-card__business">
-            <i class="fa-solid fa-store"></i>
-            {{ card.order.business.business_name|default:"—" }}
-        </div>
-
         <!-- Customer Info -->
         <div class="task-card__customer">
-            <div class="task-card__customer-name">
-                <i class="fa-solid fa-user"></i>
-                <strong>{% if addr %}{{ addr.full_name|default:card.order.customer_name|default:"—" }}{% else %}{{ card.order.customer_name|default:"—" }}{% endif %}</strong>
+            <div class="task-card__who">
+                <div class="task-card__business">
+                    <i class="fa-solid fa-store"></i>
+                    {{ card.order.business.business_name|default:"—" }}
+                </div>
+                <div class="task-card__customer-name">
+                    <i class="fa-solid fa-user"></i>
+                    <strong>{% if addr %}{{ addr.full_name|default:card.order.customer_name|default:"—" }}{% else %}{{ card.order.customer_name|default:"—" }}{% endif %}</strong>
+                </div>
             </div>
             {% if addr and addr.mobile_no %}
             <div class="task-card__phone-row" onclick="event.stopPropagation()">
@@ -265,7 +267,7 @@
                     <div class="task-card__route-line1">
                         <span class="task-card__route-value">Zone {{ card.order.dl_zone }}{% if card.order.dl_street %}, St {{ card.order.dl_street }}{% endif %}{% if card.order.dl_building %}, Bldg {{ card.order.dl_building }}{% endif %}{% if addr %}{% if addr.dl_unit %}, Unit {{ addr.dl_unit }}{% endif %}{% endif %}</span>
                         {% if card.order.coords_accuracy %}
-                        <span class="task-card__acc-badge task-card__acc-badge--{{ card.order.coords_accuracy }}">{% if card.order.coords_accuracy == 'exact' %}Exact{% elif card.order.coords_accuracy == 'street' %}Street{% elif card.order.coords_accuracy == 'landmark' %}Landmark{% elif card.order.coords_accuracy == 'zone_center' %}Zone Ctr{% elif card.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
+                        <span class="task-card__acc-badge task-card__acc-badge--{{ card.order.coords_accuracy }}">{% if card.order.coords_accuracy == 'by_customer' %}By Customer{% elif card.order.coords_accuracy == 'exact' %}Exact{% elif card.order.coords_accuracy == 'street' %}Street{% elif card.order.coords_accuracy == 'landmark' %}Landmark{% elif card.order.coords_accuracy == 'zone_center' %}Zone Ctr{% elif card.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
                         {% endif %}
                     </div>
                     <span class="task-card__route-sub">{% if card.order.customer_address %}<span class="task-card__route-addr">{{ card.order.customer_address }}</span>{% elif addr and addr.area_name %}<span class="task-card__route-addr">{{ addr.area_name }}</span>{% endif %}{% if zone_name_map and card.order.dl_zone in zone_name_map %}<span class="task-card__zone-name"> · {{ zone_name_map|get_item:card.order.dl_zone }}</span>{% endif %}</span>
@@ -649,6 +651,20 @@
     {% endif %}
 
     // openTaskDetail / closeTaskDetail are provided by fleet/parts/task_detail_sheet.html (via pwa_base.html)
+
+    // Auto-open task detail from notification link (?open_task=ID)
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const openTaskId = params.get('open_task');
+        if (openTaskId) {
+            setTimeout(function() {
+                const card = document.querySelector('.task-card[data-id="' + openTaskId + '"]');
+                if (card && typeof openTaskDetail === 'function') {
+                    openTaskDetail(new Event('click'), card);
+                }
+            }, 400);
+        }
+    })();
 
     // ── Take-via-Scan Scanner ─────────────────────────────────────────────────
     let _takeScanStream = null;

@@ -172,6 +172,21 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
         except Exception as e:
             logger.error(f"Error logging order creation: {e}")
 
+        # Fire auto flows for order creation
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('staff_order_create', extra_context={
+                'order_number': instance.order_number or '',
+                'customer_name': instance.customer_name or '',
+                'customer_phone': instance.customer_phone or '',
+                'customer_address': instance.customer_address or '',
+                'cod_amount': str(instance.cod_amount) if instance.cod_amount else '0',
+                'business_name': str(instance.business) if instance.business else '',
+                'zone': str(instance.dl_zone) if instance.dl_zone else '',
+            })
+        except Exception as e:
+            logger.warning(f"Auto flow failed for order create {instance.pk}: {e}")
+
     # Handle verification status changes
     if not created:
         old_status = getattr(instance, '_old_verification_status', '')
@@ -186,12 +201,48 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                 new_status=instance.verification_status,
                 verified_by=instance.verified_by
             )
+
+            # Fire auto flows for order verify
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('staff_order_verify', extra_context={
+                    'order_number': instance.order_number or '',
+                    'customer_name': instance.customer_name or '',
+                    'customer_phone': instance.customer_phone or '',
+                    'customer_address': instance.customer_address or '',
+                    'cod_amount': str(instance.cod_amount) if instance.cod_amount else '0',
+                    'business_name': str(instance.business) if instance.business else '',
+                    'zone': str(instance.dl_zone) if instance.dl_zone else '',
+                })
+            except Exception as e:
+                logger.warning(f"Auto flow failed for order verify {instance.pk}: {e}")
             
         # Log all status field changes to OrderStatusHistory
         _log_order_status_changes(instance)
 
-        # Auto-create delivery task when order is published
+        # Fire auto flows for order status changes
         old_order_status = getattr(instance, '_old_order_status', '')
+        if old_order_status and old_order_status != instance.order_status:
+            order_ctx = {
+                'order_number': instance.order_number or '',
+                'customer_name': instance.customer_name or '',
+                'customer_phone': instance.customer_phone or '',
+                'customer_address': instance.customer_address or '',
+                'cod_amount': str(instance.cod_amount) if instance.cod_amount else '0',
+                'business_name': str(instance.business) if instance.business else '',
+                'zone': str(instance.dl_zone) if instance.dl_zone else '',
+                'task_status': instance.order_status or '',
+            }
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                if instance.order_status == 'publish':
+                    execute_flows_for_trigger('staff_order_publish', extra_context=order_ctx)
+                elif instance.order_status == 'cancelled':
+                    execute_flows_for_trigger('staff_order_cancel', extra_context=order_ctx)
+            except Exception as e:
+                logger.warning(f"Auto flow failed for order status change {instance.pk}: {e}")
+
+        # Auto-create delivery task when order is published
         if instance.order_status == 'publish' and old_order_status != 'publish' and not instance.task_created:
             from django.conf import settings
             if getattr(settings, 'DISPATCH_BATCHING_ENABLED', False):
@@ -206,13 +257,26 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                 _create_delivery_task_from_order(instance)
 
         # Send customer WhatsApp notification on order cancellation
-        old_order_status = getattr(instance, '_old_order_status', '')
-        if instance.order_status == 'cancelled' and old_order_status != 'cancelled':
+        old_order_status2 = getattr(instance, '_old_order_status', '')
+        if instance.order_status == 'cancelled' and old_order_status2 != 'cancelled':
             try:
                 from core.order_notifications import notify_order_event
                 notify_order_event('order_cancelled', order=instance)
             except Exception as e:
                 logger.warning(f"Cancellation notification failed for order {instance.order_number}: {e}")
+            # Fire wa_order_cancelled auto flows
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('wa_order_cancelled', extra_context={
+                    'order_number': instance.order_number or '',
+                    'customer_name': instance.customer_name or '',
+                    'customer_phone': instance.customer_phone or '',
+                    'customer_address': instance.customer_address or '',
+                    'cod_amount': str(instance.cod_amount) if instance.cod_amount else '0',
+                    'business_name': str(instance.business) if instance.business else '',
+                })
+            except Exception as e:
+                logger.warning(f"Auto flow failed for wa_order_cancelled {instance.pk}: {e}")
 
         # Clean up stored old status from instance
         for attr in ('_old_verification_status', '_old_order_status', '_old_task_status', '_old_cod_status_by_staff'):

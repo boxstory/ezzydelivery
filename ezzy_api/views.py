@@ -303,6 +303,13 @@ def driver_accept_task(request, task_id):
         }
         _send_webhook_event('task_accepted', webhook_payload, business=task.business)
 
+        # Fire auto flows
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('wh_task_accepted', task=task)
+        except Exception:
+            pass
+
         serializer = ezzy_api_serializers.DeliveryTaskSerializer(task)
         return Response({
             'message': 'Task accepted successfully',
@@ -366,7 +373,14 @@ def driver_reject_task(request, task_id):
             'driver_id': driver.driver_id
         }
         _send_webhook_event('task_rejected', webhook_payload, business=task.business)
-        
+
+        # Fire auto flows
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('wh_task_rejected', task=task)
+        except Exception:
+            pass
+
         return Response({
             'message': 'Task rejected successfully'
         }, status=status.HTTP_200_OK)
@@ -447,7 +461,14 @@ def driver_update_task_status(request, task_id):
             'driver_id': driver.driver_id
         }
         _send_webhook_event('task_status_update', webhook_payload, business=task.business)
-        
+
+        # Fire auto flows
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('wh_task_status_update', task=task)
+        except Exception:
+            pass
+
         serializer = ezzy_api_serializers.DeliveryTaskSerializer(task)
         return Response({
             'message': 'Task status updated successfully',
@@ -810,6 +831,11 @@ def driver_complete_task(request, task_id):
         if cod_amount_collected:
             task.cod_collected_amount = cod_amount_collected
 
+        # Save payment method from driver
+        payment_method = request.data.get('payment_method', '') if hasattr(request.data, 'get') else request.POST.get('payment_method', '')
+        if payment_method in ('cash', 'pos', 'fawran'):
+            task.payment_method = payment_method
+
         task.save()
 
         # COD collection tracking (only on successful delivery)
@@ -817,6 +843,18 @@ def driver_complete_task(request, task_id):
         if task.order and status_value == 'delivered' and cod_collected and cod_amount_collected:
             task.order.cod_status_by_staff = 'cod_with_driver'
             task.order.save(update_fields=['cod_status_by_staff'])
+
+            # Record COD collection in driver wallet
+            from fleet.wallet_service import WalletService
+            from decimal import Decimal
+            WalletService.record_transaction(
+                driver=task.driver,
+                transaction_type='cod_collection',
+                amount=Decimal(str(cod_amount_collected)),
+                description=f"COD collected for order {task.order.order_number}",
+                delivery_task=task,
+                created_by=request.user,
+            )
         
         # Upload documents
         documents_created = []
@@ -860,7 +898,14 @@ def driver_complete_task(request, task_id):
             'driver_id': driver.driver_id
         }
         _send_webhook_event('task_completed', webhook_payload, business=task.business)
-        
+
+        # Fire auto flows
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('wh_task_completed', task=task)
+        except Exception:
+            pass
+
         task_serializer = ezzy_api_serializers.DeliveryTaskSerializer(task)
         return Response({
             'message': 'Task completed successfully',
@@ -1756,7 +1801,14 @@ def webhook_receive_task_status_update(request):
                 'driver_id': driver_id
             }
             _send_webhook_event('task_status_update', webhook_payload, business=task.business)
-            
+
+            # Fire auto flows
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('wh_task_status_update', task=task)
+            except Exception:
+                pass
+
             return Response({
                 'message': 'Task status updated successfully',
                 'task_id': task_id,
@@ -1893,7 +1945,14 @@ def webhook_receive_task_completion(request):
                 'driver_id': driver_id
             }
             _send_webhook_event('task_completed', webhook_payload, business=task.business)
-            
+
+            # Fire auto flows
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('wh_task_completed', task=task)
+            except Exception:
+                pass
+
             return Response({
                 'message': 'Task completed successfully',
                 'task_id': task_id,

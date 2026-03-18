@@ -2301,6 +2301,63 @@
    FLEET TRANSACTION DETAIL (ftd__)
    Template: fleet/parts/transaction_detail_page.html
    ======================================================================== */
+.ftd__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm, 0.5rem);
+    background: var(--fleet-grey-100, #e9ecef);
+    padding-left: var(--spacing-md, 1rem);
+}
+.ftd__header-left {
+    min-width: 0;
+    padding: 0.75rem 0;
+}
+.ftd__header-title {
+    font-weight: 700;
+    color: var(--fleet-dark, #212529);
+}
+.ftd__header-date {
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--fleet-grey-500, #6c757d);
+    margin-top: 2px;
+}
+.ftd__header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    flex-shrink: 0;
+}
+.ftd__header-amount {
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1;
+}
+.ftd__header-amount--plus { color: var(--fleet-success, #28a745); }
+.ftd__header-amount--minus { color: var(--fleet-danger, #dc3545); }
+.ftd__header-amount small {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+.ftd__balances {
+    border-radius: 0;
+    border-top: 1px solid var(--fleet-grey-100, #e9ecef);
+}
+.ftd__empty-icon {
+    font-size: 2rem;
+    color: var(--fleet-grey-300);
+    margin-bottom: var(--spacing-sm);
+}
+.ftd__back-wrap {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--spacing-md, 0.75rem);
+    margin-bottom: var(--spacing-lg, 0.875rem);
+}
+.ftd__back-btn {
+    text-decoration: none;
+    gap: var(--spacing-xs, 0.25rem);
+}
 .ftd__details {
     display: flex;
     flex-direction: column;
@@ -2339,8 +2396,28 @@
 .ftd__order {
     padding: var(--spacing-md, 1rem);
 }
+.ftd__order--compact {
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+}
 .ftd__order--border {
     border-bottom: 1px solid var(--fleet-grey-100, #e9ecef);
+}
+.ftd__order-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px var(--spacing-md, 1rem);
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--fleet-grey-500, #6c757d);
+    line-height: 1.6;
+}
+.ftd__order-inline i {
+    font-size: 9px;
+    color: var(--fleet-grey-400, #9ca3af);
+    margin-right: 2px;
+}
+.ftd__order-phone {
+    color: var(--fleet-info, #3b82f6);
+    text-decoration: none;
 }
 .ftd__order-header {
     display: flex;
@@ -2432,6 +2509,104 @@
     background: var(--fleet-warning-light, #fef3c7);
     color: #b45309;
 }
+
+/* COD collection cards */
+.ftd__cod-card {
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+}
+.ftd__cod-card--border {
+    border-bottom: 1px solid var(--fleet-grey-100, #e9ecef);
+}
+.ftd__cod-card__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-sm, 0.5rem);
+}
+.ftd__cod-card__left {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.ftd__cod-card__order {
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 600;
+    color: var(--fleet-grey-500, #6c757d);
+    font-family: monospace;
+}
+.ftd__cod-card__name {
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 700;
+    color: var(--fleet-dark, #212529);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ftd__cod-card__amount {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--fleet-success, #10b981);
+    flex-shrink: 0;
+    line-height: 1;
+    padding-top: 2px;
+}
+.ftd__cod-card__amount small {
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 500;
+}
+.ftd__cod-card__mid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px var(--spacing-md, 1rem);
+    font-size: 11px;
+    color: var(--fleet-grey-500, #6c757d);
+    margin-top: 3px;
+    line-height: 1.7;
+}
+.ftd__cod-card__mid i {
+    font-size: 9px;
+    color: var(--fleet-grey-400, #9ca3af);
+    margin-right: 2px;
+}
+.ftd__cod-card__phone {
+    color: var(--fleet-info, #3b82f6);
+    text-decoration: none;
+}
+.ftd__cod-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+}
+.ftd__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 7px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    background: var(--fleet-grey-100, #e9ecef);
+    color: var(--fleet-grey-600, #4b5563);
+}
+.ftd__tag i { font-size: 8px; }
+/* Task status tags */
+.ftd__tag--delivered { background: var(--fleet-success-light, #d1fae5); color: var(--fleet-success, #10b981); }
+.ftd__tag--pending,
+.ftd__tag--assigned,
+.ftd__tag--accepted { background: var(--fleet-info-light, #dbeafe); color: var(--fleet-info, #3b82f6); }
+.ftd__tag--start_ride,
+.ftd__tag--out_for_delivery,
+.ftd__tag--in_transit,
+.ftd__tag--picked_up { background: var(--fleet-warning-light, #fef3c7); color: #b45309; }
+.ftd__tag--failed,
+.ftd__tag--cancelled,
+.ftd__tag--rejected { background: var(--fleet-danger-light, #fee2e2); color: var(--fleet-danger, #ef4444); }
+/* COD status tags */
+.ftd__tag--cod-collected { background: #fff4e5; color: #e07b00; }
+.ftd__tag--cod-settled { background: #f5f3ff; color: #7c3aed; }
+.ftd__tag--cod-pending { background: #fef3c7; color: #92400e; }
 
 /* ========================================================================
    FLEET HELP PWA (fhp__)

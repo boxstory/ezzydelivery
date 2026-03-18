@@ -48,6 +48,7 @@ Related:
     - fleet.wallet_service: WalletService, WalletAlertService
 """
 
+import json
 import logging
 from django.db import connection
 from django.shortcuts import redirect, render
@@ -471,10 +472,10 @@ def cod_collection(request):
         # Get wallet status
         wallet_status = WalletService.get_wallet_status(driver)
 
-        # Get COD settlement transactions (only deposits/submissions to admin)
+        # Get COD settlement transactions (deposits/submissions to admin)
         cod_transactions = fleet_models.DriverTransaction.objects.filter(
             driver=driver,
-            transaction_type='cod_deposit'
+            transaction_type__in=['cod_deposit', 'cod_driver_settle']
         ).order_by('-created_at')[:20]
 
         # Get COD currently in hand (not yet settled/deposited)
@@ -2919,6 +2920,145 @@ def fleet_task_navigation(request, task_id):
     except delivery_models.DeliveryTask.DoesNotExist:
         messages.error(request, "Task not found.")
         return redirect('fleet:driver_tasks')
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_task_edit_location(request, task_id):
+    """Edit delivery location: zone, street, building, and paste Google Maps link."""
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'dl_to_address'
+        ).get(id=task_id, driver=driver)
+    except (fleet_models.Driver.DoesNotExist, delivery_models.DeliveryTask.DoesNotExist):
+        messages.error(request, "Task not found.")
+        return redirect('fleet:driver_tasks')
+
+    addr = task.dl_to_address
+
+    if request.method == 'POST':
+        zone = request.POST.get('zone', '').strip()
+        street = request.POST.get('street', '').strip()
+        building = request.POST.get('building', '').strip()
+        loc_link = request.POST.get('loc_link', '').strip()
+        resolved_lat = request.POST.get('resolved_lat', '').strip()
+        resolved_lng = request.POST.get('resolved_lng', '').strip()
+
+        lat, lng = None, None
+        # Use pre-resolved coords from JS first
+        if resolved_lat and resolved_lng:
+            try:
+                lat, lng = float(resolved_lat), float(resolved_lng)
+            except (ValueError, TypeError):
+                lat, lng = None, None
+        # Fall back to server-side extraction from link text
+        if not lat and loc_link:
+            from ai_agent.tools.address_tools import extract_coords_from_text
+            lat, lng, source, link = extract_coords_from_text(loc_link)
+
+        # Update DlAddressUpdate
+        if addr:
+            if zone:
+                addr.dl_zone = zone
+            if street:
+                addr.dl_street = street
+            if building:
+                addr.dl_building = building
+            if lat and lng:
+                addr.dl_latitude = lat
+                addr.dl_longitude = lng
+            addr.save()
+
+        # Set accuracy on task
+        if lat and lng:
+            task.address_accuracy = 'by_driver'
+            task.save(update_fields=['address_accuracy'])
+
+        # Also update Order fields
+        order = task.order
+        if order:
+            if zone:
+                order.dl_zone = zone
+            if street:
+                order.dl_street = street
+            if building:
+                order.dl_building = building
+            if lat and lng:
+                order.latitude = lat
+                order.longitude = lng
+                order.coords_accuracy = 'by_driver'
+            order.save()
+
+        messages.success(request, "Location updated successfully.")
+        return redirect('fleet:driver_tasks')
+
+    context = {
+        'task': task,
+        'addr': addr,
+        'order': task.order,
+    }
+    return render(request, 'fleet/task_edit_location_pwa.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_resolve_location(request):
+    """AJAX: resolve a Google Maps short link or Plus Code to lat/lng."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    try:
+        data = json.loads(request.body) if request.body else {}
+        text = data.get('text', '').strip()
+        if not text:
+            return JsonResponse({'error': 'No text provided'}, status=400)
+
+        from ai_agent.tools.address_tools import extract_coords_from_text
+
+        # 1. Try direct extraction (full URLs, raw coords)
+        lat, lng, source, link = extract_coords_from_text(text)
+        if lat and lng:
+            return JsonResponse({'lat': float(lat), 'lng': float(lng), 'source': source})
+
+        # 2. Try Google Plus Code geocoding via Nominatim
+        import re
+        plus_code_match = re.match(r'^([A-Z0-9]{4,8}\+[A-Z0-9]{1,4})\s*(.*)', text, re.IGNORECASE)
+        if plus_code_match:
+            code = plus_code_match.group(1)
+            locality = plus_code_match.group(2).strip() or 'Doha Qatar'
+            try:
+                import requests as http_requests
+                resp = http_requests.get(
+                    'https://nominatim.openstreetmap.org/search',
+                    params={'q': f'{code} {locality}', 'format': 'json', 'limit': 1},
+                    headers={'User-Agent': 'EzzyDelivery/1.0'},
+                    timeout=5,
+                )
+                results = resp.json()
+                if results:
+                    lat = float(results[0]['lat'])
+                    lng = float(results[0]['lon'])
+                    if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
+                        return JsonResponse({'lat': lat, 'lng': lng, 'source': 'plus_code'})
+            except Exception:
+                pass
+
+            # 3. Try openlocationcode library if available
+            try:
+                from openlocationcode import openlocationcode as olc
+                if olc.isValid(code):
+                    if olc.isFull(code):
+                        area = olc.decode(code)
+                        return JsonResponse({
+                            'lat': area.latitudeCenter, 'lng': area.longitudeCenter, 'source': 'plus_code'
+                        })
+            except ImportError:
+                pass
+
+        return JsonResponse({'error': 'Could not resolve coordinates'}, status=404)
+
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 @login_required(login_url='/accounts/login/')

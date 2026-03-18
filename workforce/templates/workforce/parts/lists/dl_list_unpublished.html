@@ -10,181 +10,23 @@
 <!-- Page Header -->
 <header class="oli__hero">
     <div class="oli__hero__left">
-        <h2><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Unpublished Orders</h2>
-        <span class="oli__hero__subtitle">| Ready to publish to DMS</span>
+        <h2><i class="fa-solid {{ page_icon|default:'fa-paper-plane' }} me-1" aria-hidden="true"></i>{{ page_title|default:"Unpublished Tasks" }}</h2>
+        <span class="oli__hero__subtitle">| {{ page_subtitle|default:"Ready to publish to fleet" }}</span>
     </div>
     <div class="oli__hero__right">
-        <button type="button" class="btn btn-success btn-sm me-2" id="publishAllSelected" style="display: none;">
-            <i class="fa-solid fa-paper-plane me-1"></i>Publish Selected (<span id="bulkSelectedCount">0</span>)
-        </button>
-        <div class="oli__hero__count" aria-label="Order count">
-            <span class="oli__hero__count-value" id="pageOrderCount">{{ orders.paginator.count|default:"0" }}</span>
-            <span class="oli__hero__count-label">orders</span>
+        <div class="oli__hero__count" aria-label="Task count">
+            <span class="oli__hero__count-value" id="pageOrderCount">{{ dl_tasks.paginator.count|default:"0" }}</span>
+            <span class="oli__hero__count-label">tasks</span>
         </div>
     </div>
 </header>
-<div class="col-12 p-3" role="main" aria-label="Unpublished Orders List">
+<div class="col-12 p-3" role="main" aria-label="Unpublished Tasks List">
 
-    {% if orders %}
-    <div class="dl-table-wrapper">
-        <!-- Bulk Actions Bar -->
-        <div id="bulkActionsBar" style="display: none;">
-            <div class="dl-bulk-bar__inner">
-                <div class="dl-bulk-bar__left">
-                    <span class="dl-bulk-bar__count"><span id="selectedCount">0</span> selected</span>
-                    <button type="button" class="btn btn-sm btn-light" onclick="clearAllSelections()">
-                        <i class="fa-solid fa-xmark me-1"></i>Clear
-                    </button>
-                </div>
-                <div class="dl-bulk-bar__actions">
-                    <button type="button" class="btn btn-sm btn-success" id="bulkPublishBtn">
-                        <i class="fa-solid fa-paper-plane me-1"></i>Publish All Selected
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="dl-table">
-                <thead>
-                    <tr>
-                        <th class="dl-table__th-check">
-                            <input type="checkbox" class="form-check-input" id="selectAllOrders" onchange="toggleSelectAll(this)">
-                        </th>
-                        <th class="dl-table__th-id">Order</th>
-                        <th>Seller</th>
-                        <th>Date</th>
-                        <th>Customer</th>
-                        <th>Zone / Address</th>
-                        <th>COD</th>
-                        <th>Verify</th>
-                        <th>Order Status</th>
-                        <th class="dl-table__th-actions">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for order in orders %}
-                    <tr class="dl-table__row" data-order-id="{{ order.id }}" id="order-row-{{ order.id }}">
-                        <td class="dl-table__td-check" onclick="event.stopPropagation();">
-                            <input type="checkbox" class="form-check-input order-checkbox" data-order-id="{{ order.id }}" onchange="updateSelectedCount()">
-                        </td>
-                        <!-- Order # / Task # -->
-                        <td class="dl-table__td-id">
-                            <div class="dl-table__id-stack">
-                                {% with dl_task=order.delivery_task.all.0 %}
-                                {% if dl_task %}
-                                <a href="{% url 'workforce:delivery_task_detail' dl_task.id %}" class="dl-table__task-num">{{ dl_task.dl_task_number|default:order.client_order_code }}</a>
-                                <span class="dl-table__order-num" title="{{ order.client_order_code }}">{{ order.client_order_code|truncatechars:14 }}</span>
-                                {% else %}
-                                <a href="{% url 'workforce:order_detail' order.id %}" class="dl-table__task-num">{{ order.order_number|default:order.client_order_code }}</a>
-                                {% endif %}
-                                {% endwith %}
-                            </div>
-                        </td>
-                        <!-- Seller -->
-                        <td class="dl-table__td-seller" title="{{ order.business.business_name }}">
-                            {{ order.business.business_name|default:"—"|truncatechars:16 }}
-                        </td>
-                        <!-- Date -->
-                        <td class="dl-table__td-date">
-                            {{ order.order_date|date:"d M"|default:"—" }}
-                        </td>
-                        <!-- Customer -->
-                        <td class="dl-table__td-customer">
-                            <div class="dl-table__customer-stack">
-                                <span class="dl-table__customer-name">{{ order.customer_name|default:"—"|truncatechars:18 }}</span>
-                                <span class="dl-table__customer-phone">{{ order.customer_phone|default:"—" }}</span>
-                            </div>
-                        </td>
-                        <!-- Zone / Address -->
-                        <td class="dl-table__td-zone">
-                            {% if order.dl_zone %}
-                            <span class="dl-table__zone-badge">Z{{ order.dl_zone }}</span>
-                            {% endif %}
-                            <span class="dl-table__address" title="{{ order.customer_address }}">{{ order.customer_address|default:"—"|truncatechars:22 }}</span>
-                        </td>
-                        <!-- COD -->
-                        <td class="dl-table__td-cod">
-                            {% if order.cod_amount and order.cod_amount > 0 %}
-                            <span class="dl-table__cod-amount">{{ order.cod_amount }} QR</span>
-                            {% else %}
-                            <span class="dl-table__cod-none">—</span>
-                            {% endif %}
-                        </td>
-                        <!-- Verification -->
-                        <td class="dl-table__td-verify">
-                            {% if order.verification_status == 'verified' %}
-                            <span class="dl-table__verify-icon dl-table__verify-icon--verified" title="Verified">
-                                <i class="fa-solid fa-circle-check"></i>
-                            </span>
-                            {% elif order.verification_status == 'rejected' %}
-                            <span class="dl-table__verify-icon dl-table__verify-icon--rejected" title="Rejected">
-                                <i class="fa-solid fa-circle-xmark"></i>
-                            </span>
-                            {% elif order.verification_status == 'address_verified' %}
-                            <span class="dl-table__verify-icon dl-table__verify-icon--address" title="Address Verified">
-                                <i class="fa-solid fa-location-check"></i>
-                            </span>
-                            {% else %}
-                            <span class="dl-table__verify-icon dl-table__verify-icon--pending" title="{{ order.get_verification_status_display }}">
-                                <i class="fa-solid fa-clock"></i>
-                            </span>
-                            {% endif %}
-                        </td>
-                        <!-- Order Status -->
-                        <td class="dl-table__td-status">
-                            {% if order.order_status == 'to_review' %}
-                            <span class="dl-badge dl-badge--for_review">Review</span>
-                            {% elif order.order_status == 'ready_to_pickup' %}
-                            <span class="dl-badge dl-badge--0">Ready</span>
-                            {% elif order.order_status == 'publish' %}
-                            <span class="dl-badge dl-badge--dms-7">Publish</span>
-                            {% elif order.order_status == 'cancelled' %}
-                            <span class="dl-badge dl-badge--9">Cancelled</span>
-                            {% else %}
-                            <span class="dl-badge dl-badge--for_review">{{ order.order_status|truncatechars:10 }}</span>
-                            {% endif %}
-                        </td>
-                        <!-- Actions -->
-                        <td class="dl-table__td-actions" onclick="event.stopPropagation();">
-                            <div class="dl-table__action-group">
-                                {% with dl_task=order.delivery_task.all.0 %}
-                                {% if dl_task %}
-                                <a href="{% url 'workforce:delivery_task_detail' dl_task.id %}" class="dl-table__action-btn dl-table__action-btn--view" title="View Task">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
-                                <a href="{% url 'workforce:delivery_task_edit' dl_task.id %}" class="dl-table__action-btn dl-table__action-btn--view" title="Edit Task" style="border-color:#fcd34d;color:#d97706;">
-                                    <i class="fa-solid fa-pen"></i>
-                                </a>
-                                {% else %}
-                                <a href="{% url 'workforce:order_detail' order.id %}" class="dl-table__action-btn dl-table__action-btn--view" title="View Order">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
-                                {% endif %}
-                                {% endwith %}
-                                <button type="button"
-                                        class="dl-table__action-btn dl-table__action-btn--publish publish-btn"
-                                        title="Publish to Fleet"
-                                        onclick="publishOrder({{ order.id }}, this)">
-                                    <i class="fa-solid fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="10" class="dl-table__empty">
-                            <i class="fa-solid fa-inbox me-2"></i>No unpublished orders
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    {% if dl_tasks %}
+    {% include "workforce/parts/components/_tasks_table_view.html" with tasks=dl_tasks %}
 
     <!-- Pagination -->
-    {% include "includes/components/_pagination.html" with page_obj=orders %}
+    {% include "includes/components/_pagination.html" with page_obj=dl_tasks %}
 
     {% else %}
     <!-- Empty State -->
@@ -194,153 +36,20 @@
         </div>
         <h4 class="text-muted mb-3">All Caught Up!</h4>
         <p class="text-muted mb-4">
-            There are no unpublished orders at the moment.
+            There are no unpublished tasks at the moment.
         </p>
-        <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-primary">
-            <i class="fa-solid fa-list me-2"></i>View All Orders
+        <a href="{% url 'workforce:dl_list_all' %}" class="btn btn-primary">
+            <i class="fa-solid fa-list me-2"></i>View All Tasks
         </a>
     </div>
     {% endif %}
 </div>
+
+<!-- Status Update Modal -->
+{% include "workforce/parts/components/_tasks_status_modal.html" %}
+
+<!-- Scripts -->
+<script src="{% static 'orders/js/orders_main.js' %}"></script>
+{% include "workforce/parts/components/_tasks_view_scripts.html" %}
+{% include "workforce/parts/components/_tasks_ai_scripts.html" %}
 {% endblock content %}
-
-{% block extra_js %}
-<script>
-function getCSRFToken() {
-    var meta = document.querySelector('meta[name="csrf-token"]');
-    if (meta) return meta.getAttribute('content');
-    var input = document.querySelector('[name=csrfmiddlewaretoken]');
-    if (input) return input.value;
-    return null;
-}
-
-function toggleSelectAll(checkbox) {
-    const checkboxes = document.querySelectorAll('.order-checkbox');
-    checkboxes.forEach(cb => cb.checked = checkbox.checked);
-    updateSelectedCount();
-}
-
-function clearAllSelections() {
-    const checkboxes = document.querySelectorAll('.order-checkbox');
-    checkboxes.forEach(cb => cb.checked = false);
-    const selectAll = document.getElementById('selectAllOrders');
-    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
-    updateSelectedCount();
-}
-
-function updateSelectedCount() {
-    const checked = document.querySelectorAll('.order-checkbox:checked');
-    const count = checked.length;
-    document.getElementById('selectedCount').textContent = count;
-    document.getElementById('bulkSelectedCount').textContent = count;
-    document.getElementById('publishAllSelected').style.display = count > 0 ? 'inline-block' : 'none';
-    document.getElementById('bulkActionsBar').style.display = count > 0 ? 'block' : 'none';
-
-    const allCheckboxes = document.querySelectorAll('.order-checkbox');
-    const selectAll = document.getElementById('selectAllOrders');
-    if (selectAll) {
-        selectAll.checked = count === allCheckboxes.length && allCheckboxes.length > 0;
-        selectAll.indeterminate = count > 0 && count < allCheckboxes.length;
-    }
-}
-
-function publishOrder(orderId, btn) {
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
-    fetch('/workforce/orders/' + orderId + '/publish/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const row = document.getElementById('order-row-' + orderId);
-            row.style.transition = 'all 0.3s ease';
-            row.style.opacity = '0';
-            row.style.transform = 'translateX(20px)';
-            setTimeout(() => { row.remove(); updatePageCount(); }, 300);
-            if (typeof showToast === 'function') {
-                showToast('Order published successfully!', 'success');
-            }
-        } else {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-            alert('Error: ' + (data.error || 'Failed to publish order'));
-        }
-    })
-    .catch(error => {
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-        alert('Error: ' + error.message);
-    });
-}
-
-document.getElementById('publishAllSelected').addEventListener('click', function() {
-    const checked = document.querySelectorAll('.order-checkbox:checked');
-    if (checked.length === 0) return;
-    if (!confirm('Publish ' + checked.length + ' orders to DMS?')) return;
-
-    const btn = this;
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Publishing...';
-
-    let completed = 0;
-    let failed = 0;
-
-    checked.forEach(checkbox => {
-        const orderId = checkbox.dataset.orderId;
-        fetch('/workforce/orders/' + orderId + '/publish/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken()
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            completed++;
-            if (data.success) {
-                const row = document.getElementById('order-row-' + orderId);
-                if (row) row.remove();
-            } else { failed++; }
-            if (completed === checked.length) {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
-                btn.style.display = 'none';
-                updatePageCount();
-                if (failed > 0) {
-                    alert('Published ' + (completed - failed) + ' orders. ' + failed + ' failed.');
-                } else if (typeof showToast === 'function') {
-                    showToast('All ' + completed + ' orders published!', 'success');
-                }
-            }
-        })
-        .catch(() => {
-            completed++; failed++;
-            if (completed === checked.length) {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
-                updatePageCount();
-            }
-        });
-    });
-});
-
-document.getElementById('bulkPublishBtn').addEventListener('click', function() {
-    document.getElementById('publishAllSelected').click();
-});
-
-function updatePageCount() {
-    const rows = document.querySelectorAll('.dl-table__row[data-order-id]');
-    const countEl = document.getElementById('pageOrderCount');
-    if (countEl) countEl.textContent = rows.length;
-    if (rows.length === 0) location.reload();
-}
-</script>
-{% endblock extra_js %}

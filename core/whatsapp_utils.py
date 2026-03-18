@@ -356,13 +356,9 @@ def send_location_verification_whatsapp(order, verification_token, phone_number)
             'error': 'Webhook URL must use HTTPS in production'
         }
 
-    # Build verification URL
-    from django.urls import reverse
-    verification_path = reverse('orders:verify_location', kwargs={'token': verification_token})
-
-    # Get base URL from settings or request
+    # Build short verification URL: /v/<phone>/<token>/
     base_url = getattr(django_settings, 'BASE_URL', 'https://your-domain.com')
-    verification_url = f"{base_url}{verification_path}"
+    verification_url = f"{base_url}/v/{phone_number}/{verification_token}/"
 
     # Build self-service update URL (order-specific with secure key, valid 4hrs)
     from urllib.parse import quote

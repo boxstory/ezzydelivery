@@ -175,6 +175,7 @@ class Order(models.Model):
     qnas_status = models.CharField(max_length=15, choices=QNAS_STATUS, default='not_checked', blank=True)
     COORDS_ACCURACY = [
         ('by_customer', 'By Customer'),
+        ('by_driver', 'By Driver'),
         ('exact', 'Exact (Building)'),
         ('street', 'Street Level'),
         ('landmark', 'Landmark/Area'),
@@ -517,7 +518,7 @@ class AddressVerification(models.Model):
     def generate_token(self):
         """Generate a unique verification token"""
         import secrets
-        self.verification_token = secrets.token_urlsafe(32)
+        self.verification_token = secrets.token_urlsafe(4)
         from django.utils import timezone
         from datetime import timedelta
         self.token_expires_at = timezone.now() + timedelta(days=7)  # Token valid for 7 days
@@ -669,10 +670,10 @@ class TempOrder(models.Model):
     customer_name = models.CharField(max_length=200, blank=True, default='')
     customer_phone = models.CharField(max_length=100, blank=True, default='')
     customer_address = models.CharField(max_length=500, blank=True, default='')
-    dl_zone = models.CharField(max_length=20, blank=True, default='')
-    dl_street = models.CharField(max_length=20, blank=True, default='')
-    dl_building = models.CharField(max_length=20, blank=True, default='')
-    cod_amount = models.CharField(max_length=30, blank=True, default='')
+    dl_zone = models.CharField(max_length=100, blank=True, default='')
+    dl_street = models.CharField(max_length=100, blank=True, default='')
+    dl_building = models.CharField(max_length=100, blank=True, default='')
+    cod_amount = models.CharField(max_length=50, blank=True, default='')
     order_date = models.CharField(max_length=50, blank=True, default='')
     package_desc = models.CharField(max_length=500, blank=True, default='')
 
@@ -716,6 +717,7 @@ class ImportLog(models.Model):
         ('shopify', 'Shopify'),
         ('woocommerce', 'WooCommerce'),
         ('google_sheet', 'Google Sheet'),
+        ('temp_order', 'Temp Order'),
     ]
 
     STATUS_CHOICES = [

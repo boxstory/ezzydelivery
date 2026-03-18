@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 {% endblock %}
 
 {% block content %}
@@ -190,109 +191,67 @@
     </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 let map;
 let marker;
-let geocoder;
 
-// Initialize map
-function initMap() {
-    // Default to Doha, Qatar
-    const defaultLocation = { lat: 25.2854, lng: 51.5310 };
+// Default to Doha, Qatar
+const defaultLocation = [25.2854, 51.5310];
 
-    // Use existing delivery task coordinates if available
-    const existingLat = {{ existing_lat|default:"null" }};
-    const existingLng = {{ existing_lng|default:"null" }};
-    const hasExistingCoords = existingLat !== null && existingLng !== null;
-    const initialLocation = hasExistingCoords ? { lat: existingLat, lng: existingLng } : defaultLocation;
-    const initialZoom = hasExistingCoords ? 16 : 13;
+// Use existing delivery task coordinates if available
+const existingLat = {{ existing_lat|default:"null" }};
+const existingLng = {{ existing_lng|default:"null" }};
+const hasExistingCoords = existingLat !== null && existingLng !== null;
+const initialLocation = hasExistingCoords ? [existingLat, existingLng] : defaultLocation;
+const initialZoom = hasExistingCoords ? 16 : 13;
 
-    geocoder = new google.maps.Geocoder();
+map = L.map('map', {
+    center: initialLocation,
+    zoom: initialZoom,
+    zoomControl: true
+});
 
-    map = new google.maps.Map(document.getElementById('map'), {
-        center: initialLocation,
-        zoom: initialZoom,
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: true
-    });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+}).addTo(map);
 
-    marker = new google.maps.Marker({
-        position: initialLocation,
-        map: map,
-        draggable: true,
-        animation: google.maps.Animation.DROP,
-        title: 'Drag me to your delivery location'
-    });
+marker = L.marker(initialLocation, { draggable: true }).addTo(map);
 
-    if (hasExistingCoords) {
-        // Already have coordinates from delivery task — use them directly
-        updateLatLng(existingLat, existingLng);
-    } else {
-        // Try to geocode the original address
-        const originalAddress = "{{ address_verification.original_address|escapejs }}";
-        if (originalAddress) {
-            geocodeAddress(originalAddress);
-        } else {
-            // Try to get user's current location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const pos = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-                        map.setCenter(pos);
-                        marker.setPosition(pos);
-                        updateLatLng(pos.lat, pos.lng);
-                    },
-                    () => {
-                        updateLatLng(defaultLocation.lat, defaultLocation.lng);
-                    }
-                );
-            } else {
-                updateLatLng(defaultLocation.lat, defaultLocation.lng);
+if (hasExistingCoords) {
+    updateLatLng(existingLat, existingLng);
+} else {
+    // Try to get user's current location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setView([lat, lng], 16);
+                marker.setLatLng([lat, lng]);
+                updateLatLng(lat, lng);
+            },
+            () => {
+                updateLatLng(defaultLocation[0], defaultLocation[1]);
             }
-        }
+        );
+    } else {
+        updateLatLng(defaultLocation[0], defaultLocation[1]);
     }
-
-    // Update coordinates when marker is dragged
-    marker.addListener('dragend', (event) => {
-        const position = marker.getPosition();
-        updateLatLng(position.lat(), position.lng());
-        reverseGeocode(position.lat(), position.lng());
-    });
-
-    // Allow clicking on map to move marker
-    map.addListener('click', (event) => {
-        marker.setPosition(event.latLng);
-        updateLatLng(event.latLng.lat(), event.latLng.lng());
-        reverseGeocode(event.latLng.lat(), event.latLng.lng());
-    });
 }
 
-function geocodeAddress(address) {
-    geocoder.geocode({ address: address + ', Qatar' }, (results, status) => {
-        if (status === 'OK') {
-            const location = results[0].geometry.location;
-            map.setCenter(location);
-            marker.setPosition(location);
-            updateLatLng(location.lat(), location.lng());
-        } else {
-            console.error('Geocode failed: ' + status);
-            updateLatLng(25.2854, 51.5310); // Default to Doha
-        }
-    });
-}
+// Update coordinates when marker is dragged
+marker.on('dragend', function(e) {
+    const pos = marker.getLatLng();
+    updateLatLng(pos.lat, pos.lng);
+});
 
-function reverseGeocode(lat, lng) {
-    const latlng = { lat: parseFloat(lat), lng: parseFloat(lng) };
-    geocoder.geocode({ location: latlng }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-            document.getElementById('verified_address').value = results[0].formatted_address;
-        }
-    });
-}
+// Allow clicking on map to move marker
+map.on('click', function(e) {
+    marker.setLatLng(e.latlng);
+    updateLatLng(e.latlng.lat, e.latlng.lng);
+});
 
 function updateLatLng(lat, lng) {
     document.getElementById('latitude').value = lat;
@@ -309,15 +268,11 @@ function getMyLocation() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Locating...';
     navigator.geolocation.getCurrentPosition(
         (position) => {
-            const pos = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-            };
-            map.setCenter(pos);
-            map.setZoom(16);
-            marker.setPosition(pos);
-            updateLatLng(pos.lat, pos.lng);
-            reverseGeocode(pos.lat, pos.lng);
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            map.setView([lat, lng], 16);
+            marker.setLatLng([lat, lng]);
+            updateLatLng(lat, lng);
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-crosshairs me-2"></i>Get My Location';
         },
@@ -345,14 +300,9 @@ document.getElementById('orders_verify_location_form_main').addEventListener('su
         return false;
     }
 
-    // Disable submit button to prevent double submission
     const submitBtn = document.getElementById('orders_verify_location_btn_submit');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Confirming...';
 });
-</script>
-
-<script async defer
-    src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap&libraries=places">
 </script>
 {% endblock %}

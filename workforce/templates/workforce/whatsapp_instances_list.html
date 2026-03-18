@@ -1,0 +1,170 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block content %}
+<header class="oli__hero">
+    <div class="oli__hero__left">
+        <h2><i class="fa-brands fa-whatsapp me-1"></i>WhatsApp Instances</h2>
+        <span class="oli__hero__subtitle">| Evolution API instances for sending messages</span>
+    </div>
+    <div class="oli__hero__right">
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addInstanceModal">
+            <i class="fa-solid fa-plus me-1"></i>Add Instance
+        </button>
+    </div>
+</header>
+
+<div class="col-12 p-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Label</th>
+                    <th>Instance Name</th>
+                    <th>Phone Number</th>
+                    <th>Default</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inst in instances %}
+                <tr>
+                    <td class="fw-bold">{{ inst.label }}</td>
+                    <td><code>{{ inst.instance_name }}</code></td>
+                    <td>{{ inst.phone_number|default:"-" }}</td>
+                    <td>
+                        {% if inst.is_default %}
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-star me-1"></i>Default</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if inst.is_active %}
+                        <span class="badge bg-success">Active</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-outline-primary btn-sm" onclick="editInstance({{ inst.id }}, '{{ inst.label|escapejs }}', '{{ inst.instance_name|escapejs }}', '{{ inst.phone_number|escapejs }}', {{ inst.is_default|yesno:'true,false' }}, {{ inst.is_active|yesno:'true,false' }})">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this instance?')">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="instance_id" value="{{ inst.id }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="fa-brands fa-whatsapp fa-2x mb-2 d-block opacity-50"></i>
+                        No instances configured. Add one to get started.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Instance Modal -->
+<div class="modal fade" id="addInstanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-plus me-2"></i>Add WhatsApp Instance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Label</label>
+                        <input type="text" class="form-control" name="label" placeholder="e.g. Main, Support, Sales" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Instance Name</label>
+                        <input type="text" class="form-control" name="instance_name" placeholder="Evolution API instance name" required>
+                        <small class="text-muted">Must match the instance name in Evolution API</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Phone Number</label>
+                        <input type="text" class="form-control" name="phone_number" placeholder="+974 XXXX XXXX">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_default" value="1" id="addDefault">
+                        <label class="form-check-label" for="addDefault">Set as default instance</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-check me-1"></i>Add</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Instance Modal -->
+<div class="modal fade" id="editInstanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="instance_id" id="editId">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-pen me-2"></i>Edit Instance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Label</label>
+                        <input type="text" class="form-control" name="label" id="editLabel" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Instance Name</label>
+                        <input type="text" class="form-control" name="instance_name" id="editInstanceName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Phone Number</label>
+                        <input type="text" class="form-control" name="phone_number" id="editPhone">
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="is_default" value="1" id="editDefault">
+                        <label class="form-check-label" for="editDefault">Set as default instance</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_active" value="1" id="editActive">
+                        <label class="form-check-label" for="editActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-check me-1"></i>Save</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editInstance(id, label, instanceName, phone, isDefault, isActive) {
+    document.getElementById('editId').value = id;
+    document.getElementById('editLabel').value = label;
+    document.getElementById('editInstanceName').value = instanceName;
+    document.getElementById('editPhone').value = phone;
+    document.getElementById('editDefault').checked = isDefault;
+    document.getElementById('editActive').checked = isActive;
+    new bootstrap.Modal(document.getElementById('editInstanceModal')).show();
+}
+</script>
+{% endblock content %}

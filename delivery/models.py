@@ -317,6 +317,7 @@ class DeliveryTask(models.Model):
 
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
+        ('pos', 'POS'),
         ('fawran', 'Fawran'),
     ]
     payment_method = models.CharField(
@@ -439,6 +440,7 @@ class DeliveryTask(models.Model):
     ADDRESS_ACCURACY_CHOICES = [
         ('by_customer', 'By Customer'),
         ('by_staff', 'By Staff'),
+        ('by_driver', 'By Driver'),
         ('geocoded', 'Geocoded'),
         ('unverified', 'Unverified'),
     ]

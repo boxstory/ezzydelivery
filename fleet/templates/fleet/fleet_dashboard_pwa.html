@@ -98,8 +98,97 @@
     </a>
 </div>
 
+<!-- Today's Stats -->
+<div class="fleet-stats fleet-slide-up" style="animation-delay: 0.3s">
+    <div class="fleet-stat">
+        <div class="fleet-stat__top">
+            <div class="fleet-stat__icon fleet-stat__icon--success">
+                <i class="fa-solid fa-truck-fast"></i>
+            </div>
+            <div class="fleet-stat__value">{{ stats_today.total_deliveries|default:0 }}</div>
+        </div>
+        <div class="fleet-stat__label">Today's Deliveries</div>
+    </div>
+
+    <div class="fleet-stat">
+        <div class="fleet-stat__top">
+            <div class="fleet-stat__icon fleet-stat__icon--warning">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="fleet-stat__value">{{ my_tasks_count|default:0 }}</div>
+        </div>
+        <div class="fleet-stat__label">Pending Tasks</div>
+    </div>
+
+    <div class="fleet-stat">
+        <div class="fleet-stat__top">
+            <div class="fleet-stat__icon fleet-stat__icon--danger">
+                <i class="fa-solid fa-money-bill-wave"></i>
+            </div>
+            <div class="fleet-stat__value">{{ stats_today.total_cod_collected|floatformat:0|default:0 }}</div>
+        </div>
+        <div class="fleet-stat__label">Today's COD</div>
+    </div>
+</div>
+
+<!-- Week Performance -->
+<div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">This Week</h3>
+        <a href="{% url 'fleet:driver_performance' %}" class="fleet-card__action">
+            View All <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="fleet-card__body">
+        <div class="fleet-stats fleet-stats--4col">
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--info">
+                    <i class="fa-solid fa-box"></i>
+                </div>
+                <div class="fleet-stat__value">{{ stats_7_days.total_deliveries|default:0 }}</div>
+                <div class="fleet-stat__label">Deliveries</div>
+            </div>
+
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--success">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+                <div class="fleet-stat__value">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
+                <div class="fleet-stat__label">Success</div>
+            </div>
+
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-star"></i>
+                </div>
+                <div class="fleet-stat__value">{{ driver.driver_rating|floatformat:1|default:"0.0" }}</div>
+                <div class="fleet-stat__label">Rating</div>
+            </div>
+
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--danger">
+                    <i class="fa-solid fa-money-bill"></i>
+                </div>
+                <div class="fleet-stat__value">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
+                <div class="fleet-stat__label">COD</div>
+            </div>
+        </div>
+
+        <!-- Progress bar for weekly goal -->
+        <div class="fleet-weekly-goal">
+            <div class="fleet-weekly-goal__header">
+                <span class="fleet-weekly-goal__label">Weekly Goal</span>
+                <span class="fleet-weekly-goal__value">{{ stats_7_days.total_deliveries|default:0 }}/100</span>
+            </div>
+            <div class="fleet-progress">
+                <div class="fleet-progress__bar" style="width: {% widthratio stats_7_days.total_deliveries|default:0 100 100 %}%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Activity Timeline -->
-<div class="fleet-card fleet-slide-up" style="animation-delay: 0.2s">
+<div class="fleet-card fleet-slide-up" style="animation-delay: 0.4s">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">Activity Log</h3>
         <a href="{% url 'fleet:transaction_history' %}" class="fleet-card__action">
@@ -187,95 +276,6 @@
             <div class="fleet-empty__text">Deliveries, earnings and notifications will appear here</div>
         </div>
         {% endif %}
-    </div>
-</div>
-
-<!-- Today's Stats -->
-<div class="fleet-stats fleet-slide-up" style="animation-delay: 0.3s">
-    <div class="fleet-stat">
-        <div class="fleet-stat__top">
-            <div class="fleet-stat__icon fleet-stat__icon--success">
-                <i class="fa-solid fa-truck-fast"></i>
-            </div>
-            <div class="fleet-stat__value">{{ stats_today.total_deliveries|default:0 }}</div>
-        </div>
-        <div class="fleet-stat__label">Today's Deliveries</div>
-    </div>
-
-    <div class="fleet-stat">
-        <div class="fleet-stat__top">
-            <div class="fleet-stat__icon fleet-stat__icon--warning">
-                <i class="fa-solid fa-clock"></i>
-            </div>
-            <div class="fleet-stat__value">{{ my_tasks_count|default:0 }}</div>
-        </div>
-        <div class="fleet-stat__label">Pending Tasks</div>
-    </div>
-
-    <div class="fleet-stat">
-        <div class="fleet-stat__top">
-            <div class="fleet-stat__icon fleet-stat__icon--danger">
-                <i class="fa-solid fa-money-bill-wave"></i>
-            </div>
-            <div class="fleet-stat__value">{{ stats_today.total_cod_collected|floatformat:0|default:0 }}</div>
-        </div>
-        <div class="fleet-stat__label">Today's COD</div>
-    </div>
-</div>
-
-<!-- Week Performance -->
-<div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s">
-    <div class="fleet-card__header">
-        <h3 class="fleet-card__title">This Week</h3>
-        <a href="{% url 'fleet:driver_performance' %}" class="fleet-card__action">
-            View All <i class="fa-solid fa-arrow-right ms-1"></i>
-        </a>
-    </div>
-    <div class="fleet-card__body">
-        <div class="fleet-stats fleet-stats--4col">
-            <div class="fleet-stat fleet-stat--compact">
-                <div class="fleet-stat__icon fleet-stat__icon--info">
-                    <i class="fa-solid fa-box"></i>
-                </div>
-                <div class="fleet-stat__value">{{ stats_7_days.total_deliveries|default:0 }}</div>
-                <div class="fleet-stat__label">Deliveries</div>
-            </div>
-
-            <div class="fleet-stat fleet-stat--compact">
-                <div class="fleet-stat__icon fleet-stat__icon--success">
-                    <i class="fa-solid fa-check"></i>
-                </div>
-                <div class="fleet-stat__value">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
-                <div class="fleet-stat__label">Success</div>
-            </div>
-
-            <div class="fleet-stat fleet-stat--compact">
-                <div class="fleet-stat__icon fleet-stat__icon--warning">
-                    <i class="fa-solid fa-star"></i>
-                </div>
-                <div class="fleet-stat__value">{{ driver.driver_rating|floatformat:1|default:"0.0" }}</div>
-                <div class="fleet-stat__label">Rating</div>
-            </div>
-
-            <div class="fleet-stat fleet-stat--compact">
-                <div class="fleet-stat__icon fleet-stat__icon--danger">
-                    <i class="fa-solid fa-money-bill"></i>
-                </div>
-                <div class="fleet-stat__value">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
-                <div class="fleet-stat__label">COD</div>
-            </div>
-        </div>
-
-        <!-- Progress bar for weekly goal -->
-        <div class="fleet-weekly-goal">
-            <div class="fleet-weekly-goal__header">
-                <span class="fleet-weekly-goal__label">Weekly Goal</span>
-                <span class="fleet-weekly-goal__value">{{ stats_7_days.total_deliveries|default:0 }}/100</span>
-            </div>
-            <div class="fleet-progress">
-                <div class="fleet-progress__bar" style="width: {% widthratio stats_7_days.total_deliveries|default:0 100 100 %}%;"></div>
-            </div>
-        </div>
     </div>
 </div>
 

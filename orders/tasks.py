@@ -257,7 +257,12 @@ def _sync_onedrive_source(source):
     created, updated = 0, 0
     seen_row_nums = set()
 
-    for i, row_data in enumerate(data_rows):
+    # Process rows from bottom (newest) to top; stop after 10 consecutive imported
+    consecutive_imported = 0
+    row_indices = list(range(len(data_rows) - 1, -1, -1))
+
+    for i in row_indices:
+        row_data = data_rows[i]
         row_num = i + 2
         if not any(row_data):
             continue
@@ -266,6 +271,14 @@ def _sync_onedrive_source(source):
         customer_phone = get_cell(row_data, 'customer_phone')
         if not customer_name and not customer_phone:
             continue
+
+        # Check if already imported in temp_orders table
+        if row_num in existing and existing[row_num].status == 'imported':
+            consecutive_imported += 1
+            if consecutive_imported >= 10:
+                break
+            continue
+        consecutive_imported = 0
 
         client_code = get_cell(row_data, 'client_order_code')
         already_imported = row_num in imported_row_nums
@@ -297,6 +310,9 @@ def _sync_onedrive_source(source):
 
         if row_num in existing:
             temp_order = existing[row_num]
+            # Don't reset status if already marked as imported
+            if temp_order.status == 'imported':
+                defaults.pop('status', None)
             changed = False
             for key, val in defaults.items():
                 if getattr(temp_order, key) != val:
@@ -312,12 +328,6 @@ def _sync_onedrive_source(source):
                 **defaults,
             )
             created += 1
-
-    stale = set(existing.keys()) - seen_row_nums
-    if stale:
-        TempOrder.objects.filter(
-            source_type='onedrive', onedrive_source=source, row_num__in=stale, status='new'
-        ).delete()
 
     return created, updated
 
@@ -472,12 +482,25 @@ def _sync_google_sheet_source(api_settings):
     created, updated = 0, 0
     seen_row_nums = set()
 
-    for i, row in enumerate(data_rows):
+    # Process rows from bottom (newest) to top; stop after 10 consecutive imported
+    consecutive_imported = 0
+    row_indices = list(range(len(data_rows) - 1, -1, -1))
+
+    for i in row_indices:
+        row = data_rows[i]
         row_num = i + 2
         customer_name = cell(row, idx_name)
         customer_phone = cell(row, idx_phone)
         if not customer_name and not customer_phone:
             continue
+
+        # Check if already imported in temp_orders table
+        if row_num in existing and existing[row_num].status == 'imported':
+            consecutive_imported += 1
+            if consecutive_imported >= 10:
+                break
+            continue
+        consecutive_imported = 0
 
         client_code = cell(row, idx_order)
         already_imported = row_num in imported_rows_from_db
@@ -506,6 +529,9 @@ def _sync_google_sheet_source(api_settings):
 
         if row_num in existing:
             temp_order = existing[row_num]
+            # Don't reset status if already marked as imported
+            if temp_order.status == 'imported':
+                defaults.pop('status', None)
             changed = False
             for key, val in defaults.items():
                 if getattr(temp_order, key) != val:
@@ -521,12 +547,6 @@ def _sync_google_sheet_source(api_settings):
                 **defaults,
             )
             created += 1
-
-    stale = set(existing.keys()) - seen_row_nums
-    if stale:
-        TempOrder.objects.filter(
-            source_type='google_sheet', api_settings=api_settings, row_num__in=stale, status='new'
-        ).delete()
 
     return created, updated
 
@@ -613,6 +633,9 @@ def _sync_api_source(api_settings):
 
         if pid in existing:
             temp_order = existing[pid]
+            # Don't reset status if already marked as imported
+            if temp_order.status == 'imported':
+                defaults.pop('status', None)
             changed = False
             for key, val in defaults.items():
                 if getattr(temp_order, key) != val:
@@ -869,7 +892,12 @@ def _sync_public_link_source(source):
     created, updated = 0, 0
     seen_row_nums = set()
 
-    for i, row_data in enumerate(rows):
+    # Process rows from bottom (newest) to top; stop after 10 consecutive imported
+    consecutive_imported = 0
+    row_indices = list(range(len(rows) - 1, -1, -1))
+
+    for i in row_indices:
+        row_data = rows[i]
         row_num = i + 2  # 1-indexed, row 1 = headers
         if not any(row_data):
             continue
@@ -878,6 +906,14 @@ def _sync_public_link_source(source):
         customer_phone = get_cell(row_data, 'customer_phone')
         if not customer_name and not customer_phone:
             continue
+
+        # Check if already imported in temp_orders table
+        if row_num in existing and existing[row_num].status == 'imported':
+            consecutive_imported += 1
+            if consecutive_imported >= 10:
+                break
+            continue
+        consecutive_imported = 0
 
         client_code = get_cell(row_data, 'client_order_code')
         already_imported = client_code and client_code in imported_codes
@@ -919,6 +955,9 @@ def _sync_public_link_source(source):
 
         if row_num in existing:
             temp_order = existing[row_num]
+            # Don't reset status if already marked as imported
+            if temp_order.status == 'imported':
+                defaults.pop('status', None)
             changed = False
             for key, val in defaults.items():
                 if getattr(temp_order, key) != val:
@@ -934,13 +973,6 @@ def _sync_public_link_source(source):
                 **defaults,
             )
             created += 1
-
-    # Remove stale rows that no longer exist in the HTML
-    stale = set(existing.keys()) - seen_row_nums
-    if stale:
-        TempOrder.objects.filter(
-            source_type='public_link', public_link_source=source, row_num__in=stale, status='new'
-        ).delete()
 
     source.last_sync_count = len(seen_row_nums)
     source.save()

@@ -1,0 +1,215 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Edit Location{% endblock %}
+{% block page_title %}Edit Location{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'fleet:driver_tasks' %}" class="fleet-btn-icon text-decoration-none">
+    <i class="fa-solid fa-arrow-left"></i>
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Task Info -->
+<div class="fleet-card fleet-fade-in">
+    <div class="td-edit-loc__task-bar">
+        <div class="td-edit-loc__task-info">
+            <span class="td-edit-loc__task-num">{{ task.dl_task_number|default:"—" }}</span>
+        </div>
+        {% if order %}
+        <span class="td-edit-loc__customer">{{ order.customer_name|default:"" }}</span>
+        {% endif %}
+    </div>
+
+    {% if addr %}
+    <!-- Current Location -->
+    <div class="td-edit-loc__current">
+        <div class="td-edit-loc__current-head">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Current Location</span>
+        </div>
+        <div class="td-edit-loc__current-body">
+            {% if addr.area_name %}
+            <strong class="td-edit-loc__area">{{ addr.area_name }}</strong>
+            {% endif %}
+            <div class="td-edit-loc__addr-tags">
+                {% if addr.dl_zone %}<span class="td-edit-loc__tag">Zone {{ addr.dl_zone }}</span>{% endif %}
+                {% if addr.dl_street %}<span class="td-edit-loc__tag">St {{ addr.dl_street }}</span>{% endif %}
+                {% if addr.dl_building %}<span class="td-edit-loc__tag">Bldg {{ addr.dl_building }}</span>{% endif %}
+            </div>
+            {% if addr.dl_latitude and addr.dl_longitude %}
+            <span class="td-edit-loc__coords">
+                <i class="fa-solid fa-crosshairs"></i>
+                {{ addr.dl_latitude|floatformat:6 }}, {{ addr.dl_longitude|floatformat:6 }}
+            </span>
+            {% else %}
+            <span class="td-edit-loc__coords td-edit-loc__coords--none">
+                <i class="fa-solid fa-triangle-exclamation"></i> No coordinates
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit Form -->
+<div class="fleet-card fleet-slide-up">
+    <div class="fleet-card__body">
+        <form method="post">
+            {% csrf_token %}
+
+            <!-- Zone / Street / Building -->
+            <div class="td-edit-loc__section-head">
+                <i class="fa-solid fa-map-signs"></i> Address Details
+            </div>
+            <div class="td-edit-loc__fields">
+                <div class="td-edit-loc__field">
+                    <label class="td-edit-loc__label" for="id_zone">Zone</label>
+                    <input type="text" id="id_zone" name="zone" class="form-control td-edit-loc__input"
+                        value="{% firstof order.dl_zone addr.dl_zone '' %}" placeholder="71" inputmode="numeric">
+                </div>
+                <div class="td-edit-loc__field">
+                    <label class="td-edit-loc__label" for="id_street">Street</label>
+                    <input type="text" id="id_street" name="street" class="form-control td-edit-loc__input"
+                        value="{% firstof order.dl_street addr.dl_street '' %}" placeholder="450" inputmode="numeric">
+                </div>
+                <div class="td-edit-loc__field">
+                    <label class="td-edit-loc__label" for="id_building">Building</label>
+                    <input type="text" id="id_building" name="building" class="form-control td-edit-loc__input"
+                        value="{% firstof order.dl_building addr.dl_building '' %}" placeholder="12">
+                </div>
+            </div>
+
+            <!-- Location Link -->
+            <div class="td-edit-loc__section-head">
+                <i class="fa-solid fa-link"></i> Location Link
+            </div>
+            <div class="td-edit-loc__link-wrap">
+                <input type="hidden" id="id_resolved_lat" name="resolved_lat" value="">
+                <input type="hidden" id="id_resolved_lng" name="resolved_lng" value="">
+                <input type="text" id="id_loc_link" name="loc_link" class="form-control td-edit-loc__input td-edit-loc__input--link"
+                    placeholder="e.g. maps.app.goo.gl/... or 8FM8+MJ Doha">
+                <div id="locLinkPreview" class="td-edit-loc__preview">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span id="locLinkCoords">—</span>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="td-edit-loc__actions">
+                <a href="{% url 'fleet:driver_tasks' %}" class="fleet-btn fleet-btn--outline td-edit-loc__btn text-decoration-none">
+                    Cancel
+                </a>
+                <button type="submit" class="fleet-btn fleet-btn--primary td-edit-loc__btn">
+                    <i class="fa-solid fa-check"></i> Save
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var linkInput = document.getElementById('id_loc_link');
+    var preview = document.getElementById('locLinkPreview');
+    var coordsSpan = document.getElementById('locLinkCoords');
+    var resolveTimer = null;
+    var latInput = document.getElementById('id_resolved_lat');
+    var lngInput = document.getElementById('id_resolved_lng');
+
+    // Client-side patterns for instant match
+    var patterns = [
+        /maps\.google\.com\/?\?[^"\s]*q=([-\d.]+),([-\d.]+)/i,
+        /google\.com\/maps\?[^"\s]*q=([-\d.]+),([-\d.]+)/i,
+        /google\.com\/maps\/[^"\s]*@([-\d.]+),([-\d.]+)/i,
+        /google\.com\/maps\/search\/([-\d.]+),([-\d.]+)/i,
+        /maps\.google\.com[^"\s]*ll=([-\d.]+),([-\d.]+)/i,
+        /(2[4-6]\.\d{3,8})\s*[,\s]\s*(5[0-2]\.\d{3,8})/
+    ];
+
+    // Patterns that need server-side resolution
+    var needsServer = /maps\.app\.goo\.gl|goo\.gl\/maps|^[A-Z0-9]{4,8}\+[A-Z0-9]/i;
+
+    function extractLocal(text) {
+        for (var i = 0; i < patterns.length; i++) {
+            var m = text.match(patterns[i]);
+            if (m) {
+                var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+                if (lat >= 24 && lat <= 27 && lng >= 50 && lng <= 52.5) return { lat: lat, lng: lng };
+            }
+        }
+        return null;
+    }
+
+    function showFound(lat, lng) {
+        coordsSpan.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+        preview.classList.add('td-edit-loc__preview--found');
+        preview.classList.remove('td-edit-loc__preview--loading');
+        latInput.value = lat;
+        lngInput.value = lng;
+    }
+
+    function showEmpty() {
+        coordsSpan.textContent = 'Paste a link or plus code';
+        preview.classList.remove('td-edit-loc__preview--found');
+        preview.classList.remove('td-edit-loc__preview--loading');
+        latInput.value = '';
+        lngInput.value = '';
+    }
+
+    function showLoading() {
+        coordsSpan.textContent = 'Resolving...';
+        preview.classList.remove('td-edit-loc__preview--found');
+        preview.classList.add('td-edit-loc__preview--loading');
+    }
+
+    function resolveServer(text) {
+        showLoading();
+        fetch('{% url "fleet:fleet_resolve_location" %}', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ text: text })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.lat && data.lng) {
+                showFound(data.lat, data.lng);
+            } else {
+                showEmpty();
+            }
+        })
+        .catch(function() { showEmpty(); });
+    }
+
+    function update() {
+        var text = linkInput.value.trim();
+        if (!text) { showEmpty(); return; }
+
+        // Try client-side first
+        var coords = extractLocal(text);
+        if (coords) { showFound(coords.lat, coords.lng); return; }
+
+        // Needs server resolution (short links, plus codes)
+        if (needsServer.test(text)) {
+            clearTimeout(resolveTimer);
+            resolveTimer = setTimeout(function() { resolveServer(text); }, 300);
+        } else {
+            showEmpty();
+        }
+    }
+
+    linkInput.addEventListener('input', update);
+    linkInput.addEventListener('paste', function() { setTimeout(update, 150); });
+    update();
+})();
+</script>
+{% endblock %}

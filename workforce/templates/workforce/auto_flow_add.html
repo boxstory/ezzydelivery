@@ -1,0 +1,638 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<header class="oli__hero">
+    <div class="oli__hero__left">
+        <h2><i class="fa-solid {% if editing %}fa-pen-to-square{% else %}fa-plus{% endif %} me-1"></i>{% if editing %}Edit Flow{% else %}Add Flow{% endif %}</h2>
+        <span class="oli__hero__subtitle">| {% if editing %}Update automation flow{% else %}Connect a trigger to an action{% endif %}</span>
+    </div>
+    <div class="oli__hero__right">
+        <a href="{% url 'workforce:auto_flows_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i>Back to Flows
+        </a>
+    </div>
+</header>
+
+<div class="col-12 p-3">
+    {% if error %}
+    <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="{% if editing %}{% url 'workforce:auto_flow_edit' flow.id %}{% else %}{% url 'workforce:auto_flow_add' %}{% endif %}">
+        {% csrf_token %}
+
+        <div class="row g-4">
+            <!-- Left: Trigger + Action Selection -->
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header"><i class="fa-solid fa-bolt me-2"></i><strong>1. Flow Setup</strong></div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="flowName" class="form-label fw-bold">Flow Name</label>
+                            <input type="text" class="form-control" id="flowName" name="name"
+                                   placeholder="e.g. Notify customer on delivery"
+                                   value="{{ form_data.name|default:'' }}" required>
+                            <small class="text-muted">A descriptive name for this automation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="triggerSelect" class="form-label fw-bold">
+                                <i class="fa-solid fa-play text-success me-1"></i>When this happens (Trigger)
+                            </label>
+                            <select class="form-select" id="triggerSelect" name="trigger_id" required onchange="updateTriggerInfo()">
+                                <option value="">— Select a trigger —</option>
+                                <optgroup label="WhatsApp Notifications">
+                                    {% for t in triggers %}{% if t.category == 'whatsapp' %}
+                                    <option value="{{ t.id }}" data-desc="{{ t.description }}" data-category="{{ t.category }}" data-key="{{ t.trigger_key }}" data-action="{{ t.action }}"
+                                        {% if form_data.trigger_id == t.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ t.label }}
+                                    </option>
+                                    {% endif %}{% endfor %}
+                                </optgroup>
+                                <optgroup label="Webhook Events">
+                                    {% for t in triggers %}{% if t.category == 'webhook' %}
+                                    <option value="{{ t.id }}" data-desc="{{ t.description }}" data-category="{{ t.category }}" data-key="{{ t.trigger_key }}" data-action="{{ t.action }}"
+                                        {% if form_data.trigger_id == t.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ t.label }}
+                                    </option>
+                                    {% endif %}{% endfor %}
+                                </optgroup>
+                                <optgroup label="System Actions">
+                                    {% for t in triggers %}{% if t.category == 'system' %}
+                                    <option value="{{ t.id }}" data-desc="{{ t.description }}" data-category="{{ t.category }}" data-key="{{ t.trigger_key }}" data-action="{{ t.action }}"
+                                        {% if form_data.trigger_id == t.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ t.label }}
+                                    </option>
+                                    {% endif %}{% endfor %}
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- Trigger Info Panel -->
+                        <div id="triggerInfoPanel" class="border rounded p-3 mb-3 bg-light" style="display:none;">
+                            <div class="mb-2">
+                                <small class="text-muted fw-bold">Description</small>
+                                <div id="triggerInfoText" class="small"></div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted fw-bold">Action Performed</small>
+                                <div id="triggerInfoAction" class="small"><code></code></div>
+                            </div>
+                            <div>
+                                <small class="text-muted fw-bold">Category</small>
+                                <div id="triggerInfoCategory"></div>
+                            </div>
+                        </div>
+
+                        <!-- Trigger Conditions -->
+                        <div id="triggerConditions" style="display:none;">
+                            <label class="form-label fw-bold small text-muted mb-2">
+                                <i class="fa-solid fa-filter me-1"></i>Trigger Conditions (optional)
+                            </label>
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold">Apply to Business</label>
+                                <select class="form-select form-select-sm" name="trigger_business">
+                                    <option value="all" {% if form_data.trigger_business == 'all' %}selected{% endif %}>All Businesses</option>
+                                    {% for biz in businesses %}
+                                    <option value="{{ biz.business_id }}" {% if form_data.trigger_business == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- WhatsApp-specific conditions -->
+                            <div id="triggerCond-whatsapp" class="trigger-cond-panel" style="display:none;">
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Only when status changes to</label>
+                                    <select class="form-select form-select-sm" name="trigger_on_status">
+                                        <option value="">Any (default for this trigger)</option>
+                                        <option value="assigned">Assigned</option>
+                                        <option value="picked_up">Picked Up</option>
+                                        <option value="out_for_delivery">Out for Delivery</option>
+                                        <option value="in_transit">In Transit</option>
+                                        <option value="delivered">Delivered</option>
+                                        <option value="failed">Failed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Only when COD amount</label>
+                                    <select class="form-select form-select-sm" name="trigger_cod_condition">
+                                        <option value="">Any</option>
+                                        <option value="has_cod" {% if form_data.trigger_cod_condition == 'has_cod' %}selected{% endif %}>Has COD (> 0)</option>
+                                        <option value="no_cod" {% if form_data.trigger_cod_condition == 'no_cod' %}selected{% endif %}>No COD (= 0)</option>
+                                        <option value="cod_above" {% if form_data.trigger_cod_condition == 'cod_above' %}selected{% endif %}>COD above amount</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2" id="codAmountWrap" style="display:none;">
+                                    <input type="number" class="form-control form-control-sm" name="trigger_cod_min_amount"
+                                           placeholder="Min COD amount (QR)" value="{{ form_data.trigger_cod_min_amount|default:'' }}">
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="trigger_only_verified" value="1"
+                                           {% if form_data.trigger_only_verified %}checked{% endif %}>
+                                    <label class="form-check-label small">Only verified addresses</label>
+                                </div>
+                            </div>
+
+                            <!-- Webhook-specific conditions -->
+                            <div id="triggerCond-webhook" class="trigger-cond-panel" style="display:none;">
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Only for event</label>
+                                    <select class="form-select form-select-sm" name="trigger_webhook_event">
+                                        <option value="">Any event (default)</option>
+                                        <option value="task_accepted">Task Accepted</option>
+                                        <option value="task_rejected">Task Rejected</option>
+                                        <option value="task_status_update">Task Status Update</option>
+                                        <option value="task_completed">Task Completed</option>
+                                        <option value="driver_location_update">Driver Location Update</option>
+                                        <option value="cod_collected">COD Collected</option>
+                                        <option value="document_uploaded">Document Uploaded</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Only when task status is</label>
+                                    <select class="form-select form-select-sm" name="trigger_wh_task_status">
+                                        <option value="">Any status</option>
+                                        <option value="assigned">Assigned</option>
+                                        <option value="picked_up">Picked Up</option>
+                                        <option value="out_for_delivery">Out for Delivery</option>
+                                        <option value="delivered">Delivered</option>
+                                        <option value="failed">Failed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- System-specific conditions -->
+                            <div id="triggerCond-system" class="trigger-cond-panel" style="display:none;">
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Only on status transition</label>
+                                    <div class="row g-2">
+                                        <div class="col-5">
+                                            <select class="form-select form-select-sm" name="trigger_from_status">
+                                                <option value="">Any</option>
+                                                <option value="for_review">For Review</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="assigned">Assigned</option>
+                                                <option value="picked_up">Picked Up</option>
+                                                <option value="out_for_delivery">Out for Delivery</option>
+                                                <option value="in_transit">In Transit</option>
+                                                <option value="delivered">Delivered</option>
+                                                <option value="failed">Failed</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-2 text-center pt-1"><i class="fa-solid fa-arrow-right text-muted"></i></div>
+                                        <div class="col-5">
+                                            <select class="form-select form-select-sm" name="trigger_to_status">
+                                                <option value="">Any</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="assigned">Assigned</option>
+                                                <option value="picked_up">Picked Up</option>
+                                                <option value="out_for_delivery">Out for Delivery</option>
+                                                <option value="in_transit">In Transit</option>
+                                                <option value="delivered">Delivered</option>
+                                                <option value="failed">Failed</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">From → To status</small>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="trigger_only_with_driver" value="1"
+                                           {% if form_data.trigger_only_with_driver %}checked{% endif %}>
+                                    <label class="form-check-label small">Only when driver is assigned</label>
+                                </div>
+                            </div>
+
+                            <!-- Time-based condition (all categories) -->
+                            <div class="mb-2 mt-2 pt-2 border-top">
+                                <label class="form-label small fw-bold">Active Hours (optional)</label>
+                                <div class="row g-2">
+                                    <div class="col-5">
+                                        <input type="time" class="form-control form-control-sm" name="trigger_active_from"
+                                               value="{{ form_data.trigger_active_from|default:'' }}">
+                                        <small class="text-muted">From</small>
+                                    </div>
+                                    <div class="col-2 text-center pt-1"><i class="fa-solid fa-arrow-right text-muted"></i></div>
+                                    <div class="col-5">
+                                        <input type="time" class="form-control form-control-sm" name="trigger_active_to"
+                                               value="{{ form_data.trigger_active_to|default:'' }}">
+                                        <small class="text-muted">To</small>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Only fire during these hours. Leave empty for 24/7.</small>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold">Max triggers per day (optional)</label>
+                                <input type="number" class="form-control form-control-sm" name="trigger_max_per_day"
+                                       placeholder="Unlimited" min="1" value="{{ form_data.trigger_max_per_day|default:'' }}" style="max-width:150px;">
+                            </div>
+                        </div>
+
+                        <hr class="my-3">
+
+                        <div class="mb-3">
+                            <label for="actionType" class="form-label fw-bold">
+                                <i class="fa-solid fa-forward text-primary me-1"></i>Do this (Action)
+                            </label>
+                            <select class="form-select" id="actionType" name="action_type" required onchange="showActionConfig()">
+                                <option value="">— Select an action —</option>
+                                {% for value, label in action_types %}
+                                <option value="{{ value }}" {% if form_data.action_type == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Flow Summary -->
+                        <div id="flowSummary" class="border rounded p-3 bg-light mt-3" style="display:none;">
+                            <h6 class="fw-bold mb-2"><i class="fa-solid fa-diagram-project me-1"></i>Flow Summary</h6>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge bg-success" id="summaryTrigger">—</span>
+                                <i class="fa-solid fa-arrow-right text-muted"></i>
+                                <span class="badge bg-primary" id="summaryAction">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Action Config -->
+            <div class="col-md-7">
+                <div class="card">
+                    <div class="card-header"><i class="fa-solid fa-gear me-2"></i><strong>2. Action Config</strong></div>
+                    <div class="card-body">
+
+                        <!-- WhatsApp Message Config -->
+                        <div id="config-whatsapp_message" class="action-config-panel" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">From Instance / Number</label>
+                                <select class="form-select" name="wa_instance">
+                                    <option value="">— Default Instance —</option>
+                                    {% for inst in wa_instances %}
+                                    <option value="{{ inst.instance_name }}" {% if form_data.wa_instance == inst.instance_name %}selected{% endif %}>
+                                        {{ inst.label }}{% if inst.phone_number %} ({{ inst.phone_number }}){% endif %}{% if inst.is_default %} ★{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">WhatsApp instance to send from. Default uses system settings.</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Send To</label>
+                                <select class="form-select" name="wa_recipient" onchange="toggleRecipientFields(this.value)">
+                                    <optgroup label="Customer">
+                                        <option value="customer" {% if form_data.wa_recipient == 'customer' %}selected{% endif %}>Customer — Order Phone</option>
+                                        <option value="customer_whatsapp" {% if form_data.wa_recipient == 'customer_whatsapp' %}selected{% endif %}>Customer — WhatsApp Number</option>
+                                    </optgroup>
+                                    <optgroup label="Driver">
+                                        <option value="driver" {% if form_data.wa_recipient == 'driver' %}selected{% endif %}>Assigned Driver — Phone</option>
+                                        <option value="driver_whatsapp" {% if form_data.wa_recipient == 'driver_whatsapp' %}selected{% endif %}>Assigned Driver — WhatsApp</option>
+                                        <option value="all_active_drivers" {% if form_data.wa_recipient == 'all_active_drivers' %}selected{% endif %}>All Active Drivers</option>
+                                        <option value="zone_drivers" {% if form_data.wa_recipient == 'zone_drivers' %}selected{% endif %}>Drivers in Same Zone</option>
+                                        <option value="available_drivers" {% if form_data.wa_recipient == 'available_drivers' %}selected{% endif %}>All Available Drivers</option>
+                                    </optgroup>
+                                    <optgroup label="Seller / Business">
+                                        <option value="seller" {% if form_data.wa_recipient == 'seller' %}selected{% endif %}>Seller — Business Phone</option>
+                                        <option value="seller_owner" {% if form_data.wa_recipient == 'seller_owner' %}selected{% endif %}>Seller — Owner Phone</option>
+                                    </optgroup>
+                                    <optgroup label="Staff">
+                                        <option value="staff_ops" {% if form_data.wa_recipient == 'staff_ops' %}selected{% endif %}>Operations Staff</option>
+                                        <option value="staff_all" {% if form_data.wa_recipient == 'staff_all' %}selected{% endif %}>All Staff Members</option>
+                                    </optgroup>
+                                    <optgroup label="Custom">
+                                        <option value="custom" {% if form_data.wa_recipient == 'custom' %}selected{% endif %}>Custom Phone Number</option>
+                                        <option value="custom_group" {% if form_data.wa_recipient == 'custom_group' %}selected{% endif %}>WhatsApp Group ID</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="waCustomPhoneWrap" style="display:none;">
+                                <label class="form-label fw-bold" id="waCustomPhoneLabel">Custom Phone Number</label>
+                                <input type="text" class="form-control" name="wa_custom_phone" id="waCustomPhoneInput"
+                                       placeholder="+974 XXXX XXXX"
+                                       value="{{ form_data.wa_custom_phone|default:'' }}">
+                                <small class="text-muted" id="waCustomPhoneHelp">Include country code (e.g. +974)</small>
+                            </div>
+                            <div class="mb-3" id="waGroupIdWrap" style="display:none;">
+                                <label class="form-label fw-bold">WhatsApp Group ID</label>
+                                <input type="text" class="form-control" name="wa_group_id"
+                                       placeholder="120363XXXXXXXXXX@g.us"
+                                       value="{{ form_data.wa_group_id|default:'' }}">
+                                <small class="text-muted">Evolution API group JID (e.g. 120363XXXXXXXXXX@g.us)</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Message Template</label>
+                                <textarea class="form-control" name="message_template" rows="5"
+                                    placeholder="Hello {customer_name}, your order {order_number} has been...">{{ form_data.message_template|default:'' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted">Available Variables</label>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('customer_name')">{customer_name}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('customer_phone')">{customer_phone}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('customer_address')">{customer_address}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('order_number')">{order_number}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('cod_amount')">{cod_amount}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('driver_name')">{driver_name}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('driver_phone')">{driver_phone}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('task_number')">{task_number}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('task_status')">{task_status}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('business_name')">{business_name}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('delivery_date')">{delivery_date}</span>
+                                    <span class="badge bg-light text-dark border" role="button" onclick="insertVar('zone')">{zone}</span>
+                                </div>
+                                <small class="text-muted mt-1 d-block">Click a variable to insert it into the message</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Delay (optional)</label>
+                                <div class="input-group" style="max-width:250px;">
+                                    <input type="number" class="form-control" name="wa_delay_seconds" min="0" max="86400"
+                                           placeholder="0" value="{{ form_data.wa_delay_seconds|default:'0' }}">
+                                    <span class="input-group-text">seconds</span>
+                                </div>
+                                <small class="text-muted">Wait before sending (0 = immediate)</small>
+                            </div>
+                        </div>
+
+                        <!-- Webhook Config -->
+                        <div id="config-webhook_call" class="action-config-panel" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Webhook URL</label>
+                                <input type="url" class="form-control" name="webhook_url"
+                                       placeholder="https://example.com/webhook"
+                                       value="{{ form_data.webhook_url|default:'' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">HTTP Method</label>
+                                <select class="form-select" name="webhook_method">
+                                    <option value="POST" {% if form_data.webhook_method == 'POST' %}selected{% endif %}>POST</option>
+                                    <option value="GET" {% if form_data.webhook_method == 'GET' %}selected{% endif %}>GET</option>
+                                    <option value="PUT" {% if form_data.webhook_method == 'PUT' %}selected{% endif %}>PUT</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Custom Headers (optional)</label>
+                                <textarea class="form-control" name="webhook_headers" rows="2"
+                                    placeholder='{"Authorization": "Bearer xxx"}'>{{ form_data.webhook_headers|default:'' }}</textarea>
+                                <small class="text-muted">JSON format for extra headers</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Payload Template (optional)</label>
+                                <textarea class="form-control" name="webhook_payload" rows="4"
+                                    placeholder='{"event": "{trigger_key}", "order": "{order_number}", "status": "{task_status}"}'>{{ form_data.webhook_payload|default:'' }}</textarea>
+                                <small class="text-muted">JSON body to send. Use {variable} placeholders. Leave empty to send full event data.</small>
+                            </div>
+                        </div>
+
+                        <!-- Order Status Update Config -->
+                        <div id="config-update_order_status" class="action-config-panel" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Target Order Status</label>
+                                <select class="form-select" name="target_order_status">
+                                    <option value="">— Select status —</option>
+                                    <option value="to_review">To Review</option>
+                                    <option value="ready_to_pickup">Ready to Pickup</option>
+                                    <option value="publish">Publish</option>
+                                    <option value="delivered">Delivered</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Apply To</label>
+                                <select class="form-select" name="status_apply_to">
+                                    <option value="current_order">Current order (from trigger)</option>
+                                    <option value="all_business_orders">All orders of same business</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Task Status Update Config -->
+                        <div id="config-update_task_status" class="action-config-panel" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Target Task Status</label>
+                                <select class="form-select" name="target_task_status">
+                                    <option value="">— Select status —</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="assigned">Assigned</option>
+                                    <option value="picked_up">Picked Up</option>
+                                    <option value="out_for_delivery">Out for Delivery</option>
+                                    <option value="in_transit">In Transit</option>
+                                    <option value="delivered">Delivered</option>
+                                    <option value="failed">Failed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Add Status Note (optional)</label>
+                                <input type="text" class="form-control" name="status_note"
+                                       placeholder="e.g. Auto-updated by flow"
+                                       value="{{ form_data.status_note|default:'' }}">
+                            </div>
+                        </div>
+
+                        <!-- Notification Config -->
+                        <div id="config-send_notification" class="action-config-panel" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Send To</label>
+                                <select class="form-select" name="notif_recipient">
+                                    <option value="driver" {% if form_data.notif_recipient == 'driver' %}selected{% endif %}>Assigned Driver</option>
+                                    <option value="all_staff" {% if form_data.notif_recipient == 'all_staff' %}selected{% endif %}>All Staff</option>
+                                    <option value="business_owner" {% if form_data.notif_recipient == 'business_owner' %}selected{% endif %}>Business Owner</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Notification Title</label>
+                                <input type="text" class="form-control" name="notification_title"
+                                       placeholder="e.g. New delivery assigned"
+                                       value="{{ form_data.notification_title|default:'' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Notification Message</label>
+                                <textarea class="form-control" name="notification_message" rows="3"
+                                    placeholder="Task {task_number} for order {order_number} has been assigned to you.">{{ form_data.notification_message|default:'' }}</textarea>
+                                <small class="text-muted">Use {variable} placeholders for dynamic content</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Notification Type</label>
+                                <select class="form-select" name="notif_type">
+                                    <option value="info">Info</option>
+                                    <option value="success">Success</option>
+                                    <option value="warning">Warning</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Assign Driver Config -->
+                        <div id="config-assign_driver" class="action-config-panel" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Assignment Method</label>
+                                <select class="form-select" name="assign_method">
+                                    <option value="auto_nearest">Auto — Nearest Available Driver</option>
+                                    <option value="auto_least_loaded">Auto — Least Loaded Driver</option>
+                                    <option value="auto_zone">Auto — Zone-Based Driver</option>
+                                    <option value="specific_driver">Specific Driver</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="specificDriverWrap" style="display:none;">
+                                <label class="form-label fw-bold">Driver ID</label>
+                                <input type="number" class="form-control" name="specific_driver_id"
+                                       placeholder="Enter driver ID"
+                                       value="{{ form_data.specific_driver_id|default:'' }}">
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" name="notify_driver_on_assign" value="1" checked>
+                                <label class="form-check-label">Notify driver after assignment</label>
+                            </div>
+                        </div>
+
+                        <!-- Create Task Config -->
+                        <div id="config-create_task" class="action-config-panel" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Task Type</label>
+                                <select class="form-select" name="task_type">
+                                    <option value="standard">Standard Delivery</option>
+                                    <option value="hub_delivery">Hub Delivery (Leg 2)</option>
+                                    <option value="return">Return Pickup</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Initial Status</label>
+                                <select class="form-select" name="task_initial_status">
+                                    <option value="for_review">For Review</option>
+                                    <option value="pending">Pending</option>
+                                </select>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" name="auto_publish_task" value="1">
+                                <label class="form-check-label">Auto-publish to fleet after creation</label>
+                            </div>
+                        </div>
+
+                        <!-- Default: no config needed -->
+                        <div id="config-default" class="action-config-panel">
+                            <div class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-arrow-left fa-2x mb-3 d-block opacity-50"></i>
+                                Select a trigger and action to configure the flow
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="mt-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-check me-1"></i>{% if editing %}Update Flow{% else %}Create Flow{% endif %}
+                    </button>
+                    <a href="{% url 'workforce:auto_flows_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function showActionConfig() {
+    document.querySelectorAll('.action-config-panel').forEach(p => p.style.display = 'none');
+    const actionType = document.getElementById('actionType').value;
+    if (actionType) {
+        const panel = document.getElementById('config-' + actionType);
+        if (panel) panel.style.display = 'block';
+    } else {
+        document.getElementById('config-default').style.display = 'block';
+    }
+    updateSummary();
+}
+
+function updateTriggerInfo() {
+    const sel = document.getElementById('triggerSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const panel = document.getElementById('triggerInfoPanel');
+    const conditions = document.getElementById('triggerConditions');
+
+    // Hide all category-specific condition panels
+    document.querySelectorAll('.trigger-cond-panel').forEach(p => p.style.display = 'none');
+
+    if (opt && opt.value && opt.dataset.desc) {
+        // Show info panel
+        document.getElementById('triggerInfoText').textContent = opt.dataset.desc;
+        document.getElementById('triggerInfoAction').innerHTML = '<code>' + (opt.dataset.action || '—') + '</code>';
+        const cat = opt.dataset.category;
+        const catBadge = document.getElementById('triggerInfoCategory');
+        if (cat === 'whatsapp') catBadge.innerHTML = '<span class="badge bg-success">WhatsApp</span>';
+        else if (cat === 'webhook') catBadge.innerHTML = '<span class="badge bg-primary">Webhook</span>';
+        else catBadge.innerHTML = '<span class="badge bg-warning text-dark">System</span>';
+        panel.style.display = 'block';
+
+        // Show conditions panel + category-specific fields
+        conditions.style.display = 'block';
+        const condPanel = document.getElementById('triggerCond-' + cat);
+        if (condPanel) condPanel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
+        conditions.style.display = 'none';
+    }
+    updateSummary();
+}
+
+function updateSummary() {
+    const triggerSel = document.getElementById('triggerSelect');
+    const actionSel = document.getElementById('actionType');
+    const summary = document.getElementById('flowSummary');
+    const triggerOpt = triggerSel.options[triggerSel.selectedIndex];
+    const actionOpt = actionSel.options[actionSel.selectedIndex];
+
+    if (triggerSel.value && actionSel.value) {
+        document.getElementById('summaryTrigger').textContent = triggerOpt.textContent.trim();
+        document.getElementById('summaryAction').textContent = actionOpt.textContent.trim();
+        summary.style.display = 'block';
+    } else {
+        summary.style.display = 'none';
+    }
+}
+
+function insertVar(varName) {
+    const ta = document.querySelector('textarea[name="message_template"]');
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    const insert = '{' + varName + '}';
+    ta.value = text.substring(0, start) + insert + text.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + insert.length;
+    ta.focus();
+}
+
+function toggleRecipientFields(val) {
+    document.getElementById('waCustomPhoneWrap').style.display = val === 'custom' ? 'block' : 'none';
+    document.getElementById('waGroupIdWrap').style.display = val === 'custom_group' ? 'block' : 'none';
+}
+
+// Show/hide conditional fields
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'wa_recipient') {
+        toggleRecipientFields(e.target.value);
+    }
+    if (e.target.name === 'assign_method') {
+        document.getElementById('specificDriverWrap').style.display = e.target.value === 'specific_driver' ? 'block' : 'none';
+    }
+    if (e.target.name === 'trigger_cod_condition') {
+        document.getElementById('codAmountWrap').style.display = e.target.value === 'cod_above' ? 'block' : 'none';
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    showActionConfig();
+    updateTriggerInfo();
+});
+</script>
+{% endblock content %}

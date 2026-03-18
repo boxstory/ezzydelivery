@@ -215,14 +215,18 @@ class WalletService:
         )
 
         # Mark corresponding delivery tasks as COD settled
+        settled_task_ids = []
         if delivery_ids:
             # Settle specific deliveries
-            DeliveryTask.objects.filter(
+            settled_task_ids = list(DeliveryTask.objects.filter(
                 id__in=delivery_ids,
                 driver=driver,
                 cod_collected=True,
                 cod_settled=False
-            ).update(cod_settled=True, cod_settled_at=timezone.now())
+            ).values_list('id', flat=True))
+            DeliveryTask.objects.filter(id__in=settled_task_ids).update(
+                cod_settled=True, cod_settled_at=timezone.now()
+            )
         else:
             # No specific IDs provided - settle oldest unsettled tasks up to the deposit amount
             remaining = Decimal(str(amount))
@@ -232,20 +236,30 @@ class WalletService:
                 cod_settled=False
             ).order_by('completed_at')
 
-            task_ids_to_settle = []
             for task in unsettled_tasks:
                 task_cod = task.cod_collected_amount or Decimal('0')
                 if task_cod <= Decimal('0'):
                     continue
                 if remaining >= task_cod:
-                    task_ids_to_settle.append(task.id)
+                    settled_task_ids.append(task.id)
                     remaining -= task_cod
                 if remaining <= Decimal('0'):
                     break
 
-            if task_ids_to_settle:
-                DeliveryTask.objects.filter(id__in=task_ids_to_settle).update(
+            if settled_task_ids:
+                DeliveryTask.objects.filter(id__in=settled_task_ids).update(
                     cod_settled=True, cod_settled_at=timezone.now()
+                )
+
+        # Update order COD status to 'cod_with_ezzy' for settled tasks
+        if settled_task_ids:
+            from orders.models import Order
+            order_ids = list(DeliveryTask.objects.filter(
+                id__in=settled_task_ids
+            ).values_list('order_id', flat=True))
+            if order_ids:
+                Order.objects.filter(id__in=order_ids).update(
+                    cod_status_by_staff='cod_with_ezzy'
                 )
 
         return trans

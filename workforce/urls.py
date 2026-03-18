@@ -45,7 +45,15 @@ urlpatterns = [
     path('orders/bulk-import/', orders_views.bulk_import_orders, name='wf_orders_bulk_import'),
     path('orders/bulk-import/preview/', orders_views.bulk_import_preview, name='wf_orders_bulk_preview'),
     path('orders/bulk-import/save/', orders_views.bulk_import_save, name='wf_orders_bulk_save'),
+    path('orders/bulk-import/save-mapping/', orders_views.bulk_import_save_mapping, name='wf_orders_bulk_save_mapping'),
     path('orders/bulk-import/finalize/', orders_views.bulk_import_finalize, name='wf_orders_bulk_finalize'),
+    # Reusable Import Wizard
+    path('import-wizard/prepare/', workforce_views.import_wizard_prepare, name='import_wizard_prepare'),
+    path('import-wizard/<int:import_log_id>/', workforce_views.import_wizard, name='import_wizard'),
+    path('import-wizard/preview/', workforce_views.import_wizard_preview, name='import_wizard_preview'),
+    path('import-wizard/confirm/', workforce_views.import_wizard_confirm, name='import_wizard_confirm'),
+    path('import-wizard/save-mapping/', workforce_views.import_wizard_save_mapping, name='import_wizard_save_mapping'),
+
     path('orders/api-orders/', workforce_views.wf_api_orders, name='wf_api_orders'),
     path('orders/api-orders/bulk-transfer/', workforce_views.bulk_transfer_api_orders, name='bulk_transfer_api_orders'),
     path('orders/api-orders/import/', workforce_views.import_api_orders, name='import_api_orders'),
@@ -137,7 +145,6 @@ urlpatterns = [
     path('fleet/earnings-verification/', workforce_views.earnings_verification, name='earnings_verification'),
     path('fleet/earnings-verification/action/', workforce_views.earnings_verification_action, name='earnings_verification_action'),
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
-    path('fleet/generate-demo-transactions/', workforce_views.generate_demo_transactions, name='generate_demo_transactions'),
     path('fleet/bulk-settle-transactions/', workforce_views.bulk_settle_transactions, name='bulk_settle_transactions'),
 
     # COD Settlement Report URLs
@@ -255,6 +262,7 @@ urlpatterns = [
     path('onedrive-sources/', workforce_views.onedrive_sources, name='onedrive_sources'),
     path('onedrive-sources/<int:source_id>/sheets/', workforce_views.onedrive_fetch_sheets, name='onedrive_fetch_sheets'),
     path('onedrive-sources/<int:source_id>/preview/', workforce_views.onedrive_sheet_preview, name='onedrive_sheet_preview'),
+    path('onedrive-sources/<int:source_id>/save-mapping/', workforce_views.onedrive_save_mapping, name='onedrive_save_mapping'),
     path('onedrive-sources/<int:source_id>/import/', workforce_views.onedrive_import_trigger, name='onedrive_import_trigger'),
 
     # Hub Operations
@@ -263,5 +271,20 @@ urlpatterns = [
     path('hub/batches/<int:batch_id>/', workforce_views.hub_batch_detail, name='hub_batch_detail'),
     path('hub/batches/<int:batch_id>/assign-driver/', workforce_views.hub_batch_assign_driver, name='hub_batch_assign_driver'),
     path('hub/batches/<int:batch_id>/update-status/', workforce_views.hub_batch_update_status, name='hub_batch_update_status'),
+
+    # Auto Triggers
+    path('auto-triggers/', workforce_views.auto_triggers_list, name='auto_triggers_list'),
+    path('auto-triggers/toggle/', workforce_views.auto_trigger_toggle, name='auto_trigger_toggle'),
+    path('auto-triggers/update/', workforce_views.auto_trigger_update, name='auto_trigger_update'),
+    path('auto-triggers/flows/', workforce_views.auto_flows_list, name='auto_flows_list'),
+    path('auto-triggers/flows/add/', workforce_views.auto_flow_add, name='auto_flow_add'),
+    path('auto-triggers/flows/<int:flow_id>/edit/', workforce_views.auto_flow_edit, name='auto_flow_edit'),
+    path('auto-triggers/flows/toggle/', workforce_views.auto_flow_toggle, name='auto_flow_toggle'),
+    path('auto-triggers/flows/delete/', workforce_views.auto_flow_delete, name='auto_flow_delete'),
+    path('auto-triggers/flows/test/', workforce_views.auto_flow_test, name='auto_flow_test'),
+    path('auto-triggers/flows/<int:flow_id>/logs/', workforce_views.auto_flow_logs, name='auto_flow_logs'),
+
+    # WhatsApp Instances
+    path('auto-triggers/whatsapp-instances/', workforce_views.whatsapp_instances_list, name='whatsapp_instances_list'),
 
 ]

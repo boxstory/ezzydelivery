@@ -107,6 +107,10 @@ urlpatterns = [
           fleet_views.fleet_task_timeline, name='fleet_task_timeline'),
      path('tasks/<int:task_id>/navigate/',
           fleet_views.fleet_task_navigation, name='fleet_task_navigation'),
+     path('tasks/<int:task_id>/edit-location/',
+          fleet_views.fleet_task_edit_location, name='fleet_task_edit_location'),
+     path('tasks/resolve-location/',
+          fleet_views.fleet_resolve_location, name='fleet_resolve_location'),
      path('tasks/map/',
           fleet_views.fleet_tasks_map, name='fleet_tasks_map'),
 ]

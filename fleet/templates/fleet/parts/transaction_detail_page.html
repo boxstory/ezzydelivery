@@ -5,7 +5,7 @@
 {% block page_title %}Transaction{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'fleet:transaction_history' %}" class="fleet-btn-icon" style="text-decoration:none;">
+<a href="{% url 'fleet:transaction_history' %}" class="fleet-btn-icon text-decoration-none">
     <i class="fa-solid fa-arrow-left"></i>
 </a>
 {% endblock %}
@@ -15,36 +15,24 @@
 {% with ttype=txn.transaction_type %}
 <!-- Transaction Header Card -->
 <div class="fleet-card fleet-fade-in">
-    <div class="fleet-card__body" style="padding: var(--spacing-lg, 1.25rem);">
-        <div class="d-flex align-items-center gap-3 mb-3">
-            <div class="fth__row-icon fth__row-icon--{% if ttype == 'earning' %}green{% elif ttype == 'bonus' %}blue{% elif ttype == 'cod_collection' or ttype == 'cod_return' %}orange{% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}yellow{% elif ttype == 'settlement' %}purple{% elif ttype == 'deduction' %}red{% elif ttype == 'delivery_charge' or ttype == 'fulfillment_charge' %}blue{% else %}grey{% endif %}" style="width:48px; height:48px; font-size:1.25rem;">
-                {% if ttype == 'earning' %}<i class="fa-solid fa-coins"></i>
-                {% elif ttype == 'bonus' %}<i class="fa-solid fa-gift"></i>
-                {% elif ttype == 'cod_collection' %}<i class="fa-solid fa-arrow-down"></i>
-                {% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}<i class="fa-solid fa-arrow-up"></i>
-                {% elif ttype == 'cod_return' %}<i class="fa-solid fa-rotate-left"></i>
-                {% elif ttype == 'cod_client_settle' %}<i class="fa-solid fa-handshake"></i>
-                {% elif ttype == 'settlement' %}<i class="fa-solid fa-building-columns"></i>
-                {% elif ttype == 'deduction' %}<i class="fa-solid fa-minus"></i>
-                {% elif ttype == 'delivery_charge' %}<i class="fa-solid fa-truck"></i>
-                {% elif ttype == 'fulfillment_charge' %}<i class="fa-solid fa-box"></i>
-                {% else %}<i class="fa-solid fa-arrow-right-arrow-left"></i>{% endif %}
-            </div>
-            <div>
-                <div style="font-size: var(--font-size-base, 1rem); font-weight: 700; color: var(--fleet-dark, #212529);">
+    <div class="fleet-card__body p-0">
+        <div class="ftd__header">
+            <div class="ftd__header-left">
+                <div class="ftd__header-title">
                     {{ txn.get_transaction_type_display }}
                 </div>
-                <div style="font-size: var(--font-size-xs, 0.75rem); color: var(--fleet-grey-500, #6c757d);">
+                <div class="ftd__header-date">
                     {{ txn.created_at|date:"d M Y, H:i" }}
                 </div>
             </div>
-        </div>
-
-        <!-- Amount -->
-        <div class="d-flex justify-content-center mb-3" style="padding: var(--spacing-md, 1rem) 0;">
-            <span style="font-size: 2rem; font-weight: 800; {% if txn.amount >= 0 %}color: var(--fleet-success, #28a745);{% else %}color: var(--fleet-danger, #dc3545);{% endif %}">
-                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small style="font-size: 1rem; font-weight: 500;">QR</small>
-            </span>
+            <div class="ftd__header-right">
+                <div class="ftd__header-amount ftd__header-amount--{% if txn.amount >= 0 %}plus{% else %}minus{% endif %}">
+                    {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small>QR</small>
+                </div>
+                <button type="button" id="ftd_share_pdf_btn" class="fleet-btn-icon" title="Export & Share PDF">
+                    <i class="fa-solid fa-share-from-square"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Details Grid -->
@@ -84,16 +72,9 @@
             </div>
             {% endif %}
         </div>
-    </div>
-</div>
 
-<!-- Balances After Transaction -->
-<div class="fleet-card fleet-slide-up">
-    <div class="fleet-card__header">
-        <h3 class="fleet-card__title">Balances After</h3>
-    </div>
-    <div class="fleet-card__body" style="padding: 0;">
-        <div class="fth__hero" style="border-radius:0;">
+        <!-- Balances After -->
+        <div class="fth__hero ftd__balances">
             <div class="fth__hero-item">
                 <span class="fth__hero-label">Wallet</span>
                 <span class="fth__hero-val fth__hero-val--green">QR {{ txn.wallet_balance_after|floatformat:0 }}</span>
@@ -118,7 +99,7 @@
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">{{ orders_count }} Order{{ orders_count|pluralize }}</h3>
     </div>
-    <div class="fleet-card__body" style="padding: 0;">
+    <div class="fleet-card__body p-0">
         {% for task in orders %}
         <div class="ftd__order {% if not forloop.last %}ftd__order--border{% endif %}">
             <div class="ftd__order-header">
@@ -174,8 +155,8 @@
 {% else %}
 <div class="fleet-card fleet-slide-up">
     <div class="fleet-card__body">
-        <div class="fleet-empty" style="padding: var(--spacing-lg) 0;">
-            <div style="font-size:2rem; color:var(--fleet-grey-300); margin-bottom:var(--spacing-sm);">
+        <div class="fleet-empty py-4">
+            <div class="ftd__empty-icon">
                 <i class="fa-solid fa-inbox"></i>
             </div>
             <p class="fleet-empty__title">No linked orders</p>
@@ -186,11 +167,61 @@
 {% endif %}
 
 <!-- Back Button -->
-<div class="d-flex justify-content-center mt-3 mb-4">
-    <a href="{% url 'fleet:transaction_history' %}" class="fleet-btn fleet-btn--outline" style="text-decoration:none; gap:var(--spacing-xs);">
+<div class="ftd__back-wrap">
+    <a href="{% url 'fleet:transaction_history' %}" class="fleet-btn fleet-btn--outline ftd__back-btn">
         <i class="fa-solid fa-arrow-left"></i> Back to Transactions
     </a>
 </div>
 
 {% endwith %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var btn = document.getElementById('ftd_share_pdf_btn');
+    if (!btn) return;
+
+    btn.addEventListener('click', async function() {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating…';
+
+        try {
+            var pdfUrl = '{% url "fleet:cod_transaction_pdf" %}?code={{ txn.transaction_code }}';
+            var resp = await fetch(pdfUrl, { credentials: 'same-origin' });
+
+            if (!resp.ok) throw new Error('PDF generation failed');
+
+            var blob = await resp.blob();
+            var filename = '{{ txn.transaction_code }}.pdf';
+            var file = new File([blob], filename, { type: 'application/pdf' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: 'Transaction {{ txn.transaction_code }}',
+                    text: '{{ txn.get_transaction_type_display }} — {{ txn.amount|floatformat:0 }} QR',
+                    files: [file]
+                });
+            } else {
+                // Fallback: download the PDF
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                if (typeof showToast === 'function') showToast('PDF downloaded', 'success');
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('Share error:', err);
+                // Fallback to direct download on any error
+                window.open('{% url "fleet:cod_transaction_pdf" %}?code={{ txn.transaction_code }}', '_blank');
+            }
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-share-from-square"></i> Export & Share';
+    });
+})();
+</script>
 {% endblock %}

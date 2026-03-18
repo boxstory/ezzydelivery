@@ -48,6 +48,37 @@
             </div>
         </div>
 
+        <!-- Import -->
+        <div id="workforce_sidebar_mob_section_import" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('import')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>Import{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-import">
+                <a id="workforce_sidebar_mob_link_temp_orders" href="{% url 'workforce:temp_orders' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-inbox"></i><span>Temp Orders{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_temp_orders_by_date" href="{% url 'workforce:temp_orders_by_date' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-calendar-days"></i><span>Fetch by Date</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_orders_bulk" href="{% url 'workforce:wf_orders_bulk_import' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-file-csv"></i><span>CSV / Excel Upload</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_onedrive" href="{% url 'workforce:onedrive_sources' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-cloud-arrow-down"></i><span>OneDrive Import</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_api_orders" href="{% url 'workforce:wf_api_orders' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plug"></i><span>Order Auto/API</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_import_history" href="{% url 'workforce:import_history' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-clock-rotate-left"></i><span>Import History</span>
+                </a>
+            </div>
+        </div>
+
         <!-- Orders -->
         <div id="workforce_sidebar_mob_section_orders" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('orders')">
@@ -61,20 +92,8 @@
                 <a id="workforce_sidebar_mob_link_orders_add" href="{% url 'workforce:wf_orders_add' %}" class="wsm__nav-link wsm__nav-link--highlight">
                     <i class="fa-solid fa-plus"></i><span>Add New Order</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_orders_bulk" href="{% url 'workforce:wf_orders_bulk_import' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-file-import"></i><span>Bulk Import</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_api_orders" href="{% url 'workforce:wf_api_orders' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-plug"></i><span>Order Auto/API</span>
-                </a>
                 <a id="workforce_sidebar_mob_link_all_orders" href="{% url 'workforce:wf_orders_all' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Orders</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_temp_orders" href="{% url 'workforce:temp_orders' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-inbox"></i><span>Temp Orders{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_temp_orders_by_date" href="{% url 'workforce:temp_orders_by_date' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-calendar-days"></i><span>Fetch by Date</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-store"></i><span>By Seller</span>
@@ -110,11 +129,11 @@
                 <a id="workforce_sidebar_mob_link_all_tasks" href="{% url 'workforce:dl_list_all' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Tasks</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_tasks_unpublished" href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-spinner"></i><span>Unpublished Tasks</span>
+                <a id="workforce_sidebar_mob_link_tasks_followup" href="{% url 'workforce:tasks_followup_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-phone"></i><span>Follow-Up List</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_tasks_incompleted" href="{% url 'workforce:dl_list_incompleted_details' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-check-double"></i><span>Incompleted List</span>
+                <a id="workforce_sidebar_mob_link_tasks_live_map" href="{% url 'workforce:tasks_live_map' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-map-location-dot"></i><span>Live Map</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_tasks_fulfilled" href="{% url 'workforce:dl_list_fulfilled_clients' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-box-open"></i><span>Fulfilled Clients</span>
@@ -122,8 +141,11 @@
                 <a id="workforce_sidebar_mob_link_tasks_non_fulfilled" href="{% url 'workforce:dl_list_non_fulfilled_clients' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-box"></i><span>Non-Fulfilled Clients</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_tasks_followup" href="{% url 'workforce:tasks_followup_list' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-phone"></i><span>Follow-Up List</span>
+                <a id="workforce_sidebar_mob_link_tasks_unpublished" href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-spinner"></i><span>Unpublished Tasks</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_tasks_incompleted" href="{% url 'workforce:dl_list_incompleted_details' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-check-double"></i><span>Incompleted List</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_tasks_published" href="{% url 'workforce:dl_list_published_to_dms' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-circle-check"></i><span>Published List</span>
@@ -285,6 +307,33 @@
                 </a>
             </div>
         </div>
+
+        <!-- Auto Triggers (superuser only) -->
+        {% if user.is_superuser %}
+        <div id="workforce_sidebar_mob_section_triggers" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('triggers')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>Auto Triggers</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-triggers">
+                <a id="workforce_sidebar_mob_link_auto_triggers" href="{% url 'workforce:auto_triggers_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-list"></i><span>All Triggers</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_auto_flows" href="{% url 'workforce:auto_flows_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-diagram-project"></i><span>Flows</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_auto_flow_add" href="{% url 'workforce:auto_flow_add' %}" class="wsm__nav-link wsm__nav-link--highlight">
+                    <i class="fa-solid fa-plus"></i><span>Add Flow</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_wa_instances" href="{% url 'workforce:whatsapp_instances_list' %}" class="wsm__nav-link">
+                    <i class="fa-brands fa-whatsapp"></i><span>WA Instances</span>
+                </a>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Zones & Maps -->
         <div id="workforce_sidebar_mob_section_zones" class="wsm__nav-section">
@@ -516,15 +565,93 @@ function closeMobileSidebarOnNav() {
 document.addEventListener('DOMContentLoaded', function() {
     const currentPath = window.location.pathname;
 
-    // Check if current page is an order detail/edit page (expand Orders section)
-    const isOrderSubpage = /^\/workforce\/orders\/\d+/.test(currentPath);
-    const isTaskSubpage = /^\/workforce\/delivery-task\/\d+/.test(currentPath);
+    // Map path prefixes to {section, highlight link} for sub-pages (longer prefixes first)
+    var subpageMap = [
+        // Import
+        {re: /^\/workforce\/orders\/temp\//,                    section: 'import',        link: 'workforce_sidebar_mob_link_temp_orders'},
+        {re: /^\/workforce\/orders\/bulk-import\//,             section: 'import',        link: 'workforce_sidebar_mob_link_orders_bulk'},
+        {re: /^\/workforce\/orders\/api-orders\//,              section: 'import',        link: 'workforce_sidebar_mob_link_api_orders'},
+        {re: /^\/workforce\/onedrive-sources\//,                section: 'import',        link: 'workforce_sidebar_mob_link_onedrive'},
+        {re: /^\/workforce\/import-wizard\//,                   section: 'import',        link: 'workforce_sidebar_mob_link_temp_orders'},
+        {re: /^\/workforce\/import-history\//,                  section: 'import',        link: 'workforce_sidebar_mob_link_import_history'},
+        // Orders
+        {re: /^\/workforce\/orders\/pending-verification\//,    section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
+        {re: /^\/workforce\/orders\/\d+/,                       section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
+        {re: /^\/workforce\/order\//,                           section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
+        // Tasks
+        {re: /^\/workforce\/delivery-task\/\d+/,                section: 'tasks',         link: 'workforce_sidebar_mob_link_all_tasks'},
+        {re: /^\/workforce\/hub\//,                             section: 'tasks',         link: 'workforce_sidebar_mob_link_all_tasks'},
+        {re: /^\/workforce\/tasks\//,                           section: 'tasks',         link: null},
+        // Fleet / Accounts (task-sheets go to Reports, must be before generic /fleet/)
+        {re: /^\/workforce\/fleet\/task-sheet/,                 section: 'reports',       link: 'workforce_sidebar_mob_link_task_sheets'},
+        {re: /^\/workforce\/fleet\/cod-settlement\//,           section: 'accounts',      link: 'workforce_sidebar_mob_link_fleet_transactions'},
+        {re: /^\/workforce\/drivers\/\d+/,                      section: 'accounts',      link: 'workforce_sidebar_mob_link_all_drivers'},
+        {re: /^\/workforce\/drivers\//,                         section: 'accounts',      link: null},
+        {re: /^\/workforce\/fleet\//,                           section: 'accounts',      link: null},
+        // Sellers
+        {re: /^\/workforce\/sellers\/api-configs\/\d+/,         section: 'sellers',       link: 'workforce_sidebar_mob_link_seller_api_configs'},
+        {re: /^\/workforce\/sellers\/\d+/,                      section: 'sellers',       link: 'workforce_sidebar_mob_link_all_sellers'},
+        {re: /^\/workforce\/sellers\//,                         section: 'sellers',       link: null},
+        // Finance
+        {re: /^\/workforce\/finance\//,                         section: 'finance',       link: 'workforce_sidebar_mob_link_finance_overview'},
+        // Fulfillment
+        {re: /^\/workforce\/suppliers\//,                       section: 'fulfillment',   link: 'workforce_sidebar_mob_link_suppliers'},
+        {re: /^\/workforce\/purchase-orders\//,                 section: 'fulfillment',   link: 'workforce_sidebar_mob_link_purchase_orders'},
+        {re: /^\/workforce\/warehouses\//,                      section: 'fulfillment',   link: 'workforce_sidebar_mob_link_warehouses_list'},
+        // Dispatch
+        {re: /^\/workforce\/dispatch\/batches\/\d+/,            section: 'dispatch',      link: 'workforce_sidebar_mob_link_dispatch_batches'},
+        {re: /^\/workforce\/dispatch\/shifts\/\d+/,             section: 'dispatch',      link: 'workforce_sidebar_mob_link_dispatch_shifts'},
+        {re: /^\/workforce\/dispatch\/kpis\/rider\//,           section: 'dispatch',      link: 'workforce_sidebar_mob_link_dispatch_kpis'},
+        {re: /^\/workforce\/dispatch\/config\/\d+/,             section: 'dispatch',      link: 'workforce_sidebar_mob_link_dispatch_config'},
+        {re: /^\/workforce\/dispatch\//,                        section: 'dispatch',      link: null},
+        // Auto Triggers
+        {re: /^\/workforce\/auto-triggers\/flows\/\d+/,         section: 'triggers',      link: 'workforce_sidebar_mob_link_auto_flows'},
+        {re: /^\/workforce\/auto-triggers\//,                   section: 'triggers',      link: null},
+        // Zones
+        {re: /^\/workforce\/tools\//,                           section: 'zones',         link: null},
+        // Verifications
+        {re: /^\/workforce\/verification\//,                    section: 'verifications', link: null},
+        // Reports / Documents
+        {re: /^\/workforce\/receipt-templates\/\d+/,            section: 'reports',       link: 'workforce_sidebar_mob_link_receipt_templates'},
+        {re: /^\/workforce\/receipt-templates\//,               section: 'reports',       link: 'workforce_sidebar_mob_link_receipt_templates'},
+        {re: /^\/workforce\/documents\//,                       section: 'reports',       link: null},
+        {re: /^\/workforce\/reports\//,                         section: 'reports',       link: 'workforce_sidebar_mob_link_staff_reports'},
+        // Inventory
+        {re: /^\/workforce\/inventory\//,                       section: 'inventory',     link: null},
+        // Warehouse
+        {re: /^\/workforce\/product-requests\//,                section: 'warehouse',     link: 'workforce_sidebar_mob_link_product_requests'},
+        // Forms
+        {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     section: 'forms',         link: 'workforce_sidebar_mob_link_pricing_inquiries'},
+        {re: /^\/workforce\/forms\/whatsapp-inquiries\/\d+/,    section: 'forms',         link: 'workforce_sidebar_mob_link_whatsapp_inquiries'},
+        {re: /^\/workforce\/forms\//,                           section: 'forms',         link: null},
+    ];
+
+    // Find sub-page match and auto-expand its section
+    var subpageMatch = null;
+    for (var i = 0; i < subpageMap.length; i++) {
+        if (subpageMap[i].re.test(currentPath)) {
+            subpageMatch = subpageMap[i];
+            break;
+        }
+    }
+
+    if (subpageMatch) {
+        var sec = document.getElementById('mobile-section-' + subpageMatch.section);
+        if (sec) {
+            sec.classList.add('show');
+            var hdr = sec.previousElementSibling;
+            hdr.classList.add('active');
+            hdr.dataset.hasActivePage = '1';
+        }
+        if (subpageMatch.link) {
+            var hl = document.getElementById(subpageMatch.link);
+            if (hl) hl.classList.add('active');
+        }
+    }
 
     document.querySelectorAll('.wsm__nav-link, .wsm__nav-single a, .wsm__dashboard-btn').forEach(function(link) {
         const linkPath = new URL(link.href, window.location.origin).pathname;
-        const isMatch = currentPath === linkPath ||
-            (isOrderSubpage && link.id === 'workforce_sidebar_mob_link_all_orders') ||
-            (isTaskSubpage && link.id === 'workforce_sidebar_mob_link_all_tasks');
+        const isMatch = currentPath === linkPath;
         if (isMatch) {
             link.classList.add('active');
 

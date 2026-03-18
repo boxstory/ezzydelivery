@@ -53,13 +53,15 @@ Related:
     - All app models: orders, delivery, fleet, business
 """
 
+from django.conf import settings
 from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 import csv
+import os
 from django.contrib.auth.decorators import login_required
-from core.decorators import staff_required
+from core.decorators import staff_required, superuser_required
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 import json
@@ -1510,6 +1512,19 @@ def match_product(business, pname):
     name = pname.strip()
     if not name:
         return None, 'unmatched'
+    # Parse coded format (e.g. '08__DAGGER OUD____BUK011' → name='DAGGER OUD', sku='BUK011')
+    clean_name, coded_sku = _parse_coded_product_name(name)
+    if coded_sku:
+        # Try clean name first
+        p = product_models.Product.objects.filter(business=business, item_name__iexact=clean_name).first()
+        if p:
+            return p, 'exact'
+        # Try extracted SKU
+        p = product_models.Product.objects.filter(business=business, item_sku__iexact=coded_sku).first()
+        if p:
+            return p, 'sku'
+        # Use clean name for remaining cascading matches
+        name = clean_name
     # 1. Exact item_name
     p = product_models.Product.objects.filter(business=business, item_name__iexact=name).first()
     if p:
@@ -1565,6 +1580,15 @@ def import_api_orders(request):
     business_id = request.POST.get('business_id', '').strip()
     platform_ids = request.POST.getlist('platform_ids[]')
     source = request.POST.get('source', '').strip()
+
+    # Parse row overrides (editable verify rows)
+    row_overrides_raw = request.POST.get('row_overrides', '').strip()
+    row_overrides = {}
+    if row_overrides_raw:
+        try:
+            row_overrides = json.loads(row_overrides_raw)
+        except (json.JSONDecodeError, TypeError):
+            row_overrides = {}
 
     if not business_id or not platform_ids:
         return JsonResponse({'success': False, 'error': 'Missing business_id or platform_ids'}, status=400)
@@ -1914,6 +1938,37 @@ def import_api_orders(request):
                         notes_parts.append(f"Staff: {internal_notes}")
                     combined_notes = ' | '.join(notes_parts)
 
+                    # Apply row overrides from editable verify UI
+                    ovr = row_overrides.get(pid, {})
+                    if ovr:
+                        if 'customer_name' in ovr: customer = ovr['customer_name']
+                        if 'customer_phone' in ovr:
+                            phone = ovr['customer_phone']
+                            customer_whatsapp = format_whatsapp_number(phone)
+                        if 'customer_whatsapp' in ovr:
+                            whatsapp_raw = ovr['customer_whatsapp']
+                            customer_whatsapp = format_whatsapp_number(whatsapp_raw)
+                        if 'customer_address' in ovr: address = ovr['customer_address']
+                        if 'cod_amount' in ovr:
+                            try:
+                                cod_amount = float(_re.sub(r'[^\d.]', '', ovr['cod_amount'])) if ovr['cod_amount'] else 0
+                            except (ValueError, TypeError):
+                                pass
+                        if 'client_order_code' in ovr: order_num = ovr['client_order_code']
+                        if 'package_desc' in ovr: product_desc = ovr['package_desc']
+                        if 'dl_amount' in ovr:
+                            try:
+                                dl_amount = float(_re.sub(r'[^\d.]', '', ovr['dl_amount'])) if ovr['dl_amount'] else 0
+                            except (ValueError, TypeError):
+                                pass
+                        if 'seller_notes' in ovr:
+                            seller_notes = ovr['seller_notes']
+                            notes_parts = [p for p in notes_parts if not p.startswith('Seller:')]
+                            if seller_notes: notes_parts.insert(0, f"Seller: {seller_notes}")
+                            combined_notes = ' | '.join(notes_parts)
+                        if 'deadline_date' in ovr:
+                            pass  # Will be applied at order creation below
+
                     original_data = {
                         'source': 'google_sheet',
                         'platform_id': pid,
@@ -1935,6 +1990,12 @@ def import_api_orders(request):
                         },
                     }
 
+                    # Resolve override-able fields
+                    _dl_zone = safe_int_or_none(ovr.get('dl_zone', cell(row, idx_zone)))
+                    _dl_street = safe_int_or_none(ovr.get('dl_street', cell(row, idx_street)))
+                    _dl_building = safe_int_or_none(ovr.get('dl_building', cell(row, idx_building)))
+                    _deadline = ovr.get('deadline_date', cell(row, idx_deadline))
+
                     order = orders_models.Order.objects.create(
                         business=business,
                         client_order_code=order_num if order_num != str(sheet_row) else '',
@@ -1942,14 +2003,14 @@ def import_api_orders(request):
                         customer_phone=phone,
                         customer_whatsapp=customer_whatsapp,
                         customer_address=address,
-                        dl_zone=safe_int_or_none(cell(row, idx_zone)),
-                        dl_street=safe_int_or_none(cell(row, idx_street)),
-                        dl_building=safe_int_or_none(cell(row, idx_building)),
+                        dl_zone=_dl_zone,
+                        dl_street=_dl_street,
+                        dl_building=_dl_building,
                         cod_amount=cod_amount,
                         dl_amount=dl_amount,
                         package_description=product_desc[:255] if product_desc else '',
-                        package_qty=safe_int(cell(row, idx_qty)) or 1,
-                        deadline_date=cell(row, idx_deadline),
+                        package_qty=safe_int(ovr.get('package_qty', cell(row, idx_qty))) or 1,
+                        deadline_date=_deadline,
                         order_notes=combined_notes[:100] if combined_notes else '',
                         order_status='to_review',
                         verification_status='pending',
@@ -1965,14 +2026,15 @@ def import_api_orders(request):
                         order.package_description = label[:255]
                         order.package_qty = safe_int(cell(row, idx_qty)) or 1
                     else:
-                        # Build from product_1..5 columns
+                        # Build from product_1..5 columns (clean coded names)
                         desc_parts = []
                         total_qty = 0
                         for i in range(1, 6):
                             prod_name = cell(row, idx_products.get(f'product_{i}'))
                             prod_count = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
                             if prod_name:
-                                desc_parts.append(f"{prod_name} x{prod_count}")
+                                clean_pn, _ = _parse_coded_product_name(prod_name)
+                                desc_parts.append(f"{clean_pn} x{prod_count}")
                                 total_qty += prod_count
                         if desc_parts:
                             order.package_description = ', '.join(desc_parts)[:255]
@@ -2165,6 +2227,563 @@ def wf_save_column_mapping(request):
     api.column_mapping = mapping
     api.save(update_fields=['column_mapping'])
     return JsonResponse({'success': True, 'mapping': mapping})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def import_wizard_prepare(request):
+    """
+    POST: Prepare data for the reusable import wizard page.
+    Creates/updates an ImportLog with raw_data, columns, and source info,
+    then returns the redirect URL to the wizard page.
+
+    Params:
+        source: 'csv_upload' | 'google_sheet' | 'shopify' | 'woocommerce' | 'onedrive'
+        business_id: business ID
+        import_log_id: (optional) existing ImportLog to use
+        platform_ids[]: (for API imports) list of platform order IDs
+        source_id: (for OneDrive) OneDrive source ID
+        sheet_name: (for OneDrive) sheet name
+        row_numbers[]: (for OneDrive) selected row numbers
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    source = request.POST.get('source', '').strip()
+    business_id = request.POST.get('business_id', '').strip()
+    import_log_id = request.POST.get('import_log_id', '').strip()
+
+    if not business_id:
+        return JsonResponse({'success': False, 'error': 'Missing business_id'}, status=400)
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+    # For CSV: reuse existing ImportLog from bulk_import_preview
+    if import_log_id:
+        try:
+            import_log = orders_models.ImportLog.objects.get(id=import_log_id)
+        except orders_models.ImportLog.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'ImportLog not found'}, status=404)
+        # Update business if it was created without one or with a different one
+        if import_log.business_id != business.business_id:
+            import_log.business = business
+            import_log.save(update_fields=['business'])
+    else:
+        # Create new ImportLog for API/OneDrive flows
+        import_log = orders_models.ImportLog.objects.create(
+            business=business,
+            source=source or 'csv_upload',
+            status='started',
+            initiated_by=request.user,
+            source_meta={},
+        )
+
+    # Store additional context in source_meta
+    meta = import_log.source_meta or {}
+    meta['source_type'] = source
+
+    if source in ('google_sheet', 'shopify', 'woocommerce'):
+        platform_ids = request.POST.getlist('platform_ids[]')
+        meta['platform_ids'] = platform_ids
+        meta['needs_mapping'] = (source == 'google_sheet')
+
+        # Get API config for the business
+        api = business.business_settings_api.filter(is_verify_api=True).first()
+        if api:
+            meta['api_settings_id'] = api.id
+            meta['api_type'] = api.api_type
+    elif source == 'onedrive':
+        source_id = request.POST.get('source_id', '')
+        sheet_name = request.POST.get('sheet_name', '')
+        row_numbers = [int(n) for n in request.POST.getlist('row_numbers[]') if n.isdigit()]
+        meta['source_id'] = source_id
+        meta['sheet_name'] = sheet_name
+        meta['row_numbers'] = row_numbers
+        meta['needs_mapping'] = True
+
+        # Download OneDrive file and extract selected rows as raw_data
+        try:
+            od_source = orders_models.OneDriveSource.objects.get(id=source_id)
+            import_log.onedrive_source = od_source
+            file_bytes, err = _onedrive_download_file(od_source)
+            if not err and file_bytes:
+                wb = _safe_load_workbook(file_bytes)
+                if sheet_name in wb.sheetnames:
+                    ws = wb[sheet_name]
+                    all_rows = list(ws.iter_rows(values_only=True))
+                    wb.close()
+                    if all_rows:
+                        headers = [str(h).strip() if h else '' for h in all_rows[0]]
+                        meta['columns_order'] = headers
+                        # Convert selected rows to list of dicts
+                        raw_data = []
+                        for row_num in row_numbers:
+                            idx = row_num - 1  # row_num is 1-indexed, row 1 = header
+                            if 0 < idx < len(all_rows):
+                                cells = [str(c).strip() if c is not None else '' for c in all_rows[idx]]
+                                row_dict = {headers[i]: cells[i] if i < len(cells) else '' for i in range(len(headers))}
+                                row_dict['__row_num__'] = row_num
+                                raw_data.append(row_dict)
+                        import_log.raw_data = raw_data
+                        import_log.total_rows = len(raw_data)
+                else:
+                    wb.close()
+        except orders_models.OneDriveSource.DoesNotExist:
+            pass
+        except Exception as e:
+            logger.warning(f'OneDrive data load in wizard prepare failed: {e}')
+    elif source == 'temp_order':
+        temp_ids = [int(x) for x in request.POST.getlist('temp_ids[]') if x.isdigit()]
+        if not temp_ids:
+            return JsonResponse({'success': False, 'error': 'No temp orders selected'}, status=400)
+
+        temps = orders_models.TempOrder.objects.filter(
+            id__in=temp_ids
+        ).select_related('business', 'onedrive_source', 'api_settings', 'public_link_source')
+
+        if not temps.exists():
+            return JsonResponse({'success': False, 'error': 'No temp orders found'}, status=404)
+
+        first_temp = temps.first()
+        # Use temp order's business
+        import_log.business = first_temp.business
+
+        # Get headers from source
+        headers = []
+        saved_mapping = {}
+        if first_temp.onedrive_source:
+            # OneDriveSource stores last_column_mapping {col_idx: db_field} but no header names.
+            # Generate positional headers from raw_row length and build mapping.
+            od_mapping = first_temp.onedrive_source.last_column_mapping or {}
+            raw_len = max(len(first_temp.raw_row) if first_temp.raw_row else 0,
+                         max((int(k) for k in od_mapping if str(k).isdigit()), default=0) + 1)
+            headers = [f'Column {i}' for i in range(raw_len)]
+            for col_idx, db_field in od_mapping.items():
+                idx = int(col_idx) if str(col_idx).isdigit() else -1
+                if db_field and 0 <= idx < len(headers):
+                    saved_mapping[db_field] = headers[idx]
+        elif first_temp.public_link_source:
+            headers = first_temp.public_link_source.last_headers or []
+            pl_mapping = first_temp.public_link_source.last_column_mapping or {}
+            for col_idx, db_field in pl_mapping.items():
+                idx = int(col_idx) if str(col_idx).isdigit() else -1
+                if db_field and 0 <= idx < len(headers):
+                    saved_mapping[db_field] = headers[idx]
+        elif first_temp.api_settings:
+            # Google Sheet: column_mapping is {db_field: header_name}
+            saved_mapping = first_temp.api_settings.column_mapping or {}
+            headers = list(set(saved_mapping.values()))
+
+        # Convert raw_row lists to dicts using headers
+        raw_data = []
+        for t in temps:
+            raw = t.raw_row if isinstance(t.raw_row, list) else []
+            row_dict = {}
+            for j, h in enumerate(headers):
+                if h and j < len(raw):
+                    row_dict[h] = str(raw[j]) if raw[j] is not None else ''
+            row_dict['__row_num__'] = t.row_num or t.id
+            row_dict['__temp_id__'] = t.id
+            raw_data.append(row_dict)
+
+        import_log.raw_data = raw_data
+        import_log.total_rows = len(raw_data)
+        if saved_mapping:
+            import_log.column_mapping = saved_mapping
+        meta['columns_order'] = [h for h in headers if h]
+        meta['temp_ids'] = temp_ids
+        meta['needs_mapping'] = True
+
+    else:
+        # CSV - already has raw_data from bulk_import_preview
+        meta['needs_mapping'] = True
+
+    import_log.source_meta = meta
+    import_log.save(update_fields=['source_meta', 'raw_data', 'total_rows', 'onedrive_source', 'business', 'column_mapping'])
+
+    wizard_url = reverse('workforce:import_wizard', args=[import_log.id])
+    return JsonResponse({'success': True, 'redirect': wizard_url, 'import_log_id': import_log.id})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def import_wizard(request, import_log_id):
+    """
+    GET: Render the full-page reusable import wizard.
+    Works for all import sources: CSV, Google Sheet, Shopify, WooCommerce, OneDrive.
+    Steps: 1) Column Mapping (if needed) → 2) Verify & Edit → 3) Confirm Import
+    """
+    import_log = get_object_or_404(orders_models.ImportLog, id=import_log_id)
+    business = import_log.business
+    meta = import_log.source_meta or {}
+    source = meta.get('source_type', import_log.source)
+    needs_mapping = meta.get('needs_mapping', source in ('csv_upload', 'google_sheet', 'onedrive', 'temp_order'))
+
+    # Load columns and saved mapping based on source
+    columns = []
+    saved_mapping = import_log.column_mapping or {}
+    raw_rows = import_log.raw_data or []
+
+    if source in ('csv_upload', 'onedrive', 'temp_order'):
+        # Columns from stored order (preserves file order), fallback to dict keys
+        columns = meta.get('columns_order', [])
+        if not columns and raw_rows:
+            columns = list(raw_rows[0].keys()) if isinstance(raw_rows[0], dict) else []
+        # Filter out internal fields
+        columns = [c for c in columns if not c.startswith('__')]
+        # Check for previous saved mapping
+        if not saved_mapping:
+            prev_source = 'csv_upload' if source == 'csv_upload' else 'onedrive'
+            prev_log = orders_models.ImportLog.objects.filter(
+                business=business, source=prev_source
+            ).exclude(column_mapping={}).exclude(id=import_log_id).order_by('-id').first()
+            if prev_log and prev_log.column_mapping:
+                saved_mapping = prev_log.column_mapping
+        # For OneDrive, also check OneDriveSource saved mapping
+        if source == 'onedrive' and not saved_mapping:
+            od_source = import_log.onedrive_source
+            if od_source and od_source.last_column_mapping:
+                saved_mapping = od_source.last_column_mapping
+
+    elif source == 'google_sheet':
+        api = business.business_settings_api.filter(is_verify_api=True).first()
+        if api and api.column_mapping:
+            saved_mapping = api.column_mapping
+        # Load Google Sheet headers as columns
+        if api:
+            try:
+                import re as _re
+                import gspread
+                from google.oauth2.credentials import Credentials as _GCreds
+                from google.auth.transport.requests import Request as _GReq
+                from django.conf import settings as django_settings
+                from pathlib import Path as _Path
+
+                sheet_url = api.google_sheet_url or api.site_api_url or ''
+                token_path = _Path(django_settings.BASE_DIR) / getattr(
+                    django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+                )
+                if token_path.exists():
+                    _td = json.loads(token_path.read_text())
+                    creds = _GCreds(
+                        token=_td.get('access_token'),
+                        refresh_token=_td.get('refresh_token'),
+                        token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                        client_id=_td.get('client_id'),
+                        client_secret=_td.get('client_secret'),
+                        scopes=_td.get('scope', '').split(),
+                    )
+                    if creds.expired and creds.refresh_token:
+                        creds.refresh(_GReq())
+                        _td['access_token'] = creds.token
+                        token_path.write_text(json.dumps(_td, indent=2))
+
+                    gc = gspread.authorize(creds)
+                    match = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+                    if match:
+                        spreadsheet = gc.open_by_key(match.group(1))
+                        gid_match = _re.search(r'gid=(\d+)', sheet_url)
+                        gid = int(gid_match.group(1)) if gid_match else 0
+                        worksheet = None
+                        for ws in spreadsheet.worksheets():
+                            if ws.id == gid:
+                                worksheet = ws
+                                break
+                        if worksheet is None:
+                            worksheet = spreadsheet.sheet1
+                        all_values = worksheet.get_all_values()
+                        if all_values:
+                            columns = [h for h in all_values[0] if h.strip()]
+            except Exception as e:
+                logger.warning(f'Failed to load Google Sheet headers for wizard: {e}')
+
+    context = {
+        'import_log': import_log,
+        'import_log_id': import_log.id,
+        'business': business,
+        'business_id': business.business_id,
+        'source': source,
+        'needs_mapping': needs_mapping,
+        'columns_json': json.dumps(columns),
+        'saved_mapping_json': json.dumps(saved_mapping),
+        'raw_rows_count': len(raw_rows),
+        'platform_ids_json': json.dumps(meta.get('platform_ids', [])),
+        'source_label': dict(orders_models.ImportLog.SOURCE_CHOICES).get(source, source),
+    }
+    return render(request, 'workforce/import_wizard.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def import_wizard_preview(request):
+    """
+    POST: Return transformed preview rows for the wizard verify step.
+    Applies column mapping to raw data and returns preview table data.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import_log_id = request.POST.get('import_log_id', '')
+    mapping_json = request.POST.get('mapping', '{}')
+
+    try:
+        import_log = orders_models.ImportLog.objects.get(id=import_log_id)
+    except orders_models.ImportLog.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'ImportLog not found'}, status=404)
+
+    try:
+        mapping = json.loads(mapping_json)
+    except (json.JSONDecodeError, TypeError):
+        mapping = {}
+
+    business = import_log.business
+    meta = import_log.source_meta or {}
+    source = meta.get('source_type', import_log.source)
+
+    if source in ('google_sheet', 'shopify', 'woocommerce'):
+        # Delegate to existing preview_api_import logic
+        platform_ids = meta.get('platform_ids', [])
+        if not platform_ids:
+            return JsonResponse({'success': False, 'error': 'No platform_ids found'})
+
+        # Reuse existing preview logic by calling it internally
+        from django.http import QueryDict
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        # Build POST data with multiple platform_ids[] values
+        post_data = QueryDict(mutable=True)
+        post_data['business_id'] = str(business.business_id)
+        for pid in platform_ids:
+            post_data.appendlist('platform_ids[]', pid)
+        fake_request = factory.post('/')
+        fake_request.POST = post_data
+        fake_request.user = request.user
+        return preview_api_import(fake_request)
+
+    elif source in ('csv_upload', 'onedrive', 'temp_order'):
+        # Transform raw_data using mapping
+        raw_rows = import_log.raw_data or []
+        if not raw_rows:
+            return JsonResponse({'success': False, 'error': 'No data in ImportLog'})
+
+        # mapping is {db_field: source_column}
+        # Build preview rows
+        preview = []
+        for i, raw_row in enumerate(raw_rows[:100]):  # Limit preview
+            row_data = {'row_number': raw_row.get('__row_num__', i + 1)}
+            for db_field, src_col in mapping.items():
+                if src_col and isinstance(raw_row, dict):
+                    row_data[db_field] = raw_row.get(src_col, '')
+                else:
+                    row_data[db_field] = ''
+            preview.append(row_data)
+
+        # Build fields list from mapping with proper labels
+        FIELD_LABELS = {
+            'client_order_code': 'Order ID', 'order_date': 'Order Date',
+            'customer_name': 'Customer Name', 'customer_phone': 'Phone 1',
+            'customer_whatsapp': 'Phone 2 / WhatsApp', 'customer_email': 'Email',
+            'customer_address': 'Customer Address', 'dl_landmark': 'City / Landmark',
+            'dl_building': 'Villa / Building No', 'dl_street': 'Street No',
+            'dl_zone': 'Zone No', 'location_link': 'Location Link',
+            'dl_latitude': 'Latitude', 'dl_longitude': 'Longitude',
+            'deadline_date': 'Day & Time', 'package_desc': 'Package Desc',
+            'sku': 'SKU', 'product_url': 'Product URL', 'package_qty': 'Package Qty',
+            'cod_amount': 'Price / COD Amount', 'dl_amount': 'Delivery Fee',
+            'seller_notes': 'Seller Notes', 'internal_notes': 'Internal Notes',
+        }
+        for i in range(1, 6):
+            FIELD_LABELS[f'product_{i}'] = f'Product {i}'
+            FIELD_LABELS[f'count_{i}'] = f'Count {i}'
+
+        fields = [{'name': 'row_number', 'label': '#', 'sheet_col': ''}]
+        for db_field, src_col in mapping.items():
+            fields.append({
+                'name': db_field,
+                'label': FIELD_LABELS.get(db_field, db_field.replace('_', ' ').title()),
+                'sheet_col': src_col,
+            })
+
+        return JsonResponse({
+            'success': True,
+            'preview': preview,
+            'fields': fields,
+            'total_rows': len(raw_rows),
+            'already_imported': [],
+        })
+
+    return JsonResponse({'success': False, 'error': f'Unsupported source: {source}'})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def import_wizard_confirm(request):
+    """
+    POST: Execute the import from the wizard.
+    Delegates to the appropriate importer based on source type.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import_log_id = request.POST.get('import_log_id', '')
+    row_overrides_json = request.POST.get('row_overrides', '{}')
+    mapping_json = request.POST.get('mapping', '{}')
+
+    try:
+        import_log = orders_models.ImportLog.objects.get(id=import_log_id)
+    except orders_models.ImportLog.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'ImportLog not found'}, status=404)
+
+    try:
+        row_overrides = json.loads(row_overrides_json)
+    except (json.JSONDecodeError, TypeError):
+        row_overrides = {}
+
+    try:
+        mapping = json.loads(mapping_json)
+    except (json.JSONDecodeError, TypeError):
+        mapping = {}
+
+    # Save mapping to ImportLog
+    if mapping:
+        import_log.column_mapping = mapping
+        import_log.save(update_fields=['column_mapping'])
+
+    business = import_log.business
+    meta = import_log.source_meta or {}
+    source = meta.get('source_type', import_log.source)
+
+    if source in ('google_sheet', 'shopify', 'woocommerce'):
+        # Delegate to existing import_api_orders
+        platform_ids = meta.get('platform_ids', [])
+        from django.http import QueryDict
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        fake_request = factory.post('/')
+        post_data = QueryDict(mutable=True)
+        post_data['business_id'] = str(business.business_id)
+        post_data['source'] = source
+        post_data['row_overrides'] = json.dumps(row_overrides)
+        for pid in platform_ids:
+            post_data.appendlist('platform_ids[]', pid)
+        fake_request.POST = post_data
+        fake_request.user = request.user
+        return import_api_orders(fake_request)
+
+    elif source in ('csv_upload', 'onedrive', 'temp_order'):
+        # Process rows using mapping + overrides
+        from orders.views import bulk_import_save
+        from django.test import RequestFactory
+
+        raw_rows = import_log.raw_data or []
+        if not raw_rows:
+            return JsonResponse({'success': False, 'error': 'No data to import'})
+
+        created = 0
+        skipped = 0
+        errors_list = []
+
+        import_log.status = 'processing'
+        import_log.total_rows = len(raw_rows)
+        import_log.save(update_fields=['status', 'total_rows'])
+
+        factory = RequestFactory()
+
+        for i, raw_row in enumerate(raw_rows):
+            try:
+                # Apply mapping: transform raw_row to mapped_row
+                mapped_row = {}
+                for db_field, src_col in mapping.items():
+                    if src_col and isinstance(raw_row, dict):
+                        mapped_row[db_field] = raw_row.get(src_col, '')
+                    else:
+                        mapped_row[db_field] = ''
+
+                # Apply row overrides (key matches row_number from preview)
+                row_key = str(raw_row.get('__row_num__', i + 1))
+                if row_key in row_overrides:
+                    for field, val in row_overrides[row_key].items():
+                        mapped_row[field] = val
+
+                # Call existing bulk_import_save endpoint
+                fake_request = factory.post('/',
+                    data=json.dumps({
+                        'business_id': str(business.business_id),
+                        'row': mapped_row,
+                        'row_index': i,
+                        'import_log_id': import_log.id,
+                    }),
+                    content_type='application/json'
+                )
+                fake_request.user = request.user
+                resp = bulk_import_save(fake_request)
+                resp_data = json.loads(resp.content)
+                if resp_data.get('success'):
+                    created += 1
+                else:
+                    errors_list.append(f"Row {i+1}: {resp_data.get('error', 'Unknown error')}")
+            except Exception as e:
+                errors_list.append(f"Row {i+1}: {str(e)}")
+
+        import_log.status = 'completed' if not errors_list else 'completed_with_errors'
+        import_log.orders_created = created
+        import_log.orders_failed = len(errors_list)
+        import_log.errors = [{'row': e.split(':')[0], 'error': e} for e in errors_list]
+        import_log.save()
+
+        # Mark temp orders as imported
+        if source == 'temp_order' and created > 0:
+            temp_ids = meta.get('temp_ids', [])
+            if temp_ids:
+                orders_models.TempOrder.objects.filter(id__in=temp_ids).update(status='imported')
+
+        return JsonResponse({
+            'success': True,
+            'created': created,
+            'skipped': skipped,
+            'errors': errors_list,
+        })
+
+    return JsonResponse({'success': False, 'error': f'Unsupported source: {source}'})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def import_wizard_save_mapping(request):
+    """POST: Save column mapping from the wizard page."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import_log_id = request.POST.get('import_log_id', '')
+    mapping_json = request.POST.get('mapping', '{}')
+
+    try:
+        import_log = orders_models.ImportLog.objects.get(id=import_log_id)
+    except orders_models.ImportLog.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'ImportLog not found'}, status=404)
+
+    try:
+        mapping = json.loads(mapping_json)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    import_log.column_mapping = mapping
+    import_log.save(update_fields=['column_mapping'])
+
+    # Also save to API settings if Google Sheet
+    source = (import_log.source_meta or {}).get('source_type', import_log.source)
+    if source == 'google_sheet':
+        api = import_log.business.business_settings_api.filter(
+            is_verify_api=True, api_type='google_sheet'
+        ).first()
+        if api:
+            api.column_mapping = mapping
+            api.save(update_fields=['column_mapping'])
+
+    return JsonResponse({'success': True})
 
 
 @login_required(login_url='/accounts/login/')
@@ -2650,7 +3269,9 @@ def dl_list_all(request):
         'order__order_items__product',
         'task_qrcode',
         Prefetch('order__status_history', queryset=failure_history_qs, to_attr='failure_history'),
-    ).all().order_by('-created_at')
+    ).filter(
+        order__business__business_status='active',
+    ).order_by('-created_at')
 
     # Get filter parameters
     dl_code = request.GET.get('dlCode', '')
@@ -2748,7 +3369,8 @@ def fulfilled_clients_tasks(request):
         'order__order_items__product',
         'task_qrcode',
     ).filter(
-        order__business__fulfillment_service_enabled=True
+        order__business__business_status='active',
+        order__business__fulfillment_service_enabled=True,
     ).order_by('-created_at')
 
     # Get filter parameters
@@ -2827,6 +3449,8 @@ def non_fulfilled_clients_tasks(request):
         'order__order_items',
         'order__order_items__product',
         'task_qrcode',
+    ).filter(
+        order__business__business_status='active',
     ).exclude(
         order__business__fulfillment_service_status='active'
     ).order_by('-created_at')
@@ -2864,7 +3488,7 @@ def non_fulfilled_clients_tasks(request):
     if business_id:
         dl_tasks = dl_tasks.filter(order__business_id=business_id)
 
-    # Get non-fulfillment businesses
+    # Get non-fulfillment businesses (only active)
     businesses = business_models.Business.objects.filter(
         business_status='active',
         fulfillment_service_enabled=False
@@ -2904,6 +3528,8 @@ def dl_list_incompleted_details(request):
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).prefetch_related(
         'order__order_items',
+    ).filter(
+        order__business__business_status='active',
     ).exclude(
         dl_task_status__in=['delivered', 'cancelled']
     ).order_by('-created_at')
@@ -2972,7 +3598,8 @@ def dl_list_published_to_dms(request):
     ).prefetch_related(
         'order__order_items',
     ).filter(
-        dl_task_publish=True
+        order__business__business_status='active',
+        dl_task_publish=True,
     ).order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
 
@@ -2990,20 +3617,23 @@ def dl_list_published_to_dms(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def dl_list_ready_to_published_to_dms(request):
-    """List orders with unpublished delivery tasks (dl_task_publish=False)"""
-    orders = orders_models.Order.objects.select_related(
-        'business', 'pickup_location'
-    ).prefetch_related(
-        'delivery_task'
+    """List unpublished delivery tasks (dl_task_publish=False)"""
+    from delivery import models as delivery_models
+    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'driver', 'pickup_location'
     ).filter(
-        delivery_task__dl_task_publish=False,
+        order__business__business_status='active',
+        dl_task_publish=False,
     ).exclude(
-        delivery_task__dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
-    ).distinct().order_by('-created_at')
-    orders = paginate_queryset(request, orders)
+        dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
+    ).order_by('-created_at')
+    dl_tasks = paginate_queryset(request, dl_tasks)
 
     data = {
-        'orders': orders,
+        'dl_tasks': dl_tasks,
+        'page_title': 'Unpublished Tasks',
+        'page_subtitle': 'Ready to publish to fleet',
+        'page_icon': 'fa-paper-plane',
     }
     return render(request, 'workforce/parts/lists/dl_list_unpublished.html', data)
 
@@ -4191,7 +4821,22 @@ def update_task_status(request, task_id):
         notes = data.get('notes', '')
         time_str = data.get('time', '')
 
+        # Validate transition — admin/superuser can go backward, staff forward only
+        from delivery.state_machine import can_transition, get_allowed_transitions
+        current_status = task.dl_task_status
+        actor = 'admin' if request.user.is_superuser or request.user.groups.filter(name='admin').exists() else 'staff'
+        allowed, reason = can_transition(current_status, status, actor=actor)
+        if not allowed:
+            allowed_next = get_allowed_transitions(current_status, actor=actor)
+            allowed_list = ', '.join(sorted(allowed_next)) if allowed_next else 'none'
+            return JsonResponse({
+                'success': False,
+                'error': f"Cannot change from '{current_status}' to '{status}'. Allowed: {allowed_list}."
+            }, status=400)
+
         # Update both task status fields
+        task._status_actor = actor
+        task._status_changed_by = request.user
         task.dl_task_status = status
         update_fields = ['dl_task_status']
 
@@ -4487,6 +5132,15 @@ def update_verification_status(request, profile_id):
                     driver = fleet_models.Driver.objects.get(user=profile.user)
                     driver.driver_status = 'approved'
                     driver.save()
+                    # Fire auto flow for driver approved
+                    try:
+                        from core.auto_flow_executor import execute_flows_for_trigger
+                        execute_flows_for_trigger('staff_driver_approved', extra_context={
+                            'driver_name': driver.driver_name or '',
+                            'driver_phone': driver.driver_phone or '',
+                        })
+                    except Exception as e:
+                        logger.warning(f"Auto flow failed for driver approved {driver.pk}: {e}")
                 except fleet_models.Driver.DoesNotExist:
                     pass
 
@@ -4616,7 +5270,8 @@ def tasks_followup_list(request):
     ).prefetch_related(
         'order__order_items',
     ).filter(
-        dl_task_status__in=active_statuses
+        order__business__business_status='active',
+        dl_task_status__in=active_statuses,
     )
 
     # Optional filters
@@ -4692,7 +5347,8 @@ def tasks_reported(request):
     ).prefetch_related(
         'order__order_items',
     ).filter(
-        dl_task_status__in=['rejected', 'cancelled']
+        order__business__business_status='active',
+        dl_task_status__in=['rejected', 'cancelled'],
     ).order_by('-created_at')
 
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
@@ -5307,6 +5963,17 @@ def earnings_verification_action(request):
             logger.exception("Error processing task %s: %s", task_id, str(e))
             errors.append(f"Error processing task {task_id}")
 
+    # Fire auto flow for earnings approved/published
+    if updated_count > 0 and action in ('verify', 'publish'):
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('staff_earnings_approved', extra_context={
+                'action': action,
+                'updated_count': str(updated_count),
+            })
+        except Exception as e:
+            logger.warning(f"Auto flow failed for earnings approved: {e}")
+
     return JsonResponse({
         'success': True,
         'updated': updated_count,
@@ -5417,6 +6084,16 @@ def cod_settlement_action(request):
                         'payment_method': payment_method
                     })
                     total_settled += cod_amount
+                    # Fire auto flow for COD settled
+                    try:
+                        from core.auto_flow_executor import execute_flows_for_trigger
+                        execute_flows_for_trigger('staff_cod_settled', extra_context={
+                            'driver_name': driver.driver_name or '',
+                            'driver_phone': driver.driver_phone or '',
+                            'cod_amount': str(cod_amount),
+                        })
+                    except Exception as e:
+                        logger.warning(f"Auto flow failed for COD settled driver {driver.pk}: {e}")
         except fleet_models.Driver.DoesNotExist:
             continue
 
@@ -5692,150 +6369,6 @@ def fleet_transactions(request):
     return render(request, 'workforce/fleet_transactions.html', context)
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def generate_demo_transactions(request):
-    """Generate demo transactions for a driver"""
-    from django.contrib import messages
-    from decimal import Decimal
-    from datetime import timedelta
-    import random
-
-    if request.method != 'POST':
-        return redirect('workforce:fleet_transactions')
-
-    driver_id = request.POST.get('driver_id')
-    if not driver_id:
-        messages.error(request, 'Driver ID is required')
-        return redirect('workforce:fleet_transactions')
-
-    try:
-        driver = fleet_models.Driver.objects.get(driver_id=driver_id)
-    except fleet_models.Driver.DoesNotExist:
-        messages.error(request, 'Driver not found')
-        return redirect('workforce:fleet_transactions')
-
-    # Check if driver already has transactions
-    existing_count = fleet_models.DriverTransaction.objects.filter(driver=driver).count()
-    if existing_count > 0:
-        messages.warning(request, f'Driver already has {existing_count} transactions. Demo data not generated.')
-        return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
-
-    now = timezone.now()
-    cod_in_hand = Decimal('0.00')
-    pending_earnings = Decimal('0.00')
-    wallet_balance = driver.wallet_balance or Decimal('5000.00')
-
-    transactions_to_create = []
-
-    # Generate 10-15 COD collection transactions over past 7 days
-    for i in range(random.randint(10, 15)):
-        days_ago = random.randint(0, 7)
-        hours_ago = random.randint(0, 23)
-        txn_date = now - timedelta(days=days_ago, hours=hours_ago)
-
-        cod_amount = Decimal(random.randint(50, 500))
-        earning_amount = Decimal(random.randint(15, 50))
-        cod_in_hand += cod_amount
-        wallet_balance -= cod_amount  # COD collection decreases wallet
-        pending_earnings += earning_amount
-
-        # COD Collection transaction
-        transactions_to_create.append(fleet_models.DriverTransaction(
-            driver=driver,
-            transaction_type='cod_collection',
-            amount=cod_amount,
-            description=f'COD collected for delivery #{random.randint(1000, 9999)}',
-            reference_number=f'COD-{random.randint(10000, 99999)}',
-            wallet_balance_after=wallet_balance,
-            cod_in_hand_after=cod_in_hand,
-            pending_earnings_after=pending_earnings,
-            created_by=request.user,
-            created_at=txn_date,
-        ))
-
-        # Earning transaction
-        transactions_to_create.append(fleet_models.DriverTransaction(
-            driver=driver,
-            transaction_type='earning',
-            amount=earning_amount,
-            description=f'Delivery earning for task #{random.randint(1000, 9999)}',
-            reference_number=f'EARN-{random.randint(10000, 99999)}',
-            wallet_balance_after=wallet_balance,
-            cod_in_hand_after=cod_in_hand,
-            pending_earnings_after=pending_earnings,
-            created_by=request.user,
-            created_at=txn_date + timedelta(minutes=5),
-        ))
-
-    # Generate 2-3 COD deposit (cash settled) transactions
-    for i in range(random.randint(2, 3)):
-        days_ago = random.randint(1, 5)
-        txn_date = now - timedelta(days=days_ago, hours=random.randint(10, 18))
-
-        deposit_amount = Decimal(random.randint(200, 800))
-        deposit_amount = min(deposit_amount, cod_in_hand)  # Can't deposit more than in hand
-        cod_in_hand = max(Decimal('0.00'), cod_in_hand - deposit_amount)
-        wallet_balance += deposit_amount  # COD deposit increases wallet
-
-        transactions_to_create.append(fleet_models.DriverTransaction(
-            driver=driver,
-            transaction_type='cod_deposit',
-            amount=-deposit_amount,  # Negative because money leaving driver
-            description=f'COD deposited to admin - Cash settlement',
-            reference_number=f'DEP-{random.randint(10000, 99999)}',
-            wallet_balance_after=wallet_balance,
-            cod_in_hand_after=cod_in_hand,
-            pending_earnings_after=pending_earnings,
-            created_by=request.user,
-            created_at=txn_date,
-        ))
-
-    # Generate 1 earnings settlement transaction
-    if pending_earnings > Decimal('100.00'):
-        settlement_amount = pending_earnings * Decimal('0.6')  # Settle 60%
-        pending_earnings -= settlement_amount
-
-        transactions_to_create.append(fleet_models.DriverTransaction(
-            driver=driver,
-            transaction_type='settlement',
-            amount=-settlement_amount,  # Negative because paid out
-            description='Weekly earnings settlement - Bank transfer',
-            reference_number=f'SETTLE-{random.randint(10000, 99999)}',
-            wallet_balance_after=wallet_balance,
-            cod_in_hand_after=cod_in_hand,
-            pending_earnings_after=pending_earnings,
-            created_by=request.user,
-            created_at=now - timedelta(days=3),
-        ))
-
-    # Add a bonus transaction
-    bonus_amount = Decimal(random.randint(50, 150))
-    pending_earnings += bonus_amount
-    transactions_to_create.append(fleet_models.DriverTransaction(
-        driver=driver,
-        transaction_type='bonus',
-        amount=bonus_amount,
-        description='Weekly performance bonus',
-        reference_number=f'BONUS-{random.randint(10000, 99999)}',
-        wallet_balance_after=wallet_balance,
-        cod_in_hand_after=cod_in_hand,
-        pending_earnings_after=pending_earnings,
-        created_by=request.user,
-        created_at=now - timedelta(days=1),
-    ))
-
-    # Bulk create all transactions
-    fleet_models.DriverTransaction.objects.bulk_create(transactions_to_create)
-
-    # Update driver's current balances including wallet_balance
-    driver.cod_in_hand = cod_in_hand
-    driver.pending_earnings = pending_earnings
-    driver.wallet_balance = wallet_balance
-    driver.save(update_fields=['cod_in_hand', 'pending_earnings', 'wallet_balance'])
-
-    messages.success(request, f'Successfully generated {len(transactions_to_create)} demo transactions for {driver.user.first_name} {driver.user.last_name}')
-    return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
 
 
 @login_required(login_url='/accounts/login/')
@@ -8160,6 +8693,7 @@ def driver_detail(request, driver_id):
 
             # Status change — superadmin only
             new_status = request.POST.get('driver_status')
+            old_driver_status = driver.driver_status
             if new_status and new_status != driver.driver_status:
                 if user_is_superadmin:
                     driver.driver_status = new_status
@@ -8170,6 +8704,19 @@ def driver_detail(request, driver_id):
                     }, status=403)
 
             driver.save()
+
+            # Fire auto flows for driver status changes
+            if new_status and new_status != old_driver_status:
+                try:
+                    from core.auto_flow_executor import execute_flows_for_trigger
+                    ctx = {'driver_name': driver.driver_name or '', 'driver_phone': driver.driver_phone or ''}
+                    if new_status == 'approved':
+                        execute_flows_for_trigger('staff_driver_approved', extra_context=ctx)
+                    elif new_status == 'suspended':
+                        execute_flows_for_trigger('staff_driver_suspended', extra_context=ctx)
+                except Exception as e:
+                    logger.warning(f"Auto flow failed for driver status change {driver.pk}: {e}")
+
             return JsonResponse({
                 'success': True,
                 'message': 'Driver updated successfully'
@@ -9140,6 +9687,20 @@ def order_edit(request, order_id):
             )
 
             messages.success(request, f'Order {order.order_number} updated successfully.')
+
+            # Fire auto flow for order edit
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('staff_order_edit', extra_context={
+                    'order_number': order.order_number or '',
+                    'customer_name': order.customer_name or '',
+                    'customer_phone': order.customer_phone or '',
+                    'customer_address': order.customer_address or '',
+                    'cod_amount': str(order.cod_amount) if order.cod_amount else '0',
+                    'business_name': str(order.business) if order.business else '',
+                })
+            except Exception as e:
+                logger.warning(f"Auto flow failed for order edit {order_id}: {e}")
 
             # Check if HTMX request
             if request.headers.get('HX-Request'):
@@ -10144,6 +10705,7 @@ def tasks_live_map(request):
     tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'order__business', 'driver', 'driver__user', 'dl_to_address',
     ).filter(
+        order__business__business_status='active',
         dl_task_status__in=active_statuses,
     )
 
@@ -10694,6 +11256,106 @@ def temp_orders_preview(request):
     return JsonResponse({'success': True, 'rows': data})
 
 
+def _parse_coded_product_name(raw_name):
+    """Parse '##__PRODUCT NAME____SKU' format into (clean_name, sku).
+
+    Examples:
+        '08__DAGGER OUD____BUK011' → ('DAGGER OUD', 'BUK011')
+        '13__SPECIAL OUD____BUK006' → ('SPECIAL OUD', 'BUK006')
+        'Regular Name' → ('Regular Name', None)
+    """
+    import re
+    if not raw_name:
+        return (raw_name, None)
+    m = re.match(r'^\d+__(.+?)____(\S+)$', raw_name.strip())
+    if m:
+        return (m.group(1).strip(), m.group(2).strip())
+    return (raw_name.strip(), None)
+
+
+def _match_product_by_name(pname, business):
+    """Match a product by name, parsing coded format if needed."""
+    from product.models import Product as ProductModel
+    clean_name, sku = _parse_coded_product_name(pname)
+
+    # Try exact name match with clean name
+    matched = ProductModel.objects.filter(
+        business=business, item_name__iexact=clean_name
+    ).first()
+    if matched:
+        return matched
+
+    # Try SKU match (extracted)
+    if sku:
+        matched = ProductModel.objects.filter(
+            business=business, item_sku__iexact=sku
+        ).first()
+        if matched:
+            return matched
+
+    # Try barcode match
+    matched = ProductModel.objects.filter(
+        business=business, barcode__iexact=clean_name
+    ).first()
+    if matched:
+        return matched
+
+    # Try original raw name as fallback (for non-coded formats)
+    if clean_name != pname.strip():
+        matched = ProductModel.objects.filter(
+            business=business, item_name__iexact=pname.strip()
+        ).first()
+        if matched:
+            return matched
+        matched = ProductModel.objects.filter(
+            business=business, item_sku__iexact=pname.strip()
+        ).first()
+        if matched:
+            return matched
+
+    return None
+
+
+def _extract_products_from_raw_row(temp_order):
+    """Extract product_1/count_1..3 from raw_row using column mapping."""
+    col_mapping = {}
+    if temp_order.onedrive_source and hasattr(temp_order.onedrive_source, 'last_column_mapping'):
+        col_mapping = temp_order.onedrive_source.last_column_mapping or {}
+    elif temp_order.api_settings and hasattr(temp_order.api_settings, 'column_mapping'):
+        col_mapping = temp_order.api_settings.column_mapping or {}
+    elif temp_order.public_link_source and hasattr(temp_order.public_link_source, 'last_column_mapping'):
+        col_mapping = temp_order.public_link_source.last_column_mapping or {}
+
+    if not col_mapping:
+        return []
+
+    # Build reverse mapping: db_field -> col_index
+    reverse_map = {}
+    for col_idx, db_field in col_mapping.items():
+        if db_field:
+            reverse_map[db_field] = int(col_idx)
+
+    raw = temp_order.raw_row if isinstance(temp_order.raw_row, list) else []
+    if not raw:
+        return []
+
+    products = []
+    for i in range(1, 4):
+        pf = f'product_{i}'
+        cf = f'count_{i}'
+        if pf in reverse_map and reverse_map[pf] < len(raw):
+            pname = str(raw[reverse_map[pf]] or '').strip()
+            pcount = 1
+            if cf in reverse_map and reverse_map[cf] < len(raw):
+                try:
+                    pcount = int(float(str(raw[reverse_map[cf]] or '1').strip())) or 1
+                except (ValueError, TypeError):
+                    pcount = 1
+            if pname:
+                products.append({'name': pname, 'qty': pcount})
+    return products
+
+
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
 def temp_orders_transfer(request):
@@ -10830,11 +11492,17 @@ def temp_orders_transfer(request):
             if pname:
                 products.append({'name': pname, 'qty': pcount})
 
-        # Build package_description from products if not already set
-        if not package_desc and products:
-            desc_parts = [f"{p['name']} x{p['qty']}" for p in products]
+        # Parse coded product names and build clean package description
+        clean_product_names = []
+        for p in products:
+            clean_name, _ = _parse_coded_product_name(p['name'])
+            clean_product_names.append({'name': clean_name, 'qty': p['qty']})
+
+        # Build package_description from clean product names if not already set
+        if not package_desc and clean_product_names:
+            desc_parts = [f"{p['name']} x{p['qty']}" for p in clean_product_names]
             package_desc = ', '.join(desc_parts)
-            package_qty = sum(p['qty'] for p in products)
+            package_qty = sum(p['qty'] for p in clean_product_names)
 
         try:
             order = orders_models.Order(
@@ -10866,7 +11534,7 @@ def temp_orders_transfer(request):
                     'customer_email': row_data.get('customer_email', ''),
                     'location_link': location_link,
                     'dl_landmark': dl_landmark,
-                    'products': [{'name': p['name'], 'qty': str(p['qty'])} for p in products],
+                    'products': [{'name': p['name'], 'qty': str(p['qty'])} for p in clean_product_names],
                     'seller_notes': seller_notes,
                     'internal_notes': internal_notes,
                 },
@@ -10875,21 +11543,10 @@ def temp_orders_transfer(request):
             created_orders.append(order)
 
             # Match product names to Product records → create OrderItems
-            from product.models import Product as ProductModel
             for p in products:
                 pname = p['name']
                 pqty = p['qty']
-                matched = ProductModel.objects.filter(
-                    business=business, item_name__iexact=pname.strip()
-                ).first()
-                if not matched:
-                    matched = ProductModel.objects.filter(
-                        business=business, item_sku__iexact=pname.strip()
-                    ).first()
-                if not matched:
-                    matched = ProductModel.objects.filter(
-                        business=business, barcode__iexact=pname.strip()
-                    ).first()
+                matched = _match_product_by_name(pname, business)
                 if matched:
                     orders_models.OrderItem.objects.create(
                         order=order, product=matched, quantity=pqty,
@@ -10907,6 +11564,17 @@ def temp_orders_transfer(request):
         except Exception as e:
             logger.exception("Transfer error for temp_order %s", temp_id)
             errors.append(f"Row {temp_id}: {str(e)}")
+
+    # Fire auto flow for temp orders transferred
+    if saved > 0:
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('staff_temp_orders_transferred', extra_context={
+                'saved_count': str(saved),
+                'skipped_count': str(skipped),
+            })
+        except Exception as e:
+            logger.warning(f"Auto flow failed for temp orders transferred: {e}")
 
     return JsonResponse({
         'success': True,
@@ -11035,26 +11703,29 @@ def temp_orders_auto_import(request):
 
         # --- Product matching ---
         products = parse_products_from_desc(package_desc)
+
+        # If no products from package_desc, try product_1/count_1 columns from raw_row
+        if not products:
+            products = _extract_products_from_raw_row(temp_order)
+
         matched_items = []
         unmatched_names = []
+        clean_product_names = []
         for p in products:
             pname = p['name']
             pqty = p['qty']
-            matched = ProductModel.objects.filter(
-                business=business, item_name__iexact=pname.strip()
-            ).first()
-            if not matched:
-                matched = ProductModel.objects.filter(
-                    business=business, item_sku__iexact=pname.strip()
-                ).first()
-            if not matched:
-                matched = ProductModel.objects.filter(
-                    business=business, barcode__iexact=pname.strip()
-                ).first()
+            matched = _match_product_by_name(pname, business)
+            # Store clean name for package description
+            clean_name, _ = _parse_coded_product_name(pname)
+            clean_product_names.append({'name': clean_name, 'qty': pqty})
             if matched:
                 matched_items.append({'product': matched, 'qty': pqty})
             else:
-                unmatched_names.append(f"{pname} x{pqty}")
+                unmatched_names.append(f"{clean_name} x{pqty}")
+
+        # Build clean package_desc from parsed product names
+        if not package_desc and clean_product_names:
+            package_desc = ', '.join(f"{p['name']} x{p['qty']}" for p in clean_product_names)
 
         if unmatched_names:
             row_warnings.append(f"Unmatched products: {', '.join(unmatched_names)}")
@@ -11423,9 +12094,11 @@ def onedrive_sources(request):
     # Serialize saved mappings and imported rows per source for JS
     source_mappings = {}
     source_imported_rows = {}
+    source_businesses = {}
     for s in sources:
         source_mappings[s.id] = s.last_column_mapping or {}
         source_imported_rows[s.id] = s.last_imported_rows or []
+        source_businesses[s.id] = s.business_id
 
     context = {
         'page_title': 'OneDrive Import Sources',
@@ -11433,6 +12106,7 @@ def onedrive_sources(request):
         'businesses': businesses,
         'source_mappings_json': json_lib.dumps(source_mappings),
         'source_imported_rows_json': json_lib.dumps(source_imported_rows),
+        'source_businesses_json': json_lib.dumps(source_businesses),
     }
     return render(request, 'workforce/onedrive_sources.html', context)
 
@@ -11632,6 +12306,25 @@ def onedrive_sheet_preview(request, source_id):
 @login_required(login_url='/accounts/login/')
 @staff_required
 @require_POST
+def onedrive_save_mapping(request, source_id):
+    """Save column mapping for an OneDrive source without importing."""
+    import json as json_lib
+    source = get_object_or_404(orders_models.OneDriveSource, id=source_id)
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    mapping = body.get('mapping', {})
+    if not mapping:
+        return JsonResponse({'success': False, 'error': 'No mapping provided'}, status=400)
+    source.last_column_mapping = mapping
+    source.save(update_fields=['last_column_mapping'])
+    return JsonResponse({'success': True, 'message': 'Mapping saved'})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
 def onedrive_import_trigger(request, source_id):
     """Import selected rows from OneDrive Excel using user-defined column mapping."""
     import openpyxl
@@ -11654,6 +12347,7 @@ def onedrive_import_trigger(request, source_id):
     sheet_name = body.get('sheet_name', '')
     row_numbers = set(body.get('row_numbers', []))  # Excel row numbers to import
     column_mapping = body.get('column_mapping', {})  # {col_idx_str: db_field}
+    row_overrides = body.get('row_overrides', {})  # {row_num_str: {col_idx_str: new_value}}
 
     if not row_numbers:
         return JsonResponse({'success': False, 'error': 'No rows selected'}, status=400)
@@ -11752,20 +12446,68 @@ def onedrive_import_trigger(request, source_id):
             },
         )
 
+        # Helper: get Excel column header name for a DB field
+        def col_label(field):
+            idx = field_indices.get(field)
+            if idx is not None and idx < len(header_row) and header_row[idx]:
+                return header_row[idx]
+            return f"col {idx}" if idx is not None else "?"
+
+        def raw_display(row_data, field):
+            """Return the raw cell value for display (shows 'empty' if blank)."""
+            idx = field_indices.get(field)
+            if idx is not None and idx < len(row_data):
+                val = row_data[idx]
+                if val is None or (isinstance(val, str) and not val.strip()):
+                    return "empty"
+                return repr(str(val).strip())
+            return "unmapped"
+
         data_rows = rows[1:]  # skip header
         for row_num, row_data in enumerate(data_rows, start=2):
             if row_num not in row_numbers:
                 continue
+            # Apply user edits from verify step
+            overrides = row_overrides.get(str(row_num), {})
+            if overrides:
+                row_data = list(row_data)
+                for col_idx_str, new_val in overrides.items():
+                    ci = int(col_idx_str)
+                    while len(row_data) <= ci:
+                        row_data.append(None)
+                    row_data[ci] = new_val
             if not any(row_data):
                 skipped += 1
+                errors.append(f"Row {row_num}: Empty row (no data)")
                 continue
 
             customer_name = get_val(row_data, 'customer_name')
             customer_phone = get_val(row_data, 'customer_phone')
             customer_address = get_val(row_data, 'customer_address')
 
-            if not customer_name or not customer_phone:
+            if not customer_name and not customer_phone:
                 skipped += 1
+                errors.append(
+                    f"Row {row_num}: Missing customer name "
+                    f"(col '{col_label('customer_name')}' = {raw_display(row_data, 'customer_name')}) "
+                    f"and phone (col '{col_label('customer_phone')}' = {raw_display(row_data, 'customer_phone')})"
+                )
+                continue
+            if not customer_name:
+                skipped += 1
+                errors.append(
+                    f"Row {row_num}: Missing customer name "
+                    f"(col '{col_label('customer_name')}' = {raw_display(row_data, 'customer_name')}), "
+                    f"phone: {customer_phone}"
+                )
+                continue
+            if not customer_phone:
+                skipped += 1
+                errors.append(
+                    f"Row {row_num}: Missing phone "
+                    f"(col '{col_label('customer_phone')}' = {raw_display(row_data, 'customer_phone')}), "
+                    f"name: {customer_name}"
+                )
                 continue
 
             client_order_code = get_val(row_data, 'client_order_code')
@@ -11796,16 +12538,46 @@ def onedrive_import_trigger(request, source_id):
                     notes_parts.append(f"Ezzy: {internal_notes}")
                 combined_notes = ' | '.join(notes_parts) if notes_parts else ''
 
+                # Parse latitude/longitude from direct fields or location link
+                lat_val = get_val(row_data, 'dl_latitude')
+                lng_val = get_val(row_data, 'dl_longitude')
+                location_link = get_val(row_data, 'location_link')
+                if location_link and (not lat_val or not lng_val):
+                    # Try to extract coords from Google Maps link
+                    import re
+                    coord_match = re.search(r'@?(-?\d+\.\d+)[,/]\s*(-?\d+\.\d+)', location_link)
+                    if coord_match:
+                        lat_val = lat_val or coord_match.group(1)
+                        lng_val = lng_val or coord_match.group(2)
+
+                parsed_lat = None
+                parsed_lng = None
+                try:
+                    if lat_val:
+                        parsed_lat = float(lat_val)
+                    if lng_val:
+                        parsed_lng = float(lng_val)
+                except (ValueError, TypeError):
+                    pass
+
+                # Append landmark to address if provided
+                dl_landmark = get_val(row_data, 'dl_landmark')
+                full_address = customer_address or ''
+                if dl_landmark and dl_landmark not in full_address:
+                    full_address = f"{full_address}, {dl_landmark}".strip(', ')
+
                 order = orders_models.Order(
                     business=business,
                     client_order_code=client_order_code,
                     customer_name=customer_name,
                     customer_phone=customer_phone,
                     customer_whatsapp=customer_whatsapp,
-                    customer_address=customer_address or '',
+                    customer_address=full_address,
                     dl_zone=safe_int_or_none(get_val(row_data, 'dl_zone')),
                     dl_street=safe_int_or_none(get_val(row_data, 'dl_street')),
                     dl_building=safe_int_or_none(get_val(row_data, 'dl_building')),
+                    latitude=parsed_lat,
+                    longitude=parsed_lng,
                     cod_amount=safe_int(get_val(row_data, 'cod_amount')),
                     dl_amount=safe_int(get_val(row_data, 'dl_amount') if 'dl_amount' in field_indices else '0'),
                     order_notes=combined_notes[:100] if combined_notes else '',
@@ -11817,6 +12589,7 @@ def onedrive_import_trigger(request, source_id):
                         'onedrive_source_id': source.id,
                         'sheet_name': sheet_name,
                         'row_number': row_num,
+                        'location_link': location_link or '',
                     },
                 )
                 # Save package description & qty, and match products
@@ -11826,14 +12599,15 @@ def onedrive_import_trigger(request, source_id):
                     order.package_description = package_desc_val[:255]
                     order.package_qty = safe_int(get_val(row_data, 'package_qty')) or 1
                 else:
-                    # Build from product_1..5 columns
+                    # Build from product_1..5 columns (clean coded names)
                     desc_parts = []
                     total_qty = 0
                     for i in range(1, 6):
                         pn = get_val(row_data, f'product_{i}')
                         if pn:
                             pc = safe_int(get_val(row_data, f'count_{i}')) or 1
-                            desc_parts.append(f"{pn} x{pc}")
+                            clean_name, _ = _parse_coded_product_name(pn)
+                            desc_parts.append(f"{clean_name} x{pc}")
                             total_qty += pc
                     if desc_parts:
                         order.package_description = ', '.join(desc_parts)[:255]
@@ -11852,17 +12626,7 @@ def onedrive_import_trigger(request, source_id):
                         pc = safe_int(get_val(row_data, f'count_{i}')) or 1
                         product_names.append((pn, pc))
                 for pname, pqty in product_names:
-                    matched = ProductModel.objects.filter(
-                        business=business, item_name__iexact=pname.strip()
-                    ).first()
-                    if not matched:
-                        matched = ProductModel.objects.filter(
-                            business=business, item_sku__iexact=pname.strip()
-                        ).first()
-                    if not matched:
-                        matched = ProductModel.objects.filter(
-                            business=business, barcode__iexact=pname.strip()
-                        ).first()
+                    matched = _match_product_by_name(pname, business)
                     if matched:
                         orders_models.OrderItem.objects.create(
                             order=order, product=matched, quantity=pqty,
@@ -11905,13 +12669,20 @@ def onedrive_import_trigger(request, source_id):
                 onedrive_source=source, row_num__in=row_numbers
             ).update(status='imported')
 
+        # Build mapping summary: "Header (col N)" → db_field
+        mapping_summary = {}
+        for db_field, idx in field_indices.items():
+            hdr = header_row[idx] if idx < len(header_row) and header_row[idx] else f"col {idx}"
+            mapping_summary[f"{hdr} (col {idx})"] = db_field
+
         return JsonResponse({
             'success': True,
             'saved': saved,
             'skipped': skipped,
-            'errors': errors[:20],
-            'imported': imported_rows_data[:20],
-            'message': f'{saved} orders imported, {skipped} skipped'
+            'errors': errors[:50],
+            'imported': imported_rows_data[:50],
+            'message': f'{saved} orders imported, {skipped} skipped',
+            'mapping_summary': mapping_summary,
         })
 
     except Exception as e:
@@ -11921,3 +12692,733 @@ def onedrive_import_trigger(request, source_id):
         except Exception:
             pass
         return JsonResponse({'success': False, 'error': f'Import failed: {str(e)}'}, status=500)
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def auto_triggers_list(request):
+    """List all automatic triggers: WhatsApp notifications, webhooks, signals."""
+    from core.models import AutoTriggerConfig
+    triggers = AutoTriggerConfig.objects.all()
+    wa_triggers = triggers.filter(category='whatsapp')
+    wh_triggers = triggers.filter(category='webhook')
+    sys_triggers = triggers.filter(category='system')
+    return render(request, 'workforce/auto_triggers_list.html', {
+        'wa_triggers': wa_triggers,
+        'wh_triggers': wh_triggers,
+        'sys_triggers': sys_triggers,
+    })
+
+
+@csrf_exempt
+@login_required(login_url='account_login')
+@superuser_required
+def auto_trigger_toggle(request):
+    """Toggle an auto trigger on/off via AJAX."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    trigger_key = body.get('trigger_key', '')
+    if not trigger_key:
+        return JsonResponse({'success': False, 'error': 'Missing trigger_key'}, status=400)
+
+    from core.models import AutoTriggerConfig
+    try:
+        trigger = AutoTriggerConfig.objects.get(trigger_key=trigger_key)
+        trigger.is_enabled = not trigger.is_enabled
+        trigger.save(update_fields=['is_enabled', 'updated_at'])
+        return JsonResponse({
+            'success': True,
+            'trigger_key': trigger.trigger_key,
+            'is_enabled': trigger.is_enabled,
+        })
+    except AutoTriggerConfig.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Trigger not found'}, status=404)
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def auto_flows_list(request):
+    """List all automation flows."""
+    from core.models import AutoFlow
+    flows = AutoFlow.objects.select_related('trigger').all()
+    return render(request, 'workforce/auto_flows_list.html', {'flows': flows})
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def auto_flow_add(request):
+    """Add a new automation flow."""
+    from core.models import AutoTriggerConfig, AutoFlow
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        trigger_id = request.POST.get('trigger_id', '')
+        action_type = request.POST.get('action_type', '')
+
+        if not name or not trigger_id or not action_type:
+            triggers = AutoTriggerConfig.objects.all()
+            action_types = AutoFlow.ACTION_TYPE_CHOICES
+            businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+            return render(request, 'workforce/auto_flow_add.html', {
+                'triggers': triggers, 'action_types': action_types,
+                'businesses': businesses,
+                'error': 'All fields are required.',
+                'form_data': request.POST,
+            })
+
+        # Build trigger_conditions
+        trigger_conditions = {}
+        trigger_business = request.POST.get('trigger_business', 'all')
+        if trigger_business != 'all':
+            trigger_conditions['business_id'] = trigger_business
+        # Category-specific conditions
+        for field in ['trigger_on_status', 'trigger_cod_condition', 'trigger_cod_min_amount',
+                      'trigger_webhook_event', 'trigger_wh_task_status',
+                      'trigger_from_status', 'trigger_to_status',
+                      'trigger_active_from', 'trigger_active_to', 'trigger_max_per_day']:
+            val = request.POST.get(field, '').strip()
+            if val:
+                trigger_conditions[field] = val
+        if request.POST.get('trigger_only_verified'):
+            trigger_conditions['only_verified'] = True
+        if request.POST.get('trigger_only_with_driver'):
+            trigger_conditions['only_with_driver'] = True
+
+        # Build action_config from POST fields
+        action_config = {}
+        if trigger_conditions:
+            action_config['trigger_conditions'] = trigger_conditions
+        if action_type == 'whatsapp_message':
+            wa_instance = request.POST.get('wa_instance', '').strip()
+            if wa_instance:
+                action_config['wa_instance'] = wa_instance
+            action_config['recipient'] = request.POST.get('wa_recipient', 'customer')
+            action_config['custom_phone'] = request.POST.get('wa_custom_phone', '')
+            action_config['group_id'] = request.POST.get('wa_group_id', '')
+            action_config['message_template'] = request.POST.get('message_template', '')
+            action_config['delay_seconds'] = int(request.POST.get('wa_delay_seconds', '0') or 0)
+        elif action_type == 'webhook_call':
+            action_config['webhook_url'] = request.POST.get('webhook_url', '')
+            action_config['method'] = request.POST.get('webhook_method', 'POST')
+            action_config['headers'] = request.POST.get('webhook_headers', '')
+            action_config['payload_template'] = request.POST.get('webhook_payload', '')
+        elif action_type == 'update_order_status':
+            action_config['target_status'] = request.POST.get('target_order_status', '')
+            action_config['apply_to'] = request.POST.get('status_apply_to', 'current_order')
+        elif action_type == 'update_task_status':
+            action_config['target_status'] = request.POST.get('target_task_status', '')
+            action_config['status_note'] = request.POST.get('status_note', '')
+        elif action_type == 'send_notification':
+            action_config['recipient'] = request.POST.get('notif_recipient', 'driver')
+            action_config['notification_title'] = request.POST.get('notification_title', '')
+            action_config['notification_message'] = request.POST.get('notification_message', '')
+            action_config['notification_type'] = request.POST.get('notif_type', 'info')
+        elif action_type == 'assign_driver':
+            action_config['method'] = request.POST.get('assign_method', 'auto_nearest')
+            action_config['specific_driver_id'] = request.POST.get('specific_driver_id', '')
+            action_config['notify_driver'] = bool(request.POST.get('notify_driver_on_assign'))
+        elif action_type == 'create_task':
+            action_config['task_type'] = request.POST.get('task_type', 'standard')
+            action_config['initial_status'] = request.POST.get('task_initial_status', 'for_review')
+            action_config['auto_publish'] = bool(request.POST.get('auto_publish_task'))
+
+        try:
+            trigger = AutoTriggerConfig.objects.get(id=trigger_id)
+        except AutoTriggerConfig.DoesNotExist:
+            triggers = AutoTriggerConfig.objects.all()
+            action_types = AutoFlow.ACTION_TYPE_CHOICES
+            businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+            return render(request, 'workforce/auto_flow_add.html', {
+                'triggers': triggers, 'action_types': action_types,
+                'businesses': businesses,
+                'error': 'Invalid trigger selected.',
+                'form_data': request.POST,
+            })
+
+        AutoFlow.objects.create(
+            name=name,
+            trigger=trigger,
+            action_type=action_type,
+            action_config=action_config,
+        )
+        from django.shortcuts import redirect
+        return redirect('workforce:auto_flows_list')
+
+    triggers = AutoTriggerConfig.objects.all()
+    action_types = AutoFlow.ACTION_TYPE_CHOICES
+    businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+    wa_instances = core_models.WhatsAppInstance.objects.filter(is_active=True)
+    return render(request, 'workforce/auto_flow_add.html', {
+        'triggers': triggers,
+        'action_types': action_types,
+        'businesses': businesses,
+        'wa_instances': wa_instances,
+    })
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def auto_flow_edit(request, flow_id):
+    """Edit an existing automation flow."""
+    from core.models import AutoTriggerConfig, AutoFlow
+    try:
+        flow = AutoFlow.objects.select_related('trigger').get(id=flow_id)
+    except AutoFlow.DoesNotExist:
+        from django.shortcuts import redirect
+        return redirect('workforce:auto_flows_list')
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        trigger_id = request.POST.get('trigger_id', '')
+        action_type = request.POST.get('action_type', '')
+
+        if not name or not trigger_id or not action_type:
+            triggers = AutoTriggerConfig.objects.all()
+            action_types = AutoFlow.ACTION_TYPE_CHOICES
+            businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+            return render(request, 'workforce/auto_flow_add.html', {
+                'triggers': triggers, 'action_types': action_types,
+                'businesses': businesses,
+                'error': 'All fields are required.',
+                'form_data': request.POST,
+                'editing': True, 'flow': flow,
+            })
+
+        # Build trigger_conditions
+        trigger_conditions = {}
+        trigger_business = request.POST.get('trigger_business', 'all')
+        if trigger_business != 'all':
+            trigger_conditions['business_id'] = trigger_business
+        for field in ['trigger_on_status', 'trigger_cod_condition', 'trigger_cod_min_amount',
+                      'trigger_webhook_event', 'trigger_wh_task_status',
+                      'trigger_from_status', 'trigger_to_status',
+                      'trigger_active_from', 'trigger_active_to', 'trigger_max_per_day']:
+            val = request.POST.get(field, '').strip()
+            if val:
+                trigger_conditions[field] = val
+        if request.POST.get('trigger_only_verified'):
+            trigger_conditions['only_verified'] = True
+        if request.POST.get('trigger_only_with_driver'):
+            trigger_conditions['only_with_driver'] = True
+
+        # Build action_config from POST fields
+        action_config = {}
+        if trigger_conditions:
+            action_config['trigger_conditions'] = trigger_conditions
+        if action_type == 'whatsapp_message':
+            wa_instance = request.POST.get('wa_instance', '').strip()
+            if wa_instance:
+                action_config['wa_instance'] = wa_instance
+            action_config['recipient'] = request.POST.get('wa_recipient', 'customer')
+            action_config['custom_phone'] = request.POST.get('wa_custom_phone', '')
+            action_config['group_id'] = request.POST.get('wa_group_id', '')
+            action_config['message_template'] = request.POST.get('message_template', '')
+            action_config['delay_seconds'] = int(request.POST.get('wa_delay_seconds', '0') or 0)
+        elif action_type == 'webhook_call':
+            action_config['webhook_url'] = request.POST.get('webhook_url', '')
+            action_config['method'] = request.POST.get('webhook_method', 'POST')
+            action_config['headers'] = request.POST.get('webhook_headers', '')
+            action_config['payload_template'] = request.POST.get('webhook_payload', '')
+        elif action_type == 'update_order_status':
+            action_config['target_status'] = request.POST.get('target_order_status', '')
+            action_config['apply_to'] = request.POST.get('status_apply_to', 'current_order')
+        elif action_type == 'update_task_status':
+            action_config['target_status'] = request.POST.get('target_task_status', '')
+            action_config['status_note'] = request.POST.get('status_note', '')
+        elif action_type == 'send_notification':
+            action_config['recipient'] = request.POST.get('notif_recipient', 'driver')
+            action_config['notification_title'] = request.POST.get('notification_title', '')
+            action_config['notification_message'] = request.POST.get('notification_message', '')
+            action_config['notification_type'] = request.POST.get('notif_type', 'info')
+        elif action_type == 'assign_driver':
+            action_config['method'] = request.POST.get('assign_method', 'auto_nearest')
+            action_config['specific_driver_id'] = request.POST.get('specific_driver_id', '')
+            action_config['notify_driver'] = bool(request.POST.get('notify_driver_on_assign'))
+        elif action_type == 'create_task':
+            action_config['task_type'] = request.POST.get('task_type', 'standard')
+            action_config['initial_status'] = request.POST.get('task_initial_status', 'for_review')
+            action_config['auto_publish'] = bool(request.POST.get('auto_publish_task'))
+
+        try:
+            trigger = AutoTriggerConfig.objects.get(id=trigger_id)
+        except AutoTriggerConfig.DoesNotExist:
+            triggers = AutoTriggerConfig.objects.all()
+            action_types = AutoFlow.ACTION_TYPE_CHOICES
+            businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+            return render(request, 'workforce/auto_flow_add.html', {
+                'triggers': triggers, 'action_types': action_types,
+                'businesses': businesses,
+                'error': 'Invalid trigger selected.',
+                'form_data': request.POST,
+                'editing': True, 'flow': flow,
+            })
+
+        flow.name = name
+        flow.trigger = trigger
+        flow.action_type = action_type
+        flow.action_config = action_config
+        flow.save()
+        from django.shortcuts import redirect
+        return redirect('workforce:auto_flows_list')
+
+    # GET — pre-populate form_data from existing flow
+    config = flow.action_config or {}
+    trigger_conditions = config.get('trigger_conditions', {})
+    form_data = {
+        'name': flow.name,
+        'trigger_id': str(flow.trigger_id),
+        'action_type': flow.action_type,
+        # WhatsApp fields
+        'wa_instance': config.get('wa_instance', ''),
+        'wa_recipient': config.get('recipient', 'customer'),
+        'wa_custom_phone': config.get('custom_phone', ''),
+        'wa_group_id': config.get('group_id', ''),
+        'message_template': config.get('message_template', ''),
+        'wa_delay_seconds': str(config.get('delay_seconds', 0)),
+        # Webhook fields
+        'webhook_url': config.get('webhook_url', ''),
+        'webhook_method': config.get('method', 'POST'),
+        'webhook_headers': config.get('headers', ''),
+        'webhook_payload': config.get('payload_template', ''),
+        # Order status fields
+        'target_order_status': config.get('target_status', ''),
+        'status_apply_to': config.get('apply_to', 'current_order'),
+        # Task status fields
+        'target_task_status': config.get('target_status', ''),
+        'status_note': config.get('status_note', ''),
+        # Notification fields
+        'notif_recipient': config.get('recipient', 'driver'),
+        'notification_title': config.get('notification_title', ''),
+        'notification_message': config.get('notification_message', ''),
+        'notif_type': config.get('notification_type', 'info'),
+        # Assign driver fields
+        'assign_method': config.get('method', 'auto_nearest'),
+        'specific_driver_id': config.get('specific_driver_id', ''),
+        'notify_driver_on_assign': config.get('notify_driver', True),
+        # Create task fields
+        'task_type': config.get('task_type', 'standard'),
+        'task_initial_status': config.get('initial_status', 'for_review'),
+        'auto_publish_task': config.get('auto_publish', False),
+        # Trigger conditions
+        'trigger_business': trigger_conditions.get('business_id', 'all'),
+        'trigger_on_status': trigger_conditions.get('trigger_on_status', ''),
+        'trigger_cod_condition': trigger_conditions.get('trigger_cod_condition', ''),
+        'trigger_cod_min_amount': trigger_conditions.get('trigger_cod_min_amount', ''),
+        'trigger_webhook_event': trigger_conditions.get('trigger_webhook_event', ''),
+        'trigger_wh_task_status': trigger_conditions.get('trigger_wh_task_status', ''),
+        'trigger_from_status': trigger_conditions.get('trigger_from_status', ''),
+        'trigger_to_status': trigger_conditions.get('trigger_to_status', ''),
+        'trigger_active_from': trigger_conditions.get('trigger_active_from', ''),
+        'trigger_active_to': trigger_conditions.get('trigger_active_to', ''),
+        'trigger_max_per_day': trigger_conditions.get('trigger_max_per_day', ''),
+        'trigger_only_verified': trigger_conditions.get('only_verified', False),
+        'trigger_only_with_driver': trigger_conditions.get('only_with_driver', False),
+    }
+
+    triggers = AutoTriggerConfig.objects.all()
+    action_types = AutoFlow.ACTION_TYPE_CHOICES
+    businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+    wa_instances = core_models.WhatsAppInstance.objects.filter(is_active=True)
+    return render(request, 'workforce/auto_flow_add.html', {
+        'triggers': triggers,
+        'action_types': action_types,
+        'businesses': businesses,
+        'form_data': form_data,
+        'editing': True,
+        'flow': flow,
+        'wa_instances': wa_instances,
+    })
+
+
+@csrf_exempt
+@login_required(login_url='account_login')
+@superuser_required
+def auto_flow_toggle(request):
+    """Toggle an auto flow on/off via AJAX."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    flow_id = body.get('flow_id')
+    if not flow_id:
+        return JsonResponse({'success': False, 'error': 'Missing flow_id'}, status=400)
+    from core.models import AutoFlow
+    try:
+        flow = AutoFlow.objects.get(id=flow_id)
+        flow.is_enabled = not flow.is_enabled
+        flow.save(update_fields=['is_enabled', 'updated_at'])
+        return JsonResponse({'success': True, 'is_enabled': flow.is_enabled})
+    except AutoFlow.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Flow not found'}, status=404)
+
+
+@csrf_exempt
+@login_required(login_url='account_login')
+@superuser_required
+def auto_flow_delete(request):
+    """Delete an auto flow via AJAX."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    flow_id = body.get('flow_id')
+    if not flow_id:
+        return JsonResponse({'success': False, 'error': 'Missing flow_id'}, status=400)
+    from core.models import AutoFlow
+    try:
+        flow = AutoFlow.objects.get(id=flow_id)
+        flow.delete()
+        return JsonResponse({'success': True})
+    except AutoFlow.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Flow not found'}, status=404)
+
+
+@csrf_exempt
+@login_required(login_url='account_login')
+@superuser_required
+def auto_flow_test(request):
+    """Test-run an auto flow and log the result."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    import time
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    flow_id = body.get('flow_id')
+    if not flow_id:
+        return JsonResponse({'success': False, 'error': 'Missing flow_id'}, status=400)
+
+    from core.models import AutoFlow, AutoFlowLog
+    try:
+        flow = AutoFlow.objects.select_related('trigger').get(id=flow_id)
+    except AutoFlow.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Flow not found'}, status=404)
+
+    import requests as http_requests
+
+    start = time.time()
+    test_data = {
+        'flow_name': flow.name,
+        'trigger': flow.trigger.label,
+        'trigger_key': flow.trigger.trigger_key,
+        'action_type': flow.action_type,
+        'action_config': flow.action_config,
+        'mode': 'test',
+    }
+
+    stages = []  # Track each stage: (stage_name, status, detail)
+    result_parts = []
+    error_msg = ''
+    failed_stage = ''
+    status = 'success'
+
+    try:
+        config = flow.action_config or {}
+
+        # Stage 1: Validate config
+        stages.append(('Config Validation', 'running', ''))
+        if flow.action_type == 'whatsapp_message':
+            recipient = config.get('recipient', 'customer')
+            template = config.get('message_template', '')
+            if not template:
+                raise ValueError("Message template is empty")
+
+            # Determine phone number
+            phone = None
+            if recipient == 'custom':
+                phone = config.get('custom_phone', '').strip()
+                if not phone:
+                    raise ValueError("Custom phone number is empty")
+            elif recipient == 'custom_group':
+                group_id = config.get('group_id', '').strip()
+                if not group_id:
+                    raise ValueError("Group ID is empty")
+
+            stages[-1] = ('Config Validation', 'ok', f"Action: WhatsApp | Recipient: {recipient}")
+
+            # Stage 2: Render message
+            stages.append(('Render Message', 'running', ''))
+            sample = template.replace('{customer_name}', 'Test Customer') \
+                             .replace('{order_number}', 'TEST-001') \
+                             .replace('{driver_name}', 'Test Driver') \
+                             .replace('{driver_phone}', '+974 0000 0000') \
+                             .replace('{cod_amount}', '150') \
+                             .replace('{customer_address}', 'Zone 45, Street 100, Building 5') \
+                             .replace('{customer_phone}', '+974 1234 5678') \
+                             .replace('{task_number}', 'DL-TEST-001') \
+                             .replace('{task_status}', 'assigned') \
+                             .replace('{business_name}', 'Test Business') \
+                             .replace('{delivery_date}', '2026-03-18') \
+                             .replace('{zone}', 'Zone 45')
+            stages[-1] = ('Render Message', 'ok', f"Message: {sample[:80]}{'...' if len(sample) > 80 else ''}")
+
+            # Stage 3: Check Evolution API config
+            stages.append(('Evolution API Config', 'running', ''))
+            from django.conf import settings as django_settings
+            evo_url = getattr(django_settings, 'EVALUATION_URL', '') or os.environ.get('EVALUATION_URL', '')
+            evo_key = getattr(django_settings, 'EVALUATION_API_KEY', '') or os.environ.get('EVALUATION_API_KEY', '')
+            evo_instance = getattr(django_settings, 'EVALUATION_INSTANCE', '') or os.environ.get('EVALUATION_INSTANCE', '')
+
+            if not evo_url or not evo_key or not evo_instance:
+                raise ValueError(f"Evolution API not configured. URL={'set' if evo_url else 'missing'}, Key={'set' if evo_key else 'missing'}, Instance={'set' if evo_instance else 'missing'}")
+            evo_url = evo_url.rstrip('/')
+            stages[-1] = ('Evolution API Config', 'ok', f"Instance: {evo_instance} | URL: {evo_url}")
+
+            # Stage 4: Check instance connection
+            stages.append(('Instance Connection', 'running', ''))
+            try:
+                conn_resp = http_requests.get(
+                    f"{evo_url}/instance/connectionState/{evo_instance}",
+                    headers={'apikey': evo_key},
+                    timeout=10
+                )
+                conn_data = conn_resp.json()
+                conn_state = conn_data.get('instance', {}).get('state', 'unknown')
+                if conn_state != 'open':
+                    raise ValueError(f"Instance not connected (state: {conn_state})")
+                stages[-1] = ('Instance Connection', 'ok', f"State: {conn_state}")
+            except http_requests.RequestException as e:
+                raise ValueError(f"Cannot reach Evolution API: {e}")
+
+            # Stage 5: Send message
+            stages.append(('Send Message', 'running', ''))
+            if recipient == 'custom_group':
+                send_payload = {'number': config.get('group_id', ''), 'text': sample}
+            else:
+                send_phone = phone or '97400000000'  # fallback for non-custom recipients in test
+                send_payload = {'number': send_phone, 'text': sample}
+
+            try:
+                send_resp = http_requests.post(
+                    f"{evo_url}/message/sendText/{evo_instance}",
+                    headers={'apikey': evo_key, 'Content-Type': 'application/json'},
+                    json=send_payload,
+                    timeout=15
+                )
+                if send_resp.status_code in (200, 201):
+                    resp_data = send_resp.json()
+                    msg_id = resp_data.get('key', {}).get('id', 'N/A')
+                    msg_status = resp_data.get('status', 'N/A')
+                    stages[-1] = ('Send Message', 'ok', f"Sent! ID: {msg_id} | Status: {msg_status}")
+                else:
+                    resp_text = send_resp.text[:200]
+                    raise ValueError(f"API returned {send_resp.status_code}: {resp_text}")
+            except http_requests.RequestException as e:
+                raise ValueError(f"Send request failed: {e}")
+
+        elif flow.action_type == 'webhook_call':
+            url = config.get('webhook_url', '')
+            method = config.get('method', 'POST')
+            if not url:
+                raise ValueError("Webhook URL is empty")
+            stages[-1] = ('Config Validation', 'ok', f"Action: Webhook {method} | URL: {url}")
+
+            # Stage 2: Send webhook
+            stages.append(('Send Webhook', 'running', ''))
+            headers = {'Content-Type': 'application/json'}
+            if config.get('headers'):
+                try:
+                    extra_headers = json_lib.loads(config['headers'])
+                    headers.update(extra_headers)
+                except json_lib.JSONDecodeError:
+                    raise ValueError("Invalid JSON in custom headers")
+
+            payload = {'event': 'test', 'flow_id': flow.id, 'flow_name': flow.name, 'mode': 'test'}
+            try:
+                resp = http_requests.request(method, url, headers=headers, json=payload, timeout=15)
+                stages[-1] = ('Send Webhook', 'ok', f"Response: {resp.status_code} | Body: {resp.text[:100]}")
+            except http_requests.RequestException as e:
+                raise ValueError(f"Webhook request failed: {e}")
+
+        elif flow.action_type == 'update_order_status':
+            target = config.get('target_status', '')
+            if not target:
+                raise ValueError("Target status not set")
+            stages[-1] = ('Config Validation', 'ok', f"Action: Update Order Status → {target}")
+            stages.append(('Dry Run', 'ok', f"Would set order status to '{target}' (apply to: {config.get('apply_to', 'current_order')})"))
+
+        elif flow.action_type == 'update_task_status':
+            target = config.get('target_status', '')
+            if not target:
+                raise ValueError("Target status not set")
+            stages[-1] = ('Config Validation', 'ok', f"Action: Update Task Status → {target}")
+            stages.append(('Dry Run', 'ok', f"Would set task status to '{target}'"))
+            if config.get('status_note'):
+                stages.append(('Status Note', 'ok', config['status_note']))
+
+        elif flow.action_type == 'send_notification':
+            stages[-1] = ('Config Validation', 'ok', f"Action: Notification to {config.get('recipient', 'driver')}")
+            stages.append(('Dry Run', 'ok', f"Title: {config.get('notification_title', 'N/A')} | Type: {config.get('notification_type', 'info')}"))
+
+        elif flow.action_type == 'assign_driver':
+            stages[-1] = ('Config Validation', 'ok', f"Action: Assign Driver ({config.get('method', 'auto_nearest')})")
+            stages.append(('Dry Run', 'ok', f"Method: {config.get('method', 'auto_nearest')} | Notify: {config.get('notify_driver', True)}"))
+
+        elif flow.action_type == 'create_task':
+            stages[-1] = ('Config Validation', 'ok', f"Action: Create Task ({config.get('task_type', 'standard')})")
+            stages.append(('Dry Run', 'ok', f"Type: {config.get('task_type', 'standard')} | Status: {config.get('initial_status', 'for_review')} | Auto-publish: {config.get('auto_publish', False)}"))
+
+        else:
+            stages[-1] = ('Config Validation', 'ok', f"Action: {flow.action_type}")
+            stages.append(('Dry Run', 'ok', 'No live execution for this action type'))
+
+        # Stage: Trigger conditions check
+        trigger_conds = config.get('trigger_conditions', {})
+        if trigger_conds:
+            stages.append(('Trigger Conditions', 'ok', json_lib.dumps(trigger_conds, indent=2)))
+
+    except Exception as e:
+        status = 'failed'
+        error_msg = str(e)
+        # Mark the current running stage as failed
+        if stages and stages[-1][1] == 'running':
+            failed_stage = stages[-1][0]
+            stages[-1] = (stages[-1][0], 'failed', str(e))
+        else:
+            failed_stage = 'Unknown'
+            stages.append(('Error', 'failed', str(e)))
+
+    duration = int((time.time() - start) * 1000)
+
+    # Build result text with stages
+    for stage_name, stage_status, stage_detail in stages:
+        if stage_status == 'ok':
+            icon = '[OK]'
+        elif stage_status == 'failed':
+            icon = '[FAILED]'
+        else:
+            icon = '[...]'
+        result_parts.append(f"{icon} {stage_name}: {stage_detail}")
+
+    if status == 'failed' and failed_stage:
+        error_msg = f"[Stage: {failed_stage}] {error_msg}"
+
+    AutoFlowLog.objects.create(
+        flow=flow,
+        status=status,
+        trigger_data=test_data,
+        result='\n'.join(result_parts),
+        error=error_msg,
+        duration_ms=duration,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'status': status,
+        'result': '\n'.join(result_parts),
+        'duration_ms': duration,
+        'error': error_msg if status == 'failed' else '',
+    })
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def auto_flow_logs(request, flow_id):
+    """View logs for a specific flow."""
+    from core.models import AutoFlow, AutoFlowLog
+    try:
+        flow = AutoFlow.objects.select_related('trigger').get(id=flow_id)
+    except AutoFlow.DoesNotExist:
+        from django.http import Http404
+        raise Http404
+    logs = AutoFlowLog.objects.filter(flow=flow)[:50]
+    all_logs = AutoFlowLog.objects.filter(flow=flow)
+    stats = {
+        'total': all_logs.count(),
+        'success': all_logs.filter(status='success').count(),
+        'failed': all_logs.filter(status='failed').count(),
+        'test': all_logs.filter(status='test').count(),
+    }
+    return render(request, 'workforce/auto_flow_logs.html', {'flow': flow, 'logs': logs, 'stats': stats})
+
+
+@csrf_exempt
+@login_required(login_url='account_login')
+@superuser_required
+def auto_trigger_update(request):
+    """Update an auto trigger's label and description via AJAX."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    trigger_key = body.get('trigger_key', '')
+    if not trigger_key:
+        return JsonResponse({'success': False, 'error': 'Missing trigger_key'}, status=400)
+
+    from core.models import AutoTriggerConfig
+    try:
+        trigger = AutoTriggerConfig.objects.get(trigger_key=trigger_key)
+        label = body.get('label', '').strip()
+        description = body.get('description', '').strip()
+        action = body.get('action', '').strip()
+        if label:
+            trigger.label = label
+        if description:
+            trigger.description = description
+        trigger.action = action
+        trigger.save(update_fields=['label', 'description', 'action', 'updated_at'])
+        return JsonResponse({
+            'success': True,
+            'trigger_key': trigger.trigger_key,
+            'label': trigger.label,
+            'description': trigger.description,
+            'action': trigger.action,
+        })
+    except AutoTriggerConfig.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Trigger not found'}, status=404)
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def whatsapp_instances_list(request):
+    """List, add, edit, delete WhatsApp instances."""
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        instance_id = request.POST.get('instance_id', '')
+
+        if action == 'add':
+            core_models.WhatsAppInstance.objects.create(
+                label=request.POST.get('label', '').strip(),
+                instance_name=request.POST.get('instance_name', '').strip(),
+                phone_number=request.POST.get('phone_number', '').strip(),
+                is_default=bool(request.POST.get('is_default')),
+                is_active=True,
+            )
+        elif action == 'edit' and instance_id:
+            try:
+                inst = core_models.WhatsAppInstance.objects.get(id=instance_id)
+                inst.label = request.POST.get('label', '').strip()
+                inst.instance_name = request.POST.get('instance_name', '').strip()
+                inst.phone_number = request.POST.get('phone_number', '').strip()
+                inst.is_default = bool(request.POST.get('is_default'))
+                inst.is_active = bool(request.POST.get('is_active', True))
+                inst.save()
+            except core_models.WhatsAppInstance.DoesNotExist:
+                pass
+        elif action == 'delete' and instance_id:
+            core_models.WhatsAppInstance.objects.filter(id=instance_id).delete()
+
+        return redirect('workforce:whatsapp_instances_list')
+
+    instances = core_models.WhatsAppInstance.objects.all()
+    return render(request, 'workforce/whatsapp_instances_list.html', {
+        'instances': instances,
+    })

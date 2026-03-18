@@ -266,3 +266,124 @@ class WhatsAppVerification(models.Model):
 
     def can_attempt(self):
         return self.attempts < self.max_attempts and not self.is_expired()
+
+
+class AutoTriggerConfig(models.Model):
+    """Configuration for automatic triggers (WhatsApp, webhooks, system actions)."""
+
+    CATEGORY_CHOICES = [
+        ('whatsapp', 'WhatsApp Notification'),
+        ('webhook', 'Webhook Event'),
+        ('system', 'System Auto-Action'),
+    ]
+
+    trigger_key = models.CharField(max_length=100, unique=True)
+    label = models.CharField(max_length=200)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    is_enabled = models.BooleanField(default=True)
+    description = models.TextField(blank=True, default='')
+    action = models.CharField(max_length=255, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'trigger_key']
+        verbose_name = 'Auto Trigger Config'
+        verbose_name_plural = 'Auto Trigger Configs'
+
+    def __str__(self):
+        status = 'ON' if self.is_enabled else 'OFF'
+        return f"[{status}] {self.label}"
+
+    @classmethod
+    def is_trigger_enabled(cls, trigger_key):
+        """Check if a trigger is enabled. Returns True if no config exists (default on)."""
+        try:
+            return cls.objects.get(trigger_key=trigger_key).is_enabled
+        except cls.DoesNotExist:
+            return True
+
+
+class AutoFlow(models.Model):
+    """User-defined automation flow: connects a trigger event to an action."""
+
+    ACTION_TYPE_CHOICES = [
+        ('whatsapp_message', 'Send WhatsApp Message'),
+        ('webhook_call', 'Call Webhook URL'),
+        ('update_order_status', 'Update Order Status'),
+        ('update_task_status', 'Update Task Status'),
+        ('assign_driver', 'Assign Driver'),
+        ('send_notification', 'Send In-App Notification'),
+        ('create_task', 'Create Delivery Task'),
+    ]
+
+    name = models.CharField(max_length=200)
+    trigger = models.ForeignKey(
+        AutoTriggerConfig, on_delete=models.CASCADE, related_name='flows'
+    )
+    action_type = models.CharField(max_length=50, choices=ACTION_TYPE_CHOICES)
+    action_config = models.JSONField(
+        default=dict, blank=True,
+        help_text='Action parameters: message template, webhook URL, status value, etc.'
+    )
+    is_enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Auto Flow'
+        verbose_name_plural = 'Auto Flows'
+
+    def __str__(self):
+        status = 'ON' if self.is_enabled else 'OFF'
+        return f"[{status}] {self.name}"
+
+
+class AutoFlowLog(models.Model):
+    """Execution log for an AutoFlow run."""
+
+    STATUS_CHOICES = [
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+        ('test', 'Test'),
+    ]
+
+    flow = models.ForeignKey(AutoFlow, on_delete=models.CASCADE, related_name='logs')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    trigger_data = models.JSONField(default=dict, blank=True)
+    result = models.TextField(blank=True, default='')
+    error = models.TextField(blank=True, default='')
+    executed_at = models.DateTimeField(auto_now_add=True)
+    duration_ms = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-executed_at']
+        verbose_name = 'Auto Flow Log'
+
+    def __str__(self):
+        return f"[{self.status}] {self.flow.name} @ {self.executed_at}"
+
+
+class WhatsAppInstance(models.Model):
+    """WhatsApp Evolution API instance for sending messages from auto flows."""
+
+    label = models.CharField(max_length=100, help_text="Friendly name (e.g. Main, Support, Sales)")
+    instance_name = models.CharField(max_length=100, unique=True, help_text="Evolution API instance name")
+    phone_number = models.CharField(max_length=30, blank=True, default='', help_text="WhatsApp number (e.g. +974 XXXX XXXX)")
+    is_default = models.BooleanField(default=False, help_text="Use as default when no instance is specified")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-is_default', 'label']
+        verbose_name = 'WhatsApp Instance'
+        verbose_name_plural = 'WhatsApp Instances'
+
+    def __str__(self):
+        default = ' (default)' if self.is_default else ''
+        return f"{self.label} — {self.phone_number or self.instance_name}{default}"
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            WhatsAppInstance.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)

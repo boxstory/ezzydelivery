@@ -797,6 +797,8 @@
                     <i class="fa-solid fa-info-circle me-1"></i>
                     Current status: <strong>{{ task.get_dl_task_status_display }}</strong>
                 </div>
+                <div id="statusError" class="alert alert-danger d-none" style="font-size:0.8125rem;"></div>
+                <div id="statusSuccess" class="alert alert-success d-none" style="font-size:0.8125rem;"></div>
                 <div class="mb-3">
                     <label for="statusSelect" class="form-label fw-semibold" style="font-size:0.8125rem;">Select New Status</label>
                     <select class="form-select" id="statusSelect" style="font-size:0.8125rem;">
@@ -877,9 +879,27 @@
         .catch(error => { console.error('Error:', error); alert('An error occurred'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign'; });
     }
 
+    function showStatusError(msg) {
+        document.getElementById('statusSuccess').classList.add('d-none');
+        const el = document.getElementById('statusError');
+        el.textContent = msg;
+        el.classList.remove('d-none');
+    }
+    function showStatusSuccess(msg) {
+        document.getElementById('statusError').classList.add('d-none');
+        const el = document.getElementById('statusSuccess');
+        el.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i>' + msg;
+        el.classList.remove('d-none');
+    }
+    function hideStatusAlerts() {
+        document.getElementById('statusError').classList.add('d-none');
+        document.getElementById('statusSuccess').classList.add('d-none');
+    }
+
     function confirmUpdateStatus(taskId) {
+        hideStatusAlerts();
         const status = document.getElementById('statusSelect').value;
-        if (!status) { return; }
+        if (!status) { showStatusError('Please select a status'); return; }
         const btn = document.querySelector('#updateStatusModal .dtd__btn--primary');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
@@ -888,21 +908,29 @@
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
             body: JSON.stringify({ status: status })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().catch(() => ({ error: 'Server error (' + response.status + ')' }));
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
-                location.reload();
+                showStatusSuccess('Status updated successfully!');
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
+                    location.reload();
+                }, 3000);
             } else {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Update';
-                alert('Error: ' + (data.error || 'Failed to update status'));
+                showStatusError(data.error || 'Failed to update status');
             }
         })
         .catch(() => {
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-check"></i> Update';
-            alert('An error occurred');
+            showStatusError('Network error. Please try again.');
         });
     }
 
