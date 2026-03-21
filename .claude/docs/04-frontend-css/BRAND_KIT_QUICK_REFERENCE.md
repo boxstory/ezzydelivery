@@ -14,12 +14,17 @@ For complete documentation, see [BRAND_KIT_REFERENCE.md](BRAND_KIT_REFERENCE.md)
 --brand-primary-dark: #f4c20d      /* 🟡 Darker Yellow */
 ```
 
-### Modern Gradients
+### Brand Gradients (defined in brandkit.css)
 ```css
---brand-gradient-purple: linear-gradient(135deg, #667eea 0%, #764ba2 100%)  /* 💜 Purple */
---brand-gradient-green: linear-gradient(135deg, #10b981 0%, #059669 100%)   /* 💚 Green */
---brand-gradient-yellow-white: linear-gradient(135deg, #f7c000, #ffffff)    /* 🟡 Yellow */
+--brand-gradient-yellow-white: linear-gradient(135deg, var(--brand-primary), var(--brand-white))
+--brand-gradient-black-grey: linear-gradient(135deg, var(--brand-black), var(--brand-grey-700))
+--brand-gradient-black-navy: linear-gradient(135deg, var(--brand-black), var(--brand-navy-light))
+--brand-gradient-navy: linear-gradient(135deg, var(--brand-navy), var(--brand-navy-light))
+--brand-gradient-yellow-dark: linear-gradient(135deg, var(--brand-primary), var(--brand-grey-800))
+--brand-gradient-purple: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark))
 ```
+
+> ⚠️ `--brand-gradient-green` is **NOT** in brandkit.css. Use inline: `linear-gradient(135deg, #10b981 0%, #059669 100%)`
 
 ### Neutral Greys
 ```css
@@ -70,38 +75,39 @@ For complete documentation, see [BRAND_KIT_REFERENCE.md](BRAND_KIT_REFERENCE.md)
 --brand-shadow-sm: 0 1px 3px rgba(0,0,0,0.08)           /* Subtle */
 --brand-shadow-md: 0 4px 8px rgba(0,0,0,0.1)            /* Standard */
 --brand-shadow-lg: 0 10px 20px rgba(0,0,0,0.12)         /* Prominent */
-
-/* Special colored shadows */
---shadow-purple: 0 10px 40px rgba(102, 126, 234, 0.3)   /* Purple glow */
---shadow-green: 0 10px 40px rgba(16, 185, 129, 0.3)     /* Green glow */
+--brand-shadow-xl: 0 20px 40px rgba(0,0,0,0.15)         /* Deep */
 ```
+
+> ⚠️ `--shadow-purple`, `--shadow-green`, `--shadow-yellow` are **NOT** in brandkit.css. Use inline values if needed.
 
 ---
 
 ## 🔘 Button Classes
 
 ```html
-<!-- Primary gradient button -->
+<!-- Primary gradient button (exists in brandkit-components.css) -->
 <button class="btn-brand-primary">Submit</button>
 
-<!-- Secondary outline button -->
+<!-- Secondary button (exists in brandkit-components.css) -->
 <button class="btn-brand-secondary">Cancel</button>
 
-<!-- Outline button -->
-<button class="btn-brand-outline">Learn More</button>
+<!-- Success/Danger buttons -->
+<button class="btn-brand-success">Confirm</button>
+<button class="btn-brand-danger">Delete</button>
 ```
+
+> ⚠️ `btn-brand-outline` does **NOT** exist in brandkit.css — use Bootstrap's `btn btn-outline-*` instead.
 
 ---
 
 ## 🎴 Card Classes
 
 ```html
-<!-- Standard card -->
-<div class="card-brand">Content</div>
-
-<!-- Gradient card -->
-<div class="card-gradient">Featured content</div>
+<!-- Standard Bootstrap card (use Bootstrap .card class) -->
+<div class="card">Content</div>
 ```
+
+> ⚠️ `card-brand` and `card-gradient` do **NOT** exist in brandkit.css — use Bootstrap's `.card` as base.
 
 ---
 
@@ -122,18 +128,10 @@ For complete documentation, see [BRAND_KIT_REFERENCE.md](BRAND_KIT_REFERENCE.md)
 
 ## 📱 Common Patterns
 
-### Profile Header with Gradient
-```html
-<div class="profile-header-gradient">
-    <div class="glass-badge">
-        <i class="fas fa-check-circle"></i> Verified
-    </div>
-    <h3 style="color: var(--brand-white);">User Name</h3>
-</div>
-```
-
 ### Role Selection Card
 ```css
+/* Note: profile-header-gradient, glass-badge, role-card are NOT predefined classes.
+   Define them in your app's CSS file using brandkit variables: */
 .role-card {
     background: var(--brand-white);
     border: 3px solid var(--brand-grey-200);
@@ -143,9 +141,9 @@ For complete documentation, see [BRAND_KIT_REFERENCE.md](BRAND_KIT_REFERENCE.md)
 }
 
 .role-card:hover {
-    border-color: var(--gradient-purple-primary);
+    border-color: #667eea; /* no CSS variable for purple */
     transform: translateY(-10px);
-    box-shadow: var(--shadow-purple);
+    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
 }
 ```
 
@@ -177,10 +175,12 @@ Before committing styled code:
 
 ## 📂 File Locations
 
-- **Brand Kit CSS:** `static/webpages/css/brand-kit.css`
-- **Full Documentation:** `docs/BRAND_KIT_REFERENCE.md`
-- **CSS Architecture:** `docs/CSS_JS_ARCHITECTURE.md`
-- **Coding Standards:** `docs/CODING_STANDARDS.md`
+- **Brand Kit CSS:** `webpages/static/webpages/css/brandkit.css`
+- **Components CSS:** `webpages/static/webpages/css/brandkit-components.css`
+- **Overrides CSS:** `webpages/static/webpages/css/brandkit-overrides.css`
+- **Full Documentation:** `.claude/docs/04-frontend-css/BRAND_KIT_REFERENCE.md`
+- **CSS Architecture:** `.claude/docs/04-frontend-css/CSS_JS_ARCHITECTURE.md`
+- **Coding Standards:** `.claude/docs/03-architecture/CODING_STANDARDS.md`
 
 ---
 
@@ -190,16 +190,18 @@ Before committing styled code:
 /* ❌ DON'T hardcode colors */
 .element { background: #667eea; }
 
-/* ✅ DO use variables */
-.element { background: var(--gradient-purple-primary); }
+/* ✅ DO use brandkit variables where they exist */
+.element { background: var(--brand-gradient-purple); }
+/* or inline for non-brand gradients */
+.element { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 ```
 
 ```html
 <!-- ❌ DON'T use inline styles -->
 <div style="padding: 20px; background: white;">
 
-<!-- ✅ DO use classes -->
-<div class="card-brand">
+<!-- ✅ DO use Bootstrap + BEM classes -->
+<div class="card your-bem-class">
 ```
 
 ```css

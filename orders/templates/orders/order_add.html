@@ -769,9 +769,9 @@
 
     // COD options
     const codOptions = [
-      { value: 'no_cod', text: 'No COD' },
-      { value: 'pending', text: 'COD Pending' },
-      { value: 'online_paid', text: 'Paid Online to Seller' }
+      { value: 'online_paid', text: 'Online Paid' },
+      { value: 'unpaid', text: 'Unpaid' },
+      { value: 'partial_paid', text: 'Partial Paid' }
     ];
 
     // Create dropdown HTML
@@ -813,7 +813,7 @@
         <td><input type="text" name="orders[${rowCounter-1}][dl_street]" placeholder="Street" value="0"></td>
         <td><input type="text" name="orders[${rowCounter-1}][dl_building]" placeholder="Bldg" value="0"></td>
         <td><input type="text" name="orders[${rowCounter-1}][customer_address]" placeholder="Full address"></td>
-        <td>${createSelect('cod_status_by_client', codOptions, rowCounter-1, 'no_cod')}</td>
+        <td>${createSelect('cod_status_by_client', codOptions, rowCounter-1, 'unpaid')}</td>
         <td><input type="number" name="orders[${rowCounter-1}][cod_amount]" placeholder="0.00" min="0" step="0.01"></td>
         <td>${createPickupSelect(rowCounter-1)}</td>
         <td><input type="text" name="orders[${rowCounter-1}][order_notes]" placeholder="Notes"></td>
@@ -996,7 +996,7 @@
     const codStatusInput = document.getElementById('mobile_cod_status');
     codAmountInput.addEventListener('input', function() {
       const val = parseFloat(this.value) || 0;
-      codStatusInput.value = val > 0 ? 'include' : 'no_cod';
+      codStatusInput.value = val > 0 ? 'include' : 'online_paid';
     });
 
     // AI Extract button
@@ -1059,7 +1059,7 @@
 
           // Auto-set COD status
           const codVal = parseFloat(d.cod_amount) || 0;
-          codStatusInput.value = codVal > 0 ? 'include' : 'no_cod';
+          codStatusInput.value = codVal > 0 ? 'include' : 'online_paid';
 
           extractStatus.innerHTML = '<i class="fas fa-check-circle"></i> Extracted ' + filledCount + ' fields';
           extractStatus.className = 'pwa-ai-extract__status pwa-ai-extract__status--success';
@@ -1142,7 +1142,7 @@
           // Auto-set COD status if amount extracted
           if (d.cod_amount && parseFloat(d.cod_amount) > 0) {
             const codStatus = document.getElementById('id_cod_status_by_client');
-            if (codStatus && codStatus.value === 'no_cod') codStatus.value = 'pending';
+            if (codStatus && codStatus.value === 'online_paid') codStatus.value = 'unpaid';
           }
 
           status.innerHTML = '<i class="fas fa-check-circle me-1"></i> ' + filledCount + ' fields filled';

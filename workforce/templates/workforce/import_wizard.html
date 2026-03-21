@@ -270,7 +270,7 @@ const IWIZ_FIELDS = [
 function iwizAutoDetect(header) {
     const h = header.trim().toLowerCase();
     const map = {
-        'order': 'client_order_code', 'order id': 'client_order_code', 'order number': 'client_order_code', 'order #': 'client_order_code', 'ref': 'client_order_code', 'reference': 'client_order_code', 'no': 'client_order_code',
+        'order': 'client_order_code', 'order id': 'client_order_code', 'order_id': 'client_order_code', 'order number': 'client_order_code', 'order #': 'client_order_code', 'ref': 'client_order_code', 'reference': 'client_order_code', 'no': 'client_order_code',
         'order date': 'order_date', 'date': 'order_date', 'created': 'order_date', 'created at': 'order_date',
         'name': 'customer_name', 'customer name': 'customer_name', 'customer': 'customer_name', 'client name': 'customer_name', 'client': 'customer_name', 'first name': 'customer_name',
         'phone': 'customer_phone', 'mobile': 'customer_phone', 'phone number': 'customer_phone', 'contact': 'customer_phone', 'phone 1': 'customer_phone',
@@ -295,10 +295,10 @@ function iwizAutoDetect(header) {
         'internal notes': 'internal_notes', 'staff notes': 'internal_notes', 'notes by ezzy': 'internal_notes',
     };
     if (map[h]) return map[h];
-    // Numbered products
-    const pm = h.match(/^(product|item)\s*(\d+)$/);
+    // Numbered products: product_1, product 1, item_2, item 2, etc.
+    const pm = h.match(/^(product|item)[\s_]*(\d+)$/);
     if (pm && parseInt(pm[2]) <= 5) return 'product_' + pm[2];
-    const cm = h.match(/^(count|qty|quantity)\s*(\d+)$/);
+    const cm = h.match(/^(count|qty|quantity)[\s_]*(\d+)$/);
     if (cm && parseInt(cm[2]) <= 5) return 'count_' + cm[2];
     return '';
 }

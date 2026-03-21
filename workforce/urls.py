@@ -23,6 +23,7 @@ urlpatterns = [
     path('google-sheets/auth/', workforce_views.google_sheets_auth_start, name='google_sheets_auth_start'),
     path('google-sheets/auth/callback/', workforce_views.google_sheets_auth_callback, name='google_sheets_auth_callback'),
     path('sellers/<int:business_id>/', workforce_views.seller_detail, name='seller_detail'),
+    path('sellers/<int:business_id>/api-products/', workforce_views.seller_api_products, name='seller_api_products'),
     path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
 
     # Drivers section urls -------------------------------------------------------------------
@@ -61,6 +62,9 @@ urlpatterns = [
     path('orders/api-orders/sheet-headers/', workforce_views.wf_sheet_headers, name='wf_sheet_headers'),
     path('orders/api-orders/save-mapping/', workforce_views.wf_save_column_mapping, name='wf_save_column_mapping'),
     path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
+    # Webhook Imports
+    path('webhook-imports/', workforce_views.wf_webhook_imports, name='wf_webhook_imports'),
+    path('webhook-imports/generate-key/<int:business_id>/', workforce_views.wf_webhook_generate_key, name='wf_webhook_generate_key'),
     path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
     path('orders/fulfilled-clients/', workforce_views.fulfilled_clients_orders, name='wf_orders_fulfilled_clients'),

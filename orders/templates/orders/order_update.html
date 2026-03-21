@@ -706,6 +706,17 @@ document.addEventListener('DOMContentLoaded', function() {
   var codInputEl = document.getElementById('id_cod_amount');
   if (codInputEl) codInputEl.addEventListener('input', checkCodMatch);
 
+  // COD status change: online_paid → zero COD
+  var codStatusEl = document.getElementById('id_cod_status_by_client');
+  if (codStatusEl && codInputEl) {
+    codStatusEl.addEventListener('change', function() {
+      if (this.value === 'online_paid') {
+        codInputEl.value = 0;
+        checkCodMatch();
+      }
+    });
+  }
+
   attachDeleteHandlers();
   checkCodMatch();
 });

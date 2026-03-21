@@ -216,6 +216,27 @@ def business_dashboard(request):
             business_id=business.business_id
         ).select_related('user').order_by('-created_at')[:3]
 
+        # Weekly orders trend + chart counts — single aggregate query
+        from datetime import timedelta
+        week_start = today - timedelta(days=today.weekday())  # Monday
+        week_end = week_start + timedelta(days=6)
+
+        weekly_agg = all_orders.filter(
+            order_date__gte=week_start, order_date__lte=week_end
+        ).values('order_date').annotate(cnt=Count('id')).order_by('order_date')
+        weekly_map = {row['order_date']: row['cnt'] for row in weekly_agg}
+        weekly_orders_data = [weekly_map.get(week_start + timedelta(days=i), 0) for i in range(7)]
+
+        # Chart status counts — from existing aggregate where possible
+        in_transit_count = all_orders.filter(order_status='publish').count()
+        failed_count = delivery_tasks.filter(
+            dl_task_status__in=['failed', 'rejected', 'non_reachable']
+        ).count()
+        cancelled_count = all_orders.filter(order_status='cancelled').count()
+
+        # COD chart data
+        cod_pending = cod_amount_total - cod_collected
+
         # Check if user has multiple businesses (for business switcher)
         user_businesses = get_all_user_businesses(request.user)
         show_business_switcher = len(user_businesses) > 1
@@ -249,6 +270,12 @@ def business_dashboard(request):
             'user_businesses': user_businesses,
             # Permissions
             'is_business_owner': is_business_owner,
+            # Chart data
+            'weekly_orders_data': weekly_orders_data,
+            'in_transit_count': in_transit_count,
+            'failed_count': failed_count,
+            'cancelled_count': cancelled_count,
+            'cod_pending': cod_pending,
         }
         return render(request, 'business/business_dashboard.html', context)
     except business_models.Business.DoesNotExist:
@@ -1067,6 +1094,133 @@ def business_settings_api_test_result(request, business_id, api_id):
     }
     return render(request, 'business/parts/business_settings_api_test_result.html', context)
 
+
+# Shopify OAuth Flow -------------------------------------------------------
+import hashlib
+import hmac
+import secrets
+
+@login_required(login_url='/accounts/login/')
+@business_required
+def shopify_oauth_start(request, business_id, api_id):
+    """Initiate Shopify OAuth flow - redirects user to Shopify authorization page."""
+    user_business = get_cached_business(request)
+    if not user_business or user_business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+
+    api_settings = business_models.BusinessApiSettings.objects.filter(
+        business_id=business_id, id=api_id, api_type='shopify'
+    ).first()
+
+    if not api_settings:
+        messages.error(request, "Shopify API settings not found.")
+        return redirect('business:business_settings_api_list', business_id=business_id)
+
+    if not api_settings.api_key or not api_settings.site_api_url:
+        messages.error(request, "Client ID and Store URL are required for OAuth.")
+        return redirect('business:business_settings_api_list', business_id=business_id)
+
+    # Generate nonce for CSRF protection
+    nonce = secrets.token_hex(16)
+    request.session['shopify_oauth_nonce'] = nonce
+    request.session['shopify_oauth_api_id'] = api_id
+    request.session['shopify_oauth_business_id'] = business_id
+
+    shop_domain = api_settings.site_api_url.replace('https://', '').replace('http://', '').rstrip('/')
+    client_id = api_settings.api_key
+    scopes = 'read_orders,read_products,read_fulfillments,read_shipping'
+    redirect_uri = request.build_absolute_uri(reverse('business:shopify_oauth_callback'))
+
+    auth_url = (
+        f"https://{shop_domain}/admin/oauth/authorize"
+        f"?client_id={client_id}"
+        f"&scope={scopes}"
+        f"&redirect_uri={redirect_uri}"
+        f"&state={nonce}"
+    )
+
+    logger.info(f'Starting Shopify OAuth for business {business_id}, redirecting to {shop_domain}')
+    return redirect(auth_url)
+
+
+@login_required(login_url='/accounts/login/')
+@business_required
+def shopify_oauth_callback(request):
+    """Handle Shopify OAuth callback - exchange code for access token."""
+    code = request.GET.get('code')
+    state = request.GET.get('state')
+    shop = request.GET.get('shop', '')
+    hmac_param = request.GET.get('hmac', '')
+
+    # Validate state/nonce
+    saved_nonce = request.session.get('shopify_oauth_nonce')
+    api_id = request.session.get('shopify_oauth_api_id')
+    business_id = request.session.get('shopify_oauth_business_id')
+
+    if not saved_nonce or state != saved_nonce:
+        messages.error(request, "OAuth verification failed. Please try again.")
+        return redirect('business:business_dashboard')
+
+    if not code or not api_id or not business_id:
+        messages.error(request, "OAuth failed - missing authorization code.")
+        return redirect('business:business_dashboard')
+
+    # Get API settings
+    api_settings = business_models.BusinessApiSettings.objects.filter(
+        business_id=business_id, id=api_id, api_type='shopify'
+    ).first()
+
+    if not api_settings:
+        messages.error(request, "API settings not found.")
+        return redirect('business:business_dashboard')
+
+    # Verify HMAC if present
+    if hmac_param:
+        query_params = {k: v for k, v in request.GET.items() if k != 'hmac'}
+        sorted_params = '&'.join(f'{k}={v}' for k, v in sorted(query_params.items()))
+        computed_hmac = hmac.new(
+            api_settings.api_secret.encode('utf-8'),
+            sorted_params.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(computed_hmac, hmac_param):
+            messages.error(request, "OAuth HMAC verification failed.")
+            return redirect('business:business_settings_api_list', business_id=business_id)
+
+    # Exchange code for permanent access token
+    shop_domain = api_settings.site_api_url.replace('https://', '').replace('http://', '').rstrip('/')
+    token_url = f"https://{shop_domain}/admin/oauth/access_token"
+
+    try:
+        response = requests.post(token_url, json={
+            'client_id': api_settings.api_key,
+            'client_secret': api_settings.api_secret,
+            'code': code,
+        }, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        access_token = data.get('access_token')
+
+        if access_token:
+            api_settings.api_access_token = access_token
+            api_settings.is_verify_api = True
+            api_settings.save()
+            logger.info(f'Shopify OAuth successful for business {business_id} - token saved')
+            messages.success(request, f"Shopify connected successfully! Access token obtained.")
+        else:
+            messages.error(request, "No access token received from Shopify.")
+            logger.error(f'Shopify OAuth no token in response: {data}')
+
+    except requests.exceptions.RequestException as e:
+        messages.error(request, f"Failed to get access token: {str(e)}")
+        logger.exception(f'Shopify OAuth token exchange failed for business {business_id}')
+
+    # Clean up session
+    for key in ['shopify_oauth_nonce', 'shopify_oauth_api_id', 'shopify_oauth_business_id']:
+        request.session.pop(key, None)
+
+    return redirect('business:business_settings_api_list', business_id=business_id)
 
 
 #business_logo_update---------------------------------------------------------------------------------------------------------------------

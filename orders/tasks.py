@@ -665,16 +665,54 @@ def _fetch_shopify_orders(api_settings):
         result = []
         for o in orders:
             ship = getattr(o, 'shipping_address', None)
-            result.append({
+            # Build line items summary
+            line_items = getattr(o, 'line_items', []) or []
+            items_data = []
+            for li in line_items:
+                variant = getattr(li, 'variant_title', '') or ''
+                item_name = li.title or ''
+                if variant and variant.lower() != 'default title':
+                    item_name = f"{item_name} - {variant}"
+                items_data.append({
+                    'name': item_name,
+                    'qty': li.quantity,
+                    'price': li.price,
+                    'sku': getattr(li, 'sku', '') or '',
+                })
+            # Build product columns (product_1..5, count_1..5) for import wizard compatibility
+            # Get customer name from shipping address or customer object
+            customer_name = ''
+            if ship:
+                first = getattr(ship, 'first_name', '') or ''
+                last = getattr(ship, 'last_name', '') or ''
+                customer_name = f"{first} {last}".strip()
+            if not customer_name:
+                cust = getattr(o, 'customer', None)
+                if cust:
+                    first = getattr(cust, 'first_name', '') or ''
+                    last = getattr(cust, 'last_name', '') or ''
+                    customer_name = f"{first} {last}".strip()
+            row = {
                 'platform_id': str(o.id),
-                'name': o.name,
-                'customer': getattr(o, 'contact_email', '') or '',
+                'order_id': o.name,
+                'name': customer_name or (getattr(o, 'contact_email', '') or ''),
+                'customer': customer_name or (getattr(o, 'contact_email', '') or ''),
                 'phone': getattr(ship, 'phone', '') if ship else '',
                 'address': getattr(ship, 'address1', '') if ship else '',
                 'cod': o.total_price,
                 'date': o.created_at,
                 'source': 'shopify',
-            })
+                'line_items': items_data,
+            }
+            # Flatten first 5 items into product_N / count_N fields
+            for idx, item in enumerate(items_data[:5], 1):
+                row[f'product_{idx}'] = item['name']
+                row[f'count_{idx}'] = str(item['qty'])
+            # Combined description as fallback (Shopify has no native package_desc)
+            desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
+            row['package_desc'] = ', '.join(desc_parts)
+            row['package_qty'] = str(sum(it['qty'] for it in items_data))
+            result.append(row)
         return result
     finally:
         shopify.ShopifyResource.clear_session()
@@ -698,16 +736,36 @@ def _fetch_woocommerce_orders(api_settings):
         billing = o.get('billing', {})
         shipping = o.get('shipping', {})
         addr_parts = [shipping.get('address_1') or billing.get('address_1'), shipping.get('city') or billing.get('city')]
-        result.append({
+        # Build line items
+        items_data = []
+        for li in o.get('line_items', []):
+            items_data.append({
+                'name': li.get('name', ''),
+                'qty': li.get('quantity', 1),
+                'price': li.get('price', '0'),
+                'sku': li.get('sku', ''),
+            })
+        customer_name = f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip()
+        row = {
             'platform_id': str(o.get('id')),
-            'name': f"#{o.get('number')}",
-            'customer': f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip(),
+            'order_id': f"#{o.get('number')}",
+            'name': customer_name,
+            'customer': customer_name,
             'phone': billing.get('phone', ''),
             'address': ', '.join(filter(None, addr_parts)),
             'cod': o.get('total'),
             'date': o.get('date_created'),
             'source': 'woocommerce',
-        })
+            'line_items': items_data,
+        }
+        for idx, item in enumerate(items_data[:5], 1):
+            row[f'product_{idx}'] = item['name']
+            row[f'count_{idx}'] = str(item['qty'])
+        # Combined description as fallback (WooCommerce has no native package_desc)
+        desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
+        row['package_desc'] = ', '.join(desc_parts)
+        row['package_qty'] = str(sum(it['qty'] for it in items_data))
+        result.append(row)
     return result
 
 

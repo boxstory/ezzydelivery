@@ -636,17 +636,28 @@
       createAreaChart('weeklyOrdersChart', weeklyOrdersData, {
         colors: ['#f7c000'],
         height: 300,
+        xaxis: {
+          categories: weeklyOrdersData.categories,
+          labels: {
+            style: { fontSize: '11px', fontWeight: 600, colors: '#6c757d' }
+          },
+          axisBorder: { show: true, color: '#e5e7eb' },
+          axisTicks: { show: true, color: '#e5e7eb' }
+        },
         yaxis: {
-          title: { text: 'Number of Orders' }
+          min: 0,
+          tickAmount: 5,
+          forceNiceScale: true,
+          title: { text: 'Orders', style: { fontSize: '11px', color: '#9ca3af' } },
+          labels: {
+            style: { fontSize: '11px', colors: '#9ca3af' },
+            formatter: function(val) { return Math.floor(val); }
+          }
         },
         title: {
-          text: 'Last 7 Days',
+          text: 'This Week',
           align: 'left',
-          style: {
-            fontSize: '13px',
-            fontWeight: 500,
-            color: '#6c757d'
-          }
+          style: { fontSize: '12px', fontWeight: 600, color: '#6c757d' }
         },
         dataLabels: { enabled: false }
       });
@@ -837,7 +848,21 @@
     createAreaChart('mobileWeeklyOrdersChart', weeklyOrdersData, {
       colors: ['#f7c000'],
       height: 240,
-      yaxis: { show: false }, // Cleaner inside mobile cards
+      xaxis: {
+        categories: weeklyOrdersData.categories,
+        labels: { style: { fontSize: '9px', fontWeight: 600, colors: '#6c757d' } },
+        axisBorder: { show: false },
+        axisTicks: { show: false }
+      },
+      yaxis: {
+        min: 0,
+        tickAmount: 4,
+        forceNiceScale: true,
+        labels: {
+          style: { fontSize: '9px', colors: '#9ca3af' },
+          formatter: function(val) { return Math.floor(val); }
+        }
+      },
       title: { text: '' },
       dataLabels: { enabled: false },
       chart: { sparkline: { enabled: false } }

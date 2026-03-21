@@ -513,7 +513,9 @@ class UpdateOrderForm(forms.ModelForm):
                 business_id=business_id
             ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
-
-
-
- 
+    def clean(self):
+        cleaned = super().clean()
+        cod_status = cleaned.get('cod_status_by_client')
+        if cod_status == 'online_paid':
+            cleaned['cod_amount'] = 0
+        return cleaned

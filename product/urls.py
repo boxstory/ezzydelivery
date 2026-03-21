@@ -22,6 +22,11 @@ urlpatterns = [
     path('<int:product_id>/inline-update/',
          product_views.product_inline_update, name='product_inline_update'),
 
+    # API Product Import Wizard
+    path('api/wizard/', product_views.product_api_wizard, name='product_api_wizard'),
+    path('api/fetch/', product_views.product_api_fetch, name='product_api_fetch'),
+    path('api/import/', product_views.product_api_import, name='product_api_import'),
+
     # Product categories
     path('product_categories_list/', product_views.product_categories, name='product_categories'),
 

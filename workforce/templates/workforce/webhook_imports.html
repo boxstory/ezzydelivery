@@ -1,0 +1,189 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Webhook Imports — Staff Dashboard{% endblock %}
+
+{% block content %}
+<div class="woa">
+    <div class="woa__hero">
+        <div class="woa__hero-inner">
+            <h1 class="woa__hero-title"><i class="fa-solid fa-satellite-dish me-2"></i>Webhook Imports</h1>
+            <p class="woa__hero-subtitle">Receive orders via webhook POST for each business</p>
+        </div>
+    </div>
+
+    <!-- Webhook Keys per Business -->
+    <div class="card mb-4">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between">
+            <h5 class="mb-0"><i class="fa-solid fa-key me-2"></i>Webhook Keys</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Business</th>
+                            <th>Code</th>
+                            <th>Webhook URL</th>
+                            <th>Status</th>
+                            <th>Last Used</th>
+                            <th class="text-end">Received</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in biz_keys %}
+                        <tr>
+                            <td><strong>{{ item.business.business_name }}</strong></td>
+                            <td><code>{{ item.business.business_code }}</code></td>
+                            <td>
+                                {% if item.wk %}
+                                <div class="input-group input-group-sm" style="max-width:520px;">
+                                    <input type="text" class="form-control form-control-sm font-monospace"
+                                           value="{{ request.scheme }}://{{ request.get_host }}/api/webhooks/order/inbound/{{ item.wk.key }}/"
+                                           id="webhook_url_{{ item.business.business_id }}" readonly
+                                           style="font-size:0.72rem;">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button"
+                                            onclick="var v=document.getElementById('webhook_url_{{ item.business.business_id }}').value;navigator.clipboard.writeText(v);this.innerHTML='<i class=\'fa-solid fa-check\'></i>';setTimeout(()=>{this.innerHTML='<i class=\'fa-solid fa-copy\'></i>';},1500);"
+                                            title="Copy URL">
+                                        <i class="fa-solid fa-copy"></i>
+                                    </button>
+                                </div>
+                                {% else %}
+                                <span class="text-muted small">No key generated</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.wk %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">None</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">
+                                {% if item.wk and item.wk.last_used %}
+                                {{ item.wk.last_used|date:"d M H:i" }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if item.wk %}{{ item.wk.total_received }}{% else %}-{% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary"
+                                        onclick="generateKey({{ item.business.business_id }})">
+                                    <i class="fa-solid fa-key me-1"></i>
+                                    {% if item.wk %}Regenerate{% else %}Generate{% endif %}
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Webhook Logs -->
+    <div class="card">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between">
+            <h5 class="mb-0"><i class="fa-solid fa-list me-2"></i>Recent Webhook Logs</h5>
+            <span class="badge bg-primary">{{ logs|length }}</span>
+        </div>
+        <div class="card-body p-0">
+            {% if logs %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Business</th>
+                            <th>Time</th>
+                            <th>IP</th>
+                            <th>Status</th>
+                            <th class="text-end">Orders</th>
+                            <th>Raw JSON</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="text-muted small">{{ log.id }}</td>
+                            <td><strong>{{ log.business.business_name }}</strong></td>
+                            <td class="small">{{ log.created_at|date:"d M H:i:s" }}</td>
+                            <td class="small font-monospace">{{ log.ip_address|default:"-" }}</td>
+                            <td>
+                                {% if log.status == 'processed' %}
+                                <span class="badge bg-success">Processed</span>
+                                {% elif log.status == 'error' %}
+                                <span class="badge bg-danger">Error</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Received</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-semibold">{{ log.orders_created }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        onclick="toggleJson({{ log.id }})" title="View payload">
+                                    <i class="fa-solid fa-code me-1"></i> View
+                                </button>
+                            </td>
+                        </tr>
+                        <tr id="webhook_json_{{ log.id }}" style="display:none;">
+                            <td colspan="7" class="bg-dark p-0">
+                                <pre class="text-success p-3 mb-0" style="font-size:0.75rem;max-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-all;">{{ log.payload|pprint }}</pre>
+                                {% if log.error_message %}
+                                <div class="alert alert-danger m-2 small">{{ log.error_message }}</div>
+                                {% endif %}
+                                {% if log.headers %}
+                                <div class="px-3 pb-2">
+                                    <small class="text-white-50">Headers:</small>
+                                    <pre class="text-info mb-0" style="font-size:0.7rem;">{{ log.headers|pprint }}</pre>
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-4">
+                <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
+                No webhook calls received yet.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+function toggleJson(id) {
+    var row = document.getElementById('webhook_json_' + id);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function generateKey(businessId) {
+    if (!confirm('Generate/regenerate webhook key for this business?')) return;
+    fetch('/workforce/webhook-imports/generate-key/' + businessId + '/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Webhook URL:\n\n' + data.url + '\n\nCopied to clipboard.');
+            navigator.clipboard.writeText(data.url);
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown'));
+        }
+    })
+    .catch(e => alert('Network error: ' + e.message));
+}
+</script>
+{% endblock extra_js %}

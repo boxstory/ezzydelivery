@@ -1,7 +1,7 @@
 # EzzyDelivery Brand Kit Reference
 
-**Version:** 2.0
-**Last Updated:** 2025-11-20
+**Version:** 2.1
+**Last Updated:** 2026-03-21
 **Status:** ✅ Official Design System
 
 ---
@@ -12,7 +12,7 @@
 >
 > - ❌ **NEVER** create custom colors, gradients, or spacing values
 > - ❌ **NEVER** use inline styles or `<style>` tags in templates
-> - ✅ **ALWAYS** reference CSS variables from `brand-kit.css`
+> - ✅ **ALWAYS** reference CSS variables from `brandkit.css` (`webpages/static/webpages/css/brandkit.css`)
 > - ✅ **ALWAYS** use predefined components and classes
 > - ✅ **ALWAYS** follow the naming conventions defined here
 
@@ -75,23 +75,21 @@ This document is the **single source of truth** for all design decisions in the 
 - **800**: Headings, emphasis
 - **White/Black**: High contrast elements
 
-### Modern Gradient Colors (New)
+### Modern Gradient Colors
+
+> ⚠️ **Note:** `--gradient-purple-primary`, `--gradient-purple-secondary`, `--gradient-green-primary`, `--gradient-green-secondary` and `--brand-gradient-green` are **NOT defined** in `brandkit.css`. Use the gradient values directly or define locally.
 
 ```css
-/* Modern purple-to-violet gradient */
---gradient-purple-primary: #667eea;    /* Start color */
---gradient-purple-secondary: #764ba2;  /* End color */
---brand-gradient-purple: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+/* Purple gradient — use inline value, not a CSS variable */
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 
-/* Modern green success gradient */
---gradient-green-primary: #10b981;     /* Start color */
---gradient-green-secondary: #059669;   /* End color */
---brand-gradient-green: linear-gradient(135deg, #10b981 0%, #059669 100%);
+/* Green gradient — use inline value, not a CSS variable */
+background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 ```
 
 **Usage:**
-- **Purple Gradient**: Modern UI elements, profile sections, role selection
-- **Green Gradient**: Success states, active badges, verification
+- **Purple**: Modern UI elements, profile sections, role selection
+- **Green**: Success states, active badges, verification
 
 ### Status Colors
 
@@ -190,10 +188,11 @@ This document is the **single source of truth** for all design decisions in the 
 --brand-shadow-xl: 0 20px 40px rgba(0,0,0,0.15);         /* Deep - Overlays */
 --brand-shadow-2xl: 0 25px 50px rgba(0,0,0,0.2);         /* Maximum - Popups */
 
-/* Special shadows with color tint */
---shadow-purple: 0 10px 40px rgba(102, 126, 234, 0.3);   /* Purple glow */
---shadow-green: 0 10px 40px rgba(16, 185, 129, 0.3);     /* Green glow */
---shadow-yellow: 0 10px 40px rgba(247, 192, 0, 0.3);     /* Yellow glow */
+/* ⚠️ NOTE: --shadow-purple, --shadow-green, --shadow-yellow are NOT defined in brandkit.css
+   Use inline values directly if needed: */
+/* box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3); */ /* Purple glow */
+/* box-shadow: 0 10px 40px rgba(16, 185, 129, 0.3); */  /* Green glow */
+/* box-shadow: 0 10px 40px rgba(247, 192, 0, 0.3); */   /* Yellow glow */
 ```
 
 **Elevation Levels:**
@@ -346,7 +345,7 @@ border: 1px solid rgba(255, 255, 255, 0.3);
 
 .btn-brand-primary:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-purple);
+    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3); /* --shadow-purple not in brandkit.css, use inline */
 }
 ```
 
@@ -748,7 +747,7 @@ app_name/
 
 Before creating any new UI component, verify:
 
-- [ ] Uses CSS variables from brand-kit.css
+- [ ] Uses CSS variables from brandkit.css
 - [ ] No hardcoded colors or spacing
 - [ ] No inline styles or `<style>` tags
 - [ ] Follows naming conventions

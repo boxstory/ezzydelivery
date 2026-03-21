@@ -15,14 +15,14 @@
     <ul id="workforce_sidebar_menu_main" class="navbar-nav">
 
       <!-- Import Section -->
-      <li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard' %}active{% endif %}">
+      <li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports' %}active{% endif %}">
         <div id="workforce_sidebar_link_import" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-import" data-title="Import">
           <i class="fa-solid fa-file-import me-2"></i>
           <span>Import</span>
           {% if temp_orders_count %}<span class="badge ms-1" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;">{{ temp_orders_count }}</span>{% endif %}
           <i class="fa-solid fa-chevron-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard' %}show{% endif %}" id="submenu-import">
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports' %}show{% endif %}" id="submenu-import">
           <ul class="nav flex-column">
             <li class="nav-item {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}">
               <a id="workforce_sidebar_link_temp_orders" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}"
@@ -65,6 +65,13 @@
                  href="{% url 'workforce:import_history' %}">
                 <i class="fa-solid fa-clock-rotate-left me-2"></i>
                 Import History
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'wf_webhook_imports' %}active{% endif %}">
+              <a id="workforce_sidebar_link_webhook_imports" class="nav-link btn {% if request.resolver_match.url_name == 'wf_webhook_imports' %}active{% endif %}"
+                 href="{% url 'workforce:wf_webhook_imports' %}">
+                <i class="fa-solid fa-satellite-dish me-2"></i>
+                Webhook Imports
               </a>
             </li>
           </ul>
@@ -844,6 +851,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/onedrive-sources\//,                menu: 'submenu-import',       link: 'workforce_sidebar_link_onedrive'},
         {re: /^\/workforce\/import-wizard\//,                   menu: 'submenu-import',       link: 'workforce_sidebar_link_temp_orders'},
         {re: /^\/workforce\/import-history\//,                  menu: 'submenu-import',       link: 'workforce_sidebar_link_import_history'},
+        {re: /^\/workforce\/webhook-imports\//,                  menu: 'submenu-import',       link: 'workforce_sidebar_link_webhook_imports'},
         {re: /^\/workforce\/orders\/pending-verification\//,    menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},
         {re: /^\/workforce\/orders\/\d+/,                       menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},
         {re: /^\/workforce\/order\//,                           menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},

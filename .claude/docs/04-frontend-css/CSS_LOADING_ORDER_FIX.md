@@ -31,26 +31,26 @@ This document summarizes the CSS architecture improvements made to fix loading o
 
 **File**: `templates/includes/head.html` (Lines 54-95)
 
-**New Correct Order**:
-1. **brand-kit.css** - CSS variables & design tokens (FIRST!)
-2. **bootstrap-custom.min.css** - Bootstrap framework
-3. **brand-kit-overrides.css** - Override Bootstrap styles (1st layer)
-4. **Font Awesome** - Icon library
-5. **Google Fonts** - Typography placeholder
-6. **base.css** - Legacy utilities
-7. **Third-party plugins** - Select2, etc.
-8. **extra_css block** - App-specific CSS
-9. **brand-kit-overrides.css** - Final override layer (LAST!)
+**Actual Current Order** (verified in `templates/includes/head.html`):
+1. **brandkit.css** - CSS variables & design tokens (FIRST)
+2. **brandkit-components.css** - Brand components
+3. **bootstrap-custom.min.css** - Bootstrap framework
+4. **Font Awesome** - Icon library (solid, brands)
+5. **base.css, base-forms.css, mobile-app.css** - Base utilities
+6. **Third-party plugins** - Select2
+7. **brandkit-overrides.css** - Bootstrap overrides (LAST, loaded once)
+8. **extra_css block** - App-specific CSS (per-page)
 
-**Key Changes**:
-- Moved brand-kit.css from position #4 → #1 (CRITICAL)
-- Added brand-kit-overrides.css in two positions (#3 and #9)
+> ⚠️ **Correction:** Earlier versions of this doc described `brand-kit-overrides.css` loading **twice** (positions #3 and #9). The current implementation loads it **once**, at position #7 (after plugins, before app CSS). File is also named `brandkit-overrides.css` (no hyphen).
+
+**Key Changes applied**:
+- Moved brandkit.css from position #4 → #1 (CRITICAL)
 - Removed duplicate Select2 CSS link
-- Added comprehensive documentation comments
+- Added comprehensive documentation comments in head.html
 
 ### 2. **Cleaned brand-kit.css** ✅
 
-**File**: `webpages/static/webpages/css/brand-kit.css`
+**File**: `webpages/static/webpages/css/brandkit.css`
 
 **Before**: 1,189 lines
 **After**: 521 lines
@@ -78,7 +78,7 @@ body { ... }
 
 ### 3. **Leveraged Existing brand-kit-overrides.css** ✅
 
-**File**: `static/webpages/css/brand-kit-overrides.css`
+**File**: `webpages/static/webpages/css/brandkit-overrides.css`
 
 **Status**: File already exists (668 lines, 17KB)
 **Action**: Now properly loaded in head.html (twice for cascade)
@@ -176,19 +176,16 @@ The order in `templates/includes/head.html` is **CRITICAL** and marked with comm
 
 **Why this order matters**:
 
-1. **brand-kit.css FIRST** - Defines CSS variables like `--brand-primary`
-2. **Bootstrap SECOND** - Can now reference those variables
-3. **brand-kit-overrides.css THIRD** - Override Bootstrap defaults
+1. **brandkit.css FIRST** - Defines CSS variables like `--brand-primary`
+2. **brandkit-components.css SECOND** - Brand component styles
+3. **Bootstrap THIRD** - Can now reference those variables
 4. **Font Awesome, plugins** - Standard third-party assets
-5. **App CSS (extra_css)** - Page-specific styles
-6. **brand-kit-overrides.css LAST** - Final override layer (highest specificity)
+5. **brandkit-overrides.css** - Bootstrap overrides (loaded once, after plugins)
+6. **App CSS (extra_css)** - Page-specific styles LAST
 
-### Why brand-kit-overrides.css loads twice:
+### Why brandkit-overrides.css loads once (at the end):
 
-1. **After Bootstrap (#3)**: Override Bootstrap's default variable values
-2. **At the end (#9)**: Final override layer to ensure brand styles always win
-
-This is **intentional** and follows CSS specificity best practices.
+Loading after Bootstrap and app plugins is sufficient — last-write wins in the CSS cascade, so overrides placed after all other stylesheets have the highest specificity without needing to double-load.
 
 ---
 

@@ -52,13 +52,14 @@ TASK_STATUS_BY_STAFF = [
     ]
 
 COD_STATUS_BY_CLIENT = [
-        ('no_cod', 'No COD'),
+        ('online_paid', 'Online Paid'),
+        ('unpaid', 'Unpaid'),
+        ('partial_paid', 'Partial Paid'),
         ('pending', 'COD Pending'),
         ('collected', 'Collected by Driver'),
         ('received_by_company', 'Received by Company'),
         ('invoiced', 'Invoiced'),
         ('settled', 'Settled with Business'),
-        ('online_paid', 'Paid Online to Seller'),
         ('disputed', 'Disputed'),
     ]
 
@@ -642,6 +643,7 @@ class TempOrder(models.Model):
         ('shopify', 'Shopify'),
         ('woocommerce', 'WooCommerce'),
         ('public_link', 'Public Link'),
+        ('webhook', 'Webhook'),
     ]
 
     source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default='onedrive', db_index=True)

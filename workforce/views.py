@@ -2377,23 +2377,67 @@ def import_wizard_prepare(request):
             saved_mapping = first_temp.api_settings.column_mapping or {}
             headers = list(set(saved_mapping.values()))
 
-        # Convert raw_row lists to dicts using headers
+        # Convert raw_row to dicts using headers (list sources) or directly (dict sources like Shopify)
         raw_data = []
         for t in temps:
-            raw = t.raw_row if isinstance(t.raw_row, list) else []
-            row_dict = {}
-            for j, h in enumerate(headers):
-                if h and j < len(raw):
-                    row_dict[h] = str(raw[j]) if raw[j] is not None else ''
+            if isinstance(t.raw_row, dict):
+                # Shopify/API sources store raw_row as dict already
+                row_dict = {k: str(v) if v is not None else '' for k, v in t.raw_row.items()}
+                if not headers:
+                    headers = [k for k in t.raw_row.keys()]
+            elif isinstance(t.raw_row, list):
+                row_dict = {}
+                for j, h in enumerate(headers):
+                    if h and j < len(t.raw_row):
+                        row_dict[h] = str(t.raw_row[j]) if t.raw_row[j] is not None else ''
+            else:
+                row_dict = {}
             row_dict['__row_num__'] = t.row_num or t.id
             row_dict['__temp_id__'] = t.id
             raw_data.append(row_dict)
 
         import_log.raw_data = raw_data
         import_log.total_rows = len(raw_data)
+
+        # Auto-map for Shopify/WooCommerce dict-based temp orders
+        if not saved_mapping and raw_data and isinstance(first_temp.raw_row, dict):
+            source_type = first_temp.raw_row.get('source', '')
+            if source_type in ('shopify', 'woocommerce'):
+                saved_mapping = {
+                    'client_order_code': 'order_id',
+                    'customer_name': 'name',
+                    'customer_phone': 'phone',
+                    'customer_address': 'address',
+                    'cod_amount': 'cod',
+                    'package_desc': 'package_desc',
+                    'package_qty': 'package_qty',
+                }
+                # Map product/count fields — check ALL rows for max products
+                all_keys = set()
+                for row in raw_data:
+                    if isinstance(row, dict):
+                        all_keys.update(row.keys())
+                for i in range(1, 6):
+                    pk = f'product_{i}'
+                    ck = f'count_{i}'
+                    if pk in all_keys:
+                        saved_mapping[pk] = pk
+                    if ck in all_keys:
+                        saved_mapping[ck] = ck
+
         if saved_mapping:
             import_log.column_mapping = saved_mapping
-        meta['columns_order'] = [h for h in headers if h]
+
+        # Ensure columns_order includes all product/count fields from all rows
+        all_col_keys = set()
+        for row in raw_data:
+            if isinstance(row, dict):
+                all_col_keys.update(k for k in row.keys() if not k.startswith('__'))
+        col_list = [h for h in headers if h and not h.startswith('__')]
+        for k in sorted(all_col_keys):
+            if k not in col_list and not k.startswith('__'):
+                col_list.append(k)
+        meta['columns_order'] = col_list
         meta['temp_ids'] = temp_ids
         meta['needs_mapping'] = True
 
@@ -8304,6 +8348,14 @@ def seller_detail(request, business_id):
         business=business
     ).select_related('color', 'unit', 'product_category').order_by('item_sku')
 
+    # API products are loaded via HTMX endpoint (seller_api_products) to avoid blocking page load
+    api_products = []
+    api_products_error = ''
+    api_products_platform = ''
+    first_api = api_settings.first() if api_settings else None
+    if first_api and first_api.api_type in ('shopify', 'woocommerce'):
+        api_products_platform = first_api.api_type
+
     context = {
         'page_title': f'Seller: {business.business_name}',
         'business': business,
@@ -8321,6 +8373,9 @@ def seller_detail(request, business_id):
         'avg_orders_per_month': avg_orders_per_month,
         'documents': documents,
         'products_list': products_list,
+        'api_products': api_products,
+        'api_products_error': api_products_error,
+        'api_products_platform': api_products_platform,
         'now': timezone.now(),
         'completion_percentage': completion_percentage,
         'user_profile': user_profile,
@@ -8328,6 +8383,194 @@ def seller_detail(request, business_id):
     }
 
     return render(request, 'workforce/seller_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def seller_api_products(request, business_id):
+    """HTMX endpoint: fetch API products from Shopify/WooCommerce without blocking main page."""
+    import signal
+
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+    api_settings = business_models.BusinessApiSettings.objects.filter(business=business)
+    first_api = api_settings.first() if api_settings else None
+
+    api_products = []
+    api_products_error = ''
+    api_products_platform = ''
+
+    if not first_api or first_api.api_type not in ('shopify', 'woocommerce'):
+        return render(request, 'workforce/parts/seller_api_products_fragment.html', {
+            'api_products': [], 'api_products_error': 'No API configured',
+            'api_products_platform': '', 'business': business,
+        })
+
+    api_products_platform = first_api.api_type
+
+    # Timeout handler to prevent hanging workers
+    class ApiTimeout(Exception):
+        pass
+
+    def timeout_handler(signum, frame):
+        raise ApiTimeout("API request timed out after 10 seconds")
+
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(10)  # 10 second hard timeout
+
+    try:
+        if first_api.api_type == 'shopify':
+            import shopify
+            shop_name = (first_api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip().rstrip('/')
+            session = shopify.Session(shop_name, first_api.api_version or '2023-10', first_api.api_access_token)
+            shopify.ShopifyResource.activate_session(session)
+            try:
+                page_products = shopify.Product.find(limit=250)
+                for p in page_products:
+                    product_title = p.title or ''
+                    product_image = ''
+                    if hasattr(p, 'image') and p.image:
+                        product_image = getattr(p.image, 'src', '') or ''
+                    elif hasattr(p, 'images') and p.images:
+                        product_image = getattr(p.images[0], 'src', '') or ''
+                    vendor = getattr(p, 'vendor', '') or ''
+                    product_type = getattr(p, 'product_type', '') or ''
+
+                    variants = getattr(p, 'variants', []) or []
+                    if variants:
+                        for v in variants:
+                            variant_image = ''
+                            if getattr(v, 'image_id', None) and hasattr(p, 'images'):
+                                for img in (p.images or []):
+                                    if getattr(img, 'id', None) == v.image_id:
+                                        variant_image = getattr(img, 'src', '') or ''
+                                        break
+                            api_products.append({
+                                'platform_id': str(p.id),
+                                'variant_id': str(v.id),
+                                'title': product_title,
+                                'variant_title': getattr(v, 'title', '') or '',
+                                'sku': getattr(v, 'sku', '') or '',
+                                'barcode': getattr(v, 'barcode', '') or '',
+                                'price': getattr(v, 'price', '') or '',
+                                'compare_at_price': getattr(v, 'compare_at_price', '') or '',
+                                'inventory_qty': getattr(v, 'inventory_quantity', 0) or 0,
+                                'option1': getattr(v, 'option1', '') or '',
+                                'option2': getattr(v, 'option2', '') or '',
+                                'option3': getattr(v, 'option3', '') or '',
+                                'weight': getattr(v, 'weight', '') or '',
+                                'weight_unit': getattr(v, 'weight_unit', '') or '',
+                                'image': variant_image or product_image,
+                                'vendor': vendor,
+                                'product_type': product_type,
+                            })
+                    else:
+                        api_products.append({
+                            'platform_id': str(p.id),
+                            'variant_id': '',
+                            'title': product_title,
+                            'variant_title': '',
+                            'sku': '',
+                            'barcode': '',
+                            'price': '',
+                            'compare_at_price': '',
+                            'inventory_qty': 0,
+                            'option1': '',
+                            'option2': '',
+                            'option3': '',
+                            'weight': '',
+                            'weight_unit': '',
+                            'image': product_image,
+                            'vendor': vendor,
+                            'product_type': product_type,
+                        })
+            finally:
+                shopify.ShopifyResource.clear_session()
+
+        elif first_api.api_type == 'woocommerce':
+            from woocommerce import API as WooAPI
+            wcapi = WooAPI(
+                url=first_api.site_api_url or '',
+                consumer_key=first_api.api_key or '',
+                consumer_secret=first_api.api_secret or '',
+                version='wc/v3',
+                timeout=10,
+            )
+            r = wcapi.get('products', params={'per_page': 100, 'orderby': 'date', 'order': 'desc'})
+            if r.status_code != 200:
+                api_products_error = f'WooCommerce API error {r.status_code}'
+            else:
+                for p in r.json():
+                    product_title = p.get('name', '')
+                    product_image = ''
+                    images = p.get('images', [])
+                    if images:
+                        product_image = images[0].get('src', '')
+                    product_type = p.get('type', '')
+
+                    variations = p.get('variations', [])
+                    if p.get('type') == 'variable' and variations:
+                        for var_id in variations:
+                            vr = wcapi.get(f'products/{p["id"]}/variations/{var_id}')
+                            if vr.status_code == 200:
+                                v = vr.json()
+                                var_attrs = v.get('attributes', [])
+                                option1 = var_attrs[0].get('option', '') if len(var_attrs) > 0 else ''
+                                option2 = var_attrs[1].get('option', '') if len(var_attrs) > 1 else ''
+                                option3 = var_attrs[2].get('option', '') if len(var_attrs) > 2 else ''
+                                var_image = v.get('image', {}).get('src', '') if v.get('image') else ''
+                                api_products.append({
+                                    'platform_id': str(p['id']),
+                                    'variant_id': str(v['id']),
+                                    'title': product_title,
+                                    'variant_title': ' / '.join(a.get('option', '') for a in var_attrs),
+                                    'sku': v.get('sku', ''),
+                                    'barcode': '',
+                                    'price': v.get('price', ''),
+                                    'compare_at_price': v.get('regular_price', ''),
+                                    'inventory_qty': v.get('stock_quantity', 0) or 0,
+                                    'option1': option1,
+                                    'option2': option2,
+                                    'option3': option3,
+                                    'weight': v.get('weight', ''),
+                                    'weight_unit': '',
+                                    'image': var_image or product_image,
+                                    'vendor': '',
+                                    'product_type': product_type,
+                                })
+                    else:
+                        api_products.append({
+                            'platform_id': str(p['id']),
+                            'variant_id': '',
+                            'title': product_title,
+                            'variant_title': '',
+                            'sku': p.get('sku', ''),
+                            'barcode': '',
+                            'price': p.get('price', ''),
+                            'compare_at_price': p.get('regular_price', ''),
+                            'inventory_qty': p.get('stock_quantity', 0) or 0,
+                            'option1': '',
+                            'option2': '',
+                            'option3': '',
+                            'weight': p.get('weight', ''),
+                            'weight_unit': '',
+                            'image': product_image,
+                            'vendor': '',
+                            'product_type': product_type,
+                        })
+    except ApiTimeout:
+        api_products_error = 'API request timed out. Please try again.'
+    except Exception as e:
+        api_products_error = str(e)
+    finally:
+        signal.alarm(0)  # Cancel alarm
+        signal.signal(signal.SIGALRM, old_handler)
+
+    return render(request, 'workforce/parts/seller_api_products_fragment.html', {
+        'api_products': api_products,
+        'api_products_error': api_products_error,
+        'api_products_platform': api_products_platform,
+        'business': business,
+    })
 
 
 @login_required(login_url='/accounts/login/')
@@ -9593,8 +9836,11 @@ def order_edit(request, order_id):
             cod_status = request.POST.get('cod_status_by_client')
             if cod_status:
                 order.cod_status_by_client = cod_status
-            elif order.cod_amount > 0 and order.cod_status_by_client == 'no_cod':
-                order.cod_status_by_client = 'pending'
+                # If online_paid, force COD to zero
+                if cod_status == 'online_paid':
+                    order.cod_amount = 0
+            elif order.cod_amount > 0 and order.cod_status_by_client in ('online_paid', 'no_cod'):
+                order.cod_status_by_client = 'unpaid'
 
             # Delivery amount
             dl_amount = request.POST.get('dl_amount', '0')
@@ -13421,4 +13667,64 @@ def whatsapp_instances_list(request):
     instances = core_models.WhatsAppInstance.objects.all()
     return render(request, 'workforce/whatsapp_instances_list.html', {
         'instances': instances,
+    })
+
+
+# =============================================================================
+# WEBHOOK IMPORTS
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_webhook_imports(request):
+    """Staff dashboard page: view webhook import keys and logs with raw JSON."""
+    from ezzy_api.models import WebhookImportKey, WebhookImportLog
+
+    # Get all active businesses with their webhook keys
+    businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+
+    webhook_keys = WebhookImportKey.objects.select_related('business').all()
+    keys_by_biz = {wk.business_id: wk for wk in webhook_keys}
+
+    # Build list of (business, webhook_key_or_none) for template
+    biz_keys = []
+    for biz in businesses:
+        biz_keys.append({
+            'business': biz,
+            'wk': keys_by_biz.get(biz.business_id),
+        })
+
+    # Recent logs
+    logs = WebhookImportLog.objects.select_related('business', 'webhook_key').order_by('-created_at')[:100]
+
+    context = {
+        'biz_keys': biz_keys,
+        'logs': logs,
+    }
+    return render(request, 'workforce/webhook_imports.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_webhook_generate_key(request, business_id):
+    """Generate or regenerate a webhook import key for a business."""
+    from ezzy_api.models import WebhookImportKey
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+
+    wk, created = WebhookImportKey.objects.get_or_create(business=business)
+    if not created:
+        # Regenerate key
+        from django.utils.crypto import get_random_string
+        wk.key = get_random_string(40)
+        wk.save(update_fields=['key'])
+
+    return JsonResponse({
+        'success': True,
+        'key': wk.key,
+        'url': request.build_absolute_uri(f'/api/webhooks/order/inbound/{wk.key}/'),
+        'created': created,
     })

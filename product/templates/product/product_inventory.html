@@ -1,11 +1,12 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 
-{% block extra_head %}Inventory{% endblock extra_head %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260319d1">
+Inventory
+{% endblock extra_head %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}">
-{% endblock extra_css %}
+{% block extra_css %}{% endblock extra_css %}
 
 {% block content %}
 <div class="piv" id="product_inventory_container">
@@ -62,34 +63,34 @@
     </form>
   </div>
 
-  <!-- Inventory Table -->
   {% if page_obj.object_list %}
-  <div class="piv__table-wrap" id="product_inventory_section_table">
+
+  <!-- ── Desktop Table ── -->
+  <div class="piv__table-wrap d-none d-md-block" id="product_inventory_section_table">
     <table class="piv__table" id="product_inventory_table">
       <thead class="piv__thead">
         <tr>
-          <th class="piv__th piv__th--center piv__th--photo">Photo</th>
+          <th class="piv__th piv__th--center" style="width:3.5rem;"></th>
           <th class="piv__th">Product</th>
           <th class="piv__th">SKU</th>
           <th class="piv__th piv__th--center">Category</th>
-          <th class="piv__th piv__th--center">Price</th>
+          <th class="piv__th piv__th--right">Price</th>
           <th class="piv__th piv__th--center">Stock</th>
           <th class="piv__th piv__th--center">Status</th>
         </tr>
       </thead>
       <tbody id="product_inventory_tbody">
         {% for product in page_obj %}
+        {% with ws=product.warehouse_stock|default:0 %}
         <tr class="piv__row" id="product_inventory_row_{{ product.id }}">
-
-          <!-- Photo (clickable thumbnail) -->
-          <td class="piv__td piv__td--center piv__td--photo">
+          <td class="piv__td piv__td--center">
             {% if product.product_image %}
             <button type="button" class="piv__thumb-btn"
                     data-img="{{ product.product_image.url }}"
                     data-name="{{ product.item_name }}"
                     id="product_inventory_thumb_{{ product.id }}"
-                    title="View photo">
-              <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}" class="piv__thumb">
+                    title="View photo" aria-label="View {{ product.item_name }} photo">
+              <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}" class="piv__thumb" loading="lazy">
             </button>
             {% else %}
             <div class="piv__thumb piv__thumb--none" title="No image">
@@ -97,57 +98,92 @@
             </div>
             {% endif %}
           </td>
-
-          <!-- Product Info -->
           <td class="piv__td">
-            <div>
-              <div class="piv__product-name">{{ product.item_name }}</div>
-              {% if product.brand_name %}
-              <div class="piv__product-brand">{{ product.brand_name }}</div>
-              {% endif %}
-            </div>
+            <div class="piv__product-name">{{ product.item_name }}</div>
+            {% if product.brand_name %}<div class="piv__product-brand">{{ product.brand_name }}</div>{% endif %}
           </td>
-
-          <!-- SKU -->
-          <td class="piv__td">
-            <code class="piv__sku">{{ product.item_sku }}</code>
-          </td>
-
-          <!-- Category -->
+          <td class="piv__td"><code class="piv__sku">{{ product.item_sku|default:"—" }}</code></td>
           <td class="piv__td piv__td--center">
             {% if product.product_category %}
             <span class="piv__badge piv__badge--cat">{{ product.product_category.category_name }}</span>
-            {% else %}
-            <span class="piv__muted">—</span>
-            {% endif %}
+            {% else %}<span class="piv__muted">—</span>{% endif %}
           </td>
-
-          <!-- Price -->
-          <td class="piv__td piv__td--center">
-            <span class="piv__price">QAR {{ product.item_price }}</span>
+          <td class="piv__td piv__td--right">
+            <span class="piv__price">{{ product.item_price }} <small class="piv__price-currency">QAR</small></span>
           </td>
-
-          <!-- Stock -->
           <td class="piv__td piv__td--center">
-            <span class="piv__qty-display">{{ product.warehouse_stock|default:0 }}</span>
+            <span class="piv__stock-pill {% if ws <= 0 %}piv__stock-pill--out{% elif ws <= 5 %}piv__stock-pill--low{% else %}piv__stock-pill--ok{% endif %}">
+              {{ ws }}
+            </span>
           </td>
-
-          <!-- Status badge (based on warehouse stock) -->
           <td class="piv__td piv__td--center">
-            {% with ws=product.warehouse_stock|default:0 %}
             {% if ws <= 0 %}
-            <span class="piv__badge piv__badge--out">Out of Stock</span>
+            <span class="piv__badge piv__badge--out"><i class="fas fa-circle-xmark me-1"></i>Out</span>
             {% elif ws <= 5 %}
-            <span class="piv__badge piv__badge--low">Low Stock</span>
+            <span class="piv__badge piv__badge--low"><i class="fas fa-triangle-exclamation me-1"></i>Low</span>
             {% else %}
-            <span class="piv__badge piv__badge--ok">In Stock</span>
+            <span class="piv__badge piv__badge--ok"><i class="fas fa-circle-check me-1"></i>OK</span>
             {% endif %}
-            {% endwith %}
           </td>
         </tr>
+        {% endwith %}
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  <!-- ── Mobile Cards ── -->
+  <div class="piv__cards d-md-none" id="product_inventory_section_cards">
+    {% for product in page_obj %}
+    {% with ws=product.warehouse_stock|default:0 %}
+    <div class="piv__card {% if ws <= 0 %}piv__card--out{% elif ws <= 5 %}piv__card--low{% else %}piv__card--ok{% endif %}" id="product_inventory_card_{{ product.id }}">
+
+      <!-- Row 1: Image + Name + Stock circle -->
+      <div class="piv__card-row">
+        <div class="piv__card-img">
+          {% if product.product_image %}
+          <button type="button" class="piv__thumb-btn"
+                  data-img="{{ product.product_image.url }}"
+                  data-name="{{ product.item_name }}"
+                  aria-label="View photo">
+            <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}" class="piv__card-photo" loading="lazy">
+          </button>
+          {% else %}
+          <div class="piv__card-photo piv__card-photo--none">
+            <i class="fas fa-box"></i>
+          </div>
+          {% endif %}
+        </div>
+        <div class="piv__card-body">
+          <div class="piv__card-name">{{ product.item_name }}</div>
+          {% if product.brand_name %}<div class="piv__card-brand">{{ product.brand_name }}</div>{% endif %}
+        </div>
+        <div class="piv__card-stock-ring {% if ws <= 0 %}piv__card-stock-ring--out{% elif ws <= 5 %}piv__card-stock-ring--low{% else %}piv__card-stock-ring--ok{% endif %}">
+          <span class="piv__card-stock-val">{{ ws }}</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Meta chips + Price -->
+      <div class="piv__card-footer">
+        <div class="piv__card-chips">
+          {% if product.item_sku %}<code class="piv__sku">{{ product.item_sku }}</code>{% endif %}
+          {% if product.product_category %}
+          <span class="piv__badge piv__badge--cat">{{ product.product_category.category_name }}</span>
+          {% endif %}
+          {% if ws <= 0 %}
+          <span class="piv__badge piv__badge--out">Out of Stock</span>
+          {% elif ws <= 5 %}
+          <span class="piv__badge piv__badge--low">Low Stock</span>
+          {% endif %}
+        </div>
+        <div class="piv__card-price">
+          <span class="piv__card-price-val">{{ product.item_price }}</span>
+          <span class="piv__card-price-cur">QAR</span>
+        </div>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
   </div>
 
   <!-- Pagination -->
@@ -198,7 +234,7 @@
 <!-- Photo Modal -->
 <div class="piv__modal-overlay" id="product_inventory_photo_modal" style="display:none" role="dialog" aria-modal="true">
   <div class="piv__modal-box">
-    <button type="button" class="piv__modal-close" id="product_inventory_modal_close" title="Close">
+    <button type="button" class="piv__modal-close" id="product_inventory_modal_close" title="Close" aria-label="Close photo">
       <i class="fas fa-xmark"></i>
     </button>
     <div class="piv__modal-img-wrap">
@@ -212,7 +248,6 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Photo modal
     var modal    = document.getElementById('product_inventory_photo_modal');
     var modalImg = document.getElementById('product_inventory_modal_img');
     var caption  = document.getElementById('product_inventory_modal_caption');

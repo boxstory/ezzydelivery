@@ -75,7 +75,24 @@
       "Bash(printf '0 * * * * /home/ezzyadmin/ezdlproject/venvezzy/bin/python manage.py sync_temp_orders >> /tmp/sync_temp_orders.log 2>&1\\\\n')",
       "Bash(crontab /tmp/cron_temp)",
       "Bash(crontab -l)",
-      "Bash(/tmp/cron_temp:*)"
+      "Bash(/tmp/cron_temp:*)",
+      "WebFetch(domain:thesmartmiswak-qa.com)",
+      "Bash(mkdir -p /run/gunicorn)",
+      "Bash(gunicorn --workers 3 --max-requests 1000 --max-requests-jitter 50 --timeout 120 --graceful-timeout 30 --worker-tmp-dir /dev/shm --bind unix:/run/gunicorn/ezzy.sock ezzydelivery.wsgi:application --daemon --pid /tmp/gunicorn.pid)",
+      "Bash(/home/ezzyadmin/ezdlproject/venvezzy/bin/gunicorn --workers 3 --max-requests 1000 --max-requests-jitter 50 --timeout 120 --graceful-timeout 30 --worker-tmp-dir /dev/shm --bind unix:/run/gunicorn/ezzy.sock ezzydelivery.wsgi:application --daemon)",
+      "Bash(mkdir -p /tmp/gunicorn)",
+      "Bash(/home/ezzyadmin/ezdlproject/venvezzy/bin/gunicorn --workers 3 --max-requests 1000 --max-requests-jitter 50 --timeout 120 --graceful-timeout 30 --worker-tmp-dir /dev/shm --bind unix:/tmp/gunicorn/ezzy.sock ezzydelivery.wsgi:application --daemon)",
+      "Bash(systemctl start:*)",
+      "Bash(python manage.py shell -c \":*)",
+      "Bash(systemctl --user restart gunicornezzy)",
+      "Bash(systemctl --user start gunicornezzy)",
+      "Read(//etc/systemd/system/**)",
+      "Bash(systemctl cat:*)",
+      "Bash(top -bn1)",
+      "Bash(ps aux:*)",
+      "Bash(ps:*)",
+      "Bash(chmod:*)",
+      "Bash(dmesg --since '10 min ago')"
     ]
   }
 }

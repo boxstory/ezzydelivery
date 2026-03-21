@@ -1569,6 +1569,30 @@ def test_tiktokshop_connection(request):
 
 # ==================== HELPER FUNCTIONS ====================
 
+def _shopify_cod_status(shopify_order):
+    """Determine COD status from Shopify financial_status."""
+    fs = getattr(shopify_order, 'financial_status', '') or ''
+    if fs == 'pending':
+        return 'unpaid'
+    elif fs == 'partially_paid':
+        return 'partial_paid'
+    else:
+        return 'online_paid'
+
+
+def _shopify_cod_amount(shopify_order):
+    """Return COD amount in cents. Paid=0, Unpaid=full, Partial=balance."""
+    fs = getattr(shopify_order, 'financial_status', '') or ''
+    total = int(float(shopify_order.total_price) * 100)
+    if fs == 'pending':
+        return total
+    elif fs == 'partially_paid':
+        total_outstanding = float(getattr(shopify_order, 'total_outstanding', shopify_order.total_price))
+        return int(total_outstanding * 100)
+    else:
+        return 0
+
+
 def _create_order_from_shopify(shopify_order, business):
     """Helper function to create an Order from Shopify order data"""
     try:
@@ -1591,8 +1615,8 @@ def _create_order_from_shopify(shopify_order, business):
             customer_name=shipping_address.name if shipping_address else (customer.first_name + ' ' + customer.last_name if customer else ''),
             customer_phone=shipping_address.phone if shipping_address else '',
             customer_address=f"{shipping_address.address1 or ''} {shipping_address.city or ''} {shipping_address.province or ''}".strip() if shipping_address else '',
-            cod_amount=int(float(shopify_order.total_price) * 100) if shopify_order.financial_status == 'pending' else 0,
-            cod_status_by_client='pending' if shopify_order.financial_status == 'pending' else 'online_paid',
+            cod_amount=_shopify_cod_amount(shopify_order),
+            cod_status_by_client=_shopify_cod_status(shopify_order),
             order_status='to_review',
             order_date=datetime.strptime(shopify_order.created_at[:10], '%Y-%m-%d').date() if shopify_order.created_at else timezone.now().date()
         )
@@ -1600,6 +1624,32 @@ def _create_order_from_shopify(shopify_order, business):
         return order
     except Exception as e:
         raise Exception(f"Error creating order: {str(e)}")
+def _woo_cod_status(order_data):
+    """Determine COD status from WooCommerce order data."""
+    if order_data.get('payment_method') == 'cod':
+        if order_data.get('date_paid'):
+            return 'online_paid'
+        return 'unpaid'
+    elif order_data.get('status') == 'partially-paid':
+        return 'partial_paid'
+    else:
+        return 'online_paid'
+
+
+def _woo_cod_amount(order_data):
+    """Return COD amount in cents. Paid=0, Unpaid=full, Partial=balance."""
+    total = int(float(order_data.get('total', 0)) * 100)
+    if order_data.get('payment_method') == 'cod':
+        if order_data.get('date_paid'):
+            return 0
+        return total
+    elif order_data.get('status') == 'partially-paid':
+        balance = float(order_data.get('total_outstanding', order_data.get('total', 0)))
+        return int(balance * 100)
+    else:
+        return 0
+
+
 def _create_order_from_woocommerce(order_data, business):
     """Helper function to create an Order from WooCommerce order data"""
     try:
@@ -1622,8 +1672,8 @@ def _create_order_from_woocommerce(order_data, business):
             customer_name=f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip(),
             customer_phone=billing.get('phone', ''),
             customer_address=f"{shipping.get('address_1', '')} {shipping.get('city', '')} {shipping.get('state', '')}".strip(),
-            cod_amount=int(float(order_data.get('total', 0)) * 100) if order_data.get('payment_method') == 'cod' else 0,
-            cod_status_by_client='pending' if order_data.get('payment_method') == 'cod' else 'online_paid',
+            cod_amount=_woo_cod_amount(order_data),
+            cod_status_by_client=_woo_cod_status(order_data),
             order_status='to_review',
             order_date=datetime.strptime(order_data.get('date_created', '')[:10], '%Y-%m-%d').date() if order_data.get('date_created') else timezone.now().date()
         )
@@ -3395,3 +3445,186 @@ def qnas_get_location(request, zone_number, street_number, building_number=None)
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+# =============================================================================
+# INBOUND WEBHOOK — Receive orders via POST
+# =============================================================================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def webhook_inbound_order(request, webhook_key):
+    """
+    Public endpoint: receive order(s) via webhook POST.
+    URL: /api/webhooks/order/inbound/<webhook_key>/
+    Accepts single order dict or list of orders.
+    Stores as TempOrder(source_type='webhook') + WebhookImportLog.
+    """
+    import json as _json
+
+    try:
+        wk = ezzy_api_models.WebhookImportKey.objects.select_related('business').get(key=webhook_key)
+    except ezzy_api_models.WebhookImportKey.DoesNotExist:
+        return Response({'success': False, 'error': 'Invalid webhook key'}, status=404)
+
+    if not wk.is_active:
+        return Response({'success': False, 'error': 'Webhook key is disabled'}, status=403)
+
+    business = wk.business
+
+    # Get client IP
+    x_fwd = request.META.get('HTTP_X_FORWARDED_FOR')
+    ip = x_fwd.split(',')[0].strip() if x_fwd else request.META.get('REMOTE_ADDR')
+
+    # Save selected headers
+    hdr = {}
+    for k in ('HTTP_CONTENT_TYPE', 'HTTP_USER_AGENT', 'HTTP_X_SHOPIFY_SHOP_DOMAIN',
+              'HTTP_X_SHOPIFY_TOPIC', 'HTTP_X_WC_WEBHOOK_TOPIC', 'HTTP_X_WC_WEBHOOK_SOURCE'):
+        if request.META.get(k):
+            hdr[k] = request.META[k]
+
+    # Parse payload
+    payload = request.data
+    if isinstance(payload, list):
+        orders_list = payload
+    elif isinstance(payload, dict):
+        orders_list = [payload]
+    else:
+        return Response({'success': False, 'error': 'Invalid JSON payload'}, status=400)
+
+    # Create webhook log
+    log = ezzy_api_models.WebhookImportLog.objects.create(
+        webhook_key=wk,
+        business=business,
+        payload=payload,
+        ip_address=ip,
+        headers=hdr,
+    )
+
+    # Auto-map common field names to our standard fields
+    FIELD_MAP = {
+        # Order ID
+        'order_id': 'client_order_code', 'order_number': 'client_order_code',
+        'order_code': 'client_order_code', 'id': 'client_order_code',
+        'name': 'client_order_code', 'order': 'client_order_code',
+        # Customer
+        'customer_name': 'customer_name', 'customer': 'customer_name',
+        'client_name': 'customer_name', 'recipient': 'customer_name',
+        # Phone
+        'phone': 'customer_phone', 'customer_phone': 'customer_phone',
+        'mobile': 'customer_phone', 'contact': 'customer_phone',
+        # Address
+        'address': 'customer_address', 'customer_address': 'customer_address',
+        'delivery_address': 'customer_address', 'shipping_address': 'customer_address',
+        # COD
+        'cod': 'cod_amount', 'cod_amount': 'cod_amount', 'amount': 'cod_amount',
+        'total': 'cod_amount', 'total_price': 'cod_amount', 'price': 'cod_amount',
+        # Package
+        'package_desc': 'package_desc', 'description': 'package_desc',
+        'items': 'package_desc', 'product': 'package_desc',
+        'package_qty': 'package_qty', 'qty': 'package_qty', 'quantity': 'package_qty',
+        # Notes
+        'notes': 'seller_notes', 'note': 'seller_notes', 'seller_notes': 'seller_notes',
+    }
+
+    created_count = 0
+    for order_data in orders_list:
+        if not isinstance(order_data, dict):
+            continue
+
+        # Map fields — only scalar values (skip dicts/lists, handle them below)
+        mapped = {}
+        for src_key, val in order_data.items():
+            if isinstance(val, (dict, list)):
+                continue
+            db_field = FIELD_MAP.get(src_key.lower().strip())
+            if db_field and val is not None:
+                mapped[db_field] = str(val).strip()
+
+        # Handle nested customer object (Shopify-style)
+        cust = order_data.get('customer')
+        if isinstance(cust, dict):
+            if not mapped.get('customer_name'):
+                name = f"{cust.get('first_name', '')} {cust.get('last_name', '')}".strip()
+                if name:
+                    mapped['customer_name'] = name
+            if not mapped.get('customer_phone'):
+                mapped['customer_phone'] = cust.get('phone', '') or ''
+            # Also check default_address
+            da = cust.get('default_address')
+            if isinstance(da, dict):
+                if not mapped.get('customer_phone'):
+                    mapped['customer_phone'] = da.get('phone', '') or ''
+                if not mapped.get('customer_address'):
+                    mapped['customer_address'] = da.get('address1', '') or ''
+
+        # Handle nested shipping_address (Shopify-style)
+        sa = order_data.get('shipping_address')
+        if isinstance(sa, dict):
+            if not mapped.get('customer_address'):
+                mapped['customer_address'] = sa.get('address1', '') or ''
+            if not mapped.get('customer_name'):
+                name = f"{sa.get('first_name', '')} {sa.get('last_name', '')}".strip()
+                if name:
+                    mapped['customer_name'] = name
+            if not mapped.get('customer_phone'):
+                mapped['customer_phone'] = sa.get('phone', '') or ''
+
+        # Handle nested billing (WooCommerce-style)
+        billing = order_data.get('billing')
+        if isinstance(billing, dict):
+            if not mapped.get('customer_name'):
+                name = f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip()
+                if name:
+                    mapped['customer_name'] = name
+            if not mapped.get('customer_phone'):
+                mapped['customer_phone'] = billing.get('phone', '') or ''
+            if not mapped.get('customer_address'):
+                mapped['customer_address'] = billing.get('address_1', '') or ''
+
+        # Handle nested line_items
+        line_items = order_data.get('line_items', [])
+        if isinstance(line_items, list) and line_items:
+            for idx, li in enumerate(line_items[:5], 1):
+                if isinstance(li, dict):
+                    li_name = li.get('name') or li.get('title', '')
+                    li_qty = li.get('quantity') or li.get('qty', 1)
+                    mapped[f'product_{idx}'] = str(li_name)
+                    mapped[f'count_{idx}'] = str(li_qty)
+            if not mapped.get('package_desc'):
+                desc = ', '.join(
+                    f"{li.get('name') or li.get('title', '')} x{li.get('quantity') or li.get('qty', 1)}"
+                    for li in line_items if isinstance(li, dict)
+                )
+                mapped['package_desc'] = desc
+
+        # Create TempOrder
+        orders_models.TempOrder.objects.create(
+            business=business,
+            source_type='webhook',
+            platform_id=mapped.get('client_order_code', ''),
+            client_order_code=mapped.get('client_order_code', ''),
+            customer_name=mapped.get('customer_name', ''),
+            customer_phone=mapped.get('customer_phone', ''),
+            customer_address=mapped.get('customer_address', ''),
+            cod_amount=mapped.get('cod_amount', ''),
+            package_desc=mapped.get('package_desc', ''),
+            raw_row=order_data,
+            status='new',
+        )
+        created_count += 1
+
+    # Update log and key stats
+    log.orders_created = created_count
+    log.status = 'processed'
+    log.save(update_fields=['orders_created', 'status'])
+
+    wk.last_used = timezone.now()
+    wk.total_received = (wk.total_received or 0) + created_count
+    wk.save(update_fields=['last_used', 'total_received'])
+
+    return Response({
+        'success': True,
+        'message': f'{created_count} order(s) received',
+        'orders_created': created_count,
+    }, status=201)

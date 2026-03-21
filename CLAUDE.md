@@ -23,6 +23,22 @@ python manage.py collectstatic --noinput
 
 ---
 
+## ⚠️ Server Alert Handling
+
+The server is monitored by **ezzy-watchdog** (`/home/ezzyadmin/ezdlproject/ezzy-watchdog.sh`), a systemd timer that runs every 5 minutes. It checks health via the Gunicorn socket, attempts auto-recovery (restart gunicorn, then gunicorn+nginx), and sends WhatsApp alerts if recovery fails.
+
+When you receive a `🔴 EZZY SERVER ALERT` message, **do NOT panic or make changes blindly**. Follow this process:
+
+1. **Check if the site is actually down** by running: `curl -sI https://ezzydelivery.qa/ | head -5`
+2. **If HTTP 200** → the site is up. Analyze the error — common false alarms include:
+   - `DisallowedHost: Invalid HTTP_HOST header: 'localhost'` — this is bots/scanners hitting the server directly, NOT a real outage. No fix needed.
+   - Sporadic 5xx from bots with malformed requests
+3. **Only take action if the site is genuinely unreachable** (non-200 response or connection refused)
+4. **Check watchdog log** for context: `tail -50 /home/ezzyadmin/ezdlproject/ezzydelivery/logs/watchdog.log`
+5. **Check Django error log**: `tail -50 /home/ezzyadmin/ezdlproject/ezzydelivery/logs/error.log`
+
+---
+
 ## Project Overview
 
 EzzyDelivery is a Django-based multi-tenant delivery and logistics management platform for Qatar. It handles order management, driver fleet operations, COD (Cash on Delivery) tracking, and integrations with e-commerce platforms (Shopify, WooCommerce) and delivery management systems (ShipDay).
@@ -161,7 +177,7 @@ Always use `select_related()` for foreign keys and `prefetch_related()` for reve
 
 ### CSS/Styling
 
-All styling must use the Brand Kit variables from `static/webpages/css/brand-kit.css`:
+All styling must use the Brand Kit variables from `webpages/static/webpages/css/brandkit.css`:
 - Never use inline styles or `<style>` tags in templates
 - Use CSS variables: `var(--brand-primary)`, `var(--spacing-md)`, etc.
 - Link CSS files in `{% block extra_css %}`
@@ -213,8 +229,8 @@ Format: `{type}: {description}` where type is feat/fix/refactor/docs/style/perf/
 - **Settings**: `ezzydelivery/ezzydelivery/settings.py`
 - **URLs**: `ezzydelivery/ezzydelivery/urls.py`
 - **Requirements**: `ezzydelivery/requirements.txt`
-- **Brand Kit CSS**: `ezzydelivery/static/webpages/css/brand-kit.css`
-- **Documentation**: `ezzydelivery/docs/`
+- **Brand Kit CSS**: `ezzydelivery/webpages/static/webpages/css/brandkit.css` (+ `brandkit-components.css`, `brandkit-overrides.css`)
+- **Documentation**: `ezzydelivery/.claude/docs/`
 
 ## Claude Skills & Commands
 
