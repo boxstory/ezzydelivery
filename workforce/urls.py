@@ -239,6 +239,9 @@ urlpatterns = [
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
 
+    # Import Wizard
+    path('import-wizard/mapping-manager/', workforce_views.mapping_manager, name='mapping_manager'),
+
     # Import History & Temp Orders
     path('import-history/', workforce_views.import_history, name='import_history'),
     path('orders/temp/', workforce_views.temp_orders, name='temp_orders'),

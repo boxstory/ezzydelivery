@@ -924,7 +924,7 @@ const MAPPING_FIELDS = [
     // Notes
     { name: 'seller_notes', label: 'Seller Notes', group: 'Notes' },
     { name: 'internal_notes', label: 'Internal Notes', group: 'Notes' },
-    // Additional Products (Items 1-5)
+    // Additional Products (Items 1-10)
     { name: 'product_1', label: 'Product Item 1', group: 'Additional Products' },
     { name: 'count_1', label: 'Count 1', group: 'Additional Products' },
     { name: 'product_2', label: 'Product Item 2', group: 'Additional Products' },
@@ -935,6 +935,16 @@ const MAPPING_FIELDS = [
     { name: 'count_4', label: 'Count 4', group: 'Additional Products' },
     { name: 'product_5', label: 'Product Item 5', group: 'Additional Products' },
     { name: 'count_5', label: 'Count 5', group: 'Additional Products' },
+    { name: 'product_6', label: 'Product Item 6', group: 'Additional Products' },
+    { name: 'count_6', label: 'Count 6', group: 'Additional Products' },
+    { name: 'product_7', label: 'Product Item 7', group: 'Additional Products' },
+    { name: 'count_7', label: 'Count 7', group: 'Additional Products' },
+    { name: 'product_8', label: 'Product Item 8', group: 'Additional Products' },
+    { name: 'count_8', label: 'Count 8', group: 'Additional Products' },
+    { name: 'product_9', label: 'Product Item 9', group: 'Additional Products' },
+    { name: 'count_9', label: 'Count 9', group: 'Additional Products' },
+    { name: 'product_10', label: 'Product Item 10', group: 'Additional Products' },
+    { name: 'count_10', label: 'Count 10', group: 'Additional Products' },
 ];
 
 let _sheetHeaders = [];
@@ -1069,7 +1079,7 @@ function autoDetectField(header) {
         'delivery fee': 'dl_amount', 'shipping fee': 'dl_amount', 'delivery amount': 'dl_amount',
         'notes': 'seller_notes', 'seller notes': 'seller_notes', 'note': 'seller_notes', 'remarks': 'seller_notes', 'comment': 'seller_notes', 'comments': 'seller_notes',
         'internal notes': 'internal_notes', 'staff notes': 'internal_notes', 'notes by ezzy': 'internal_notes',
-        // Product items 1-5
+        // Product items 1-10
         'product 1': 'product_1', 'product:1': 'product_1', 'item 1': 'product_1', 'product1': 'product_1',
         'count 1': 'count_1', 'count:1': 'count_1', 'qty 1': 'count_1', 'count1': 'count_1',
         'product 2': 'product_2', 'product:2': 'product_2', 'item 2': 'product_2', 'product2': 'product_2',
@@ -1080,14 +1090,24 @@ function autoDetectField(header) {
         'count 4': 'count_4', 'count:4': 'count_4', 'qty 4': 'count_4', 'count4': 'count_4',
         'product 5': 'product_5', 'product:5': 'product_5', 'item 5': 'product_5', 'product5': 'product_5',
         'count 5': 'count_5', 'count:5': 'count_5', 'qty 5': 'count_5', 'count5': 'count_5',
+        'product 6': 'product_6', 'product:6': 'product_6', 'item 6': 'product_6', 'product6': 'product_6',
+        'count 6': 'count_6', 'count:6': 'count_6', 'qty 6': 'count_6', 'count6': 'count_6',
+        'product 7': 'product_7', 'product:7': 'product_7', 'item 7': 'product_7', 'product7': 'product_7',
+        'count 7': 'count_7', 'count:7': 'count_7', 'qty 7': 'count_7', 'count7': 'count_7',
+        'product 8': 'product_8', 'product:8': 'product_8', 'item 8': 'product_8', 'product8': 'product_8',
+        'count 8': 'count_8', 'count:8': 'count_8', 'qty 8': 'count_8', 'count8': 'count_8',
+        'product 9': 'product_9', 'product:9': 'product_9', 'item 9': 'product_9', 'product9': 'product_9',
+        'count 9': 'count_9', 'count:9': 'count_9', 'qty 9': 'count_9', 'count9': 'count_9',
+        'product 10': 'product_10', 'product:10': 'product_10', 'item 10': 'product_10', 'product10': 'product_10',
+        'count 10': 'count_10', 'count:10': 'count_10', 'qty 10': 'count_10', 'count10': 'count_10',
     };
     if (map[h]) return map[h];
 
-    // Fuzzy: numbered product/count columns
+    // Fuzzy: numbered product/count columns (up to 10)
     const prodMatch = h.match(/^(product|item)\s*(\d+)$/);
-    if (prodMatch && parseInt(prodMatch[2]) <= 5) return 'product_' + prodMatch[2];
+    if (prodMatch && parseInt(prodMatch[2]) <= 10) return 'product_' + prodMatch[2];
     const countMatch = h.match(/^(count|qty|quantity)\s*(\d+)$/);
-    if (countMatch && parseInt(countMatch[2]) <= 5) return 'count_' + countMatch[2];
+    if (countMatch && parseInt(countMatch[2]) <= 10) return 'count_' + countMatch[2];
 
     return '';
 }

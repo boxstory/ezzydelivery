@@ -21,7 +21,7 @@
           <span>Orders</span>
           <i class="fa-solid fa-chevron-down ms-auto wf-sidebar__icon--rotate"></i>
         </a>
-        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,wf_api_orders,onedrive_sources,order_detail,order_edit,temp_orders,temp_orders_by_date' %}show{% endif %}" id="submenu-orders">
+        <div class="collapse wf-sidebar__submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,wf_api_orders,onedrive_sources,export_orders_csv,order_detail,order_edit,temp_orders,temp_orders_by_date' %}show{% endif %}" id="submenu-orders">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_wf_orders_add" class="nav-link btn wf-sidebar__submenu-link wf-sidebar__submenu-link--highlight {% if request.resolver_match.url_name == 'wf_orders_add' %}active{% endif %}"
@@ -42,6 +42,13 @@
                  href="{% url 'workforce:onedrive_sources' %}">
                 <i class="fa-solid fa-cloud-arrow-down me-2"></i>
                 OneDrive Import
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_menu_export" class="nav-link btn wf-sidebar__submenu-link {% if request.resolver_match.url_name == 'export_orders_csv' %}active{% endif %}"
+                 href="{% url 'workforce:export_orders_csv' %}">
+                <i class="fa-solid fa-file-export me-2"></i>
+                Export Orders
               </a>
             </li>
             <li class="nav-item">

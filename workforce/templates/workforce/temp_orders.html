@@ -195,7 +195,9 @@
             <tbody>
                 {% for row in temp_rows %}
                 <tr class="{% if row.status == 'imported' %}table-secondary{% elif row.status == 'skipped' %}table-light{% endif %}"
-                    data-temp-id="{{ row.id }}">
+                    data-temp-id="{{ row.id }}"
+                    data-biz-id="{{ row.business_id }}"
+                    data-biz-name="{{ row.business.business_name }}">
                     <td>
                         <input type="checkbox" class="form-check-input row-checkbox"
                                data-temp-id="{{ row.id }}"
@@ -1037,6 +1039,72 @@ async function deletePublicLink(sourceId) {
         if (data.success) { showToast('Source deleted', 'success'); document.getElementById('plMappingArea').innerHTML = ''; loadPublicLinkSources(); setTimeout(() => location.reload(), 1000); }
         else showToast(data.error, 'danger');
     } catch(e) { showToast('Error: ' + e.message, 'danger'); }
+}
+
+// ─── Business Group Headers with Show More ───
+(function initBizGroups() {
+    const ROWS_VISIBLE = 10;
+    const tbody = document.querySelector('table tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr[data-biz-id]'));
+    if (!rows.length) return;
+
+    // Group rows by business id, preserving order
+    const groups = []; // [{bizId, bizName, rows:[]}]
+    const seen = new Map();
+    rows.forEach(tr => {
+        const id = tr.dataset.bizId;
+        if (!seen.has(id)) {
+            seen.set(id, { bizId: id, bizName: tr.dataset.bizName, rows: [] });
+            groups.push(seen.get(id));
+        }
+        seen.get(id).rows.push(tr);
+    });
+
+    if (groups.length <= 1) return; // Only one business — no grouping needed
+
+    const COLS = tbody.closest('table').querySelectorAll('thead th').length;
+
+    groups.forEach(g => {
+        const firstRow = g.rows[0];
+        const total = g.rows.length;
+
+        // Insert group header before first row
+        const hdr = document.createElement('tr');
+        hdr.className = 'table-active biz-group-header';
+        hdr.innerHTML = `<td colspan="${COLS}" class="py-1 ps-2 small fw-semibold text-secondary">
+            <i class="fa-solid fa-building me-1 opacity-50"></i>${escHtml(g.bizName)}
+            <span class="badge bg-secondary ms-1" style="font-size:0.6rem;">${total}</span>
+        </td>`;
+        tbody.insertBefore(hdr, firstRow);
+
+        // Hide rows beyond ROWS_VISIBLE
+        if (total > ROWS_VISIBLE) {
+            g.rows.slice(ROWS_VISIBLE).forEach(tr => { tr.dataset.bizHidden = '1'; tr.style.display = 'none'; });
+
+            const more = total - ROWS_VISIBLE;
+            const showMoreRow = document.createElement('tr');
+            showMoreRow.className = 'biz-show-more-row';
+            showMoreRow.dataset.bizId = g.bizId;
+            showMoreRow.innerHTML = `<td colspan="${COLS}" class="py-1 text-center">
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-3" style="font-size:0.75rem;"
+                    onclick="showBizMoreRows(this,'${g.bizId}')">
+                    <i class="fa-solid fa-chevron-down me-1"></i>Show ${more} more rows
+                </button>
+            </td>`;
+            // Insert after last visible row (row at index ROWS_VISIBLE-1)
+            g.rows[ROWS_VISIBLE - 1].insertAdjacentElement('afterend', showMoreRow);
+        }
+    });
+})();
+
+function showBizMoreRows(btn, bizId) {
+    document.querySelectorAll(`tr[data-biz-id="${bizId}"][data-biz-hidden]`).forEach(tr => {
+        tr.style.display = '';
+        delete tr.dataset.bizHidden;
+    });
+    btn.closest('tr').remove();
 }
 </script>
 {% endblock content %}

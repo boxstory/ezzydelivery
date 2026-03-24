@@ -1458,7 +1458,7 @@ def preview_api_import(request):
 
             # Build product match preview for verify step
             idx_products_preview = {}
-            for i in range(1, 6):
+            for i in range(1, 11):
                 idx_products_preview[f'product_{i}'] = get_idx(f'product_{i}', f'product {i}', f'product:{i}', f'item {i}')
                 idx_products_preview[f'count_{i}'] = get_idx(f'count_{i}', f'count {i}', f'count:{i}', f'qty {i}')
             product_matches = []
@@ -1472,8 +1472,8 @@ def preview_api_import(request):
                     'matched_name': matched0.item_name if matched0 else None,
                     'match_type': mtype0,
                 })
-            # product_1..5 columns
-            for i in range(1, 6):
+            # product_1..10 columns
+            for i in range(1, 11):
                 pn = cell(row, idx_products_preview.get(f'product_{i}'))
                 if pn:
                     pqty = int(cell(row, idx_products_preview.get(f'count_{i}')) or 1) if idx_products_preview.get(f'count_{i}') is not None else 1
@@ -1819,7 +1819,7 @@ def import_api_orders(request):
             idx_internal_notes = get_idx('internal_notes', 'notes by ezzy', 'internal notes', 'staff notes')
             # Additional product columns
             idx_products = {}
-            for i in range(1, 6):
+            for i in range(1, 11):
                 idx_products[f'product_{i}'] = get_idx(f'product_{i}', f'product {i}', f'product:{i}', f'item {i}')
                 idx_products[f'count_{i}'] = get_idx(f'count_{i}', f'count {i}', f'count:{i}', f'qty {i}')
 
@@ -1965,10 +1965,10 @@ def import_api_orders(request):
                         order.package_description = label[:255]
                         order.package_qty = safe_int(cell(row, idx_qty)) or 1
                     else:
-                        # Build from product_1..5 columns
+                        # Build from product_1..10 columns
                         desc_parts = []
                         total_qty = 0
-                        for i in range(1, 6):
+                        for i in range(1, 11):
                             prod_name = cell(row, idx_products.get(f'product_{i}'))
                             prod_count = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
                             if prod_name:
@@ -1984,7 +1984,7 @@ def import_api_orders(request):
                     product_names = []
                     if product_desc:
                         product_names.append((product_desc, safe_int(cell(row, idx_qty)) or 1))
-                    for i in range(1, 6):
+                    for i in range(1, 11):
                         pn = cell(row, idx_products.get(f'product_{i}'))
                         if pn:
                             pc = safe_int(cell(row, idx_products.get(f'count_{i}'))) or 1
@@ -2049,6 +2049,42 @@ def import_api_orders(request):
         'created': created,
         'skipped': skipped,
         'errors': errors,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def mapping_manager(request):
+    """
+    Dedicated column mapping manager page for import wizard.
+    URL: /workforce/import-wizard/mapping-manager/?business=<business_id>
+    Shows a two-panel (both-side) interface: system fields ↔ sheet columns.
+    """
+    business_id = request.GET.get('business', '').strip()
+    business = None
+    api = None
+
+    if business_id:
+        try:
+            business = business_models.Business.objects.get(business_id=business_id)
+            api = business.business_settings_api.filter(
+                api_type='google_sheet', is_verify_api=True
+            ).first()
+        except business_models.Business.DoesNotExist:
+            pass
+
+    # All businesses with Google Sheet config for the selector
+    businesses_with_sheet = business_models.Business.objects.filter(
+        business_status='active',
+        business_settings_api__api_type='google_sheet',
+        business_settings_api__is_verify_api=True,
+    ).distinct().order_by('business_name')
+
+    return render(request, 'workforce/mapping_manager.html', {
+        'business': business,
+        'api': api,
+        'business_id': business_id,
+        'businesses_with_sheet': businesses_with_sheet,
     })
 
 
@@ -10364,25 +10400,24 @@ def temp_orders(request):
     if source_type_filter:
         qs = qs.filter(source_type=source_type_filter)
 
-    # Get the last 25 rows per source group (onedrive_source, api_settings, or public_link_source)
+    # Get the last N rows per source group (onedrive_source, api_settings, or public_link_source)
+    # When filtered by a specific business, show all rows (no cap); otherwise cap at 25 per source
+    row_cap = None if business_id else 25
     keep_ids = []
     od_source_ids = qs.filter(source_type='onedrive').values_list('onedrive_source_id', flat=True).distinct()
     for sid in od_source_ids:
-        ids = list(
-            qs.filter(onedrive_source_id=sid).order_by('-row_num').values_list('id', flat=True)[:25]
-        )
+        source_qs = qs.filter(onedrive_source_id=sid).order_by('-row_num').values_list('id', flat=True)
+        ids = list(source_qs[:row_cap] if row_cap else source_qs)
         keep_ids.extend(ids)
     api_groups = qs.filter(source_type__in=['google_sheet', 'shopify', 'woocommerce']).values_list('api_settings_id', 'source_type').distinct()
     for api_id, st in api_groups:
-        ids = list(
-            qs.filter(api_settings_id=api_id, source_type=st).order_by('-row_num').values_list('id', flat=True)[:25]
-        )
+        source_qs = qs.filter(api_settings_id=api_id, source_type=st).order_by('-row_num').values_list('id', flat=True)
+        ids = list(source_qs[:row_cap] if row_cap else source_qs)
         keep_ids.extend(ids)
     pl_source_ids = qs.filter(source_type='public_link').values_list('public_link_source_id', flat=True).distinct()
     for sid in pl_source_ids:
-        ids = list(
-            qs.filter(public_link_source_id=sid).order_by('-row_num').values_list('id', flat=True)[:25]
-        )
+        source_qs = qs.filter(public_link_source_id=sid).order_by('-row_num').values_list('id', flat=True)
+        ids = list(source_qs[:row_cap] if row_cap else source_qs)
         keep_ids.extend(ids)
 
     # Sort options
@@ -10627,7 +10662,9 @@ def temp_orders_preview(request):
         'dl_building', 'dl_street', 'dl_zone', 'location_link', 'dl_latitude',
         'dl_longitude', 'deadline_date', 'package_desc', 'package_qty',
         'cod_amount', 'product_1', 'count_1', 'product_2', 'count_2',
-        'product_3', 'count_3', 'seller_notes', 'internal_notes',
+        'product_3', 'count_3', 'product_4', 'count_4', 'product_5', 'count_5',
+        'product_6', 'count_6', 'product_7', 'count_7', 'product_8', 'count_8',
+        'product_9', 'count_9', 'product_10', 'count_10', 'seller_notes', 'internal_notes',
     ]
 
     # Fields stored directly on TempOrder model
@@ -11826,10 +11863,10 @@ def onedrive_import_trigger(request, source_id):
                     order.package_description = package_desc_val[:255]
                     order.package_qty = safe_int(get_val(row_data, 'package_qty')) or 1
                 else:
-                    # Build from product_1..5 columns
+                    # Build from product_1..10 columns
                     desc_parts = []
                     total_qty = 0
-                    for i in range(1, 6):
+                    for i in range(1, 11):
                         pn = get_val(row_data, f'product_{i}')
                         if pn:
                             pc = safe_int(get_val(row_data, f'count_{i}')) or 1
@@ -11846,7 +11883,7 @@ def onedrive_import_trigger(request, source_id):
                 product_names = []
                 if package_desc_val:
                     product_names.append((package_desc_val, safe_int(get_val(row_data, 'package_qty')) or 1))
-                for i in range(1, 6):
+                for i in range(1, 11):
                     pn = get_val(row_data, f'product_{i}')
                     if pn:
                         pc = safe_int(get_val(row_data, f'count_{i}')) or 1
