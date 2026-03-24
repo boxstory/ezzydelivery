@@ -84,7 +84,7 @@ class Order(models.Model):
     order_number = models.CharField(max_length=64, unique=True, db_index=True)  # INDEX: Unique, frequently searched
     business = models.ForeignKey(
         business_models.Business, on_delete=models.CASCADE, related_name='order', db_index=True)  # INDEX: Filtered in every order query
-    client_order_code = models.CharField(max_length=64, unique=True, db_index=True)  # INDEX: Searched by clients
+    client_order_code = models.CharField(max_length=64, db_index=True)  # INDEX: Searched by clients, unique per business
     order_notes = models.CharField(max_length=100, blank=True, null=True)
     package_description = models.CharField(max_length=255, blank=True, default='',
         help_text="Seller's package description e.g. 'Perfumes', 'Food items'")
@@ -140,6 +140,23 @@ class Order(models.Model):
     verified_at = models.DateTimeField(blank=True, null=True)
     verification_notes = models.TextField(blank=True, null=True)
     
+    # Source platform tracking
+    PLATFORM_CHOICES = [
+        ('manual', 'Manual'),
+        ('shopify', 'Shopify'),
+        ('woocommerce', 'WooCommerce'),
+        ('onedrive', 'OneDrive'),
+        ('google_sheet', 'Google Sheet'),
+        ('public_link', 'Public Link'),
+        ('csv', 'CSV Upload'),
+        ('api', 'API'),
+        ('other', 'Other'),
+    ]
+    platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES, blank=True, default='',
+        help_text="Source platform this order came from")
+    platform_id = models.CharField(max_length=128, blank=True, default='',
+        help_text="Original order ID on the source platform (e.g. Shopify order name '#1042')")
+
     # Original order data (proof/backup)
     original_order_data = models.JSONField(blank=True, null=True, help_text="Original order data as proof")
     order_source_text = models.TextField(blank=True, null=True, help_text="Raw pasted order text (WhatsApp/chat message) kept for reference")
@@ -296,6 +313,9 @@ class Order(models.Model):
             models.Index(fields=['client_order_code'], name='ord_client_code_idx'),
             models.Index(fields=['-created_at'], name='ord_created_idx'),
             models.Index(fields=['verification_status'], name='ord_verification_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['business', 'client_order_code'], name='ord_unique_client_code_per_business'),
         ]
 
 class OrderLog(models.Model):
@@ -678,6 +698,7 @@ class TempOrder(models.Model):
     cod_amount = models.CharField(max_length=50, blank=True, default='')
     order_date = models.CharField(max_length=50, blank=True, default='')
     package_desc = models.CharField(max_length=500, blank=True, default='')
+    financial_status = models.CharField(max_length=50, blank=True, default='', help_text="Payment status from source platform (e.g. Shopify: paid/pending/refunded)")
 
     # Raw row data for reference
     raw_row = models.JSONField(default=list, blank=True)
