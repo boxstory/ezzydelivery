@@ -63,7 +63,7 @@
                                         <a href="tel:{{ task.order.customer_phone }}" class="dtd__contact dtd__contact--phone">
                                             <i class="fa-solid fa-phone"></i> {{ task.order.customer_phone }}
                                         </a>
-                                        <a href="https://wa.me/{{ task.order.customer_phone }}" target="_blank" class="dtd__contact dtd__contact--whatsapp">
+                                        <a id="dtdWhatsAppBtn" href="#" target="_blank" class="dtd__contact dtd__contact--whatsapp" onclick="window.open(this.dataset.waUrl,'_blank');return false;">
                                             <i class="fa-brands fa-whatsapp"></i> WhatsApp
                                         </a>
                                     </div>
@@ -797,6 +797,8 @@
                     <i class="fa-solid fa-info-circle me-1"></i>
                     Current status: <strong>{{ task.get_dl_task_status_display }}</strong>
                 </div>
+                <div id="statusError" class="alert alert-danger d-none" style="font-size:0.8125rem;"></div>
+                <div id="statusSuccess" class="alert alert-success d-none" style="font-size:0.8125rem;"></div>
                 <div class="mb-3">
                     <label for="statusSelect" class="form-label fw-semibold" style="font-size:0.8125rem;">Select New Status</label>
                     <select class="form-select" id="statusSelect" style="font-size:0.8125rem;">
@@ -877,9 +879,27 @@
         .catch(error => { console.error('Error:', error); alert('An error occurred'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign'; });
     }
 
+    function showStatusError(msg) {
+        document.getElementById('statusSuccess').classList.add('d-none');
+        const el = document.getElementById('statusError');
+        el.textContent = msg;
+        el.classList.remove('d-none');
+    }
+    function showStatusSuccess(msg) {
+        document.getElementById('statusError').classList.add('d-none');
+        const el = document.getElementById('statusSuccess');
+        el.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i>' + msg;
+        el.classList.remove('d-none');
+    }
+    function hideStatusAlerts() {
+        document.getElementById('statusError').classList.add('d-none');
+        document.getElementById('statusSuccess').classList.add('d-none');
+    }
+
     function confirmUpdateStatus(taskId) {
+        hideStatusAlerts();
         const status = document.getElementById('statusSelect').value;
-        if (!status) { return; }
+        if (!status) { showStatusError('Please select a status'); return; }
         const btn = document.querySelector('#updateStatusModal .dtd__btn--primary');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
@@ -888,21 +908,29 @@
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
             body: JSON.stringify({ status: status })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().catch(() => ({ error: 'Server error (' + response.status + ')' }));
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
-                location.reload();
+                showStatusSuccess('Status updated successfully!');
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
+                    location.reload();
+                }, 3000);
             } else {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Update';
-                alert('Error: ' + (data.error || 'Failed to update status'));
+                showStatusError(data.error || 'Failed to update status');
             }
         })
         .catch(() => {
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-check"></i> Update';
-            alert('An error occurred');
+            showStatusError('Network error. Please try again.');
         });
     }
 
@@ -918,6 +946,33 @@
         })
         .catch(error => { console.error('Error:', error); alert('An error occurred'); });
     }
+
+    // Build WhatsApp message with full order details (matching driver app)
+    (function() {
+        var waBtn = document.getElementById('dtdWhatsAppBtn');
+        if (!waBtn) return;
+        var phoneRaw = '{{ task.order.customer_phone|escapejs }}';
+        var phoneClean = phoneRaw.replace(/[\s+]/g, '');
+        var order = '{{ task.order.client_order_code|escapejs }}';
+        var zone = '{{ task.order.dl_zone|default:""|escapejs }}';
+        var street = '{{ task.order.dl_street|default:""|escapejs }}';
+        var building = '{{ task.order.dl_building|default:""|escapejs }}';
+        var cod = '{{ task.order.cod_amount|default:""|escapejs }}';
+        var customerName = '{{ task.order.customer_name|default:""|escapejs }}';
+        var sellerName = '{{ task.order.business.business_name|default:""|escapejs }}';
+        var verifyUrl = '{% with av=task.order.address_verifications.first %}{% with phone=task.order.customer_phone|default:"" %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url "verify_location_short" phone av.verification_token %}{% endif %}{% endwith %}{% endwith %}';
+
+        var msg = 'Hello' + (customerName ? ' ' + customerName : '') + '! \ud83d\udc4b This is EzzyDelivery.\n\n\ud83d\udce6 Order: ' + (order || '\u2014');
+        if (sellerName) msg += '\n\ud83c\udfea From: ' + sellerName;
+        if (zone) msg += '\n\ud83d\udccd Zone ' + zone;
+        if (street) msg += ', St ' + street;
+        if (building) msg += ', Bldg ' + building;
+        if (cod) msg += '\n\ud83d\udcb5 COD: ' + cod + ' QR';
+        if (verifyUrl) msg += '\n\n\ud83d\udccd Please verify your delivery address:\n' + verifyUrl;
+        msg += '\n\nYour delivery is on its way. Please be available. Thank you! \ud83d\ude9a';
+
+        waBtn.dataset.waUrl = 'https://wa.me/' + phoneClean + '?text=' + encodeURIComponent(msg);
+    })();
 
     // Auto-refresh every hour
     setInterval(function() { location.reload(); }, 3600000);

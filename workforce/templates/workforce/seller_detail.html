@@ -793,9 +793,12 @@
     <!-- Tab: Products -->
     <div id="panel-products" class="sld__panel">
         <h3 class="sld__section-title">
-            <i class="fa-solid fa-boxes-stacked sld__section-icon"></i> Products ({{ products_list.count|default:0 }})
+            <i class="fa-solid fa-boxes-stacked sld__section-icon"></i> Products
         </h3>
+
+        <!-- Local Products Table -->
         {% if products_list %}
+        <h6 class="text-muted mb-2 mt-4"><i class="fa-solid fa-database me-1"></i> Local Products ({{ products_list.count }})</h6>
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle mb-0">
                 <thead>
@@ -836,10 +839,28 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
+        {% endif %}
+
+        {% if api_products_platform %}
+        <div class="mt-3 mb-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="seller_btn_show_api_products"
+                    hx-get="{% url 'workforce:seller_api_products' business.business_id %}"
+                    hx-target="#seller-api-products-container"
+                    hx-swap="innerHTML"
+                    hx-indicator="#seller-api-products-spinner">
+                <i class="fa-solid fa-cloud-arrow-down me-1"></i> Show {{ api_products_platform|title }} Products
+            </button>
+            <span id="seller-api-products-spinner" class="htmx-indicator ms-2 text-muted small">
+                <i class="fa-solid fa-spinner fa-spin me-1"></i> Loading...
+            </span>
+        </div>
+        <div id="seller-api-products-container"></div>
+        {% endif %}
+
+        {% if not api_products_platform and not products_list %}
         <div class="text-center text-muted py-4">
             <i class="fa-solid fa-box-open fa-2x mb-2 d-block"></i>
-            No products added yet.
+            No products found.
         </div>
         {% endif %}
     </div>

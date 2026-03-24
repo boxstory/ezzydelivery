@@ -444,6 +444,18 @@ function updateTotal() {
     document.getElementById('totalAmount').textContent = (cod + delivery) + ' QAR';
 }
 
+// COD status change: online_paid → zero COD, partial_paid → keep balance
+var codStatusEl = document.getElementById('cod_status_by_client');
+var codAmountEl = document.getElementById('cod_amount');
+if (codStatusEl && codAmountEl) {
+    codStatusEl.addEventListener('change', function() {
+        if (this.value === 'online_paid') {
+            codAmountEl.value = 0;
+            updateTotal();
+        }
+    });
+}
+
 // Zone name lookup
 var _zoneCache = {};
 function updateZoneName(zoneNum) {

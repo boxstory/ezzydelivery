@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import WhatsAppVerification
+from .models import WhatsAppVerification, WhatsAppInstance
 
 
 @admin.register(WhatsAppVerification)
@@ -12,3 +12,11 @@ class WhatsAppVerificationAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('user')
+
+
+@admin.register(WhatsAppInstance)
+class WhatsAppInstanceAdmin(admin.ModelAdmin):
+    list_display = ['label', 'instance_name', 'phone_number', 'is_default', 'is_active']
+    list_editable = ['is_default', 'is_active']
+    list_filter = ['is_active', 'is_default']
+    search_fields = ['label', 'instance_name', 'phone_number']

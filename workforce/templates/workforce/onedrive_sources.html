@@ -175,6 +175,7 @@ const csrfToken = '{{ csrf_token }}';
 const baseUrl = '{% url "workforce:onedrive_sources" %}';
 var _allSavedMappings = {{ source_mappings_json|safe }};
 var _allImportedRows = {{ source_imported_rows_json|safe }};
+var _sourceBusinesses = {{ source_businesses_json|safe }};
 
 function addSource() {
     const business_id = document.getElementById('addBusiness').value;
@@ -358,7 +359,7 @@ var DB_FIELDS = [
     {value: 'customer_name', label: 'Customer Name *'},
     {value: 'customer_phone', label: 'Phone 1 *'},
     {value: 'customer_whatsapp', label: 'Phone 2 / WhatsApp'},
-    {value: 'customer_email', label: 'Email'},
+    {value: 'customer_email', label: 'Customer Email'},
     {value: 'customer_address', label: 'Customer Address *'},
     {value: 'dl_landmark', label: 'City / Landmark'},
     {value: 'dl_building', label: 'Villa / Building No'},
@@ -371,12 +372,17 @@ var DB_FIELDS = [
     {value: 'package_desc', label: 'Package Desc'},
     {value: 'package_qty', label: 'Package Qty'},
     {value: 'cod_amount', label: 'Price / COD Amount'},
+    {value: 'dl_amount', label: 'Delivery Amount'},
     {value: 'product_1', label: 'Product 1'},
     {value: 'count_1', label: 'Count 1'},
     {value: 'product_2', label: 'Product 2'},
     {value: 'count_2', label: 'Count 2'},
     {value: 'product_3', label: 'Product 3'},
     {value: 'count_3', label: 'Count 3'},
+    {value: 'product_4', label: 'Product 4'},
+    {value: 'count_4', label: 'Count 4'},
+    {value: 'product_5', label: 'Product 5'},
+    {value: 'count_5', label: 'Count 5'},
     {value: 'seller_notes', label: 'Notes By Seller'},
     {value: 'internal_notes', label: 'Notes By Ezzy'},
 ];
@@ -401,12 +407,17 @@ var MAP_PATTERNS = {
     'package_desc': ['product name','product','item','item name','description','package desc','package description'],
     'package_qty': ['qty','quantity','count','units','pcs','package qty'],
     'cod_amount': ['price','cod','amount','cod amount','total','value','payment','cash'],
+    'dl_amount': ['delivery amount','delivery fee','delivery charge','shipping fee','delivery cost'],
     'product_1': ['product 1','item 1'],
     'count_1': ['count 1','qty 1'],
     'product_2': ['product 2','item 2'],
     'count_2': ['count 2','qty 2'],
     'product_3': ['product 3','item 3'],
     'count_3': ['count 3','qty 3'],
+    'product_4': ['product 4','item 4'],
+    'count_4': ['count 4','qty 4'],
+    'product_5': ['product 5','item 5'],
+    'count_5': ['count 5','qty 5'],
     'seller_notes': ['notes by seller','seller notes','notes','remarks','comment','instructions'],
     'internal_notes': ['notes by ezzy','internal notes','staff notes'],
 };
@@ -466,21 +477,66 @@ function selectSheet(sourceId, sheetName, totalRows) {
 
 function goToRow(sourceId) {
     var info = _currentSheet[sourceId];
-    if (!info) return;
+    if (!info) { alert('Please select a sheet first.'); return; }
     var rowNum = parseInt(document.getElementById('goto-row-' + sourceId).value) || 2;
+    if (rowNum < 2) rowNum = 2;
     var offset = Math.max(0, rowNum - 2);
     _previewRows[sourceId] = [];
     loadSheetPreview(sourceId, info.name, offset, true);
 }
 
+function _renderPreviewTable(sourceId, sheetName, offset, data) {
+    var sn = sheetName.replace(/'/g, "\\'");
+    var startRowVal = offset + 2;
+    var html = '<div class="d-flex align-items-center justify-content-between mt-3 mb-2 flex-wrap gap-2">';
+    html += '<div class="fw-semibold"><i class="fa-solid fa-eye me-1"></i> ' + sheetName + ' <span class="text-muted small">(from row ' + startRowVal + ', ' + data.total + ' total)</span></div>';
+    html += '<div class="d-flex align-items-center gap-2">';
+    html += '<span id="sel-count-' + sourceId + '" class="badge bg-primary">0 selected</span>';
+    html += '<button class="btn btn-success btn-sm text-nowrap" onclick="goToImportWizard(' + sourceId + ')">';
+    html += '<i class="fa-solid fa-arrow-right me-1"></i> Next: Map Columns</button>';
+    html += '</div></div>';
+
+    if (offset > 0) {
+        html += '<div id="preview-prev-' + sourceId + '" class="text-center mb-2" data-current="' + offset + '">';
+        html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadPrevRows(' + sourceId + ', \'' + sn + '\')">';
+        html += '<i class="fa-solid fa-arrow-up me-1"></i> Load +10 previous rows</button></div>';
+    } else {
+        html += '<div id="preview-prev-' + sourceId + '" class="text-center mb-2 d-none" data-current="' + offset + '"></div>';
+    }
+
+    html += '<div class="table-responsive" style="max-height:70vh;overflow:auto"><table class="table table-sm table-bordered table-striped small mb-2" style="width:max-content;min-width:100%">';
+    html += '<thead class="table-dark"><tr>';
+    html += '<th class="text-center" style="width:40px"><input type="checkbox" id="sel-all-' + sourceId + '" onchange="toggleAllRows(' + sourceId + ')" checked></th>';
+    html += '<th class="text-center" style="width:50px">#</th>';
+    data.headers.forEach(function(h) {
+        html += '<th>' + (h || '<em class="text-muted">—</em>') + '</th>';
+    });
+    html += '</tr></thead>';
+    html += '<tbody>' + _buildRowsHtml(sourceId, data.rows) + '</tbody>';
+    html += '</table></div>';
+
+    if (data.has_more) {
+        html += '<div id="preview-more-' + sourceId + '" class="text-center mb-2">';
+        html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadMoreRows(' + sourceId + ', \'' + sn + '\', ' + data.next_offset + ')">';
+        html += '<i class="fa-solid fa-arrow-down me-1"></i> Load +10 more rows</button></div>';
+    } else {
+        html += '<div id="preview-more-' + sourceId + '" class="text-center mb-2"><span class="text-muted small">All rows loaded</span></div>';
+    }
+
+    html += '<div id="mapping-area-' + sourceId + '"></div>';
+    html += '<div id="import-result-' + sourceId + '"></div>';
+    return html;
+}
+
 function loadSheetPreview(sourceId, sheetName, offset, reset) {
     var previewArea = document.getElementById('preview-area-' + sourceId);
+    if (!previewArea) return;
     if (!_currentSheet[sourceId] || typeof _currentSheet[sourceId] === 'string') {
         _currentSheet[sourceId] = { name: sheetName, total: 0 };
     }
 
     if (offset === 0 || reset) {
-        previewArea.innerHTML = '<div class="text-muted mt-2"><span class="spinner-border spinner-border-sm me-1"></span> Loading rows from row ' + (offset + 2) + '...</div>';
+        previewArea.innerHTML = '<div class="text-muted mt-2"><span class="spinner-border spinner-border-sm me-1"></span> Downloading file & loading rows from row ' + (offset + 2) + '...</div>';
     }
 
     var fd = new FormData();
@@ -493,71 +549,35 @@ function loadSheetPreview(sourceId, sheetName, offset, reset) {
         headers: { 'X-CSRFToken': csrfToken },
         body: fd,
     })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+        if (!r.ok) throw new Error('Server returned ' + r.status);
+        return r.json();
+    })
     .then(function(data) {
         if (!data.success) {
-            previewArea.innerHTML = '<div class="alert alert-danger py-2 mt-2">' + data.error + '</div>';
+            previewArea.innerHTML = '<div class="alert alert-danger py-2 mt-2"><i class="fa-solid fa-exclamation-triangle me-1"></i> ' + data.error + '</div>';
             return;
         }
 
         _previewHeaders[sourceId] = data.headers;
-        var startRowVal = offset + 2;
 
         if (offset === 0 || reset) {
             _previewRows[sourceId] = [];
-            var sn = sheetName.replace(/'/g, "\\'");
-            var html = '<div class="d-flex align-items-center justify-content-between mt-3 mb-2 flex-wrap gap-2">';
-            html += '<div class="fw-semibold"><i class="fa-solid fa-eye me-1"></i> ' + sheetName + ' <span class="text-muted small">(from row ' + startRowVal + ', ' + data.total + ' total)</span></div>';
-            html += '<div class="d-flex align-items-center gap-2">';
-            html += '<span id="sel-count-' + sourceId + '" class="badge bg-primary">0 selected</span>';
-            html += '<button class="btn btn-success btn-sm text-nowrap" onclick="showColumnMapping(' + sourceId + ')">';
-            html += '<i class="fa-solid fa-arrow-right me-1"></i> Next: Map Columns</button>';
-            html += '</div></div>';
-
-            html += '<div class="table-responsive" style="max-height:70vh;overflow:auto"><table class="table table-sm table-bordered table-striped small mb-2" style="width:max-content;min-width:100%">';
-            html += '<thead class="table-dark"><tr>';
-            html += '<th class="text-center" style="width:40px"><input type="checkbox" id="sel-all-' + sourceId + '" onchange="toggleAllRows(' + sourceId + ')" checked></th>';
-            html += '<th class="text-center" style="width:50px">#</th>';
-            data.headers.forEach(function(h) {
-                html += '<th>' + (h || '<em class="text-muted">—</em>') + '</th>';
-            });
-            html += '</tr></thead>';
-            // Previous rows button (above table)
-            var prevOffset = Math.max(0, offset - 10);
-            if (offset > 0) {
-                html += '<div id="preview-prev-' + sourceId + '" class="text-center mb-2" data-current="' + offset + '">';
-                html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadPrevRows(' + sourceId + ', \'' + sn + '\')">';
-                html += '<i class="fa-solid fa-arrow-up me-1"></i> Load +10 previous rows</button></div>';
-            } else {
-                html += '<div id="preview-prev-' + sourceId + '" class="text-center mb-2 d-none" data-current="' + offset + '"></div>';
-            }
-
-            html += '<tbody id="preview-tbody-' + sourceId + '"></tbody>';
-            html += '</table></div>';
-
-            if (data.has_more) {
-                html += '<div id="preview-more-' + sourceId + '" class="text-center mb-2">';
-                html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadMoreRows(' + sourceId + ', \'' + sn + '\', ' + data.next_offset + ')">';
-                html += '<i class="fa-solid fa-arrow-down me-1"></i> Load +10 more rows</button></div>';
-            } else {
-                html += '<div id="preview-more-' + sourceId + '" class="text-center mb-2"><span class="text-muted small">All rows loaded</span></div>';
-            }
-
-            html += '<div id="mapping-area-' + sourceId + '"></div>';
-            html += '<div id="import-result-' + sourceId + '"></div>';
-            previewArea.innerHTML = html;
-        }
-
-        // Store rows and append to tbody
-        data.rows.forEach(function(r) { _previewRows[sourceId].push(r); });
-        var tbody = document.getElementById('preview-tbody-' + sourceId);
-        if (tbody) {
-            tbody.innerHTML = _buildRowsHtml(sourceId, data.rows);
+            data.rows.forEach(function(r) { _previewRows[sourceId].push(r); });
+            previewArea.innerHTML = _renderPreviewTable(sourceId, sheetName, offset, data);
             updateSelCount(sourceId);
+        } else {
+            // Append mode (not used currently but kept for safety)
+            data.rows.forEach(function(r) { _previewRows[sourceId].push(r); });
+            var tbody = document.querySelector('#preview-area-' + sourceId + ' tbody');
+            if (tbody) {
+                tbody.innerHTML += _buildRowsHtml(sourceId, data.rows);
+                updateSelCount(sourceId);
+            }
         }
     })
     .catch(function(err) {
-        previewArea.innerHTML = '<div class="alert alert-danger py-2 mt-2">Network error: ' + err.message + '</div>';
+        previewArea.innerHTML = '<div class="alert alert-danger py-2 mt-2"><i class="fa-solid fa-exclamation-triangle me-1"></i> Error: ' + err.message + '</div>';
     });
 }
 
@@ -617,9 +637,11 @@ function loadMoreRows(sourceId, sheetName, nextOffset) {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd,
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (!data.success) return;
-        var tbody = document.getElementById('preview-tbody-' + sourceId);
-        tbody.insertAdjacentHTML('beforeend', _buildRowsHtml(sourceId, data.rows));
-        data.rows.forEach(function(r) { _previewRows[sourceId].push(r); });
+        var tbody = document.querySelector('#preview-area-' + sourceId + ' tbody');
+        if (tbody) {
+            tbody.insertAdjacentHTML('beforeend', _buildRowsHtml(sourceId, data.rows));
+            data.rows.forEach(function(r) { _previewRows[sourceId].push(r); });
+        }
         var sn = sheetName.replace(/'/g, "\\'");
         if (data.has_more) {
             moreDiv.innerHTML = '<button class="btn btn-outline-secondary btn-sm" onclick="loadMoreRows(' + sourceId + ', \'' + sn + '\', ' + data.next_offset + ')"><i class="fa-solid fa-arrow-down me-1"></i> Load +10 more rows</button>';
@@ -648,9 +670,11 @@ function loadPrevRows(sourceId, sheetName) {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd,
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (!data.success) return;
-        var tbody = document.getElementById('preview-tbody-' + sourceId);
-        tbody.insertAdjacentHTML('afterbegin', _buildRowsHtml(sourceId, data.rows));
-        data.rows.forEach(function(r) { _previewRows[sourceId].unshift(r); });
+        var tbody = document.querySelector('#preview-area-' + sourceId + ' tbody');
+        if (tbody) {
+            tbody.insertAdjacentHTML('afterbegin', _buildRowsHtml(sourceId, data.rows));
+            data.rows.forEach(function(r) { _previewRows[sourceId].unshift(r); });
+        }
         prevDiv.setAttribute('data-current', newStart);
         var sn = sheetName.replace(/'/g, "\\'");
         if (newStart > 0) {
@@ -662,12 +686,106 @@ function loadPrevRows(sourceId, sheetName) {
     });
 }
 
+function goToImportWizard(sourceId) {
+    var selectedNums = getSelectedRowNums(sourceId);
+    if (!selectedNums.length) { alert('No rows selected.'); return; }
+
+    var sheetInfo = _currentSheet[sourceId];
+    var sheetName = sheetInfo ? sheetInfo.name : '';
+    var businessId = _sourceBusinesses[sourceId];
+    if (!businessId) { alert('Business not found for this source.'); return; }
+
+    var body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', csrfToken);
+    body.append('business_id', String(businessId));
+    body.append('source', 'onedrive');
+    body.append('source_id', String(sourceId));
+    body.append('sheet_name', sheetName);
+    selectedNums.forEach(function(n) { body.append('row_numbers[]', String(n)); });
+
+    var btn = event.target.closest('button');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Preparing...'; }
+
+    fetch('{% url "workforce:import_wizard_prepare" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: body
+    })
+    .then(function(r) {
+        if (!r.ok) return r.text().then(function(t) { throw new Error('Server returned ' + r.status); });
+        return r.json();
+    })
+    .then(function(data) {
+        if (data.success && data.redirect) {
+            window.location.href = data.redirect;
+        } else {
+            alert(data.error || 'Failed to prepare import wizard');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right me-1"></i> Next: Map Columns'; }
+        }
+    })
+    .catch(function(err) {
+        alert('Error: ' + err.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right me-1"></i> Next: Map Columns'; }
+    });
+}
+
 function getSelectedRowNums(sourceId) {
     var nums = [];
     document.querySelectorAll('.row-chk-' + sourceId + ':checked').forEach(function(cb) {
         nums.push(parseInt(cb.value));
     });
     return nums;
+}
+
+/* ─── Reset saved mapping ─── */
+function resetMapping(sourceId) {
+    _savedMapping[sourceId] = {};
+    showColumnMapping(sourceId);
+}
+
+/* ─── Save mapping to server ─── */
+function saveMapping(sourceId) {
+    var mapping = {};
+    document.querySelectorAll('.col-map-' + sourceId).forEach(function(sel) {
+        var idx = sel.getAttribute('data-col-idx');
+        if (sel.value) mapping[idx] = sel.value;
+    });
+    var btn = document.getElementById('save-mapping-btn-' + sourceId);
+    var statusDiv = document.getElementById('mapping-status-' + sourceId);
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+    if (statusDiv) statusDiv.innerHTML = '<div class="text-muted small mt-1"><i class="fa-solid fa-spinner fa-spin me-1"></i>Saving ' + Object.keys(mapping).length + ' mapped fields...</div>';
+    var url = baseUrl + sourceId + '/save-mapping/';
+    fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mapping: mapping }),
+    })
+    .then(function(r) {
+        if (!r.ok) {
+            return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 200)); });
+        }
+        return r.json();
+    })
+    .then(function(data) {
+        if (data.success) {
+            _savedMapping[sourceId] = mapping;
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Saved!';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-success');
+            if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-success py-1 px-2 small mt-1 mb-0"><i class="fa-solid fa-check me-1"></i>Mapping saved — ' + Object.keys(mapping).length + ' fields. Will be used on next import.</div>';
+            setTimeout(function() { btn.classList.remove('btn-success'); btn.classList.add('btn-outline-primary'); btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Save Mapping'; btn.disabled = true; }, 2000);
+        } else {
+            btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Save Mapping';
+            btn.disabled = false;
+            if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small mt-1 mb-0"><i class="fa-solid fa-xmark me-1"></i>Save failed: ' + (data.error || 'Unknown error') + '</div>';
+        }
+    })
+    .catch(function(err) {
+        btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Save Mapping';
+        btn.disabled = false;
+        if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small mt-1 mb-0"><i class="fa-solid fa-xmark me-1"></i>Error: ' + err.message + '</div>';
+    });
 }
 
 /* ─── Step 3: Column mapping ─── */
@@ -688,6 +806,10 @@ function showColumnMapping(sourceId) {
     if (hasSaved) html += ' <span class="badge bg-success ms-1"><i class="fa-solid fa-save me-1"></i>Saved mapping loaded</span>';
     html += '</div>';
     html += '<div class="d-flex gap-2">';
+    if (hasSaved) {
+        html += '<button class="btn btn-outline-warning btn-sm" onclick="resetMapping(' + sourceId + ')" title="Clear saved mapping and re-auto-map from headers"><i class="fa-solid fa-rotate-left me-1"></i> Reset</button>';
+    }
+    html += '<button class="btn btn-outline-primary btn-sm" id="save-mapping-btn-' + sourceId + '" onclick="saveMapping(' + sourceId + ')" disabled><i class="fa-solid fa-save me-1"></i> Save Mapping</button>';
     html += '<button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById(\'mapping-area-' + sourceId + '\').innerHTML=\'\'"><i class="fa-solid fa-arrow-left me-1"></i> Back</button>';
     html += '<button class="btn btn-success btn-sm" onclick="doMappedImport(' + sourceId + ', \'' + sn.replace(/'/g, "\\'") + '\', this)">';
     html += '<i class="fa-solid fa-download me-1"></i> Import ' + selectedNums.length + ' Orders</button>';
@@ -699,8 +821,8 @@ function showColumnMapping(sourceId) {
     var saved = _savedMapping[sourceId] || {};
     headers.forEach(function(h, idx) {
         if (!h) return;  // skip empty columns
-        // Use saved mapping first, then auto-map
-        var fieldVal = saved[String(idx)] || autoMapColumn(h);
+        // Use saved mapping if exists, otherwise auto-map
+        var fieldVal = hasSaved ? (saved[String(idx)] || '') : autoMapColumn(h);
         var mapped = fieldVal ? ' class="table-success"' : '';
         html += '<tr' + mapped + '>';
         html += '<td class="fw-semibold">' + h + '</td>';
@@ -714,12 +836,25 @@ function showColumnMapping(sourceId) {
     });
 
     html += '</tbody></table>';
+    html += '<div id="mapping-status-' + sourceId + '"></div>';
 
     mappingArea.innerHTML = html;
     mappingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Enable "Save Mapping" button when any dropdown changes
+    document.querySelectorAll('.col-map-' + sourceId).forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            var saveBtn = document.getElementById('save-mapping-btn-' + sourceId);
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('btn-outline-primary');
+                saveBtn.classList.add('btn-primary');
+            }
+        });
+    });
 }
 
-/* ─── Step 4: Import with mapped columns ─── */
+/* ─── Step 4: Verify before import ─── */
 function doMappedImport(sourceId, sheetName, btn) {
     var selectedNums = getSelectedRowNums(sourceId);
     if (!selectedNums.length) { alert('No rows selected.'); return; }
@@ -742,12 +877,202 @@ function doMappedImport(sourceId, sheetName, btn) {
         return;
     }
 
+    // Build verify preview from selected rows using the mapping
+    var headers = _previewHeaders[sourceId] || [];
+    var rows = _previewRows[sourceId] || [];
+    var selectedRows = rows.filter(function(r) { return selectedNums.indexOf(r.row_num) >= 0; });
+
+    // DB field labels lookup
+    var fieldLabels = {};
+    DB_FIELDS.forEach(function(f) { if (f.value) fieldLabels[f.value] = f.label; });
+
+    // Build mapped field list (col_idx -> db_field) sorted by display order
+    var mappedCols = [];
+    DB_FIELDS.forEach(function(f) {
+        if (!f.value) return;
+        for (var idx in mapping) {
+            if (mapping[idx] === f.value) {
+                mappedCols.push({ idx: parseInt(idx), field: f.value, label: f.label, header: headers[parseInt(idx)] || '' });
+                break;
+            }
+        }
+    });
+
+    var resultDiv = document.getElementById('import-result-' + sourceId);
+
+    if (selectedRows.length === 0) {
+        resultDiv.innerHTML = '<div class="alert alert-warning py-2 mt-2"><i class="fa-solid fa-triangle-exclamation me-1"></i> No row data available for preview. The selected rows may not be loaded. Try loading the rows first using "Go to row", then select and import.</div>';
+        return;
+    }
+
+    var html = '<div class="mt-3 border rounded p-3 bg-white">';
+    html += '<div class="d-flex align-items-center justify-content-between mb-3">';
+    html += '<h6 class="mb-0"><i class="fa-solid fa-clipboard-check me-2 text-primary"></i>Verify Import — ' + selectedRows.length + ' Orders</h6>';
+    html += '<div class="d-flex gap-2">';
+    html += '<button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById(\'import-result-' + sourceId + '\').innerHTML=\'\'"><i class="fa-solid fa-arrow-left me-1"></i> Back</button>';
+    html += '<button class="btn btn-success btn-sm" id="confirm-import-' + sourceId + '" onclick="confirmImport(' + sourceId + ', \'' + sheetName.replace(/'/g, "\\'") + '\')"><i class="fa-solid fa-check me-1"></i> Confirm Import</button>';
+    html += '</div></div>';
+
+    // Summary cards
+    html += '<div class="d-flex flex-wrap gap-2 mb-3">';
+    html += '<span class="badge bg-primary"><i class="fa-solid fa-list me-1"></i>' + selectedRows.length + ' rows selected</span>';
+    html += '<span class="badge bg-info text-dark"><i class="fa-solid fa-columns me-1"></i>' + mappedCols.length + ' fields mapped</span>';
+    html += '<span class="badge bg-secondary"><i class="fa-solid fa-file-excel me-1"></i>' + sheetName + '</span>';
+    html += '</div>';
+
+    // Mapping summary table
+    html += '<div class="mb-3"><table class="table table-sm table-bordered small mb-0" style="max-width:500px">';
+    html += '<thead class="table-light"><tr><th>Excel Column</th><th><i class="fa-solid fa-arrow-right me-1"></i>Maps To</th></tr></thead><tbody>';
+    mappedCols.forEach(function(mc) {
+        var isRequired = ['customer_name','customer_phone','customer_address'].indexOf(mc.field) >= 0;
+        html += '<tr' + (isRequired ? ' class="table-success"' : '') + '>';
+        html += '<td class="fw-semibold">' + mc.header + '</td>';
+        html += '<td>' + mc.label + (isRequired ? ' <span class="text-danger">*</span>' : '') + '</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+
+    // Verify table — show mapped data per row
+    html += '<div class="table-responsive" style="max-height:60vh;overflow:auto">';
+    html += '<table class="table table-sm table-bordered table-striped small mb-0" style="width:max-content;min-width:100%">';
+    html += '<thead class="table-dark"><tr><th class="text-center" style="width:50px">#</th>';
+    mappedCols.forEach(function(mc) {
+        var isRequired = ['customer_name','customer_phone','customer_address'].indexOf(mc.field) >= 0;
+        html += '<th><div>' + mc.label + (isRequired ? ' <span class="text-warning">*</span>' : '') + '</div><div class="fw-normal text-white-50 small">' + mc.header + '</div></th>';
+    });
+    html += '<th class="text-center" style="width:60px">Action</th>';
+    html += '</tr></thead><tbody>';
+
+    var warnings = 0;
+    var warningDetails = [];
+    var _rowOverrides = {};  // {row_num: {col_idx: new_value}}
+    selectedRows.forEach(function(r) {
+        var nameIdx = null, phoneIdx = null;
+        var nameHeader = '', phoneHeader = '';
+        for (var idx in mapping) {
+            if (mapping[idx] === 'customer_name') { nameIdx = parseInt(idx); nameHeader = headers[parseInt(idx)] || 'col ' + idx; }
+            if (mapping[idx] === 'customer_phone') { phoneIdx = parseInt(idx); phoneHeader = headers[parseInt(idx)] || 'col ' + idx; }
+        }
+        var hasName = nameIdx !== null && nameIdx < r.cells.length && r.cells[nameIdx].trim();
+        var hasPhone = phoneIdx !== null && phoneIdx < r.cells.length && r.cells[phoneIdx].trim();
+        var rowWarn = !hasName || !hasPhone;
+        if (rowWarn) {
+            warnings++;
+            var missingParts = [];
+            if (!hasName) {
+                var nameVal = (nameIdx !== null && nameIdx < r.cells.length) ? r.cells[nameIdx].trim() : '';
+                missingParts.push('name (col \'' + nameHeader + '\' = ' + (nameVal || 'empty') + ')');
+            }
+            if (!hasPhone) {
+                var phoneVal = (phoneIdx !== null && phoneIdx < r.cells.length) ? r.cells[phoneIdx].trim() : '';
+                missingParts.push('phone (col \'' + phoneHeader + '\' = ' + (phoneVal || 'empty') + ')');
+            }
+            warningDetails.push('Row ' + r.row_num + ': missing ' + missingParts.join(' and '));
+        }
+
+        html += '<tr id="verify-row-' + sourceId + '-' + r.row_num + '"' + (rowWarn ? ' class="table-danger"' : '') + '>';
+        html += '<td class="text-center text-muted">' + r.row_num;
+        if (rowWarn) html += ' <i class="fa-solid fa-triangle-exclamation text-danger" title="Missing required data"></i>';
+        html += '</td>';
+        mappedCols.forEach(function(mc) {
+            var val = mc.idx < r.cells.length ? r.cells[mc.idx] : '';
+            var display = val.length > 80 ? val.substring(0, 80) + '...' : val;
+            var isEmpty = !val.trim();
+            var isReq = ['customer_name','customer_phone','customer_address'].indexOf(mc.field) >= 0;
+            html += '<td class="verify-cell-' + sourceId + '-' + r.row_num + '" data-col-idx="' + mc.idx + '" data-field="' + mc.field + '"';
+            html += (isEmpty && isReq ? ' class="bg-danger bg-opacity-10 text-danger fw-semibold"' : '') + '>';
+            html += '<span class="cell-display">' + (display || (isReq ? '<i class="fa-solid fa-xmark text-danger"></i> missing' : '<span class="text-muted">—</span>')) + '</span>';
+            html += '</td>';
+        });
+        html += '<td class="text-center"><button class="btn btn-outline-primary btn-sm py-0 px-1" onclick="toggleVerifyEdit(' + sourceId + ',' + r.row_num + ',this)" title="Edit row"><i class="fa-solid fa-pen-to-square"></i></button></td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+
+    if (warnings > 0) {
+        html += '<div class="alert alert-warning py-2 mt-2 mb-0"><i class="fa-solid fa-triangle-exclamation me-1"></i> <strong>' + warnings + ' row(s)</strong> will be skipped:';
+        html += '<ul class="mb-0 ps-3 mt-1 small">';
+        warningDetails.forEach(function(d) { html += '<li>' + d + '</li>'; });
+        html += '</ul></div>';
+    }
+
+    html += '</div>';
+    resultDiv.innerHTML = html;
+    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Store mapping and overrides for confirm step
+    _pendingImport = { sourceId: sourceId, sheetName: sheetName, mapping: mapping, selectedNums: selectedNums, rowOverrides: _rowOverrides };
+
+    // Toggle row to edit mode
+    window.toggleVerifyEdit = function(sid, rowNum, btn) {
+        var cells = document.querySelectorAll('.verify-cell-' + sid + '-' + rowNum);
+        var isEditing = btn.getAttribute('data-editing') === '1';
+        if (isEditing) {
+            // Save: read inputs back
+            cells.forEach(function(td) {
+                var input = td.querySelector('input');
+                if (input) {
+                    var newVal = input.value;
+                    var colIdx = td.getAttribute('data-col-idx');
+                    var field = td.getAttribute('data-field');
+                    // Store override
+                    if (!_pendingImport.rowOverrides[rowNum]) _pendingImport.rowOverrides[rowNum] = {};
+                    _pendingImport.rowOverrides[rowNum][colIdx] = newVal;
+                    // Update display
+                    var isEmpty = !newVal.trim();
+                    var isReq = ['customer_name','customer_phone','customer_address'].indexOf(field) >= 0;
+                    td.innerHTML = '<span class="cell-display">' + (newVal || (isReq ? '<i class="fa-solid fa-xmark text-danger"></i> missing' : '<span class="text-muted">—</span>')) + '</span>';
+                    td.className = 'verify-cell-' + sid + '-' + rowNum;
+                    if (isEmpty && isReq) td.classList.add('bg-danger', 'bg-opacity-10', 'text-danger', 'fw-semibold');
+                }
+            });
+            btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+            btn.setAttribute('data-editing', '0');
+            // Mark row as edited
+            var tr = document.getElementById('verify-row-' + sid + '-' + rowNum);
+            if (tr && _pendingImport.rowOverrides[rowNum]) tr.classList.add('table-info');
+            tr.classList.remove('table-danger');
+        } else {
+            // Enter edit mode: replace displays with inputs
+            cells.forEach(function(td) {
+                var colIdx = td.getAttribute('data-col-idx');
+                var currentVal = '';
+                // Get current value from override or original
+                if (_pendingImport.rowOverrides[rowNum] && _pendingImport.rowOverrides[rowNum][colIdx] !== undefined) {
+                    currentVal = _pendingImport.rowOverrides[rowNum][colIdx];
+                } else {
+                    var displaySpan = td.querySelector('.cell-display');
+                    currentVal = displaySpan ? displaySpan.textContent.trim() : '';
+                    if (currentVal === '—' || currentVal === 'missing') currentVal = '';
+                }
+                td.innerHTML = '<input type="text" class="form-control form-control-sm py-0" value="' + currentVal.replace(/"/g, '&quot;') + '" style="min-width:80px">';
+            });
+            btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-success');
+            btn.setAttribute('data-editing', '1');
+        }
+    };
+}
+
+var _pendingImport = null;
+
+function confirmImport(sourceId, sheetName) {
+    if (!_pendingImport || _pendingImport.sourceId !== sourceId) return;
+
+    var mapping = _pendingImport.mapping;
+    var selectedNums = _pendingImport.selectedNums;
+    var btn = document.getElementById('confirm-import-' + sourceId);
+
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Importing...';
 
     var resultDiv = document.getElementById('import-result-' + sourceId);
-    resultDiv.innerHTML = '<div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Importing ' + selectedNums.length + ' orders...</div>';
 
+    var rowOverrides = _pendingImport.rowOverrides || {};
     fetch(baseUrl + sourceId + '/import/', {
         method: 'POST',
         headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
@@ -755,12 +1080,17 @@ function doMappedImport(sourceId, sheetName, btn) {
             sheet_name: sheetName,
             row_numbers: selectedNums,
             column_mapping: mapping,
+            row_overrides: rowOverrides,
         }),
     })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+        if (!r.ok) throw new Error('Server returned ' + r.status);
+        return r.json();
+    })
     .then(function(data) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> Import';
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Confirm Import';
+        _pendingImport = null;
 
         if (data.success) {
             var html = '<div class="alert alert-success py-2 mb-1 mt-2"><i class="fa-solid fa-check me-1"></i> <strong>' + data.saved + ' orders imported</strong>';
@@ -779,6 +1109,14 @@ function doMappedImport(sourceId, sheetName, btn) {
                 data.errors.forEach(function(e) { html += '<li>' + e + '</li>'; });
                 html += '</ul></div>';
             }
+            if (data.mapping_summary && Object.keys(data.mapping_summary).length) {
+                html += '<details class="mt-2 small"><summary class="text-muted" style="cursor:pointer;"><i class="fa-solid fa-columns me-1"></i>Column mapping used</summary>';
+                html += '<div class="bg-light rounded p-2 mt-1">';
+                Object.keys(data.mapping_summary).forEach(function(col) {
+                    html += '<span class="badge bg-secondary me-1 mb-1">' + col + ' → ' + data.mapping_summary[col] + '</span>';
+                });
+                html += '</div></details>';
+            }
             resultDiv.innerHTML = html;
             // Update imported rows cache for highlighting
             if (data.imported && data.imported.length) {
@@ -793,7 +1131,7 @@ function doMappedImport(sourceId, sheetName, btn) {
     })
     .catch(function(err) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> Import';
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Confirm Import';
         resultDiv.innerHTML = '<div class="alert alert-danger py-2 mb-0 mt-2">Network error: ' + err.message + '</div>';
     });
 }

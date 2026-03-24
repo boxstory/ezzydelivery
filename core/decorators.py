@@ -94,6 +94,19 @@ def staff_required(view_func=None, redirect_url=None):
     return decorator
 
 
+def superuser_required(view_func):
+    """Decorator to require superuser access. Redirects non-superusers."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('account_login')
+        if not request.user.is_superuser:
+            messages.error(request, "This page is restricted to administrators.")
+            return redirect('workforce:wf_dashboard')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
 def api_staff_required(view_func):
     """
     Decorator for API endpoints that returns JSON responses.

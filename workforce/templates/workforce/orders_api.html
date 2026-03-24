@@ -91,7 +91,7 @@
         <div id="wfapi_bulk_bar" class="d-none mb-3 p-2 rounded d-flex align-items-center gap-3" style="background:#fef9c3; border:1px solid #fde047;">
             <span class="fw-semibold small"><span id="wfapi_selected_count">0</span> order(s) selected</span>
             <button type="button" class="btn btn-success btn-sm" id="wfapi_transfer_btn">
-                <i class="fa-solid fa-circle-check me-1"></i> Import to Main Orders
+                <i class="fa-solid fa-file-import me-1"></i> Import (Mapping)
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="wfapi_deselect_btn">
                 <i class="fa-solid fa-xmark me-1"></i> Deselect All
@@ -291,7 +291,10 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary btn-sm" id="wfapi_save_mapping_btn" onclick="saveMapping()">
+        <button type="button" class="btn btn-outline-warning btn-sm" id="wfapi_reset_mapping_btn" onclick="resetMapping()">
+          <i class="fa-solid fa-rotate-left me-1"></i>Reset
+        </button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="wfapi_save_mapping_btn" onclick="saveMapping()">
           <i class="fa-solid fa-save me-1"></i>Save Mapping
         </button>
       </div>
@@ -402,6 +405,7 @@
             <div class="alert alert-info small mb-3">
               <i class="fa-solid fa-database me-1"></i>
               <strong>Data to be saved:</strong> Each column below shows the <strong>database field name</strong> (bold) and the source sheet column it reads from (grey arrow). Verify values look correct before confirming import.
+              Click <i class="fa-solid fa-pen-to-square"></i> to edit a row inline — changes override the original data on import.
             </div>
             <div id="wiz_already_imported" class="alert alert-warning small d-none mb-3">
               <i class="fa-solid fa-exclamation-triangle me-1"></i>
@@ -546,12 +550,42 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Open Import Wizard instead of direct import
+    // Open Import Wizard — redirect to full-page wizard
     if (transferBtn) {
         transferBtn.addEventListener('click', function() {
             const checked = getChecked();
             if (!checked.length) return;
-            openImportWizard(checked);
+
+            // Prepare wizard: POST to create ImportLog, then redirect
+            const body = new URLSearchParams();
+            body.append('csrfmiddlewaretoken', csrf);
+            body.append('business_id', '{{ selected_business_id }}');
+            body.append('source', '{{ selected_api.api_type }}');
+            checked.forEach(cb => body.append('platform_ids[]', cb.value));
+
+            transferBtn.disabled = true;
+            transferBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Preparing...';
+
+            fetch('{% url "workforce:import_wizard_prepare" %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf },
+                body: body
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.redirect) {
+                    window.location.href = data.redirect;
+                } else {
+                    transferBtn.disabled = false;
+                    transferBtn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import Selected';
+                    alert(data.error || 'Failed to prepare import');
+                }
+            })
+            .catch(err => {
+                transferBtn.disabled = false;
+                transferBtn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import Selected';
+                alert('Network error: ' + err.message);
+            });
         });
     }
 })();
@@ -561,6 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
 let _wizStep = 1;
 let _wizChecked = [];
 let _wizPreviewData = null;
+let _wizRowOverrides = {};
 const IS_GSHEET = '{{ selected_api.api_type }}' === 'google_sheet';
 const WIZ_STEPS = IS_GSHEET ? [1,2,3,4] : [1,3,4];
 
@@ -732,16 +767,29 @@ function loadPreview() {
                 labelRow.appendChild(th1);
                 sourceRow.appendChild(th2);
             });
+            // Action column header
+            const thAct1 = document.createElement('th');
+            thAct1.textContent = 'Action';
+            thAct1.style.whiteSpace = 'nowrap';
+            labelRow.appendChild(thAct1);
+            const thAct2 = document.createElement('th');
+            sourceRow.appendChild(thAct2);
             thead.appendChild(labelRow);
             thead.appendChild(sourceRow);
         }
 
+        // Reset row overrides for fresh preview
+        _wizRowOverrides = {};
+
         // Build data rows
         if (data.preview && data.preview.length) {
             data.preview.forEach(row => {
+                const platformId = row.platform_id || row.client_order_code || '';
                 const tr = document.createElement('tr');
+                tr.dataset.platformId = platformId;
                 fields.forEach(f => {
                     const td = document.createElement('td');
+                    td.dataset.field = f.name;
                     const val = row[f.name] || '—';
                     if (f.name === 'row_number') {
                         td.className = 'text-muted small';
@@ -757,6 +805,11 @@ function loadPreview() {
                     }
                     tr.appendChild(td);
                 });
+                // Action cell with Edit button
+                const actTd = document.createElement('td');
+                actTd.className = 'text-center';
+                actTd.innerHTML = `<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="toggleApiVerifyEdit('${platformId}', this)" title="Edit row"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                tr.appendChild(actTd);
                 tbody.appendChild(tr);
             });
         }
@@ -815,6 +868,56 @@ function loadPreview() {
     });
 }
 
+function toggleApiVerifyEdit(platformId, btn) {
+    const tr = btn.closest('tr');
+    const isEditing = tr.classList.contains('wiz-editing');
+    const fields = _wizPreviewData?.fields || [];
+
+    if (!isEditing) {
+        // Enter edit mode: replace td text with inputs
+        tr.classList.add('wiz-editing');
+        btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-success');
+
+        fields.forEach(f => {
+            if (f.name === 'row_number') return;
+            const td = tr.querySelector(`td[data-field="${f.name}"]`);
+            if (!td) return;
+            const curVal = td.textContent === '—' ? '' : td.textContent;
+            td.innerHTML = `<input type="text" class="form-control form-control-sm" style="min-width:80px;font-size:0.78rem;" value="${curVal.replace(/"/g, '&quot;')}" data-orig="${curVal.replace(/"/g, '&quot;')}">`;
+        });
+    } else {
+        // Save mode: read inputs, store overrides, restore to view
+        tr.classList.remove('wiz-editing');
+        btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-secondary');
+
+        let hasChanges = false;
+        if (!_wizRowOverrides[platformId]) _wizRowOverrides[platformId] = {};
+
+        fields.forEach(f => {
+            if (f.name === 'row_number') return;
+            const td = tr.querySelector(`td[data-field="${f.name}"]`);
+            if (!td) return;
+            const input = td.querySelector('input');
+            if (!input) return;
+            const newVal = input.value.trim();
+            const origVal = input.dataset.orig;
+            if (newVal !== origVal) {
+                _wizRowOverrides[platformId][f.name] = newVal;
+                hasChanges = true;
+            }
+            td.textContent = newVal || '—';
+        });
+
+        if (hasChanges) {
+            tr.classList.add('table-info');
+        }
+    }
+}
+
 function wizImport() {
     showWizStep(4);
     const loading = document.getElementById('wiz_import_loading');
@@ -829,6 +932,11 @@ function wizImport() {
     body.append('business_id', '{{ selected_business_id }}');
     body.append('source', _wizChecked[0]?.dataset?.source || '');
     _wizChecked.forEach(cb => body.append('platform_ids[]', cb.value));
+
+    // Send row overrides if any edits were made
+    if (Object.keys(_wizRowOverrides).length > 0) {
+        body.append('row_overrides', JSON.stringify(_wizRowOverrides));
+    }
 
     fetch('{% url "workforce:import_api_orders" %}', {
         method: 'POST',
@@ -1049,7 +1157,38 @@ function buildMappingRows() {
 
     // Update count
     updateMappedCount();
-    container.querySelectorAll('.wfapi-map-field').forEach(s => s.addEventListener('change', updateMappedCount));
+    container.querySelectorAll('.wfapi-map-field').forEach(s => {
+        s.addEventListener('change', updateMappedCount);
+        s.addEventListener('change', onMappingChanged);
+    });
+}
+
+let _mappingOriginal = {};
+
+function onMappingChanged() {
+    // Detect if any dropdown differs from saved mapping
+    const btn = document.getElementById('wfapi_save_mapping_btn');
+    let changed = false;
+    document.querySelectorAll('.wfapi-map-field').forEach(s => {
+        const savedVal = _savedMapping[s.dataset.field] || '';
+        if (s.value !== savedVal) changed = true;
+    });
+    if (changed) {
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-primary');
+        btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping <span class="badge bg-warning text-dark ms-1">changed</span>';
+    } else {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+        btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping';
+    }
+}
+
+function resetMapping() {
+    // Clear saved mapping and re-run auto-detect
+    _savedMapping = {};
+    buildMappingRows();
+    onMappingChanged();
 }
 
 function autoDetectField(header) {

@@ -68,23 +68,25 @@ showToast({
 });
 ```
 
-#### Using Convenience Functions
+#### Using Convenience Functions (from `dashboard-notifications.js`)
+
+> ⚠️ **Correct function names** — these are defined in `webpages/static/webpages/js/dashboard-notifications.js`
 
 ```javascript
 // Success toast
-showSuccessToast('Payment processed successfully!');
+showSuccess('Payment processed successfully!');
 
 // Error toast
-showErrorToast('Failed to save changes.');
+showError('Failed to save changes.');
 
 // Warning toast
-showWarningToast('Your session is about to expire.');
+showWarning('Your session is about to expire.');
 
 // Info toast
-showInfoToast('Check out our new features!');
+showInfo('Check out our new features!');
 
-// With custom title and duration
-showSuccessToast('Order #12345 created', 'Success!', 3000);
+// With custom duration (ms)
+showSuccess('Order #12345 created', 3000);
 ```
 
 ### 3. From HTMX Responses
@@ -140,10 +142,10 @@ document.getElementById('myForm').addEventListener('submit', function(e) {
     })
     .then(response => response.json())
     .then(data => {
-        showSuccessToast('Form submitted successfully!');
+        showSuccess('Form submitted successfully!');
     })
     .catch(error => {
-        showErrorToast('Failed to submit form. Please try again.');
+        showError('Failed to submit form. Please try again.');
     });
 });
 ```
@@ -155,9 +157,9 @@ function deleteItem(itemId) {
         fetch(`/api/delete/${itemId}`, { method: 'DELETE' })
             .then(response => {
                 if (response.ok) {
-                    showSuccessToast(`Item #${itemId} deleted successfully`);
+                    showSuccess(`Item #${itemId} deleted successfully`);
                 } else {
-                    showErrorToast('Failed to delete item');
+                    showError('Failed to delete item');
                 }
             });
     }
@@ -167,16 +169,16 @@ function deleteItem(itemId) {
 #### Multiple Operations
 ```javascript
 async function processOrders() {
-    showInfoToast('Processing orders...', 'Please wait', 0);  // Persistent
+    showInfo('Processing orders...');  // from dashboard-notifications.js
 
     try {
         await processOrder1();
         await processOrder2();
         await processOrder3();
 
-        showSuccessToast('All orders processed successfully!');
+        showSuccess('All orders processed successfully!');
     } catch (error) {
-        showErrorToast('Some orders failed to process');
+        showError('Some orders failed to process');
     }
 }
 ```
@@ -222,20 +224,22 @@ Toasts appear in the **top-right corner** by default. To change the position, mo
 Open your browser console and test:
 
 ```javascript
-// Test all types
-showSuccessToast('This is a success message');
-showErrorToast('This is an error message');
-showWarningToast('This is a warning message');
-showInfoToast('This is an info message');
+// Test all types (correct function names from dashboard-notifications.js)
+showSuccess('This is a success message');
+showError('This is an error message');
+showWarning('This is a warning message');
+showInfo('This is an info message');
+// Or using the base function:
+showToast('Custom message', 'success', 3000);
 ```
 
 ## Integration Points
 
 The toast system is automatically integrated in:
-- ✅ `client_dashboard_base.html`
-- ✅ Works with Django messages
-- ✅ Works with HTMX requests
-- ✅ Available globally via JavaScript
+- ✅ `templates/includes/toast_notifications.html` — Django messages → Bootstrap toasts (server-side)
+- ✅ `webpages/static/webpages/js/dashboard-notifications.js` — JS convenience functions (`showSuccess`, `showError`, `showWarning`, `showInfo`, `showToast`)
+- ✅ Works with Django messages framework
+- ✅ Works with HTMX requests (via `X-Toast-Message` / `X-Toast-Type` response headers)
 
 ## Browser Support
 

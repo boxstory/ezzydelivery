@@ -1,0 +1,508 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260319a1">
+Import Products from API
+{% endblock extra_head %}
+
+{% block content %}
+<div class="pal__container" id="product_api_wizard_container">
+
+    <!-- Header -->
+    <div class="plt__header" id="product_api_wizard_header">
+        <div class="plt__header-left">
+            <a href="{% url 'product:product_all_list_table' %}" class="psa__back me-2" title="Back to Products">
+                <i class="fa-solid fa-arrow-left"></i>
+            </a>
+            <div class="plt__header-icon">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+            </div>
+            <div>
+                <h2 class="plt__title">Import from {{ api_platform|title }}</h2>
+                <span class="plt__count" id="product_api_wizard_subtitle">Step 1 of 4 — Fetch Products</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step Progress Bar -->
+    <div class="apiw__steps" id="product_api_wizard_steps">
+        <div class="apiw__step apiw__step--active" data-step="1">
+            <div class="apiw__step-num">1</div>
+            <div class="apiw__step-label">Fetch</div>
+        </div>
+        <div class="apiw__step-line"></div>
+        <div class="apiw__step" data-step="2">
+            <div class="apiw__step-num">2</div>
+            <div class="apiw__step-label">Mapping</div>
+        </div>
+        <div class="apiw__step-line"></div>
+        <div class="apiw__step" data-step="3">
+            <div class="apiw__step-num">3</div>
+            <div class="apiw__step-label">Verify</div>
+        </div>
+        <div class="apiw__step-line"></div>
+        <div class="apiw__step" data-step="4">
+            <div class="apiw__step-num">4</div>
+            <div class="apiw__step-label">Confirm</div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- STEP 1: Fetch from API                       -->
+    <!-- ============================================ -->
+    <div class="apiw__panel" id="product_api_step_1">
+        <div class="apiw__card">
+            <div class="apiw__card-icon">
+                <i class="fa-solid fa-cloud"></i>
+            </div>
+            <h3 class="apiw__card-title">Fetch Products from {{ api_platform|title }}</h3>
+            <p class="apiw__card-text">
+                Connect to your {{ api_platform|title }} store and pull your product catalog.
+                This may take a few seconds depending on the number of products.
+            </p>
+            <button type="button" class="btn btn-primary btn-lg" id="product_api_btn_fetch">
+                <i class="fa-solid fa-cloud-arrow-down me-2"></i> Fetch Products
+            </button>
+            <div id="product_api_fetch_status" class="mt-3" style="display:none;">
+                <div class="d-flex align-items-center justify-content-center gap-2 text-muted">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Connecting to {{ api_platform|title }} API...</span>
+                </div>
+            </div>
+            <div id="product_api_fetch_error" class="alert alert-danger mt-3" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- STEP 2: Field Mapping                        -->
+    <!-- ============================================ -->
+    <div class="apiw__panel" id="product_api_step_2" style="display:none;">
+        <div class="apiw__card" style="max-width:800px;">
+            <h3 class="apiw__card-title"><i class="fa-solid fa-arrows-left-right me-2"></i>Map Fields</h3>
+            <p class="apiw__card-text">
+                Choose how API fields map to your product fields. We've set sensible defaults —
+                adjust if needed.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0" id="product_api_mapping_table">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:40%;">Your Product Field</th>
+                            <th style="width:15%;text-align:center;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </th>
+                            <th style="width:45%;">API Source Field</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Product Name</strong> <span class="text-danger">*</span></td>
+                            <td class="text-center"><i class="fa-solid fa-arrow-left text-muted"></i></td>
+                            <td>
+                                <select class="form-select form-select-sm apiw__map-select" data-target="item_name" id="product_api_map_item_name">
+                                    <option value="title_variant" selected>Title + Variant</option>
+                                    <option value="title">Title only</option>
+                                    <option value="variant_title">Variant only</option>
+                                    <option value="sku">SKU</option>
+                                    <option value="_skip">— Skip —</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Brand Name</strong></td>
+                            <td class="text-center"><i class="fa-solid fa-arrow-left text-muted"></i></td>
+                            <td>
+                                <select class="form-select form-select-sm apiw__map-select" data-target="brand_name" id="product_api_map_brand_name">
+                                    <option value="vendor" selected>Vendor</option>
+                                    <option value="title">Title</option>
+                                    <option value="product_type">Product Type</option>
+                                    <option value="_skip">— Skip —</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>SKU</strong></td>
+                            <td class="text-center"><i class="fa-solid fa-arrow-left text-muted"></i></td>
+                            <td>
+                                <select class="form-select form-select-sm apiw__map-select" data-target="item_sku" id="product_api_map_sku">
+                                    <option value="sku" selected>SKU</option>
+                                    <option value="barcode">Barcode</option>
+                                    <option value="platform_id">Platform ID</option>
+                                    <option value="_skip">— Skip —</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Barcode</strong></td>
+                            <td class="text-center"><i class="fa-solid fa-arrow-left text-muted"></i></td>
+                            <td>
+                                <select class="form-select form-select-sm apiw__map-select" data-target="barcode" id="product_api_map_barcode">
+                                    <option value="barcode" selected>Barcode</option>
+                                    <option value="sku">SKU</option>
+                                    <option value="_skip">— Skip —</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Price</strong></td>
+                            <td class="text-center"><i class="fa-solid fa-arrow-left text-muted"></i></td>
+                            <td>
+                                <select class="form-select form-select-sm apiw__map-select" data-target="item_price" id="product_api_map_price">
+                                    <option value="price" selected>Price</option>
+                                    <option value="_skip">— Skip —</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Size</strong></td>
+                            <td class="text-center"><i class="fa-solid fa-arrow-left text-muted"></i></td>
+                            <td>
+                                <select class="form-select form-select-sm apiw__map-select" data-target="size" id="product_api_map_size">
+                                    <option value="options" selected>Option 1 / 2 / 3</option>
+                                    <option value="option1">Option 1 only</option>
+                                    <option value="variant_title">Variant Title</option>
+                                    <option value="_skip">— Skip —</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Description</strong></td>
+                            <td class="text-center"><i class="fa-solid fa-arrow-left text-muted"></i></td>
+                            <td>
+                                <select class="form-select form-select-sm apiw__map-select" data-target="item_discription" id="product_api_map_desc">
+                                    <option value="product_type" selected>Product Type</option>
+                                    <option value="vendor">Vendor</option>
+                                    <option value="title">Title</option>
+                                    <option value="_skip">— Skip —</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-outline-secondary" id="product_api_btn_back_to_1">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Back
+                </button>
+                <button type="button" class="btn btn-primary" id="product_api_btn_to_verify">
+                    Next: Verify <i class="fa-solid fa-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- STEP 3: Verify Table                         -->
+    <!-- ============================================ -->
+    <div class="apiw__panel" id="product_api_step_3" style="display:none;">
+        <div class="apiw__card" style="max-width:100%;">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h3 class="apiw__card-title mb-0"><i class="fa-solid fa-table-list me-2"></i>Verify Products</h3>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="product_api_btn_select_all">
+                        <i class="fa-solid fa-check-double me-1"></i> Select All
+                    </button>
+                    <span class="badge bg-primary" id="product_api_verify_count">0 selected</span>
+                </div>
+            </div>
+            <p class="apiw__card-text">
+                Review the mapped products below. Uncheck any you don't want to import.
+                <span class="text-warning"><i class="fa-solid fa-circle-info me-1"></i>Products with duplicate SKUs (already in your catalog) will be skipped.</span>
+            </p>
+            <div class="table-responsive" style="max-height:55vh;overflow-y:auto;">
+                <table class="table table-sm table-hover align-middle mb-0" id="product_api_verify_table">
+                    <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+                        <tr>
+                            <th style="width:32px;"><input type="checkbox" class="form-check-input" id="product_api_verify_check_all" checked></th>
+                            <th>Product Name</th>
+                            <th>Brand</th>
+                            <th>SKU</th>
+                            <th>Barcode</th>
+                            <th class="text-end">Price</th>
+                            <th>Size</th>
+                            <th>Description</th>
+                            <th style="width:44px;">Img</th>
+                        </tr>
+                    </thead>
+                    <tbody id="product_api_verify_tbody">
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-outline-secondary" id="product_api_btn_back_to_2">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Back to Mapping
+                </button>
+                <button type="button" class="btn btn-success btn-lg" id="product_api_btn_confirm">
+                    <i class="fa-solid fa-check me-1"></i> Confirm Import (<span id="product_api_confirm_count">0</span>)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- STEP 4: Result                               -->
+    <!-- ============================================ -->
+    <div class="apiw__panel" id="product_api_step_4" style="display:none;">
+        <div class="apiw__card">
+            <div class="apiw__card-icon apiw__card-icon--success" id="product_api_result_icon">
+                <i class="fa-solid fa-check-circle"></i>
+            </div>
+            <h3 class="apiw__card-title" id="product_api_result_title">Import Complete</h3>
+            <p class="apiw__card-text" id="product_api_result_text"></p>
+            <a href="{% url 'product:product_all_list_table' %}" class="btn btn-primary btn-lg">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Products
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function() {
+    /* ── State ── */
+    var apiProducts = [];         // Raw data from API
+    var mappedProducts = [];      // After mapping applied
+    var currentStep = 1;
+    var platform = '{{ api_platform }}';
+    var csrfToken = '{{ csrf_token }}';
+
+    /* ── DOM refs ── */
+    var steps     = document.querySelectorAll('.apiw__step');
+    var panels    = [null, 'product_api_step_1', 'product_api_step_2', 'product_api_step_3', 'product_api_step_4'];
+    var subtitle  = document.getElementById('product_api_wizard_subtitle');
+    var stepLabels = ['', 'Step 1 of 4 — Fetch Products', 'Step 2 of 4 — Map Fields', 'Step 3 of 4 — Verify', 'Step 4 of 4 — Done'];
+
+    function goToStep(n) {
+        currentStep = n;
+        for (var i = 1; i <= 4; i++) {
+            document.getElementById(panels[i]).style.display = (i === n) ? '' : 'none';
+        }
+        steps.forEach(function(el) {
+            var s = parseInt(el.dataset.step);
+            el.classList.toggle('apiw__step--active', s === n);
+            el.classList.toggle('apiw__step--done', s < n);
+        });
+        subtitle.textContent = stepLabels[n];
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    /* ── STEP 1: Fetch ── */
+    var fetchBtn    = document.getElementById('product_api_btn_fetch');
+    var fetchStatus = document.getElementById('product_api_fetch_status');
+    var fetchError  = document.getElementById('product_api_fetch_error');
+
+    fetchBtn.addEventListener('click', function() {
+        fetchBtn.disabled = true;
+        fetchStatus.style.display = '';
+        fetchError.style.display = 'none';
+
+        fetch("{% url 'product:product_api_fetch' %}", {
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            fetchStatus.style.display = 'none';
+            if (!data.success) {
+                fetchError.style.display = '';
+                fetchError.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> ' + (data.error || 'Unknown error');
+                fetchBtn.disabled = false;
+                return;
+            }
+            apiProducts = data.products || [];
+            if (!apiProducts.length) {
+                fetchError.style.display = '';
+                fetchError.innerHTML = '<i class="fa-solid fa-box-open me-1"></i> No products found on ' + platform + '.';
+                fetchBtn.disabled = false;
+                return;
+            }
+            // Show success briefly then go to step 2
+            fetchStatus.style.display = '';
+            fetchStatus.innerHTML = '<div class="d-flex align-items-center justify-content-center gap-2 text-success"><i class="fa-solid fa-check-circle"></i><span>Found ' + apiProducts.length + ' product variants. Loading mapping...</span></div>';
+            setTimeout(function() { goToStep(2); }, 600);
+        })
+        .catch(function(err) {
+            fetchStatus.style.display = 'none';
+            fetchError.style.display = '';
+            fetchError.textContent = 'Network error: ' + err.message;
+            fetchBtn.disabled = false;
+        });
+    });
+
+    /* ── STEP 2: Mapping ── */
+    document.getElementById('product_api_btn_back_to_1').addEventListener('click', function() {
+        goToStep(1);
+        fetchBtn.disabled = false;
+        fetchStatus.style.display = 'none';
+    });
+
+    function getMapping() {
+        var map = {};
+        document.querySelectorAll('.apiw__map-select').forEach(function(sel) {
+            map[sel.dataset.target] = sel.value;
+        });
+        return map;
+    }
+
+    function applyMapping(raw, mapping) {
+        return raw.map(function(p) {
+            var row = {_image: p.image || ''};
+
+            // item_name
+            var nameMap = mapping.item_name || 'title_variant';
+            if (nameMap === 'title_variant') {
+                var vt = p.variant_title || '';
+                row.item_name = (vt && vt.toLowerCase() !== 'default title') ? (p.title + ' - ' + vt) : p.title;
+            } else if (nameMap === '_skip') {
+                row.item_name = '';
+            } else {
+                row.item_name = p[nameMap] || '';
+            }
+
+            // brand_name
+            row.brand_name = (mapping.brand_name === '_skip') ? '' : (p[mapping.brand_name] || '');
+
+            // item_sku
+            row.item_sku = (mapping.item_sku === '_skip') ? '' : (p[mapping.item_sku] || '');
+
+            // barcode
+            row.barcode = (mapping.barcode === '_skip') ? '' : (p[mapping.barcode] || '');
+
+            // item_price
+            if (mapping.item_price === '_skip') {
+                row.item_price = '0';
+            } else {
+                row.item_price = p[mapping.item_price] || '0';
+            }
+
+            // size
+            var sizeMap = mapping.size || 'options';
+            if (sizeMap === '_skip') {
+                row.size = '';
+            } else if (sizeMap === 'options') {
+                var opts = [p.option1, p.option2, p.option3].filter(function(o) { return o && o.toLowerCase() !== 'default title'; });
+                row.size = opts.join(' / ');
+            } else {
+                row.size = p[sizeMap] || '';
+            }
+
+            // item_discription
+            row.item_discription = (mapping.item_discription === '_skip') ? '' : (p[mapping.item_discription] || '');
+
+            return row;
+        });
+    }
+
+    document.getElementById('product_api_btn_to_verify').addEventListener('click', function() {
+        var mapping = getMapping();
+        mappedProducts = applyMapping(apiProducts, mapping);
+        renderVerifyTable();
+        goToStep(3);
+    });
+
+    /* ── STEP 3: Verify ── */
+    var verifyTbody  = document.getElementById('product_api_verify_tbody');
+    var checkAll     = document.getElementById('product_api_verify_check_all');
+    var verifyCount  = document.getElementById('product_api_verify_count');
+    var confirmCount = document.getElementById('product_api_confirm_count');
+    var confirmBtn   = document.getElementById('product_api_btn_confirm');
+    var selectAllBtn = document.getElementById('product_api_btn_select_all');
+
+    function esc(s) {
+        var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+    }
+
+    function renderVerifyTable() {
+        var html = '';
+        mappedProducts.forEach(function(p, i) {
+            html += '<tr>'
+              + '<td><input type="checkbox" class="form-check-input apiw__verify-check" data-idx="' + i + '" checked></td>'
+              + '<td><strong>' + esc(p.item_name) + '</strong></td>'
+              + '<td>' + esc(p.brand_name) + '</td>'
+              + '<td><code class="small">' + esc(p.item_sku || '-') + '</code></td>'
+              + '<td class="small">' + esc(p.barcode || '-') + '</td>'
+              + '<td class="text-end fw-semibold">' + esc(p.item_price) + '</td>'
+              + '<td class="small">' + esc(p.size || '-') + '</td>'
+              + '<td class="small">' + esc(p.item_discription || '-') + '</td>'
+              + '<td>' + (p._image ? '<img src="' + esc(p._image) + '" style="max-height:28px;max-width:28px;border-radius:3px;object-fit:cover;">' : '-') + '</td>'
+              + '</tr>';
+        });
+        verifyTbody.innerHTML = html;
+        checkAll.checked = true;
+        updateVerifyCount();
+    }
+
+    function updateVerifyCount() {
+        var c = document.querySelectorAll('.apiw__verify-check:checked').length;
+        verifyCount.textContent = c + ' selected';
+        confirmCount.textContent = c;
+        confirmBtn.disabled = c === 0;
+    }
+
+    checkAll.addEventListener('change', function() {
+        document.querySelectorAll('.apiw__verify-check').forEach(function(cb) { cb.checked = checkAll.checked; });
+        updateVerifyCount();
+    });
+
+    selectAllBtn.addEventListener('click', function() {
+        checkAll.checked = !checkAll.checked;
+        document.querySelectorAll('.apiw__verify-check').forEach(function(cb) { cb.checked = checkAll.checked; });
+        updateVerifyCount();
+    });
+
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('apiw__verify-check')) updateVerifyCount();
+    });
+
+    document.getElementById('product_api_btn_back_to_2').addEventListener('click', function() { goToStep(2); });
+
+    /* ── STEP 4: Confirm Import ── */
+    confirmBtn.addEventListener('click', function() {
+        var selected = [];
+        document.querySelectorAll('.apiw__verify-check:checked').forEach(function(cb) {
+            selected.push(mappedProducts[parseInt(cb.dataset.idx)]);
+        });
+        if (!selected.length) return;
+
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Importing...';
+
+        fetch("{% url 'product:product_api_import' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({products: selected}),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var resultIcon  = document.getElementById('product_api_result_icon');
+            var resultTitle = document.getElementById('product_api_result_title');
+            var resultText  = document.getElementById('product_api_result_text');
+
+            if (data.success) {
+                resultIcon.innerHTML = '<i class="fa-solid fa-check-circle"></i>';
+                resultIcon.className = 'apiw__card-icon apiw__card-icon--success';
+                resultTitle.textContent = 'Import Complete';
+                resultText.textContent = data.message;
+            } else {
+                resultIcon.innerHTML = '<i class="fa-solid fa-times-circle"></i>';
+                resultIcon.className = 'apiw__card-icon apiw__card-icon--error';
+                resultTitle.textContent = 'Import Failed';
+                resultText.textContent = data.message || 'Unknown error';
+            }
+            goToStep(4);
+        })
+        .catch(function(err) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Confirm Import (' + selected.length + ')';
+            alert('Network error: ' + err.message);
+        });
+    });
+
+})();
+</script>
+{% endblock extra_js %}

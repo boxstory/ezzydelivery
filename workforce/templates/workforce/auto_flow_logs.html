@@ -1,0 +1,129 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<header class="oli__hero">
+    <div class="oli__hero__left">
+        <h2><i class="fa-solid fa-clock-rotate-left me-1"></i>Flow Logs</h2>
+        <span class="oli__hero__subtitle">| {{ flow.name }}</span>
+    </div>
+    <div class="oli__hero__right">
+        <a href="{% url 'workforce:auto_flows_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i>Back to Flows
+        </a>
+    </div>
+</header>
+
+<div class="col-12 p-3">
+    <!-- Flow Info -->
+    <div class="card mb-3">
+        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            <span class="fw-bold">{{ flow.name }}</span>
+            <span class="badge {% if flow.trigger.category == 'whatsapp' %}bg-success{% elif flow.trigger.category == 'webhook' %}bg-primary{% else %}bg-warning text-dark{% endif %}">{{ flow.trigger.label }}</span>
+            <i class="fa-solid fa-arrow-right text-muted"></i>
+            <code>{{ flow.get_action_type_display }}</code>
+            <span class="badge {% if flow.is_enabled %}bg-success{% else %}bg-secondary{% endif %} ms-auto">{% if flow.is_enabled %}Active{% else %}Disabled{% endif %}</span>
+        </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="row g-3 mb-3">
+        <div class="col-auto">
+            <div class="d-flex align-items-center gap-2 border rounded px-3 py-2 bg-white">
+                <span class="badge bg-success">Success</span>
+                <strong>{{ stats.success }}</strong>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="d-flex align-items-center gap-2 border rounded px-3 py-2 bg-white">
+                <span class="badge bg-danger">Failed</span>
+                <strong>{{ stats.failed }}</strong>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="d-flex align-items-center gap-2 border rounded px-3 py-2 bg-white">
+                <span class="badge bg-info text-dark">Test</span>
+                <strong>{{ stats.test }}</strong>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="d-flex align-items-center gap-2 border rounded px-3 py-2 bg-white">
+                <i class="fa-solid fa-list text-muted"></i>
+                <strong>{{ stats.total }}</strong> <span class="text-muted small">total</span>
+            </div>
+        </div>
+    </div>
+
+    {% if logs %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:4%">#</th>
+                            <th style="width:14%">Time</th>
+                            <th style="width:8%">Status</th>
+                            <th style="width:8%">Duration</th>
+                            <th style="width:36%">Result</th>
+                            <th style="width:30%">Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr class="{% if log.status == 'failed' %}table-danger{% elif log.status == 'success' %}table-success{% endif %}">
+                            <td>{{ forloop.counter }}</td>
+                            <td><span class="small">{{ log.executed_at|date:"d M H:i:s" }}</span></td>
+                            <td>
+                                {% if log.status == 'success' %}
+                                <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Success</span>
+                                {% elif log.status == 'test' %}
+                                <span class="badge bg-info text-dark"><i class="fa-solid fa-flask me-1"></i>Test</span>
+                                {% else %}
+                                <span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>Failed</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="small">{{ log.duration_ms }}ms</span></td>
+                            <td>
+                                <pre class="mb-0 small" style="white-space:pre-wrap;max-height:120px;overflow-y:auto;">{{ log.result }}</pre>
+                            </td>
+                            <td>
+                                {% if log.error %}
+                                <div class="small">
+                                    <span class="badge bg-danger bg-opacity-10 text-danger mb-1">
+                                        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                        {% if 'connection' in log.error|lower %}Connection Error
+                                        {% elif 'timeout' in log.error|lower %}Timeout
+                                        {% elif 'auth' in log.error|lower or '401' in log.error %}Auth Error
+                                        {% elif '404' in log.error %}Not Found
+                                        {% elif '500' in log.error %}Server Error
+                                        {% elif 'validation' in log.error|lower %}Validation Error
+                                        {% else %}Error
+                                        {% endif %}
+                                    </span>
+                                    <div class="text-danger mt-1" style="white-space:pre-wrap;max-height:100px;overflow-y:auto;">{{ log.error }}</div>
+                                </div>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fa-solid fa-clock-rotate-left fa-3x text-muted opacity-50 mb-3 d-block"></i>
+        <h5 class="text-muted">No Logs Yet</h5>
+        <p class="text-muted">Run a test or wait for the flow to trigger automatically.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}

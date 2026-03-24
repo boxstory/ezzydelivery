@@ -47,6 +47,9 @@ urlpatterns = [
     path('webhooks/task/complete/', ezzy_api_views.webhook_receive_task_completion, name='webhook_receive_task_completion'),
     path('webhooks/driver/location/', ezzy_api_views.webhook_receive_driver_location, name='webhook_receive_driver_location'),
     
+    # Inbound webhook (public — receives orders)
+    path('webhooks/order/inbound/<str:webhook_key>/', ezzy_api_views.webhook_inbound_order, name='webhook_inbound_order'),
+
     # Webhook management
     path('webhooks/endpoints/', ezzy_api_views.list_webhook_endpoints, name='list_webhook_endpoints'),
     path('webhooks/endpoints/create/', ezzy_api_views.create_webhook_endpoint, name='create_webhook_endpoint'),

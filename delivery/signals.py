@@ -27,6 +27,7 @@ def delivery_task_pre_save(sender, instance, **kwargs):
             old = DeliveryTask.objects.get(pk=instance.pk)
             instance._old_dl_task_status = old.dl_task_status
             instance._old_dl_task_publish = old.dl_task_publish
+            instance._old_dl_task_date = old.dl_task_date
 
             if instance.dl_task_status != old.dl_task_status:
 
@@ -146,20 +147,26 @@ def _send_customer_notification(task, old_status, new_status):
     """
     Fire WhatsApp notification to customer on key status changes.
     Runs in a try/except so it never blocks the main save flow.
+    Checks AutoTriggerConfig to see if each trigger is enabled.
     """
-    # Map status transitions → notification events
+    # Map status transitions → notification events and trigger keys
     EVENT_MAP = {
-        'assigned':         'driver_assigned',
-        'out_for_delivery': 'out_for_delivery',
-        'in_transit':       'out_for_delivery',   # same message for in_transit
-        'delivered':        'delivered',
-        'failed':           'delivery_failed',
+        'assigned':         ('driver_assigned', 'wa_driver_assigned'),
+        'out_for_delivery': ('out_for_delivery', 'wa_out_for_delivery'),
+        'in_transit':       ('out_for_delivery', 'wa_out_for_delivery'),
+        'delivered':        ('delivered', 'wa_delivered'),
+        'failed':           ('delivery_failed', 'wa_delivery_failed'),
     }
-    event = EVENT_MAP.get(new_status)
-    if not event:
+    entry = EVENT_MAP.get(new_status)
+    if not entry:
         return
+    event, trigger_key = entry
 
     try:
+        from core.models import AutoTriggerConfig
+        if not AutoTriggerConfig.is_trigger_enabled(trigger_key):
+            logger.debug(f"WhatsApp trigger '{trigger_key}' is disabled, skipping notification")
+            return
         from core.order_notifications import notify_order_event
         notify_order_event(event, task=task)
     except Exception as e:
@@ -173,6 +180,11 @@ def _send_location_verification_on_publish(task):
     and sends via WhatsApp.
     """
     try:
+        from core.models import AutoTriggerConfig
+        if not AutoTriggerConfig.is_trigger_enabled('wa_location_verification'):
+            logger.debug("WhatsApp trigger 'wa_location_verification' is disabled, skipping")
+            return
+
         order = task.order
         if not order or not order.customer_address:
             return
@@ -339,6 +351,15 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         if old_status is not None and old_status != new_status and instance.order_id:
             _sync_order_status_from_task(instance)
 
+        # Fire COD collected trigger when delivered with COD
+        if old_status is not None and new_status == 'delivered' and instance.cod_collected and instance.cod_collected_amount:
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('staff_cod_collected', task=instance)
+                execute_flows_for_trigger('wh_cod_collected', task=instance)
+            except Exception as e:
+                logger.warning(f"Auto flow failed for COD collected {instance.pk}: {e}")
+
         # Increment failed_attempt_count when task transitions to 'failed'
         if old_status is not None and old_status != 'failed' and new_status == 'failed':
             try:
@@ -364,15 +385,63 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
             except Exception as e:
                 logger.warning(f"Could not create driver notification for task assignment {instance.pk}: {e}")
 
+            # Fire auto flows for driver assignment
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('staff_task_assign_driver', task=instance)
+            except Exception as e:
+                logger.warning(f"Auto flow execution failed for driver assignment {instance.pk}: {e}")
+
         # --- Customer WhatsApp notifications ---
         if old_status is not None and old_status != new_status:
             _send_customer_notification(instance, old_status, new_status)
+
+            # Fire auto flows for task status change
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('staff_task_status_change', task=instance)
+
+                # Specific trigger for task cancel
+                if new_status == 'cancelled':
+                    execute_flows_for_trigger('staff_task_cancel', task=instance)
+
+                # WhatsApp auto flow triggers (wa_*)
+                wa_trigger_map = {
+                    'assigned': 'wa_driver_assigned',
+                    'out_for_delivery': 'wa_out_for_delivery',
+                    'in_transit': 'wa_out_for_delivery',
+                    'delivered': 'wa_delivered',
+                    'failed': 'wa_delivery_failed',
+                }
+                wa_key = wa_trigger_map.get(new_status)
+                if wa_key:
+                    execute_flows_for_trigger(wa_key, task=instance)
+            except Exception as e:
+                logger.warning(f"Auto flow execution failed for status change {instance.pk}: {e}")
 
     # Send WhatsApp location verification when task is published
     if not created:
         old_publish = getattr(instance, '_old_dl_task_publish', None)
         if old_publish is False and instance.dl_task_publish is True:
             _send_location_verification_on_publish(instance)
+
+            # Fire auto flows for task publish and location verification triggers
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('staff_task_publish', task=instance)
+                execute_flows_for_trigger('wa_location_verification', task=instance)
+            except Exception as e:
+                logger.warning(f"Auto flow execution failed for task publish {instance.pk}: {e}")
+
+    # Fire auto flow for task reschedule (date changed)
+    if not created:
+        old_date = getattr(instance, '_old_dl_task_date', None)
+        if old_date is not None and old_date != instance.dl_task_date:
+            try:
+                from core.auto_flow_executor import execute_flows_for_trigger
+                execute_flows_for_trigger('staff_task_reschedule', task=instance)
+            except Exception as e:
+                logger.warning(f"Auto flow failed for task reschedule {instance.pk}: {e}")
 
     # Sync delivery task status → driver availability
     if instance.driver_id:

@@ -161,17 +161,23 @@ Each task should have select_related: order, driver, business, pickup_location, 
                             {% else %}
                                 <span class="dl-table__cod-none">No COD</span>
                             {% endif %}
-                            <span class="dl-table__verify-status dl-table__verify-status--{{ dl.order.verification_status|default:'pending' }}">
-                                {% if dl.order.verification_status == 'verified' %}
-                                    <i class="fa-solid fa-circle-check me-1"></i>Verified
-                                {% elif dl.order.verification_status == 'rejected' %}
-                                    <i class="fa-solid fa-circle-xmark me-1"></i>Rejected
-                                {% elif dl.order.verification_status == 'address_verified' %}
-                                    <i class="fa-solid fa-location-check me-1"></i>Address OK
+                            {% if dl.order.cod_amount and dl.order.cod_amount > 0 and dl.order.cod_status_by_staff %}
+                            <span class="dl-table__verify-status dl-table__verify-status--{{ dl.order.cod_status_by_staff }}">
+                                {% if dl.order.cod_status_by_staff == 'cod_with_driver' %}
+                                    <i class="fa-solid fa-user me-1"></i>With Driver
+                                {% elif dl.order.cod_status_by_staff == 'cod_with_ezzy' %}
+                                    <i class="fa-solid fa-building me-1"></i>With EZZY
+                                {% elif dl.order.cod_status_by_staff == 'cod_settled_with_business' %}
+                                    <i class="fa-solid fa-circle-check me-1"></i>Settled
+                                {% elif dl.order.cod_status_by_staff == 'not_collected' %}
+                                    <i class="fa-solid fa-clock me-1"></i>Not Collected
+                                {% elif dl.order.cod_status_by_staff == 'fully_paid' %}
+                                    <i class="fa-solid fa-check-double me-1"></i>Collected
                                 {% else %}
-                                    <i class="fa-solid fa-clock me-1"></i>Pending
+                                    <i class="fa-solid fa-clock me-1"></i>{{ dl.order.get_cod_status_by_staff_display }}
                                 {% endif %}
                             </span>
+                            {% endif %}
                         </div>
                     </td>
                     <!-- Status -->

@@ -41,6 +41,11 @@ urlpatterns = [
          name='business_settings_api_test_result'),
     path('<int:business_id>/settings/api/<int:api_id>/delete/', business_views.business_settings_api_delete,
          name='business_settings_api_delete'),
+    # Shopify OAuth
+    path('<int:business_id>/settings/api/<int:api_id>/shopify-oauth/', business_views.shopify_oauth_start,
+         name='shopify_oauth_start'),
+    path('shopify/oauth/callback/', business_views.shopify_oauth_callback,
+         name='shopify_oauth_callback'),
 
      # teams settings
      path('<int:business_id>/teams/', business_views.business_teams,

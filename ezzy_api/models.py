@@ -126,6 +126,63 @@ class ClientApiKey(models.Model):
         return True
 
 
+class WebhookImportKey(models.Model):
+    """Unique inbound webhook key per business for receiving orders via POST."""
+    business = models.OneToOneField(
+        business_models.Business,
+        on_delete=models.CASCADE,
+        related_name='webhook_import_key',
+    )
+    key = models.CharField(max_length=48, unique=True, db_index=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used = models.DateTimeField(blank=True, null=True)
+    total_received = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name_plural = "Webhook Import Keys"
+
+    def __str__(self):
+        return f"{self.business.business_name} - {self.key[:12]}..."
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            while True:
+                k = get_random_string(40)
+                if not WebhookImportKey.objects.filter(key=k).exists():
+                    self.key = k
+                    break
+        super().save(*args, **kwargs)
+
+
+class WebhookImportLog(models.Model):
+    """Log each inbound webhook call with raw JSON payload."""
+    webhook_key = models.ForeignKey(
+        WebhookImportKey, on_delete=models.CASCADE, related_name='logs',
+    )
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.CASCADE, related_name='webhook_import_logs',
+    )
+    payload = models.JSONField()
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    headers = models.JSONField(blank=True, null=True)
+    status = models.CharField(max_length=20, default='received', choices=[
+        ('received', 'Received'),
+        ('processed', 'Processed'),
+        ('error', 'Error'),
+    ])
+    error_message = models.TextField(blank=True, default='')
+    orders_created = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Webhook Import Logs"
+
+    def __str__(self):
+        return f"Webhook {self.business.business_name} @ {self.created_at}"
+
+
 class TaskDocument(models.Model):
     """Document model for delivery tasks (DMS uploads)"""
     DOCUMENT_TYPES = (

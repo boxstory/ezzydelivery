@@ -382,7 +382,7 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max per task
 CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # Soft limit 25 minutes
 
 # Celery Beat settings
-CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BEAT_SCHEDULER = 'celery.beat:PersistentScheduler'
 
 # Task result expiration
 CELERY_RESULT_EXPIRES = 3600  # 1 hour
@@ -730,6 +730,11 @@ AI_AGENT_WHATSAPP_ENABLED = config('AI_AGENT_WHATSAPP_ENABLED', default=True, ca
 N8N_AI_AGENT_WEBHOOK_URL = config('N8N_AI_AGENT_WEBHOOK_URL', default='')
 N8N_WHATSAPP_WEBHOOK_URL = config('N8N_WHATSAPP_WEBHOOK_URL', default='')
 N8N_WEBHOOK_SECRET_KEY = config('N8N_WEBHOOK_SECRET_KEY', default='')
+
+# Evolution API (WhatsApp)
+EVALUATION_URL = config('EVALUATION_URL', default='')
+EVALUATION_API_KEY = config('EVALUATION_API_KEY', default='')
+EVALUATION_INSTANCE = config('EVALUATION_INSTANCE', default='')
 
 # ==========================================
 # END AI AGENT CONFIGURATION

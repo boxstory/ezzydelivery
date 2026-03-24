@@ -946,7 +946,7 @@ def add_order_bulk(request):
                 dl_street=order_data.get('dl_street', '0'),
                 dl_building=order_data.get('dl_building', '0'),
                 customer_address=order_data.get('customer_address', ''),
-                cod_status_by_client=order_data.get('cod_status_by_client', 'no_cod') if order_data.get('cod_status_by_client') != 'include' else 'pending',
+                cod_status_by_client=order_data.get('cod_status_by_client', 'unpaid') if order_data.get('cod_status_by_client') != 'include' else 'unpaid',
                 cod_amount=order_data.get('cod_amount') or 0,
                 order_notes=order_data.get('order_notes', ''),
                 order_status=order_data.get('order_status', 'to_review'),
@@ -1318,6 +1318,19 @@ def order_update(request, order_id):
             if form.is_valid():
                 logger.info(f"Order {order_id} updated successfully")
                 form.save()
+                # Fire auto flow for order edit
+                try:
+                    from core.auto_flow_executor import execute_flows_for_trigger
+                    execute_flows_for_trigger('staff_order_edit', extra_context={
+                        'order_number': order.order_number or '',
+                        'customer_name': order.customer_name or '',
+                        'customer_phone': order.customer_phone or '',
+                        'customer_address': order.customer_address or '',
+                        'cod_amount': str(order.cod_amount) if order.cod_amount else '0',
+                        'business_name': str(order.business) if order.business else '',
+                    })
+                except Exception as e:
+                    logger.warning(f"Auto flow failed for order edit {order_id}: {e}")
                 messages.success(request, 'Order updated successfully.')
                 return redirect('orders:orders_all_list')
             else:
@@ -1757,6 +1770,24 @@ def add_order_comment(request, order_id):
                 body=comment_text
             )
 
+            # Notify assigned driver if order is published to fleet
+            try:
+                from delivery.models import DeliveryTask
+                from fleet.models import DriverNotification
+                task = DeliveryTask.objects.filter(
+                    order=order, driver__isnull=False
+                ).select_related('driver').first()
+                if task and task.driver_id:
+                    DriverNotification.objects.create(
+                        driver=task.driver,
+                        title='New Comment on Order',
+                        message=f'{name}: {comment_text[:120]}',
+                        notification_type='order_comment',
+                        related_task=task,
+                    )
+            except Exception:
+                pass
+
         # Get all comments for this order
         comments = order.order_comments.all().order_by('created_at')
 
@@ -2073,160 +2104,36 @@ def get_orders_by_base_api(request):
         return redirect('business:business_settings_api_list', business_id)
 
 # Location Verification View
+def verify_location_short(request, phone, token):
+    """Short URL: /v/<phone>/<token>/ — redirect to update_location page"""
+    return _verify_token_redirect(request, token)
+
+
 def verify_location(request, token):
-    """
-    Public view for customers to verify their delivery location
-    """
+    """Legacy URL: /orders/verify-location/<token>/ — redirect to update_location page"""
+    return _verify_token_redirect(request, token)
+
+
+def _verify_token_redirect(request, token):
+    """Validate token and redirect to the unified update_location page."""
     from orders.models import AddressVerification
-    from django.utils import timezone
-    
-    try:
-        # Get address verification by token
-        address_verification = get_object_or_404(
-            AddressVerification,
-            verification_token=token
-        )
-        
-        # Check if token is expired
-        if address_verification.is_token_expired():
-            return render(request, 'orders/verification_expired.html', {
-                'order': address_verification.order
-            })
-        
-        order = address_verification.order
-        
-        if request.method == 'POST':
-            # Get form data
-            latitude = request.POST.get('latitude')
-            longitude = request.POST.get('longitude')
-            verified_address = request.POST.get('verified_address')
-            zone_number = request.POST.get('zone_number')
-            street_number = request.POST.get('street_number')
-            building_number = request.POST.get('building_number')
-            notes = request.POST.get('notes')
-            
-            # Update address verification
-            address_verification.latitude = latitude
-            address_verification.longitude = longitude
-            address_verification.verified_address = verified_address or address_verification.original_address
-            address_verification.zone_number = zone_number if zone_number else None
-            address_verification.street_number = street_number if street_number else None
-            address_verification.building_number = building_number if building_number else None
-            address_verification.notes = notes
-            address_verification.verification_result = 'address_verified'
-            address_verification.customer_verified_at = timezone.now()
-            address_verification.save()
-            
-            # Update order verification status and accuracy
-            order.verification_status = 'address_verified'
-            order.coords_accuracy = 'by_customer'
-            if latitude and longitude:
-                order.latitude = latitude
-                order.longitude = longitude
-            if zone_number:
-                order.zone_number = zone_number
-            if street_number:
-                order.street_number = street_number
-            if building_number:
-                order.building_number = building_number
-            order.save()
+    from core.templatetags.custom_filters import generate_order_verify_key
+    from urllib.parse import quote
 
-            # Update DeliveryTask with coordinates and accuracy
-            delivery_task = order.delivery_task.first()
-            if delivery_task:
-                from delivery.models import DlAddressUpdate
-                from decimal import Decimal as _D
-                dl_update_fields = {}
-                if latitude and longitude:
-                    dl_update_fields['dl_latitude'] = _D(str(latitude))
-                    dl_update_fields['dl_longitude'] = _D(str(longitude))
-                if zone_number:
-                    dl_update_fields['Zone'] = int(zone_number)
-                if street_number:
-                    dl_update_fields['street'] = int(street_number)
-                if building_number:
-                    dl_update_fields['building'] = int(building_number)
+    av = AddressVerification.objects.filter(
+        verification_token=token
+    ).select_related('order').first()
+    if not av:
+        raise Http404
 
-                if dl_update_fields:
-                    # Update or create DlAddressUpdate
-                    dl_addr = delivery_task.dl_address_update
-                    if not dl_addr:
-                        dl_addr, _ = DlAddressUpdate.objects.get_or_create(
-                            order=order,
-                            defaults={
-                                'full_name': order.customer_name or '',
-                                'mobile_no': order.customer_phone or '',
-                                'dl_task_number': order.order_number,
-                                'dl_latitude': _D('0'),
-                                'dl_longitude': _D('0'),
-                                'dl_unit': '0',
-                            }
-                        )
-                    for attr, val in dl_update_fields.items():
-                        setattr(dl_addr, attr, val)
-                    dl_addr.save()
-
-                    delivery_task.dl_address_update = dl_addr
-
-                delivery_task.address_accuracy = 'by_customer'
-                delivery_task.save(update_fields=['address_accuracy', 'dl_address_update'])
-
-            return render(request, 'orders/verification_success.html', {
-                'order': order
-            })
-        
-        # GET request - show verification form with map
-        # Fallback chain: DlAddressUpdate → Order → ZoneName/ZoneArea → None
-        existing_lat = None
-        existing_lng = None
-
-        # 1. Check delivery task's DlAddressUpdate
-        delivery_task = order.delivery_task.select_related('dl_address_update').first()
-        if delivery_task and delivery_task.dl_address_update:
-            dl_addr = delivery_task.dl_address_update
-            if dl_addr.dl_latitude and dl_addr.dl_longitude and dl_addr.dl_latitude != 0 and dl_addr.dl_longitude != 0:
-                existing_lat = float(dl_addr.dl_latitude)
-                existing_lng = float(dl_addr.dl_longitude)
-
-        # 2. Check order lat/long
-        if existing_lat is None and order.latitude and order.longitude:
-            existing_lat = float(order.latitude)
-            existing_lng = float(order.longitude)
-
-        # 3. Look up zone in ZoneName/ZoneArea tables
-        if existing_lat is None and order.dl_zone:
-            from delivery.models import ZoneName
-            try:
-                zone = ZoneName.objects.filter(zone_number=order.dl_zone).first()
-                if zone:
-                    # Try ZoneArea first (more precise)
-                    area = zone.areas.filter(
-                        is_active=True, latitude__isnull=False, longitude__isnull=False
-                    ).first()
-                    if area:
-                        existing_lat = float(area.latitude)
-                        existing_lng = float(area.longitude)
-                    elif zone.latitude and zone.longitude:
-                        existing_lat = float(zone.latitude)
-                        existing_lng = float(zone.longitude)
-            except Exception:
-                pass
-
-        context = {
-            'order': order,
-            'address_verification': address_verification,
-            'google_maps_api_key': config('GOOGLE_MAPS_API_KEY', default=''),
-            'existing_lat': existing_lat,
-            'existing_lng': existing_lng,
-        }
-        
-        return render(request, 'orders/verify_location.html', context)
-        
-    except Exception as e:
-        logger.error(f"Error in location verification: {str(e)}")
-        return render(request, 'orders/verification_error.html', {
-            'error': 'Invalid or expired verification link'
+    if av.is_token_expired():
+        return render(request, 'orders/verification_expired.html', {
+            'order': av.order
         })
+
+    order = av.order
+    verify_key = generate_order_verify_key(order.order_number, order.customer_phone)
+    return redirect(f'/orders/verify/?order={quote(order.order_number)}&key={verify_key}')
 
 
 # =============================================================================
@@ -2716,7 +2623,6 @@ def bulk_import_orders(request):
 
 
 @login_required
-@business_access_required()
 @require_POST
 def bulk_import_preview(request):
     """
@@ -2966,21 +2872,77 @@ def bulk_import_preview(request):
                 source_meta={
                     'file_name': uploaded_file.name,
                     'file_size': uploaded_file.size,
+                    'columns_order': columns,
                 },
             )
             import_log_id = import_log.id
+
+        # Check for saved mapping from previous imports
+        saved_mapping = {}
+        use_saved_mapping = False
+        if business:
+            prev_log = orders_models.ImportLog.objects.filter(
+                business=business, source='csv_upload'
+            ).exclude(column_mapping={}).order_by('-id').first()
+            if prev_log and prev_log.column_mapping:
+                saved_mapping = prev_log.column_mapping
+                use_saved_mapping = True
 
         return JsonResponse({
             'columns': columns,
             'rows': rows[:100],  # Limit preview rows
             'total_rows': len(rows),
             'auto_mapping': auto_mapping,
+            'saved_mapping': saved_mapping,
+            'use_saved_mapping': use_saved_mapping,
             'import_log_id': import_log_id,
         })
 
     except Exception as e:
         logger.error(f'Error parsing bulk import file: {e}')
         return JsonResponse({'error': f'Error parsing file: {str(e)}'}, status=400)
+
+
+@login_required
+@require_POST
+def bulk_import_save_mapping(request):
+    """Save column mapping for bulk CSV import (persists via ImportLog)."""
+    try:
+        mapping_str = request.POST.get('mapping', '{}')
+        mapping = json.loads(mapping_str)
+        business_id = request.POST.get('business_id', '').strip()
+
+        business = None
+        if request.user.is_staff and business_id:
+            try:
+                business = business_models.Business.objects.get(business_id=business_id)
+            except business_models.Business.DoesNotExist:
+                pass
+        if not business:
+            business = get_cached_business(request)
+        if not business:
+            return JsonResponse({'success': False, 'error': 'No business found'}, status=400)
+
+        # Update the latest csv_upload ImportLog, or create a lightweight one
+        log = orders_models.ImportLog.objects.filter(
+            business=business, source='csv_upload'
+        ).order_by('-id').first()
+        if log:
+            log.column_mapping = mapping
+            log.save(update_fields=['column_mapping'])
+        else:
+            orders_models.ImportLog.objects.create(
+                business=business,
+                source='csv_upload',
+                status='completed',
+                initiated_by=request.user,
+                column_mapping=mapping,
+                source_meta={'note': 'saved_mapping_only'},
+            )
+
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 @login_required
@@ -3163,7 +3125,9 @@ def bulk_import_save(request):
                     pn = str(row.get(f'product_{i}', '')).strip()
                     if pn:
                         pc = safe_int(row.get(f'count_{i}')) or 1
-                        desc_parts.append(f"{pn} x{pc}")
+                        from workforce.views import _parse_coded_product_name
+                        clean_pn, _ = _parse_coded_product_name(pn)
+                        desc_parts.append(f"{clean_pn} x{pc}")
                         total_qty += pc
                 if desc_parts:
                     order.package_description = ', '.join(desc_parts)[:255]
@@ -3172,6 +3136,7 @@ def bulk_import_save(request):
 
             # Match product columns to actual Product records → create OrderItems
             from product.models import Product as ProductModel
+            from workforce.views import _match_product_by_name
             items_created = 0
             product_names = []
             if package_desc_val:
@@ -3182,17 +3147,7 @@ def bulk_import_save(request):
                     pc = safe_int(row.get(f'count_{i}')) or 1
                     product_names.append((pn, pc))
             for pname, pqty in product_names:
-                matched = ProductModel.objects.filter(
-                    business=business, item_name__iexact=pname.strip()
-                ).first()
-                if not matched:
-                    matched = ProductModel.objects.filter(
-                        business=business, item_sku__iexact=pname.strip()
-                    ).first()
-                if not matched:
-                    matched = ProductModel.objects.filter(
-                        business=business, barcode__iexact=pname.strip()
-                    ).first()
+                matched = _match_product_by_name(pname, business)
                 if matched:
                     orders_models.OrderItem.objects.create(
                         order=order, product=matched, quantity=pqty,
@@ -3278,6 +3233,16 @@ def bulk_import_finalize(request):
         if column_mapping:
             il.column_mapping = column_mapping
         il.mark_completed()
+        # Fire auto flow for orders imported
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('staff_orders_imported', extra_context={
+                'import_log_id': str(import_log_id),
+                'total_rows': str(il.total_rows) if hasattr(il, 'total_rows') else '',
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Auto flow failed for orders imported: {e}")
         return JsonResponse({'success': True})
     except orders_models.ImportLog.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'ImportLog not found'}, status=404)

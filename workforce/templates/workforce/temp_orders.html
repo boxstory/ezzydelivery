@@ -19,14 +19,18 @@
                 <i class="fa-regular fa-clock me-1"></i>{{ last_sync|timesince }} ago
             </span>
             {% endif %}
+            <span class="d-inline-flex flex-column align-items-center" style="min-width:70px;max-width:70px;line-height:1.1;">
+                <span style="font-size:0.75rem;color:#000;font-weight:600;">Auto Sync</span>
+                <span id="autoSyncTimer" style="font-size:0.75rem;color:#000;"></span>
+            </span>
             <button type="button" class="btn btn-dark btn-sm" id="syncBtn" onclick="syncAllSources()">
                 <i class="fa-solid fa-sync me-1"></i>Sync Now
             </button>
             <button type="button" class="btn btn-outline-dark btn-sm" onclick="openPublicLinkModal()">
                 <i class="fa-solid fa-link me-1"></i>Public Links
             </button>
-            <button type="button" class="btn btn-success btn-sm d-none" id="importBtn" onclick="openPreview()">
-                <i class="fa-solid fa-file-import me-1"></i>Import <span id="importBtnCount"></span>
+            <button type="button" class="btn btn-success btn-sm d-none" id="importBtn" onclick="importWithMapping()">
+                <i class="fa-solid fa-file-import me-1"></i>Import (Mapping) <span id="importBtnCount"></span>
             </button>
             <button type="button" class="btn btn-warning btn-sm d-none" id="autoImportBtn" onclick="openAutoImport()">
                 <i class="fa-solid fa-bolt me-1"></i>Auto-Import <span id="autoImportBtnCount"></span>
@@ -429,6 +433,28 @@ const CSRF = (() => {
 })();
 let previewRows = [];
 
+// ─── Auto Sync Countdown ───
+(function() {
+    const now = new Date();
+    const nextHour = new Date(now);
+    nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+    const timerEl = document.getElementById('autoSyncTimer');
+
+    function updateCountdown() {
+        const diff = nextHour - new Date();
+        if (diff <= 0) {
+            timerEl.textContent = 'now';
+            setTimeout(() => location.reload(), 3000);
+            return;
+        }
+        const m = Math.floor(diff / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        timerEl.textContent = `${m}m ${s < 10 ? '0' : ''}${s}s`;
+    }
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+})();
+
 // ─── Detail Modal (single row) ───
 function showDetail(btn) {
     const d = btn.dataset;
@@ -589,6 +615,45 @@ async function openAutoImport() {
         document.getElementById('autoImportModalBody').innerHTML =
             `<div class="text-danger p-3"><i class="fa-solid fa-circle-xmark me-2"></i>Error: ${escHtml(e.message)}</div>`;
         document.getElementById('autoImportCloseBtn').disabled = false;
+    }
+}
+
+// ─── Import with Mapping (redirect to import wizard) ───
+async function importWithMapping() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (!checked.length) { alert('Select rows first'); return; }
+
+    const btn = document.getElementById('importBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Preparing...';
+
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', CSRF);
+    body.append('source', 'temp_order');
+    // Use first checked row's business
+    const firstRow = checked[0].closest('tr');
+    const bizId = firstRow ? firstRow.dataset.businessId : '';
+    body.append('business_id', bizId);
+    checked.forEach(cb => body.append('temp_ids[]', cb.dataset.tempId));
+
+    try {
+        const resp = await fetch('{% url "workforce:import_wizard_prepare" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF },
+            body: body
+        });
+        const data = await resp.json();
+        if (data.success && data.redirect) {
+            window.location.href = data.redirect;
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import (Mapping) <span id="importBtnCount">(' + checked.length + ')</span>';
+            alert(data.error || 'Failed to prepare import');
+        }
+    } catch(e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import (Mapping) <span id="importBtnCount">(' + checked.length + ')</span>';
+        alert('Network error: ' + e.message);
     }
 }
 

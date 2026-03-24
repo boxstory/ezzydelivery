@@ -1,0 +1,255 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<header class="oli__hero">
+    <div class="oli__hero__left">
+        <h2><i class="fa-solid fa-diagram-project me-1"></i>Automation Flows</h2>
+        <span class="oli__hero__subtitle">| Trigger → Action connections</span>
+    </div>
+    <div class="oli__hero__right">
+        <a href="{% url 'workforce:auto_flow_add' %}" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-plus me-1"></i>Add Flow
+        </a>
+    </div>
+</header>
+
+<div class="col-12 p-3">
+    {% if flows %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:3%">#</th>
+                            <th style="width:14%">Flow Name</th>
+                            <th style="width:14%">Trigger</th>
+                            <th style="width:7%">Category</th>
+                            <th style="width:14%">Action Type</th>
+                            <th style="width:8%">Config</th>
+                            <th style="width:7%">Status</th>
+                            <th style="width:5%" class="text-center">On/Off</th>
+                            <th style="width:14%" class="text-center">Test</th>
+                            <th style="width:5%" class="text-center">Edit</th>
+                            <th style="width:5%" class="text-center">Logs</th>
+                            <th style="width:5%" class="text-center">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for flow in flows %}
+                        <tr id="flow-row-{{ flow.id }}">
+                            <td>{{ forloop.counter }}</td>
+                            <td><strong>{{ flow.name }}</strong></td>
+                            <td>
+                                <i class="fa-solid {% if flow.trigger.category == 'whatsapp' %}fa-brands fa-whatsapp text-success{% elif flow.trigger.category == 'webhook' %}fa-globe text-primary{% else %}fa-gears text-warning{% endif %} me-1"></i>
+                                {{ flow.trigger.label }}
+                            </td>
+                            <td>
+                                {% if flow.trigger.category == 'whatsapp' %}
+                                <span class="badge bg-success">WhatsApp</span>
+                                {% elif flow.trigger.category == 'webhook' %}
+                                <span class="badge bg-primary">Webhook</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">System</span>
+                                {% endif %}
+                            </td>
+                            <td><code>{{ flow.get_action_type_display }}</code></td>
+                            <td>
+                                {% if flow.action_config %}
+                                <button class="btn btn-sm btn-outline-info" onclick="showConfig({{ flow.id }}, '{{ flow.name|escapejs }}')" title="View config">
+                                    <i class="fa-solid fa-eye me-1"></i>View
+                                </button>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if flow.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="flow-badge-{{ flow.id }}">
+                                    {% if flow.is_enabled %}Active{% else %}Disabled{% endif %}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="flow-toggle-{{ flow.id }}"
+                                           {% if flow.is_enabled %}checked{% endif %}
+                                           onchange="toggleFlow({{ flow.id }}, this)">
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-warning" id="test-btn-{{ flow.id }}" onclick="testFlow({{ flow.id }})" title="Test run">
+                                    <i class="fa-solid fa-play me-1"></i>Test
+                                </button>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'workforce:auto_flow_edit' flow.id %}" class="btn btn-sm btn-outline-secondary" title="Edit flow">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'workforce:auto_flow_logs' flow.id %}" class="btn btn-sm btn-outline-info" title="View logs">
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                </a>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteFlow({{ flow.id }}, '{{ flow.name|escapejs }}')" title="Delete flow">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <i class="fa-solid fa-diagram-project fa-4x text-muted opacity-50"></i>
+        </div>
+        <h4 class="text-muted mb-3">No Flows Yet</h4>
+        <p class="text-muted mb-4">Create your first automation flow to connect triggers to actions.</p>
+        <a href="{% url 'workforce:auto_flow_add' %}" class="btn btn-primary">
+            <i class="fa-solid fa-plus me-1"></i>Add Flow
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Config Modal -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-gear me-2"></i><span id="configModalTitle">Flow Config</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="configModalBody" class="bg-light p-3 rounded" style="white-space:pre-wrap;word-break:break-word;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Result Modal -->
+<div class="modal fade" id="testResultModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-flask me-2"></i>Test Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span id="testStatusBadge" class="badge bg-info">Test</span>
+                    <span id="testDuration" class="text-muted small"></span>
+                </div>
+                <pre id="testResultBody" class="bg-light p-3 rounded" style="white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function getCSRFToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) return meta.getAttribute('content');
+    var input = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (input) return input.value;
+    return null;
+}
+
+// Store config data from Django
+var flowConfigs = {
+    {% for flow in flows %}
+    {{ flow.id }}: {{ flow.action_config|safe }},
+    {% endfor %}
+};
+
+function showConfig(flowId, flowName) {
+    document.getElementById('configModalTitle').textContent = flowName + ' — Config';
+    document.getElementById('configModalBody').textContent = JSON.stringify(flowConfigs[flowId] || {}, null, 2);
+    new bootstrap.Modal(document.getElementById('configModal')).show();
+}
+
+function toggleFlow(flowId, checkbox) {
+    checkbox.disabled = true;
+    fetch("{% url 'workforce:auto_flow_toggle' %}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+        body: JSON.stringify({flow_id: flowId})
+    })
+    .then(r => r.json())
+    .then(data => {
+        checkbox.disabled = false;
+        if (data.success) {
+            const badge = document.getElementById('flow-badge-' + flowId);
+            badge.className = data.is_enabled ? 'badge bg-success' : 'badge bg-secondary';
+            badge.textContent = data.is_enabled ? 'Active' : 'Disabled';
+            checkbox.checked = data.is_enabled;
+        } else {
+            checkbox.checked = !checkbox.checked;
+            alert('Error: ' + (data.error || 'Failed'));
+        }
+    })
+    .catch(err => { checkbox.disabled = false; checkbox.checked = !checkbox.checked; alert(err.message); });
+}
+
+function testFlow(flowId) {
+    const btn = document.getElementById('test-btn-' + flowId);
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Running...';
+
+    fetch("{% url 'workforce:auto_flow_test' %}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+        body: JSON.stringify({flow_id: flowId})
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (data.success) {
+            const badge = document.getElementById('testStatusBadge');
+            if (data.status === 'test') { badge.className = 'badge bg-info text-dark'; badge.textContent = 'Test'; }
+            else if (data.status === 'success') { badge.className = 'badge bg-success'; badge.textContent = 'Success'; }
+            else { badge.className = 'badge bg-danger'; badge.textContent = 'Failed'; }
+            document.getElementById('testDuration').textContent = data.duration_ms + 'ms';
+            document.getElementById('testResultBody').textContent = data.result;
+            new bootstrap.Modal(document.getElementById('testResultModal')).show();
+        } else {
+            alert('Error: ' + (data.error || 'Test failed'));
+        }
+    })
+    .catch(err => { btn.disabled = false; btn.innerHTML = origHtml; alert(err.message); });
+}
+
+function deleteFlow(flowId, flowName) {
+    if (!confirm('Delete flow "' + flowName + '"? This cannot be undone.')) return;
+    fetch("{% url 'workforce:auto_flow_delete' %}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+        body: JSON.stringify({flow_id: flowId})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const row = document.getElementById('flow-row-' + flowId);
+            if (row) { row.style.transition = 'opacity 0.3s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }
+            if (typeof showToast === 'function') showToast('Flow deleted', 'success');
+        } else { alert('Error: ' + (data.error || 'Failed')); }
+    })
+    .catch(err => alert(err.message));
+}
+</script>
+{% endblock content %}

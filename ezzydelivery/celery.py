@@ -55,6 +55,12 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=0, minute=5),
         'options': {'queue': 'dispatch'},
     },
+
+    # Sync temp orders from all external sources - every 1 hour
+    'sync-temp-orders': {
+        'task': 'orders.tasks.sync_all_temp_orders',
+        'schedule': 3600.0,
+    },
 }
 
 # Task routing

@@ -124,27 +124,24 @@ def product_single_add(request):
 # Template: product/product_single_delete.html
 # -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
+@require_http_methods(["POST"])
 def product_single_delete(request, product_id):
-    # SECURITY FIX: Verify product belongs to user's business
+    """Delete product. POST only, redirects back to product table."""
     business = get_cached_business(request)
     if not business:
-        logger.warning(f"User {request.user.id} has no associated business")
         messages.error(request, "No business associated with your account")
         return redirect('business_dashboard')
 
     try:
         product = product_models.Product.objects.get(id=product_id, business=business)
-
         logger.info(f"User {request.user.id} deleting product {product_id} from business {business.business_id}")
         product.delete()
-        logger.info(f"Product {product_id} deleted successfully")
         messages.success(request, 'Product deleted successfully!')
     except product_models.Product.DoesNotExist:
         logger.warning(f"User {request.user.id} attempted to delete non-existent or unauthorized product {product_id}")
         messages.error(request, "Product not found or unauthorized")
 
-    data = {}
-    return render(request, 'product/product_single_delete.html', data)
+    return redirect('product:product_all_list_table')
 
 
 # -----------------------------------------------------------------------------
@@ -470,6 +467,269 @@ def product_inline_update(request, product_id):
             'success': False,
             'message': 'Error updating product'
         }, status=500)
+
+
+# =============================================================================
+# API PRODUCT IMPORT WIZARD (Shopify / WooCommerce)
+# Steps: 1) Fetch from API  2) Field Mapping  3) Verify  4) Confirm Import
+# =============================================================================
+
+
+def _fetch_api_products(business):
+    """Shared helper: fetch products from Shopify/WooCommerce for a business.
+    Returns (api_products_list, error_string, platform_string).
+    """
+    import signal
+
+    api_settings = business_models.BusinessApiSettings.objects.filter(business=business)
+    first_api = api_settings.first() if api_settings else None
+
+    api_products = []
+    api_products_error = ''
+    api_products_platform = ''
+
+    if not first_api or first_api.api_type not in ('shopify', 'woocommerce'):
+        return [], 'No Shopify or WooCommerce API configured for your business.', ''
+
+    api_products_platform = first_api.api_type
+
+    class ApiTimeout(Exception):
+        pass
+
+    def timeout_handler(signum, frame):
+        raise ApiTimeout("API request timed out after 15 seconds")
+
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(15)
+
+    try:
+        if first_api.api_type == 'shopify':
+            import shopify
+            shop_name = (first_api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip().rstrip('/')
+            session = shopify.Session(shop_name, first_api.api_version or '2023-10', first_api.api_access_token)
+            shopify.ShopifyResource.activate_session(session)
+            try:
+                page_products = shopify.Product.find(limit=250)
+                for p in page_products:
+                    product_title = p.title or ''
+                    product_image = ''
+                    if hasattr(p, 'image') and p.image:
+                        product_image = getattr(p.image, 'src', '') or ''
+                    elif hasattr(p, 'images') and p.images:
+                        product_image = getattr(p.images[0], 'src', '') or ''
+                    vendor = getattr(p, 'vendor', '') or ''
+                    product_type = getattr(p, 'product_type', '') or ''
+
+                    variants = getattr(p, 'variants', []) or []
+                    if variants:
+                        for v in variants:
+                            variant_image = ''
+                            if getattr(v, 'image_id', None) and hasattr(p, 'images'):
+                                for img in (p.images or []):
+                                    if getattr(img, 'id', None) == v.image_id:
+                                        variant_image = getattr(img, 'src', '') or ''
+                                        break
+                            api_products.append({
+                                'platform_id': str(p.id),
+                                'variant_id': str(v.id),
+                                'title': product_title,
+                                'variant_title': getattr(v, 'title', '') or '',
+                                'sku': getattr(v, 'sku', '') or '',
+                                'barcode': getattr(v, 'barcode', '') or '',
+                                'price': getattr(v, 'price', '') or '',
+                                'inventory_qty': getattr(v, 'inventory_quantity', 0) or 0,
+                                'option1': getattr(v, 'option1', '') or '',
+                                'option2': getattr(v, 'option2', '') or '',
+                                'option3': getattr(v, 'option3', '') or '',
+                                'image': variant_image or product_image,
+                                'vendor': vendor,
+                                'product_type': product_type,
+                            })
+                    else:
+                        api_products.append({
+                            'platform_id': str(p.id), 'variant_id': '',
+                            'title': product_title, 'variant_title': '',
+                            'sku': '', 'barcode': '', 'price': '',
+                            'inventory_qty': 0, 'option1': '', 'option2': '', 'option3': '',
+                            'image': product_image, 'vendor': vendor, 'product_type': product_type,
+                        })
+            finally:
+                shopify.ShopifyResource.clear_session()
+
+        elif first_api.api_type == 'woocommerce':
+            from woocommerce import API as WooAPI
+            wcapi = WooAPI(
+                url=first_api.site_api_url or '',
+                consumer_key=first_api.api_key or '',
+                consumer_secret=first_api.api_secret or '',
+                version='wc/v3', timeout=10,
+            )
+            r = wcapi.get('products', params={'per_page': 100, 'orderby': 'date', 'order': 'desc'})
+            if r.status_code != 200:
+                api_products_error = f'WooCommerce API error {r.status_code}'
+            else:
+                for p in r.json():
+                    product_title = p.get('name', '')
+                    product_image = ''
+                    images = p.get('images', [])
+                    if images:
+                        product_image = images[0].get('src', '')
+                    product_type = p.get('type', '')
+
+                    variations = p.get('variations', [])
+                    if p.get('type') == 'variable' and variations:
+                        for var_id in variations:
+                            vr = wcapi.get(f'products/{p["id"]}/variations/{var_id}')
+                            if vr.status_code == 200:
+                                v = vr.json()
+                                var_attrs = v.get('attributes', [])
+                                option1 = var_attrs[0].get('option', '') if len(var_attrs) > 0 else ''
+                                option2 = var_attrs[1].get('option', '') if len(var_attrs) > 1 else ''
+                                option3 = var_attrs[2].get('option', '') if len(var_attrs) > 2 else ''
+                                var_image = v.get('image', {}).get('src', '') if v.get('image') else ''
+                                api_products.append({
+                                    'platform_id': str(p['id']), 'variant_id': str(v['id']),
+                                    'title': product_title,
+                                    'variant_title': ' / '.join(a.get('option', '') for a in var_attrs),
+                                    'sku': v.get('sku', ''), 'barcode': '',
+                                    'price': v.get('price', ''),
+                                    'inventory_qty': v.get('stock_quantity', 0) or 0,
+                                    'option1': option1, 'option2': option2, 'option3': option3,
+                                    'image': var_image or product_image, 'vendor': '', 'product_type': product_type,
+                                })
+                    else:
+                        api_products.append({
+                            'platform_id': str(p['id']), 'variant_id': '',
+                            'title': product_title, 'variant_title': '',
+                            'sku': p.get('sku', ''), 'barcode': '',
+                            'price': p.get('price', ''),
+                            'inventory_qty': p.get('stock_quantity', 0) or 0,
+                            'option1': '', 'option2': '', 'option3': '',
+                            'image': product_image, 'vendor': '', 'product_type': product_type,
+                        })
+    except ApiTimeout:
+        api_products_error = 'API request timed out. Please try again.'
+    except Exception as e:
+        api_products_error = str(e)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+    return api_products, api_products_error, api_products_platform
+
+
+# -----------------------------------------------------------------------------
+# product_api_wizard: Full-page wizard for API product import.
+# Renders the wizard page; API fetch happens via HTMX on button click.
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+def product_api_wizard(request):
+    """Render the API product import wizard page."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('product:product_all_list_table')
+
+    api_settings = business_models.BusinessApiSettings.objects.filter(business=business)
+    first_api = api_settings.first() if api_settings else None
+    api_platform = first_api.api_type if first_api and first_api.api_type in ('shopify', 'woocommerce') else ''
+
+    if not api_platform:
+        messages.error(request, "No Shopify or WooCommerce API configured for your business.")
+        return redirect('product:product_all_list_table')
+
+    return render(request, 'product/product_api_wizard.html', {
+        'business': business,
+        'api_platform': api_platform,
+    })
+
+
+# -----------------------------------------------------------------------------
+# product_api_fetch: HTMX endpoint to fetch API products and return JSON.
+# Called by the wizard page step 1.
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+def product_api_fetch(request):
+    """HTMX endpoint: fetch API products and return as JSON for the wizard."""
+    business = get_cached_business(request)
+    if not business:
+        return JsonResponse({'success': False, 'error': 'No business found'}, status=400)
+
+    api_products, error, platform = _fetch_api_products(business)
+
+    if error:
+        return JsonResponse({'success': False, 'error': error, 'platform': platform})
+
+    return JsonResponse({
+        'success': True,
+        'platform': platform,
+        'products': api_products,
+        'count': len(api_products),
+    })
+
+
+# -----------------------------------------------------------------------------
+# product_api_import: Import selected & mapped products into the local database.
+# Accepts JSON payload with list of products and their mapped field values.
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+@require_http_methods(["POST"])
+def product_api_import(request):
+    """Import selected products from API into the local product catalog using custom field mapping."""
+    business = get_cached_business(request)
+    if not business:
+        return JsonResponse({'success': False, 'message': 'No business found'}, status=400)
+
+    try:
+        data = json.loads(request.body)
+        products_to_import = data.get('products', [])
+    except (json.JSONDecodeError, KeyError):
+        return JsonResponse({'success': False, 'message': 'Invalid request data'}, status=400)
+
+    if not products_to_import:
+        return JsonResponse({'success': False, 'message': 'No products selected'}, status=400)
+
+    imported_count = 0
+    skipped_count = 0
+
+    for p in products_to_import:
+        item_name = (p.get('item_name') or '').strip()[:100]
+        sku = (p.get('item_sku') or '').strip()[:100]
+
+        if not item_name:
+            skipped_count += 1
+            continue
+
+        # Skip if a product with the same SKU already exists for this business
+        if sku and Product.objects.filter(business=business, item_sku=sku).exists():
+            skipped_count += 1
+            continue
+
+        # Parse price - item_price is PositiveIntegerField
+        try:
+            price_val = int(float(p.get('item_price') or 0))
+        except (ValueError, TypeError):
+            price_val = 0
+
+        Product.objects.create(
+            business=business,
+            item_name=item_name,
+            brand_name=(p.get('brand_name') or '')[:100],
+            item_sku=sku,
+            barcode=(p.get('barcode') or '')[:100],
+            item_price=price_val,
+            size=(p.get('size') or '')[:100],
+            item_discription=(p.get('item_discription') or '')[:100],
+        )
+        imported_count += 1
+
+    return JsonResponse({
+        'success': True,
+        'message': f'Imported {imported_count} product{"s" if imported_count != 1 else ""}.'
+                   + (f' Skipped {skipped_count} (duplicate SKU or empty).' if skipped_count else ''),
+        'imported': imported_count,
+        'skipped': skipped_count,
+    })
 
 
 # =============================================================================

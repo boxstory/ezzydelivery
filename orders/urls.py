@@ -71,6 +71,7 @@ urlpatterns = [
      path('bulk-import/', orders_views.bulk_import_orders, name='bulk_import_orders'),
      path('bulk-import/preview/', orders_views.bulk_import_preview, name='bulk_import_preview'),
      path('bulk-import/save/', orders_views.bulk_import_save, name='bulk_import_save'),
+     path('bulk-import/save-mapping/', orders_views.bulk_import_save_mapping, name='bulk_import_save_mapping'),
      path('bulk-import/finalize/', orders_views.bulk_import_finalize, name='bulk_import_finalize'),
 
 ]

@@ -1,0 +1,780 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Import Wizard — {{ business.business_name }}{% endblock %}
+
+{% block content %}
+<div class="obi">
+    <!-- Hero Header -->
+    <div class="obi__hero">
+        <div class="obi__hero-content">
+            <h1 class="obi__hero-title">
+                <i class="fa-solid fa-file-import me-2"></i>Import Wizard
+            </h1>
+            <p class="obi__hero-sub">{{ source_label }} — {{ business.business_name }}</p>
+        </div>
+        <div class="p-3 d-flex gap-2">
+            <a href="{% url 'workforce:import_history' %}" class="btn btn-outline-light btn-sm">
+                <i class="fa-solid fa-clock-rotate-left me-1"></i>History
+            </a>
+            <button type="button" class="btn btn-outline-light btn-sm" onclick="window.history.back()">
+                <i class="fa-solid fa-arrow-left me-1"></i>Back
+            </button>
+        </div>
+    </div>
+
+    <div class="p-3">
+        {% csrf_token %}
+
+        <!-- Wizard Steps -->
+        <div class="bim__wizard-steps">
+            {% if needs_mapping %}
+            <div class="bim__wizard-step active" data-step="1">
+                <div class="bim__wizard-step-number">1</div>
+                <div class="bim__wizard-step-label">Map Columns</div>
+            </div>
+            <div class="bim__wizard-step" data-step="2">
+                <div class="bim__wizard-step-number">2</div>
+                <div class="bim__wizard-step-label">Verify & Edit</div>
+            </div>
+            <div class="bim__wizard-step" data-step="3">
+                <div class="bim__wizard-step-number">3</div>
+                <div class="bim__wizard-step-label">Confirm Import</div>
+            </div>
+            {% else %}
+            <div class="bim__wizard-step active" data-step="2">
+                <div class="bim__wizard-step-number">1</div>
+                <div class="bim__wizard-step-label">Verify & Edit</div>
+            </div>
+            <div class="bim__wizard-step" data-step="3">
+                <div class="bim__wizard-step-number">2</div>
+                <div class="bim__wizard-step-label">Confirm Import</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             STEP 1: COLUMN MAPPING
+             ═══════════════════════════════════════════════════ -->
+        {% if needs_mapping %}
+        <div class="bim__step-content {% if needs_mapping %}active{% endif %}" id="wizStep1">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-columns me-2 text-primary"></i>Map Columns
+                    </h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <span class="badge bg-info" id="iwiz_col_count">0 columns</span>
+                        <span class="badge bg-success" id="iwiz_mapped_count">0 mapped</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="px-3 pt-3 pb-2">
+                        <div class="alert alert-info small mb-2">
+                            <i class="fa-solid fa-info-circle me-1"></i>
+                            Map your source columns to order fields. Required fields are marked with <span class="text-danger">*</span>.
+                        </div>
+                        <div id="iwiz_mapping_badge" class="d-none mb-2">
+                            <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Saved mapping loaded</span>
+                        </div>
+                    </div>
+
+                    <!-- Mapping Header Row -->
+                    <div class="d-flex gap-2 px-3 py-2 fw-semibold small" style="background:#f8f9fa; border-top:1px solid #dee2e6; border-bottom:1px solid #dee2e6;">
+                        <div style="flex:1;">Source Column (from file)</div>
+                        <div style="width:30px;text-align:center;"><i class="fa-solid fa-arrow-right text-muted"></i></div>
+                        <div style="flex:1;">Map To</div>
+                    </div>
+
+                    <!-- Mapping Rows Container -->
+                    <div id="iwiz_mapping_rows" class="px-3" style="max-height:55vh; overflow-y:auto;"></div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-warning btn-sm d-none" id="iwiz_reset_btn" onclick="iwizResetMapping()">
+                            <i class="fa-solid fa-rotate-left me-1"></i>Reset
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm d-none" id="iwiz_save_btn" onclick="iwizSaveMapping()">
+                            <i class="fa-solid fa-save me-1"></i>Save Mapping
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="iwizGoToVerify()">
+                        Next: Verify Data <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ═══════════════════════════════════════════════════
+             STEP 2: VERIFY & EDIT
+             ═══════════════════════════════════════════════════ -->
+        <div class="bim__step-content {% if not needs_mapping %}active{% endif %}" id="wizStep2">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-table me-2 text-primary"></i>Verify & Edit Data
+                    </h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <span class="badge bg-info" id="iwiz_row_count">0 rows</span>
+                        <span class="badge bg-warning text-dark d-none" id="iwiz_edit_count">0 edited</span>
+                    </div>
+                </div>
+                <div class="card-body p-3">
+                    <div class="alert alert-info small mb-3">
+                        <i class="fa-solid fa-pen-to-square me-1"></i>
+                        Click the <strong>Edit</strong> button on any row to modify values inline. Changes override the original data on import.
+                    </div>
+
+                    <div id="iwiz_verify_loading" class="text-center py-5">
+                        <span class="spinner-border spinner-border-sm me-1"></span>Loading preview data...
+                    </div>
+                    <div id="iwiz_verify_error" class="alert alert-danger d-none"></div>
+
+                    <div id="iwiz_verify_content" class="d-none">
+                        <div id="iwiz_already_imported" class="alert alert-warning small d-none mb-3">
+                            <i class="fa-solid fa-exclamation-triangle me-1"></i>
+                            <span id="iwiz_already_count">0</span> order(s) already imported — they will be skipped.
+                        </div>
+                        <div class="table-responsive" style="max-height:55vh; overflow-y:auto;">
+                            <table class="table table-sm table-hover table-bordered mb-0" style="font-size:0.8rem;">
+                                <thead class="table-dark" id="iwiz_verify_head" style="position:sticky; top:0; z-index:2;"></thead>
+                                <tbody id="iwiz_verify_body"></tbody>
+                            </table>
+                        </div>
+                        <div id="iwiz_verify_summary" class="small text-muted mt-2"></div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between py-3">
+                    {% if needs_mapping %}
+                    <button type="button" class="btn btn-outline-secondary" onclick="iwizGoToStep(1)">
+                        <i class="fa-solid fa-arrow-left me-1"></i>Back to Mapping
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                        <i class="fa-solid fa-arrow-left me-1"></i>Back
+                    </button>
+                    {% endif %}
+                    <button type="button" class="btn btn-success" id="iwiz_import_btn" onclick="iwizConfirmImport()">
+                        <i class="fa-solid fa-file-import me-1"></i>Confirm Import
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             STEP 3: CONFIRM / RESULT
+             ═══════════════════════════════════════════════════ -->
+        <div class="bim__step-content" id="wizStep3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div id="iwiz_import_loading" class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <h5>Importing orders...</h5>
+                        <p class="text-muted">Please wait while orders are being created.</p>
+                    </div>
+                    <div id="iwiz_import_result" class="d-none">
+                        <div id="iwiz_import_success" class="d-none text-center py-4">
+                            <i class="fa-solid fa-circle-check text-success" style="font-size:3.5rem;"></i>
+                            <h3 class="mt-3">Import Complete!</h3>
+                            <p class="text-muted" id="iwiz_result_summary"></p>
+                            <div id="iwiz_result_errors" class="alert alert-warning small text-start d-none mt-3"></div>
+                        </div>
+                        <div id="iwiz_import_error" class="d-none text-center py-4">
+                            <i class="fa-solid fa-circle-xmark text-danger" style="font-size:3.5rem;"></i>
+                            <h3 class="mt-3">Import Failed</h3>
+                            <p class="text-danger" id="iwiz_error_msg"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-center gap-2 py-3" id="iwiz_done_footer" style="display:none !important;">
+                    <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-primary">
+                        <i class="fa-solid fa-list me-1"></i>View All Orders
+                    </a>
+                    <a href="{% url 'workforce:import_history' %}" class="btn btn-outline-secondary">
+                        <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                        <i class="fa-solid fa-arrow-left me-1"></i>Back
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// ═══════════════════════════════════════════════════
+// IMPORT WIZARD — Reusable across all import sources
+// ═══════════════════════════════════════════════════
+
+const IWIZ = {
+    importLogId: {{ import_log_id }},
+    businessId: '{{ business_id }}',
+    source: '{{ source }}',
+    needsMapping: {{ needs_mapping|yesno:"true,false" }},
+    columns: {{ columns_json|safe }},
+    savedMapping: {{ saved_mapping_json|safe }},
+    platformIds: {{ platform_ids_json|safe }},
+    rawRowsCount: {{ raw_rows_count }},
+};
+
+// Step sequence
+const IWIZ_STEPS = IWIZ.needsMapping ? [1, 2, 3] : [2, 3];
+let _iwizCurrentStep = IWIZ_STEPS[0];
+let _iwizRowOverrides = {};
+let _iwizPreviewData = null;
+let _iwizAutoMapping = {};
+let _iwizCurrentMapping = {};
+
+// ─── Target Fields (shared across all import types) ───
+const IWIZ_FIELDS = [
+    { name: 'client_order_code', label: 'Order ID', group: 'Order Info' },
+    { name: 'order_date', label: 'Order Date', group: 'Order Info' },
+    { name: 'customer_name', label: 'Customer Name', required: true, group: 'Customer' },
+    { name: 'customer_phone', label: 'Phone 1', required: true, group: 'Customer' },
+    { name: 'customer_whatsapp', label: 'Phone 2 / WhatsApp', group: 'Customer' },
+    { name: 'customer_email', label: 'Email', group: 'Customer' },
+    { name: 'customer_address', label: 'Customer Address', required: true, group: 'Address' },
+    { name: 'dl_landmark', label: 'City / Landmark', group: 'Address' },
+    { name: 'dl_building', label: 'Villa / Building No', group: 'Address' },
+    { name: 'dl_street', label: 'Street No', group: 'Address' },
+    { name: 'dl_zone', label: 'Zone No', group: 'Address' },
+    { name: 'location_link', label: 'Location Link', group: 'Address' },
+    { name: 'dl_latitude', label: 'Latitude', group: 'Address' },
+    { name: 'dl_longitude', label: 'Longitude', group: 'Address' },
+    { name: 'deadline_date', label: 'Preferred Day & Time', group: 'Delivery' },
+    { name: 'package_desc', label: 'Package Desc', group: 'Product' },
+    { name: 'sku', label: 'SKU', group: 'Product' },
+    { name: 'product_url', label: 'Product URL', group: 'Product' },
+    { name: 'package_qty', label: 'Package Qty', group: 'Product' },
+    { name: 'cod_amount', label: 'Price / COD Amount', group: 'Payment' },
+    { name: 'dl_amount', label: 'Delivery Fee', group: 'Payment' },
+    { name: 'seller_notes', label: 'Seller Notes', group: 'Notes' },
+    { name: 'internal_notes', label: 'Internal Notes', group: 'Notes' },
+    { name: 'product_1', label: 'Product 1', group: 'Additional Products' },
+    { name: 'count_1', label: 'Count 1', group: 'Additional Products' },
+    { name: 'product_2', label: 'Product 2', group: 'Additional Products' },
+    { name: 'count_2', label: 'Count 2', group: 'Additional Products' },
+    { name: 'product_3', label: 'Product 3', group: 'Additional Products' },
+    { name: 'count_3', label: 'Count 3', group: 'Additional Products' },
+    { name: 'product_4', label: 'Product 4', group: 'Additional Products' },
+    { name: 'count_4', label: 'Count 4', group: 'Additional Products' },
+    { name: 'product_5', label: 'Product 5', group: 'Additional Products' },
+    { name: 'count_5', label: 'Count 5', group: 'Additional Products' },
+];
+
+// ─── Auto-detect mapping ───
+function iwizAutoDetect(header) {
+    const h = header.trim().toLowerCase();
+    const map = {
+        'order': 'client_order_code', 'order id': 'client_order_code', 'order_id': 'client_order_code', 'order number': 'client_order_code', 'order #': 'client_order_code', 'ref': 'client_order_code', 'reference': 'client_order_code', 'no': 'client_order_code',
+        'order date': 'order_date', 'date': 'order_date', 'created': 'order_date', 'created at': 'order_date',
+        'name': 'customer_name', 'customer name': 'customer_name', 'customer': 'customer_name', 'client name': 'customer_name', 'client': 'customer_name', 'first name': 'customer_name',
+        'phone': 'customer_phone', 'mobile': 'customer_phone', 'phone number': 'customer_phone', 'contact': 'customer_phone', 'phone 1': 'customer_phone',
+        'whatsapp': 'customer_whatsapp', 'phone 2': 'customer_whatsapp', 'alternate phone': 'customer_whatsapp',
+        'email': 'customer_email', 'e-mail': 'customer_email', 'customer email': 'customer_email',
+        'address': 'customer_address', 'delivery address': 'customer_address', 'location': 'customer_address', 'shipping address': 'customer_address', 'full address': 'customer_address',
+        'city': 'dl_landmark', 'area': 'dl_landmark', 'landmark': 'dl_landmark',
+        'building': 'dl_building', 'villa': 'dl_building', 'building no': 'dl_building', 'villa no': 'dl_building',
+        'street': 'dl_street', 'street no': 'dl_street', 'street number': 'dl_street',
+        'zone': 'dl_zone', 'zone no': 'dl_zone', 'zone number': 'dl_zone',
+        'location link': 'location_link', 'google map': 'location_link', 'map link': 'location_link', 'gps': 'location_link',
+        'latitude': 'dl_latitude', 'lat': 'dl_latitude',
+        'longitude': 'dl_longitude', 'lng': 'dl_longitude', 'long': 'dl_longitude',
+        'deadline': 'deadline_date', 'preferred time': 'deadline_date', 'delivery date': 'deadline_date', 'day time': 'deadline_date', 'day': 'deadline_date',
+        'product': 'package_desc', 'product name': 'package_desc', 'item': 'package_desc', 'items': 'package_desc', 'description': 'package_desc', 'package desc': 'package_desc',
+        'sku': 'sku', 'product sku': 'sku', 'item sku': 'sku', 'article': 'sku',
+        'product url': 'product_url', 'url': 'product_url', 'product link': 'product_url',
+        'quantity': 'package_qty', 'qty': 'package_qty', 'count': 'package_qty', 'pcs': 'package_qty', 'package qty': 'package_qty',
+        'cod': 'cod_amount', 'amount': 'cod_amount', 'cod amount': 'cod_amount', 'price': 'cod_amount', 'total': 'cod_amount',
+        'delivery fee': 'dl_amount', 'shipping fee': 'dl_amount', 'delivery amount': 'dl_amount',
+        'notes': 'seller_notes', 'seller notes': 'seller_notes', 'note': 'seller_notes', 'remarks': 'seller_notes', 'comment': 'seller_notes',
+        'internal notes': 'internal_notes', 'staff notes': 'internal_notes', 'notes by ezzy': 'internal_notes',
+    };
+    if (map[h]) return map[h];
+    // Numbered products: product_1, product 1, item_2, item 2, etc.
+    const pm = h.match(/^(product|item)[\s_]*(\d+)$/);
+    if (pm && parseInt(pm[2]) <= 5) return 'product_' + pm[2];
+    const cm = h.match(/^(count|qty|quantity)[\s_]*(\d+)$/);
+    if (cm && parseInt(cm[2]) <= 5) return 'count_' + cm[2];
+    return '';
+}
+
+const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+// ═══════════════════════════════════════════════════
+// STEP NAVIGATION
+// ═══════════════════════════════════════════════════
+function iwizGoToStep(step) {
+    _iwizCurrentStep = step;
+    document.querySelectorAll('.bim__step-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('wizStep' + step)?.classList.add('active');
+
+    document.querySelectorAll('.bim__wizard-step').forEach(el => {
+        const s = parseInt(el.dataset.step);
+        el.classList.remove('active', 'completed');
+        if (s === step) {
+            el.classList.add('active');
+        } else if (IWIZ_STEPS.indexOf(s) < IWIZ_STEPS.indexOf(step)) {
+            el.classList.add('completed');
+        }
+    });
+}
+
+function iwizGoToVerify() {
+    // Collect current mapping: { db_field: source_column }
+    _iwizCurrentMapping = {};
+    document.querySelectorAll('.iwiz-map-select').forEach(s => {
+        if (s.value) _iwizCurrentMapping[s.value] = s.dataset.col;
+    });
+    iwizGoToStep(2);
+    iwizLoadPreview();
+}
+
+// ═══════════════════════════════════════════════════
+// STEP 1: COLUMN MAPPING
+// ═══════════════════════════════════════════════════
+function iwizBuildMapping() {
+    const container = document.getElementById('iwiz_mapping_rows');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const columns = IWIZ.columns;
+    if (!columns.length) {
+        container.innerHTML = '<div class="text-muted p-3">No columns available. Preview data will load from source.</div>';
+        return;
+    }
+
+    document.getElementById('iwiz_col_count').textContent = columns.length + ' columns';
+
+    // Determine which mapping to use
+    const hasSaved = Object.keys(IWIZ.savedMapping).length > 0;
+
+    // Build auto-detect mapping: { db_field: source_col }
+    _iwizAutoMapping = {};
+    columns.forEach(col => {
+        const detected = iwizAutoDetect(col);
+        if (detected) _iwizAutoMapping[detected] = col;
+    });
+
+    // Use saved mapping if available, otherwise auto-detect
+    const useMapping = hasSaved ? IWIZ.savedMapping : _iwizAutoMapping;
+    _iwizCurrentMapping = { ...useMapping };
+
+    // Reverse lookup: { source_col: db_field }
+    const reverseMap = {};
+    Object.entries(useMapping).forEach(([field, col]) => { reverseMap[col] = field; });
+
+    if (hasSaved) {
+        document.getElementById('iwiz_mapping_badge').classList.remove('d-none');
+        document.getElementById('iwiz_reset_btn').classList.remove('d-none');
+    }
+
+    // Build target field options grouped by category
+    let optionsHtml = '<option value="">-- Skip --</option>';
+    let lastGroup = '';
+    IWIZ_FIELDS.forEach(f => {
+        if (f.group !== lastGroup) {
+            if (lastGroup) optionsHtml += '</optgroup>';
+            lastGroup = f.group;
+            optionsHtml += `<optgroup label="${f.group}">`;
+        }
+        const req = f.required ? ' *' : '';
+        optionsHtml += `<option value="${f.name}">${f.label} (${f.name})${req}</option>`;
+    });
+    if (lastGroup) optionsHtml += '</optgroup>';
+
+    // Build one row per source column (in file order)
+    columns.forEach((col, idx) => {
+        const mappedField = reverseMap[col] || '';
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 align-items-center py-2 border-bottom';
+
+        let selectHtml = optionsHtml;
+        if (mappedField) {
+            selectHtml = selectHtml.replace(
+                `value="${mappedField}"`,
+                `value="${mappedField}" selected`
+            );
+        }
+
+        row.innerHTML = `
+            <div style="flex:1;" class="small">
+                <span class="fw-semibold">${col}</span>
+                <span class="text-muted ms-1" style="font-size:0.7rem;">#${idx + 1}</span>
+            </div>
+            <div style="width:30px;text-align:center;"><i class="fa-solid fa-arrow-right text-muted"></i></div>
+            <div style="flex:1;">
+                <select class="form-select form-select-sm iwiz-map-select" data-col="${col}">
+                    ${selectHtml}
+                </select>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    // Add change listeners
+    container.querySelectorAll('.iwiz-map-select').forEach(s => {
+        s.addEventListener('change', iwizUpdateMappedCount);
+        s.addEventListener('change', iwizOnMappingChanged);
+    });
+    iwizUpdateMappedCount();
+}
+
+function iwizUpdateMappedCount() {
+    let count = 0;
+    document.querySelectorAll('.iwiz-map-select').forEach(s => { if (s.value) count++; });
+    const el = document.getElementById('iwiz_mapped_count');
+    if (el) el.textContent = count + ' mapped';
+}
+
+function iwizOnMappingChanged() {
+    const btn = document.getElementById('iwiz_save_btn');
+    if (btn) {
+        btn.classList.remove('d-none');
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-primary');
+        btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping <span class="badge bg-warning text-dark ms-1">changed</span>';
+    }
+}
+
+function iwizResetMapping() {
+    _iwizCurrentMapping = { ..._iwizAutoMapping };
+    document.getElementById('iwiz_mapping_badge').classList.add('d-none');
+    document.getElementById('iwiz_reset_btn').classList.add('d-none');
+    document.getElementById('iwiz_save_btn').classList.add('d-none');
+    // Rebuild with auto-detect
+    IWIZ.savedMapping = {};
+    iwizBuildMapping();
+}
+
+function iwizSaveMapping() {
+    // Collect mapping as { db_field: source_col }
+    const mapping = {};
+    document.querySelectorAll('.iwiz-map-select').forEach(s => {
+        if (s.value) mapping[s.value] = s.dataset.col;
+    });
+
+    const btn = document.getElementById('iwiz_save_btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', csrf);
+    body.append('import_log_id', IWIZ.importLogId);
+    body.append('mapping', JSON.stringify(mapping));
+
+    fetch('{% url "workforce:import_wizard_save_mapping" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf },
+        body: body
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        if (data.success) {
+            IWIZ.savedMapping = mapping;
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline-primary');
+            btn.innerHTML = '<i class="fa-solid fa-check me-1 text-success"></i>Saved!';
+            document.getElementById('iwiz_mapping_badge').classList.remove('d-none');
+            document.getElementById('iwiz_reset_btn').classList.remove('d-none');
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping';
+            }, 2000);
+        } else {
+            btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping';
+            alert(data.error || 'Failed to save mapping');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save Mapping';
+        alert('Network error');
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// STEP 2: VERIFY & EDIT
+// ═══════════════════════════════════════════════════
+function iwizLoadPreview() {
+    const loading = document.getElementById('iwiz_verify_loading');
+    const errorEl = document.getElementById('iwiz_verify_error');
+    const content = document.getElementById('iwiz_verify_content');
+    loading.classList.remove('d-none');
+    errorEl.classList.add('d-none');
+    content.classList.add('d-none');
+
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', csrf);
+    body.append('import_log_id', IWIZ.importLogId);
+    body.append('mapping', JSON.stringify(_iwizCurrentMapping));
+
+    fetch('{% url "workforce:import_wizard_preview" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf },
+        body: body
+    })
+    .then(r => r.json())
+    .then(data => {
+        loading.classList.add('d-none');
+        if (!data.success) {
+            errorEl.textContent = data.error;
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        _iwizPreviewData = data;
+        _iwizRowOverrides = {};
+        iwizBuildVerifyTable(data);
+        content.classList.remove('d-none');
+    })
+    .catch(err => {
+        loading.classList.add('d-none');
+        errorEl.textContent = 'Failed to load preview: ' + err.message;
+        errorEl.classList.remove('d-none');
+    });
+}
+
+function iwizBuildVerifyTable(data) {
+    const thead = document.getElementById('iwiz_verify_head');
+    const tbody = document.getElementById('iwiz_verify_body');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    const fields = data.fields || [];
+    if (!fields.length) {
+        tbody.innerHTML = '<tr><td class="text-muted p-3">No preview data available</td></tr>';
+        return;
+    }
+
+    // Header row 1: Field labels
+    const labelRow = document.createElement('tr');
+    // Header row 2: Source column indicators
+    const sourceRow = document.createElement('tr');
+
+    fields.forEach(f => {
+        const th1 = document.createElement('th');
+        const th2 = document.createElement('th');
+        th1.style.whiteSpace = 'nowrap';
+        th2.style.whiteSpace = 'nowrap';
+
+        if (f.name === 'row_number') {
+            th1.className = 'text-center';
+            th1.innerHTML = '<span class="text-warning">#</span>';
+            th2.className = 'text-center text-muted fw-normal';
+            th2.style.fontSize = '0.65rem';
+            th2.textContent = 'Row';
+        } else {
+            th1.innerHTML = '<span class="text-warning fw-bold">' + f.label + '</span>';
+            th1.title = 'DB column: ' + f.name;
+            th2.className = 'fw-normal';
+            th2.style.fontSize = '0.65rem';
+            th2.innerHTML = f.sheet_col
+                ? '<span class="badge bg-secondary" style="font-size:0.6rem;font-weight:normal;">&larr; ' + f.sheet_col + '</span>'
+                : '<span class="text-muted">&mdash;</span>';
+        }
+        labelRow.appendChild(th1);
+        sourceRow.appendChild(th2);
+    });
+
+    // Action column header
+    const thAct = document.createElement('th');
+    thAct.textContent = 'Edit';
+    thAct.style.whiteSpace = 'nowrap';
+    labelRow.appendChild(thAct);
+    sourceRow.appendChild(document.createElement('th'));
+
+    thead.appendChild(labelRow);
+    thead.appendChild(sourceRow);
+
+    // Data rows
+    const preview = data.preview || [];
+    document.getElementById('iwiz_row_count').textContent = preview.length + ' rows';
+
+    preview.forEach(row => {
+        const rowKey = row.platform_id || row.row_number || '';
+        const tr = document.createElement('tr');
+        tr.dataset.rowKey = rowKey;
+
+        fields.forEach(f => {
+            const td = document.createElement('td');
+            td.dataset.field = f.name;
+            const val = row[f.name] || '';
+            const display = val === '' ? '—' : val;
+
+            if (f.name === 'row_number') {
+                td.className = 'text-muted small';
+                td.textContent = display;
+            } else if (f.name === 'client_order_code' || f.name === 'cod_amount') {
+                td.className = 'fw-semibold';
+                td.textContent = display;
+            } else if (f.name === 'customer_name') {
+                td.textContent = display;
+            } else {
+                td.className = 'text-muted small';
+                td.textContent = typeof display === 'string' && display.length > 40 ? display.substring(0, 40) + '…' : display;
+            }
+            tr.appendChild(td);
+        });
+
+        // Edit button
+        const actTd = document.createElement('td');
+        actTd.className = 'text-center';
+        actTd.innerHTML = '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="iwizToggleEdit(this)" title="Edit row"><i class="fa-solid fa-pen-to-square"></i></button>';
+        tr.appendChild(actTd);
+        tbody.appendChild(tr);
+    });
+
+    // Already imported warning
+    const alreadyDiv = document.getElementById('iwiz_already_imported');
+    if (data.already_imported && data.already_imported.length > 0) {
+        document.getElementById('iwiz_already_count').textContent = data.already_imported.length;
+        alreadyDiv.classList.remove('d-none');
+    } else {
+        alreadyDiv.classList.add('d-none');
+    }
+
+    // Summary
+    const skipText = data.already_imported?.length ? ', ' + data.already_imported.length + ' will be skipped' : '';
+    document.getElementById('iwiz_verify_summary').textContent =
+        preview.length + ' order(s) ready to import' + skipText;
+}
+
+function iwizToggleEdit(btn) {
+    const tr = btn.closest('tr');
+    const rowKey = tr.dataset.rowKey;
+    const isEditing = tr.classList.contains('iwiz-editing');
+    const fields = _iwizPreviewData?.fields || [];
+
+    if (!isEditing) {
+        // Enter edit mode
+        tr.classList.add('iwiz-editing');
+        btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-success');
+
+        fields.forEach(f => {
+            if (f.name === 'row_number') return;
+            const td = tr.querySelector('td[data-field="' + f.name + '"]');
+            if (!td) return;
+            const curVal = td.textContent === '—' ? '' : td.textContent;
+            td.innerHTML = '<input type="text" class="form-control form-control-sm" style="min-width:80px;font-size:0.78rem;" value="' + curVal.replace(/"/g, '&quot;') + '" data-orig="' + curVal.replace(/"/g, '&quot;') + '">';
+        });
+    } else {
+        // Save edits
+        tr.classList.remove('iwiz-editing');
+        btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-secondary');
+
+        let hasChanges = false;
+        if (!_iwizRowOverrides[rowKey]) _iwizRowOverrides[rowKey] = {};
+
+        fields.forEach(f => {
+            if (f.name === 'row_number') return;
+            const td = tr.querySelector('td[data-field="' + f.name + '"]');
+            if (!td) return;
+            const input = td.querySelector('input');
+            if (!input) return;
+            const newVal = input.value.trim();
+            const origVal = input.dataset.orig;
+            if (newVal !== origVal) {
+                _iwizRowOverrides[rowKey][f.name] = newVal;
+                hasChanges = true;
+            }
+            td.textContent = newVal || '—';
+        });
+
+        if (hasChanges) {
+            tr.classList.add('table-info');
+        }
+
+        // Update edit count badge
+        const editCount = Object.keys(_iwizRowOverrides).filter(k => Object.keys(_iwizRowOverrides[k]).length > 0).length;
+        const editBadge = document.getElementById('iwiz_edit_count');
+        if (editCount > 0) {
+            editBadge.textContent = editCount + ' edited';
+            editBadge.classList.remove('d-none');
+        } else {
+            editBadge.classList.add('d-none');
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// STEP 3: CONFIRM IMPORT
+// ═══════════════════════════════════════════════════
+function iwizConfirmImport() {
+    iwizGoToStep(3);
+    const loading = document.getElementById('iwiz_import_loading');
+    const result = document.getElementById('iwiz_import_result');
+    loading.classList.remove('d-none');
+    result.classList.add('d-none');
+
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', csrf);
+    body.append('import_log_id', IWIZ.importLogId);
+    body.append('mapping', JSON.stringify(_iwizCurrentMapping));
+    if (Object.keys(_iwizRowOverrides).length > 0) {
+        body.append('row_overrides', JSON.stringify(_iwizRowOverrides));
+    }
+
+    fetch('{% url "workforce:import_wizard_confirm" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf },
+        body: body
+    })
+    .then(r => r.json())
+    .then(data => {
+        loading.classList.add('d-none');
+        result.classList.remove('d-none');
+        document.getElementById('iwiz_done_footer').style.display = 'flex';
+        document.getElementById('iwiz_done_footer').classList.add('d-flex');
+
+        if (data.success) {
+            document.getElementById('iwiz_import_success').classList.remove('d-none');
+            document.getElementById('iwiz_import_error').classList.add('d-none');
+
+            let msg = '<strong>' + (data.created || 0) + '</strong> order(s) imported successfully';
+            if (data.skipped) msg += ', <strong>' + data.skipped + '</strong> already existed (skipped)';
+            document.getElementById('iwiz_result_summary').innerHTML = msg;
+
+            if (data.errors && data.errors.length) {
+                const errDiv = document.getElementById('iwiz_result_errors');
+                errDiv.innerHTML = '<strong>Errors:</strong><ul class="mb-0 mt-1">' +
+                    data.errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
+                errDiv.classList.remove('d-none');
+            }
+        } else {
+            document.getElementById('iwiz_import_success').classList.add('d-none');
+            document.getElementById('iwiz_import_error').classList.remove('d-none');
+            document.getElementById('iwiz_error_msg').textContent = data.error || 'Unknown error';
+        }
+    })
+    .catch(err => {
+        loading.classList.add('d-none');
+        result.classList.remove('d-none');
+        document.getElementById('iwiz_done_footer').style.display = 'flex';
+        document.getElementById('iwiz_done_footer').classList.add('d-flex');
+        document.getElementById('iwiz_import_success').classList.add('d-none');
+        document.getElementById('iwiz_import_error').classList.remove('d-none');
+        document.getElementById('iwiz_error_msg').textContent = 'Network error: ' + err.message;
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+    if (IWIZ.needsMapping) {
+        iwizBuildMapping();
+    } else {
+        // Skip mapping, go directly to verify
+        iwizLoadPreview();
+    }
+});
+</script>
+{% endblock extra_js %}

@@ -19,12 +19,12 @@
 
     <!-- PWA Modern CSS -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260308a">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260317k">
     <!-- Fleet Component CSS - fth__ ffs__ fpm__ BEM blocks -->
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260308a">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260317k">
 
     <!-- AI Tools CSS (shared modal, results, progress) -->
-    <link rel="stylesheet" href="{% static 'ai_agent/css/ai-tools.css' %}?v=20260308a" type="text/css" />
+    <link rel="stylesheet" href="{% static 'ai_agent/css/ai-tools.css' %}?v=20260317k" type="text/css" />
 
     {% block extra_css %}{% endblock %}
 
@@ -147,18 +147,8 @@
 
     <!-- Scripts -->
     <script>
-        // Prevent pull-to-refresh on iOS
-        let startY = 0;
-        document.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].pageY;
-        }, { passive: true });
-
-        document.addEventListener('touchmove', (e) => {
-            const y = e.touches[0].pageY;
-            if (y > startY && window.scrollY === 0) {
-                e.preventDefault();
-            }
-        }, { passive: false });
+        // Pull-to-refresh is prevented by CSS overscroll-behavior-y: none on body.
+        // No JS touchmove interception needed — it kills scroll performance.
 
         // Toast notification system
         function showToast(message, type = 'info', duration = 3000) {
@@ -399,7 +389,7 @@
     </script>
 
     <!-- AI Address Parse (global utility) -->
-    <script src="{% static 'ai_agent/js/ai-address-parse.js' %}?v=20260308a"></script>
+    <script src="{% static 'ai_agent/js/ai-address-parse.js' %}?v=20260317k"></script>
 
     {% block extra_js %}{% endblock %}
 </body>

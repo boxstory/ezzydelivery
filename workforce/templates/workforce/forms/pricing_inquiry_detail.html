@@ -168,12 +168,12 @@
           </div>
           <div class="pid__field">
             <span class="pid__field__lbl">Website URL</span>
-            <span class="pid__field__val pid-view">{{ inquiry.website_url|default:"—" }}</span>
+            <span class="pid__field__val pid-view">{% if inquiry.website_url %}<a href="{% if inquiry.website_url|slice:':4' == 'http' %}{{ inquiry.website_url }}{% else %}https://{{ inquiry.website_url }}{% endif %}" target="_blank" rel="noopener">{{ inquiry.website_url }}</a>{% else %}—{% endif %}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="website_url" value="{{ inquiry.website_url|default:'' }}">
           </div>
           <div class="pid__field">
             <span class="pid__field__lbl">Social Media Profile</span>
-            <span class="pid__field__val pid-view">{{ inquiry.social_profile|default:"—" }}</span>
+            <span class="pid__field__val pid-view">{% if inquiry.social_profile %}<a href="{% if inquiry.social_profile|slice:':4' == 'http' %}{{ inquiry.social_profile }}{% else %}https://{{ inquiry.social_profile }}{% endif %}" target="_blank" rel="noopener">{{ inquiry.social_profile }}</a>{% else %}—{% endif %}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="social_profile" value="{{ inquiry.social_profile|default:'' }}">
           </div>
 
@@ -502,7 +502,7 @@
             </a>
             {% endif %}
             {% if inquiry.website_url %}
-            <a href="{{ inquiry.website_url }}" target="_blank" class="pid__contact__item">
+            <a href="{% if inquiry.website_url|slice:':4' == 'http' %}{{ inquiry.website_url }}{% else %}https://{{ inquiry.website_url }}{% endif %}" target="_blank" rel="noopener" class="pid__contact__item">
               <i class="fa-solid fa-globe"></i>
               <div>
                 <div class="pid__contact__label">Website URL</div>
@@ -510,15 +510,13 @@
               </div>
             </a>
             {% endif %}
-            {% if inquiry.social_profile %}
-            <a href="{{ inquiry.social_profile }}" target="_blank" class="pid__contact__item">
+            <a href="{% if inquiry.social_profile %}{% if inquiry.social_profile|slice:':4' == 'http' %}{{ inquiry.social_profile }}{% else %}https://{{ inquiry.social_profile }}{% endif %}{% else %}#{% endif %}" {% if inquiry.social_profile %}target="_blank" rel="noopener"{% endif %} class="pid__contact__item{% if not inquiry.social_profile %} opacity-50{% endif %}">
               <i class="fa-solid fa-share-nodes"></i>
               <div>
                 <div class="pid__contact__label">Social Media Profile</div>
-                <div class="pid__contact__val">{{ inquiry.social_profile|truncatechars:45 }}</div>
+                <div class="pid__contact__val">{{ inquiry.social_profile|default:"—"|truncatechars:45 }}</div>
               </div>
             </a>
-            {% endif %}
           </div>
 
           <div class="pid__divider"></div>

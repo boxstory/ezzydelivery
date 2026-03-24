@@ -693,6 +693,7 @@ NOTIFICATION_TYPE_CHOICES = [
     ('delivery_assigned', 'Delivery Assigned'),
     ('cod_collected', 'COD Collected'),
     ('earnings_settled', 'Earnings Settled'),
+    ('order_comment', 'Order Comment'),
     ('alert', 'Alert'),
     ('system', 'System'),
 ]

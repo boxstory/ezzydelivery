@@ -94,6 +94,17 @@ class BatchService:
             }
         )
 
+        # Fire auto flow for batch created
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('staff_batch_created', extra_context={
+                'order_number': order.order_number or '',
+                'zone': str(order.dl_zone) if order.dl_zone else '',
+                'business_name': str(order.business) if order.business else '',
+            })
+        except Exception as e:
+            logger.warning(f"Auto flow failed for batch created: {e}")
+
         logger.info(f"Created batch {batch.batch_code} for zone {order.dl_zone}")
         return batch
 
@@ -188,6 +199,16 @@ class BatchService:
                 'total_cod': str(batch.total_cod)
             }
         )
+
+        # Fire auto flow for batch dispatched
+        try:
+            from core.auto_flow_executor import execute_flows_for_trigger
+            execute_flows_for_trigger('staff_batch_dispatched', extra_context={
+                'order_number': batch.batch_code or '',
+                'zone': str(batch.destination_zone) if batch.destination_zone else '',
+            })
+        except Exception as e:
+            logger.warning(f"Auto flow failed for batch dispatched: {e}")
 
         logger.info(f"Released batch {batch.batch_code} - reason: {reason}")
 

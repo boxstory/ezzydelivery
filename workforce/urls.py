@@ -23,6 +23,7 @@ urlpatterns = [
     path('google-sheets/auth/', workforce_views.google_sheets_auth_start, name='google_sheets_auth_start'),
     path('google-sheets/auth/callback/', workforce_views.google_sheets_auth_callback, name='google_sheets_auth_callback'),
     path('sellers/<int:business_id>/', workforce_views.seller_detail, name='seller_detail'),
+    path('sellers/<int:business_id>/api-products/', workforce_views.seller_api_products, name='seller_api_products'),
     path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
 
     # Drivers section urls -------------------------------------------------------------------
@@ -45,7 +46,15 @@ urlpatterns = [
     path('orders/bulk-import/', orders_views.bulk_import_orders, name='wf_orders_bulk_import'),
     path('orders/bulk-import/preview/', orders_views.bulk_import_preview, name='wf_orders_bulk_preview'),
     path('orders/bulk-import/save/', orders_views.bulk_import_save, name='wf_orders_bulk_save'),
+    path('orders/bulk-import/save-mapping/', orders_views.bulk_import_save_mapping, name='wf_orders_bulk_save_mapping'),
     path('orders/bulk-import/finalize/', orders_views.bulk_import_finalize, name='wf_orders_bulk_finalize'),
+    # Reusable Import Wizard
+    path('import-wizard/prepare/', workforce_views.import_wizard_prepare, name='import_wizard_prepare'),
+    path('import-wizard/<int:import_log_id>/', workforce_views.import_wizard, name='import_wizard'),
+    path('import-wizard/preview/', workforce_views.import_wizard_preview, name='import_wizard_preview'),
+    path('import-wizard/confirm/', workforce_views.import_wizard_confirm, name='import_wizard_confirm'),
+    path('import-wizard/save-mapping/', workforce_views.import_wizard_save_mapping, name='import_wizard_save_mapping'),
+
     path('orders/api-orders/', workforce_views.wf_api_orders, name='wf_api_orders'),
     path('orders/api-orders/bulk-transfer/', workforce_views.bulk_transfer_api_orders, name='bulk_transfer_api_orders'),
     path('orders/api-orders/import/', workforce_views.import_api_orders, name='import_api_orders'),
@@ -53,6 +62,9 @@ urlpatterns = [
     path('orders/api-orders/sheet-headers/', workforce_views.wf_sheet_headers, name='wf_sheet_headers'),
     path('orders/api-orders/save-mapping/', workforce_views.wf_save_column_mapping, name='wf_save_column_mapping'),
     path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
+    # Webhook Imports
+    path('webhook-imports/', workforce_views.wf_webhook_imports, name='wf_webhook_imports'),
+    path('webhook-imports/generate-key/<int:business_id>/', workforce_views.wf_webhook_generate_key, name='wf_webhook_generate_key'),
     path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
     path('orders/fulfilled-clients/', workforce_views.fulfilled_clients_orders, name='wf_orders_fulfilled_clients'),
@@ -137,7 +149,6 @@ urlpatterns = [
     path('fleet/earnings-verification/', workforce_views.earnings_verification, name='earnings_verification'),
     path('fleet/earnings-verification/action/', workforce_views.earnings_verification_action, name='earnings_verification_action'),
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
-    path('fleet/generate-demo-transactions/', workforce_views.generate_demo_transactions, name='generate_demo_transactions'),
     path('fleet/bulk-settle-transactions/', workforce_views.bulk_settle_transactions, name='bulk_settle_transactions'),
 
     # COD Settlement Report URLs
@@ -258,6 +269,7 @@ urlpatterns = [
     path('onedrive-sources/', workforce_views.onedrive_sources, name='onedrive_sources'),
     path('onedrive-sources/<int:source_id>/sheets/', workforce_views.onedrive_fetch_sheets, name='onedrive_fetch_sheets'),
     path('onedrive-sources/<int:source_id>/preview/', workforce_views.onedrive_sheet_preview, name='onedrive_sheet_preview'),
+    path('onedrive-sources/<int:source_id>/save-mapping/', workforce_views.onedrive_save_mapping, name='onedrive_save_mapping'),
     path('onedrive-sources/<int:source_id>/import/', workforce_views.onedrive_import_trigger, name='onedrive_import_trigger'),
 
     # Hub Operations
@@ -266,5 +278,20 @@ urlpatterns = [
     path('hub/batches/<int:batch_id>/', workforce_views.hub_batch_detail, name='hub_batch_detail'),
     path('hub/batches/<int:batch_id>/assign-driver/', workforce_views.hub_batch_assign_driver, name='hub_batch_assign_driver'),
     path('hub/batches/<int:batch_id>/update-status/', workforce_views.hub_batch_update_status, name='hub_batch_update_status'),
+
+    # Auto Triggers
+    path('auto-triggers/', workforce_views.auto_triggers_list, name='auto_triggers_list'),
+    path('auto-triggers/toggle/', workforce_views.auto_trigger_toggle, name='auto_trigger_toggle'),
+    path('auto-triggers/update/', workforce_views.auto_trigger_update, name='auto_trigger_update'),
+    path('auto-triggers/flows/', workforce_views.auto_flows_list, name='auto_flows_list'),
+    path('auto-triggers/flows/add/', workforce_views.auto_flow_add, name='auto_flow_add'),
+    path('auto-triggers/flows/<int:flow_id>/edit/', workforce_views.auto_flow_edit, name='auto_flow_edit'),
+    path('auto-triggers/flows/toggle/', workforce_views.auto_flow_toggle, name='auto_flow_toggle'),
+    path('auto-triggers/flows/delete/', workforce_views.auto_flow_delete, name='auto_flow_delete'),
+    path('auto-triggers/flows/test/', workforce_views.auto_flow_test, name='auto_flow_test'),
+    path('auto-triggers/flows/<int:flow_id>/logs/', workforce_views.auto_flow_logs, name='auto_flow_logs'),
+
+    # WhatsApp Instances
+    path('auto-triggers/whatsapp-instances/', workforce_views.whatsapp_instances_list, name='whatsapp_instances_list'),
 
 ]

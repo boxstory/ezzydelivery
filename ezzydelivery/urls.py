@@ -81,6 +81,7 @@ urlpatterns = [
 
     path('business/', include('business.urls', namespace='business')),
     path('orders/', include('orders.urls', namespace='orders')),
+    path('v/<str:phone>/<str:token>/', orders_views.verify_location_short, name='verify_location_short'),
 
     path('fleet/', include('fleet.urls', namespace='fleet')),
     path('delivery/', include('delivery.urls', namespace='delivery')),

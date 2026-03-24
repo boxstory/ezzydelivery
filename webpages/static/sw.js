@@ -1,7 +1,7 @@
 // EzzyDriver Service Worker
-const CACHE_NAME = 'ezzydriver-v4';
-const STATIC_CACHE = 'ezzydriver-static-v4';
-const DYNAMIC_CACHE = 'ezzydriver-dynamic-v4';
+const CACHE_NAME = 'ezzydriver-v5';
+const STATIC_CACHE = 'ezzydriver-static-v5';
+const DYNAMIC_CACHE = 'ezzydriver-dynamic-v5';
 
 // Static assets to cache
 const STATIC_ASSETS = [
@@ -57,18 +57,18 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For static assets - cache first
+  // For static assets - network first with cache fallback
+  // This ensures ?v= cache-busting works correctly
   if (url.pathname.startsWith('/static/')) {
     event.respondWith(
-      caches.match(request).then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        return fetch(request).then(networkResponse => {
-          return caches.open(STATIC_CACHE).then(cache => {
-            cache.put(request, networkResponse.clone());
-            return networkResponse;
-          });
+      fetch(request).then(networkResponse => {
+        return caches.open(STATIC_CACHE).then(cache => {
+          cache.put(request, networkResponse.clone());
+          return networkResponse;
+        });
+      }).catch(() => {
+        return caches.match(request).then(cachedResponse => {
+          return cachedResponse || new Response('', { status: 408 });
         });
       })
     );
