@@ -1,0 +1,311 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Pack — {{ pick_list.pick_number }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ═══ Pack Station — pak__ prefix ═══ */
+.pak__progress-wrap { margin-bottom: 0.5rem; }
+.pak__progress-bar {
+    height: 10px; background: var(--wh-border-light, #eef0f4);
+    border-radius: 5px; overflow: hidden;
+}
+.pak__progress-fill {
+    height: 100%; border-radius: 5px; transition: width 0.4s ease;
+    background: linear-gradient(90deg, var(--wh-blue, #2563eb), #6366f1);
+}
+.pak__progress-fill--done { background: linear-gradient(90deg, #15803d, #22c55e); }
+.pak__progress-label {
+    display: flex; justify-content: space-between;
+    font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--wh-muted); margin-bottom: 0.25rem; font-weight: 600;
+}
+
+/* Order card */
+.pak__order {
+    border: 1px solid var(--wh-border, #e2e6ed);
+    border-radius: 8px; margin-bottom: 0.75rem;
+    overflow: hidden; transition: all 0.2s ease;
+    background: var(--wh-surface, #fff);
+}
+.pak__order--packed {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+.pak__order--packed .pak__order-header { background: #dcfce7; }
+
+/* Order header — clickable to pack */
+.pak__order-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    user-select: none; transition: background 0.12s ease;
+    background: var(--wh-surface-alt, #f8f9fb);
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+}
+.pak__order-header:hover { background: var(--wh-border-light, #eef0f4); }
+.pak__order--packed .pak__order-header:hover { background: #bbf7d0; }
+
+/* Pack checkbox */
+.pak__check {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 2px solid var(--wh-border, #e2e6ed); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 0.875rem; color: transparent;
+    transition: all 0.2s ease;
+}
+.pak__order--packed .pak__check {
+    background: #15803d; border-color: #15803d; color: #fff;
+}
+
+/* Order info */
+.pak__order-info { flex: 1; min-width: 0; }
+.pak__order-num {
+    font-family: var(--wh-mono, monospace);
+    font-size: 0.875rem; font-weight: 700; color: var(--wh-navy, #0c1a2e);
+}
+.pak__order--packed .pak__order-num { color: #15803d; }
+.pak__order-meta {
+    font-size: 0.6875rem; color: var(--wh-muted, #64748b);
+    display: flex; gap: 0.625rem; flex-wrap: wrap; margin-top: 0.125rem;
+}
+.pak__order-meta i { font-size: 0.5625rem; width: 10px; text-align: center; }
+
+/* Status label */
+.pak__status {
+    font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 0.25rem 0.5rem; border-radius: 4px;
+    flex-shrink: 0;
+}
+.pak__status--pending { background: #fef3c7; color: #92400e; }
+.pak__status--packed { background: #dcfce7; color: #15803d; }
+
+/* Product list inside order */
+.pak__products { padding: 0; }
+.pak__product {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+    font-size: 0.8125rem;
+}
+.pak__product:last-child { border-bottom: none; }
+.pak__product-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: var(--wh-surface-alt, #f8f9fb);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.625rem; color: var(--wh-muted); flex-shrink: 0;
+}
+.pak__product-name {
+    flex: 1; min-width: 0; font-weight: 500; color: var(--wh-slate, #334155);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pak__product-sku {
+    font-family: var(--wh-mono, monospace); font-size: 0.6875rem;
+    color: var(--wh-dim, #94a3b8);
+}
+.pak__product-qty {
+    font-family: var(--wh-mono, monospace); font-weight: 700;
+    font-size: 0.8125rem; color: var(--wh-navy, #0c1a2e);
+    min-width: 30px; text-align: right; flex-shrink: 0;
+}
+
+/* All done banner */
+.pak__done-banner {
+    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+    border: 1px solid #86efac; border-radius: 8px;
+    padding: 1.25rem; text-align: center; margin-top: 1rem;
+}
+.pak__done-banner i { font-size: 2rem; color: #15803d; margin-bottom: 0.5rem; }
+.pak__done-banner h3 { font-size: 1rem; font-weight: 700; color: #15803d; margin: 0 0 0.25rem; }
+.pak__done-banner p { font-size: 0.8125rem; color: #166534; margin: 0; }
+
+/* Mobile */
+@media (max-width: 767.98px) {
+    .pak__order-header { padding: 0.625rem 0.75rem; gap: 0.5rem; }
+    .pak__check { width: 28px; height: 28px; font-size: 0.75rem; }
+    .pak__order-num { font-size: 0.8125rem; }
+    .pak__product { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .pak__product-icon { width: 24px; height: 24px; font-size: 0.5625rem; }
+}
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:pick_list_list' %}">Pick Lists</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <a href="{% url 'warehouse:pick_list_detail' pick_list.pk %}">{{ pick_list.pick_number }}</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">Pack</span>
+  </div>
+
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-box-open"></i></div>
+      <div>
+        <h1 class="wh__title">Pack Station</h1>
+        <p class="wh__subtitle">{{ pick_list.pick_number }} &mdash; {{ pick_list.warehouse.name }}</p>
+      </div>
+    </div>
+    <span class="wh__badge pkl__badge--lg
+      {% if pick_list.status == 'packed' %}wh__badge--success
+      {% elif pick_list.status == 'packing' %}wh__badge--primary
+      {% else %}wh__badge--info{% endif %}"
+      id="pak_status_badge">
+      {{ pick_list.get_status_display }}
+    </span>
+  </div>
+
+  <!-- Progress -->
+  <div class="pak__progress-wrap" id="pak_progress_wrap">
+    <div class="pak__progress-label">
+      <span>Packing Progress</span>
+      <span id="pak_progress_text">{{ packed_orders }} of {{ total_orders }} orders</span>
+    </div>
+    <div class="pak__progress-bar">
+      <div class="pak__progress-fill {% if packed_orders == total_orders %}pak__progress-fill--done{% endif %}"
+           id="pak_progress_fill"
+           style="width:{% if total_orders > 0 %}{% widthratio packed_orders total_orders 100 %}{% else %}0{% endif %}%;"></div>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="wh__card mb-3">
+    <div class="wh__card-body" style="padding:0.75rem 1rem;">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="wh__badge wh__badge--info"><i class="fas fa-info-circle"></i> How to pack</span>
+        <span class="wh__meta">Sort picked products into each order &rarr; Tap the order card to mark as packed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- All done banner (hidden by default) -->
+  <div class="pak__done-banner" id="pak_done_banner" style="display:none;">
+    <i class="fas fa-circle-check d-block"></i>
+    <h3>All Orders Packed!</h3>
+    <p>All {{ total_orders }} orders are packed and ready for dispatch.</p>
+    <a href="{% url 'warehouse:pick_list_list' %}" class="wh__btn wh__btn--primary mt-3">
+      <i class="fas fa-arrow-left"></i> Back to Pick Lists
+    </a>
+  </div>
+
+  <!-- Order Cards -->
+  <div id="pak_order_list">
+    {% for grp in order_list %}
+    <div class="pak__order {% if grp.all_packed %}pak__order--packed{% endif %}" id="pak_order_{{ grp.order.pk }}">
+      <!-- Order Header — tap to pack -->
+      <div class="pak__order-header" onclick="togglePackOrder({{ grp.order.pk }})">
+        <div class="pak__check">
+          {% if grp.all_packed %}<i class="fas fa-check"></i>{% endif %}
+        </div>
+        <div class="pak__order-info">
+          <div class="pak__order-num">{{ grp.order.order_number }}</div>
+          <div class="pak__order-meta">
+            <span><i class="fas fa-store"></i> {{ grp.order.business.business_name|default:"-" }}</span>
+            <span><i class="fas fa-box"></i> {{ grp.items|length }} product{{ grp.items|length|pluralize }}</span>
+            <span><i class="fas fa-cubes"></i> {{ grp.total_qty }} pcs</span>
+            {% if grp.order.customer_name %}
+            <span><i class="fas fa-user"></i> {{ grp.order.customer_name }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <span class="pak__status {% if grp.all_packed %}pak__status--packed{% else %}pak__status--pending{% endif %}"
+              id="pak_badge_{{ grp.order.pk }}">
+          {% if grp.all_packed %}Packed{% else %}Pack{% endif %}
+        </span>
+      </div>
+
+      <!-- Product List -->
+      <div class="pak__products">
+        {% for item in grp.items %}
+        <div class="pak__product">
+          <div class="pak__product-icon"><i class="fas fa-cube"></i></div>
+          <div class="pak__product-name">{{ item.product.item_name }}</div>
+          <div class="pak__product-sku d-none d-md-block">{{ item.product.item_sku }}</div>
+          <div class="pak__product-qty">&times;{{ item.quantity_to_pick }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="wh__empty">
+      <i class="fas fa-box-open"></i>
+      <p><strong>No orders to pack</strong></p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCsrfToken() {
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (el) return el.value;
+    return '';
+}
+
+function togglePackOrder(orderId) {
+    var card = document.getElementById('pak_order_' + orderId);
+    var check = card.querySelector('.pak__check');
+    if (check) check.style.opacity = '0.5';
+
+    fetch("{% url 'warehouse:pack_order' pick_list.pk 999999 %}".replace('999999', orderId), {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+
+        var badge = document.getElementById('pak_badge_' + orderId);
+
+        if (data.is_packed) {
+            card.classList.add('pak__order--packed');
+            if (check) check.innerHTML = '<i class="fas fa-check"></i>';
+            if (badge) { badge.textContent = 'Packed'; badge.className = 'pak__status pak__status--packed'; }
+        } else {
+            card.classList.remove('pak__order--packed');
+            if (check) check.innerHTML = '';
+            if (badge) { badge.textContent = 'Pack'; badge.className = 'pak__status pak__status--pending'; }
+        }
+        if (check) check.style.opacity = '1';
+
+        // Update progress
+        var pText = document.getElementById('pak_progress_text');
+        var pFill = document.getElementById('pak_progress_fill');
+        var pct = data.total_orders > 0 ? Math.round(data.packed_orders / data.total_orders * 100) : 0;
+        if (pText) pText.textContent = data.packed_orders + ' of ' + data.total_orders + ' orders';
+        if (pFill) {
+            pFill.style.width = pct + '%';
+            pFill.className = 'pak__progress-fill' + (pct >= 100 ? ' pak__progress-fill--done' : '');
+        }
+
+        // Update status badge
+        var sBadge = document.getElementById('pak_status_badge');
+        if (sBadge) {
+            if (data.all_done) {
+                sBadge.textContent = 'Packed';
+                sBadge.className = 'wh__badge pkl__badge--lg wh__badge--success';
+            } else {
+                sBadge.textContent = 'Packing';
+                sBadge.className = 'wh__badge pkl__badge--lg wh__badge--primary';
+            }
+        }
+
+        // Show done banner
+        var banner = document.getElementById('pak_done_banner');
+        if (banner) banner.style.display = data.all_done ? 'block' : 'none';
+    })
+    .catch(function() {
+        if (check) check.style.opacity = '1';
+        alert('Network error. Please try again.');
+    });
+}
+</script>
+{% endblock extra_js %}

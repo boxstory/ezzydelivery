@@ -447,7 +447,7 @@ def business_profile_update(request):
         business.save()
         logger.info(f"Business profile updated for user {request.user.id}")
         messages.success(request, 'Your business details have been updated!')
-        return redirect('business:business_profile', business_id=request.user.id)
+        return redirect('business:business_profile', business_id=business_profile.business_id)
     elif request.method == 'POST':
         logger.warning(f"Invalid business update form for user {request.user.id}")
         messages.error(request, "Please correct the errors below.")
@@ -565,8 +565,8 @@ def join_us(request):
     profile = get_cached_profile(request)
     if profile:
         joinusform = core_forms.JoinUsForm(request.POST or None, instance=profile)
-        driverjoinform = fleet_forms.DriverJoinForm()
-        businessjoinform = business_forms.businessRegisterForm()
+        driverjoinform = fleet_forms.DriverJoinForm(request.POST or None)
+        businessjoinform = business_forms.businessRegisterForm(request.POST or None)
 
         if request.method == 'POST':
             if driverjoinform.is_valid():
@@ -1290,8 +1290,9 @@ def make_staff(request):
     Temporary view to set current user as staff.
     Only works for superusers. Remove after use.
     """
-    if not request.user.is_superuser:
-        messages.error(request, "Only superusers can access this.")
+    _prof = getattr(request.user, 'profile', None)
+    if not (request.user.is_superuser or getattr(_prof, 'is_superadmin', False)):
+        messages.error(request, "Only superadmins can access this.")
         return redirect('core:main_dashboard')
 
     profile = get_cached_profile(request)

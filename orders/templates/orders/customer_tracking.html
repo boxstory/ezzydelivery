@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if not_found %}Order Not Found{% else %}Track Order #{{ order.order_number }} | {{ business.business_name }}{% endif %}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/static/webpages/images/ezzy-favicon.png" type="image/png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  {% if show_map %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  {% endif %}
+  <style>
+    :root {
+      --trk-primary: {{ primary_color|default:"#f7c000" }};
+      --trk-secondary: {{ secondary_color|default:"#001f3f" }};
+      --trk-bg: #f5f6fa;
+      --trk-card: #ffffff;
+      --trk-border: #e8eaed;
+      --trk-text: #333;
+      --trk-muted: #6c757d;
+      --trk-radius: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: var(--trk-bg);
+      color: var(--trk-text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .trk-header {
+      background: var(--trk-secondary);
+      padding: 1.25rem 1rem;
+      text-align: center;
+      position: relative;
+    }
+    .trk-header__logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(255,255,255,0.25);
+      margin-bottom: 0.5rem;
+    }
+    .trk-header__business {
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .trk-header__order {
+      color: var(--trk-primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.2rem;
+    }
+
+    /* Container */
+    .trk-container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
+    /* Status badge */
+    .trk-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--trk-primary);
+      color: var(--trk-secondary);
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 20px;
+      margin-top: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .trk-status-badge--failed {
+      background: #dc3545;
+      color: #fff;
+    }
+
+    /* Timeline */
+    .trk-timeline {
+      background: var(--trk-card);
+      border-radius: var(--trk-radius);
+      padding: 1.5rem 1.25rem;
+      margin-top: 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .trk-timeline__title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--trk-muted);
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+    }
+    .trk-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      position: relative;
+      padding-bottom: 1.4rem;
+    }
+    .trk-step:last-child { padding-bottom: 0; }
+    .trk-step__icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.8rem;
+      background: var(--trk-border);
+      color: var(--trk-muted);
+      z-index: 1;
+      transition: all 0.3s ease;
+    }
+    .trk-step--done .trk-step__icon {
+      background: var(--trk-primary);
+      color: var(--trk-secondary);
+    }
+    .trk-step--current .trk-step__icon {
+      background: var(--trk-primary);
+      color: var(--trk-secondary);
+      box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.25);
+      animation: trk-pulse 2s infinite;
+    }
+    @keyframes trk-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.25); }
+      50% { box-shadow: 0 0 0 8px rgba(247, 192, 0, 0.1); }
+    }
+    .trk-step__label {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--trk-muted);
+      padding-top: 0.35rem;
+    }
+    .trk-step--done .trk-step__label,
+    .trk-step--current .trk-step__label {
+      color: var(--trk-text);
+      font-weight: 600;
+    }
+    /* Connector line */
+    .trk-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 16px;
+      top: 34px;
+      width: 2px;
+      height: calc(100% - 34px);
+      background: var(--trk-border);
+    }
+    .trk-step--done:not(:last-child)::after {
+      background: var(--trk-primary);
+    }
+
+    /* Cards */
+    .trk-card {
+      background: var(--trk-card);
+      border-radius: var(--trk-radius);
+      padding: 1.25rem;
+      margin-top: 0.75rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .trk-card__title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--trk-muted);
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+    .trk-card__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.4rem 0;
+    }
+    .trk-card__row + .trk-card__row {
+      border-top: 1px solid var(--trk-border);
+    }
+    .trk-card__label {
+      font-size: 0.85rem;
+      color: var(--trk-muted);
+    }
+    .trk-card__value {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--trk-text);
+      text-align: right;
+    }
+    .trk-card__value--cod {
+      color: #dc3545;
+      font-size: 1rem;
+    }
+
+    /* Driver card */
+    .trk-driver {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .trk-driver__avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--trk-primary);
+      color: var(--trk-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .trk-driver__info { flex: 1; }
+    .trk-driver__name {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .trk-driver__role {
+      font-size: 0.8rem;
+      color: var(--trk-muted);
+    }
+    .trk-driver__call {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #25d366;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      text-decoration: none;
+      transition: transform 0.2s;
+    }
+    .trk-driver__call:hover { transform: scale(1.08); color: #fff; }
+
+    /* Map */
+    .trk-map {
+      border-radius: var(--trk-radius);
+      overflow: hidden;
+      margin-top: 0.75rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    #trk_map_canvas {
+      width: 100%;
+      height: 260px;
+    }
+
+    /* Items list */
+    .trk-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.35rem 0;
+      font-size: 0.85rem;
+    }
+    .trk-item + .trk-item {
+      border-top: 1px solid var(--trk-border);
+    }
+    .trk-item__name { color: var(--trk-text); }
+    .trk-item__qty {
+      color: var(--trk-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Footer */
+    .trk-footer {
+      text-align: center;
+      padding: 1.5rem 1rem;
+      color: var(--trk-muted);
+      font-size: 0.75rem;
+    }
+    .trk-footer a { color: var(--trk-primary); text-decoration: none; }
+
+    /* Not found page */
+    .trk-notfound {
+      text-align: center;
+      padding: 4rem 1.5rem;
+    }
+    .trk-notfound__icon {
+      font-size: 3rem;
+      color: var(--trk-muted);
+      margin-bottom: 1rem;
+    }
+    .trk-notfound__title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--trk-text);
+    }
+    .trk-notfound__text {
+      color: var(--trk-muted);
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    /* Refresh indicator */
+    .trk-refresh {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      color: var(--trk-muted);
+      font-size: 0.72rem;
+      margin-top: 0.5rem;
+    }
+    .trk-refresh i { animation: trk-spin 2s linear infinite; }
+    @keyframes trk-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+{% if not_found %}
+  <!-- Not Found State -->
+  <div class="trk-header" style="--trk-secondary: #001f3f;">
+    <p class="trk-header__business">EzzyDelivery</p>
+  </div>
+  <div class="trk-container">
+    <div class="trk-notfound">
+      <div class="trk-notfound__icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+      <h1 class="trk-notfound__title">Order Not Found</h1>
+      <p class="trk-notfound__text">This tracking link is invalid or has expired. Please check the link and try again.</p>
+    </div>
+  </div>
+
+{% else %}
+  <!-- Header -->
+  <div class="trk-header">
+    {% if logo and logo.business_logo %}
+    <img src="{{ logo.business_logo.url }}" alt="{{ business.business_name }}" class="trk-header__logo">
+    {% endif %}
+    <p class="trk-header__business">{{ business.business_name }}</p>
+    <p class="trk-header__order">Order #{{ order.order_number }}</p>
+    {% if is_failed %}
+    <span class="trk-status-badge trk-status-badge--failed">
+      <i class="fa-solid fa-circle-xmark"></i> {{ task.get_dl_task_status_display }}
+    </span>
+    {% else %}
+    <span class="trk-status-badge">
+      <i class="fa-solid fa-circle-dot"></i> {{ task.get_dl_task_status_display }}
+    </span>
+    {% endif %}
+  </div>
+
+  <div class="trk-container">
+
+    <!-- Status Timeline -->
+    <div class="trk-timeline">
+      <div class="trk-timeline__title">Delivery Progress</div>
+      {% for status_key, label, icon in status_steps %}
+      <div class="trk-step {% if forloop.counter0 < current_step %}trk-step--done{% elif forloop.counter0 == current_step %}trk-step--current{% endif %}">
+        <div class="trk-step__icon">
+          {% if forloop.counter0 < current_step %}
+          <i class="fa-solid fa-check"></i>
+          {% else %}
+          <i class="fa-solid {{ icon }}"></i>
+          {% endif %}
+        </div>
+        <span class="trk-step__label">{{ label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Driver Info -->
+    {% if task.driver and show_driver_name %}
+    <div class="trk-card">
+      <div class="trk-card__title">Your Driver</div>
+      <div class="trk-driver">
+        <div class="trk-driver__avatar">
+          {{ task.driver.user.first_name|first|upper|default:"D" }}
+        </div>
+        <div class="trk-driver__info">
+          <div class="trk-driver__name">{{ task.driver.user.get_full_name|default:task.driver.driver_code }}</div>
+          <div class="trk-driver__role">Delivery Driver</div>
+        </div>
+        {% if show_driver_phone and task.driver.driver_phone %}
+        <a href="tel:{{ task.driver.driver_phone }}" class="trk-driver__call" title="Call driver">
+          <i class="fa-solid fa-phone"></i>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Map -->
+    {% if show_map %}
+    <div class="trk-map">
+      <div id="trk_map_canvas"></div>
+    </div>
+    <div class="trk-refresh">
+      <i class="fa-solid fa-rotate"></i> Live updates every 30 seconds
+    </div>
+    {% endif %}
+
+    <!-- Order Details -->
+    <div class="trk-card">
+      <div class="trk-card__title">Order Details</div>
+      <div class="trk-card__row">
+        <span class="trk-card__label">Order Number</span>
+        <span class="trk-card__value">#{{ order.order_number }}</span>
+      </div>
+      {% if order.customer_name %}
+      <div class="trk-card__row">
+        <span class="trk-card__label">Customer</span>
+        <span class="trk-card__value">{{ order.customer_name }}</span>
+      </div>
+      {% endif %}
+      {% if order.customer_address %}
+      <div class="trk-card__row">
+        <span class="trk-card__label">Delivery Address</span>
+        <span class="trk-card__value" style="max-width:60%; text-align:right;">{{ order.customer_address|truncatechars:60 }}</span>
+      </div>
+      {% endif %}
+      {% if order.cod_amount %}
+      <div class="trk-card__row">
+        <span class="trk-card__label">Cash on Delivery</span>
+        <span class="trk-card__value trk-card__value--cod">QAR {{ order.cod_amount }}</span>
+      </div>
+      {% endif %}
+      {% if task.preferred_time %}
+      <div class="trk-card__row">
+        <span class="trk-card__label">Time Slot</span>
+        <span class="trk-card__value">{{ task.get_preferred_time_display }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Items -->
+    {% if order_items %}
+    <div class="trk-card">
+      <div class="trk-card__title">Items</div>
+      {% for item in order_items %}
+      <div class="trk-item">
+        <span class="trk-item__name">{{ item.item_name|default:item.product_name }}</span>
+        <span class="trk-item__qty">x{{ item.item_qty|default:1 }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="trk-footer">
+      {% if footer_text %}
+        <p>{{ footer_text }}</p>
+      {% else %}
+        <p>Thank you for choosing {{ business.business_name }}</p>
+      {% endif %}
+      <p style="margin-top:0.5rem;">Powered by <a href="https://ezzydelivery.qa" target="_blank">EzzyDelivery</a></p>
+    </div>
+  </div>
+
+  {% if show_map %}
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+  (function() {
+    var deliveryLat = {{ delivery_lat|default:"null" }};
+    var deliveryLng = {{ delivery_lng|default:"null" }};
+    var driverLat = {{ driver_lat|default:"null" }};
+    var driverLng = {{ driver_lng|default:"null" }};
+    var token = "{{ task.tracking_token }}";
+
+    // Default center: Doha
+    var centerLat = driverLat || deliveryLat || 25.2854;
+    var centerLng = driverLng || deliveryLng || 51.5310;
+
+    var map = L.map('trk_map_canvas', {
+      zoomControl: false,
+      attributionControl: false,
+    }).setView([centerLat, centerLng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Delivery pin (red)
+    var deliveryIcon = L.divIcon({
+      html: '<i class="fa-solid fa-location-dot" style="font-size:28px;color:#dc3545;text-shadow:0 2px 4px rgba(0,0,0,0.3);"></i>',
+      className: '',
+      iconSize: [28, 36],
+      iconAnchor: [14, 36],
+    });
+
+    // Driver pin (primary color)
+    var driverIcon = L.divIcon({
+      html: '<i class="fa-solid fa-truck" style="font-size:24px;color:{{ primary_color|default:"#f7c000" }};text-shadow:0 2px 4px rgba(0,0,0,0.3);"></i>',
+      className: '',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+
+    var deliveryMarker = null;
+    var driverMarker = null;
+
+    if (deliveryLat && deliveryLng) {
+      deliveryMarker = L.marker([deliveryLat, deliveryLng], {icon: deliveryIcon}).addTo(map)
+        .bindPopup('Delivery Location');
+    }
+    if (driverLat && driverLng) {
+      driverMarker = L.marker([driverLat, driverLng], {icon: driverIcon}).addTo(map)
+        .bindPopup('Driver');
+    }
+
+    // Fit bounds if we have both
+    function fitBounds() {
+      var bounds = [];
+      if (deliveryMarker) bounds.push(deliveryMarker.getLatLng());
+      if (driverMarker) bounds.push(driverMarker.getLatLng());
+      if (bounds.length > 1) {
+        map.fitBounds(L.latLngBounds(bounds), {padding: [40, 40]});
+      }
+    }
+    fitBounds();
+
+    // Auto-refresh
+    setInterval(function() {
+      fetch('/track/' + token + '/data/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.driver_lat && data.driver_lng) {
+            if (driverMarker) {
+              driverMarker.setLatLng([data.driver_lat, data.driver_lng]);
+            } else {
+              driverMarker = L.marker([data.driver_lat, data.driver_lng], {icon: driverIcon}).addTo(map)
+                .bindPopup('Driver');
+            }
+            fitBounds();
+          }
+          // If status changed to delivered/failed, reload page
+          if (data.status === 'delivered' || data.status === 'failed' || data.status === 'cancelled') {
+            window.location.reload();
+          }
+        })
+        .catch(function() {});
+    }, 30000);
+  })();
+  </script>
+  {% endif %}
+
+{% endif %}
+
+</body>
+</html>

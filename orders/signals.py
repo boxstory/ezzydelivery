@@ -77,7 +77,7 @@ def generate_order_number(business, client_order_code):
 
     return order_number
 
-@receiver(pre_save, sender=Order)
+@receiver(pre_save, sender=Order, dispatch_uid='orders.order_pre_save')
 def order_pre_save_receiver(sender, instance, *args, **kwargs):
     if not instance.order_number:
         # Generate order number: {business_code}-{client_order_code}-{YMMDD}-{sequence}
@@ -98,8 +98,8 @@ def order_pre_save_receiver(sender, instance, *args, **kwargs):
             pass
 
 
-@ receiver(post_save, sender=Order)
-def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
+@receiver(post_save, sender=Order, dispatch_uid='orders.order_post_save')
+def order_post_save_receiver(sender, instance, created, *args, **kwargs):
     logger.debug('order_post_save_receiver')
     if created:
         logger.debug(f'New order created: {instance}')
@@ -156,12 +156,10 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                 dl_building=instance.dl_building,
                 dl_longitude=Decimal('0'),
                 dl_latitude=Decimal('0'))
-            instance.save()
-        
-        if instance.order_number not in OrderBarcode.objects.values_list('order_number'):
+
+        if instance.order_number not in OrderBarcode.objects.values_list('order_number', flat=True):
             OrderBarcode.objects.create(
-                order_id=instance.id, order_number= instance.order_number )
-            instance.save()
+                order_id=instance.id, order_number=instance.order_number)
 
         # OrderItem entries should be created when products are added to the order
         # Not automatically on order creation
@@ -441,8 +439,33 @@ def _create_delivery_task_from_order(order):
     """Create delivery task from verified order (DMS push handled by delivery signal)"""
     from django.utils import timezone
     from decimal import Decimal
+    from business.models import PickupLocation
 
     try:
+        # Auto-assign pickup location if not set:
+        # Priority: active fulfilment centre → default active → first active
+        if not order.pickup_location_id:
+            fallback_pl = (
+                PickupLocation.objects.filter(
+                    business=order.business,
+                    pickup_status='active',
+                    is_fulfilment_center=True,
+                ).order_by('-is_default', 'id').first()
+                or
+                PickupLocation.objects.filter(
+                    business=order.business,
+                    pickup_status='active',
+                ).order_by('-is_default', 'id').first()
+            )
+            if fallback_pl:
+                order.pickup_location = fallback_pl
+                order.save(update_fields=['pickup_location'])
+                logger.info(
+                    f"Order {order.order_number}: auto-assigned pickup location "
+                    f"'{fallback_pl.pickup_location_title}' "
+                    f"(fulfilment={fallback_pl.is_fulfilment_center})"
+                )
+
         # Hub delivery orders: delivery task created later when batch arrives at hub.
         # Ensure address update and geocode are still created, but skip task creation.
         if order.is_hub_delivery:

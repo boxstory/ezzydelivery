@@ -49,6 +49,7 @@ STATUS_STAGE = {
     'failed':        8,
     'rejected':      8,
     'cancelled':     8,
+    'dropsownlost':  8,
 }
 
 _ALL_STATUSES = set(STATUS_STAGE.keys())
@@ -70,7 +71,7 @@ def _build_staff_transitions():
                 forward.add(target)
         transitions[status] = forward
     # Terminal statuses — no forward moves for staff
-    for terminal in ('delivered', 'failed', 'rejected', 'cancelled'):
+    for terminal in ('delivered', 'failed', 'rejected', 'cancelled', 'dropsownlost'):
         transitions[terminal] = set()
     return transitions
 
@@ -102,10 +103,11 @@ DRIVER_TRANSITIONS = {
     'pending':    {'accepted'},
     'for_review': {'accepted'},
     # Terminal
-    'delivered': set(),
-    'failed':    set(),
-    'rejected':  set(),
-    'cancelled': set(),
+    'delivered':    set(),
+    'failed':       set(),
+    'rejected':     set(),
+    'cancelled':    set(),
+    'dropsownlost': set(),
 }
 
 # ---------------------------------------------------------------------------

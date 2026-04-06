@@ -1,0 +1,566 @@
+/* =========================================================
+   Order API Get — Receipt Card Design
+   oag__ prefix
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ── Layout ──────────────────────────────────────────────── */
+.oag {
+  padding: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  font-family: 'Sora', system-ui, sans-serif;
+}
+
+/* ── Hero Header ─────────────────────────────────────────── */
+.oag__hero {
+  margin-bottom: 1.5rem;
+}
+.oag__hero-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.oag__hero-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f7c000;
+  margin-bottom: 0.2rem;
+}
+.oag__hero-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1c1e;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.oag__hero-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Action Buttons ──────────────────────────────────────── */
+.oag__action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: 'Sora', system-ui, sans-serif;
+  text-decoration: none;
+  border: 1.5px solid #dee2e6;
+  background: #fff;
+  color: #495057;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.oag__action-btn:hover {
+  border-color: #adb5bd;
+  color: #212529;
+  text-decoration: none;
+  background: #f8f9fa;
+}
+.oag__action-btn--primary {
+  background: #f7c000;
+  border-color: #f7c000;
+  color: #1a1c1e;
+}
+.oag__action-btn--primary:hover {
+  background: #e6b000;
+  border-color: #e6b000;
+  color: #1a1c1e;
+}
+.oag__action-btn--import {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.oag__action-btn--import:hover {
+  background: #15803d;
+  border-color: #15803d;
+  color: #fff;
+  text-decoration: none;
+}
+
+/* ── Filter Bar ──────────────────────────────────────────── */
+.oag__filter {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 0.625rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.oag__filter-form { flex: 1; }
+.oag__filter-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.oag__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.oag__field-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6c757d;
+}
+.oag__field-input {
+  height: 2.1rem;
+  padding: 0 0.75rem;
+  border: 1.5px solid #dee2e6;
+  border-radius: 0.375rem;
+  font-size: 0.82rem;
+  font-family: 'Sora', system-ui, sans-serif;
+  color: #212529;
+  background: #f8f9fa;
+  transition: border-color 0.15s;
+}
+.oag__field-input:focus {
+  outline: none;
+  border-color: #f7c000;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(247,192,0,0.12);
+}
+.oag__result-count {
+  font-size: 0.8rem;
+  color: #6c757d;
+  white-space: nowrap;
+}
+.oag__count-num {
+  font-weight: 700;
+  color: #1a1c1e;
+  font-size: 1rem;
+}
+
+/* ── Orders List ─────────────────────────────────────────── */
+.oag__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+/* ── Receipt Card ────────────────────────────────────────── */
+.oag__receipt {
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid #e9ecef;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  animation: oag-fade-up 0.35s ease both;
+}
+@keyframes oag-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Receipt Header ──────────────────────────────────────── */
+.oag__receipt-header {
+  background: #1a1c1e;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.oag__receipt-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.oag__order-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #f7c000;
+  letter-spacing: 0.02em;
+}
+.oag__receipt-date {
+  font-size: 0.75rem;
+  color: #adb5bd;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* ── Financial Status Badge ──────────────────────────────── */
+.oag__fin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 2rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.oag__fin-badge--paid            { background: #d1fae5; color: #065f46; }
+.oag__fin-badge--unpaid          { background: #fee2e2; color: #991b1b; }
+.oag__fin-badge--partially_paid  { background: #fef3c7; color: #92400e; }
+.oag__fin-badge--refunded,
+.oag__fin-badge--partially_refunded { background: #fce7f3; color: #831843; }
+.oag__fin-badge--voided          { background: #f1f5f9; color: #64748b; }
+.oag__fin-badge--pending         { background: #fff7ed; color: #c2410c; }
+
+/* ── Receipt Body (Two Panel) ────────────────────────────── */
+.oag__receipt-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+@media (max-width: 700px) {
+  .oag__receipt-body { grid-template-columns: 1fr; }
+}
+
+/* ── Left Panel: Customer & Addresses ───────────────────── */
+.oag__receipt-left {
+  padding: 1.25rem;
+  border-right: 1px solid #f1f3f5;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+@media (max-width: 700px) {
+  .oag__receipt-left { border-right: none; border-bottom: 1px solid #f1f3f5; }
+}
+
+.oag__info-block { display: flex; flex-direction: column; gap: 0.1rem; }
+.oag__info-eyebrow {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #adb5bd;
+  margin-bottom: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.oag__info-primary {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a1c1e;
+  line-height: 1.3;
+}
+.oag__info-secondary {
+  font-size: 0.78rem;
+  color: #6c757d;
+  line-height: 1.5;
+}
+
+/* ── Right Panel: Price Ledger ──────────────────────────── */
+.oag__receipt-right {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.oag__ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.oag__ledger-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px dotted #f1f3f5;
+}
+.oag__ledger-row:last-child { border-bottom: none; }
+.oag__ledger-label {
+  font-size: 0.8rem;
+  color: #6c757d;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+.oag__shipping-type-badge {
+  display: flex !important;
+  width: fit-content !important;
+  align-items: center;
+  gap: 5px;
+  margin-top: 0.5rem;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em;
+  color: #6d28d9 !important;
+  background: #ede9fe !important;
+  border: 1.5px solid #a78bfa !important;
+  border-radius: 5px !important;
+  padding: 3px 10px !important;
+  text-transform: uppercase;
+}
+
+/* Express / سريع → red */
+.oag__shipping-type-badge[data-type*="express"],
+.oag__shipping-type-badge[data-type*="سريع"] {
+  color: #b91c1c !important;
+  background: #fef2f2 !important;
+  border-color: #fca5a5 !important;
+}
+/* Free / مجاني / Normal / عادي → green */
+.oag__shipping-type-badge[data-type*="free"],
+.oag__shipping-type-badge[data-type*="مجاني"],
+.oag__shipping-type-badge[data-type*="normal"],
+.oag__shipping-type-badge[data-type*="عادي"] {
+  color: #15803d !important;
+  background: #f0fdf4 !important;
+  border-color: #86efac !important;
+}
+/* Standard → blue */
+.oag__shipping-type-badge[data-type*="standard"] {
+  color: #1d4ed8 !important;
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+}
+/* Same Day / نفس اليوم → orange */
+.oag__shipping-type-badge[data-type*="same day"],
+.oag__shipping-type-badge[data-type*="same-day"],
+.oag__shipping-type-badge[data-type*="نفس اليوم"] {
+  color: #c2410c !important;
+  background: #fff7ed !important;
+  border-color: #fdba74 !important;
+}
+
+.oag__ledger-note {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-inline-start: 4px;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+.oag__ledger-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #495057;
+  white-space: nowrap;
+}
+.oag__ledger-row--discount .oag__ledger-label { color: #15803d; }
+.oag__ledger-row--discount .oag__ledger-value { color: #15803d; }
+
+.oag__ledger-divider {
+  border: none;
+  border-top: 2px solid #1a1c1e;
+  margin: 0.5rem 0 0.25rem;
+}
+.oag__ledger-divider--light {
+  border-top: 1px dashed #dee2e6;
+  margin: 0.4rem 0;
+}
+
+.oag__ledger-row--total {
+  border-bottom: none;
+  padding-top: 0.5rem;
+}
+.oag__ledger-row--total .oag__ledger-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a1c1e;
+}
+.oag__ledger-row--total .oag__ledger-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1c1e;
+}
+.oag__ledger-row--paid .oag__ledger-label { color: #15803d; }
+.oag__ledger-row--paid .oag__ledger-value { color: #15803d; font-weight: 600; }
+.oag__ledger-row--cod .oag__ledger-label  { color: #6c757d; }
+.oag__ledger-row--cod .oag__ledger-value  { color: #6c757d; font-weight: 600; }
+.oag__ledger-row--cod-due {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.06)) !important;
+  border: none !important;
+  border-left: 3px solid #ef4444 !important;
+  border-radius: 0 6px 6px 0 !important;
+  padding: 0.55rem 0.75rem !important;
+  margin-top: 0.4rem !important;
+}
+.oag__ledger-row--cod-due .oag__ledger-label {
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+  font-size: 0.82rem !important;
+}
+.oag__ledger-row--cod-due .oag__ledger-value {
+  color: #dc2626 !important;
+  font-weight: 800 !important;
+  font-size: 1.1rem !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* ── Line Items ─────────────────────────────────────────── */
+.oag__items {
+  border-top: 1px solid #f1f3f5;
+  background: #fafafa;
+  padding: 0.75rem 1.25rem;
+}
+.oag__items-header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #adb5bd;
+  margin-bottom: 0.6rem;
+}
+.oag__items-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.oag__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #f1f3f5;
+}
+.oag__item:last-child { border-bottom: none; }
+.oag__item-qty {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #f7c000;
+  background: #1a1c1e;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  min-width: 2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+.oag__item-name {
+  font-size: 0.8rem;
+  color: #495057;
+  flex: 1;
+  line-height: 1.3;
+}
+.oag__item-price {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #1a1c1e;
+  white-space: nowrap;
+}
+
+/* ── Empty State ────────────────────────────────────────── */
+.oag__empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 0.75rem;
+}
+.oag__empty-icon {
+  font-size: 2.5rem;
+  color: #dee2e6;
+  margin-bottom: 1rem;
+}
+.oag__empty-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0.25rem;
+}
+.oag__empty-hint {
+  font-size: 0.82rem;
+  color: #adb5bd;
+  margin: 0;
+}
+
+/* ── Workforce overrides ─────────────────────────────────── */
+.oag__receipt--imported .oag__receipt-header {
+  background: #14532d;
+}
+.oag__receipt--imported {
+  border-color: #bbf7d0;
+}
+.oag__source-tag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: rgba(255,255,255,0.12);
+  color: #e2e8f0;
+}
+.woa__check {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.oag__imported-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 2rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #4ade80;
+  color: #14532d;
+  text-decoration: none;
+}
+.oag__imported-link:hover {
+  background: #86efac;
+  color: #14532d;
+  text-decoration: none;
+}
+
+/* ── Import status badges ──────────────────────────────────── */
+.oag__status-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.3rem;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.oag__status-badge--imported {
+  background: #d1fae5;
+  color: #065f46;
+}
+.oag__status-badge--new {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.oag__status-badge--unsynced {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.oag__receipt--imported {
+  opacity: 0.7;
+}
+.oag__select-cb:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

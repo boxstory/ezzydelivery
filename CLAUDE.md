@@ -23,6 +23,28 @@ python manage.py collectstatic --noinput
 
 ---
 
+## ⚠️ CRITICAL RULE: Read Before Coding
+
+**Before making ANY code changes, ALWAYS read the relevant existing code first. Trace the full data flow:**
+
+1. **Read the view** — understand what context variables are passed
+2. **Read the template** — understand HTML structure, block hierarchy, JS variable scope
+3. **Read the JS** — understand init flow, event handlers, variable declarations (scope!)
+4. **Check related functions** — any function you call or modify, read it fully first
+
+**NEVER:**
+- Add variables without checking where they're declared and their scope
+- Add auto-fetch/auto-load behavior without checking if data is already pre-loaded
+- Override or overwrite saved data without checking if other code depends on it
+- Create separate pages/views when the existing pattern already handles it (e.g., platform tabs in mapping manager)
+
+**ALWAYS:**
+- Trace: View context → Template rendering → JS initialization → Runtime behavior
+- Check variable scope (const/let inside DOMContentLoaded vs top-level)
+- Verify existing save/load logic before adding new fields or endpoints
+
+---
+
 ## ⚠️ Server Alert Handling
 
 The server is monitored by **ezzy-watchdog** (`/home/ezzyadmin/ezdlproject/ezzy-watchdog.sh`), a systemd timer that runs every 5 minutes. It checks health via the Gunicorn socket, attempts auto-recovery (restart gunicorn, then gunicorn+nginx), and sends WhatsApp alerts if recovery fails.

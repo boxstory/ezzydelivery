@@ -625,23 +625,8 @@ window.setStatusModalTask = function setStatusModalTask(button) {
             statusSelect.innerHTML = optionsHtml;
             console.log('DMS Status - currentDms:', currentDms, 'Type:', typeof currentDms);
         } else {
-            // Task status options - build with selected attribute
-            const taskStatuses = [
-                {value: 'for_review', label: 'For Review'},
-                {value: 'pending', label: 'Pending'},
-                {value: 'assigned', label: 'Assigned'},
-                {value: 'accepted', label: 'Accepted'},
-                {value: 'picked_up', label: 'Picked Up'},
-                {value: 'start_ride', label: 'Start Ride'},
-                {value: 'out_for_delivery', label: 'Out for Delivery'},
-                {value: 'in_transit', label: 'In Transit'},
-                {value: 'contacted', label: 'Contacted & Confirmed'},
-                {value: 'non_reachable', label: 'Non Reachable'},
-                {value: 'delivered', label: 'Delivered'},
-                {value: 'failed', label: 'Failed'},
-                {value: 'rejected', label: 'Rejected'},
-                {value: 'cancelled', label: 'Cancelled'}
-            ];
+            // Task status options - loaded from model choices via context processor
+            const taskStatuses = window.TASK_STATUS_CHOICES || [];
 
             let optionsHtml = '<option value="">-- Select Status --</option>';
             taskStatuses.forEach(status => {

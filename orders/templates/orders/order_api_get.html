@@ -3,146 +3,370 @@
 {% load crispy_forms_tags %}
 {% load static %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'orders/css/order_api_get.css' %}">
+{% endblock extra_css %}
+
 {% block content %}
 <div class="oag" id="orders_get_api_container_main">
-    <!-- Hero Header -->
+
+    <!-- Header -->
     <div class="oag__hero">
-        <div class="oag__hero-content">
-            <div class="oag__hero-left">
-                <h1 class="oag__title">
-                    <i class="fas fa-plug"></i>
-                    API Orders
-                </h1>
-                <p class="oag__subtitle">Orders imported from external API integrations</p>
+        <div class="oag__hero-inner">
+            <div>
+                <div class="oag__hero-eyebrow">Integration Feed</div>
+                <h1 class="oag__hero-title">API Orders</h1>
             </div>
             <div class="oag__hero-actions">
-                <a href="{% url 'orders:get_order_by_api' %}" class="oag__btn oag__btn--primary" id="orders_get_api_btn_api_upload">
-                    <i class="fa fa-cloud-download-alt"></i> API Upload
+                <a href="{% url 'orders:orders_all_list' %}" class="oag__action-btn">
+                    <i class="fa fa-basket-shopping"></i> Go to Orders
                 </a>
-                <a href="{% url 'orders:order_upload_file' %}" class="oag__btn oag__btn--outline" id="orders_get_api_btn_upload_bulk">
-                    <i class="fa fa-file-upload"></i> Upload Bulk
+                <button type="button" class="oag__action-btn oag__action-btn--primary" id="orders_get_api_btn_api_upload" onclick="oagRunSync(this)">
+                    <i class="fa fa-cloud-download-alt"></i> <span id="oag_sync_label">API Upload</span>
+                </button>
+                <button type="button" class="oag__action-btn oag__action-btn--import{% if not ready_count %} d-none{% endif %}" id="oag_btn_import_selected" onclick="oagImportSelected(this)">
+                    <i class="fa fa-file-import"></i> <span id="oag_import_label">Import Selected (<span id="oag_selected_count">0</span>)</span>
+                </button>
+                <a href="{% url 'orders:order_upload_file' %}" class="oag__action-btn" id="orders_get_api_btn_upload_bulk">
+                    <i class="fa fa-file-upload"></i> Bulk Upload
                 </a>
-                <a href="{% url 'orders:add_order' %}" class="oag__btn oag__btn--outline" id="orders_get_api_btn_add_orders">
-                    <i class="fa fa-plus"></i> Add Orders
+                <a href="{% url 'orders:add_order' %}" class="oag__action-btn" id="orders_get_api_btn_add_orders">
+                    <i class="fa fa-plus"></i> Add Order
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- Filter Card -->
-    <div class="oag__filter-card">
-        <div class="oag__filter-header">
-            <i class="fas fa-filter"></i>
-            <span>Filter Orders</span>
-        </div>
+    <!-- Filter -->
+    <div class="oag__filter">
         <form method="get" action="{% url 'orders:get_order_by_api' %}" class="oag__filter-form" id="orders_get_api_form_filter">
-            {% csrf_token %}
-            <div class="oag__filter-row">
-                <div class="oag__filter-group">
-                    <label class="oag__filter-label" for="orders_get_api_input_start_date">Start Date</label>
-                    <input type="date" class="oag__filter-input" id="orders_get_api_input_start_date" name="start_date" required value="{{ 30|days_ago }}">
+            <div class="oag__filter-fields">
+                <div class="oag__field">
+                    <label class="oag__field-label" for="orders_get_api_input_start_date">From</label>
+                    <input type="date" class="oag__field-input" id="orders_get_api_input_start_date" name="start_date" required value="{{ 30|days_ago }}">
                 </div>
-                <div class="oag__filter-group">
-                    <label class="oag__filter-label" for="orders_get_api_input_end_date">End Date</label>
-                    <input type="date" class="oag__filter-input" id="orders_get_api_input_end_date" name="end_date" required value="{% now 'Y-m-d' %}">
+                <div class="oag__field">
+                    <label class="oag__field-label" for="orders_get_api_input_end_date">To</label>
+                    <input type="date" class="oag__field-input" id="orders_get_api_input_end_date" name="end_date" required value="{% now 'Y-m-d' %}">
                 </div>
-                <div class="oag__filter-group oag__filter-group--action">
-                    <button type="submit" class="oag__btn oag__btn--primary" id="orders_get_api_btn_filter">
-                        <i class="fas fa-search"></i> Filter Orders
-                    </button>
-                </div>
+                <button type="submit" class="oag__action-btn oag__action-btn--primary" id="orders_get_api_btn_filter">
+                    <i class="fas fa-search"></i> Search
+                </button>
             </div>
         </form>
-    </div>
-
-    <!-- Orders List -->
-    <div class="oag__card">
-        <div class="oag__card-header">
-            <i class="fas fa-receipt"></i>
-            <span>Order Details</span>
-            <span class="oag__count">{{ orders|length }}</span>
-        </div>
-
         {% if orders %}
-        <div class="oag__orders-list">
-            {% for order in orders %}
-            <div class="oag__order-item">
-                <div class="oag__order-top">
-                    <div class="oag__order-id-group">
-                        <span class="oag__order-badge">
-                            <i class="fas fa-hashtag"></i> {{ order.order_number }}
-                        </span>
-                        <span class="oag__status-badge">{{ order.financial_status }}</span>
-                    </div>
-                    <span class="oag__order-date">
-                        <i class="far fa-calendar-alt"></i> {{ order.created_at|slice:":10" }}
-                    </span>
-                </div>
-
-                <div class="oag__order-details">
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Customer</span>
-                        <span class="oag__detail-value">{{ order.customer.first_name }} {{ order.customer.last_name }}</span>
-                    </div>
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Total Price</span>
-                        <span class="oag__detail-value oag__detail-value--amount">{{ order.total_price }}</span>
-                    </div>
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Subtotal</span>
-                        <span class="oag__detail-value">{{ order.subtotal_price }}</span>
-                    </div>
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Total Tax</span>
-                        <span class="oag__detail-value">{{ order.total_tax }}</span>
-                    </div>
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Payment</span>
-                        <span class="oag__detail-value">{{ order.payment_gateway_names.0 }}</span>
-                    </div>
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Terms</span>
-                        <span class="oag__detail-value">{{ order.payment_terms }}</span>
-                    </div>
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Shipping</span>
-                        <span class="oag__detail-value">{{ order.shipping_address.province }}, {{ order.shipping_address.country }}</span>
-                    </div>
-                    <div class="oag__detail-row">
-                        <span class="oag__detail-label">Billing</span>
-                        <span class="oag__detail-value">{{ order.billing_address.province }}, {{ order.billing_address.country }}</span>
-                    </div>
-                </div>
-
-                <!-- Line Items -->
-                {% if order.line_items %}
-                <div class="oag__line-items">
-                    <div class="oag__line-items-header">
-                        <i class="fas fa-box"></i>
-                        <span>Line Items</span>
-                    </div>
-                    {% for item in order.line_items %}
-                    <div class="oag__line-item">
-                        <span class="oag__item-name">{{ item.name }}</span>
-                        <span class="oag__item-qty">x{{ item.quantity }}</span>
-                        <span class="oag__item-price">{{ item.price }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="oag__empty">
-            <i class="fas fa-plug"></i>
-            <p>No orders found. Adjust your date range and try again.</p>
+        <div class="oag__result-count d-flex align-items-center gap-3">
+            <span class="oag__count-num">{{ orders|length }}</span> orders found
+            {% if ready_count %}
+            <label class="d-flex align-items-center gap-2 mb-0 ms-2" style="cursor:pointer;font-size:.875rem;">
+                <input type="checkbox" id="oag_select_all" onchange="oagToggleSelectAll(this)" style="width:16px;height:16px;cursor:pointer;">
+                <span>Select All (<span id="oag_selectable_count">{{ ready_count }}</span> ready)</span>
+            </label>
+            {% endif %}
         </div>
         {% endif %}
     </div>
+
+    <!-- Orders -->
+    {% if orders %}
+    <div class="oag__list">
+        {% for order in orders %}
+        <div class="oag__receipt{% if order.import_status == 'imported' %} oag__receipt--imported{% endif %}" style="animation-delay: {{ forloop.counter0 }}00ms" data-shopify-id="{{ order.id }}">
+
+            <!-- Receipt Header -->
+            <div class="oag__receipt-header">
+                <div class="oag__receipt-header-left">
+                    {% if order.import_status == 'imported' %}
+                    <input type="checkbox" class="oag__select-cb woa__check" data-shopify-id="{{ order.id }}" disabled title="Already imported">
+                    {% elif order.import_status == 'not_synced' %}
+                    <input type="checkbox" class="oag__select-cb woa__check" data-shopify-id="{{ order.id }}" disabled title="Click API Upload to sync first">
+                    {% else %}
+                    <input type="checkbox" class="oag__select-cb woa__check" data-shopify-id="{{ order.id }}" onchange="oagUpdateSelection()" title="Select to import">
+                    {% endif %}
+                    <span class="oag__order-num">#{{ order.order_number }}</span>
+                    <span class="oag__fin-badge oag__fin-badge--{{ order.financial_status }}">{{ order.financial_status }}</span>
+                    {% if order.import_status == 'imported' %}
+                    <span class="oag__status-badge oag__status-badge--imported"><i class="fas fa-check-circle me-1"></i>Imported</span>
+                    {% elif order.import_status == 'new' %}
+                    <span class="oag__status-badge oag__status-badge--new"><i class="fas fa-inbox me-1"></i>Ready</span>
+                    {% else %}
+                    <span class="oag__status-badge oag__status-badge--unsynced"><i class="fas fa-sync me-1"></i>Sync First</span>
+                    {% endif %}
+                </div>
+                <div class="oag__receipt-header-right">
+                    <span class="oag__receipt-date">
+                        <i class="far fa-calendar-alt"></i>
+                        {{ order.created_at|slice:":10" }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Receipt Body -->
+            <div class="oag__receipt-body">
+
+                <!-- Left: Customer & Addresses -->
+                <div class="oag__receipt-left">
+
+                    <div class="oag__info-block">
+                        <div class="oag__info-eyebrow">Customer</div>
+                        <div class="oag__info-primary">{{ order.customer.first_name }} {{ order.customer.last_name }}</div>
+                        {% if order.customer.email %}
+                        <div class="oag__info-secondary">{{ order.customer.email }}</div>
+                        {% endif %}
+                        {% if order.customer.phone %}
+                        <div class="oag__info-secondary">{{ order.customer.phone }}</div>
+                        {% endif %}
+                    </div>
+
+                    {% if order.shipping_address %}
+                    <div class="oag__info-block">
+                        <div class="oag__info-eyebrow"><i class="fas fa-map-marker-alt"></i> Ship To</div>
+                        <div class="oag__info-primary">
+                            {% if order.shipping_address.name %}{{ order.shipping_address.name }}{% endif %}
+                        </div>
+                        <div class="oag__info-secondary">
+                            {% if order.shipping_address.address1 %}{{ order.shipping_address.address1 }}{% if order.shipping_address.address2 %}, {{ order.shipping_address.address2 }}{% endif %}<br>{% endif %}
+                            {% if order.shipping_address.city %}{{ order.shipping_address.city }}{% if order.shipping_address.province %}, {{ order.shipping_address.province }}{% endif %}{% endif %}
+                            {% if order.shipping_address.country %} · {{ order.shipping_address.country }}{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if order.shipping_lines %}
+                    <div class="oag__info-block">
+                        <div class="oag__info-eyebrow"><i class="fas fa-truck"></i> Shipping Type</div>
+                        {% for line in order.shipping_lines %}
+                        <div class="oag__info-primary">{{ line.title }}</div>
+                        {% if line.code %}<div class="oag__info-secondary">{{ line.code }}</div>{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if order.payment_gateway_names.0 %}
+                    <div class="oag__info-block">
+                        <div class="oag__info-eyebrow"><i class="fas fa-credit-card"></i> Payment</div>
+                        <div class="oag__info-primary">{{ order.payment_gateway_names.0 }}</div>
+                        {% if order.payment_terms %}
+                        <div class="oag__info-secondary">Terms: {{ order.payment_terms }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                </div>
+
+                <!-- Right: Price Breakdown -->
+                <div class="oag__receipt-right">
+                    <div class="oag__ledger">
+
+                        <div class="oag__ledger-row">
+                            <span class="oag__ledger-label">Subtotal</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.subtotal_price }}</span>
+                        </div>
+
+                        {% for line in order.shipping_lines %}
+                        <div class="oag__ledger-row">
+                            <span class="oag__ledger-label">
+                                Shipping
+                                {% if line.title %}<span class="oag__ledger-note">{{ line.title }}</span>{% endif %}
+                            </span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ line.price }}</span>
+                        </div>
+                        {% empty %}
+                        <div class="oag__ledger-row">
+                            <span class="oag__ledger-label">Shipping</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.total_shipping_price_set.shop_money.amount|default:"0.00" }}</span>
+                        </div>
+                        {% endfor %}
+
+                        {% if order.total_tax and order.total_tax != "0.00" %}
+                        <div class="oag__ledger-row">
+                            <span class="oag__ledger-label">Tax</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.total_tax }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if order.total_discounts and order.total_discounts != "0.00" %}
+                        <div class="oag__ledger-row oag__ledger-row--discount">
+                            <span class="oag__ledger-label"><i class="fas fa-tag"></i> Discount</span>
+                            <span class="oag__ledger-value">− {{ order.currency }} {{ order.total_discounts }}</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="oag__ledger-divider"></div>
+
+                        <div class="oag__ledger-row oag__ledger-row--total">
+                            <span class="oag__ledger-label">Total</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.total_price }}</span>
+                        </div>
+
+                        <div class="oag__ledger-divider oag__ledger-divider--light"></div>
+
+                        {% if order.financial_status == 'paid' %}
+                        <div class="oag__ledger-row oag__ledger-row--paid">
+                            <span class="oag__ledger-label"><i class="fas fa-check-circle"></i> Paid</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.total_price }}</span>
+                        </div>
+                        <div class="oag__ledger-row oag__ledger-row--cod">
+                            <span class="oag__ledger-label"><i class="fas fa-money-bill-wave"></i> COD</span>
+                            <span class="oag__ledger-value">{{ order.currency }} 0.00</span>
+                        </div>
+                        {% elif order.financial_status == 'partially_paid' %}
+                        <div class="oag__ledger-row oag__ledger-row--paid">
+                            <span class="oag__ledger-label"><i class="fas fa-check-circle"></i> Paid</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.total_price }}</span>
+                        </div>
+                        <div class="oag__ledger-row oag__ledger-row--cod oag__ledger-row--cod-due">
+                            <span class="oag__ledger-label"><i class="fas fa-money-bill-wave"></i> COD Due</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.total_outstanding|default:order.total_price }}</span>
+                        </div>
+                        {% else %}
+                        <div class="oag__ledger-row oag__ledger-row--paid">
+                            <span class="oag__ledger-label"><i class="fas fa-check-circle"></i> Paid</span>
+                            <span class="oag__ledger-value">{{ order.currency }} 0.00</span>
+                        </div>
+                        <div class="oag__ledger-row oag__ledger-row--cod oag__ledger-row--cod-due">
+                            <span class="oag__ledger-label"><i class="fas fa-money-bill-wave"></i> COD Due</span>
+                            <span class="oag__ledger-value">{{ order.currency }} {{ order.total_price }}</span>
+                        </div>
+                        {% endif %}
+
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Line Items -->
+            {% if order.line_items %}
+            <div class="oag__items">
+                <div class="oag__items-header">
+                    <i class="fas fa-cubes"></i> Items ({{ order.line_items|length }})
+                </div>
+                <div class="oag__items-grid">
+                    {% for item in order.line_items %}
+                    <div class="oag__item">
+                        <span class="oag__item-qty">{{ item.quantity }}×</span>
+                        <span class="oag__item-name">{{ item.name }}</span>
+                        <span class="oag__item-price">{{ order.currency }} {{ item.price }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="oag__empty">
+        <div class="oag__empty-icon"><i class="fas fa-plug"></i></div>
+        <p class="oag__empty-text">No orders found for this date range.</p>
+        <p class="oag__empty-hint">Try adjusting the dates above.</p>
+    </div>
+    {% endif %}
+
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script type="text/javascript" charset="UTF-8" src="{% static 'orders/js/orders_main.js' %}"></script>
+<script>
+// ── API Upload: sync Shopify → TempOrder ─────────────────────────────────
+function oagRunSync(btn) {
+    const label = document.getElementById('oag_sync_label');
+    btn.disabled = true;
+    label.textContent = 'Syncing…';
+    btn.querySelector('i').className = 'fa fa-spinner fa-spin';
+
+    fetch("{% url 'workforce:temp_orders_sync' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'source_type=shopify',
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            label.textContent = `Done — ${data.created} new, ${data.updated} updated`;
+            btn.querySelector('i').className = 'fa fa-check-circle';
+            // Always reload so import statuses refresh
+            setTimeout(() => window.location.reload(), 1800);
+        } else {
+            label.textContent = 'Sync failed';
+            btn.querySelector('i').className = 'fa fa-exclamation-triangle';
+            btn.disabled = false;
+            alert(data.error || 'Sync failed. Check API settings.');
+        }
+    })
+    .catch(() => {
+        label.textContent = 'Error';
+        btn.querySelector('i').className = 'fa fa-exclamation-triangle';
+        btn.disabled = false;
+    });
+}
+
+// ── Select All ───────────────────────────────────────────────────────────
+function oagToggleSelectAll(cb) {
+    document.querySelectorAll('.oag__select-cb:not(:disabled)').forEach(el => {
+        el.checked = cb.checked;
+    });
+    oagUpdateSelection();
+}
+
+// ── Checkbox selection ───────────────────────────────────────────────────
+function oagUpdateSelection() {
+    // Sync select-all state
+    const all = document.querySelectorAll('.oag__select-cb:not(:disabled)');
+    const checked = document.querySelectorAll('.oag__select-cb:not(:disabled):checked');
+    const selectAllCb = document.getElementById('oag_select_all');
+    if (selectAllCb) {
+        selectAllCb.checked = all.length > 0 && checked.length === all.length;
+        selectAllCb.indeterminate = checked.length > 0 && checked.length < all.length;
+    }
+    const importBtn = document.getElementById('oag_btn_import_selected');
+    const countEl = document.getElementById('oag_selected_count');
+    countEl.textContent = checked.length;
+    if (checked.length > 0) {
+        importBtn.classList.remove('d-none');
+    } else {
+        importBtn.classList.add('d-none');
+    }
+}
+
+// ── Import selected orders → main Orders ─────────────────────────────────
+function oagImportSelected(btn) {
+    const checked = document.querySelectorAll('.oag__select-cb:checked');
+    if (!checked.length) return;
+
+    const platform_ids = Array.from(checked).map(cb => cb.dataset.shopifyId);
+    const label = document.getElementById('oag_import_label');
+    btn.disabled = true;
+    label.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Importing…';
+
+    fetch("{% url 'orders:import_shopify_orders' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform_ids }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            label.innerHTML = `✓ ${data.saved} imported, ${data.skipped} skipped`;
+            btn.querySelector('i') && (btn.querySelector('i').className = '');
+            if (data.errors && data.errors.length) {
+                console.warn('Import errors:', data.errors);
+            }
+            setTimeout(() => { window.location.href = "{% url 'orders:orders_all_list' %}"; }, 1800);
+        } else {
+            label.innerHTML = `Import Selected (<span id="oag_selected_count">${platform_ids.length}</span>)`;
+            btn.disabled = false;
+            alert(data.error || 'Import failed. Click "API Upload" first to sync orders.');
+        }
+    })
+    .catch(() => {
+        label.innerHTML = `Import Selected (<span id="oag_selected_count">${platform_ids.length}</span>)`;
+        btn.disabled = false;
+        alert('Network error. Please try again.');
+    });
+}
+</script>
 {% endblock extra_js %}

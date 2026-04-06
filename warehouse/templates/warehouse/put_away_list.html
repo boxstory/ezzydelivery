@@ -1,0 +1,76 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Put-Away Tasks{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-dolly"></i></div>
+      <div>
+        <h1 class="wh__title">Put-Away Tasks</h1>
+        <p class="wh__subtitle">Place received stock into storage locations</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wh__filter-bar">
+    <form method="GET" class="wh__filter-form">
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Status</label>
+        <select name="status" class="wh__filter-select">
+          <option value="">All</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if selected_status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="wh__filter-group--sm">
+        <button type="submit" class="wh__filter-btn"><i class="fas fa-filter"></i> Filter</button>
+      </div>
+    </form>
+  </div>
+
+  {% for task in tasks %}
+  <a href="{% url 'warehouse:put_away_detail' task.pk %}" class="wh__card mb-2 d-block" style="text-decoration:none;color:inherit;">
+    <div class="wh__card-body">
+      <div class="d-flex align-items-center gap-3">
+        <div class="wh__stat-icon {% if task.status == 'completed' %}wh__stat-icon--success{% elif task.status == 'in_progress' %}wh__stat-icon--info{% elif task.status == 'assigned' %}wh__stat-icon--info{% else %}wh__stat-icon--warning{% endif %}">
+          <i class="fas {% if task.status == 'completed' %}fa-check{% elif task.status == 'in_progress' or task.status == 'assigned' %}fa-dolly{% else %}fa-clock{% endif %}"></i>
+        </div>
+        <div class="flex-grow-1" style="min-width:0;">
+          <div style="font-family:var(--wh-mono);font-size:0.8125rem;font-weight:700;color:var(--wh-navy);">{{ task.task_number }}</div>
+          <div class="wh__meta">
+            <i class="fas fa-warehouse"></i> {{ task.warehouse.name }}
+            &middot; {{ task.total_items }} item{{ task.total_items|pluralize }}
+            {% if task.assigned_to %}&middot; <i class="fas fa-user"></i> {{ task.assigned_to.username }}{% endif %}
+            {% if task.priority != 'normal' %}&middot; <span style="color:{% if task.priority == 'urgent' %}var(--wh-red){% else %}var(--wh-amber){% endif %};font-weight:600;">{{ task.get_priority_display }}</span>{% endif %}
+          </div>
+          {% if task.total_items > 0 and task.status != 'completed' and task.status != 'pending' %}
+          <div class="mt-1" style="height:4px;background:var(--wh-border-light);border-radius:2px;overflow:hidden;max-width:200px;">
+            <div style="height:100%;border-radius:2px;background:var(--wh-green);width:{{ task.progress_percentage }}%;"></div>
+          </div>
+          {% endif %}
+        </div>
+        <span class="wh__badge {% if task.status == 'completed' %}wh__badge--success{% elif task.status == 'in_progress' or task.status == 'assigned' %}wh__badge--primary{% elif task.status == 'cancelled' %}wh__badge--danger{% else %}wh__badge--warning{% endif %}">
+          {{ task.get_status_display }}
+        </span>
+      </div>
+    </div>
+  </a>
+  {% empty %}
+  <div class="wh__card">
+    <div class="wh__empty">
+      <i class="fas fa-dolly" style="color:var(--wh-dim);"></i>
+      <p><strong>No put-away tasks</strong></p>
+      <p>Put-away tasks are created automatically when stock is received. Go to <a href="{% url 'warehouse:receive_stock' %}">Receive Stock</a> to get started.</p>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="wh__card-footer">
+    {% include "includes/components/_pagination.html" with page_obj=tasks %}
+  </div>
+</div>
+{% endblock %}

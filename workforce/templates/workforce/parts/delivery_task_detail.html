@@ -4,10 +4,16 @@
 
 {% block extra_css %}
 {# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=202603281">
 {% endblock extra_css %}
 
 {% block content %}
 <div class="col-12 p-2 p-md-3">
+
+    <!-- Back Button -->
+    <button type="button" class="btn btn-sm btn-outline-secondary mb-2" onclick="history.back()">
+        <i class="fa-solid fa-arrow-left me-1"></i> Back
+    </button>
 
     <!-- Hero Banner -->
     <div class="dtd__hero">
@@ -90,6 +96,13 @@
                                     <span class="dtd__cod__amount">{{ task.order.cod_amount|default:0 }}</span>
                                     <span class="dtd__cod__currency">QAR</span>
                                 </div>
+                                {% if task.cod_collected and task.cod_collected_amount and task.driver %}
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="dtd_btn_cod_return" data-task-id="{{ task.id }}">
+                                        <i class="fa-solid fa-rotate-left me-1"></i> Process COD Return
+                                    </button>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -130,8 +143,8 @@
                             <!-- Address row + AI Parse + Map inline -->
                             <div class="d-flex gap-2 align-items-start mt-1">
                                 <div class="flex-fill">
-                                    <span class="odp__field__label d-block">Address</span>
-                                    <span class="odp__field__value">{{ task.order.customer_address|default:"-" }}</span>
+                                    <span class="dtd__field__label d-block">Address</span>
+                                    <span class="dtd__field__value">{{ task.order.customer_address|default:"-" }}</span>
                                 </div>
                                 <div class="d-flex flex-column gap-1 flex-shrink-0">
                                     {% include "includes/components/_ai_parse_button.html" with address=task.order.customer_address|default:"" zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building lat=task.order.latitude|default:task.dl_address_update.dl_latitude lng=task.order.longitude|default:task.dl_address_update.dl_longitude order_id=task.order.id order_number=task.order.order_number show_map="true" title="Dropoff Location" btn_label="AI Parse" %}
@@ -147,27 +160,27 @@
                             <!-- Zone / Street / Building / QNAS row -->
                             <div class="row g-0 mt-0">
                                 <div class="col-3">
-                                    <div class="odp__field">
-                                        <span class="odp__field__label">Zone</span>
-                                        <span class="odp__field__value odp__field__value--mono">{{ task.order.dl_zone|default:"-" }}</span>
+                                    <div class="dtd__field flex-column align-items-start">
+                                        <span class="dtd__field__label">Zone</span>
+                                        <span class="dtd__field__value" style="font-family:var(--dtd-font-mono);font-size:0.8rem;">{{ task.order.dl_zone|default:"-" }}</span>
                                     </div>
                                 </div>
                                 <div class="col-3">
-                                    <div class="odp__field">
-                                        <span class="odp__field__label">Street</span>
-                                        <span class="odp__field__value">{{ task.order.dl_street|default:"-" }}</span>
+                                    <div class="dtd__field flex-column align-items-start">
+                                        <span class="dtd__field__label">Street</span>
+                                        <span class="dtd__field__value">{{ task.order.dl_street|default:"-" }}</span>
                                     </div>
                                 </div>
                                 <div class="col-3">
-                                    <div class="odp__field">
-                                        <span class="odp__field__label">Building</span>
-                                        <span class="odp__field__value">{{ task.order.dl_building|default:"-" }}</span>
+                                    <div class="dtd__field flex-column align-items-start">
+                                        <span class="dtd__field__label">Building</span>
+                                        <span class="dtd__field__value">{{ task.order.dl_building|default:"-" }}</span>
                                     </div>
                                 </div>
                                 <div class="col-3">
-                                    <div class="odp__field">
-                                        <span class="odp__field__label">QNAS</span>
-                                        <div class="odp__field__value d-flex flex-column gap-1">
+                                    <div class="dtd__field flex-column align-items-start">
+                                        <span class="dtd__field__label">QNAS</span>
+                                        <div class="dtd__field__value d-flex flex-column gap-1">
                                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                                 <button type="button" class="dtd__addr__qnas-btn"
                                                         id="qnasVerifyBtn{{ task.id }}"
@@ -192,19 +205,19 @@
                             <!-- Lat / Long + Accuracy -->
                             <div class="row g-1 mt-1 mx-0">
                                 <div class="col-4 ps-0">
-                                    <label class="odp__field__label d-block mb-0" style="font-size:0.65rem;">Latitude</label>
+                                    <label class="dtd__field__label d-block mb-0">Latitude</label>
                                     <input type="text" class="form-control form-control-sm dtd__latlon-input" disabled
                                            value="{% if task.order.latitude %}{{ task.order.latitude|floatformat:6 }}{% elif task.dl_address_update.dl_latitude %}{{ task.dl_address_update.dl_latitude|floatformat:6 }}{% endif %}"
                                            placeholder="Not set">
                                 </div>
                                 <div class="col-4 px-1">
-                                    <label class="odp__field__label d-block mb-0" style="font-size:0.65rem;">Longitude</label>
+                                    <label class="dtd__field__label d-block mb-0">Longitude</label>
                                     <input type="text" class="form-control form-control-sm dtd__latlon-input" disabled
                                            value="{% if task.order.longitude %}{{ task.order.longitude|floatformat:6 }}{% elif task.dl_address_update.dl_longitude %}{{ task.dl_address_update.dl_longitude|floatformat:6 }}{% endif %}"
                                            placeholder="Not set">
                                 </div>
                                 <div class="col-4 pe-0">
-                                    <label class="odp__field__label d-block mb-0" style="font-size:0.65rem;">Accuracy</label>
+                                    <label class="dtd__field__label d-block mb-0">Accuracy</label>
                                     {% if task.order.coords_accuracy %}
                                     <span class="dtd__accuracy dtd__accuracy--{{ task.order.coords_accuracy }}">
                                         {% if task.order.coords_accuracy == 'by_customer' %}<i class="fa-solid fa-user-check"></i>
@@ -212,12 +225,12 @@
                                         {% elif task.order.coords_accuracy == 'street' %}<i class="fa-solid fa-road"></i>
                                         {% elif task.order.coords_accuracy == 'landmark' %}<i class="fa-solid fa-map-marker-alt"></i>
                                         {% elif task.order.coords_accuracy == 'zone_center' %}<i class="fa-solid fa-draw-polygon"></i>
-                                        {% elif task.order.coords_accuracy == 'ai_estimate' %}<i class="fa-solid fa-wand-magic-sparkles"></i>
+                                        {% elif task.order.coords_accuracy == 'ai_estimate' %}<i class="fa-solid fa-robot"></i>
                                         {% endif %}
                                         {{ task.order.get_coords_accuracy_display }}
                                     </span>
                                     {% else %}
-                                    <span class="odp__field__value odp__field__value--muted">—</span>
+                                    <span class="dtd__field__value" style="color:var(--dtd-label);">—</span>
                                     {% endif %}
                                 </div>
                             </div>
@@ -238,23 +251,20 @@
                 </div>
                 <div class="dtd__card__body">
                     <!-- Summary: Package / Qty / COD -->
-                    <div class="d-flex flex-column gap-2 mb-3 p-2 rounded" style="background:var(--brand-warning-light, #fff8e1); border:1px solid var(--brand-warning, #f5c542);">
+                    <div class="dtd__pkg-strip mb-3">
                         {% if task.order.package_description %}
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fa-solid fa-box-open" style="color:#c49000;"></i>
-                            <span class="text-muted small" style="min-width:50px;">Package</span>
-                            <span class="fw-medium">{{ task.order.package_description }}</span>
+                        <div class="dtd__pkg-item" style="flex:2;align-items:flex-start;">
+                            <span class="dtd__pkg-item__label"><i class="fa-solid fa-box-open"></i> Package</span>
+                            <span class="dtd__pkg-item__val" style="text-align:left;font-size:0.8rem;font-weight:500;">{{ task.order.package_description }}</span>
                         </div>
                         {% endif %}
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
-                            <span class="text-muted small" style="min-width:50px;">Qty</span>
-                            <span class="fw-semibold">{% if task.order.package_qty %}{{ task.order.package_qty }}{% else %}{{ task.order.order_items.count }}{% endif %}</span>
+                        <div class="dtd__pkg-item">
+                            <span class="dtd__pkg-item__label"><i class="fa-solid fa-cubes"></i> Qty</span>
+                            <span class="dtd__pkg-item__val">{% if task.order.package_qty %}{{ task.order.package_qty }}{% else %}{{ task.order.order_items.count }}{% endif %}</span>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fa-solid fa-money-bill-wave text-success"></i>
-                            <span class="text-muted small" style="min-width:50px;">COD</span>
-                            <span class="fw-semibold">{% if task.order.cod_amount %}{{ task.order.cod_amount }} QR{% else %}—{% endif %}</span>
+                        <div class="dtd__pkg-item">
+                            <span class="dtd__pkg-item__label"><i class="fa-solid fa-money-bill-wave"></i> COD</span>
+                            <span class="dtd__pkg-item__val">{% if task.order.cod_amount %}{{ task.order.cod_amount }} QR{% else %}—{% endif %}</span>
                         </div>
                     </div>
 
@@ -262,10 +272,10 @@
                     {% if task.order.order_items.exists %}
                     <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.65rem;">Product Items ({{ task.order.order_items.count }})</div>
                     {% for item in task.order.order_items.all %}
-                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}">
-                        <span class="badge bg-light text-dark">{{ item.quantity }}</span>
-                        <span>{% if item.product %}{{ item.product.item_name }}{% else %}{{ item.notes|default:"Item" }}{% endif %}</span>
-                        {% if item.unit_price %}<span class="ms-auto text-muted small">{{ item.unit_price }} QR</span>{% endif %}
+                    <div class="d-flex align-items-start gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}">
+                        <span class="badge bg-light text-dark flex-shrink-0 mt-1">{{ item.quantity }}</span>
+                        <span class="flex-grow-1" style="overflow-wrap:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35;">{{ item.display_name }}</span>
+                        {% if item.unit_price %}<span class="ms-auto text-muted small flex-shrink-0">{{ item.unit_price }} QR</span>{% endif %}
                     </div>
                     {% endfor %}
                     {% endif %}
@@ -290,52 +300,51 @@
                     </span>
                 </div>
                 <div class="dtd__card__body">
-                    <div class="d-flex justify-content-between align-items-center mb-2" style="font-size:0.75rem;color:var(--brand-grey-500);">
-                        <span><i class="fa-solid fa-hashtag me-1"></i><code style="font-size:0.8rem;color:var(--brand-grey-700);">{{ pick_list.pick_number }}</code></span>
+                    <div class="dtd__picklist-meta">
+                        <span><i class="fa-solid fa-hashtag me-1"></i><code>{{ pick_list.pick_number }}</code></span>
                         <span><i class="fa-solid fa-warehouse me-1"></i>{{ pick_list.warehouse.name }}</span>
                     </div>
                     {% if pick_list.assigned_to %}
-                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.75rem;color:var(--brand-grey-500);">
-                        <i class="fa-solid fa-user"></i>
-                        <span>Assigned to <strong style="color:var(--brand-grey-700);">{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}</strong></span>
+                    <div class="dtd__field mb-2">
+                        <span class="dtd__field__label"><i class="fa-solid fa-user"></i> Assigned</span>
+                        <span class="dtd__field__value">{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}</span>
                     </div>
                     {% endif %}
 
                     <!-- Progress bar -->
                     {% if pick_list.total_items > 0 %}
                     <div class="mb-2">
-                        <div class="d-flex justify-content-between" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--brand-grey-500);margin-bottom:0.25rem;">
+                        <div class="d-flex justify-content-between dtd__picklist-header mb-1">
                             <span>Progress</span>
                             <span>{{ pick_list.picked_items }}/{{ pick_list.total_items }}</span>
                         </div>
-                        <div style="height:6px;background:var(--brand-grey-200);border-radius:3px;overflow:hidden;">
-                            <div style="height:100%;width:{{ pick_list.progress_percentage }}%;background:{% if pick_list.progress_percentage == 100 %}#15803d{% else %}var(--brand-primary){% endif %};border-radius:3px;transition:width 0.3s ease;"></div>
+                        <div class="dtd__progress-track">
+                            <div class="dtd__progress-bar {% if pick_list.progress_percentage == 100 %}dtd__progress-bar--complete{% endif %}" style="width:{{ pick_list.progress_percentage }}%;"></div>
                         </div>
                     </div>
                     {% endif %}
 
                     <!-- Items table -->
-                    <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--brand-grey-500);font-weight:600;margin-bottom:0.375rem;">Items to Pick</div>
+                    <div class="dtd__picklist-header mb-2">Items to Pick</div>
                     {% for item in pick_list_items %}
-                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}" style="font-size:0.8rem;">
+                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}" style="font-size:0.82rem;">
                         <span class="badge bg-light text-dark" style="min-width:28px;">{{ item.quantity_to_pick }}</span>
                         <span class="flex-grow-1">{{ item.product.item_name }}</span>
                         {% if item.location %}
-                        <code style="font-size:0.7rem;color:var(--brand-grey-500);">{{ item.location.code }}</code>
+                        <code style="font-family:var(--dtd-font-mono);font-size:0.7rem;color:var(--dtd-muted);">{{ item.location.code }}</code>
                         {% endif %}
                         {% if item.is_picked %}
-                        <i class="fa-solid fa-circle-check" style="color:#15803d;"></i>
+                        <i class="fa-solid fa-circle-check" style="color:var(--dtd-success);"></i>
                         {% elif item.quantity_picked > 0 %}
-                        <span style="font-size:0.7rem;color:#92400e;">{{ item.quantity_picked }}/{{ item.quantity_to_pick }}</span>
+                        <span style="font-size:0.7rem;color:var(--dtd-warning);">{{ item.quantity_picked }}/{{ item.quantity_to_pick }}</span>
                         {% else %}
-                        <i class="fa-solid fa-circle" style="color:var(--brand-grey-300);font-size:0.6rem;"></i>
+                        <i class="fa-solid fa-circle" style="color:var(--dtd-border-strong);font-size:0.6rem;"></i>
                         {% endif %}
                     </div>
                     {% endfor %}
 
                     <div class="mt-2 text-end">
-                        <a href="{% url 'warehouse:pick_list_detail' pick_list.pk %}"
-                           style="font-size:0.75rem;color:var(--brand-navy);text-decoration:none;font-weight:600;">
+                        <a href="{% url 'warehouse:pick_list_detail' pick_list.pk %}" class="dtd__btn dtd__btn--secondary dtd__btn--sm" style="display:inline-flex;">
                             View Full Pick List <i class="fa-solid fa-arrow-right ms-1"></i>
                         </a>
                     </div>
@@ -426,7 +435,7 @@
                         <div class="dtd__update__body">
                             <div class="dtd__update__title">{{ doc.get_document_type_display }}</div>
                             {% if doc.description %}
-                            <div style="font-size:0.75rem;color:var(--brand-grey-500);">{{ doc.description }}</div>
+                            <div class="dtd__update__note">{{ doc.description }}</div>
                             {% endif %}
                             {% if doc.document_file %}
                             <a href="{{ doc.document_file.url }}" target="_blank" class="dtd__update__file">
@@ -562,6 +571,9 @@
                         <i class="fa-solid fa-map-location-dot"></i>
                         Delivery Location
                     </div>
+                    <button type="button" class="btn btn-xs btn-outline-primary" style="font-size:0.65rem;padding:0.2rem 0.55rem;" data-bs-toggle="modal" data-bs-target="#locUpdateModal" title="Update Location">
+                        <i class="fa-solid fa-location-crosshairs me-1"></i>Update Location
+                    </button>
                 </div>
                 <div class="dtd__map">
                     <div id="taskMap" class="dtd__map__inner"></div>
@@ -579,8 +591,141 @@
                 </div>
             </div>
 
+            <!-- Location Update Modal -->
+            <div class="modal fade" id="locUpdateModal" tabindex="-1" aria-labelledby="locUpdateModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content lum__modal">
+
+                        <!-- Header -->
+                        <div class="lum__hdr">
+                            <div class="lum__hdr__icon">
+                                <i class="fa-solid fa-location-crosshairs"></i>
+                            </div>
+                            <div class="lum__hdr__info">
+                                <h6 class="lum__hdr__title" id="locUpdateModalLabel">Update Delivery Location</h6>
+                                <div class="lum__hdr__meta">
+                                    <code class="lum__hdr__code">{{ task.order.order_number }}</code>
+                                    <span class="lum__hdr__dot"></span>
+                                    {{ task.order.business.business_name }}
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+
+                        <!-- Body -->
+                        <div class="modal-body lum__body">
+
+                            <!-- Address -->
+                            <div class="mb-3">
+                                <label class="lum__label" for="locModalAddress">
+                                    <i class="fa-solid fa-location-dot"></i> Address
+                                </label>
+                                <input type="text" class="form-control form-control-sm" id="locModalAddress"
+                                    value="{{ task.order.customer_address|default:'' }}"
+                                    placeholder="Customer delivery address">
+                            </div>
+
+                            <!-- Zone / Street / Building -->
+                            <div class="lum__qna-row mb-3">
+                                <div class="lum__qna-cell">
+                                    <label class="lum__label" for="locModalZone">
+                                        <i class="fa-solid fa-draw-polygon"></i> Zone
+                                    </label>
+                                    <input type="number" class="form-control form-control-sm lum__digit-input" id="locModalZone"
+                                        value="{{ task.order.dl_zone|default:'' }}" placeholder="e.g. 46">
+                                </div>
+                                <div class="lum__qna-cell">
+                                    <label class="lum__label" for="locModalStreet">
+                                        <i class="fa-solid fa-road"></i> Street
+                                    </label>
+                                    <input type="number" class="form-control form-control-sm lum__digit-input" id="locModalStreet"
+                                        value="{{ task.order.dl_street|default:'' }}" placeholder="e.g. 9">
+                                </div>
+                                <div class="lum__qna-cell">
+                                    <label class="lum__label" for="locModalBuilding">
+                                        <i class="fa-solid fa-building"></i> Building
+                                    </label>
+                                    <input type="number" class="form-control form-control-sm lum__digit-input" id="locModalBuilding"
+                                        value="{{ task.order.dl_building|default:'' }}" placeholder="e.g. 18">
+                                </div>
+                            </div>
+
+                            <!-- Map -->
+                            <div class="lum__map-wrap mb-3">
+                                <div class="lum__map-toolbar">
+                                    <span class="lum__map-toolbar__hint">
+                                        <i class="fa-solid fa-circle-info"></i>
+                                        Drag pin or click map to reposition
+                                    </span>
+                                    <button type="button" class="lum__gps-btn" onclick="locModalGeolocate()">
+                                        <i class="fa-solid fa-crosshairs"></i> My Location
+                                    </button>
+                                </div>
+                                <div id="locModalMap" class="lum__map"></div>
+                            </div>
+
+                            <!-- Coords + Accuracy -->
+                            <div class="lum__coords-row mb-3">
+                                <div class="lum__coord-field">
+                                    <label class="lum__label">
+                                        <i class="fa-solid fa-arrow-up-down"></i> Latitude
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm lum__coord-input"
+                                        id="locModalLat" readonly placeholder="—">
+                                </div>
+                                <div class="lum__coord-field">
+                                    <label class="lum__label">
+                                        <i class="fa-solid fa-arrow-left-right"></i> Longitude
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm lum__coord-input"
+                                        id="locModalLng" readonly placeholder="—">
+                                </div>
+                                <div class="lum__coord-field lum__coord-field--accuracy">
+                                    <label class="lum__label" for="locModalAccuracy">
+                                        <i class="fa-solid fa-satellite-dish"></i> Accuracy
+                                    </label>
+                                    <select class="form-select form-select-sm" id="locModalAccuracy">
+                                        <option value="exact">Exact</option>
+                                        <option value="street">Street</option>
+                                        <option value="landmark">Landmark</option>
+                                        <option value="zone_center">Zone Center</option>
+                                        <option value="ai_estimate">AI Estimate</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Paste Link / Plus Code -->
+                            <div class="lum__link-section">
+                                <label class="lum__label">
+                                    <i class="fa-solid fa-link"></i> Paste Google Maps URL or Plus Code
+                                </label>
+                                <div class="lum__link-wrap">
+                                    <i class="fa-solid fa-map-location-dot lum__link-ico"></i>
+                                    <input type="text" class="form-control form-control-sm lum__link-input"
+                                        id="locModalUrlInput" placeholder="maps.app.goo.gl/… or 8FM8+MJ Doha">
+                                </div>
+                                <div id="locModalUrlPreview" class="lum__link-preview"></div>
+                            </div>
+
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="modal-footer lum__footer">
+                            <span id="locModalMsg" class="lum__footer__msg me-auto"></span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+                                Cancel
+                            </button>
+                            <button type="button" class="btn btn-sm lum__save-btn" id="locModalSaveBtn" onclick="saveLocationUpdate()">
+                                <i class="fa-solid fa-check me-1"></i> Save Location
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
             <!-- Driver GPS at Completion (Delivered / Failed / Cancelled) -->
-            {% if task.dl_task_status in 'delivered,failed,cancelled' %}
+            {% if task.dl_task_status == 'delivered' or task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}
             <div class="dtd__card">
                 <div class="dtd__card__head">
                     <div class="dtd__card__head-left">
@@ -590,9 +735,9 @@
                         {% else %}Cancellation GPS{% endif %}
                     </div>
                     {% if task.completion_latitude and task.completion_longitude %}
-                    <span class="badge badge-success"><i class="fa-solid fa-satellite-dish me-1"></i>Captured</span>
+                    <span class="badge bg-success"><i class="fa-solid fa-satellite-dish me-1"></i>Captured</span>
                     {% else %}
-                    <span class="badge badge-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS</span>
+                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS</span>
                     {% endif %}
                 </div>
                 <div class="dtd__card__body">
@@ -606,9 +751,9 @@
                             <span class="dtd__field__label"><i class="fa-solid fa-circle-info"></i> Status</span>
                             <span class="dtd__field__value">
                                 {% if task.dl_task_status == 'delivered' %}
-                                <span class="badge badge-success">Delivered</span>
+                                <span class="badge bg-success">Delivered</span>
                                 {% elif task.dl_task_status == 'failed' %}
-                                <span class="badge badge-error">Failed / Returned</span>
+                                <span class="badge bg-danger">Failed / Returned</span>
                                 {% else %}
                                 <span class="badge bg-secondary">Cancelled</span>
                                 {% endif %}
@@ -735,7 +880,7 @@
     </div>
 
     <!-- Back Link -->
-    <a href="{% url 'workforce:wf_orders_all' %}" class="dtd__back">
+    <a href="{% url 'workforce:wf_orders_all' %}" class="dtd__back-btn">
         <i class="fa-solid fa-arrow-left"></i> Back to Orders
     </a>
 </div>
@@ -774,6 +919,11 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="dtd__btn dtd__btn--secondary" data-bs-dismiss="modal" style="width:auto;">Cancel</button>
+                {% if task.driver %}
+                <button type="button" class="dtd__btn dtd__btn--danger" id="btnUnassignDriver" onclick="unassignDriver({{ task.id }})" style="width:auto;">
+                    <i class="fa-solid fa-user-minus"></i> Unassign
+                </button>
+                {% endif %}
                 <button type="button" class="dtd__btn dtd__btn--primary" id="btnConfirmAssignDriver" onclick="assignDriver({{ task.id }})" style="width:auto;">
                     <i class="fa-solid fa-check"></i> Assign
                 </button>
@@ -799,6 +949,16 @@
                 </div>
                 <div id="statusError" class="alert alert-danger d-none" style="font-size:0.8125rem;"></div>
                 <div id="statusSuccess" class="alert alert-success d-none" style="font-size:0.8125rem;"></div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold" style="font-size:0.8125rem;">Delivered Date</label>
+                        <input type="date" class="form-control" id="statusDeliveredDate" value="{% if task.completed_at %}{{ task.completed_at|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" style="font-size:0.8125rem;">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold" style="font-size:0.8125rem;">COD Amount</label>
+                        <input type="number" class="form-control" id="statusCodAmount" value="{{ task.order.cod_amount|default:'0' }}" step="0.01" min="0" style="font-size:0.8125rem;">
+                    </div>
+                </div>
                 <div class="mb-3">
                     <label for="statusSelect" class="form-label fw-semibold" style="font-size:0.8125rem;">Select New Status</label>
                     <select class="form-select" id="statusSelect" style="font-size:0.8125rem;">
@@ -858,6 +1018,24 @@
         }
     }
 
+    function unassignDriver(taskId) {
+        if (!confirm('Remove driver assignment from this task?')) return;
+        const btn = document.getElementById('btnUnassignDriver');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Removing...';
+        fetch(`/workforce/delivery-task/${taskId}/unassign-driver/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) { location.reload(); }
+            else { alert('Error: ' + (data.error || 'Failed to unassign driver')); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-minus me-1"></i>Unassign'; }
+        })
+        .catch(error => { console.error('Error:', error); alert('An error occurred'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-minus me-1"></i>Unassign'; });
+    }
+
     function assignDriver(taskId) {
         const select = document.getElementById('driverSelect');
         const driverId = select.value;
@@ -906,7 +1084,11 @@
         fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-            body: JSON.stringify({ status: status })
+            body: JSON.stringify({
+                status: status,
+                delivered_date: document.getElementById('statusDeliveredDate').value,
+                cod_amount: document.getElementById('statusCodAmount').value
+            })
         })
         .then(response => {
             if (!response.ok) {
@@ -976,6 +1158,45 @@
 
     // Auto-refresh every hour
     setInterval(function() { location.reload(); }, 3600000);
+
+    // COD Return button handler
+    (function() {
+        var codReturnBtn = document.getElementById('dtd_btn_cod_return');
+        if (!codReturnBtn) return;
+
+        codReturnBtn.addEventListener('click', function() {
+            var taskId = this.dataset.taskId;
+            var notes = prompt('Enter notes for COD return (optional):');
+            if (notes === null) return; // cancelled
+
+            if (!confirm('Are you sure you want to process a COD return for this task?')) return;
+
+            codReturnBtn.disabled = true;
+            codReturnBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing...';
+
+            fetch('/workforce/delivery-task/' + taskId + '/cod-return/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ notes: notes })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                    codReturnBtn.disabled = false;
+                    codReturnBtn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i> Process COD Return';
+                }
+            })
+            .catch(function(err) {
+                alert('Request failed: ' + err);
+                codReturnBtn.disabled = false;
+                codReturnBtn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i> Process COD Return';
+            });
+        });
+    })();
 
 </script>
 
@@ -1107,6 +1328,220 @@
     }
 
     setTimeout(function() { map.invalidateSize(); }, 300);
+})();
+</script>
+
+<!-- Location Update Modal JS -->
+<script>
+(function() {
+    var locMap = null, locMarker = null;
+    var orderId = {{ task.order.id }};
+    var initLat = {% if task.order.latitude %}{{ task.order.latitude }}{% elif task.dl_address_update.dl_latitude %}{{ task.dl_address_update.dl_latitude }}{% else %}25.2854{% endif %};
+    var initLng = {% if task.order.longitude %}{{ task.order.longitude }}{% elif task.dl_address_update.dl_longitude %}{{ task.dl_address_update.dl_longitude }}{% else %}51.5310{% endif %};
+    var hasCoords = {% if task.order.latitude or task.dl_address_update.dl_latitude %}true{% else %}false{% endif %};
+
+    var pinIcon = L.divIcon({
+        className: '',
+        html: '<div style="background:#dc2626;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);cursor:grab;"><i class="fa-solid fa-location-dot"></i></div>',
+        iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32]
+    });
+
+    function updateCoordsDisplay(lat, lng) {
+        document.getElementById('locModalLat').value = lat.toFixed(6);
+        document.getElementById('locModalLng').value = lng.toFixed(6);
+    }
+
+    function initLocModal() {
+        if (locMap) { locMap.invalidateSize(); return; }
+
+        locMap = L.map('locModalMap', { zoomControl: true, attributionControl: false }).setView([initLat, initLng], hasCoords ? 16 : 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(locMap);
+
+        locMarker = L.marker([initLat, initLng], { icon: pinIcon, draggable: true }).addTo(locMap);
+
+        if (hasCoords) {
+            updateCoordsDisplay(initLat, initLng);
+        }
+
+        locMarker.on('dragend', function(e) {
+            var ll = e.target.getLatLng();
+            updateCoordsDisplay(ll.lat, ll.lng);
+        });
+
+        locMap.on('click', function(e) {
+            locMarker.setLatLng(e.latlng);
+            updateCoordsDisplay(e.latlng.lat, e.latlng.lng);
+        });
+    }
+
+    var modalEl = document.getElementById('locUpdateModal');
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', function() {
+            initLocModal();
+            setTimeout(function() { if (locMap) locMap.invalidateSize(); }, 200);
+            initUrlInput();
+        });
+    }
+
+    // URL / Plus Code resolution
+    var urlPatterns = [
+        /[?&]q=([-\d.]+),([-\d.]+)/,
+        /@([-\d.]+),([-\d.]+)/,
+        /\/search\/([-\d.]+),([-\d.]+)/,
+        /[?&]ll=([-\d.]+),([-\d.]+)/,
+        /(2[4-6]\.\d{3,8})\s*[,\s]\s*(5[0-2]\.\d{3,8})/
+    ];
+    var needsServer = /maps\.app\.goo\.gl|goo\.gl\/maps|^[A-Z0-9]{4,8}\+[A-Z0-9]/i;
+    var urlTimer = null;
+
+    function extractLocalCoords(text) {
+        for (var i = 0; i < urlPatterns.length; i++) {
+            var m = text.match(urlPatterns[i]);
+            if (m) {
+                var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+                if (lat >= 24 && lat <= 27 && lng >= 50 && lng <= 52.5) return { lat: lat, lng: lng };
+            }
+        }
+        return null;
+    }
+
+    function applyCoords(lat, lng) {
+        updateCoordsDisplay(lat, lng);
+        if (locMarker && locMap) {
+            locMarker.setLatLng([lat, lng]);
+            locMap.setView([lat, lng], 17);
+        }
+    }
+
+    function setUrlPreview(html, color) {
+        var el = document.getElementById('locModalUrlPreview');
+        if (el) { el.innerHTML = html; el.style.color = color || '#64748b'; }
+    }
+
+    function resolveUrlServer(text) {
+        setUrlPreview('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Resolving...', '#64748b');
+        fetch('/workforce/api/resolve-location/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ text: text })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.lat && data.lng) {
+                applyCoords(data.lat, data.lng);
+                setUrlPreview('<i class="fa-solid fa-circle-check me-1"></i>' + data.lat.toFixed(6) + ', ' + data.lng.toFixed(6), '#16a34a');
+            } else {
+                setUrlPreview('<i class="fa-solid fa-triangle-exclamation me-1"></i>Could not extract coordinates', '#dc2626');
+            }
+        })
+        .catch(function() { setUrlPreview('<i class="fa-solid fa-triangle-exclamation me-1"></i>Network error', '#dc2626'); });
+    }
+
+    function handleUrlInput() {
+        var text = document.getElementById('locModalUrlInput').value.trim();
+        if (!text) { setUrlPreview(''); return; }
+        var coords = extractLocalCoords(text);
+        if (coords) {
+            applyCoords(coords.lat, coords.lng);
+            setUrlPreview('<i class="fa-solid fa-circle-check me-1"></i>' + coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6), '#16a34a');
+            return;
+        }
+        if (needsServer.test(text)) {
+            clearTimeout(urlTimer);
+            urlTimer = setTimeout(function() { resolveUrlServer(text); }, 350);
+        } else {
+            setUrlPreview('');
+        }
+    }
+
+    function initUrlInput() {
+        var inp = document.getElementById('locModalUrlInput');
+        if (!inp || inp._locInited) return;
+        inp._locInited = true;
+        inp.addEventListener('input', handleUrlInput);
+        inp.addEventListener('paste', function() { setTimeout(handleUrlInput, 150); });
+    }
+
+    window.locModalGeolocate = function() {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            var lat = pos.coords.latitude, lng = pos.coords.longitude;
+            if (locMap && locMarker) {
+                locMarker.setLatLng([lat, lng]);
+                locMap.setView([lat, lng], 17);
+                updateCoordsDisplay(lat, lng);
+            }
+        });
+    };
+
+    window.saveLocationUpdate = function() {
+        var zone = document.getElementById('locModalZone').value.trim();
+        var street = document.getElementById('locModalStreet').value.trim();
+        var building = document.getElementById('locModalBuilding').value.trim();
+        var latVal = document.getElementById('locModalLat').value.trim();
+        var lngVal = document.getElementById('locModalLng').value.trim();
+        var accuracy = document.getElementById('locModalAccuracy').value;
+        var msgEl = document.getElementById('locModalMsg');
+        var saveBtn = document.getElementById('locModalSaveBtn');
+
+        if (!zone) {
+            msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Zone is required.</span>';
+            return;
+        }
+
+        var payload = { zone_number: parseInt(zone) };
+        if (street) payload.street_number = parseInt(street);
+        if (building) payload.building_number = parseInt(building);
+        if (latVal && lngVal) {
+            payload.latitude = parseFloat(latVal);
+            payload.longitude = parseFloat(lngVal);
+            payload.coords_accuracy = accuracy;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...';
+        msgEl.innerHTML = '';
+
+        fetch('/workforce/order/' + orderId + '/update-zone/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || getCookie('csrftoken')
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Location';
+            if (data.success) {
+                msgEl.innerHTML = '<span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>' + (data.message || 'Location updated!') + '</span>';
+                // Update the read-only lat/lon inputs in the main page
+                var latInputs = document.querySelectorAll('.dtd__latlon-input');
+                if (latVal && lngVal && latInputs.length >= 2) {
+                    latInputs[0].value = parseFloat(latVal).toFixed(6);
+                    latInputs[1].value = parseFloat(lngVal).toFixed(6);
+                }
+                setTimeout(function() {
+                    var bsModal = bootstrap.Modal.getInstance(document.getElementById('locUpdateModal'));
+                    if (bsModal) bsModal.hide();
+                    location.reload();
+                }, 1200);
+            } else {
+                msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>' + (data.error || 'Failed to update.') + '</span>';
+            }
+        })
+        .catch(function() {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Location';
+            msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Network error. Please try again.</span>';
+        });
+    };
+
+    function getCookie(name) {
+        var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return match ? decodeURIComponent(match[2]) : '';
+    }
 })();
 </script>
 {% endblock extra_js %}

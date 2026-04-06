@@ -1,0 +1,116 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Returns{% endblock title %}
+
+{% block content %}
+<div class="flex-fill p-3 p-md-4" id="business_returns_container_main">
+
+  <!-- Page Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+    <div>
+      <h4 class="fw-bold mb-1" style="color: var(--brand-primary);">
+        <i class="fa-solid fa-rotate-left me-2"></i>Returns
+      </h4>
+      <p class="text-muted mb-0">Manage return requests for delivered orders.</p>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="card mb-4">
+    <div class="card-body py-2">
+      <form method="get" class="d-flex flex-wrap align-items-center gap-2">
+        <label class="form-label mb-0 fw-semibold me-1">
+          <i class="fa-solid fa-filter me-1"></i>Status:
+        </label>
+        <select name="status" class="form-select form-select-sm brt__filter-select" style="width: auto; min-width: 160px;" onchange="this.form.submit()">
+          <option value="">All Statuses</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {% if status_filter %}
+        <a href="{% url 'business:returns_list' %}" class="btn btn-sm btn-outline-secondary">
+          <i class="fa-solid fa-times me-1"></i>Clear
+        </a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <!-- Returns Table -->
+  {% if returns %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="business_returns_table">
+        <thead>
+          <tr>
+            <th>Return #</th>
+            <th>Order #</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>COD Reversal</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ret in returns %}
+          <tr>
+            <td class="fw-semibold">
+              <a href="{% url 'business:return_detail' ret.id %}" class="text-decoration-none">
+                RET-{{ ret.return_number }}
+              </a>
+            </td>
+            <td>
+              <a href="{% url 'orders:order_details' ret.order_id %}" class="text-decoration-none">
+                #{{ ret.order.order_number }}
+              </a>
+            </td>
+            <td>{{ ret.get_reason_display }}</td>
+            <td>
+              <span class="badge brt__badge--{{ ret.status }}">
+                {{ ret.get_status_display }}
+              </span>
+            </td>
+            <td>
+              {% if ret.cod_reversal_amount %}QAR {{ ret.cod_reversal_amount }}{% else %}-{% endif %}
+            </td>
+            <td class="text-muted">{{ ret.created_at|date:"d M Y H:i" }}</td>
+            <td>
+              <a href="{% url 'business:return_detail' ret.id %}" class="btn btn-sm btn-outline-primary">
+                <i class="fa-solid fa-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card">
+    <div class="card-body text-center py-5">
+      <i class="fa-solid fa-rotate-left fa-3x text-muted mb-3"></i>
+      <h5 class="text-muted">No return requests found</h5>
+      <p class="text-muted mb-0">Return requests will appear here when created from delivered orders.</p>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+.brt__filter-select { border-radius: var(--radius-sm, 6px); }
+.brt__badge--pending { background: var(--brand-warning, #f0ad4e); color: #fff; }
+.brt__badge--approved { background: var(--brand-info, #5bc0de); color: #fff; }
+.brt__badge--rejected { background: var(--brand-danger, #d9534f); color: #fff; }
+.brt__badge--pickup_scheduled { background: #6f42c1; color: #fff; }
+.brt__badge--picked_up { background: #0dcaf0; color: #000; }
+.brt__badge--received { background: #198754; color: #fff; }
+.brt__badge--refunded { background: var(--brand-success, #5cb85c); color: #fff; }
+.brt__badge--closed { background: var(--brand-muted, #6c757d); color: #fff; }
+</style>
+{% endblock extra_css %}

@@ -57,12 +57,56 @@ def notify_order_event(event, task=None, order=None):
         if not _order:
             return
 
+        # Check if business has an active trigger for this event
+        from business.models import WhatsAppNotificationTrigger
+        event_to_trigger = {
+            'driver_assigned': 'assigned',
+            'out_for_delivery': 'out_for_delivery',
+            'delivered': 'delivered',
+            'delivery_failed': 'failed',
+        }
+        trigger_status = event_to_trigger.get(event)
+        if trigger_status and _order.business_id:
+            trigger = WhatsAppNotificationTrigger.objects.filter(
+                business_id=_order.business_id,
+                trigger_status=trigger_status,
+                is_active=True
+            ).first()
+            if not trigger:
+                logger.debug(f"WhatsApp trigger not active for {event} on business {_order.business_id}")
+                return  # Don't send if trigger is not active
+
         phone = _order.customer_phone
         if not phone:
             logger.debug(f"notify_order_event({event}): order {_order.order_number} has no customer_phone, skipping")
             return
 
-        message = _build_message(event, _order, task)
+        # Use custom message from trigger if set
+        custom_msg = None
+        if trigger_status and _order.business_id:
+            trigger_obj = WhatsAppNotificationTrigger.objects.filter(
+                business_id=_order.business_id,
+                trigger_status=trigger_status,
+                is_active=True
+            ).first()
+            if trigger_obj and trigger_obj.custom_message:
+                try:
+                    driver_name = ''
+                    driver_phone_str = ''
+                    if task and task.driver:
+                        driver_name = str(task.driver)
+                        driver_phone_str = task.driver.driver_phone or ''
+                    custom_msg = trigger_obj.custom_message.format(
+                        customer_name=_order.customer_name or '',
+                        order_number=_order.order_number or '',
+                        driver_name=driver_name,
+                        driver_phone=driver_phone_str,
+                    )
+                except (KeyError, IndexError):
+                    logger.warning(f"Custom message template error for business {_order.business_id}, event {event}")
+                    custom_msg = None
+
+        message = custom_msg or _build_message(event, _order, task)
         if not message:
             return
 

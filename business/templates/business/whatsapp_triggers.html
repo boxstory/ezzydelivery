@@ -1,0 +1,231 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}WhatsApp Alerts{% endblock title %}
+
+{% block content %}
+<div class="col-12 bwt" id="business_whatsapp_triggers_container">
+
+  <!-- Page Header -->
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <div class="bwt__hero-icon">
+      <i class="fa-brands fa-whatsapp"></i>
+    </div>
+    <div>
+      <h1 class="bwt__title">WhatsApp Notification Alerts</h1>
+      <p class="bwt__subtitle mb-0">Configure which delivery status changes auto-send WhatsApp messages to your customers.</p>
+    </div>
+  </div>
+
+  <!-- Info Banner -->
+  <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="alert">
+    <i class="fa-solid fa-circle-info mt-1"></i>
+    <div>
+      <strong>How it works:</strong> When a delivery status changes, we automatically send a WhatsApp message to the customer.
+      Toggle on the statuses you want to notify customers about. You can also set a custom message per status using placeholders:
+      <code>{customer_name}</code>, <code>{order_number}</code>, <code>{driver_name}</code>, <code>{driver_phone}</code>.
+    </div>
+  </div>
+
+  <!-- Trigger Cards -->
+  <div class="row g-3">
+    {% for status_key, trigger in triggers.items %}
+    <div class="col-12 col-md-6 col-xl-4">
+      <div class="card bwt__card" id="business_whatsapp_trigger_card_{{ status_key }}">
+        <div class="card-body">
+          <!-- Header row with toggle -->
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex align-items-center gap-2">
+              <span class="bwt__status-icon bwt__status-icon--{{ status_key }}">
+                {% if status_key == 'assigned' %}
+                  <i class="fa-solid fa-user-check"></i>
+                {% elif status_key == 'picked_up' %}
+                  <i class="fa-solid fa-box"></i>
+                {% elif status_key == 'start_ride' %}
+                  <i class="fa-solid fa-motorcycle"></i>
+                {% elif status_key == 'out_for_delivery' %}
+                  <i class="fa-solid fa-truck-fast"></i>
+                {% elif status_key == 'delivered' %}
+                  <i class="fa-solid fa-circle-check"></i>
+                {% elif status_key == 'failed' %}
+                  <i class="fa-solid fa-circle-exclamation"></i>
+                {% endif %}
+              </span>
+              <h6 class="bwt__card-title mb-0">{{ trigger.label }}</h6>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input bwt__toggle"
+                     type="checkbox"
+                     role="switch"
+                     id="bwt_toggle_{{ status_key }}"
+                     data-status="{{ status_key }}"
+                     {% if trigger.is_active %}checked{% endif %}>
+            </div>
+          </div>
+
+          <!-- Custom Message (collapsible) -->
+          <div class="mt-3">
+            <button class="btn btn-sm btn-outline-secondary bwt__msg-toggle"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#bwt_msg_{{ status_key }}"
+                    aria-expanded="false">
+              <i class="fa-solid fa-pen-to-square me-1"></i> Custom Message
+            </button>
+            <div class="collapse {% if trigger.custom_message %}show{% endif %} mt-2" id="bwt_msg_{{ status_key }}">
+              <textarea class="form-control bwt__textarea"
+                        id="bwt_message_{{ status_key }}"
+                        rows="3"
+                        placeholder="Leave blank to use default message. Use {customer_name}, {order_number}, {driver_name}, {driver_phone}."
+                        data-status="{{ status_key }}">{{ trigger.custom_message }}</textarea>
+            </div>
+          </div>
+
+          <!-- Save button -->
+          <div class="mt-3 d-flex justify-content-end">
+            <button class="btn btn-sm btn-primary bwt__save-btn"
+                    data-status="{{ status_key }}"
+                    id="bwt_save_{{ status_key }}">
+              <i class="fa-solid fa-floppy-disk me-1"></i> Save
+            </button>
+          </div>
+
+          <!-- Status indicator -->
+          <div class="bwt__save-status d-none" id="bwt_status_{{ status_key }}"></div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  .bwt__hero-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md, 0.5rem);
+    background: #25d366;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+  .bwt__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--brand-dark, #1a1a2e);
+    margin: 0;
+  }
+  .bwt__subtitle {
+    color: var(--text-muted, #6c757d);
+    font-size: 0.9rem;
+  }
+  .bwt__card {
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: var(--radius-md, 0.5rem);
+    transition: box-shadow 0.2s;
+  }
+  .bwt__card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .bwt__card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--brand-dark, #1a1a2e);
+  }
+  .bwt__status-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .bwt__status-icon--assigned { background: #0d6efd; }
+  .bwt__status-icon--picked_up { background: #6f42c1; }
+  .bwt__status-icon--start_ride { background: #fd7e14; }
+  .bwt__status-icon--out_for_delivery { background: #20c997; }
+  .bwt__status-icon--delivered { background: #198754; }
+  .bwt__status-icon--failed { background: #dc3545; }
+
+  .bwt__toggle {
+    width: 3rem;
+    height: 1.5rem;
+    cursor: pointer;
+  }
+  .bwt__textarea {
+    font-size: 0.85rem;
+    resize: vertical;
+  }
+  .bwt__msg-toggle {
+    font-size: 0.8rem;
+  }
+  .bwt__save-status {
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    text-align: right;
+  }
+  .bwt__save-status--success { color: #198754; }
+  .bwt__save-status--error { color: #dc3545; }
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+    || document.querySelector('meta[name="csrf-token"]')?.content
+    || '{{ csrf_token }}';
+
+  document.querySelectorAll('.bwt__save-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const status = this.dataset.status;
+      const toggle = document.getElementById('bwt_toggle_' + status);
+      const textarea = document.getElementById('bwt_message_' + status);
+      const statusEl = document.getElementById('bwt_status_' + status);
+
+      const isActive = toggle.checked;
+      const customMessage = textarea ? textarea.value : '';
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving...';
+
+      const formData = new FormData();
+      formData.append('trigger_status', status);
+      formData.append('is_active', isActive ? 'true' : 'false');
+      formData.append('custom_message', customMessage);
+
+      fetch('{% url "business:whatsapp_trigger_toggle" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: formData,
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        statusEl.classList.remove('d-none', 'bwt__save-status--error');
+        statusEl.classList.add('bwt__save-status--success');
+        statusEl.textContent = 'Saved successfully';
+        setTimeout(function() { statusEl.classList.add('d-none'); }, 2500);
+      })
+      .catch(function(err) {
+        statusEl.classList.remove('d-none', 'bwt__save-status--success');
+        statusEl.classList.add('bwt__save-status--error');
+        statusEl.textContent = 'Error saving. Please try again.';
+      })
+      .finally(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save';
+      });
+    });
+  });
+});
+</script>
+{% endblock extra_js %}

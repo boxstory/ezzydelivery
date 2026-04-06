@@ -229,6 +229,7 @@ def orders_all_list(request):
     VALID_SORT_FIELDS = {
         'id': 'id',
         'order_number': 'order_number',
+        'client_order_code': 'client_order_code',
         'order_date': 'order_date',
         'customer_name': 'customer_name',
         'customer_phone': 'customer_phone',
@@ -244,8 +245,9 @@ def orders_all_list(request):
         else:
             items = items.order_by(f'-{order_field}')
     else:
-        sort_by = ''
-        items = items.order_by('-id')
+        sort_by = 'client_order_code'
+        sort_dir = 'desc'
+        items = items.order_by('-client_order_code')
 
     logger.debug(f"Fetching orders for business {business.business_id}")
 
@@ -790,7 +792,7 @@ def add_order(request):
                 order.business = business_models.Business.objects.get(
                     business_id=business.business_id)
                 logger.debug(f"Order business_id: {order.business_id}")
-                order = form.save()
+                order.save()
                 logger.info(f"Order created with id: {order.id}")
 
                 # Save inline products if any were submitted
@@ -1422,11 +1424,17 @@ def order_details(request, order_id):
             if fail_entry:
                 fail_notes = fail_entry.notes
 
+        # Get delivery proofs
+        delivery_proofs = []
+        if delivery_task:
+            delivery_proofs = delivery_task.delivery_proofs.all()
+
         data = {
             'order': order,
             'delivery_task': delivery_task,
             'order_items': order_items,
             'fail_notes': fail_notes,
+            'delivery_proofs': delivery_proofs,
             'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
             'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
         }
@@ -1678,6 +1686,11 @@ def update_order_status(request, order_id=None):
             ).update(
                 dl_task_status='cancelled'
             )
+            # Free up the client_order_code so the same order can be re-imported
+            if order.client_order_code and '_DEL' not in order.client_order_code:
+                orders_models.Order.objects.filter(pk=order.pk).update(
+                    client_order_code=f"{order.client_order_code}_DEL{order.pk}"
+                )
 
         logger.debug(f'Order {order_id} status updated from {old_status} to {status}')
 
@@ -1874,24 +1887,28 @@ def get_order_by_api(request):
         'X-Shopify-Access-Token': api_data.api_access_token
     }
 
-    try:
-        get_orders = requests.get(api_url, headers=headers, params={'status': 'any'}, timeout=30)
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Shopify API request failed: {e}")
-        messages.error(request, "Failed to connect to Shopify API")
-        return redirect('orders:orders_all_list')
-
-    logger.debug(f'Start date from POST: {request.POST.get("start_date")}')
-    if request.method == 'POST':
-        order_list_start_date = request.POST.get('start_date')
-        order_list_end_date = request.POST.get('end_date')
-        logger.debug('Using posted date range')
+    order_list_start_date = request.GET.get('start_date') or request.POST.get('start_date')
+    order_list_end_date = request.GET.get('end_date') or request.POST.get('end_date')
+    if order_list_start_date and order_list_end_date:
+        logger.debug(f'Using date range from request: {order_list_start_date} to {order_list_end_date}')
     else:
         order_list_start_date = (dj_timezone.localtime() - timedelta(days=30)).strftime('%Y-%m-%d')
         order_list_end_date = dj_timezone.localtime().strftime('%Y-%m-%d')
         logger.debug('Using default date range (last 30 days)')
 
     logger.debug(f'Date range: {order_list_start_date} to {order_list_end_date}')
+
+    try:
+        get_orders = requests.get(api_url, headers=headers, params={
+            'status': 'any',
+            'created_at_min': f'{order_list_start_date}T00:00:00+03:00',
+            'created_at_max': f'{order_list_end_date}T23:59:59+03:00',
+            'limit': 250,
+        }, timeout=30)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Shopify API request failed: {e}")
+        messages.error(request, "Failed to connect to Shopify API")
+        return redirect('orders:orders_all_list')
 
     if get_orders.status_code == 200:
         order_data = get_orders.json()
@@ -1902,14 +1919,172 @@ def get_order_by_api(request):
         ]
         filtered_orders.sort(key=lambda x: x['created_at'], reverse=True)
 
+        # Annotate each order with its TempOrder import status
+        visible_pids = [str(o['id']) for o in filtered_orders]
+        temp_status_map = {}
+        if visible_pids:
+            from orders.models import TempOrder as _TempOrder
+            for t in _TempOrder.objects.filter(
+                business=business,
+                source_type='shopify',
+                platform_id__in=visible_pids,
+            ).values('platform_id', 'status'):
+                temp_status_map[t['platform_id']] = t['status']
+        ready_count = 0
+        for order in filtered_orders:
+            status = temp_status_map.get(str(order['id']), 'not_synced')
+            order['import_status'] = status
+            if status == 'new':
+                ready_count += 1
+
         data={
             'order_data': order_data,
             'orders': filtered_orders,
             'business': business,
+            'ready_count': ready_count,
         }
         return render(request, 'orders/order_api_get.html', data)
     else:
         return JsonResponse({'status': 'error', 'message': 'Failed to fetch orders from Shopify'})
+
+
+@login_required(login_url='account_login')
+@require_POST
+def import_shopify_orders(request):
+    """Client-facing: import selected Shopify orders (by platform_id) into real Order records.
+
+    Expects JSON body: {"platform_ids": ["1234567890", ...]}
+    Finds matching TempOrders (synced via API Upload), creates Order records.
+    """
+    import uuid as _uuid
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    platform_ids = [str(pid) for pid in body.get('platform_ids', []) if pid]
+    if not platform_ids:
+        return JsonResponse({'success': False, 'error': 'No orders selected'}, status=400)
+
+    user_business = get_cached_business(request)
+    if not user_business:
+        return JsonResponse({'success': False, 'error': 'No business found'}, status=403)
+
+    temp_orders = orders_models.TempOrder.objects.filter(
+        business=user_business,
+        platform_id__in=platform_ids,
+        status='new',
+    )
+
+    if not temp_orders.exists():
+        return JsonResponse({
+            'success': False,
+            'error': 'No pending orders found for the selected IDs. Run "API Upload" first to sync.'
+        }, status=404)
+
+    saved, skipped, errors = 0, 0, []
+
+    for temp in temp_orders:
+        client_order_code = temp.client_order_code or f"SH-{_uuid.uuid4().hex[:8].upper()}"
+
+        if orders_models.Order.objects.filter(business=user_business, client_order_code=client_order_code).exists():
+            temp.status = 'imported'
+            temp.save(update_fields=['status'])
+            skipped += 1
+            continue
+
+        if not temp.customer_name and not temp.customer_phone:
+            errors.append(f"Order {temp.platform_id}: missing name and phone")
+            skipped += 1
+            continue
+
+        def _safe_int(val):
+            try:
+                return int(float(str(val).replace(',', '').strip())) if val else 0
+            except (ValueError, TypeError):
+                return 0
+
+        try:
+            raw = temp.raw_row if isinstance(temp.raw_row, dict) else {}
+            line_items = raw.get('line_items', []) or []
+
+            # Build package description from line items if package_desc is empty
+            pkg_desc = (temp.package_desc or '')[:255]
+            if not pkg_desc and line_items:
+                pkg_desc = ', '.join(
+                    f"{it.get('name', '')} x{it.get('qty', 1)}" for it in line_items
+                )[:255]
+            pkg_qty = _safe_int(raw.get('package_qty', '')) or max(
+                sum(it.get('qty', 1) for it in line_items), 1
+            )
+
+            # Determine COD amount and payment status from Shopify financial_status
+            financial_status = temp.financial_status or (raw.get('financial_status') or '') or ''
+            if financial_status == 'paid':
+                cod_amount = 0
+                cod_status = 'online_paid'
+            elif financial_status == 'partially_paid':
+                cod_amount = _safe_int(temp.cod_amount)
+                cod_status = 'partial_paid'
+            else:
+                cod_amount = _safe_int(temp.cod_amount)
+                cod_status = 'unpaid'
+
+            order = orders_models.Order(
+                business=user_business,
+                client_order_code=client_order_code,
+                customer_name=temp.customer_name or '',
+                customer_phone=temp.customer_phone or '',
+                customer_whatsapp=temp.customer_phone or '',
+                customer_address=temp.customer_address or '',
+                cod_amount=cod_amount,
+                cod_status_by_client=cod_status,
+                package_description=pkg_desc,
+                package_qty=pkg_qty,
+                order_status='to_review',
+                verification_status='pending',
+                original_order_data={
+                    'source': 'shopify_import',
+                    'platform_id': temp.platform_id,
+                    'temp_order_id': temp.id,
+                    'source_type': 'shopify',
+                    'financial_status': financial_status,
+                    'line_items': line_items,
+                },
+            )
+            order.save()
+
+            # Create OrderItem records from line items
+            for it in line_items:
+                iname = it.get('name', '')
+                iqty = it.get('qty', 1)
+                iprice = it.get('price', 0)
+                try:
+                    orders_models.OrderItem.objects.create(
+                        order=order,
+                        product=None,
+                        quantity=iqty,
+                        unit_price=float(iprice) if iprice else 0,
+                        notes=iname,
+                    )
+                except Exception as item_exc:
+                    logger.warning("OrderItem creation failed for order %s item '%s': %s", order.order_number, iname, item_exc)
+
+            temp.status = 'imported'
+            temp.imported_order = order
+            temp.save(update_fields=['status', 'imported_order'])
+            saved += 1
+        except Exception as exc:
+            logger.exception("Import error for platform_id %s", temp.platform_id)
+            errors.append(f"Order {temp.platform_id}: {str(exc)}")
+
+    return JsonResponse({
+        'success': True,
+        'saved': saved,
+        'skipped': skipped,
+        'errors': errors,
+    })
 
 
 @login_required(login_url='account_login')
@@ -2485,6 +2660,27 @@ def update_location(request):
                                 task_fields_to_save.append('payment_method')
                             delivery_task.save(update_fields=task_fields_to_save)
 
+                        # Fix 5: Notify driver of address update
+                        if order:
+                            active_task = order.delivery_task.filter(
+                                dl_task_status__in=[
+                                    'assigned', 'accepted', 'picked_up',
+                                    'start_ride', 'out_for_delivery', 'in_transit',
+                                ]
+                            ).first()
+                            if active_task and active_task.driver:
+                                try:
+                                    from fleet.models import DriverNotification
+                                    DriverNotification.objects.create(
+                                        driver=active_task.driver,
+                                        title='Address Updated',
+                                        message=f'Customer updated delivery address for {active_task.dl_task_number}',
+                                        notification_type='alert',
+                                        related_task=active_task,
+                                    )
+                                except Exception:
+                                    pass
+
                         step = 'success'
                         success = True
 
@@ -2654,6 +2850,9 @@ def bulk_import_preview(request):
 
         if not columns:
             return JsonResponse({'error': 'No columns found in file'}, status=400)
+
+        if len(rows) > 500:
+            return JsonResponse({'error': 'Maximum 500 orders per import. Please split your file.'}, status=400)
 
         # Fuzzy matching with multiple strategies
         from difflib import SequenceMatcher
@@ -2939,6 +3138,10 @@ def bulk_import_save_mapping(request):
                 column_mapping=mapping,
                 source_meta={'note': 'saved_mapping_only'},
             )
+        # Sync to shared business import mapping
+        if mapping:
+            business.import_mapping = mapping
+            business.save(update_fields=['import_mapping'])
 
         return JsonResponse({'success': True})
     except Exception as e:
@@ -2961,6 +3164,7 @@ def bulk_import_save(request):
         row_index = data.get('row_index', 0)
         business_id = data.get('business_id')
         import_log_id = data.get('import_log_id')
+        pickup_location_id = data.get('pickup_location_id')
 
         # Determine business based on user type
         if request.user.is_staff and business_id:
@@ -3092,6 +3296,24 @@ def bulk_import_save(request):
                 }
             }
 
+            # Resolve COD/payment status from import data
+            _COD_STATUS_MAP = {
+                'paid': 'online_paid', 'online paid': 'online_paid', 'online_paid': 'online_paid',
+                'unpaid': 'unpaid', 'no cod': 'online_paid', 'nocod': 'online_paid',
+                'pending': 'pending', 'cod': 'pending', 'cod pending': 'pending',
+                'collected': 'collected',
+                'partial': 'partial_paid', 'partial paid': 'partial_paid', 'partial_paid': 'partial_paid',
+                # Shopify financial_status values
+                'authorized': 'online_paid', 'voided': 'unpaid', 'refunded': 'unpaid',
+                # WooCommerce status values
+                'processing': 'online_paid', 'completed': 'online_paid',
+                'on-hold': 'pending', 'cancelled': 'unpaid', 'pending payment': 'pending',
+            }
+            raw_cod_status = str(row.get('cod_status_by_client', '') or '').strip().lower()
+            if not raw_cod_status:
+                raw_cod_status = str(row.get('financial_status', '') or '').strip().lower()
+            resolved_cod_status = _COD_STATUS_MAP.get(raw_cod_status) or None
+
             # Create Order
             order = orders_models.Order(
                 business=business,
@@ -3105,12 +3327,27 @@ def bulk_import_save(request):
                 dl_building=safe_int_or_none(row.get('dl_building')),
                 cod_amount=safe_int(row.get('cod_amount')),
                 dl_amount=safe_int(row.get('dl_amount')),
+                cod_status_by_client=resolved_cod_status,
                 order_notes=combined_notes[:100] if combined_notes else str(row.get('order_notes', ''))[:100],
                 deadline_date=str(row.get('deadline_date', '')),
                 order_status='to_review',
                 verification_status='pending',
                 original_order_data=original_data,
             )
+            # Set pickup location if provided
+            if pickup_location_id:
+                try:
+                    pl = business_models.PickupLocation.objects.get(id=pickup_location_id, business=business)
+                    order.pickup_location = pl
+                except business_models.PickupLocation.DoesNotExist:
+                    pass
+            # Fallback: auto-assign fulfillment center
+            if not order.pickup_location_id:
+                order.pickup_location = business_models.PickupLocation.objects.filter(
+                    business=business, pickup_status='active', is_fulfilment_center=True
+                ).first() or business_models.PickupLocation.objects.filter(
+                    business=business, pickup_status='active'
+                ).first()
             order.save()
 
             # Set package_description & package_qty
@@ -3248,3 +3485,157 @@ def bulk_import_finalize(request):
         return JsonResponse({'success': False, 'error': 'ImportLog not found'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# =============================================================================
+# PUBLIC CUSTOMER TRACKING PAGE
+# =============================================================================
+
+def customer_tracking(request, token):
+    """
+    Public tracking page for customers. No login required.
+    Accessed via WhatsApp link: /track/<token>/
+
+    Shows order status timeline, delivery info, and a live map
+    when the delivery is in an active status.
+    """
+    from delivery import models as delivery_models
+    from fleet import models as fleet_models
+
+    task = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'driver', 'driver__user',
+        'business', 'dl_address_update',
+    ).filter(tracking_token=token).first()
+
+    if not task:
+        return render(request, 'orders/customer_tracking.html', {
+            'not_found': True,
+        })
+
+    order = task.order
+    business = task.business or order.business
+
+    # Get tracking config (or defaults)
+    try:
+        tracking_config = business.tracking_config
+    except Exception:
+        tracking_config = None
+
+    if tracking_config and not tracking_config.is_active:
+        return render(request, 'orders/customer_tracking.html', {
+            'not_found': True,
+        })
+
+    # Get business logo
+    logo = business_models.BusinessLogo.objects.filter(business=business).first()
+
+    # Build status timeline
+    STATUS_STEPS = [
+        ('for_review', 'Order Received', 'fa-inbox'),
+        ('pending', 'Processing', 'fa-cog'),
+        ('assigned', 'Driver Assigned', 'fa-user-check'),
+        ('picked_up', 'Picked Up', 'fa-box-open'),
+        ('in_transit', 'On the Way', 'fa-truck'),
+        ('delivered', 'Delivered', 'fa-check-circle'),
+    ]
+    # Map alternative statuses to their step
+    STATUS_MAP = {
+        'for_review': 0,
+        'pending': 1,
+        'assigned': 2, 'accepted': 2,
+        'picked_up': 3, 'start_ride': 3,
+        'out_for_delivery': 4, 'in_transit': 4, 'contacted': 4, 'non_reachable': 4,
+        'delivered': 5,
+    }
+    current_step = STATUS_MAP.get(task.dl_task_status, 1)
+
+    # Failed/cancelled get special treatment
+    is_failed = task.dl_task_status in ('failed', 'cancelled', 'rejected')
+
+    # Active delivery statuses where we show map
+    ACTIVE_STATUSES = ['assigned', 'accepted', 'picked_up', 'start_ride',
+                       'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
+    show_map = task.dl_task_status in ACTIVE_STATUSES
+
+    # Get driver location if active
+    driver_lat = driver_lng = None
+    if show_map and task.driver_id:
+        latest_loc = fleet_models.DriverLocation.objects.filter(
+            driver_id=task.driver_id
+        ).order_by('-created_at').first()
+        if latest_loc:
+            driver_lat = float(latest_loc.latitude)
+            driver_lng = float(latest_loc.longitude)
+
+    # Delivery location
+    delivery_lat = delivery_lng = None
+    if order.latitude and order.longitude:
+        delivery_lat = float(order.latitude)
+        delivery_lng = float(order.longitude)
+
+    # Get order items
+    order_items = orders_models.OrderItem.objects.filter(order=order)
+
+    # Config values
+    primary_color = tracking_config.primary_color if tracking_config else '#f7c000'
+    secondary_color = tracking_config.secondary_color if tracking_config else '#001f3f'
+    show_driver_name = tracking_config.show_driver_name if tracking_config else True
+    show_driver_phone = tracking_config.show_driver_phone if tracking_config else False
+    show_eta = tracking_config.show_eta if tracking_config else True
+    footer_text = tracking_config.custom_footer_text if tracking_config else ''
+
+    context = {
+        'task': task,
+        'order': order,
+        'business': business,
+        'logo': logo,
+        'status_steps': STATUS_STEPS,
+        'current_step': current_step,
+        'is_failed': is_failed,
+        'show_map': show_map,
+        'driver_lat': driver_lat,
+        'driver_lng': driver_lng,
+        'delivery_lat': delivery_lat,
+        'delivery_lng': delivery_lng,
+        'order_items': order_items,
+        'primary_color': primary_color,
+        'secondary_color': secondary_color,
+        'show_driver_name': show_driver_name,
+        'show_driver_phone': show_driver_phone,
+        'show_eta': show_eta,
+        'footer_text': footer_text,
+    }
+    return render(request, 'orders/customer_tracking.html', context)
+
+
+def customer_tracking_data(request, token):
+    """
+    JSON endpoint for live map refresh on the customer tracking page.
+    Returns driver lat/lng and current status.
+    """
+    from delivery import models as delivery_models
+    from fleet import models as fleet_models
+
+    task = delivery_models.DeliveryTask.objects.select_related(
+        'driver',
+    ).filter(tracking_token=token).first()
+
+    if not task:
+        return JsonResponse({'error': 'Not found'}, status=404)
+
+    data = {
+        'status': task.dl_task_status,
+        'status_display': task.get_dl_task_status_display(),
+        'driver_lat': None,
+        'driver_lng': None,
+    }
+
+    if task.driver_id:
+        latest_loc = fleet_models.DriverLocation.objects.filter(
+            driver_id=task.driver_id
+        ).order_by('-created_at').first()
+        if latest_loc:
+            data['driver_lat'] = float(latest_loc.latitude)
+            data['driver_lng'] = float(latest_loc.longitude)
+
+    return JsonResponse(data)

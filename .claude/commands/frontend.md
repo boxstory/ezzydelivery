@@ -50,24 +50,16 @@ Then bump version: `?v=YYYYMMDDx` in the template `<link>` tag
 
 ---
 
-## Brand Tokens (ALWAYS USE VARIABLES)
+## Brand Tokens
+Full token reference → `.claude/skills/frontend-designer.md` (Brand Identity section).
+
+**Quick reference:**
 ```css
 --brand-primary: #f7c000;       /* Ezzy Yellow */
 --brand-navy: #001f3f;
---brand-navy-light: #003366;
---brand-grey-100: #fafafa;      /* Backgrounds, alternating rows */
---brand-grey-200: #f0f0f0;      /* Borders, dividers */
---brand-grey-300: #dcdcdc;      /* Input borders */
---brand-grey-400: #b0b0b0;      /* Placeholder text, icons */
---brand-grey-500: #6c757d;      /* Labels, section headers */
---brand-grey-600: #555;         /* Secondary text */
---brand-grey-700: #333;         /* Primary text */
---brand-grey-800: #1f1f1f;      /* Headings, bold values */
---brand-shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
---brand-shadow-md: 0 4px 8px rgba(0,0,0,0.1);
---brand-radius-sm: 0.5rem;      /* 8px - buttons, inputs */
---brand-radius-md: 0.75rem;     /* 12px - cards */
---brand-radius-lg: 1.125rem;    /* 18px - hero sections */
+--brand-grey-100 → grey-800     /* fafafa → 1f1f1f */
+--brand-shadow-sm/md/lg
+--brand-radius-sm: 0.5rem  /  -md: 0.75rem  /  -lg: 1.125rem
 --brand-transition: all 0.3s ease;
 ```
 
@@ -189,11 +181,10 @@ border-radius: var(--brand-radius-sm);
 ---
 
 ## BEM Naming
-Short 2–4 letter prefix per page/component:
-- `odp__` = Order Detail Panel  |  `odt-` = Order Details page
-- `pwa-` = PWA mobile  |  `wfd__` = Workforce Dashboard
-- Block: `.odp` / Element: `.odp__hero` / Modifier: `.odp__btn--primary`
-- Template IDs: `{app}_{section}_{element}_{descriptor}` e.g. `orders_list_table_view`
+Full prefix table + step-by-step application process → `.claude/skills/frontend-designer.md` (BEM Styling section).
+
+**Syntax:** `block__element--modifier` with short app prefix (e.g. `wexp__hero-title`)
+**Template IDs:** `{app}_{section}_{element}_{descriptor}` e.g. `orders_list_table_view`
 
 ---
 

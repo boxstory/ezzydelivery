@@ -10,7 +10,10 @@ urlpatterns = [
 
     # ==================== DRIVER APP APIs ====================
     path('driver/login/', ezzy_api_views.driver_login, name='driver_login'),
+    path('driver/logout/', ezzy_api_views.driver_logout, name='driver_logout'),
     path('driver/profile/', ezzy_api_views.driver_profile, name='driver_profile'),
+    path('driver/status/', ezzy_api_views.driver_set_status, name='driver_set_status'),
+    path('driver/dashboard/', ezzy_api_views.driver_dashboard, name='driver_dashboard'),
     path('driver/tasks/', ezzy_api_views.driver_tasks, name='driver_tasks'),
     path('driver/tasks/<int:task_id>/', ezzy_api_views.driver_task_detail, name='driver_task_detail'),
     path('driver/tasks/<int:task_id>/accept/', ezzy_api_views.driver_accept_task, name='driver_accept_task'),
@@ -19,9 +22,34 @@ urlpatterns = [
     path('driver/tasks/<int:task_id>/complete/', ezzy_api_views.driver_complete_task, name='driver_complete_task'),
     path('driver/tasks/<int:task_id>/documents/', ezzy_api_views.driver_task_documents, name='driver_task_documents'),
     path('driver/tasks/<int:task_id>/documents/upload/', ezzy_api_views.driver_upload_task_document, name='driver_upload_task_document'),
+    path('driver/tasks/<int:task_id>/report-issue/', ezzy_api_views.driver_report_task_issue, name='driver_report_task_issue'),
+    path('driver/tasks/<int:task_id>/items/', ezzy_api_views.driver_task_items, name='driver_task_items'),
+    path('driver/order/lookup/', ezzy_api_views.driver_order_lookup, name='driver_order_lookup'),
+    path('driver/pickup-locations/', ezzy_api_views.driver_pickup_locations, name='driver_pickup_locations'),
+    path('driver/documents/upload/', ezzy_api_views.driver_document_upload, name='driver_document_upload'),
+    path('driver/performance-metrics/', ezzy_api_views.driver_performance_metrics, name='driver_performance_metrics'),
+    path('driver/app-config/', ezzy_api_views.driver_app_config, name='driver_app_config'),
     path('driver/location/', ezzy_api_views.driver_update_location, name='driver_update_location'),
     path('driver/<int:driver_id>/location/', ezzy_api_views.driver_latest_location, name='driver_latest_location'),
     path('driver/statistics/', ezzy_api_views.driver_statistics, name='driver_statistics'),
+
+    # COD
+    path('driver/cod/submit/', ezzy_api_views.driver_cod_submit, name='driver_cod_submit'),
+    path('driver/cod/submit-bulk/', ezzy_api_views.driver_cod_submit_bulk, name='driver_cod_submit_bulk'),
+    path('driver/cod/pending/', ezzy_api_views.driver_cod_pending, name='driver_cod_pending'),
+
+    # Earnings / Transactions
+    path('driver/transactions/', ezzy_api_views.driver_transactions, name='driver_transactions'),
+    path('driver/transactions/<str:code>/', ezzy_api_views.driver_transaction_detail, name='driver_transaction_detail'),
+
+    # Settlements
+    path('driver/settlements/', ezzy_api_views.driver_settlements, name='driver_settlements'),
+    path('driver/settlements/<str:code>/', ezzy_api_views.driver_settlement_detail, name='driver_settlement_detail'),
+
+    # Notifications
+    path('driver/notifications/', ezzy_api_views.driver_notifications, name='driver_notifications'),
+    path('driver/notifications/mark-read/', ezzy_api_views.driver_notifications_mark_read, name='driver_notifications_mark_read'),
+    path('driver/device-token/', ezzy_api_views.driver_device_token, name='driver_device_token'),
 
     # Hub pickup batch endpoints (driver app)
     path('driver/hub-batches/', ezzy_api_views.driver_hub_batches, name='driver_hub_batches'),

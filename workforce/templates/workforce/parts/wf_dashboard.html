@@ -49,7 +49,7 @@
         <div class="wf-metric-card__value">{{ orders_today|default:0 }}</div>
       </div>
       <div class="wf-metric-card__footer">
-        <a href="{% url 'workforce:wf_orders_all' %}?dateFrom={{ today }}&dateTo={{ today }}" class="wf-metric-card__link">
+        <a href="{% url 'workforce:wf_orders_all' %}?dateFrom={{ today|date:'Y-m-d' }}&dateTo={{ today|date:'Y-m-d' }}" class="wf-metric-card__link">
           <i class="fa-solid fa-arrow-right"></i>
           View today's orders
         </a>
@@ -243,7 +243,7 @@
         <div class="wf-card__header">
           <h2 class="wf-card__title">
             <i class="fa-solid fa-chart-line"></i>
-            Deliveries Trend (Last 7 Days)
+            Orders & Deliveries Trend (Last 7 Days)
           </h2>
         </div>
         <div class="wf-card__body">
@@ -406,13 +406,17 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Prepare data from Django template
     const categories = [{% for day in orders_trend %}'{{ day.date }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
-    const data = [{% for day in orders_trend %}{{ day.count }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+    const ordersData = [{% for day in orders_trend %}{{ day.orders }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+    const deliveriesData = [{% for day in orders_trend %}{{ day.deliveries }}{% if not forloop.last %}, {% endif %}{% endfor %}];
 
     // ApexCharts configuration
     const options = {
         series: [{
             name: 'Orders',
-            data: data
+            data: ordersData
+        }, {
+            name: 'Deliveries',
+            data: deliveriesData
         }],
         chart: {
             type: 'area',
@@ -437,12 +441,12 @@ document.addEventListener('DOMContentLoaded', function() {
             type: 'gradient',
             gradient: {
                 shadeIntensity: 1,
-                opacityFrom: 0.7,
-                opacityTo: 0.2,
+                opacityFrom: 0.5,
+                opacityTo: 0.1,
                 stops: [0, 90, 100]
             }
         },
-        colors: ['#f7c000'],
+        colors: ['#3b82f6', '#10b981'],
         xaxis: {
             categories: categories,
             labels: {
@@ -465,12 +469,17 @@ document.addEventListener('DOMContentLoaded', function() {
             borderColor: '#e9ecef',
             strokeDashArray: 4
         },
-        tooltip: {
-            y: {
-                formatter: function(val) {
-                    return val + ' orders';
-                }
+        legend: {
+            position: 'top',
+            horizontalAlign: 'right',
+            fontSize: '13px',
+            markers: {
+                size: 8
             }
+        },
+        tooltip: {
+            shared: true,
+            intersect: false
         }
     };
 

@@ -1,0 +1,109 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Labels - {{ user_business.business_name }}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #fff; }
+
+    .blp__header {
+      padding: 1rem 2rem;
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .blp__title { font-size: 1.25rem; font-weight: 600; }
+    .blp__count { color: #666; font-size: 0.9rem; }
+    .blp__btn-print {
+      background: #001f3f;
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .blp__btn-print:hover { background: #003366; }
+
+    .blp__labels { padding: 1rem; }
+
+    .blp__label {
+      page-break-after: always;
+      page-break-inside: avoid;
+      text-align: center;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .blp__label:last-child { page-break-after: auto; }
+
+    .blp__label img {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ddd;
+    }
+    .blp__label-info {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    .blp__empty {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #999;
+    }
+    .blp__empty i { font-size: 3rem; margin-bottom: 1rem; display: block; }
+
+    @media print {
+      .blp__header { display: none; }
+      .blp__label { padding: 0; margin: 0; border: none; }
+      .blp__label img { border: none; }
+      .blp__label-info { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="blp__header">
+    <div>
+      <div class="blp__title">Shipping Labels - {{ user_business.business_name }}</div>
+      <div class="blp__count">{{ labels|length }} label{{ labels|length|pluralize }}</div>
+    </div>
+    {% if labels %}
+    <button class="blp__btn-print" onclick="window.print()">
+      <i class="fas fa-print"></i> Print All
+    </button>
+    {% endif %}
+  </div>
+
+  <div class="blp__labels">
+    {% if labels %}
+      {% for label in labels %}
+      <div class="blp__label">
+        <img src="{{ label.label_url }}" alt="Label for {{ label.order_number }}">
+        <div class="blp__label-info">{{ label.order_number }} - {{ label.customer_name }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="blp__empty">
+        <i class="fas fa-print"></i>
+        <p>No labels available. Select orders from the order list to print labels.</p>
+        <a href="javascript:window.close()">Close</a>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if labels %}
+  <script>
+    // Auto-print if opened from order list
+    if (window.opener || document.referrer) {
+      setTimeout(function() { window.print(); }, 500);
+    }
+  </script>
+  {% endif %}
+</body>
+</html>

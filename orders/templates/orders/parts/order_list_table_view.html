@@ -18,6 +18,9 @@
         <th class="oal__table-th sortable-header" data-sort="order_number">
           Order # <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
+        <th class="oal__table-th sortable-header" data-sort="client_order_code">
+          Client # <i class="fa-solid fa-sort oal__table-sort-icon"></i>
+        </th>
         <th class="oal__table-th sortable-header" data-sort="customer_name">
           Customer <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
@@ -43,6 +46,15 @@
         <td class="oal__table-td oal__table-td--order" onclick="openOrderDetailPanel({{ order.id }})">
           <span class="oal__table-order-num">{{ order.order_number }}</span>
           <span class="oal__table-order-date">{{ order.order_date|date:"d/m/Y" }}</span>
+        </td>
+
+        <!-- Client Order # -->
+        <td class="oal__table-td">
+          {% if order.client_order_code %}
+          <span class="oal__table-client-code">{{ order.client_order_code }}</span>
+          {% else %}
+          <span class="oal__table-no-cod">--</span>
+          {% endif %}
         </td>
 
         <!-- Customer -->
@@ -89,6 +101,15 @@
         <!-- Status -->
         <td class="oal__table-td status-cell" data-order-id="{{ order.id }}" data-current-status="{{ order.order_status }}">
           <div class="oal__table-status-cell">
+            {% if order.stock_flag == 'out_of_stock' %}
+            <span class="oal__stock-badge oal__stock-badge--oos" title="One or more items are out of stock — reconfirm before dispatch">
+              <i class="fa-solid fa-triangle-exclamation"></i> Out of Stock
+            </span>
+            {% elif order.stock_flag == 'low_stock' %}
+            <span class="oal__stock-badge oal__stock-badge--low" title="Insufficient stock for ordered quantity — reconfirm before dispatch">
+              <i class="fa-solid fa-box-open"></i> Low Stock
+            </span>
+            {% endif %}
             <span class="ob__ ob__--{{ order.order_status }} status-cell__display">
               <i class="fa-solid {% if order.order_status == 'publish' %}fa-rocket{% elif order.order_status == 'ready_to_pickup' %}fa-clipboard-check{% elif order.order_status == 'cancelled' %}fa-ban{% elif order.order_status == 'delivered' %}fa-check{% else %}fa-clock{% endif %}"></i>
               {{ order.get_order_status_display }}

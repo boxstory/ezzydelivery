@@ -92,7 +92,7 @@ def product_single_add(request):
     if not business:
         logger.warning(f"User {request.user.id} has no associated business")
         messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+        return redirect('business:business_dashboard')
     logger.info(f"User {request.user.id} accessing product add page for business {business.business_id}")
 
     if request.method == 'POST':
@@ -130,7 +130,7 @@ def product_single_delete(request, product_id):
     business = get_cached_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+        return redirect('business:business_dashboard')
 
     try:
         product = product_models.Product.objects.get(id=product_id, business=business)
@@ -157,7 +157,7 @@ def product_single_update(request, product_id):
     if not business:
         logger.warning(f"User {request.user.id} has no associated business")
         messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+        return redirect('business:business_dashboard')
 
     try:
         # OPTIMIZATION: Use select_related to fetch related data in single query
@@ -205,7 +205,7 @@ def product_inventory(request):
     if not business:
         logger.warning(f"User {request.user.id} has no associated business")
         messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+        return redirect('business:business_dashboard')
     logger.info(f"User {request.user.id} accessing inventory for business {business.business_id}")
 
     search_q = request.GET.get('q', '').strip()
@@ -329,7 +329,7 @@ def product_all_list_table(request):
     if not business:
         logger.warning(f"User {request.user.id} has no associated business")
         messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+        return redirect('business:business_dashboard')
     logger.info(f"User {request.user.id} accessing product table for business {business.business_id}")
 
     products = product_models.Product.objects.filter(
@@ -497,10 +497,10 @@ def _fetch_api_products(business):
         pass
 
     def timeout_handler(signum, frame):
-        raise ApiTimeout("API request timed out after 15 seconds")
+        raise ApiTimeout("API request timed out after 60 seconds")
 
     old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(15)
+    signal.alarm(60)
 
     try:
         if first_api.api_type == 'shopify':
@@ -510,49 +510,55 @@ def _fetch_api_products(business):
             shopify.ShopifyResource.activate_session(session)
             try:
                 page_products = shopify.Product.find(limit=250)
-                for p in page_products:
-                    product_title = p.title or ''
-                    product_image = ''
-                    if hasattr(p, 'image') and p.image:
-                        product_image = getattr(p.image, 'src', '') or ''
-                    elif hasattr(p, 'images') and p.images:
-                        product_image = getattr(p.images[0], 'src', '') or ''
-                    vendor = getattr(p, 'vendor', '') or ''
-                    product_type = getattr(p, 'product_type', '') or ''
+                while page_products:
+                    for p in page_products:
+                        product_title = p.title or ''
+                        product_image = ''
+                        if hasattr(p, 'image') and p.image:
+                            product_image = getattr(p.image, 'src', '') or ''
+                        elif hasattr(p, 'images') and p.images:
+                            product_image = getattr(p.images[0], 'src', '') or ''
+                        vendor = getattr(p, 'vendor', '') or ''
+                        product_type = getattr(p, 'product_type', '') or ''
 
-                    variants = getattr(p, 'variants', []) or []
-                    if variants:
-                        for v in variants:
-                            variant_image = ''
-                            if getattr(v, 'image_id', None) and hasattr(p, 'images'):
-                                for img in (p.images or []):
-                                    if getattr(img, 'id', None) == v.image_id:
-                                        variant_image = getattr(img, 'src', '') or ''
-                                        break
+                        variants = getattr(p, 'variants', []) or []
+                        if variants:
+                            for v in variants:
+                                variant_image = ''
+                                if getattr(v, 'image_id', None) and hasattr(p, 'images'):
+                                    for img in (p.images or []):
+                                        if getattr(img, 'id', None) == v.image_id:
+                                            variant_image = getattr(img, 'src', '') or ''
+                                            break
+                                api_products.append({
+                                    'platform_id': str(p.id),
+                                    'variant_id': str(v.id),
+                                    'title': product_title,
+                                    'variant_title': getattr(v, 'title', '') or '',
+                                    'sku': getattr(v, 'sku', '') or '',
+                                    'barcode': getattr(v, 'barcode', '') or '',
+                                    'price': getattr(v, 'price', '') or '',
+                                    'inventory_qty': getattr(v, 'inventory_quantity', 0) or 0,
+                                    'option1': getattr(v, 'option1', '') or '',
+                                    'option2': getattr(v, 'option2', '') or '',
+                                    'option3': getattr(v, 'option3', '') or '',
+                                    'image': variant_image or product_image,
+                                    'vendor': vendor,
+                                    'product_type': product_type,
+                                })
+                        else:
                             api_products.append({
-                                'platform_id': str(p.id),
-                                'variant_id': str(v.id),
-                                'title': product_title,
-                                'variant_title': getattr(v, 'title', '') or '',
-                                'sku': getattr(v, 'sku', '') or '',
-                                'barcode': getattr(v, 'barcode', '') or '',
-                                'price': getattr(v, 'price', '') or '',
-                                'inventory_qty': getattr(v, 'inventory_quantity', 0) or 0,
-                                'option1': getattr(v, 'option1', '') or '',
-                                'option2': getattr(v, 'option2', '') or '',
-                                'option3': getattr(v, 'option3', '') or '',
-                                'image': variant_image or product_image,
-                                'vendor': vendor,
-                                'product_type': product_type,
+                                'platform_id': str(p.id), 'variant_id': '',
+                                'title': product_title, 'variant_title': '',
+                                'sku': '', 'barcode': '', 'price': '',
+                                'inventory_qty': 0, 'option1': '', 'option2': '', 'option3': '',
+                                'image': product_image, 'vendor': vendor, 'product_type': product_type,
                             })
+                    # Fetch next page if available
+                    if page_products.has_next_page():
+                        page_products = page_products.next_page()
                     else:
-                        api_products.append({
-                            'platform_id': str(p.id), 'variant_id': '',
-                            'title': product_title, 'variant_title': '',
-                            'sku': '', 'barcode': '', 'price': '',
-                            'inventory_qty': 0, 'option1': '', 'option2': '', 'option3': '',
-                            'image': product_image, 'vendor': vendor, 'product_type': product_type,
-                        })
+                        break
             finally:
                 shopify.ShopifyResource.clear_session()
 
@@ -564,11 +570,16 @@ def _fetch_api_products(business):
                 consumer_secret=first_api.api_secret or '',
                 version='wc/v3', timeout=10,
             )
-            r = wcapi.get('products', params={'per_page': 100, 'orderby': 'date', 'order': 'desc'})
-            if r.status_code != 200:
-                api_products_error = f'WooCommerce API error {r.status_code}'
-            else:
-                for p in r.json():
+            page = 1
+            while True:
+                r = wcapi.get('products', params={'per_page': 100, 'page': page, 'orderby': 'date', 'order': 'desc'})
+                if r.status_code != 200:
+                    api_products_error = f'WooCommerce API error {r.status_code}'
+                    break
+                products_page = r.json()
+                if not products_page:
+                    break
+                for p in products_page:
                     product_title = p.get('name', '')
                     product_image = ''
                     images = p.get('images', [])
@@ -607,6 +618,11 @@ def _fetch_api_products(business):
                             'option1': '', 'option2': '', 'option3': '',
                             'image': product_image, 'vendor': '', 'product_type': product_type,
                         })
+                # Check if there are more pages
+                total_pages = int(r.headers.get('X-WP-TotalPages', 1))
+                if page >= total_pages:
+                    break
+                page += 1
     except ApiTimeout:
         api_products_error = 'API request timed out. Please try again.'
     except Exception as e:
@@ -744,7 +760,8 @@ def get_user_business(request):
 
 def is_staff_user(request):
     """Check if user is a staff member (can access all warehouses)"""
-    return request.user.is_staff or request.user.is_superuser
+    _prof = getattr(request.user, 'profile', None)
+    return request.user.is_staff or getattr(_prof, 'is_staff', False) or getattr(_prof, 'is_superadmin', False)
 
 
 def get_business_filter(request):
@@ -953,3 +970,174 @@ def transaction_list(request):
         'is_staff': is_staff,
     }
     return render(request, 'product/transaction_list.html', context)
+
+
+# =============================================================================
+# PRODUCT COMBO / BUNDLE VIEWS
+# =============================================================================
+
+ProductCombo = product_models.ProductCombo
+ProductComboItem = product_models.ProductComboItem
+
+
+@login_required(login_url='account_login')
+def combo_list(request):
+    """List all combos/bundles for the current business."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('business:business_dashboard')
+
+    combos = ProductCombo.objects.filter(
+        business=business
+    ).prefetch_related('items__product').order_by('-created_at')
+
+    context = {
+        'combos': combos,
+    }
+    return render(request, 'product/combo_list.html', context)
+
+
+@login_required(login_url='account_login')
+def combo_create(request):
+    """Create a new product combo/bundle."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('business:business_dashboard')
+
+    products = Product.objects.filter(business=business).order_by('item_name')
+
+    if request.method == 'POST':
+        combo_name = request.POST.get('combo_name', '').strip()
+        combo_sku = request.POST.get('combo_sku', '').strip()
+        description = request.POST.get('description', '').strip()
+        combo_price = request.POST.get('combo_price', '').strip()
+
+        if not combo_name:
+            messages.error(request, "Combo name is required.")
+            return render(request, 'product/combo_form.html', {
+                'products': products, 'mode': 'create',
+            })
+
+        combo = ProductCombo.objects.create(
+            business=business,
+            combo_name=combo_name,
+            combo_sku=combo_sku,
+            description=description,
+            combo_price=combo_price if combo_price else None,
+        )
+
+        # Process combo items from POST data
+        product_ids = request.POST.getlist('product_id')
+        quantities = request.POST.getlist('quantity')
+
+        items_added = 0
+        for pid, qty in zip(product_ids, quantities):
+            if pid and qty:
+                try:
+                    product = Product.objects.get(id=int(pid), business=business)
+                    ProductComboItem.objects.create(
+                        combo=combo,
+                        product=product,
+                        quantity=max(1, int(qty)),
+                    )
+                    items_added += 1
+                except (Product.DoesNotExist, ValueError):
+                    continue
+
+        if items_added == 0:
+            combo.delete()
+            messages.error(request, "Please add at least one product to the combo.")
+            return render(request, 'product/combo_form.html', {
+                'products': products, 'mode': 'create',
+            })
+
+        messages.success(request, f'Combo "{combo.combo_name}" created with {items_added} product(s).')
+        return redirect('product:combo_list')
+
+    context = {
+        'products': products,
+        'mode': 'create',
+    }
+    return render(request, 'product/combo_form.html', context)
+
+
+@login_required(login_url='account_login')
+def combo_update(request, combo_id):
+    """Edit an existing product combo/bundle."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('business:business_dashboard')
+
+    combo = get_object_or_404(ProductCombo, id=combo_id, business=business)
+    products = Product.objects.filter(business=business).order_by('item_name')
+
+    if request.method == 'POST':
+        combo_name = request.POST.get('combo_name', '').strip()
+        combo_sku = request.POST.get('combo_sku', '').strip()
+        description = request.POST.get('description', '').strip()
+        combo_price = request.POST.get('combo_price', '').strip()
+
+        if not combo_name:
+            messages.error(request, "Combo name is required.")
+            return render(request, 'product/combo_form.html', {
+                'combo': combo, 'products': products, 'mode': 'update',
+            })
+
+        combo.combo_name = combo_name
+        combo.combo_sku = combo_sku
+        combo.description = description
+        combo.combo_price = combo_price if combo_price else None
+        combo.is_active = request.POST.get('is_active') == 'on'
+        combo.save()
+
+        # Replace combo items
+        combo.items.all().delete()
+
+        product_ids = request.POST.getlist('product_id')
+        quantities = request.POST.getlist('quantity')
+
+        items_added = 0
+        for pid, qty in zip(product_ids, quantities):
+            if pid and qty:
+                try:
+                    product = Product.objects.get(id=int(pid), business=business)
+                    ProductComboItem.objects.create(
+                        combo=combo,
+                        product=product,
+                        quantity=max(1, int(qty)),
+                    )
+                    items_added += 1
+                except (Product.DoesNotExist, ValueError):
+                    continue
+
+        messages.success(request, f'Combo "{combo.combo_name}" updated.')
+        return redirect('product:combo_list')
+
+    existing_items = combo.items.select_related('product').all()
+
+    context = {
+        'combo': combo,
+        'products': products,
+        'existing_items': existing_items,
+        'mode': 'update',
+    }
+    return render(request, 'product/combo_form.html', context)
+
+
+@login_required(login_url='account_login')
+@require_http_methods(["POST"])
+def combo_delete(request, combo_id):
+    """Delete a product combo/bundle (POST only)."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('business:business_dashboard')
+
+    combo = get_object_or_404(ProductCombo, id=combo_id, business=business)
+    name = combo.combo_name
+    combo.delete()
+    messages.success(request, f'Combo "{name}" deleted.')
+    return redirect('product:combo_list')

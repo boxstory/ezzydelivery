@@ -1,0 +1,158 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Request Return - Order #{{ order.order_number }}{% endblock title %}
+
+{% block content %}
+<div class="flex-fill p-3 p-md-4" id="business_return_create_container">
+
+  <!-- Page Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+    <div>
+      <a href="{% url 'orders:order_details' order.id %}" class="text-decoration-none text-muted mb-1 d-inline-block">
+        <i class="fa-solid fa-arrow-left me-1"></i> Back to Order #{{ order.order_number }}
+      </a>
+      <h4 class="fw-bold mb-1" style="color: var(--brand-primary);">
+        <i class="fa-solid fa-rotate-left me-2"></i>Request Return
+      </h4>
+      <p class="text-muted mb-0">Create a return request for order <strong>#{{ order.order_number }}</strong></p>
+    </div>
+  </div>
+
+  <form method="post" id="business_return_create_form">
+    {% csrf_token %}
+    <div class="row g-3">
+
+      <!-- Left: Order Summary -->
+      <div class="col-lg-5">
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">
+            <i class="fa-solid fa-box me-1"></i> Order Summary
+          </div>
+          <div class="card-body">
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <small class="text-muted">Order #</small>
+                <div class="fw-semibold">{{ order.order_number }}</div>
+              </div>
+              <div class="col-6">
+                <small class="text-muted">Customer</small>
+                <div>{{ order.customer_name|default:"-" }}</div>
+              </div>
+              <div class="col-6">
+                <small class="text-muted">Order Date</small>
+                <div>{{ order.order_date|date:"d M Y" }}</div>
+              </div>
+              <div class="col-6">
+                <small class="text-muted">COD Amount</small>
+                <div class="fw-semibold">{% if order.cod_amount %}QAR {{ order.cod_amount }}{% else %}-{% endif %}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Return Form -->
+      <div class="col-lg-7">
+
+        <!-- Return Reason -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">
+            <i class="fa-solid fa-comment-dots me-1"></i> Return Reason
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
+              <select name="reason" class="form-select" required id="brt_reason_select">
+                <option value="">-- Select Reason --</option>
+                {% for val, label in reason_choices %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-0">
+              <label class="form-label fw-semibold">Additional Notes</label>
+              <textarea name="reason_notes" class="form-control" rows="3" placeholder="Describe the issue in detail..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Select Items -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">
+            <i class="fa-solid fa-list-check me-1"></i> Select Items to Return <span class="text-danger">*</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th class="ps-3" style="width: 40px;">
+                      <input type="checkbox" class="form-check-input" id="brt_select_all" title="Select all">
+                    </th>
+                    <th>Item</th>
+                    <th class="text-center">Ordered</th>
+                    <th class="text-center" style="width: 100px;">Return Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in order.order_items.all %}
+                  <tr>
+                    <td class="ps-3">
+                      <input type="checkbox" class="form-check-input brt__item-check" name="item_{{ item.id }}" value="1" id="brt_check_{{ item.id }}">
+                    </td>
+                    <td>
+                      <label for="brt_check_{{ item.id }}" class="mb-0 cursor-pointer">
+                        {{ item.display_name }}
+                        {% if item.unit_price %}
+                        <small class="text-muted">(QAR {{ item.unit_price }})</small>
+                        {% endif %}
+                      </label>
+                    </td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-center">
+                      <input type="number" name="qty_{{ item.id }}" class="form-control form-control-sm text-center brt__qty-input"
+                             value="{{ item.quantity }}" min="1" max="{{ item.quantity }}" style="width: 70px; margin: 0 auto;">
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-3">No items found for this order.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-paper-plane me-1"></i> Submit Return Request
+          </button>
+          <a href="{% url 'orders:order_details' order.id %}" class="btn btn-outline-secondary">
+            Cancel
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </form>
+
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var selectAll = document.getElementById('brt_select_all');
+  var checks = document.querySelectorAll('.brt__item-check');
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      checks.forEach(function(cb) { cb.checked = selectAll.checked; });
+    });
+  }
+});
+</script>
+{% endblock extra_js %}

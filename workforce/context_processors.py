@@ -28,16 +28,30 @@ def workforce_sidebar_counts(request):
     if not is_staff:
         return {}
 
-    # Check if already cached on request
+    # Check if already cached on request (per-request dedup)
     if hasattr(request, '_cached_workforce_counts'):
         return request._cached_workforce_counts
 
     from orders.models import Order, TempOrder
     from delivery.models import DeliveryTask
+    from django.core.cache import cache
+
+    # Check cross-request cache (60 second TTL)
+    cache_key = f'wf_sidebar_counts_{request.user.id}'
+    cached = cache.get(cache_key)
+    if cached:
+        request._cached_workforce_counts = cached
+        return cached
+
+    # Check for sync errors from last auto-sync
+    sync_errors = cache.get('temp_orders_sync_errors', [])
 
     counts = {
         # New (unimported) temp orders count for sidebar badge
         'temp_orders_count': TempOrder.objects.filter(status='new').count(),
+
+        # Sync errors from last auto-sync (mapping mismatch, etc.)
+        'temp_orders_sync_errors': sync_errors,
 
         # Orders verified but not yet published to task
         'pending_publish_count': Order.objects.filter(
@@ -58,5 +72,6 @@ def workforce_sidebar_counts(request):
         ).count(),
     }
 
+    cache.set(cache_key, counts, 60)  # 60 second TTL
     request._cached_workforce_counts = counts
     return counts

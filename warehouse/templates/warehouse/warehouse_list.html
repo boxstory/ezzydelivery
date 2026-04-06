@@ -1,11 +1,8 @@
-{% extends 'wf_dashboard_base.html' %}
+{% extends 'wh_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Warehouses{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219c" type="text/css" />
-{% endblock extra_css %}
 
 {% block content %}
 <div class="wh">
@@ -90,7 +87,7 @@
                    title="View Details">
                   <i class="fas fa-eye"></i>
                 </a>
-                {% if user.is_superuser %}
+                {% if user.profile.is_superadmin %}
                 <a href="{% url 'warehouse:warehouse_edit' wh.pk %}" class="wh__action-btn"
                    hx-get="{% url 'warehouse:warehouse_edit' wh.pk %}"
                    hx-target="#main-content"

@@ -1,0 +1,183 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/wf_export.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wexp__wrapper">
+
+  <!-- Page Header -->
+  <div class="wexp__hero">
+    <div class="wexp__hero-title">
+      <i class="fa-solid fa-truck-fast wexp__hero-icon"></i>
+      DL Tasks Export
+    </div>
+    <span class="wexp__hero-subtitle">View and export delivery tasks by business and date</span>
+  </div>
+
+  {% if step != 'select_business' %}
+  <div class="wexp__breadcrumb">
+    <a href="{% url 'workforce:dl_tasks_export_page' %}"><i class="fa-solid fa-store me-1"></i>Businesses</a>
+    <span>/</span>
+    <span class="wexp__crumb-active">{{ selected_business.business_name }}</span>
+  </div>
+  {% endif %}
+
+
+  {# ════════════════════════════════════════════════════════════ #}
+  {# STEP 1 — SELECT BUSINESS                                    #}
+  {# ════════════════════════════════════════════════════════════ #}
+  {% if step == 'select_business' %}
+  <div class="wexp__step-intro">Select a business to continue:</div>
+  <div class="wexp__biz-grid">
+    {% for biz in all_businesses %}
+    <a href="{% url 'workforce:dl_tasks_export_page' %}?business={{ biz.business_id }}" class="wexp__biz-card">
+      <div class="wexp__biz-card__name">{{ biz.business_name }}</div>
+      <div class="wexp__biz-card__count"><i class="fa-solid fa-truck me-1"></i>{{ biz.task_count }} task{{ biz.task_count|pluralize }}</div>
+    </a>
+    {% empty %}
+    <div class="wexp__empty"><i class="fa-solid fa-store"></i><p>No active businesses found.</p></div>
+    {% endfor %}
+  </div>
+
+
+  {# ════════════════════════════════════════════════════════════ #}
+  {# STEP 2 — FILTER & RESULTS                                   #}
+  {# ════════════════════════════════════════════════════════════ #}
+  {% elif step == 'results' %}
+
+  <!-- Filter Bar -->
+  <form method="get" action="{% url 'workforce:dl_tasks_export_page' %}">
+    <input type="hidden" name="business" value="{{ business_id }}">
+    <div class="wexp__filter-bar">
+
+      <div>
+        <label>Date From</label>
+        <input type="date" name="dateFrom" class="form-control wexp__filter-input--date" value="{{ filters.dateFrom }}">
+      </div>
+      <div>
+        <label>Date To</label>
+        <input type="date" name="dateTo" class="form-control wexp__filter-input--date" value="{{ filters.dateTo }}">
+      </div>
+      <div>
+        <label>Task Status</label>
+        <select name="taskStatus" class="form-select wexp__filter-input--status">
+          <option value="">All Statuses</option>
+          <option value="new_task"         {% if filters.taskStatus == 'new_task' %}selected{% endif %}>New</option>
+          <option value="pending_pickup"   {% if filters.taskStatus == 'pending_pickup' %}selected{% endif %}>Pending Pickup</option>
+          <option value="out_for_delivery" {% if filters.taskStatus == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
+          <option value="delivered"        {% if filters.taskStatus == 'delivered' %}selected{% endif %}>Delivered</option>
+          <option value="failed_delivery"  {% if filters.taskStatus == 'failed_delivery' %}selected{% endif %}>Failed</option>
+          <option value="cancelled"        {% if filters.taskStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
+          <option value="returned"         {% if filters.taskStatus == 'returned' %}selected{% endif %}>Returned</option>
+        </select>
+      </div>
+
+      <div class="wexp__actions">
+        <button type="submit" class="btn btn-dark btn-sm">
+          <i class="fa-solid fa-magnifying-glass me-1"></i>Filter
+        </button>
+        {% if total_count %}
+        <a href="?business={{ business_id }}&dateFrom={{ filters.dateFrom }}&dateTo={{ filters.dateTo }}{% if filters.taskStatus %}&taskStatus={{ filters.taskStatus }}{% endif %}&export=excel"
+           class="btn btn-success btn-sm">
+          <i class="fa-solid fa-file-excel me-1"></i>Export Excel
+        </a>
+        <a href="?business={{ business_id }}&dateFrom={{ filters.dateFrom }}&dateTo={{ filters.dateTo }}{% if filters.taskStatus %}&taskStatus={{ filters.taskStatus }}{% endif %}&export=csv"
+           class="btn btn-outline-secondary btn-sm">
+          <i class="fa-solid fa-file-csv me-1"></i>Export CSV
+        </a>
+        <span class="wexp__count-badge">{{ total_count }} task{{ total_count|pluralize }}</span>
+        {% endif %}
+      </div>
+
+    </div>
+  </form>
+
+  <!-- Results Table -->
+  {% if tasks %}
+  <div class="wexp__table-wrap">
+    <table class="wexp__table w-100">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Task #</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Driver</th>
+          <th>Order Code</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Address</th>
+          <th>Zone</th>
+          <th>Street</th>
+          <th>Building</th>
+          <th>COD Amt</th>
+          <th>COD Collected</th>
+          <th>DL Price</th>
+          <th>Speed</th>
+          <th>Preferred Time</th>
+          <th>Completed At</th>
+          <th>Failure Reason</th>
+          <th>Order Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in tasks %}
+        {% with o=task.order %}
+        <tr>
+          <td class="wexp__row-num">{{ forloop.counter }}</td>
+          <td><a href="{% url 'workforce:delivery_task_detail' task.id %}" target="_blank" class="wexp__order-link">{{ task.dl_task_number|default:"-" }}</a></td>
+          <td>{{ task.dl_task_date|date:"d/m/Y"|default:"-" }}</td>
+          <td>
+            <span class="badge
+              {% if task.dl_task_status == 'delivered' %}bg-success
+              {% elif task.dl_task_status == 'failed_delivery' %}bg-danger
+              {% elif task.dl_task_status == 'out_for_delivery' %}bg-primary
+              {% elif task.dl_task_status == 'cancelled' %}bg-secondary
+              {% else %}bg-warning text-dark{% endif %}"
+              style="font-size:.68rem;">
+              {{ task.get_dl_task_status_display|default:task.dl_task_status }}
+            </span>
+          </td>
+          <td>{{ task.driver|default:"-" }}</td>
+          <td>{% if o %}<a href="{% url 'workforce:order_detail' o.id %}" target="_blank" class="wexp__order-link">{{ o.client_order_code|default:o.order_number }}</a>{% else %}-{% endif %}</td>
+          <td>{{ o.customer_name|default:"-"|truncatechars:22 }}</td>
+          <td>{{ o.customer_phone|default:"-" }}</td>
+          <td title="{% if o %}{{ o.customer_address }}{% endif %}">{{ o.customer_address|truncatechars:28|default:"-" }}</td>
+          <td>{{ o.dl_zone|default:"-" }}</td>
+          <td>{{ o.dl_street|default:"-" }}</td>
+          <td>{{ o.dl_building|default:"-" }}</td>
+          <td>{{ o.cod_amount|default:"-" }}</td>
+          <td>
+            {% if task.cod_collected %}
+              <span class="badge bg-success" style="font-size:.68rem;">Collected</span>
+            {% else %}
+              <span class="badge bg-light text-dark border" style="font-size:.68rem;">No</span>
+            {% endif %}
+          </td>
+          <td>{{ task.dl_price|default:"-" }}</td>
+          <td>{{ task.dl_speed|default:"-" }}</td>
+          <td>{{ task.preferred_time|default:"-" }}</td>
+          <td>{{ task.completed_at|date:"d/m/Y H:i"|default:"-" }}</td>
+          <td title="{{ task.failure_reason }}">{{ task.failure_reason|truncatechars:20|default:"-" }}</td>
+          <td>{% if o %}<span class="badge bg-light text-dark border" style="font-size:.65rem;">{{ o.order_status }}</span>{% else %}-{% endif %}</td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="wexp__empty py-5">
+    <i class="fa-solid fa-truck fa-2x d-block mb-3 text-muted opacity-25"></i>
+    <p class="text-muted">No delivery tasks found for the selected filters.</p>
+  </div>
+  {% endif %}
+
+  {% endif %}{# end step #}
+
+</div>
+{% endblock content %}

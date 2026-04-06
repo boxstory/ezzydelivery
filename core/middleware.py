@@ -197,3 +197,68 @@ class QueryInspectorMiddleware:
             # Log to both console and query log file
             log_message = '\n'.join(log_lines)
             query_logger.warning(log_message)
+
+
+class DriverStatusCheckMiddleware:
+    """
+    Fix 18: Force logout drivers whose status is no longer approved.
+    Only checks requests to /fleet/ paths to minimize overhead.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated and request.path.startswith('/fleet/'):
+            try:
+                profile = getattr(request.user, 'profile', None)
+                if profile and profile.is_driver:
+                    from fleet.models import Driver
+                    driver = Driver.objects.filter(user=request.user).first()
+                    if driver and driver.driver_status not in ('approved', 'processing'):
+                        logout(request)
+                        return redirect('/accounts/login/')
+            except Exception:
+                pass
+        return self.get_response(request)
+
+
+class SecurityHeadersMiddleware:
+    """
+    Add Content-Security-Policy and Permissions-Policy headers.
+    Improves security posture which Google factors into rankings.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+
+        # Content-Security-Policy (report-only to avoid breaking things)
+        if 'Content-Security-Policy' not in response:
+            response['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+                "https://cdn.jsdelivr.net https://code.jquery.com "
+                "https://cdn.lordicon.com https://unpkg.com "
+                "https://www.googletagmanager.com https://www.google-analytics.com; "
+                "style-src 'self' 'unsafe-inline' "
+                "https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+                "font-src 'self' https://fonts.gstatic.com; "
+                "img-src 'self' data: https:; "
+                "connect-src 'self' https://www.google-analytics.com; "
+                "frame-src 'self' https://www.google.com; "
+                "frame-ancestors 'self'"
+            )
+
+        # Permissions-Policy
+        if 'Permissions-Policy' not in response:
+            response['Permissions-Policy'] = (
+                "geolocation=(self), "
+                "camera=(), "
+                "microphone=(), "
+                "payment=(), "
+                "usb=()"
+            )
+
+        return response

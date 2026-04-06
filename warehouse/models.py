@@ -79,7 +79,9 @@ PICKLIST_STATUS_CHOICES = [
     ('pending', 'Pending'),
     ('assigned', 'Assigned'),
     ('in_progress', 'In Progress'),
-    ('completed', 'Completed'),
+    ('completed', 'Picked'),
+    ('packing', 'Packing'),
+    ('packed', 'Packed'),
     ('cancelled', 'Cancelled'),
 ]
 
@@ -131,7 +133,7 @@ class Warehouse(models.Model):
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=20, blank=True)
-    country = models.CharField(max_length=100, default='Bahrain')
+    country = models.CharField(max_length=100, default='Qatar')
 
     # GPS coordinates for distance-based auto-selection
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -640,7 +642,7 @@ class InventoryTransaction(models.Model):
         choices=TRANSACTION_TYPE_CHOICES,
         db_index=True
     )
-    quantity = models.IntegerField()  # Positive for in, negative for out
+    quantity = models.IntegerField()  # Positive for in, negative for out (validated in save)
     quantity_before = models.IntegerField()
     quantity_after = models.IntegerField()
     reference_type = models.CharField(max_length=50, blank=True)  # 'order', 'transfer', 'count'
@@ -671,6 +673,9 @@ class InventoryTransaction(models.Model):
         if not self.transaction_number:
             # Auto-generate transaction number
             self.transaction_number = f"TXN-{uuid.uuid4().hex[:12].upper()}"
+        # Block negative quantity on receive/return/adjust_in transactions
+        if self.transaction_type in ('receive', 'return', 'adjust_in', 'transfer_in') and self.quantity < 0:
+            raise ValueError(f"Cannot record negative quantity ({self.quantity}) for {self.transaction_type} transaction")
         super().save(*args, **kwargs)
 
 
@@ -731,13 +736,29 @@ class StockReservation(models.Model):
 class PickList(models.Model):
     """
     A pick list groups items to be picked from the warehouse.
-    Supports wave picking for multiple orders.
+    Grouped by warehouse + business + zone for efficient picking.
     """
     pick_number = models.CharField(max_length=50, unique=True, db_index=True)
     warehouse = models.ForeignKey(
         Warehouse,
         on_delete=models.CASCADE,
         related_name='pick_lists'
+    )
+    business = models.ForeignKey(
+        business_models.Business,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pick_lists',
+        help_text="Seller/business this pick list belongs to"
+    )
+    zone = models.ForeignKey(
+        StorageLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pick_lists',
+        help_text="Warehouse zone for this pick list"
     )
     wave_number = models.CharField(max_length=50, blank=True, db_index=True)
     status = models.CharField(
@@ -829,6 +850,8 @@ class PickListItem(models.Model):
         blank=True,
         related_name='picked_items'
     )
+    is_packed = models.BooleanField(default=False)
+    packed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -838,6 +861,277 @@ class PickListItem(models.Model):
 
     def __str__(self):
         return f"{self.pick_list.pick_number} - {self.product.item_sku} x {self.quantity_to_pick}"
+
+
+# =============================================================================
+# DISPATCH MODELS
+# =============================================================================
+
+DISPATCH_STATUS_CHOICES = [
+    ('ready', 'Ready'),
+    ('assigned', 'Assigned to Driver'),
+    ('handed_over', 'Handed Over'),
+    ('dispatched', 'Dispatched'),
+    ('completed', 'Completed'),
+    ('cancelled', 'Cancelled'),
+]
+
+class DispatchBatch(models.Model):
+    """
+    A batch of packed orders assigned to a driver for delivery.
+    Created from the dispatch queue when staff assigns orders to a driver.
+    """
+    batch_number = models.CharField(max_length=50, unique=True, db_index=True)
+    warehouse = models.ForeignKey(
+        Warehouse, on_delete=models.CASCADE, related_name='dispatch_batches'
+    )
+    driver = models.ForeignKey(
+        'fleet.Driver', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='dispatch_batches'
+    )
+    status = models.CharField(
+        max_length=20, choices=DISPATCH_STATUS_CHOICES, default='ready', db_index=True
+    )
+    total_orders = models.IntegerField(default=0)
+    total_cod_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    notes = models.TextField(blank=True)
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    handed_over_at = models.DateTimeField(null=True, blank=True)
+    dispatched_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name='wh_dispatch_batches'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Dispatch Batch'
+        verbose_name_plural = 'Dispatch Batches'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.batch_number} — {self.get_status_display()}"
+
+    def save(self, *args, **kwargs):
+        if not self.batch_number:
+            self.batch_number = f"DSP-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
+
+
+class DispatchItem(models.Model):
+    """An order within a dispatch batch."""
+    batch = models.ForeignKey(
+        DispatchBatch, on_delete=models.CASCADE, related_name='items'
+    )
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.CASCADE, related_name='dispatch_items'
+    )
+    pick_list = models.ForeignKey(
+        PickList, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='dispatch_items'
+    )
+    is_handed_over = models.BooleanField(default=False)
+    handed_over_at = models.DateTimeField(null=True, blank=True)
+    cod_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Dispatch Item'
+        verbose_name_plural = 'Dispatch Items'
+
+    def __str__(self):
+        return f"{self.batch.batch_number} — {self.order.order_number}"
+
+
+# =============================================================================
+# CUSTOMER RETURN / RMA MODELS
+# =============================================================================
+
+RMA_REASON_CHOICES = [
+    ('wrong_item', 'Wrong Item Received'),
+    ('damaged', 'Damaged / Defective'),
+    ('refused', 'Customer Refused (COD)'),
+    ('change_of_mind', 'Change of Mind'),
+    ('not_as_described', 'Not as Described'),
+    ('other', 'Other'),
+]
+
+RMA_STATUS_CHOICES = [
+    ('requested', 'Requested'),
+    ('approved', 'Approved'),
+    ('in_transit', 'In Transit (returning)'),
+    ('received', 'Received at Warehouse'),
+    ('inspected', 'Inspected'),
+    ('resolved', 'Resolved'),
+    ('rejected', 'Rejected'),
+]
+
+RMA_DISPOSITION_CHOICES = [
+    ('restock', 'Restock (Good Condition)'),
+    ('quarantine', 'Quarantine (Inspect Further)'),
+    ('dispose', 'Dispose (Damaged)'),
+]
+
+class CustomerReturn(models.Model):
+    """
+    A customer return / RMA request.
+    Tracks the full lifecycle: request → approve → receive → inspect → resolve.
+    """
+    rma_number = models.CharField(max_length=50, unique=True, db_index=True)
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.CASCADE, related_name='customer_returns'
+    )
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='customer_returns'
+    )
+    warehouse = models.ForeignKey(
+        Warehouse, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='customer_returns'
+    )
+    status = models.CharField(
+        max_length=20, choices=RMA_STATUS_CHOICES, default='requested', db_index=True
+    )
+    reason = models.CharField(max_length=30, choices=RMA_REASON_CHOICES)
+    customer_notes = models.TextField(blank=True)
+    staff_notes = models.TextField(blank=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name='rma_requests'
+    )
+    received_at = models.DateTimeField(null=True, blank=True)
+    inspected_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Customer Return'
+        verbose_name_plural = 'Customer Returns'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.rma_number} — {self.order.order_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.rma_number:
+            self.rma_number = f"RMA-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
+
+
+class CustomerReturnItem(models.Model):
+    """Individual product being returned."""
+    customer_return = models.ForeignKey(
+        CustomerReturn, on_delete=models.CASCADE, related_name='items'
+    )
+    product = models.ForeignKey(
+        product_models.Product, on_delete=models.PROTECT, related_name='return_items'
+    )
+    quantity = models.IntegerField(default=1)
+    reason = models.CharField(max_length=30, choices=RMA_REASON_CHOICES, blank=True)
+    condition = models.CharField(max_length=20, choices=[
+        ('good', 'Good'),
+        ('damaged', 'Damaged'),
+        ('defective', 'Defective'),
+        ('opened', 'Opened/Used'),
+    ], blank=True)
+    disposition = models.CharField(
+        max_length=20, choices=RMA_DISPOSITION_CHOICES, blank=True
+    )
+    location = models.ForeignKey(
+        StorageLocation, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='return_items',
+        help_text="Location to restock to (if disposition is restock)"
+    )
+    is_received = models.BooleanField(default=False)
+    is_inspected = models.BooleanField(default=False)
+    is_restocked = models.BooleanField(default=False)
+    inspected_at = models.DateTimeField(null=True, blank=True)
+    restocked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Return Item'
+        verbose_name_plural = 'Return Items'
+
+    def __str__(self):
+        return f"{self.product.item_sku} x{self.quantity}"
+
+
+# =============================================================================
+# RETURN TASK MODELS
+# =============================================================================
+
+RETURN_STATUS_CHOICES = [
+    ('pending', 'Pending'),
+    ('in_progress', 'In Progress'),
+    ('completed', 'Completed'),
+]
+
+class ReturnTask(models.Model):
+    """
+    A task for staff to physically return picked items back to warehouse shelves.
+    Created when an order is cancelled after items were already picked.
+    """
+    return_number = models.CharField(max_length=50, unique=True, db_index=True)
+    warehouse = models.ForeignKey(
+        Warehouse, on_delete=models.CASCADE, related_name='return_tasks'
+    )
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.CASCADE, related_name='return_tasks'
+    )
+    pick_list = models.ForeignKey(
+        PickList, on_delete=models.SET_NULL, null=True, blank=True, related_name='return_tasks'
+    )
+    status = models.CharField(
+        max_length=20, choices=RETURN_STATUS_CHOICES, default='pending', db_index=True
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='assigned_returns'
+    )
+    reason = models.CharField(max_length=100, default='order_cancelled')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Return Task'
+        verbose_name_plural = 'Return Tasks'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.return_number} — {self.order.order_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.return_number:
+            self.return_number = f"RTN-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
+
+
+class ReturnTaskItem(models.Model):
+    """Individual item to return to a shelf location."""
+    return_task = models.ForeignKey(
+        ReturnTask, on_delete=models.CASCADE, related_name='items'
+    )
+    product = models.ForeignKey(
+        product_models.Product, on_delete=models.PROTECT, related_name='return_task_items'
+    )
+    location = models.ForeignKey(
+        StorageLocation, on_delete=models.SET_NULL, null=True, related_name='return_task_items'
+    )
+    quantity = models.IntegerField()
+    is_returned = models.BooleanField(default=False)
+    returned_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Return Task Item'
+        verbose_name_plural = 'Return Task Items'
+
+    def __str__(self):
+        return f"{self.product.item_sku} x{self.quantity} → {self.location}"
 
 
 # =============================================================================
@@ -1221,3 +1515,130 @@ class ProductRequestItem(models.Model):
     def remaining_quantity(self):
         """Calculate remaining quantity to be fulfilled"""
         return max(0, self.quantity_requested - self.quantity_fulfilled)
+
+
+# =============================================================================
+# PUT-AWAY TASK MODELS
+# =============================================================================
+
+PUTAWAY_STATUS_CHOICES = [
+    ('pending', 'Pending'),
+    ('assigned', 'Assigned'),
+    ('in_progress', 'In Progress'),
+    ('completed', 'Completed'),
+    ('cancelled', 'Cancelled'),
+]
+
+PUTAWAY_PRIORITY_CHOICES = [
+    ('normal', 'Normal'),
+    ('high', 'High'),
+    ('urgent', 'Urgent'),
+]
+
+
+class PutAwayTask(models.Model):
+    """
+    A task for warehouse staff to place received stock into storage locations.
+    Auto-created after stock is received via the receive_stock view.
+    """
+    task_number = models.CharField(max_length=50, unique=True, db_index=True)
+    warehouse = models.ForeignKey(
+        Warehouse, on_delete=models.CASCADE, related_name='put_away_tasks'
+    )
+    status = models.CharField(
+        max_length=20, choices=PUTAWAY_STATUS_CHOICES, default='pending', db_index=True
+    )
+    priority = models.CharField(
+        max_length=10, choices=PUTAWAY_PRIORITY_CHOICES, default='normal'
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='assigned_put_aways'
+    )
+    # Reference to inbound request if applicable
+    inbound_request = models.ForeignKey(
+        InboundProductRequest, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='put_away_tasks'
+    )
+    notes = models.TextField(blank=True)
+    total_items = models.IntegerField(default=0)
+    completed_items = models.IntegerField(default=0)
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name='created_put_aways'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Put-Away Task'
+        verbose_name_plural = 'Put-Away Tasks'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['warehouse', 'status', '-created_at'], name='wh_putaway_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.task_number} — {self.get_status_display()}"
+
+    def save(self, *args, **kwargs):
+        if not self.task_number:
+            self.task_number = f"PA-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
+
+    @property
+    def progress_percentage(self):
+        if self.total_items == 0:
+            return 0
+        return int((self.completed_items / self.total_items) * 100)
+
+
+class PutAwayTaskItem(models.Model):
+    """
+    Individual item to be put away at a storage location.
+    Tracks suggested location (from existing stock) and actual placed location.
+    """
+    put_away_task = models.ForeignKey(
+        PutAwayTask, on_delete=models.CASCADE, related_name='items'
+    )
+    product = models.ForeignKey(
+        product_models.Product, on_delete=models.PROTECT, related_name='put_away_items'
+    )
+    quantity = models.IntegerField()
+    # Source location where stock was received (staging/dock)
+    source_location = models.ForeignKey(
+        StorageLocation, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='put_away_sources',
+        help_text="Location where stock was received (dock/staging)"
+    )
+    # Location where this product already has stock (suggestion)
+    suggested_location = models.ForeignKey(
+        StorageLocation, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='suggested_put_aways',
+        help_text="System-suggested location (where product already exists)"
+    )
+    # Location where staff actually placed the items
+    actual_location = models.ForeignKey(
+        StorageLocation, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='actual_put_aways',
+        help_text="Location where items were actually placed"
+    )
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='completed_put_away_items'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Put-Away Item'
+        verbose_name_plural = 'Put-Away Items'
+        ordering = ['put_away_task', 'suggested_location__code']
+
+    def __str__(self):
+        loc = self.suggested_location.code if self.suggested_location else '?'
+        return f"{self.product.item_sku} x{self.quantity} → {loc}"

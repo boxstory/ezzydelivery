@@ -1,11 +1,8 @@
-{% extends 'wf_dashboard_base.html' %}
+{% extends 'wh_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Stock Card - {{ product.item_name }}{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219c" type="text/css" />
-{% endblock extra_css %}
 
 {% block content %}
 <div class="wh">
@@ -60,7 +57,9 @@
           {% empty %}
           <tr>
             <td colspan="5" class="wh__empty">
-              <p>No stock records found</p>
+              <i class="fas fa-boxes-stacked"></i>
+              <p><strong>No stock found</strong></p>
+              <p>This product has no stock in any warehouse yet.</p>
             </td>
           </tr>
           {% endfor %}
@@ -116,7 +115,9 @@
           {% empty %}
           <tr>
             <td colspan="8" class="wh__empty">
-              <p>No transactions found</p>
+              <i class="fas fa-arrow-right-arrow-left"></i>
+              <p><strong>No transactions yet</strong></p>
+              <p>Stock movements for this product will appear here.</p>
             </td>
           </tr>
           {% endfor %}

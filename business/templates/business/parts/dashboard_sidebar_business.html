@@ -1,4 +1,5 @@
 {% load static %}
+{% load i18n %}
 {% with current_url=request.resolver_match.url_name %}
 
 <div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-3 col-lg-2 bsb__container bsb__sidebar" id="client_sidebar_container_main">
@@ -25,7 +26,7 @@
     <ul class="nav flex-column gap-1" id="client_sidebar_nav_main">
 
       <!-- ORDERS SECTION -->
-      <li class="bsb__section-label">Orders</li>
+      <li class="bsb__section-label">{% trans "Orders" %}</li>
       <li class="nav-item">
         <a class="nav-link btn bsb__link--collapse {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}active{% endif %}"
            data-bs-toggle="collapse"
@@ -42,42 +43,42 @@
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'orders_all_list' or current_url == 'orders_list' %}active{% endif %}"
                  href="{% url 'orders:orders_all_list' %}">
                 <i class="fa-solid fa-bars me-2"></i>
-                <span>All Orders</span>
+                <span>{% trans "All Orders" %}</span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'add_order' %}active{% endif %}"
                  href="{% url 'orders:add_order' %}">
                 <i class="fa-solid fa-plus me-2"></i>
-                <span>Add Orders</span>
+                <span>{% trans "Add Orders" %}</span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'bulk_import_orders' %}active{% endif %}"
                  href="{% url 'orders:bulk_import_orders' %}">
                 <i class="fa-solid fa-file-import me-2"></i>
-                <span>Bulk Import</span>
+                <span>{% trans "Bulk Import" %}</span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'orders_successfull_list' %}active{% endif %}"
                  href="{% url 'orders:orders_successfull_list' %}">
                 <i class="fa-solid fa-check me-2"></i>
-                <span>Successful</span>
+                <span>{% trans "Successful" %}</span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'orders_pending_list' %}active{% endif %}"
                  href="{% url 'orders:orders_pending_list' %}">
                 <i class="fa-solid fa-spinner me-2"></i>
-                <span>Pending</span>
+                <span>{% trans "Pending" %}</span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'get_orders_by_base_api' %}active{% endif %}"
                  href="{% url 'orders:get_orders_by_base_api' %}">
                 <i class="fa-solid fa-code me-2"></i>
-                <span>API Orders</span>
+                <span>{% trans "API Orders" %}</span>
               </a>
             </li>
           </ul>
@@ -85,31 +86,38 @@
       </li>
 
       <!-- PRODUCTS SECTION -->
-      <li class="bsb__section-label">Catalog</li>
+      <li class="bsb__section-label">{% trans "Catalog" %}</li>
       <li class="nav-item">
-        <a class="nav-link btn bsb__link--collapse {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}active{% endif %}"
+        <a class="nav-link btn bsb__link--collapse {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}active{% endif %}"
            data-bs-toggle="collapse"
            data-bs-target="#submenu-product"
            href="#"
-           aria-expanded="{% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}true{% else %}false{% endif %}">
+           aria-expanded="{% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-box-open me-2"></i>
           <span>Products</span>
           <i class="fa-solid fa-chevron-down ms-auto bsb__icon--rotate"></i>
         </a>
-        <div class="collapse bsb__submenu {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}show{% endif %}" id="submenu-product">
+        <div class="collapse bsb__submenu {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' or current_url == 'inbound_requests_list' or current_url == 'outbound_requests_list' %}show{% endif %}" id="submenu-product">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'product_all_list_table' %}active{% endif %}"
                  href="{% url 'product:product_all_list_table' %}">
                 <i class="fa-solid fa-bars me-2"></i>
-                <span>All Products</span>
+                <span>{% trans "All Products" %}</span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'product_single_add' %}active{% endif %}"
                  href="{% url 'product:product_single_add' %}">
                 <i class="fa-solid fa-plus me-2"></i>
-                <span>Add Product</span>
+                <span>{% trans "Add Product" %}</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn bsb__submenu-link {% if current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' %}active{% endif %}"
+                 href="{% url 'product:combo_list' %}">
+                <i class="fa-solid fa-layer-group me-2"></i>
+                <span>Combos / Bundles</span>
               </a>
             </li>
             {% if user_business.fulfillment_service_enabled %}
@@ -133,38 +141,65 @@
       </li>
 
       <!-- OPERATIONS SECTION -->
-      <li class="bsb__section-label">Operations</li>
+      <li class="bsb__section-label">{% trans "Operations" %}</li>
       <li class="nav-item">
         <a class="nav-link btn bsb__link--single {% if current_url == 'product_inventory' %}active{% endif %}"
            href="{% url 'product:product_inventory' %}">
           <i class="fa-solid fa-chart-bar me-2"></i>
-          <span>Inventory Report</span>
+          <span>{% trans "Inventory Report" %}</span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link btn bsb__link--single {% if current_url == 'pickup_location_list' or current_url == 'pickup_location_add' or current_url == 'pickup_location_update' %}active{% endif %}"
            href="{% url 'business:pickup_location_list' %}">
           <i class="fa-solid fa-location-dot me-2"></i>
-          <span>Stores List</span>
+          <span>{% trans "Stores List" %}</span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link btn bsb__link--single {% if current_url == 'driver_directory' %}active{% endif %}"
            href="{% url 'business:driver_directory' %}">
           <i class="fa-solid fa-address-book me-2"></i>
-          <span>Fleet List</span>
+          <span>{% trans "Fleet List" %}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link btn bsb__link--single {% if current_url == 'live_tracking_map' %}active{% endif %}"
+           href="{% url 'business:live_tracking_map' %}">
+          <i class="fa-solid fa-map-location-dot me-2"></i>
+          <span>{% trans "Live Tracking" %}</span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link btn bsb__link--single {% if current_url == 'business_profile' %}active{% endif %}"
            href="{% url 'business:business_profile' %}">
           <i class="fa-solid fa-store me-2"></i>
-          <span>Public View</span>
+          <span>{% trans "Public View" %}</span>
+        </a>
+      </li>
+
+      <!-- RETURNS SECTION -->
+      <li class="bsb__section-label">{% trans "Returns" %}</li>
+      <li class="nav-item">
+        <a class="nav-link btn bsb__link--single {% if current_url == 'returns_list' or current_url == 'return_detail' or current_url == 'return_create' %}active{% endif %}"
+           href="{% url 'business:returns_list' %}">
+          <i class="fa-solid fa-rotate-left me-2"></i>
+          <span>Returns</span>
+        </a>
+      </li>
+
+      <!-- REPORTS SECTION -->
+      <li class="bsb__section-label">{% trans "Reports" %}</li>
+      <li class="nav-item">
+        <a class="nav-link btn bsb__link--single {% if current_url == 'reports_dashboard' %}active{% endif %}"
+           href="{% url 'business:reports_dashboard' %}">
+          <i class="fa-solid fa-file-export me-2"></i>
+          <span>Reports & Export</span>
         </a>
       </li>
 
       <!-- FINANCE SECTION -->
-      <li class="bsb__section-label">Finance</li>
+      <li class="bsb__section-label">{% trans "Finance" %}</li>
       <li class="nav-item">
         <a class="nav-link btn bsb__link--collapse {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}active{% endif %}"
            data-bs-toggle="collapse"
@@ -181,14 +216,14 @@
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'business_finance_dashboard' %}active{% endif %}"
                  href="{% url 'business:business_finance_dashboard' %}">
                 <i class="fa-solid fa-chart-pie me-2"></i>
-                <span>Finance Overview</span>
+                <span>{% trans "Finance Overview" %}</span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'business_transactions' %}active{% endif %}"
                  href="{% url 'business:business_transactions' %}">
                 <i class="fa-solid fa-clock-rotate-left me-2"></i>
-                <span>Recent Transactions</span>
+                <span>{% trans "Recent Transactions" %}</span>
               </a>
             </li>
             <li class="nav-item">
@@ -211,18 +246,18 @@
 
       <!-- SETTINGS SECTION -->
       {% if is_business_owner %}
-      <li class="bsb__section-label">Settings</li>
+      <li class="bsb__section-label">{% trans "Settings" %}</li>
       <li class="nav-item">
-        <a class="nav-link btn bsb__link--collapse {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}"
+        <a class="nav-link btn bsb__link--collapse {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}active{% endif %}"
            data-bs-toggle="collapse"
            data-bs-target="#submenu-settings"
            href="#"
-           aria-expanded="{% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}true{% else %}false{% endif %}">
+           aria-expanded="{% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-gear me-2"></i>
           <span>Settings</span>
           <i class="fa-solid fa-chevron-down ms-auto bsb__icon--rotate"></i>
         </a>
-        <div class="collapse bsb__submenu {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}show{% endif %}" id="submenu-settings">
+        <div class="collapse bsb__submenu {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}show{% endif %}" id="submenu-settings">
           <ul class="nav flex-column">
             {% if user_business %}
             <li class="nav-item">
@@ -246,6 +281,20 @@
                 <span>API Settings</span>
               </a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link btn bsb__submenu-link {% if current_url == 'whatsapp_triggers_list' %}active{% endif %}"
+                 href="{% url 'business:whatsapp_triggers_list' %}">
+                <i class="fa-brands fa-whatsapp me-2"></i>
+                <span>WhatsApp Alerts</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn bsb__submenu-link {% if current_url == 'branded_tracking_settings' %}active{% endif %}"
+                 href="{% url 'business:branded_tracking_settings' %}">
+                <i class="fa-solid fa-palette me-2"></i>
+                <span>Tracking Page</span>
+              </a>
+            </li>
             {% endif %}
           </ul>
         </div>
@@ -254,7 +303,7 @@
 
       <!-- BUSINESS SWITCHER -->
       {% if show_business_switcher and request.resolver_match.url_name == 'business_dashboard' %}
-      <li class="bsb__section-label">Account</li>
+      <li class="bsb__section-label">{% trans "Account" %}</li>
       <li class="nav-item">
         <a class="nav-link btn bsb__link--collapse"
            data-bs-toggle="collapse"
@@ -307,8 +356,22 @@
            href="{% url 'webpages:help_center' %}"
            target="_blank">
           <i class="fa-solid fa-circle-question me-2"></i>
-          <span>Help Center</span>
+          <span>{% trans "Help Center" %}</span>
         </a>
+      </li>
+
+      <!-- LANGUAGE SWITCHER -->
+      <hr class="bsb__divider" />
+      <li class="nav-item">
+        <form action="{% url 'set_language' %}" method="post" class="bsb__lang-form">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <button type="submit" name="language" value="{% if LANGUAGE_CODE == 'ar' %}en{% else %}ar{% endif %}"
+                  class="nav-link btn bsb__link--single w-100 text-start">
+            <i class="fa-solid fa-language me-2"></i>
+            <span>{% if LANGUAGE_CODE == 'ar' %}English{% else %}العربية{% endif %}</span>
+          </button>
+        </form>
       </li>
 
     </ul>

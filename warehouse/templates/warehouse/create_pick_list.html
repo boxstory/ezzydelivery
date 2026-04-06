@@ -1,0 +1,155 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Create Pick List{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:pick_list_list' %}">Pick Lists</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">Create</span>
+  </div>
+
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-plus-circle"></i></div>
+      <div>
+        <h1 class="wh__title">Create Pick List</h1>
+        <p class="wh__subtitle">Select orders to batch into a product-grouped pick list</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="wh__card mb-3">
+    <div class="wh__card-body" style="padding:0.75rem 1rem;">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="wh__badge wh__badge--info"><i class="fas fa-info-circle"></i> How it works</span>
+        <span class="wh__meta">Select orders below &rarr; Items are grouped by product &rarr; Picker walks once per product location</span>
+      </div>
+    </div>
+  </div>
+
+  <form method="POST" id="pkl_create_form">
+    {% csrf_token %}
+
+    <!-- Orders Table -->
+    <div class="wh__card">
+      <div class="wh__card-header">
+        <div class="wh__card-header-left">
+          <i class="fas fa-file-invoice"></i>
+          <span>Orders Ready for Pickup</span>
+        </div>
+        <span class="wh__count-badge">{{ ready_orders|length }}</span>
+      </div>
+
+      {% if ready_orders %}
+      <!-- Select all -->
+      <div class="d-flex align-items-center gap-2 px-3 py-2" style="border-bottom:1px solid var(--wh-border-light);">
+        <input type="checkbox" id="pkl_select_all" class="form-check-input" onchange="toggleAllOrders(this.checked)">
+        <label for="pkl_select_all" class="wh__meta mb-0" style="cursor:pointer;">Select All</label>
+        <span class="wh__meta ms-auto" id="pkl_selected_count">0 selected</span>
+      </div>
+
+      <!-- Order rows -->
+      <div id="pkl_order_list">
+        {% for order in ready_orders %}
+        <label class="pkl-create__row" for="pkl_order_{{ order.pk }}">
+          <input type="checkbox" name="order_ids" value="{{ order.pk }}" id="pkl_order_{{ order.pk }}" class="form-check-input pkl-order-cb" onchange="updateSelectedCount()">
+          <div class="pkl-create__info">
+            <div class="pkl-create__order-num">{{ order.order_number }}</div>
+            <div class="pkl-create__meta">
+              <span><i class="fas fa-store"></i> {{ order.business.business_name|default:"-" }}</span>
+              <span><i class="fas fa-box"></i> {{ order.product_count }} product{{ order.product_count|pluralize }}</span>
+              <span><i class="fas fa-calendar"></i> {{ order.created_at|date:"d M H:i" }}</span>
+            </div>
+          </div>
+          {% if order.customer_name %}
+          <div class="pkl-create__customer d-none d-md-block">
+            <span class="wh__meta"><i class="fas fa-user"></i> {{ order.customer_name }}</span>
+          </div>
+          {% endif %}
+          <span class="wh__badge wh__badge--success">Ready</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <!-- Submit -->
+      <div class="wh__card-footer d-flex align-items-center gap-2 justify-content-between">
+        <a href="{% url 'warehouse:pick_list_list' %}" class="wh__btn wh__btn--secondary">
+          <i class="fas fa-arrow-left"></i> Cancel
+        </a>
+        <button type="submit" class="wh__btn wh__btn--primary" id="pkl_submit_btn" disabled>
+          <i class="fas fa-clipboard-list"></i> Create Pick List
+        </button>
+      </div>
+
+      {% else %}
+      <div class="wh__empty">
+        <i class="fas fa-check-circle" style="color:var(--wh-green);"></i>
+        <p><strong>No orders waiting</strong></p>
+        <p>All orders are either already in a pick list or not yet ready for pickup.</p>
+        <a href="{% url 'warehouse:pick_list_list' %}" class="wh__btn wh__btn--secondary mt-2">
+          <i class="fas fa-arrow-left"></i> Back to Pick Lists
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<style>
+.pkl-create__row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+    cursor: pointer;
+    transition: background 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+    margin: 0;
+}
+.pkl-create__row:hover { background: var(--wh-surface-alt, #f8f9fb); }
+.pkl-create__row:has(input:checked) { background: rgba(247, 192, 0, 0.06); }
+.pkl-create__row:last-of-type { border-bottom: none; }
+.pkl-create__info { flex: 1; min-width: 0; }
+.pkl-create__order-num {
+    font-family: var(--wh-mono, monospace);
+    font-size: 0.8125rem; font-weight: 700; color: var(--wh-navy, #0c1a2e);
+}
+.pkl-create__meta {
+    display: flex; flex-wrap: wrap; gap: 0.625rem;
+    font-size: 0.6875rem; color: var(--wh-muted, #64748b); margin-top: 0.125rem;
+}
+.pkl-create__meta i { font-size: 0.5625rem; width: 10px; text-align: center; }
+.pkl-create__customer { flex-shrink: 0; }
+
+@media (max-width: 767.98px) {
+    .pkl-create__row { padding: 0.5rem 0.75rem; gap: 0.5rem; }
+    .pkl-create__order-num { font-size: 0.75rem; }
+    .pkl-create__meta { font-size: 0.625rem; gap: 0.5rem; }
+}
+</style>
+
+<script>
+function toggleAllOrders(checked) {
+    document.querySelectorAll('.pkl-order-cb').forEach(function(cb) { cb.checked = checked; });
+    updateSelectedCount();
+}
+function updateSelectedCount() {
+    var count = document.querySelectorAll('.pkl-order-cb:checked').length;
+    var el = document.getElementById('pkl_selected_count');
+    var btn = document.getElementById('pkl_submit_btn');
+    if (el) el.textContent = count + ' selected';
+    if (btn) btn.disabled = count === 0;
+    // Update select-all checkbox
+    var all = document.querySelectorAll('.pkl-order-cb').length;
+    var selAll = document.getElementById('pkl_select_all');
+    if (selAll) selAll.checked = count === all && all > 0;
+}
+</script>
+{% endblock %}

@@ -1,10 +1,136 @@
-{% extends 'wf_dashboard_base.html' %}
+{% extends 'wh_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Pick Lists{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219c" type="text/css" />
+<style>
+/* ── Pick List Mobile Cards (pkl-mob__) ── */
+.pkl-mob__list { display: none; }
+
+@media (max-width: 767.98px) {
+    .pkl-mob__list { display: block; }
+    .pkl-mob__desktop { display: none !important; }
+
+    .pkl-mob__card {
+        background: var(--wh-surface, #fff);
+        border: 1px solid var(--wh-border, #e2e6ed);
+        border-radius: 8px;
+        padding: 0.875rem;
+        margin-bottom: 0.625rem;
+        transition: box-shadow 0.15s ease;
+        text-decoration: none;
+        display: block;
+        color: inherit;
+    }
+    .pkl-mob__card:hover { box-shadow: var(--wh-shadow); }
+    .pkl-mob__card:active { transform: scale(0.99); }
+
+    /* Top row: pick number + status badge */
+    .pkl-mob__top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+    .pkl-mob__number {
+        font-family: var(--wh-mono, monospace);
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: var(--wh-navy, #0c1a2e);
+    }
+    .pkl-mob__warehouse {
+        font-size: 0.6875rem;
+        color: var(--wh-muted, #64748b);
+        margin-top: 0.125rem;
+    }
+
+    /* Middle: metadata row */
+    .pkl-mob__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 0.625rem;
+        font-size: 0.6875rem;
+        color: var(--wh-muted, #64748b);
+    }
+    .pkl-mob__meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .pkl-mob__meta-item i {
+        font-size: 0.5625rem;
+        width: 12px;
+        text-align: center;
+        color: var(--wh-dim, #94a3b8);
+    }
+
+    /* Progress bar (in_progress only) */
+    .pkl-mob__progress {
+        background: var(--wh-border-light, #eef0f4);
+        border-radius: 4px;
+        height: 6px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+    .pkl-mob__progress-fill {
+        height: 100%;
+        border-radius: 4px;
+        background: linear-gradient(90deg, var(--wh-accent, #f7c000), #f59e0b);
+        transition: width 0.4s ease;
+    }
+    .pkl-mob__progress-fill--done {
+        background: linear-gradient(90deg, #059669, #34d399);
+    }
+
+    /* Bottom: action row */
+    .pkl-mob__actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--wh-border-light, #eef0f4);
+    }
+    .pkl-mob__btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .pkl-mob__btn--start {
+        background: linear-gradient(135deg, var(--wh-accent, #f7c000), #e5b000);
+        color: var(--wh-navy, #0c1a2e);
+    }
+    .pkl-mob__btn--start:active { filter: brightness(0.95); }
+    .pkl-mob__btn--continue {
+        background: linear-gradient(135deg, var(--wh-blue, #2563eb), #1d4ed8);
+        color: #fff;
+    }
+    .pkl-mob__btn--continue:hover { color: #fff; }
+    .pkl-mob__btn--continue:active { filter: brightness(0.95); }
+    .pkl-mob__btn--view {
+        background: var(--wh-surface-alt, #f8f9fb);
+        border: 1px solid var(--wh-border, #e2e6ed);
+        color: var(--wh-slate, #334155);
+        margin-left: auto;
+    }
+    .pkl-mob__done-icon {
+        width: 24px; height: 24px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: #dcfce7; color: #15803d; border-radius: 50%;
+        font-size: 0.625rem;
+    }
+}
+</style>
 {% endblock extra_css %}
 
 {% block content %}
@@ -37,6 +163,28 @@
           {% endfor %}
         </select>
       </div>
+      {% if is_staff and businesses %}
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Business</label>
+        <select name="business" class="wh__filter-select">
+          <option value="">All Businesses</option>
+          {% for biz in businesses %}
+          <option value="{{ biz.pk }}" {% if selected_business == biz.pk|stringformat:"d" %}selected{% endif %}>{{ biz.business_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      {% if zones %}
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Zone</label>
+        <select name="zone" class="wh__filter-select">
+          <option value="">All Zones</option>
+          {% for z in zones %}
+          <option value="{{ z.pk }}" {% if selected_zone == z.pk|stringformat:"d" %}selected{% endif %}>{{ z.code }} — {{ z.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="wh__filter-group--sm">
         <button type="submit" class="wh__filter-btn">
           <i class="fas fa-filter"></i> Filter
@@ -45,8 +193,119 @@
     </form>
   </div>
 
-  <!-- Table Card -->
-  <div class="wh__card">
+  {% if is_superadmin %}
+  <!-- Bulk Actions Bar (superadmin only) -->
+  <form method="POST" action="{% url 'warehouse:bulk_drop_pick_lists' %}" id="pkl_bulk_form">
+    {% csrf_token %}
+    <div class="wh__card mb-2" id="pkl_bulk_bar">
+      <div class="wh__card-body d-flex align-items-center gap-3 py-2 px-3 flex-wrap">
+        <input type="checkbox" id="pkl_select_all" class="form-check-input" onchange="pklToggleAll(this.checked)">
+        <label for="pkl_select_all" class="wh__meta mb-0" style="cursor:pointer;">Select All</label>
+        <span class="wh__meta" id="pkl_sel_count">0 selected</span>
+        <button type="submit" class="wh__btn wh__btn--secondary ms-auto" id="pkl_bulk_drop_btn" disabled
+                onclick="return confirm('Drop all picked items back to shelf for selected pick lists? This resets them to Pending.')">
+          <i class="fas fa-rotate-left" style="color:var(--wh-amber);"></i> Drop to Shelf
+        </button>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- ═══════ MOBILE: Card View ═══════ -->
+  <div class="pkl-mob__list">
+    {% for pl in pick_lists %}
+    <div class="pkl-mob__card">
+      <!-- Top: Number + Status -->
+      <div class="pkl-mob__top">
+        {% if is_superadmin %}
+        <input type="checkbox" name="pk_ids" value="{{ pl.pk }}" class="form-check-input pkl-cb me-2" onchange="pklUpdateCount()" onclick="event.stopPropagation()">
+        {% endif %}
+        <div>
+          <div class="pkl-mob__number">{{ pl.pick_number }}</div>
+          <div class="pkl-mob__warehouse">{{ pl.warehouse.name }}{% if pl.zone %} &middot; {{ pl.zone.code }}{% endif %}</div>
+        </div>
+        <span class="wh__badge
+          {% if pl.status == 'packed' %}wh__badge--success
+          {% elif pl.status == 'completed' or pl.status == 'packing' %}wh__badge--primary
+          {% elif pl.status == 'in_progress' %}wh__badge--info
+          {% elif pl.status == 'assigned' %}wh__badge--info
+          {% else %}wh__badge--warning{% endif %}">
+          {{ pl.get_status_display }}
+        </span>
+      </div>
+
+      <!-- Meta -->
+      {% if pl.business %}
+      <div class="pkl-mob__meta mb-1">
+        <span class="pkl-mob__meta-item"><i class="fas fa-store"></i> {{ pl.business.business_name }}</span>
+        {% if pl.zone %}<span class="pkl-mob__meta-item"><i class="fas fa-map"></i> {{ pl.zone.name }}</span>{% endif %}
+      </div>
+      {% endif %}
+      <div class="pkl-mob__meta">
+        <span class="pkl-mob__meta-item">
+          <i class="fas fa-user"></i>
+          {% if pl.assigned_to %}{{ pl.assigned_to.get_full_name|default:pl.assigned_to.username }}{% else %}Unassigned{% endif %}
+        </span>
+        <span class="pkl-mob__meta-item">
+          <i class="fas fa-box"></i> {{ pl.total_items }} items
+        </span>
+        <span class="pkl-mob__meta-item">
+          <i class="fas fa-calendar"></i> {{ pl.created_at|date:"d M H:i" }}
+        </span>
+      </div>
+
+      <!-- Progress (in_progress only) -->
+      {% if pl.status == 'in_progress' and pl.total_items > 0 %}
+      <div class="pkl-mob__progress">
+        <div class="pkl-mob__progress-fill{% if pl.picked_items >= pl.total_items %} pkl-mob__progress-fill--done{% endif %}"
+             style="width:{{ pl.progress_percentage }}%;"></div>
+      </div>
+      {% endif %}
+
+      <!-- Actions -->
+      <div class="pkl-mob__actions">
+        {% if pl.status == 'pending' or pl.status == 'assigned' %}
+        <form method="POST" action="{% url 'warehouse:start_pick_list' pl.pk %}" class="d-inline" novalidate>
+          {% csrf_token %}
+          <button type="submit" class="pkl-mob__btn pkl-mob__btn--start">
+            <i class="fas fa-play"></i> Start
+          </button>
+        </form>
+        {% elif pl.status == 'in_progress' %}
+        <a href="{% url 'warehouse:pick_list_detail' pl.pk %}" class="pkl-mob__btn pkl-mob__btn--continue">
+          Continue <i class="fas fa-arrow-right"></i>
+        </a>
+        {% elif pl.status == 'completed' or pl.status == 'packing' %}
+        <a href="{% url 'warehouse:pack_station' pl.pk %}" class="pkl-mob__btn pkl-mob__btn--continue">
+          <i class="fas fa-box-open"></i> Pack
+        </a>
+        {% elif pl.status == 'packed' %}
+        <span class="pkl-mob__done-icon"><i class="fas fa-check"></i></span>
+        {% endif %}
+        <a href="{% url 'warehouse:pick_list_detail' pl.pk %}" class="pkl-mob__btn pkl-mob__btn--view"
+           hx-get="{% url 'warehouse:pick_list_detail' pl.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fas fa-eye"></i> View
+        </a>
+      </div>
+    </div>
+    {% empty %}
+    <div class="wh__empty">
+      <i class="fas fa-clipboard-list"></i>
+      <p><strong>No pick lists found</strong></p>
+      <p>Create a pick list to start fulfilling orders.</p>
+      <a href="{% url 'warehouse:create_pick_list' %}" class="wh__btn wh__btn--primary mt-2">
+        <i class="fas fa-plus"></i> Create Pick List
+      </a>
+    </div>
+    {% endfor %}
+
+    <!-- Mobile Pagination -->
+    <div class="wh__card-footer">
+      {% include "includes/components/_pagination.html" with page_obj=pick_lists filter_params=filter_params %}
+    </div>
+  </div>
+
+  <!-- ═══════ DESKTOP: Table View ═══════ -->
+  <div class="wh__card pkl-mob__desktop">
     <div class="wh__card-header">
       <div class="wh__card-header-left">
         <i class="fas fa-list"></i>
@@ -57,8 +316,10 @@
       <table class="wh__table">
         <thead>
           <tr>
+            {% if is_superadmin %}<th class="wh__th" style="width:32px;"></th>{% endif %}
             <th class="wh__th">Pick List #</th>
-            <th class="wh__th">Warehouse</th>
+            <th class="wh__th">Business</th>
+            <th class="wh__th">Warehouse / Zone</th>
             <th class="wh__th">Status</th>
             <th class="wh__th">Assigned To</th>
             <th class="wh__th wh__th--center">Items</th>
@@ -69,8 +330,10 @@
         <tbody>
           {% for pl in pick_lists %}
           <tr>
+            {% if is_superadmin %}<td class="wh__td"><input type="checkbox" name="pk_ids" value="{{ pl.pk }}" class="form-check-input pkl-cb" onchange="pklUpdateCount()"></td>{% endif %}
             <td class="wh__td"><strong>{{ pl.pick_number }}</strong></td>
-            <td class="wh__td">{{ pl.warehouse.name }}</td>
+            <td class="wh__td">{{ pl.business.business_name|default:"-" }}</td>
+            <td class="wh__td">{{ pl.warehouse.name }}{% if pl.zone %} <span class="wh__code">{{ pl.zone.code }}</span>{% endif %}</td>
             <td class="wh__td">
               <span class="wh__badge
                 {% if pl.status == 'completed' %}wh__badge--success
@@ -79,21 +342,52 @@
                 {% else %}wh__badge--warning{% endif %}">
                 {{ pl.get_status_display }}
               </span>
+              {% if pl.status == 'in_progress' and pl.total_items > 0 %}
+              <div class="pkl-row__progress">
+                <div class="pkl-row__progress-bar">
+                  <div class="pkl-row__progress-fill{% if pl.picked_items >= pl.total_items %} pkl-row__progress-fill--done{% endif %}" style="width:{{ pl.progress_percentage }}%;"></div>
+                </div>
+                <span class="pkl-row__progress-text">{{ pl.picked_items }}/{{ pl.total_items }}</span>
+              </div>
+              {% endif %}
             </td>
-            <td class="wh__td">{{ pl.assigned_to.username|default:"-" }}</td>
-            <td class="wh__td wh__td--center">{{ pl.items.count }}</td>
+            <td class="wh__td">{% if pl.assigned_to %}{{ pl.assigned_to.get_full_name|default:pl.assigned_to.username }}{% else %}-{% endif %}</td>
+            <td class="wh__td wh__td--center">{{ pl.total_items }}</td>
             <td class="wh__td"><span class="wh__meta">{{ pl.created_at|date:"d M Y H:i" }}</span></td>
             <td class="wh__td wh__td--center">
-              <a href="{% url 'warehouse:pick_list_detail' pl.pk %}" class="wh__action-btn" title="View">
-                <i class="fas fa-eye"></i>
-              </a>
+              <div class="pkl-row__actions">
+                {% if pl.status == 'pending' or pl.status == 'assigned' %}
+                <form method="POST" action="{% url 'warehouse:start_pick_list' pl.pk %}" class="d-inline" novalidate>
+                  {% csrf_token %}
+                  <button type="submit" class="pkl-row__start-btn" title="Assign to me and start picking">
+                    <i class="fas fa-play"></i> Start Picking
+                  </button>
+                </form>
+                {% elif pl.status == 'in_progress' %}
+                <a href="{% url 'warehouse:pick_list_detail' pl.pk %}" class="pkl-row__continue-btn" title="Continue picking items"
+                   hx-get="{% url 'warehouse:pick_list_detail' pl.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                  Continue <i class="fas fa-arrow-right"></i>
+                </a>
+                {% elif pl.status == 'completed' or pl.status == 'packing' %}
+                <a href="{% url 'warehouse:pack_station' pl.pk %}" class="pkl-row__continue-btn" title="Pack orders">
+                  <i class="fas fa-box-open"></i> Pack
+                </a>
+                {% elif pl.status == 'packed' %}
+                <span class="pkl-row__done-badge" title="All packed"><i class="fas fa-check"></i></span>
+                {% endif %}
+                <a href="{% url 'warehouse:pick_list_detail' pl.pk %}" class="wh__action-btn" title="View details"
+                   hx-get="{% url 'warehouse:pick_list_detail' pl.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                  <i class="fas fa-eye"></i>
+                </a>
+              </div>
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="wh__empty">
+            <td colspan="9" class="wh__empty">
               <i class="fas fa-clipboard-list"></i>
-              <p>No pick lists found</p>
+              <p><strong>No pick lists found</strong></p>
+              <p>Create a pick list to start fulfilling orders.</p>
             </td>
           </tr>
           {% endfor %}
@@ -104,6 +398,10 @@
       {% include "includes/components/_pagination.html" with page_obj=pick_lists filter_params=filter_params %}
     </div>
   </div>
+
+  {% if is_superadmin %}
+  </form>
+  {% endif %}
 
   <!-- Tips & Workflow -->
   <div class="wh__help-grid">
@@ -144,3 +442,24 @@
   </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+{% if is_superadmin %}
+<script>
+function pklToggleAll(checked) {
+    document.querySelectorAll('.pkl-cb').forEach(function(cb) { cb.checked = checked; });
+    pklUpdateCount();
+}
+function pklUpdateCount() {
+    var count = document.querySelectorAll('.pkl-cb:checked').length;
+    var el = document.getElementById('pkl_sel_count');
+    var btn = document.getElementById('pkl_bulk_drop_btn');
+    var allCb = document.getElementById('pkl_select_all');
+    var total = document.querySelectorAll('.pkl-cb').length;
+    if (el) el.textContent = count + ' selected';
+    if (btn) btn.disabled = count === 0;
+    if (allCb) allCb.checked = count === total && total > 0;
+}
+</script>
+{% endif %}
+{% endblock extra_js %}

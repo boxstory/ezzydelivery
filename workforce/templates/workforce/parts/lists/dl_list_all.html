@@ -11,7 +11,11 @@
         <h2><i class="fa-solid {{ page_icon|default:'fa-tasks' }} me-1" aria-hidden="true"></i>{{ page_title|default:"Delivery Tasks" }}</h2>
         <span class="oli__hero__subtitle">| {{ page_subtitle|default:"Manage and track" }}</span>
     </div>
-    <div class="oli__hero__right">
+    <div class="oli__hero__right d-flex align-items-center gap-3">
+        <a href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="btn btn-warning btn-sm">
+            <i class="fa-solid fa-paper-plane me-1"></i>Unpublished
+            <span class="badge bg-dark ms-1">{{ unpublished_count|default:"0" }}</span>
+        </a>
         <div class="oli__hero__count" aria-label="Task count summary">
             <span class="oli__hero__count-value" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
             <span class="oli__hero__count-label">tasks</span>
@@ -21,93 +25,83 @@
 <div class="col-12 p-3" role="main" aria-label="Delivery Tasks List">
 
     {% if show_filters %}
-    <!-- Filter Section -->
-    <div class="pg-filter">
-        <div class="pg-filter__toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
-            <div class="d-flex align-items-center gap-3">
-                <div>
-                    <i class="fa-solid fa-filter me-2"></i>
-                    <strong>Filter Tasks</strong>
-                </div>
-                <div id="activeFiltersCount" class="pg-filter__active-count">
-                    <span class="badge bg-primary" id="filterCountBadge">0</span>
-                    <span class="small text-muted ms-1">active filters</span>
-                </div>
+    <!-- Filter Panel -->
+    <div class="pgf" id="pgFilterPanel">
+
+        <!-- Toggle Bar -->
+        <div class="pgf__bar" id="pgfBarToggle" data-bs-toggle="collapse" data-bs-target="#pgfCollapse" aria-expanded="false" aria-controls="pgfCollapse" role="button">
+            <div class="pgf__bar-left">
+                <span class="pgf__bar-icon"><i class="fa-solid fa-sliders"></i></span>
+                <span class="pgf__bar-label">FILTERS</span>
+                <span class="pgf__bar-count" id="pgfCount" style="display:none"><span id="pgfCountNum">0</span></span>
             </div>
-            <i class="fa-solid fa-chevron-down"></i>
+            <div class="pgf__chips" id="pgfChips"><!-- populated by JS --></div>
+            <div class="pgf__bar-right">
+                <button type="button" class="pgf__bar-clear" id="pgfClearBtn" style="display:none" onclick="event.stopPropagation();pgfClearAll()">
+                    <i class="fa-solid fa-xmark"></i> Clear
+                </button>
+                <span class="pgf__bar-chevron" id="pgfChevron"><i class="fa-solid fa-chevron-down"></i></span>
+            </div>
         </div>
-        <div class="collapse" id="filterCollapse">
-            <form id="filterForm" method="get" action="{{ request.path }}">
-                <!-- Row 1: Search Filters -->
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6 col-lg-2">
-                        <label for="dlCode" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-hashtag me-1"></i>DL Code
-                        </label>
-                        <input type="text" class="form-control" name="dlCode" id="dlCode"
-                               placeholder="Search DL Code..." value="{{ filters.dlCode }}"
-                               autocomplete="off">
+
+        <!-- Expanded Form -->
+        <div class="collapse" id="pgfCollapse">
+            <form id="filterForm" method="get" action="{{ request.path }}" class="pgf__form">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+
+                <!-- Quick Presets -->
+                <div class="pgf__presets">
+                    <span class="pgf__section-label">Quick</span>
+                    <button type="button" class="pgf__preset {% if filters.dateFrom == today|date:'Y-m-d' and not filters.dateFrom == '' %}pgf__preset--active{% endif %}" data-preset="today">Today</button>
+                    <button type="button" class="pgf__preset" data-preset="yesterday">Yesterday</button>
+                    <button type="button" class="pgf__preset {% if filters.dlStatus == 'pending' %}pgf__preset--active{% endif %}" data-preset="pending">Pending</button>
+                    <button type="button" class="pgf__preset {% if filters.dlStatus == 'in_transit' %}pgf__preset--active{% endif %}" data-preset="in_transit">In Transit</button>
+                    <button type="button" class="pgf__preset {% if filters.dlStatus == 'out_for_delivery' %}pgf__preset--active{% endif %}" data-preset="out_for_delivery">Out for Delivery</button>
+                    <button type="button" class="pgf__preset {% if filters.dlStatus == 'failed' %}pgf__preset--active{% endif %}" data-preset="failed">Failed</button>
+                </div>
+
+                <!-- Text Search Row -->
+                <div class="pgf__grid">
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="dlCode"><i class="fa-solid fa-hashtag"></i> DL CODE</label>
+                        <input type="text" class="pgf__input" name="dlCode" id="dlCode" placeholder="e.g. DL-0001" value="{{ filters.dlCode }}" autocomplete="off">
                     </div>
-                    <div class="col-md-6 col-lg-2">
-                        <label for="cCode" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-code me-1"></i>Client Code
-                        </label>
-                        <input type="text" class="form-control" name="cCode" id="cCode"
-                               placeholder="Search Code..." value="{{ filters.cCode }}"
-                               autocomplete="off">
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="cCode"><i class="fa-solid fa-barcode"></i> CLIENT CODE</label>
+                        <input type="text" class="pgf__input" name="cCode" id="cCode" placeholder="Order / ref code" value="{{ filters.cCode }}" autocomplete="off">
                     </div>
-                    <div class="col-md-6 col-lg-2">
-                        <label for="mobile" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-mobile me-1"></i>Mobile
-                        </label>
-                        <input type="text" class="form-control" name="mobile" id="mobile"
-                               placeholder="Search Mobile..." value="{{ filters.mobile }}"
-                               autocomplete="off">
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="mobile"><i class="fa-solid fa-mobile-screen"></i> MOBILE</label>
+                        <input type="text" class="pgf__input" name="mobile" id="mobile" placeholder="+974 …" value="{{ filters.mobile }}" autocomplete="off">
                     </div>
-                    <div class="col-md-6 col-lg-2">
-                        <label for="driverName" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-user-tie me-1"></i>Driver
-                        </label>
-                        <input type="text" class="form-control" name="driverName" id="driverName"
-                               placeholder="Search Driver..." value="{{ filters.driverName }}"
-                               autocomplete="off">
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="driverName"><i class="fa-solid fa-user-tie"></i> DRIVER</label>
+                        <input type="text" class="pgf__input" name="driverName" id="driverName" placeholder="Driver name" value="{{ filters.driverName }}" autocomplete="off">
                     </div>
-                    <div class="col-md-6 col-lg-2">
-                        <label for="dateFrom" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-calendar-days me-1"></i>Date From
-                        </label>
-                        <input type="date" class="form-control" name="dateFrom" id="dateFrom"
-                               value="{{ filters.dateFrom }}">
-                    </div>
-                    <div class="col-md-6 col-lg-2">
-                        <label for="dateTo" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-calendar-days me-1"></i>Date To
-                        </label>
-                        <input type="date" class="form-control" name="dateTo" id="dateTo"
-                               value="{{ filters.dateTo }}">
+                    <div class="pgf__field pgf__field--daterange">
+                        <label class="pgf__label"><i class="fa-solid fa-calendar-days"></i> DATE RANGE</label>
+                        <div class="pgf__daterange">
+                            <input type="date" class="pgf__input pgf__input--date" name="dateFrom" id="dateFrom" value="{{ filters.dateFrom }}">
+                            <span class="pgf__daterange-sep">→</span>
+                            <input type="date" class="pgf__input pgf__input--date" name="dateTo" id="dateTo" value="{{ filters.dateTo }}">
+                        </div>
                     </div>
                 </div>
 
-                <!-- Row 2: Dropdown Filters -->
-                <div class="row g-3">
-                    <div class="col-md-6 col-lg-4">
-                        <label for="business" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-store me-1"></i>Client/Business
-                        </label>
-                        <select class="form-select" name="business" id="business">
+                <!-- Dropdowns Row -->
+                <div class="pgf__grid pgf__grid--selects">
+                    <div class="pgf__field pgf__field--wide">
+                        <label class="pgf__label" for="business"><i class="fa-solid fa-store"></i> CLIENT / BUSINESS</label>
+                        <select class="pgf__select" name="business" id="business">
                             <option value="">All Clients</option>
                             {% for biz in businesses %}
-                            <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>
-                                {{ biz.business_name }}
-                            </option>
+                            <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-6 col-lg-4">
-                        <label for="cStatus" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-circle-check me-1"></i>Client Status
-                        </label>
-                        <select class="form-select" name="cStatus" id="cStatus">
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="cStatus"><i class="fa-solid fa-circle-check"></i> CLIENT STATUS</label>
+                        <select class="pgf__select" name="cStatus" id="cStatus">
                             <option value="">All Statuses</option>
                             <option value="for_review" {% if filters.cStatus == 'for_review' %}selected{% endif %}>For Review</option>
                             <option value="customer_confiration_pending" {% if filters.cStatus == 'customer_confiration_pending' %}selected{% endif %}>Customer Confirmation Pending</option>
@@ -117,62 +111,25 @@
                             <option value="9" {% if filters.cStatus == '9' %}selected{% endif %}>Cancelled</option>
                         </select>
                     </div>
-                    <div class="col-md-6 col-lg-4">
-                        <label for="dlStatus" class="form-label small fw-bold text-muted">
-                            <i class="fa-solid fa-circle-dot me-1"></i>DL Task Status
-                        </label>
-                        <select class="form-select" name="dlStatus" id="dlStatus">
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="dlStatus"><i class="fa-solid fa-circle-dot"></i> DL TASK STATUS</label>
+                        <select class="pgf__select" name="dlStatus" id="dlStatus">
                             <option value="">All Task Statuses</option>
-                            <option value="for_review" {% if filters.dlStatus == 'for_review' %}selected{% endif %}>For Review</option>
-                            <option value="pending" {% if filters.dlStatus == 'pending' %}selected{% endif %}>Pending</option>
-                            <option value="assigned" {% if filters.dlStatus == 'assigned' %}selected{% endif %}>Assigned</option>
-                            <option value="accepted" {% if filters.dlStatus == 'accepted' %}selected{% endif %}>Accepted</option>
-                            <option value="picked_up" {% if filters.dlStatus == 'picked_up' %}selected{% endif %}>Picked Up</option>
-                            <option value="start_ride" {% if filters.dlStatus == 'start_ride' %}selected{% endif %}>Start Ride</option>
-                            <option value="out_for_delivery" {% if filters.dlStatus == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
-                            <option value="in_transit" {% if filters.dlStatus == 'in_transit' %}selected{% endif %}>In Transit</option>
-                            <option value="contacted" {% if filters.dlStatus == 'contacted' %}selected{% endif %}>Contacted & Confirmed</option>
-                            <option value="non_reachable" {% if filters.dlStatus == 'non_reachable' %}selected{% endif %}>Non Reachable</option>
-                            <option value="delivered" {% if filters.dlStatus == 'delivered' %}selected{% endif %}>Delivered</option>
-                            <option value="failed" {% if filters.dlStatus == 'failed' %}selected{% endif %}>Failed</option>
-                            <option value="rejected" {% if filters.dlStatus == 'rejected' %}selected{% endif %}>Rejected</option>
-                            <option value="cancelled" {% if filters.dlStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                            {% for s in dl_task_status_choices %}
+                            <option value="{{ s.value }}" {% if filters.dlStatus == s.value %}selected{% endif %}>{{ s.label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="row g-2 mt-3 pt-3 border-top">
-                    <div class="col-12">
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button type="submit" class="btn btn-dark px-4">
-                                <i class="fa fa-search me-2"></i>Apply Filters
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary px-4" id="clearFilter">
-                                <i class="fa fa-times me-2"></i>Clear All
-                            </button>
-                            <div class="ms-auto d-flex align-items-center gap-2">
-                                <span class="text-muted small">Quick:</span>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('today')">
-                                    Today
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('pending')">
-                                    Pending
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('in_transit')">
-                                    In Transit
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Active Filters Display -->
-                <div id="activeFilterTags" class="pg-filter__tags mt-3">
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <span class="small fw-bold text-muted">Active Filters:</span>
-                        <div id="filterTagsContainer" class="d-flex gap-2 flex-wrap"></div>
-                    </div>
+                <!-- Actions -->
+                <div class="pgf__actions">
+                    <button type="submit" class="pgf__btn pgf__btn--apply">
+                        <i class="fa-solid fa-magnifying-glass"></i> Apply Filters
+                    </button>
+                    <button type="button" class="pgf__btn pgf__btn--clear" id="clearFilter">
+                        <i class="fa-solid fa-xmark"></i> Clear All
+                    </button>
                 </div>
             </form>
         </div>
@@ -216,4 +173,115 @@
 <script src="{% static 'orders/js/orders_main.js' %}"></script>
 {% include "workforce/parts/components/_tasks_view_scripts.html" %}
 {% include "workforce/parts/components/_tasks_ai_scripts.html" %}
+
+<script>
+// ---- PGF Filter Panel ----
+(function() {
+    var FIELD_LABELS = {
+        dlCode: 'DL Code', cCode: 'Client Code', mobile: 'Mobile',
+        driverName: 'Driver', dateFrom: 'From', dateTo: 'To',
+        business: 'Client', cStatus: 'Client Status', dlStatus: 'DL Status'
+    };
+
+    function getFilterValues() {
+        var form = document.getElementById('filterForm');
+        if (!form) return {};
+        var vals = {};
+        ['dlCode','cCode','mobile','driverName','dateFrom','dateTo'].forEach(function(n) {
+            var el = form.querySelector('[name="'+n+'"]');
+            if (el && el.value.trim()) vals[n] = el.value.trim();
+        });
+        ['business','cStatus','dlStatus'].forEach(function(n) {
+            var el = form.querySelector('[name="'+n+'"]');
+            if (el && el.value) {
+                vals[n] = el.options[el.selectedIndex].text;
+            }
+        });
+        return vals;
+    }
+
+    function renderChips() {
+        var vals = getFilterValues();
+        var chips = document.getElementById('pgfChips');
+        var countEl = document.getElementById('pgfCount');
+        var countNum = document.getElementById('pgfCountNum');
+        var clearBtn = document.getElementById('pgfClearBtn');
+        if (!chips) return;
+        var keys = Object.keys(vals);
+        chips.innerHTML = '';
+        if (keys.length) {
+            keys.slice(0, 6).forEach(function(k) {
+                var chip = document.createElement('span');
+                chip.className = 'pgf__chip';
+                chip.innerHTML = '<span class="pgf__chip-key">'+FIELD_LABELS[k]+':</span> '+vals[k];
+                chips.appendChild(chip);
+            });
+            if (countEl) { countEl.style.display = ''; countNum.textContent = keys.length; }
+            if (clearBtn) clearBtn.style.display = '';
+        } else {
+            if (countEl) countEl.style.display = 'none';
+            if (clearBtn) clearBtn.style.display = 'none';
+        }
+    }
+
+    // Open panel if filters are active on page load
+    function maybeOpenPanel() {
+        var vals = getFilterValues();
+        if (Object.keys(vals).length) {
+            var collapse = document.getElementById('pgfCollapse');
+            var bar = document.getElementById('pgfBarToggle');
+            if (collapse && !collapse.classList.contains('show')) {
+                var bsCollapse = new bootstrap.Collapse(collapse, {toggle: false});
+                bsCollapse.show();
+                if (bar) bar.setAttribute('aria-expanded', 'true');
+            }
+        }
+    }
+
+    // Preset quick filters
+    document.querySelectorAll('.pgf__preset').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var preset = btn.getAttribute('data-preset');
+            var form = document.getElementById('filterForm');
+            var today = new Date();
+            var fmt = function(d) { return d.toISOString().split('T')[0]; };
+            if (preset === 'today') {
+                form.querySelector('[name="dateFrom"]').value = fmt(today);
+                form.querySelector('[name="dateTo"]').value = fmt(today);
+            } else if (preset === 'yesterday') {
+                var y = new Date(today); y.setDate(y.getDate()-1);
+                form.querySelector('[name="dateFrom"]').value = fmt(y);
+                form.querySelector('[name="dateTo"]').value = fmt(y);
+            } else {
+                var dlStatus = form.querySelector('[name="dlStatus"]');
+                if (dlStatus) dlStatus.value = preset;
+            }
+            form.submit();
+        });
+    });
+
+    // Clear all
+    window.pgfClearAll = function() {
+        window.location.href = '{{ request.path }}?per_page={{ per_page }}';
+    };
+    document.getElementById('clearFilter')?.addEventListener('click', window.pgfClearAll);
+    document.getElementById('pgfClearBtn')?.addEventListener('click', window.pgfClearAll);
+    document.getElementById('clearFilterEmpty')?.addEventListener('click', window.pgfClearAll);
+
+    // Chevron rotation via Bootstrap collapse events
+    var pgfCollapse = document.getElementById('pgfCollapse');
+    var pgfBar = document.getElementById('pgfBarToggle');
+    if (pgfCollapse) {
+        pgfCollapse.addEventListener('show.bs.collapse', function() {
+            if (pgfBar) pgfBar.setAttribute('aria-expanded', 'true');
+        });
+        pgfCollapse.addEventListener('hide.bs.collapse', function() {
+            if (pgfBar) pgfBar.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    renderChips();
+    maybeOpenPanel();
+})();
+</script>
 {% endblock content %}

@@ -106,6 +106,32 @@ urlpatterns = [
     path('finance/transactions/', business_views.business_transactions, name='business_transactions'),
     path('finance/cod-statement/', business_views.business_cod_statement, name='business_cod_statement'),
 
+    # Live Tracking Map
+    path('tracking/', business_views.live_tracking_map, name='live_tracking_map'),
+    path('tracking/data/', business_views.live_tracking_data, name='live_tracking_data'),
+
+    # Branded Tracking Page Settings
+    path('settings/tracking-page/', business_views.branded_tracking_settings, name='branded_tracking_settings'),
+
+    # WhatsApp notification triggers
+    path('settings/whatsapp-triggers/', business_views.whatsapp_triggers_list, name='whatsapp_triggers_list'),
+    path('settings/whatsapp-triggers/toggle/', business_views.whatsapp_trigger_toggle, name='whatsapp_trigger_toggle'),
+
+    # Reports & CSV Export
+    path('reports/', business_views.reports_dashboard, name='reports_dashboard'),
+    path('reports/orders/csv/', business_views.export_orders_csv, name='export_orders_csv'),
+    path('reports/cod/csv/', business_views.export_cod_csv, name='export_cod_csv'),
+    path('reports/performance/csv/', business_views.export_performance_csv, name='export_performance_csv'),
+
+    # Bulk Label Printing
+    path('labels/bulk-print/', business_views.bulk_print_labels, name='bulk_print_labels'),
+
+    # Returns Management
+    path('returns/', business_views.returns_list, name='returns_list'),
+    path('returns/<int:return_id>/', business_views.return_detail, name='return_detail'),
+    path('returns/create/<int:order_id>/', business_views.return_create, name='return_create'),
+    path('returns/<int:return_id>/status/', business_views.return_update_status, name='return_update_status'),
+
     # Product Requests (Fulfillment Service)
     path('inbound-requests/', business_views.inbound_requests_list, name='inbound_requests_list'),
     path('inbound-requests/create/', business_views.inbound_request_create, name='inbound_request_create'),

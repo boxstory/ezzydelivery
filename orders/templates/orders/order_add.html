@@ -137,6 +137,16 @@
         <i class="fas fa-triangle-exclamation"></i>
         COD <strong id="mobile_cod_mismatch_cod">0.00</strong> QAR doesn't match products total <strong id="mobile_cod_mismatch_total">0.00</strong> QAR
       </div>
+      <div class="pwa-form-group" id="fg_time_slot">
+        <label class="pwa-form-group__label"><i class="fas fa-clock me-1"></i>Delivery Time Slot</label>
+        <select name="preferred_time_slot" id="mobile_preferred_time_slot" class="pwa-form-group__input">
+          <option value="">No Preference</option>
+          <option value="morning">Morning (8 AM - 12 PM)</option>
+          <option value="afternoon">Afternoon (12 PM - 4 PM)</option>
+          <option value="evening">Evening (4 PM - 8 PM)</option>
+          <option value="night">Night (8 PM - 10 PM)</option>
+        </select>
+      </div>
     </div>
 
     <!-- Products Section (Mobile) -->
@@ -237,6 +247,10 @@
 
     <!-- Quick Actions -->
     <div class="oap__quick-actions">
+      <a href="{% url 'delivery:all_delivery_tasks' %}" class="oap__quick-btn">
+        <i class="fas fa-truck"></i>
+        <span>Go to Tasks</span>
+      </a>
       <a href="{% url 'orders:order_upload_file' %}" class="oap__quick-btn">
         <i class="fas fa-file-upload"></i>
         <span>Upload CSV</span>
@@ -466,6 +480,25 @@
         </div>
       </div>
 
+      <!-- Delivery Time Slot -->
+      <div class="oap__form-section">
+        <div class="oap__form-section-header">
+          <i class="fas fa-clock"></i>
+          <h3>Delivery Time Slot</h3>
+        </div>
+        <div class="oap__form-section-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="id_preferred_time_slot">
+                <i class="fas fa-clock me-1 text-muted"></i>Preferred Time
+              </label>
+              {{ form.preferred_time_slot }}
+              <div class="form-text">Customer's preferred delivery window</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Notes Section -->
       <div class="oap__form-section">
         <div class="oap__form-section-header">
@@ -625,10 +658,20 @@
   $(document).ready(function () {
     // ========== SOURCE TEXT SYNC ==========
     // Copy AI textarea content into hidden order_source_text before desktop form submit
-    $('#orders_add_form_main').on('submit', function() {
+    $('#orders_add_form_main').on('submit', function(e) {
       const aiText = $('#oap_ai_text_input').val().trim();
       const sourceField = document.getElementById('id_order_source_text');
       if (sourceField && aiText) sourceField.value = aiText;
+
+      // Warn if no GPS coordinates
+      const lat = document.getElementById('id_latitude')?.value;
+      const lng = document.getElementById('id_longitude')?.value;
+      if (!lat || !lng || lat === '0' || lng === '0') {
+        if (!confirm('No GPS coordinates set. Delivery tracking and distance calculation may not work. Continue anyway?')) {
+          e.preventDefault();
+          return false;
+        }
+      }
     });
 
     // ========== VIEW TOGGLE LOGIC ==========
@@ -977,10 +1020,20 @@
     // Source text: copy paste textarea into hidden field before submit
     const mobileForm = document.getElementById('orders_add_form_mobile');
     if (mobileForm) {
-      mobileForm.addEventListener('submit', function() {
+      mobileForm.addEventListener('submit', function(e) {
         const pasteText = document.getElementById('ai_extract_textarea')?.value?.trim() || '';
         const srcField = document.getElementById('mobile_order_source_text');
         if (srcField && pasteText) srcField.value = pasteText;
+
+        // Warn if no GPS coordinates
+        const lat = document.getElementById('mobile_latitude')?.value;
+        const lng = document.getElementById('mobile_longitude')?.value;
+        if (!lat || !lng || lat === '0' || lng === '0') {
+          if (!confirm('No GPS coordinates set. Delivery tracking and distance calculation may not work. Continue anyway?')) {
+            e.preventDefault();
+            return false;
+          }
+        }
       });
     }
 

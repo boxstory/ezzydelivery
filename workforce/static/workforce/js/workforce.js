@@ -414,9 +414,15 @@
                 badgeEl.className = 'dl-badge dl-badge--' + (currentStatus || 'dms-' + currentDms);
             }
 
-            // Pre-select current status
+            // Rebuild status options from model choices and pre-select current status
             var selectEl = document.getElementById('statusSelect');
-            selectEl.value = currentStatus || '';
+            var taskStatuses = window.TASK_STATUS_CHOICES || [];
+            var optionsHtml = '<option value="">-- Select Status --</option>';
+            taskStatuses.forEach(function(s) {
+                var selected = (s.value === currentStatus) ? ' selected' : '';
+                optionsHtml += '<option value="' + s.value + '"' + selected + '>' + s.label + '</option>';
+            });
+            selectEl.innerHTML = optionsHtml;
 
             // Set current time
             var timeEl = document.getElementById('statusModalTime');
@@ -573,7 +579,7 @@
                     submitBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Update Status';
                 }
                 console.error('Error:', error);
-                showToast('An error occurred while updating status', 'danger');
+                showToast('Error: ' + (error.message || 'An error occurred while updating status'), 'danger');
             });
         }
     };

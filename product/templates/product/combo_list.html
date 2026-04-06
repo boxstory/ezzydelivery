@@ -1,0 +1,200 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260402a">
+Combos / Bundles
+{% endblock extra_head %}
+
+{% block extra_css %}
+<style>
+/* pco__ = product combo BEM block */
+.pco__container { padding: var(--spacing-md); }
+.pco__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--brand-navy);
+    color: var(--brand-white);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+}
+.pco__header-left { display: flex; align-items: center; gap: var(--spacing-md); }
+.pco__header-icon {
+    width: 48px; height: 48px;
+    background: rgba(255,255,255,0.15);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem;
+}
+.pco__title { margin: 0; font-size: 1.35rem; font-weight: 700; }
+.pco__count { font-size: 0.85rem; opacity: 0.8; }
+.pco__add-btn {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--brand-primary); color: var(--brand-navy);
+    padding: 0.5rem 1.1rem; border-radius: var(--radius-md);
+    font-weight: 600; font-size: 0.9rem; text-decoration: none;
+    transition: background 0.2s;
+}
+.pco__add-btn:hover { background: var(--brand-primary-dark); color: var(--brand-navy); }
+
+.pco__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--spacing-lg);
+}
+.pco__card {
+    background: var(--brand-white);
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    transition: box-shadow 0.2s;
+}
+.pco__card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.pco__card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--spacing-sm); }
+.pco__card-name { font-weight: 700; font-size: 1.1rem; color: var(--brand-navy); margin: 0; }
+.pco__card-sku { font-size: 0.8rem; color: var(--brand-grey-500); font-family: monospace; }
+.pco__card-desc { font-size: 0.85rem; color: var(--brand-grey-600); margin-bottom: var(--spacing-sm); }
+.pco__badge--active { background: var(--brand-success-bg, #d4edda); color: var(--brand-success, #155724); padding: 0.15rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600; }
+.pco__badge--inactive { background: var(--brand-grey-100); color: var(--brand-grey-600); padding: 0.15rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600; }
+
+.pco__items-list {
+    list-style: none; padding: 0; margin: 0 0 var(--spacing-md) 0;
+    border-top: 1px solid var(--brand-grey-200);
+    padding-top: var(--spacing-sm);
+}
+.pco__items-list li {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.3rem 0; font-size: 0.88rem; color: var(--brand-grey-700);
+}
+.pco__items-list li .pco__qty-badge {
+    background: var(--brand-secondary); color: var(--brand-navy);
+    padding: 0.1rem 0.4rem; border-radius: var(--radius-sm);
+    font-size: 0.78rem; font-weight: 600; min-width: 24px; text-align: center;
+}
+
+.pco__price-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--brand-grey-200);
+    margin-bottom: var(--spacing-sm);
+}
+.pco__price-label { font-size: 0.8rem; color: var(--brand-grey-500); }
+.pco__price-value { font-size: 1.05rem; font-weight: 700; color: var(--brand-navy); }
+
+.pco__card-actions { display: flex; gap: var(--spacing-sm); }
+.pco__btn-edit, .pco__btn-delete {
+    padding: 0.35rem 0.75rem; border-radius: var(--radius-sm);
+    font-size: 0.82rem; font-weight: 600; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    border: none; cursor: pointer;
+}
+.pco__btn-edit { background: var(--brand-secondary); color: var(--brand-navy); }
+.pco__btn-edit:hover { background: var(--brand-primary); }
+.pco__btn-delete { background: var(--brand-grey-100); color: var(--brand-grey-700); }
+.pco__btn-delete:hover { background: #f8d7da; color: #842029; }
+
+.pco__empty {
+    text-align: center; padding: var(--spacing-xl) var(--spacing-lg);
+    color: var(--brand-grey-500);
+}
+.pco__empty i { font-size: 2.5rem; display: block; margin-bottom: var(--spacing-md); opacity: 0.4; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="pco__container" id="product_combo_container">
+
+    <!-- Header -->
+    <div class="pco__header" id="product_combo_header">
+        <div class="pco__header-left">
+            <div class="pco__header-icon">
+                <i class="fa-solid fa-layer-group"></i>
+            </div>
+            <div>
+                <h2 class="pco__title">Combos / Bundles</h2>
+                <span class="pco__count">{{ combos|length }} combo{{ combos|length|pluralize }}</span>
+            </div>
+        </div>
+        <a href="{% url 'product:combo_create' %}" class="pco__add-btn" id="product_combo_btn_create">
+            <i class="fa-solid fa-plus"></i> Create Combo
+        </a>
+    </div>
+
+    {% if combos %}
+    <div class="pco__grid" id="product_combo_grid">
+        {% for combo in combos %}
+        <div class="pco__card" id="product_combo_card_{{ combo.id }}">
+            <div class="pco__card-header">
+                <div>
+                    <h3 class="pco__card-name">{{ combo.combo_name }}</h3>
+                    {% if combo.combo_sku %}<span class="pco__card-sku">{{ combo.combo_sku }}</span>{% endif %}
+                </div>
+                {% if combo.is_active %}
+                <span class="pco__badge--active">Active</span>
+                {% else %}
+                <span class="pco__badge--inactive">Inactive</span>
+                {% endif %}
+            </div>
+
+            {% if combo.description %}
+            <p class="pco__card-desc">{{ combo.description|truncatewords:20 }}</p>
+            {% endif %}
+
+            <ul class="pco__items-list">
+                {% for item in combo.items.all %}
+                <li>
+                    <span class="pco__qty-badge">{{ item.quantity }}x</span>
+                    {{ item.product.item_name }}
+                    {% if item.product.item_price %}
+                    <span class="ms-auto text-muted small">QAR {{ item.product.item_price }}</span>
+                    {% endif %}
+                </li>
+                {% empty %}
+                <li class="text-muted"><em>No products</em></li>
+                {% endfor %}
+            </ul>
+
+            <div class="pco__price-row">
+                <span class="pco__price-label">Bundle Price</span>
+                <span class="pco__price-value">
+                    {% if combo.combo_price %}
+                    QAR {{ combo.combo_price }}
+                    {% else %}
+                    QAR {{ combo.total_items_price }}
+                    <span class="pco__price-label ms-1">(sum)</span>
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="pco__card-actions">
+                <a href="{% url 'product:combo_update' combo.id %}" class="pco__btn-edit">
+                    <i class="fa-solid fa-pen-to-square"></i> Edit
+                </a>
+                <form method="post" action="{% url 'product:combo_delete' combo.id %}"
+                      onsubmit="return confirm('Delete combo &quot;{{ combo.combo_name }}&quot;?');"
+                      style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="pco__btn-delete">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="pco__empty">
+        <i class="fa-solid fa-layer-group"></i>
+        <p>No combos yet. Create your first product combo to get started.</p>
+        <a href="{% url 'product:combo_create' %}" class="pco__add-btn">
+            <i class="fa-solid fa-plus"></i> Create Combo
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock content %}

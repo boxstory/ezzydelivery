@@ -1,0 +1,83 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Customer Returns{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-undo-alt"></i></div>
+      <div>
+        <h1 class="wh__title">Customer Returns</h1>
+        <p class="wh__subtitle">Manage return requests, inspections, and restocking</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wh__filter-bar">
+    <form method="GET" class="wh__filter-form">
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Status</label>
+        <select name="status" class="wh__filter-select">
+          <option value="">All</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if selected_status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="wh__filter-group--sm">
+        <button type="submit" class="wh__filter-btn"><i class="fas fa-filter"></i> Filter</button>
+      </div>
+    </form>
+  </div>
+
+  {% for rma in returns %}
+  <a href="{% url 'warehouse:rma_detail' rma.pk %}" class="wh__card mb-2 d-block" style="text-decoration:none;color:inherit;">
+    <div class="wh__card-body">
+      <div class="d-flex align-items-center gap-3">
+        <div class="wh__stat-icon
+          {% if rma.status == 'resolved' %}wh__stat-icon--success
+          {% elif rma.status == 'received' or rma.status == 'inspected' %}wh__stat-icon--info
+          {% elif rma.status == 'rejected' %}wh__stat-icon--warning
+          {% else %}wh__stat-icon--warning{% endif %}">
+          <i class="fas
+            {% if rma.status == 'resolved' %}fa-check
+            {% elif rma.status == 'received' %}fa-box-open
+            {% elif rma.status == 'inspected' %}fa-search
+            {% else %}fa-undo-alt{% endif %}"></i>
+        </div>
+        <div class="flex-grow-1" style="min-width:0;">
+          <div style="font-family:var(--wh-mono);font-size:0.8125rem;font-weight:700;color:var(--wh-navy);">{{ rma.rma_number }}</div>
+          <div class="wh__meta">
+            <i class="fas fa-file-invoice"></i> {{ rma.order.order_number }}
+            {% if rma.business %}&middot; <i class="fas fa-store"></i> {{ rma.business.business_name }}{% endif %}
+            &middot; {{ rma.items.count }} item{{ rma.items.count|pluralize }}
+            &middot; {{ rma.get_reason_display }}
+          </div>
+        </div>
+        <span class="wh__badge
+          {% if rma.status == 'resolved' %}wh__badge--success
+          {% elif rma.status == 'rejected' %}wh__badge--danger
+          {% elif rma.status == 'received' or rma.status == 'inspected' %}wh__badge--primary
+          {% else %}wh__badge--warning{% endif %}">
+          {{ rma.get_status_display }}
+        </span>
+      </div>
+    </div>
+  </a>
+  {% empty %}
+  <div class="wh__card">
+    <div class="wh__empty">
+      <i class="fas fa-check-circle" style="color:var(--wh-green);"></i>
+      <p><strong>No customer returns</strong></p>
+      <p>Return requests will appear here when customers request refunds or exchanges.</p>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="wh__card-footer">
+    {% include "includes/components/_pagination.html" with page_obj=returns %}
+  </div>
+</div>
+{% endblock %}

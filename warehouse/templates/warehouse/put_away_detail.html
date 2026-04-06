@@ -1,0 +1,334 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Put-Away {{ task.task_number }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Put-Away Detail — pa__ prefix */
+.pa__item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+    transition: background 0.15s ease;
+}
+.pa__item:last-child { border-bottom: none; }
+.pa__item--done { background: #f0fdf4; }
+
+.pa__check {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 2px solid var(--wh-border, #e2e6ed); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; font-size: 0.875rem;
+    transition: all 0.2s ease; color: transparent;
+    -webkit-tap-highlight-color: transparent;
+}
+.pa__check:hover { border-color: var(--wh-green, #059669); transform: scale(1.08); }
+.pa__check--done {
+    background: #15803d; border-color: #15803d; color: #fff; cursor: default;
+}
+
+.pa__info { flex: 1; min-width: 0; }
+.pa__product {
+    font-size: 0.8125rem; font-weight: 600; color: var(--wh-navy, #0c1a2e);
+}
+.pa__meta {
+    font-size: 0.6875rem; color: var(--wh-muted, #64748b);
+    display: flex; gap: 0.625rem; flex-wrap: wrap; margin-top: 0.125rem;
+}
+.pa__meta i { font-size: 0.5625rem; width: 10px; text-align: center; }
+
+.pa__qty {
+    font-family: var(--wh-mono, monospace); font-size: 0.9375rem; font-weight: 700;
+    color: var(--wh-navy, #0c1a2e); flex-shrink: 0; min-width: 40px; text-align: center;
+}
+.pa__item--done .pa__qty { color: #15803d; }
+
+.pa__location-tag {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    background: var(--wh-blue-bg, #eff6ff); color: var(--wh-blue, #2563eb);
+    font-family: var(--wh-mono, monospace); font-size: 0.6875rem; font-weight: 700;
+    padding: 0.2rem 0.5rem; border-radius: 4px;
+}
+.pa__location-tag--suggestion {
+    background: var(--wh-amber-bg, #fffbeb); color: var(--wh-amber, #d97706);
+}
+
+.pa__override-btn {
+    background: none; border: 1px dashed var(--wh-border);
+    font-size: 0.625rem; color: var(--wh-muted); cursor: pointer;
+    padding: 0.15rem 0.4rem; border-radius: 3px; white-space: nowrap;
+}
+.pa__override-btn:hover { border-color: var(--wh-blue); color: var(--wh-blue); }
+
+.pa__override-select {
+    font-size: 0.6875rem; padding: 0.2rem 0.4rem;
+    border: 1px solid var(--wh-border); border-radius: 4px;
+    background: #fff; max-width: 160px;
+    font-family: var(--wh-mono, monospace);
+}
+
+.pa__done-banner {
+    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+    border: 1px solid #86efac; border-radius: 8px;
+    padding: 1.25rem; text-align: center; margin-top: 1rem;
+}
+.pa__done-banner i { font-size: 2rem; color: #15803d; margin-bottom: 0.5rem; }
+.pa__done-banner h3 { font-size: 1rem; font-weight: 700; color: #15803d; margin: 0 0 0.25rem; }
+.pa__done-banner p { font-size: 0.8125rem; color: #166534; margin: 0; }
+
+/* Progress */
+.pa__progress-bar {
+    height: 10px; background: var(--wh-border-light, #eef0f4);
+    border-radius: 5px; overflow: hidden;
+}
+.pa__progress-fill {
+    height: 100%; border-radius: 5px; transition: width 0.4s ease;
+    background: linear-gradient(90deg, var(--wh-green, #059669), #34d399);
+}
+
+@media (max-width: 767.98px) {
+    .pa__item { padding: 0.625rem 0.75rem; gap: 0.5rem; }
+    .pa__check { width: 32px; height: 32px; font-size: 0.75rem; }
+    .pa__product { font-size: 0.75rem; }
+    .pa__qty { font-size: 0.8125rem; }
+}
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:put_away_list' %}">Put-Away</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">{{ task.task_number }}</span>
+  </div>
+
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-dolly"></i></div>
+      <div>
+        <h1 class="wh__title">Put-Away Task</h1>
+        <p class="wh__subtitle">{{ task.task_number }} &mdash; {{ task.warehouse.name }}</p>
+      </div>
+    </div>
+    <span class="wh__badge pkl__badge--lg
+      {% if task.status == 'completed' %}wh__badge--success
+      {% elif task.status == 'in_progress' or task.status == 'assigned' %}wh__badge--primary
+      {% else %}wh__badge--warning{% endif %}" id="pa_status_badge">
+      {{ task.get_status_display }}
+    </span>
+  </div>
+
+  <!-- Info Card -->
+  <div class="wh__card mb-3">
+    <div class="wh__card-body">
+      <div class="pkl__detail-row"><span class="wh__meta">Warehouse</span><strong>{{ task.warehouse.name }}</strong></div>
+      <div class="pkl__detail-row"><span class="wh__meta">Priority</span>
+        <strong {% if task.priority == 'urgent' %}style="color:var(--wh-red)"{% elif task.priority == 'high' %}style="color:var(--wh-amber)"{% endif %}>
+          {{ task.get_priority_display }}
+        </strong>
+      </div>
+      <div class="pkl__detail-row"><span class="wh__meta">Created</span><strong>{{ task.created_at|date:"d M Y H:i" }}</strong></div>
+      {% if task.inbound_request %}
+      <div class="pkl__detail-row"><span class="wh__meta">Inbound Req</span><strong>{{ task.inbound_request.request_number }}</strong></div>
+      {% endif %}
+      {% if task.assigned_to %}
+      <div class="pkl__detail-row"><span class="wh__meta">Assigned To</span><strong>{{ task.assigned_to.username }}</strong></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="mb-3">
+    <div class="d-flex justify-content-between mb-1">
+      <span class="wh__meta" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Put-Away Progress</span>
+      <span class="wh__meta" style="font-size:0.65rem;font-weight:600;" id="pa_progress_text">{{ completed_items }} of {{ total_items }} items</span>
+    </div>
+    <div class="pa__progress-bar">
+      <div class="pa__progress-fill" id="pa_progress_fill"
+           style="width:{% if total_items > 0 %}{% widthratio completed_items total_items 100 %}{% else %}0{% endif %}%;"></div>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="wh__card mb-3">
+    <div class="wh__card-body" style="padding:0.75rem 1rem;">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="wh__badge wh__badge--info"><i class="fas fa-info-circle"></i> Instructions</span>
+        <span class="wh__meta">Walk to the suggested location &rarr; place items on shelf &rarr; tap to confirm. Use "change" to override location.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done banner (hidden) -->
+  <div class="pa__done-banner" id="pa_done_banner" style="display:none;">
+    <i class="fas fa-circle-check d-block"></i>
+    <h3>All Items Put Away!</h3>
+    <p>All {{ total_items }} items have been placed in their storage locations. Stock levels updated.</p>
+    <a href="{% url 'warehouse:put_away_list' %}" class="wh__btn wh__btn--primary mt-3">
+      <i class="fas fa-arrow-left"></i> Back to Put-Away Tasks
+    </a>
+  </div>
+
+  <!-- Items -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-box-open"></i>
+        <span>Items to Put Away</span>
+      </div>
+      <span class="wh__count-badge">{{ total_items }} items</span>
+    </div>
+
+    {% for item in items %}
+    <div class="pa__item {% if item.is_completed %}pa__item--done{% endif %}" id="pa_item_{{ item.pk }}">
+      {% if item.is_completed %}
+      <div class="pa__check pa__check--done"><i class="fas fa-check"></i></div>
+      {% else %}
+      <div class="pa__check" id="pa_check_{{ item.pk }}"
+           onclick="confirmPutAway({{ item.pk }})" title="Confirm placed at location">
+      </div>
+      {% endif %}
+
+      <div class="pa__info">
+        <div class="pa__product">{{ item.product.item_name }}</div>
+        <div class="pa__meta">
+          <span><i class="fas fa-hashtag"></i> {{ item.product.item_sku }}</span>
+          {% if item.is_completed and item.actual_location %}
+            <span class="pa__location-tag"><i class="fas fa-location-dot"></i> {{ item.actual_location.code }}</span>
+          {% elif item.suggested_location %}
+            <span class="pa__location-tag pa__location-tag--suggestion"><i class="fas fa-lightbulb"></i> {{ item.suggested_location.code }}</span>
+            {% if not item.is_completed %}
+            <button class="pa__override-btn" onclick="toggleOverride({{ item.pk }})" type="button">change</button>
+            {% endif %}
+          {% else %}
+            <span class="wh__meta" style="color:var(--wh-amber);">No suggestion — select location</span>
+          {% endif %}
+        </div>
+        {% if not item.is_completed %}
+        <div id="pa_override_{{ item.pk }}" style="display:{% if not item.suggested_location %}block{% else %}none{% endif %};margin-top:0.375rem;">
+          <select class="pa__override-select" id="pa_loc_{{ item.pk }}">
+            {% if item.suggested_location %}<option value="">Use suggested</option>{% endif %}
+            {% for loc in storage_locations %}
+            <option value="{{ loc.pk }}">{{ loc.code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="pa__qty">
+        {% if item.is_completed %}<i class="fas fa-circle-check"></i>{% else %}&times;{{ item.quantity }}{% endif %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="wh__empty">
+      <i class="fas fa-check-circle" style="color:var(--wh-green);"></i>
+      <p><strong>No items to put away</strong></p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCsrfToken() {
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
+function toggleOverride(itemId) {
+    var el = document.getElementById('pa_override_' + itemId);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function confirmPutAway(itemId) {
+    var check = document.getElementById('pa_check_' + itemId);
+    if (check) check.style.opacity = '0.5';
+
+    var locSelect = document.getElementById('pa_loc_' + itemId);
+    var locationId = locSelect ? locSelect.value : '';
+    var body = locationId ? 'location_id=' + locationId : '';
+
+    fetch("{% url 'warehouse:put_away_confirm_item' task.pk 999999 %}".replace('999999', itemId), {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) {
+            alert(data.error || 'Error confirming put-away');
+            if (check) check.style.opacity = '1';
+            return;
+        }
+
+        var row = document.getElementById('pa_item_' + itemId);
+        var checkEl = document.getElementById('pa_check_' + itemId);
+        var qtyEl = row.querySelector('.pa__qty');
+
+        // Mark as done
+        row.classList.add('pa__item--done');
+        if (checkEl) {
+            checkEl.classList.add('pa__check--done');
+            checkEl.innerHTML = '<i class="fas fa-check"></i>';
+            checkEl.onclick = null;
+            checkEl.style.cursor = 'default';
+            checkEl.style.opacity = '1';
+        }
+        if (qtyEl) qtyEl.innerHTML = '<i class="fas fa-circle-check"></i>';
+
+        // Update location display
+        var infoEl = row.querySelector('.pa__info');
+        var metaEl = infoEl.querySelector('.pa__meta');
+        // Remove override btn and suggestion tag, add final location
+        var overrideEl = document.getElementById('pa_override_' + itemId);
+        if (overrideEl) overrideEl.remove();
+        var overrideBtns = metaEl.querySelectorAll('.pa__override-btn');
+        overrideBtns.forEach(function(b) { b.remove(); });
+        var suggestionTags = metaEl.querySelectorAll('.pa__location-tag--suggestion');
+        suggestionTags.forEach(function(t) {
+            t.className = 'pa__location-tag';
+            t.innerHTML = '<i class="fas fa-location-dot"></i> ' + data.actual_location;
+        });
+        // If there was no suggestion tag, add one
+        if (!metaEl.querySelector('.pa__location-tag')) {
+            var tag = document.createElement('span');
+            tag.className = 'pa__location-tag';
+            tag.innerHTML = '<i class="fas fa-location-dot"></i> ' + data.actual_location;
+            metaEl.appendChild(tag);
+        }
+
+        // Update progress
+        var pText = document.getElementById('pa_progress_text');
+        var pFill = document.getElementById('pa_progress_fill');
+        var pct = data.total_items > 0 ? Math.round(data.completed_items / data.total_items * 100) : 0;
+        if (pText) pText.textContent = data.completed_items + ' of ' + data.total_items + ' items';
+        if (pFill) pFill.style.width = pct + '%';
+
+        // Update status badge
+        var sBadge = document.getElementById('pa_status_badge');
+        if (data.all_done && sBadge) {
+            sBadge.textContent = 'Completed';
+            sBadge.className = 'wh__badge pkl__badge--lg wh__badge--success';
+        }
+
+        // Show done banner
+        var banner = document.getElementById('pa_done_banner');
+        if (banner) banner.style.display = data.all_done ? 'block' : 'none';
+    })
+    .catch(function() {
+        if (check) check.style.opacity = '1';
+        alert('Network error. Please try again.');
+    });
+}
+</script>
+{% endblock extra_js %}

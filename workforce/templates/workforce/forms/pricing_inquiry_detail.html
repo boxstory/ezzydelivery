@@ -810,7 +810,7 @@
                 <div class="pid__tl-head">
                   <span class="pid__tl-type">{{ activity.get_activity_type_display }}</span>
                   <span class="pid__tl-time">{{ activity.created_at|date:"d M, H:i" }}</span>
-                  {% if activity.created_by == request.user or request.user.is_superuser %}
+                  {% if activity.created_by == request.user or request.user.profile.is_superadmin %}
                   <button class="pid__tl-del pid__delete-activity" data-activity-id="{{ activity.pk }}">
                     <i class="fa-solid fa-trash-can"></i>
                   </button>

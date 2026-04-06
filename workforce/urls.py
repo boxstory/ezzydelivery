@@ -54,12 +54,17 @@ urlpatterns = [
     path('import-wizard/preview/', workforce_views.import_wizard_preview, name='import_wizard_preview'),
     path('import-wizard/confirm/', workforce_views.import_wizard_confirm, name='import_wizard_confirm'),
     path('import-wizard/save-mapping/', workforce_views.import_wizard_save_mapping, name='import_wizard_save_mapping'),
+    path('import-wizard/mapping-manager/', workforce_views.wf_mapping_manager, name='wf_mapping_manager'),
+    path('import-wizard/mapping-manager/save/', workforce_views.wf_mapping_manager_save, name='wf_mapping_manager_save'),
+    path('import-wizard/mapping-manager/test/', workforce_views.wf_mapping_manager_test, name='wf_mapping_manager_test'),
 
     path('orders/api-orders/', workforce_views.wf_api_orders, name='wf_api_orders'),
     path('orders/api-orders/bulk-transfer/', workforce_views.bulk_transfer_api_orders, name='bulk_transfer_api_orders'),
     path('orders/api-orders/import/', workforce_views.import_api_orders, name='import_api_orders'),
     path('orders/api-orders/preview/', workforce_views.preview_api_import, name='preview_api_import'),
     path('orders/api-orders/sheet-headers/', workforce_views.wf_sheet_headers, name='wf_sheet_headers'),
+    path('orders/api-orders/source-headers/', workforce_views.wf_source_headers, name='wf_source_headers'),
+    path('orders/api-orders/upload-sample-headers/', workforce_views.wf_upload_sample_headers, name='wf_upload_sample_headers'),
     path('orders/api-orders/save-mapping/', workforce_views.wf_save_column_mapping, name='wf_save_column_mapping'),
     path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
     # Webhook Imports
@@ -84,8 +89,10 @@ urlpatterns = [
     path('orders/<int:order_id>/items/<int:item_id>/update/', workforce_views.order_item_update, name='order_item_update'),
     path('orders/<int:order_id>/items/<int:item_id>/delete/', workforce_views.order_item_delete, name='order_item_delete'),
     path('orders/<int:order_id>/cancel/', workforce_views.cancel_order, name='cancel_order'),
+    path('orders/<int:order_id>/partial-return/', workforce_views.partial_return_order, name='partial_return_order'),
     path('orders/<int:order_id>/delete/', workforce_views.delete_order, name='delete_order'),
     path('order/<int:order_id>/update-zone/', workforce_views.update_order_zone, name='update_order_zone'),
+    path('api/resolve-location/', workforce_views.resolve_location_link, name='resolve_location_link'),
     path('order/<int:order_id>/assign-driver/', workforce_views.assign_driver_to_order, name='assign_driver_to_order'),
 
     # AJAX endpoints for orders
@@ -114,7 +121,9 @@ urlpatterns = [
     path('delivery-task/<int:task_id>/publish-fleets/', workforce_views.publish_task_to_fleets, name='publish_task_to_fleets'),
     path('delivery-task/<int:task_id>/unpublish-fleets/', workforce_views.unpublish_task_from_fleets, name='unpublish_task_from_fleets'),
     path('delivery-task/<int:task_id>/assign-driver/', workforce_views.assign_driver_to_task, name='assign_driver_to_task'),
+    path('delivery-task/<int:task_id>/unassign-driver/', workforce_views.unassign_driver_from_task, name='unassign_driver_from_task'),
     path('delivery-task/<int:task_id>/update-status/', workforce_views.update_task_status, name='update_task_status'),
+    path('delivery-task/<int:task_id>/cod-return/', workforce_views.process_cod_return, name='process_cod_return'),
 
     # Bulk action endpoints for delivery tasks
     path('tasks/bulk-print/', workforce_views.bulk_print_tasks, name='bulk_print_tasks'),
@@ -144,6 +153,7 @@ urlpatterns = [
     path('finance/', workforce_views.workforce_finance_dashboard, name='workforce_finance_dashboard'),
 
     # Fleet Accounts URLs
+    path('fleet/driver-tasks/', workforce_views.wf_driver_tasks, name='wf_driver_tasks'),
     path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
     path('fleet/drivers-earnings/', workforce_views.fleet_drivers_earnings, name='fleet_drivers_earnings'),
     path('fleet/earnings-verification/', workforce_views.earnings_verification, name='earnings_verification'),
@@ -250,11 +260,9 @@ urlpatterns = [
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
 
-    # Import Wizard
-    path('import-wizard/mapping-manager/', workforce_views.mapping_manager, name='mapping_manager'),
-
     # Import History & Temp Orders
     path('import-history/', workforce_views.import_history, name='import_history'),
+    path('orders/temp/config/', workforce_views.temp_order_config, name='temp_order_config'),
     path('orders/temp/', workforce_views.temp_orders, name='temp_orders'),
     path('orders/temp/by-date/', workforce_views.temp_orders_by_date, name='temp_orders_by_date'),
     path('orders/temp/sync/', workforce_views.temp_orders_sync, name='temp_orders_sync'),
@@ -262,6 +270,7 @@ urlpatterns = [
     path('orders/temp/transfer/', workforce_views.temp_orders_transfer, name='temp_orders_transfer'),
     path('orders/temp/auto-import/', workforce_views.temp_orders_auto_import, name='temp_orders_auto_import'),
     path('orders/temp/public-links/', workforce_views.public_link_sources, name='public_link_sources'),
+    path('public-link-sources/', workforce_views.public_link_sources_page, name='public_link_sources_page'),
     path('orders/temp/public-links/<int:source_id>/delete/', workforce_views.public_link_source_delete, name='public_link_source_delete'),
     path('orders/temp/public-links/<int:source_id>/save-mapping/', workforce_views.public_link_save_mapping, name='public_link_save_mapping'),
 
@@ -278,6 +287,12 @@ urlpatterns = [
     path('hub/batches/<int:batch_id>/', workforce_views.hub_batch_detail, name='hub_batch_detail'),
     path('hub/batches/<int:batch_id>/assign-driver/', workforce_views.hub_batch_assign_driver, name='hub_batch_assign_driver'),
     path('hub/batches/<int:batch_id>/update-status/', workforce_views.hub_batch_update_status, name='hub_batch_update_status'),
+
+    # Export
+    path('export/', workforce_views.wf_export_page, name='wf_export_page'),
+    path('dl-tasks/export/', workforce_views.dl_tasks_export_page, name='dl_tasks_export_page'),
+    path('export/api/', workforce_views.wf_export_api, name='wf_export_api'),
+    path('export/api/selected/', workforce_views.wf_export_selected, name='wf_export_selected'),
 
     # Auto Triggers
     path('auto-triggers/', workforce_views.auto_triggers_list, name='auto_triggers_list'),

@@ -1,0 +1,216 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Return {{ rma.rma_number }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.rma__item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.75rem 1rem; border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+}
+.rma__item:last-child { border-bottom: none; }
+.rma__item--done { background: #f0fdf4; }
+.rma__item-info { flex: 1; min-width: 0; }
+.rma__product { font-size: 0.8125rem; font-weight: 600; color: var(--wh-navy); }
+.rma__item-meta { font-size: 0.6875rem; color: var(--wh-muted); display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.125rem; }
+.rma__item-meta i { font-size: 0.5625rem; }
+.rma__inspect-form { display: flex; gap: 0.375rem; flex-wrap: wrap; align-items: center; }
+.rma__inspect-form select { font-size: 0.75rem; padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid var(--wh-border); }
+.rma__inspect-btn {
+    padding: 0.35rem 0.75rem; border-radius: 6px; border: none;
+    font-size: 0.6875rem; font-weight: 700; cursor: pointer;
+    background: var(--wh-navy); color: #fff; transition: all 0.15s ease;
+}
+.rma__inspect-btn:hover { transform: translateY(-1px); box-shadow: var(--wh-shadow-sm); }
+.rma__result { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+.rma__result-badge {
+    font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 0.2rem 0.5rem; border-radius: 4px;
+}
+.rma__result-badge--good { background: #dcfce7; color: #15803d; }
+.rma__result-badge--damaged { background: #fef2f2; color: #dc2626; }
+.rma__result-badge--restock { background: #eff6ff; color: #2563eb; }
+.rma__result-badge--dispose { background: #fef2f2; color: #dc2626; }
+.rma__result-badge--quarantine { background: #fef3c7; color: #92400e; }
+@media (max-width: 767.98px) {
+    .rma__item { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .rma__inspect-form { width: 100%; }
+}
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="wh">
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:rma_list' %}">Returns</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">{{ rma.rma_number }}</span>
+  </div>
+
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-undo-alt"></i></div>
+      <div>
+        <h1 class="wh__title">{{ rma.rma_number }}</h1>
+        <p class="wh__subtitle">{{ rma.order.order_number }}{% if rma.business %} &middot; {{ rma.business.business_name }}{% endif %}</p>
+      </div>
+    </div>
+    <span class="wh__badge pkl__badge--lg
+      {% if rma.status == 'resolved' %}wh__badge--success
+      {% elif rma.status == 'received' or rma.status == 'inspected' %}wh__badge--primary
+      {% elif rma.status == 'rejected' %}wh__badge--danger
+      {% else %}wh__badge--warning{% endif %}" id="rma_status_badge">
+      {{ rma.get_status_display }}
+    </span>
+  </div>
+
+  <!-- Info -->
+  <div class="wh__card mb-3">
+    <div class="wh__card-body">
+      <div class="pkl__detail-row"><span class="wh__meta">Reason</span><strong>{{ rma.get_reason_display }}</strong></div>
+      <div class="pkl__detail-row"><span class="wh__meta">Order</span><strong>{{ rma.order.order_number }}</strong></div>
+      {% if rma.warehouse %}<div class="pkl__detail-row"><span class="wh__meta">Warehouse</span><strong>{{ rma.warehouse.name }}</strong></div>{% endif %}
+      <div class="pkl__detail-row"><span class="wh__meta">Created</span><strong>{{ rma.created_at|date:"d M Y H:i" }}</strong></div>
+      {% if rma.customer_notes %}<div class="pkl__detail-row"><span class="wh__meta">Notes</span><span>{{ rma.customer_notes }}</span></div>{% endif %}
+    </div>
+  </div>
+
+  <!-- Receive button -->
+  {% if rma.status == 'requested' or rma.status == 'approved' or rma.status == 'in_transit' %}
+  <form method="POST" action="{% url 'warehouse:rma_receive' rma.pk %}" class="mb-3">
+    {% csrf_token %}
+    <button type="submit" class="wh__btn wh__btn--primary">
+      <i class="fas fa-box-open"></i> Mark All Items as Received
+    </button>
+  </form>
+  {% endif %}
+
+  <!-- Progress -->
+  {% if rma.status == 'received' or rma.status == 'inspected' %}
+  <div class="mb-3">
+    <div class="d-flex justify-content-between mb-1">
+      <span class="wh__meta" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Inspection Progress</span>
+      <span class="wh__meta" style="font-size:0.65rem;font-weight:600;" id="rma_progress_text">{{ inspected }} of {{ total }} items</span>
+    </div>
+    <div class="rtn__progress-bar">
+      <div class="rtn__progress-fill" id="rma_progress_fill"
+           style="width:{% if total > 0 %}{% widthratio inspected total 100 %}{% else %}0{% endif %}%;"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Items -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left"><i class="fas fa-box"></i> <span>Return Items</span></div>
+      <span class="wh__count-badge">{{ total }}</span>
+    </div>
+
+    {% for item in items %}
+    <div class="rma__item {% if item.is_inspected %}rma__item--done{% endif %}" id="rma_item_{{ item.pk }}">
+      <div class="rma__item-info">
+        <div class="rma__product">{{ item.product.item_name }}</div>
+        <div class="rma__item-meta">
+          <span><i class="fas fa-hashtag"></i> {{ item.product.item_sku }}</span>
+          <span><i class="fas fa-cubes"></i> x{{ item.quantity }}</span>
+          {% if item.is_received %}<span><i class="fas fa-box-open"></i> Received</span>{% endif %}
+        </div>
+      </div>
+
+      {% if item.is_inspected %}
+      <!-- Already inspected — show result -->
+      <div class="rma__result">
+        <span class="rma__result-badge rma__result-badge--{{ item.condition }}">{{ item.get_condition_display }}</span>
+        <span class="rma__result-badge rma__result-badge--{{ item.disposition }}">{{ item.get_disposition_display }}</span>
+        {% if item.is_restocked %}<span class="rma__result-badge rma__result-badge--restock"><i class="fas fa-check"></i> Restocked</span>{% endif %}
+      </div>
+      {% elif item.is_received %}
+      <!-- Received — show inspect form -->
+      <div class="rma__inspect-form" id="rma_form_{{ item.pk }}">
+        <select id="rma_cond_{{ item.pk }}">
+          <option value="good">Good</option>
+          <option value="damaged">Damaged</option>
+          <option value="defective">Defective</option>
+          <option value="opened">Opened</option>
+        </select>
+        <select id="rma_disp_{{ item.pk }}">
+          <option value="restock">Restock</option>
+          <option value="quarantine">Quarantine</option>
+          <option value="dispose">Dispose</option>
+        </select>
+        <button class="rma__inspect-btn" onclick="inspectItem({{ item.pk }})">
+          <i class="fas fa-check"></i> Confirm
+        </button>
+      </div>
+      {% else %}
+      <span class="wh__badge wh__badge--muted">Awaiting</span>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="wh__empty"><i class="fas fa-box"></i><p><strong>No items</strong></p></div>
+    {% endfor %}
+  </div>
+
+  <!-- Resolved banner -->
+  {% if rma.status == 'resolved' %}
+  <div class="rtn__done-banner mt-3">
+    <i class="fas fa-circle-check d-block"></i>
+    <h3>Return Resolved</h3>
+    <p>All items inspected. Restocked items are back on shelf.</p>
+    <a href="{% url 'warehouse:rma_list' %}" class="wh__btn wh__btn--primary mt-3"><i class="fas fa-arrow-left"></i> Back to Returns</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCsrfToken() {
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
+function inspectItem(itemId) {
+    var cond = document.getElementById('rma_cond_' + itemId).value;
+    var disp = document.getElementById('rma_disp_' + itemId).value;
+
+    fetch("{% url 'warehouse:rma_inspect_item' rma.pk 999999 %}".replace('999999', itemId), {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'condition=' + cond + '&disposition=' + disp
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        var row = document.getElementById('rma_item_' + itemId);
+        row.classList.add('rma__item--done');
+
+        // Replace form with result badges
+        var form = document.getElementById('rma_form_' + itemId);
+        var condLabel = {'good':'Good','damaged':'Damaged','defective':'Defective','opened':'Opened'}[data.condition] || data.condition;
+        var dispLabel = {'restock':'Restock','quarantine':'Quarantine','dispose':'Dispose'}[data.disposition] || data.disposition;
+        var html = '<div class="rma__result">';
+        html += '<span class="rma__result-badge rma__result-badge--' + data.condition + '">' + condLabel + '</span>';
+        html += '<span class="rma__result-badge rma__result-badge--' + data.disposition + '">' + dispLabel + '</span>';
+        if (data.is_restocked) html += '<span class="rma__result-badge rma__result-badge--restock"><i class="fas fa-check"></i> Restocked</span>';
+        html += '</div>';
+        form.outerHTML = html;
+
+        // Update progress
+        var pText = document.getElementById('rma_progress_text');
+        var pFill = document.getElementById('rma_progress_fill');
+        if (pText) pText.textContent = data.inspected + ' of ' + data.total + ' items';
+        if (pFill) pFill.style.width = (data.total > 0 ? Math.round(data.inspected / data.total * 100) : 0) + '%';
+
+        if (data.all_done) {
+            document.getElementById('rma_status_badge').textContent = 'Resolved';
+            document.getElementById('rma_status_badge').className = 'wh__badge pkl__badge--lg wh__badge--success';
+            location.reload();
+        }
+    })
+    .catch(function() { alert('Network error.'); });
+}
+</script>
+{% endblock extra_js %}

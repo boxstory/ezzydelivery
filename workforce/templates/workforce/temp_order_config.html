@@ -1,0 +1,126 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block content %}
+<div style="min-width:0;max-width:100%">
+    <header class="oli__hero">
+        <div class="oli__hero__left">
+            <h2><i class="fa-solid fa-sliders me-1"></i>Temp Order Config</h2>
+            <span class="oli__hero__subtitle">| Select which businesses sync to temp orders</span>
+        </div>
+        <div class="oli__hero__right d-flex gap-2">
+            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
+            </a>
+            <a href="{% url 'workforce:temp_orders' %}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i>Back to Temp Orders
+            </a>
+        </div>
+    </header>
+
+    <div class="d-flex justify-content-between align-items-center px-2 mb-2">
+        <div class="text-muted" style="font-size:0.85rem;">
+            <span id="enabledCount">{{ enabled_count }}</span> of {{ biz_list|length }} businesses enabled
+        </div>
+    </div>
+
+    <div class="table-responsive px-2">
+        <table class="table table-sm table-hover align-middle" style="font-size:0.85rem;">
+            <thead class="table-dark">
+                <tr>
+                    <th>Business</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">ID</th>
+                    <th class="text-center">Temp Orders</th>
+                    <th class="text-center">OneDrive</th>
+                    <th class="text-center">API</th>
+                    <th class="text-center">Public Link</th>
+                    <th class="text-center">Temp Sync</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in biz_list %}
+                <tr>
+                    <td class="fw-semibold">{{ item.business.business_name }}</td>
+                    <td class="text-center">
+                        {% if item.business.business_status == 'active' %}
+                        <span class="badge bg-success">Active</span>
+                        {% elif item.business.business_status == 'pending' %}
+                        <span class="badge bg-warning text-dark">Pending</span>
+                        {% elif item.business.business_status == 'suspended' %}
+                        <span class="badge bg-danger">Suspended</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ item.business.business_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center text-muted">{{ item.business.business_id }}</td>
+                    <td class="text-center">
+                        {% if item.temp_count %}
+                        <span class="badge bg-primary">{{ item.temp_count }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if item.onedrive_count %}
+                        <span class="badge bg-info text-dark">{{ item.onedrive_count }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if item.api_count %}
+                        <span class="badge bg-warning text-dark">{{ item.api_count }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if item.public_link_count %}
+                        <span class="badge bg-secondary">{{ item.public_link_count }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="form-check form-switch d-flex justify-content-center mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   data-biz-id="{{ item.business.business_id }}"
+                                   {% if item.business.temp_order_enabled %}checked{% endif %}
+                                   onchange="toggleBiz(this)">
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+function toggleBiz(el) {
+    const bizId = el.dataset.bizId;
+    fetch('{% url "workforce:temp_order_config" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=toggle&business_id=' + bizId,
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            // Update count
+            const cnt = document.querySelectorAll('.form-check-input:checked').length;
+            document.getElementById('enabledCount').textContent = cnt;
+        } else {
+            el.checked = !el.checked;
+        }
+    })
+    .catch(() => { el.checked = !el.checked; });
+}
+</script>
+{% endblock extra_js %}

@@ -255,6 +255,11 @@
             </div>
             <div class="oal__header-actions" id="orders_all_list_nav_actions">
               <a class="oal__btn oal__btn--outline"
+                 href="{% url 'delivery:all_delivery_tasks' %}"
+                 id="orders_all_list_btn_go_tasks">
+                <i class="fa-solid fa-truck"></i> Go to Tasks
+              </a>
+              <a class="oal__btn oal__btn--outline"
                  href="{% url 'orders:get_order_by_api' %}"
                  id="orders_all_list_btn_api_upload">
                 <i class="fa-solid fa-code"></i> API
@@ -440,6 +445,9 @@
                 </button>
                 <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--cancel" id="orders_bulk_btn_cancel">
                   <i class="fa-solid fa-ban"></i> Cancel
+                </button>
+                <button type="button" class="bulk-action-bar__btn" id="orders_bulk_btn_print" style="background:var(--brand-navy, #001f3f);color:#fff;">
+                  <i class="fa-solid fa-print"></i> Print Labels
                 </button>
               </div>
               <a href="#" class="bulk-action-bar__deselect" id="orders_bulk_deselect">Deselect All</a>
@@ -917,6 +925,27 @@
     document.getElementById('orders_bulk_btn_confirmed').addEventListener('click', function() { bulkUpdate('ready_to_pickup'); });
     document.getElementById('orders_bulk_btn_publish').addEventListener('click', function() { bulkUpdate('publish'); });
     document.getElementById('orders_bulk_btn_cancel').addEventListener('click', function() { bulkUpdate('cancelled'); });
+
+    // Print Labels - opens in new tab
+    document.getElementById('orders_bulk_btn_print').addEventListener('click', function() {
+      var ids = getChecked();
+      if (!ids.length) return;
+      var form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '{% url "business:bulk_print_labels" %}';
+      form.target = '_blank';
+      var csrf = document.createElement('input');
+      csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = '{{ csrf_token }}';
+      form.appendChild(csrf);
+      ids.forEach(function(id) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'order_ids'; inp.value = id;
+        form.appendChild(inp);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    });
   })();
 
   // ===== Status Cell Inline Popup =====

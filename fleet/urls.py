@@ -113,4 +113,8 @@ urlpatterns = [
           fleet_views.fleet_resolve_location, name='fleet_resolve_location'),
      path('tasks/map/',
           fleet_views.fleet_tasks_map, name='fleet_tasks_map'),
+
+     # Delivery Proof
+     path('task/<int:task_id>/proof/upload/',
+          fleet_views.upload_delivery_proof, name='upload_delivery_proof'),
 ]

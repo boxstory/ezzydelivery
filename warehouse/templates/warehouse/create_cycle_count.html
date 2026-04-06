@@ -1,0 +1,179 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Create Cycle Count{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:cycle_count_list' %}">Cycle Counts</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">Create New</span>
+  </div>
+
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-plus-circle"></i></div>
+      <div>
+        <h1 class="wh__title">Create Cycle Count</h1>
+        <p class="wh__subtitle">Schedule an inventory count for a warehouse zone or location</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-clipboard-list"></i>
+        <span>COUNT DETAILS</span>
+      </div>
+    </div>
+    <div class="wh__card-body">
+      <form method="POST" action="{% url 'warehouse:create_cycle_count' %}">
+        {% csrf_token %}
+
+        <div class="wha__row">
+          <!-- Warehouse -->
+          <div class="wha__field">
+            <label class="wha__label" for="warehouse">Warehouse <span class="wha__required">*</span></label>
+            <select id="warehouse" name="warehouse" class="wha__select" required>
+              <option value="">Select warehouse...</option>
+              {% for wh in warehouses %}
+              <option value="{{ wh.pk }}">{{ wh.code }} — {{ wh.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Scheduled Date -->
+          <div class="wha__field">
+            <label class="wha__label" for="scheduled_date">Scheduled Date <span class="wha__required">*</span></label>
+            <input type="date" id="scheduled_date" name="scheduled_date" class="wha__input" required>
+          </div>
+        </div>
+
+        <div class="wha__row">
+          <!-- Location (zone) — optional -->
+          <div class="wha__field">
+            <label class="wha__label" for="location">Zone / Location <small class="text-muted">(optional)</small></label>
+            <select id="location" name="location" class="wha__select" disabled>
+              <option value="">All locations (entire warehouse)</option>
+            </select>
+            <span class="wha__hint"><i class="fas fa-info-circle"></i> Select a zone to count only products in that zone. Leave empty to count all stock.</span>
+          </div>
+
+          <!-- Assigned To -->
+          <div class="wha__field">
+            <label class="wha__label" for="assigned_to">Assign To <small class="text-muted">(optional)</small></label>
+            <select id="assigned_to" name="assigned_to" class="wha__select">
+              <option value="">Unassigned</option>
+              {% for user in staff_users %}
+              <option value="{{ user.pk }}">{{ user.get_full_name|default:user.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Notes — full width -->
+        <div class="wha__row">
+          <div class="wha__field" style="flex: 1 1 100%;">
+            <label class="wha__label" for="notes">Notes</label>
+            <textarea id="notes" name="notes" class="wha__input" rows="3" placeholder="Special instructions or notes..."></textarea>
+          </div>
+        </div>
+
+        <div class="wha__actions">
+          <a href="{% url 'warehouse:cycle_count_list' %}" class="wh__btn wh__btn--secondary">Cancel</a>
+          <button type="submit" class="wh__btn wh__btn--primary">
+            <i class="fas fa-clipboard-check"></i> Create Cycle Count
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- How It Works -->
+  <div class="wh__help-grid">
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--tips">
+        <i class="fas fa-lightbulb"></i> How It Works
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__tip"><i class="fas fa-circle"></i><span>The system will auto-populate items based on current stock levels in the selected warehouse / zone</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span>Only products with stock &gt; 0 are included in the count</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span>After creation, staff can start counting and enter physical quantities</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span>Variances are reviewed and approved — stock levels are adjusted automatically on approval</span></div>
+      </div>
+    </div>
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--workflow">
+        <i class="fas fa-route"></i> Cycle Count Workflow
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__step">
+          <div class="wh__step-number">1</div>
+          <div><div class="wh__step-title">Create</div><div class="wh__step-desc">Select warehouse, optional zone, and scheduled date</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number">2</div>
+          <div><div class="wh__step-title">Count</div><div class="wh__step-desc">Staff physically counts items and records quantities</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number">3</div>
+          <div><div class="wh__step-title">Review</div><div class="wh__step-desc">Submit for review — manager checks variances</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number wh__step-number--success"><i class="fas fa-check fa-xs"></i></div>
+          <div><div class="wh__step-title">Approve</div><div class="wh__step-desc">Stock levels adjusted automatically for all variances</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  var whSelect = document.getElementById('warehouse');
+  var locSelect = document.getElementById('location');
+  var dateInput = document.getElementById('scheduled_date');
+
+  // Default date to today
+  if (dateInput && !dateInput.value) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+
+  if (!whSelect || !locSelect) return;
+
+  // Dynamic zone loading when warehouse changes
+  whSelect.addEventListener('change', function(){
+    var whId = this.value;
+    locSelect.innerHTML = '<option value="">All locations (entire warehouse)</option>';
+    locSelect.disabled = true;
+    if (!whId) return;
+
+    locSelect.innerHTML = '<option value="">Loading locations...</option>';
+
+    fetch('/workforce/warehouse/api/warehouses/' + whId + '/storage-locations/')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        locSelect.innerHTML = '<option value="">All locations (entire warehouse)</option>';
+        data.forEach(function(loc){
+          var opt = document.createElement('option');
+          opt.value = loc.id;
+          opt.textContent = (loc.code || loc.name) + (loc.location_type ? ' — ' + loc.location_type : '');
+          locSelect.appendChild(opt);
+        });
+        locSelect.disabled = false;
+      })
+      .catch(function(){
+        locSelect.innerHTML = '<option value="">All locations (entire warehouse)</option>';
+        locSelect.disabled = false;
+      });
+  });
+})();
+</script>
+{% endblock %}

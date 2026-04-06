@@ -14,6 +14,9 @@
             <span class="oli__hero__subtitle">| Synced from external sources (last 25 per source)</span>
         </div>
         <div class="oli__hero__right d-flex align-items-center gap-3">
+            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
+            </a>
             {% if last_sync %}
             <span class="text-muted small" title="Last sync">
                 <i class="fa-regular fa-clock me-1"></i>{{ last_sync|timesince }} ago
@@ -29,15 +32,15 @@
             <button type="button" class="btn btn-outline-dark btn-sm" onclick="openPublicLinkModal()">
                 <i class="fa-solid fa-link me-1"></i>Public Links
             </button>
-            <button type="button" class="btn btn-success btn-sm d-none" id="importBtn" onclick="importWithMapping()">
-                <i class="fa-solid fa-file-import me-1"></i>Import (Mapping) <span id="importBtnCount"></span>
-            </button>
             <button type="button" class="btn btn-warning btn-sm d-none" id="autoImportBtn" onclick="openAutoImport()">
                 <i class="fa-solid fa-bolt me-1"></i>Auto-Import <span id="autoImportBtnCount"></span>
             </button>
+            <a href="{% url 'workforce:temp_order_config' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-gear me-1"></i>Config
+            </a>
             <div class="oli__hero__count">
-                <span class="oli__hero__count-value">{{ total_count|default:"0" }}</span>
-                <span class="oli__hero__count-label">rows</span>
+                <span class="oli__hero__count-value">{{ new_count|default:"0" }}</span>
+                <span class="oli__hero__count-label">not imported</span>
             </div>
         </div>
     </header>
@@ -116,6 +119,24 @@
         {% endif %}
     </div>
 
+    <!-- Unmapped Sources Warning -->
+    {% if unmapped_sources %}
+    <div class="alert alert-warning d-flex align-items-start gap-3 mx-2 mb-2 py-2 px-3" role="alert">
+        <i class="fa-solid fa-triangle-exclamation mt-1"></i>
+        <div class="flex-grow-1">
+            <strong>Mapping not configured</strong> — The following sources have no column mapping and will be skipped during sync:
+            <ul class="mb-1 mt-1" style="font-size:0.85rem;">
+                {% for src in unmapped_sources %}
+                <li><strong>{{ src.type }}</strong>: {{ src.label }} ({{ src.business.business_name }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <a href="{% url 'workforce:wf_mapping_manager' %}" class="btn btn-sm btn-dark text-nowrap">
+            <i class="fa-solid fa-sliders me-1"></i>Set Mapping
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Business Breakdown Pills -->
     {% if biz_counts %}
     <div class="d-flex flex-wrap gap-2 mb-3 px-2">
@@ -158,7 +179,7 @@
     </div>
 
     <!-- Temp Orders Table -->
-    {% if temp_rows %}
+    {% if biz_groups %}
     <div class="table-responsive px-2">
         <table class="table table-sm table-hover align-middle small">
             <thead class="table-dark" style="position:sticky;top:0;z-index:1">
@@ -166,6 +187,7 @@
                     <th style="width:30px">
                         <input type="checkbox" class="form-check-input" id="selectAllRows" onchange="toggleSelectAll(this)">
                     </th>
+                    <th class="text-nowrap" style="width:50px">#</th>
                     <th>
                         <a href="?sort={% if filters.sort == 'date_desc' %}date_asc{% else %}date_desc{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
                            class="text-white text-decoration-none">
@@ -197,7 +219,23 @@
                 </tr>
             </thead>
             <tbody>
-                {% for row in temp_rows %}
+                {% for group in biz_groups %}
+                <!-- Business group header -->
+                <tr class="table-light">
+                    <td colspan="15" class="py-1 px-2">
+                        <span class="fw-semibold small text-dark">
+                            <i class="fa-solid fa-building me-1 opacity-50"></i>{{ group.business.business_name }}
+                        </span>
+                        <span class="text-muted small ms-2">rows {{ group.offset|add:1 }}–{{ group.next_offset }}</span>
+                        {% if group.has_prev %}
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 ms-2" style="font-size:0.65rem;"
+                                onclick="bizPage({{ group.business_id }}, {{ group.prev_offset }})">
+                            <i class="fa-solid fa-chevron-left"></i> Prev 10
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% for row in group.rows %}
                 <tr class="{% if row.status == 'imported' %}table-secondary{% elif row.status == 'skipped' %}table-light{% endif %}"
                     data-temp-id="{{ row.id }}"
                     data-biz-id="{{ row.business_id }}"
@@ -207,7 +245,8 @@
                                data-temp-id="{{ row.id }}"
                                onchange="updateSelectedCount()">
                     </td>
-                    <td class="text-muted text-nowrap">{{ row.order_date|default:"—" }}</td>
+                    <td class="text-muted text-nowrap" style="font-size:0.7rem;">{{ row.id }}</td>
+                    <td class="text-muted text-nowrap fmt-datetime">{{ row.order_date|default:"" }}</td>
                     <td>
                         <span class="badge bg-dark" style="font-size:0.65rem;">{{ row.business.business_name|truncatechars:18 }}</span>
                     </td>
@@ -275,11 +314,22 @@
                             data-status="{{ row.status }}"
                             data-synced-at="{{ row.synced_at|date:'Y-m-d H:i' }}"
                             data-created-at="{{ row.created_at|date:'Y-m-d H:i' }}"
-                            data-raw-row="{{ row.raw_row|safe }}">
+                            data-raw-row="{{ row.raw_row|escapejs }}">
                             <i class="fa-solid fa-eye"></i>
                         </button>
                     </td>
                 </tr>
+                {% endfor %}
+                <!-- Next 10 row: only shown when all visible rows are "new" and there are more -->
+                {% if group.all_new and group.has_more %}
+                <tr class="table-warning">
+                    <td colspan="15" class="text-center py-1">
+                        <button type="button" class="btn btn-warning btn-sm py-0 px-3" onclick="bizPage({{ group.business_id }}, {{ group.next_offset }})">
+                            <i class="fa-solid fa-chevron-down me-1"></i>Next 10 for {{ group.business.business_name }}
+                        </button>
+                    </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>
@@ -424,6 +474,13 @@
 </div>
 
 <script>
+// Per-business pagination: navigate to next/prev 10 for a specific business
+function bizPage(bizId, offset) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('biz_' + bizId, offset);
+    window.location.href = url.href;
+}
+
 const CSRF = (() => {
     // Prefer hidden input (always present), fallback to cookie
     const inp = document.querySelector('[name=csrfmiddlewaretoken]');
@@ -435,25 +492,62 @@ let previewRows = [];
 
 // ─── Auto Sync Countdown ───
 (function() {
-    const now = new Date();
-    const nextHour = new Date(now);
-    nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+    const SYNC_HOURS = [6,8,9,10,11,12,13,14,15,16,17,18,19];
     const timerEl = document.getElementById('autoSyncTimer');
 
+    function getNextSync() {
+        const now = new Date();
+        const h = now.getHours();
+        // Find next sync hour today
+        for (const sh of SYNC_HOURS) {
+            if (sh > h || (sh === h && now.getMinutes() === 0 && now.getSeconds() === 0)) {
+                const next = new Date(now);
+                next.setHours(sh, 0, 0, 0);
+                if (next > now) return next;
+            }
+        }
+        // Next sync is tomorrow at first hour
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(SYNC_HOURS[0], 0, 0, 0);
+        return tomorrow;
+    }
+
+    let nextSync = getNextSync();
+
     function updateCountdown() {
-        const diff = nextHour - new Date();
+        const now = new Date();
+        const diff = nextSync - now;
         if (diff <= 0) {
             timerEl.textContent = 'now';
             setTimeout(() => location.reload(), 3000);
             return;
         }
-        const m = Math.floor(diff / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        timerEl.textContent = `${m}m ${s < 10 ? '0' : ''}${s}s`;
+        const totalMin = Math.floor(diff / 60000);
+        if (totalMin >= 60) {
+            const hrs = Math.floor(totalMin / 60);
+            const mins = totalMin % 60;
+            timerEl.textContent = `${hrs}h ${mins}m`;
+        } else {
+            const s = Math.floor((diff % 60000) / 1000);
+            timerEl.textContent = `${totalMin}m ${s < 10 ? '0' : ''}${s}s`;
+        }
     }
     updateCountdown();
     setInterval(updateCountdown, 1000);
 })();
+
+// ─── Format datetime cells ───
+document.querySelectorAll('.fmt-datetime').forEach(td => {
+    const val = td.textContent.trim();
+    if (!val) { td.textContent = '—'; return; }
+    const d = new Date(val);
+    if (!isNaN(d)) {
+        const date = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+        const time = d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+        td.textContent = date + ' ' + time;
+    }
+});
 
 // ─── Detail Modal (single row) ───
 function showDetail(btn) {
@@ -527,9 +621,6 @@ function updateSelectedCount() {
     document.getElementById('selectedCount').textContent = n;
     const bar = document.getElementById('bulkImportBar');
     bar.style.setProperty('display', n > 0 ? 'flex' : 'none', 'important');
-    const hdrBtn = document.getElementById('importBtn');
-    if (n > 0) { hdrBtn.classList.remove('d-none'); document.getElementById('importBtnCount').textContent = `(${n})`; }
-    else { hdrBtn.classList.add('d-none'); }
     const autoHdrBtn = document.getElementById('autoImportBtn');
     if (n > 0) { autoHdrBtn.classList.remove('d-none'); document.getElementById('autoImportBtnCount').textContent = `(${n})`; }
     else { autoHdrBtn.classList.add('d-none'); }
@@ -618,44 +709,6 @@ async function openAutoImport() {
     }
 }
 
-// ─── Import with Mapping (redirect to import wizard) ───
-async function importWithMapping() {
-    const checked = document.querySelectorAll('.row-checkbox:checked');
-    if (!checked.length) { alert('Select rows first'); return; }
-
-    const btn = document.getElementById('importBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Preparing...';
-
-    const body = new URLSearchParams();
-    body.append('csrfmiddlewaretoken', CSRF);
-    body.append('source', 'temp_order');
-    // Use first checked row's business
-    const firstRow = checked[0].closest('tr');
-    const bizId = firstRow ? firstRow.dataset.businessId : '';
-    body.append('business_id', bizId);
-    checked.forEach(cb => body.append('temp_ids[]', cb.dataset.tempId));
-
-    try {
-        const resp = await fetch('{% url "workforce:import_wizard_prepare" %}', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': CSRF },
-            body: body
-        });
-        const data = await resp.json();
-        if (data.success && data.redirect) {
-            window.location.href = data.redirect;
-        } else {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import (Mapping) <span id="importBtnCount">(' + checked.length + ')</span>';
-            alert(data.error || 'Failed to prepare import');
-        }
-    } catch(e) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import (Mapping) <span id="importBtnCount">(' + checked.length + ')</span>';
-        alert('Network error: ' + e.message);
-    }
-}
 
 // ─── Step 1: Preview ───
 async function openPreview() {
@@ -715,9 +768,54 @@ const DB_FIELDS = [
     {key: 'count_2', label: 'Count 2', group: 'Products'},
     {key: 'product_3', label: 'Product 3', group: 'Products'},
     {key: 'count_3', label: 'Count 3', group: 'Products'},
+    {key: 'product_4', label: 'Product 4', group: 'Products'},
+    {key: 'count_4', label: 'Count 4', group: 'Products'},
+    {key: 'product_5', label: 'Product 5', group: 'Products'},
+    {key: 'count_5', label: 'Count 5', group: 'Products'},
+    {key: 'product_6', label: 'Product 6', group: 'Products'},
+    {key: 'count_6', label: 'Count 6', group: 'Products'},
+    {key: 'product_7', label: 'Product 7', group: 'Products'},
+    {key: 'count_7', label: 'Count 7', group: 'Products'},
+    {key: 'product_8', label: 'Product 8', group: 'Products'},
+    {key: 'count_8', label: 'Count 8', group: 'Products'},
+    {key: 'product_9', label: 'Product 9', group: 'Products'},
+    {key: 'count_9', label: 'Count 9', group: 'Products'},
+    {key: 'product_10', label: 'Product 10', group: 'Products'},
+    {key: 'count_10', label: 'Count 10', group: 'Products'},
     {key: 'seller_notes', label: 'Notes By Seller', group: 'Notes'},
     {key: 'internal_notes', label: 'Notes By Ezzy', group: 'Notes'},
 ];
+
+// ─── Helper: label lookup for a db field key ───
+const DB_FIELD_MAP = Object.fromEntries(DB_FIELDS.map(f => [f.key, f]));
+
+function _mappedFieldsFor(r) {
+    // Use col_mapping keys if available, else fall back to DB_FIELDS
+    const mapping = r.col_mapping && Object.keys(r.col_mapping).length ? r.col_mapping : null;
+    if (!mapping) return DB_FIELDS.map(f => ({ dbField: f.key, srcCol: '', meta: f }));
+
+    // Detect old-format: keys are numeric col indices, values are db_field names
+    const isOldFormat = Object.keys(mapping).every(k => /^\d+$/.test(k));
+
+    // Build lookup: dbField -> srcCol
+    let fieldToSrc = {};
+    if (isOldFormat) {
+        Object.entries(mapping).forEach(([colIdx, dbField]) => {
+            if (dbField) fieldToSrc[dbField] = 'Col ' + colIdx;
+        });
+    } else {
+        fieldToSrc = {...mapping};
+    }
+
+    // Return in DB_FIELDS order, only mapped fields
+    return DB_FIELDS
+        .filter(f => f.key in fieldToSrc)
+        .map(f => ({
+            dbField: f.key,
+            srcCol: fieldToSrc[f.key] || '',
+            meta: f,
+        }));
+}
 
 function renderPreviewTable() {
     const srcLabel = { onedrive:'OneDrive', google_sheet:'Google Sheet', shopify:'Shopify', woocommerce:'WooCommerce', public_link:'Public Link' };
@@ -735,19 +833,15 @@ function renderPreviewTable() {
         html += `</div>`;
 
         html += `<div class="table-responsive"><table class="table table-sm table-bordered small align-middle mb-0">`;
-        html += `<thead class="table-light"><tr><th style="width:200px">Field</th><th>Mapped Value</th></tr></thead><tbody>`;
+        html += `<thead class="table-light"><tr><th style="width:160px">Source Column</th><th style="width:180px">→ Field</th><th>Value</th></tr></thead><tbody>`;
 
-        let lastGroup = '';
-        DB_FIELDS.forEach(f => {
-            const val = r[f.key] || '';
-            const hasVal = val && val.trim() !== '';
-            if (f.group !== lastGroup) {
-                html += `<tr class="table-secondary"><td colspan="2" class="fw-semibold text-muted" style="font-size:0.7rem"><i class="fa-solid fa-folder me-1"></i>${f.group}</td></tr>`;
-                lastGroup = f.group;
-            }
+        _mappedFieldsFor(r).forEach(({ dbField, srcCol, meta }) => {
+            const val = r[dbField] || '';
+            const hasVal = val && String(val).trim() !== '';
             html += `<tr${hasVal ? ' class="table-success"' : ''}>`;
-            html += `<td class="fw-semibold text-nowrap">${f.label}</td>`;
-            html += `<td>${hasVal ? escHtml(val) : '<span class="text-muted">—</span>'}</td>`;
+            html += `<td class="text-muted small text-nowrap">${escHtml(srcCol) || '<em>—</em>'}</td>`;
+            html += `<td class="fw-semibold text-nowrap small">${escHtml(meta.label)}</td>`;
+            html += `<td>${hasVal ? escHtml(String(val)) : '<span class="text-muted">—</span>'}</td>`;
             html += `</tr>`;
         });
 
@@ -758,7 +852,7 @@ function renderPreviewTable() {
     document.getElementById('previewCount').textContent = `${previewRows.length} row(s)`;
 }
 
-// ─── Step 2: Verify (editable) — mapping-style per row ───
+// ─── Step 2: Verify (editable) ───
 function goToVerify() {
     document.getElementById('previewStep1Title').classList.add('d-none');
     document.getElementById('previewStep2Title').classList.remove('d-none');
@@ -776,19 +870,15 @@ function goToVerify() {
         html += `</div>`;
 
         html += `<div class="table-responsive"><table class="table table-sm table-bordered small align-middle mb-0">`;
-        html += `<thead class="table-light"><tr><th style="width:200px">Field</th><th>Value (editable)</th></tr></thead><tbody>`;
+        html += `<thead class="table-light"><tr><th style="width:160px">Source Column</th><th style="width:180px">→ Field</th><th>Value (editable)</th></tr></thead><tbody>`;
 
-        let lastGroup = '';
-        DB_FIELDS.forEach(f => {
-            if (f.group !== lastGroup) {
-                html += `<tr class="table-secondary"><td colspan="2" class="fw-semibold text-muted" style="font-size:0.7rem"><i class="fa-solid fa-folder me-1"></i>${f.group}</td></tr>`;
-                lastGroup = f.group;
-            }
-            const val = r[f.key] || '';
-            const isRequired = f.label.includes('*');
+        _mappedFieldsFor(r).forEach(({ dbField, srcCol, meta }) => {
+            const val = r[dbField] || '';
+            const isRequired = meta.label && meta.label.includes('*');
             html += `<tr>`;
-            html += `<td class="fw-semibold text-nowrap">${f.label}</td>`;
-            html += `<td><input type="text" class="form-control form-control-sm py-0" style="font-size:0.75rem" data-field="${f.key}" data-idx="${i}" value="${escHtml(val)}"${isRequired ? ' required' : ''}></td>`;
+            html += `<td class="text-muted small text-nowrap">${escHtml(srcCol) || '<em>—</em>'}</td>`;
+            html += `<td class="fw-semibold text-nowrap small">${escHtml(meta.label)}</td>`;
+            html += `<td><input type="text" class="form-control form-control-sm py-0" style="font-size:0.75rem" data-field="${dbField}" data-idx="${i}" value="${escHtml(String(val))}"${isRequired ? ' required' : ''}></td>`;
             html += `</tr>`;
         });
 

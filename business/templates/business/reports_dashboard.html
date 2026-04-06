@@ -1,0 +1,194 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Reports & Export{% endblock title %}
+
+{% block content %}
+<div class="flex-fill p-3 p-md-4" id="business_reports_container_main">
+
+  <!-- Page Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+    <div>
+      <h4 class="fw-bold mb-1" style="color: var(--brand-primary);">
+        <i class="fa-solid fa-file-export me-2"></i>Reports & Export
+      </h4>
+      <p class="text-muted mb-0">Download CSV reports for orders, COD reconciliation, and delivery performance.</p>
+    </div>
+  </div>
+
+  <!-- Date Range Filter -->
+  <div class="card brp__filter-card mb-4">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-4">
+          <label for="brp_date_from" class="form-label fw-semibold">
+            <i class="fa-solid fa-calendar-day me-1"></i>From Date
+          </label>
+          <input type="date" class="form-control" id="brp_date_from" value="{{ default_from }}">
+        </div>
+        <div class="col-12 col-md-4">
+          <label for="brp_date_to" class="form-label fw-semibold">
+            <i class="fa-solid fa-calendar-day me-1"></i>To Date
+          </label>
+          <input type="date" class="form-control" id="brp_date_to" value="{{ default_to }}">
+        </div>
+        <div class="col-12 col-md-4">
+          <button type="button" class="btn btn-outline-secondary w-100" onclick="brpResetDates()">
+            <i class="fa-solid fa-rotate-left me-1"></i>Reset to Last 30 Days
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Cards -->
+  <div class="row g-4">
+
+    <!-- Orders Report -->
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card brp__card h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="brp__card-icon mb-3">
+            <i class="fa-solid fa-basket-shopping"></i>
+          </div>
+          <h5 class="card-title fw-bold">Orders Report</h5>
+          <p class="text-muted flex-grow-1">
+            Export all orders with customer details, addresses, COD amounts, and delivery status for the selected date range.
+          </p>
+          <div class="mb-3">
+            <label for="brp_order_status" class="form-label fw-semibold small">Filter by Status</label>
+            <select class="form-select" id="brp_order_status">
+              <option value="all" selected>All Statuses</option>
+              <option value="to_review">Hold for Review</option>
+              <option value="ready_to_pickup">Ready to Pickup</option>
+              <option value="publish">Published</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <button type="button" class="btn brp__btn-download mt-auto" onclick="brpDownload('orders')">
+            <i class="fa-solid fa-download me-2"></i>Download CSV
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COD Reconciliation -->
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card brp__card h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="brp__card-icon brp__card-icon--cod mb-3">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
+          </div>
+          <h5 class="card-title fw-bold">COD Reconciliation</h5>
+          <p class="text-muted flex-grow-1">
+            Export cash-on-delivery orders with collection status from both client and staff perspectives. Useful for reconciling COD payments.
+          </p>
+          <button type="button" class="btn brp__btn-download mt-auto" onclick="brpDownload('cod')">
+            <i class="fa-solid fa-download me-2"></i>Download CSV
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delivery Performance -->
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card brp__card h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="brp__card-icon brp__card-icon--perf mb-3">
+            <i class="fa-solid fa-chart-line"></i>
+          </div>
+          <h5 class="card-title fw-bold">Delivery Performance</h5>
+          <p class="text-muted flex-grow-1">
+            Daily breakdown of delivery tasks showing totals, success/failure counts, and success rate percentage.
+          </p>
+          <button type="button" class="btn brp__btn-download mt-auto" onclick="brpDownload('performance')">
+            <i class="fa-solid fa-download me-2"></i>Download CSV
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .brp__filter-card {
+    border: 1px solid var(--border-light, #e2e8f0);
+    border-radius: var(--radius-lg, 0.75rem);
+    background: var(--surface-primary, #fff);
+  }
+  .brp__card {
+    border: 1px solid var(--border-light, #e2e8f0);
+    border-radius: var(--radius-lg, 0.75rem);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    background: var(--surface-primary, #fff);
+  }
+  .brp__card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+  .brp__card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md, 0.5rem);
+    background: var(--brand-primary, #001f3f);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+  }
+  .brp__card-icon--cod {
+    background: var(--brand-success, #28a745);
+  }
+  .brp__card-icon--perf {
+    background: var(--brand-info, #17a2b8);
+  }
+  .brp__btn-download {
+    background: var(--brand-primary, #001f3f);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-md, 0.5rem);
+    padding: 0.6rem 1.25rem;
+    font-weight: 600;
+    transition: background 0.2s ease;
+  }
+  .brp__btn-download:hover {
+    background: var(--brand-primary-dark, #001530);
+    color: #fff;
+  }
+</style>
+
+<script>
+  const BRP_URLS = {
+    orders: "{% url 'business:export_orders_csv' %}",
+    cod: "{% url 'business:export_cod_csv' %}",
+    performance: "{% url 'business:export_performance_csv' %}"
+  };
+
+  function brpGetDateParams() {
+    const dateFrom = document.getElementById('brp_date_from').value;
+    const dateTo = document.getElementById('brp_date_to').value;
+    const params = new URLSearchParams();
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
+    return params;
+  }
+
+  function brpDownload(type) {
+    const params = brpGetDateParams();
+    if (type === 'orders') {
+      const status = document.getElementById('brp_order_status').value;
+      if (status !== 'all') params.set('status', status);
+    }
+    const url = BRP_URLS[type] + '?' + params.toString();
+    window.location.href = url;
+  }
+
+  function brpResetDates() {
+    document.getElementById('brp_date_from').value = "{{ default_from }}";
+    document.getElementById('brp_date_to').value = "{{ default_to }}";
+  }
+</script>
+{% endblock content %}

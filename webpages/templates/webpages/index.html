@@ -2,10 +2,13 @@
 {% load static %}
 
 {% block extra_css %}
+<!-- Preload hero image for faster LCP -->
+<link rel="preload" as="image" type="image/webp" href="{% static 'webpages/img/hero-fulfillment-poster.webp' %}">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'webpages/css/home.css' %}?v=20260219e">
+<link rel="stylesheet" href="{% static 'webpages/css/home.css' %}?v=20260402a">
 {% endblock %}
 
 {% block content %}
@@ -70,9 +73,12 @@
         <div class="ez-hero__visual">
           <div class="ez-hero__accent-shape"></div>
           <div class="ez-hero__img-wrapper">
-            <img src="{% static 'webpages/img/hero-fulfillment-poster.png' %}"
-                 alt="Qatar delivery service - same day courier and e-commerce fulfillment in Doha"
-                 width="600" height="500" loading="eager" />
+            <picture>
+              <source srcset="{% static 'webpages/img/hero-fulfillment-poster.webp' %}" type="image/webp">
+              <img src="{% static 'webpages/img/hero-fulfillment-poster.png' %}"
+                   alt="Qatar delivery service - same day courier and e-commerce fulfillment in Doha"
+                   width="600" height="500" loading="eager" />
+            </picture>
           </div>
         </div>
       </div>
@@ -186,9 +192,12 @@
     <div class="row align-items-center">
       <div class="col-12 col-lg-6 ez-reveal">
         <div class="ez-fulfillment__img">
-          <img src="{% static 'webpages/img/hero-delivery-poster.png' %}"
-               alt="Express delivery and fulfillment services in Qatar - Doha warehouse and logistics"
-               width="600" height="500" loading="lazy" />
+          <picture>
+            <source srcset="{% static 'webpages/img/hero-delivery-poster.webp' %}" type="image/webp">
+            <img src="{% static 'webpages/img/hero-delivery-poster.png' %}"
+                 alt="Express delivery and fulfillment services in Qatar - Doha warehouse and logistics"
+                 width="600" height="500" loading="lazy" />
+          </picture>
         </div>
       </div>
       <div class="col-12 col-lg-6">
@@ -290,9 +299,15 @@
 {% block extra_js %}
 <script src="{% static 'webpages/js/schema-home.js' %}" defer></script>
 <script>
-/* Scroll-triggered reveal animation */
+/* Scroll-triggered reveal animation
+   Content starts visible (opacity:1) for SEO crawlers.
+   JS adds ez-reveal--init to enable animations for real users. */
 (function() {
   'use strict';
+
+  // Enable animations only after JS loads (crawlers see content at opacity:1)
+  document.documentElement.classList.add('ez-reveal--init');
+
   const observer = new IntersectionObserver(function(entries) {
     entries.forEach(function(entry) {
       if (entry.isIntersecting) {

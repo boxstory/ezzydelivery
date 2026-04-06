@@ -13,7 +13,10 @@
             <div class="oli__hero__left">
                 <h2><i class="fa-solid fa-list-check me-1"></i>All Orders</h2>
             </div>
-            <div class="oli__hero__right">
+            <div class="oli__hero__right d-flex align-items-center gap-3">
+                <a href="{% url 'workforce:dl_list_all' %}" class="btn btn-outline-dark btn-sm">
+                    <i class="fa-solid fa-truck me-1"></i>Go to Tasks
+                </a>
                 <div class="oli__hero__count">
                     <span class="oli__hero__count-value">{{ orders.paginator.count|default:"0" }}</span>
                     <span class="oli__hero__count-label">orders</span>
@@ -191,8 +194,18 @@
                     <div class="orc__hcell">Customer</div>
                     <div class="orc__hcell orc__hcell--addr">Address</div>
                     <div class="orc__hcell orc__hcell--items">Items</div>
-                    <div class="orc__hcell orc__hcell--right">COD</div>
-                    <div class="orc__hcell orc__hcell--center">Date</div>
+                    <div class="orc__hcell orc__hcell--right">
+                        <a href="?{{ filter_params }}{% if filter_params %}&{% endif %}sort={% if sort == 'cod_desc' %}cod_asc{% else %}cod_desc{% endif %}" class="orc__sort-link">
+                            COD
+                            {% if sort == 'cod_desc' %}<i class="bi bi-arrow-down"></i>{% elif sort == 'cod_asc' %}<i class="bi bi-arrow-up"></i>{% endif %}
+                        </a>
+                    </div>
+                    <div class="orc__hcell orc__hcell--center">
+                        <a href="?{{ filter_params }}{% if filter_params %}&{% endif %}sort={% if sort == 'date_desc' %}date_asc{% else %}date_desc{% endif %}" class="orc__sort-link">
+                            Date
+                            {% if sort == 'date_asc' %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %}
+                        </a>
+                    </div>
                     <div class="orc__hcell">Order / DL Status</div>
                     <div class="orc__hcell orc__hcell--right"></div>
                 </div>
@@ -258,9 +271,18 @@
                     <div class="orc__cell orc__cell--cod">
                         {% if order.cod_amount != None %}<span class="orc__cod-val">{{ order.cod_amount }}</span><span class="orc__cod-cur">QR</span>{% else %}<span class="orc__cod-nil">—</span>{% endif %}
                     </div>
-                    <div class="orc__cell orc__cell--date"><span class="orc__date">{{ order.order_date|date:"d M" }}</span></div>
+                    <div class="orc__cell orc__cell--date"><span class="orc__date">{{ order.order_date|date:"d M" }}</span><span class="orc__time text-muted" style="font-size:0.75rem;display:block;">{{ order.created_at|time:"H:i" }}</span></div>
                     <div class="orc__cell orc__cell--status">
                         <div class="orc__statuses">
+                            {% if order.stock_flag == 'out_of_stock' %}
+                            <span class="oal__stock-badge oal__stock-badge--oos" title="One or more items are out of stock — reconfirm before dispatch">
+                              <i class="fa-solid fa-triangle-exclamation"></i> Out of Stock
+                            </span>
+                            {% elif order.stock_flag == 'low_stock' %}
+                            <span class="oal__stock-badge oal__stock-badge--low" title="Insufficient stock for ordered quantity — reconfirm before dispatch">
+                              <i class="fa-solid fa-box-open"></i> Low Stock
+                            </span>
+                            {% endif %}
                             <div class="orc__st-row">
                                 <span class="orc__st-label">OD</span>
                                 {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>

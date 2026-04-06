@@ -6,6 +6,7 @@ Also provides utility functions for views to get cached user data:
     - get_cached_profile(request) -> Profile or None
     - get_cached_business(request) -> Business or None
 """
+import datetime
 from core.seo import SEOMetadata
 import json
 
@@ -132,7 +133,7 @@ def site_info(request):
     return {
         'SITE_NAME': 'EzzyDelivery Qatar',
         'SITE_TAGLINE': 'Professional Delivery Services in Qatar',
-        'CURRENT_YEAR': 2025,
+        'CURRENT_YEAR': datetime.date.today().year,
         'SUPPORT_EMAIL': 'support@ezzydelivery.qa',
         'SUPPORT_PHONE': '+974-XXXX-XXXX',
     }
@@ -222,6 +223,21 @@ def user_driver(request):
     except Exception:
         request._cached_user_driver = None
         return {'user_driver': None}
+
+
+def dl_task_status_choices(request):
+    """
+    Expose DeliveryTask status choices as JSON for the status modal dropdown.
+    Only runs on workforce paths to avoid overhead elsewhere.
+    """
+    if not request.path.startswith('/workforce/'):
+        return {}
+    from delivery.models import DeliveryTask
+    choices = [{'value': v, 'label': l} for v, l in DeliveryTask._meta.get_field('dl_task_status').choices]
+    return {
+        'dl_task_status_choices_json': json.dumps(choices),
+        'dl_task_status_choices': choices,
+    }
 
 
 def driver_pending_tasks(request):

@@ -155,6 +155,14 @@ def sync_all_temp_orders(self, source_type=None, source_id=None):
         'synced_at': timezone.now().isoformat(),
     }
     logger.info("Temp orders sync complete: %s", result)
+
+    # Cache sync errors for sidebar badge display
+    from django.core.cache import cache
+    if errors:
+        cache.set('temp_orders_sync_errors', errors, timeout=7200)  # 2 hours
+    else:
+        cache.delete('temp_orders_sync_errors')
+
     return result
 
 
@@ -168,9 +176,15 @@ sync_onedrive_temp_orders = sync_all_temp_orders
 
 def _sync_all_onedrive(source_id=None):
     from orders.models import OneDriveSource
+    # Include sources with no per-source mapping if their business has a shared mapping
+    from django.db.models import Q
     sources = OneDriveSource.objects.filter(
         is_active=True,
-    ).exclude(last_column_mapping={}).select_related('business')
+    ).filter(
+        Q(last_column_mapping__isnull=False) | Q(business__import_mapping__isnull=False)
+    ).exclude(
+        last_column_mapping={}, business__import_mapping={}
+    ).select_related('business')
     if source_id:
         sources = sources.filter(id=source_id)
 
@@ -190,15 +204,9 @@ def _sync_onedrive_source(source):
     from orders.models import TempOrder, Order
     from workforce.views import _onedrive_download_file, _safe_load_workbook
 
-    mapping = source.last_column_mapping
     sheet_name = source.last_sheet_name
-    if not mapping or not sheet_name:
+    if not sheet_name:
         return 0, 0
-
-    field_map = {}
-    for col_idx_str, db_field in mapping.items():
-        if db_field:
-            field_map[int(col_idx_str)] = db_field
 
     file_bytes, err = _onedrive_download_file(source)
     if err:
@@ -216,20 +224,91 @@ def _sync_onedrive_source(source):
     if len(all_rows) < 2:
         return 0, 0
 
+    # Build header-name lookup (same approach as Google Sheet)
+    header_row = [str(c).strip() if c is not None else '' for c in all_rows[0]]
     data_rows = all_rows[1:]
 
+    # Save headers on source for preview lookups
+    if header_row != (source.last_headers or []):
+        source.last_headers = header_row
+        source.save(update_fields=['last_headers'])
+
+    def col_idx_by_header(header_name):
+        for j, h in enumerate(header_row):
+            if h.lower() == header_name.lower():
+                return j
+        return None
+
+    # Resolve mapping — use saved mapping only (business-level or per-source)
+    raw_biz_full = source.business.import_mapping or {}
+    # Handle nested format: extract onedrive key
+    is_nested = any(k in raw_biz_full for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
+    raw_biz = raw_biz_full.get('onedrive', {}) if is_nested else raw_biz_full
+    raw_source = source.last_column_mapping or {}
+
+    # Detect format: if keys are numeric strings it's old index-based, convert to header-name
+    biz_mapping = {}
+    if raw_biz:
+        if all(str(k).isdigit() for k in raw_biz):
+            for col_idx_str, db_field in raw_biz.items():
+                if db_field:
+                    idx = int(col_idx_str)
+                    if idx < len(header_row) and header_row[idx]:
+                        biz_mapping[db_field] = header_row[idx]
+        else:
+            biz_mapping = raw_biz  # already {db_field: header_name}
+    elif raw_source:
+        # Per-source mapping: convert index-based {col_idx_str: db_field} → {db_field: header_name}
+        for col_idx_str, db_field in raw_source.items():
+            if db_field:
+                idx = int(col_idx_str)
+                if idx < len(header_row) and header_row[idx]:
+                    biz_mapping[db_field] = header_row[idx]
+
+    if not biz_mapping:
+        logger.info("OneDrive sync skipped for '%s' (source: %s): no saved mapping configured.",
+                     source.business.business_name, source.label)
+        return 0, 0
+
+    # Validate: skip if required mapped headers are missing from the sheet
+    missing = {db_f: hname for db_f, hname in biz_mapping.items() if col_idx_by_header(hname) is None}
+    if missing:
+        REQUIRED_FIELDS = {'customer_name', 'customer_phone', 'customer_address'}
+        missing_required = {f: h for f, h in missing.items() if f in REQUIRED_FIELDS}
+        if missing_required:
+            msg = (
+                f"OneDrive sync SKIPPED for '{source.business.business_name}' (source: {source.label}): "
+                f"required headers changed — {missing_required}. "
+                f"Please update the import mapping in Mapping Manager."
+            )
+            logger.error(msg)
+            raise RuntimeError(msg)
+        else:
+            logger.warning(
+                "OneDrive mapping mismatch for '%s' (source: %s): headers %s not found in sheet '%s'. "
+                "Non-required fields will be empty. Please update the import mapping.",
+                source.business.business_name, source.label, list(missing.values()), sheet_name,
+            )
+
+    # Build field_map: {db_field: col_idx} via header-name lookup
+    field_map = {}
+    for db_field, header_name in biz_mapping.items():
+        idx = col_idx_by_header(header_name)
+        if idx is not None:
+            field_map[db_field] = idx
+
     def get_cell(row_data, field_name):
-        for idx, f in field_map.items():
-            if f == field_name and idx < len(row_data):
-                val = row_data[idx]
-                return str(val).strip() if val is not None else ''
+        idx = field_map.get(field_name)
+        if idx is not None and idx < len(row_data):
+            val = row_data[idx]
+            return str(val).strip() if val is not None else ''
         return ''
 
     def get_cell_raw(row_data, field_name):
         """Return raw cell value (preserves datetime objects)."""
-        for idx, f in field_map.items():
-            if f == field_name and idx < len(row_data):
-                return row_data[idx]
+        idx = field_map.get(field_name)
+        if idx is not None and idx < len(row_data):
+            return row_data[idx]
         return ''
 
     existing = {
@@ -417,34 +496,80 @@ def _sync_google_sheet_source(api_settings):
     headers = all_values[0]
     data_rows = all_values[1:]
 
-    # Column mapping
-    saved_mapping = api_settings.column_mapping or {}
+    # Column mapping — use saved mapping only (business-level or per-source)
+    raw_biz_full = api_settings.business.import_mapping or {}
+    # Handle nested format: extract google_sheet key
+    is_nested = any(k in raw_biz_full for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
+    raw_biz = raw_biz_full.get('google_sheet', {}) if is_nested else raw_biz_full
+    saved_mapping = api_settings.column_mapping or {}     # {db_field: col_header_name}
+
+    if not raw_biz and not saved_mapping:
+        logger.info("Google Sheet sync skipped for '%s': no saved mapping configured.", api_settings.business.business_name)
+        return 0, 0
 
     def col_idx_by_header(header_name):
         for j, h in enumerate(headers):
-            if h.strip() == header_name.strip():
+            if h.strip().lower() == header_name.strip().lower():
                 return j
         return None
 
-    def col_idx_auto(*keys):
-        for k in keys:
-            for j, h in enumerate(headers):
-                if h.strip().lower() == k.lower():
-                    return j
-        return None
+    # Resolve business mapping to {db_field: col_idx} via header-name lookup
+    # If keys are numeric (old index-based format), validate against sheet column count
+    biz_field_to_idx = {}
+    if raw_biz:
+        if all(str(k).isdigit() for k in raw_biz):
+            # Old index-based format {col_idx_str: db_field} — validate and warn if mismatch
+            sheet_col_count = len(headers)
+            max_idx = max((int(k) for k in raw_biz), default=-1)
+            if max_idx >= sheet_col_count:
+                logger.warning(
+                    "Column mapping mismatch for Google Sheet of '%s': mapping references column %d "
+                    "but sheet only has %d column(s). Please update the import mapping.",
+                    api_settings.business.business_name, max_idx, sheet_col_count,
+                )
+            else:
+                biz_field_to_idx = {db_field: int(col_idx) for col_idx, db_field in raw_biz.items() if db_field}
+        else:
+            # New header-name format {db_field: header_name} — resolve via col_idx_by_header
+            for db_field, header_name in raw_biz.items():
+                idx = col_idx_by_header(header_name)
+                if idx is not None:
+                    biz_field_to_idx[db_field] = idx
+                else:
+                    logger.warning(
+                        "Google Sheet mapping mismatch for '%s': header '%s' not found in sheet. "
+                        "Please update the import mapping to match this sheet's columns.",
+                        api_settings.business.business_name, header_name,
+                    )
 
-    def get_idx(field_name, *auto_keys):
+    def get_idx(field_name):
+        # 1. Shared business mapping (most authoritative)
+        if field_name in biz_field_to_idx:
+            return biz_field_to_idx[field_name]
+        # 2. Per-source mapping by header name
         if field_name in saved_mapping:
             return col_idx_by_header(saved_mapping[field_name])
-        return col_idx_auto(*auto_keys)
+        return None
 
-    idx_name = get_idx('customer_name', 'name', 'customer name', 'customer', 'first name')
-    idx_phone = get_idx('customer_phone', 'phone', 'mobile', 'phone number', 'contact')
-    idx_address = get_idx('customer_address', 'address', 'delivery address', 'location', 'area', 'city')
-    idx_cod = get_idx('cod_amount', 'cod', 'amount', 'cod amount', 'price', 'total', 'total charge')
-    idx_date = get_idx('order_date', 'date', 'order date', 'created', 'created at')
-    idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id', 'ref')
-    idx_product = get_idx('package_desc', 'product', 'product name', 'item', 'package desc')
+    idx_name = get_idx('customer_name')
+    idx_phone = get_idx('customer_phone')
+    idx_address = get_idx('customer_address')
+    idx_cod = get_idx('cod_amount')
+    idx_date = get_idx('order_date')
+    idx_order = get_idx('client_order_code')
+    idx_product = get_idx('package_desc')
+
+    # Validate required fields are mapped
+    required_check = {'customer_name': idx_name, 'customer_phone': idx_phone, 'customer_address': idx_address}
+    missing_required = {f: f for f, idx in required_check.items() if idx is None}
+    if missing_required:
+        msg = (
+            f"Google Sheet sync SKIPPED for '{api_settings.business.business_name}': "
+            f"required column headers changed — {list(missing_required.keys())}. "
+            f"Please update the import mapping in Mapping Manager."
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
 
     def cell(row, idx):
         if idx is not None and idx < len(row):
@@ -620,13 +745,14 @@ def _sync_api_source(api_settings):
         defaults = {
             'business': business,
             'source_type': api_type,
-            'client_order_code': o.get('name', ''),
-            'customer_name': o.get('customer', ''),
+            'client_order_code': o.get('order_id', '') or o.get('platform_id', ''),
+            'customer_name': o.get('customer', '') or o.get('name', ''),
             'customer_phone': o.get('phone', ''),
             'customer_address': o.get('address', ''),
             'cod_amount': str(o.get('cod', '')) if o.get('cod') else '',
             'order_date': _convert_excel_date(o.get('date', '')),
-            'package_desc': '',
+            'package_desc': o.get('package_desc', ''),
+            'financial_status': o.get('financial_status', ''),
             'raw_row': o,
             'status': status,
         }
@@ -692,15 +818,21 @@ def _fetch_shopify_orders(api_settings):
                     first = getattr(cust, 'first_name', '') or ''
                     last = getattr(cust, 'last_name', '') or ''
                     customer_name = f"{first} {last}".strip()
+            fin_status = getattr(o, 'financial_status', '') or ''
             row = {
                 'platform_id': str(o.id),
                 'order_id': o.name,
                 'name': customer_name or (getattr(o, 'contact_email', '') or ''),
                 'customer': customer_name or (getattr(o, 'contact_email', '') or ''),
                 'phone': getattr(ship, 'phone', '') if ship else '',
-                'address': getattr(ship, 'address1', '') if ship else '',
-                'cod': o.total_price,
+                'address': ', '.join(filter(None, [
+                    getattr(ship, 'address1', '') or '',
+                    getattr(ship, 'address2', '') or '',
+                ])) if ship else '',
+                'cod': '' if fin_status == 'paid' else o.total_price,
+                'total_price': o.total_price,
                 'date': o.created_at,
+                'financial_status': fin_status,
                 'source': 'shopify',
                 'line_items': items_data,
             }
@@ -907,23 +1039,67 @@ def _sync_public_link_source(source):
 
     resp = requests.get(source.url, timeout=30)
     resp.raise_for_status()
+    resp.encoding = resp.apparent_encoding or 'utf-8'
 
     headers, rows = _parse_html_table(resp.text)
     if not headers or not rows:
         return 0, 0
 
-    # Auto-map headers
-    mapping = _auto_map_headers(headers)
-    if not mapping:
-        raise RuntimeError(f"Could not auto-map any columns from headers: {headers}")
+    # Use saved mapping only — skip if no mapping configured
+    raw_biz = source.business.import_mapping or {}
+    # Handle nested format: extract public_link key
+    is_nested = any(k in raw_biz for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
+    business_mapping = raw_biz.get('public_link', {}) if is_nested else raw_biz
+    source_mapping = source.last_column_mapping or {}
+    if business_mapping:
+        mapping = business_mapping
+    elif source_mapping:
+        mapping = source_mapping
+    else:
+        logger.info("Public link sync skipped for '%s': no saved mapping configured.", source.label)
+        return 0, 0
 
-    # Save mapping and headers back to source
-    source.last_column_mapping = mapping
+    # Save headers back to source
     source.last_headers = headers
     source.last_sync_at = timezone.now()
 
     # Build field_map: col_idx(int) -> db_field
-    field_map = {int(k): v for k, v in mapping.items() if v}
+    # Handle two formats:
+    #   Old: {col_idx_str: db_field}  e.g. {'0': 'client_order_code'}
+    #   New: {db_field: header_name}  e.g. {'client_order_code': 'Order ID'}
+    field_map = {}
+    is_old_format = mapping and all(str(k).isdigit() for k in mapping)
+    if is_old_format:
+        for k, v in mapping.items():
+            if v and str(k).isdigit():
+                field_map[int(k)] = v
+    else:
+        # New format — resolve header_name to column index
+        header_lower = [h.lower() for h in headers]
+        idx_mapping = {}
+        for db_field, header_name in mapping.items():
+            if db_field and header_name:
+                try:
+                    idx = header_lower.index(str(header_name).lower())
+                    field_map[idx] = db_field
+                    idx_mapping[str(idx)] = db_field
+                except ValueError:
+                    pass
+        # Save resolved index-based mapping to source
+        if idx_mapping:
+            source.last_column_mapping = idx_mapping
+
+    # Validate required fields are mapped
+    mapped_fields = set(field_map.values())
+    missing_required = {'customer_name', 'customer_phone', 'customer_address'} - mapped_fields
+    if missing_required:
+        msg = (
+            f"Public link sync SKIPPED for '{source.label}' ({source.business.business_name}): "
+            f"required columns not mapped — {list(missing_required)}. "
+            f"Please update the import mapping in Mapping Manager."
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
 
     def get_cell(row_data, field_name):
         for idx, f in field_map.items():
@@ -932,11 +1108,11 @@ def _sync_public_link_source(source):
                 return str(val).strip() if val else ''
         return ''
 
-    # Existing temp orders for this source
-    existing = {
-        to.row_num: to
-        for to in TempOrder.objects.filter(source_type='public_link', public_link_source=source)
-    }
+    # Existing temp orders for this source — indexed by BOTH row_num and client_order_code
+    # (page may shift row numbers when old orders fall off the top)
+    existing_temp = list(TempOrder.objects.filter(source_type='public_link', public_link_source=source))
+    existing_by_row = {to.row_num: to for to in existing_temp}
+    existing_by_code = {to.client_order_code: to for to in existing_temp if to.client_order_code}
 
     # Check which client codes are already imported
     all_codes = [get_cell(r, 'client_order_code') for r in rows]
@@ -965,15 +1141,20 @@ def _sync_public_link_source(source):
         if not customer_name and not customer_phone:
             continue
 
+        client_code = get_cell(row_data, 'client_order_code')
+
+        # Match existing TempOrder by client_order_code first (handles row shifts),
+        # then fall back to row_num for rows without a code.
+        existing_to = existing_by_code.get(client_code) if client_code else existing_by_row.get(row_num)
+
         # Check if already imported in temp_orders table
-        if row_num in existing and existing[row_num].status == 'imported':
+        if existing_to and existing_to.status == 'imported':
             consecutive_imported += 1
             if consecutive_imported >= 10:
                 break
             continue
         consecutive_imported = 0
 
-        client_code = get_cell(row_data, 'client_order_code')
         already_imported = client_code and client_code in imported_codes
 
         status = 'imported' if already_imported else 'new'
@@ -1011,18 +1192,17 @@ def _sync_public_link_source(source):
 
         seen_row_nums.add(row_num)
 
-        if row_num in existing:
-            temp_order = existing[row_num]
+        if existing_to:
             # Don't reset status if already marked as imported
-            if temp_order.status == 'imported':
+            if existing_to.status == 'imported':
                 defaults.pop('status', None)
             changed = False
             for key, val in defaults.items():
-                if getattr(temp_order, key) != val:
-                    setattr(temp_order, key, val)
+                if getattr(existing_to, key) != val:
+                    setattr(existing_to, key, val)
                     changed = True
             if changed:
-                temp_order.save()
+                existing_to.save()
                 updated += 1
         else:
             TempOrder.objects.create(

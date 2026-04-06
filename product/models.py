@@ -110,13 +110,13 @@ class UnitVariant(models.Model):
 
 class Product(models.Model):
     product_id = models.CharField(
-        max_length=6,
+        max_length=15,
         unique=True,
         editable=False,
         db_index=True,
         null=True,
         blank=True,
-        help_text="6-digit unique product identifier (last 2 digits from business code)"
+        help_text="Unique product identifier: {business_pk}-{5-digit-counter} (e.g. 3-00001)"
     )  # Unique, non-editable product ID for inventory tracking
     brand_name = models.CharField(max_length=100)
     item_name = models.CharField(max_length=100)
@@ -164,58 +164,52 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Override save to auto-generate unique 6-digit product_id.
-        Format: {4-digit-counter}{2-digit-business-code}
-        Example: 000101, 000212, 123456
+        Override save to auto-generate unique product_id.
+        Format: {business_pk}-{5-digit-counter}
+        Example: 3-00001, 12-00045
 
-        - First 4 digits: Sequential counter (0001-9999)
-        - Last 2 digits: Last 2 digits from business_id
+        - Prefix: business primary key (scoped per business, no collisions)
+        - Counter: 5-digit sequential (00001-99999) per business
+        - Products without a business use prefix "0"
         """
         if not self.product_id:
-            from django.db.models import Max
+            biz_pk = self.business.pk if self.business else 0
+            prefix = str(biz_pk)
 
-            # Get last 2 digits from business_id
-            if self.business and self.business.business_id:
-                # Extract only digits from business_id and take last 2
-                business_digits = ''.join(filter(str.isdigit, str(self.business.business_id)))
-                business_suffix = business_digits[-2:].zfill(2) if business_digits else "00"
-            else:
-                business_suffix = "00"
+            # Find highest counter for this business
+            existing = Product.objects.filter(
+                product_id__startswith=f"{prefix}-"
+            ).order_by('-product_id')
 
-            # Find the highest product_id with this business suffix
-            suffix_pattern = f"_____{business_suffix}"  # 5 chars + suffix
-            last_product = Product.objects.filter(
-                product_id__endswith=business_suffix
-            ).order_by('-product_id').first()
-
-            if last_product and len(last_product.product_id) == 6:
-                # Extract the 4-digit counter from existing product_id
+            counter = 1
+            if existing.exists():
+                last_id = existing.first().product_id
                 try:
-                    last_counter = int(last_product.product_id[:4])
+                    last_counter = int(last_id.split('-', 1)[1])
                     counter = last_counter + 1
-                    # If counter exceeds 9999, wrap to 0001
-                    if counter > 9999:
-                        counter = 1
                 except (ValueError, IndexError):
                     counter = 1
-            else:
-                counter = 1
 
-            # Generate 6-digit product_id: {counter:04d}{business_suffix}
-            self.product_id = f"{counter:04d}{business_suffix}"
+            self.product_id = f"{prefix}-{counter:05d}"
 
-            # Ensure uniqueness (in case of race condition)
-            max_attempts = 9999
+            # Ensure uniqueness (race condition guard)
+            max_attempts = 99999
             attempts = 0
             while Product.objects.filter(product_id=self.product_id).exists() and attempts < max_attempts:
                 counter += 1
-                if counter > 9999:
-                    counter = 1
-                self.product_id = f"{counter:04d}{business_suffix}"
+                self.product_id = f"{prefix}-{counter:05d}"
                 attempts += 1
 
             if attempts >= max_attempts:
-                raise ValueError(f"Unable to generate unique product_id for business suffix {business_suffix}")
+                raise ValueError(f"Unable to generate unique product_id for business {biz_pk}")
+
+        # Require item_sku for businesses with fulfillment enabled
+        if self.business and getattr(self.business, 'fulfillment_service_enabled', False):
+            if not self.item_sku or not self.item_sku.strip():
+                raise ValueError(
+                    "SKU is required for products in fulfillment-enabled businesses. "
+                    "Please provide a valid item_sku."
+                )
 
         super().save(*args, **kwargs)
 
@@ -260,3 +254,71 @@ class services(models.Model):
 
     class Meta:
         verbose_name_plural = "Services"
+
+
+# =============================================================================
+# PRODUCT COMBOS / BUNDLES
+# =============================================================================
+
+
+class ProductCombo(models.Model):
+    """
+    A bundle/combo of multiple products that can be quickly added to orders.
+
+    Fields:
+        - combo_name: Display name for the combo
+        - combo_sku: Optional SKU for the bundle
+        - combo_price: Override price (if different from sum of items)
+        - is_active: Whether the combo is available
+
+    Related:
+        - ProductComboItem: Individual products in the combo
+        - business.models.Business: Owner business
+    """
+    business = models.ForeignKey(
+        'business.Business', on_delete=models.CASCADE, related_name='product_combos')
+    combo_name = models.CharField(max_length=200)
+    combo_sku = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    description = models.TextField(blank=True, default='')
+    combo_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Bundle price (if different from sum of items)")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'product_combo'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.combo_name
+
+    @property
+    def total_items_price(self):
+        return sum(
+            item.product.item_price * item.quantity
+            for item in self.items.select_related('product').all()
+            if item.product.item_price
+        )
+
+
+class ProductComboItem(models.Model):
+    """
+    A single product entry within a ProductCombo.
+
+    Fields:
+        - combo: Parent combo
+        - product: The product included
+        - quantity: How many of this product in the combo
+    """
+    combo = models.ForeignKey(ProductCombo, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='combo_memberships')
+    quantity = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        db_table = 'product_comboitem'
+        unique_together = ('combo', 'product')
+
+    def __str__(self):
+        return f"{self.quantity}x {self.product.item_name}"

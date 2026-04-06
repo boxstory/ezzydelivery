@@ -23,13 +23,16 @@
                 </h1>
                 <p class="bim__subtitle">Upload and import multiple orders at once</p>
             </div>
-            {% if request.user.is_staff %}
             <div class="bim__hero-right">
+                <a href="{% url 'orders:orders_all_list' %}" class="btn btn-outline-light btn-sm">
+                    <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
+                </a>
+                {% if request.user.is_staff %}
                 <a href="{% url 'workforce:import_history' %}?source=csv_upload" class="btn btn-outline-light btn-sm">
                     <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
                 </a>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
 
@@ -71,13 +74,22 @@
                             <label for="businessSelect" class="bim__field-label">
                                 <i class="fa-solid fa-store"></i> Select Seller <span class="bim__required">*</span>
                             </label>
-                            <select id="businessSelect" name="business" class="form-select" required>
+                            <select id="businessSelect" name="business" class="form-select" required onchange="bimLoadPickupLocations(this.value)">
                                 <option value="">-- Select a Seller --</option>
                                 {% for biz in businesses %}
                                     <option value="{{ biz.business_id }}">
                                         {{ biz.business_name }} ({{ biz.business_code }})
                                     </option>
                                 {% endfor %}
+                            </select>
+                        </div>
+                        <!-- Staff: Pickup Location (dynamic) -->
+                        <div class="bim__field-group" id="pickupLocationGroup" style="display:none;">
+                            <label for="pickupLocationSelect" class="bim__field-label">
+                                <i class="fa-solid fa-warehouse"></i> Pickup Location <span class="bim__required">*</span>
+                            </label>
+                            <select id="pickupLocationSelect" name="pickup_location" class="form-select">
+                                <option value="">-- Select Pickup Location --</option>
                             </select>
                         </div>
                         {% else %}
@@ -90,6 +102,21 @@
                             <div class="bim__biz-code">Code: {{ business.business_code }}</div>
                             <input type="hidden" id="businessId" value="{{ business.business_id }}">
                         </div>
+                        <!-- Client: Pickup Location -->
+                        {% if pickup_locations %}
+                        <div class="bim__field-group">
+                            <label for="pickupLocationSelect" class="bim__field-label">
+                                <i class="fa-solid fa-warehouse"></i> Pickup Location
+                            </label>
+                            <select id="pickupLocationSelect" name="pickup_location" class="form-select">
+                                {% for loc in pickup_locations %}
+                                    <option value="{{ loc.id }}"{% if forloop.first %} selected{% endif %}>
+                                        {{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                         {% endif %}
 
                         <!-- File Upload Zone -->
@@ -461,6 +488,34 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// ── Pickup Location dynamic loader (staff only) ──
+function bimLoadPickupLocations(businessId) {
+    const group = document.getElementById('pickupLocationGroup');
+    const select = document.getElementById('pickupLocationSelect');
+    if (!group || !select) return;
+    if (!businessId) { group.style.display = 'none'; return; }
+    fetch(`/workforce/api/pickup-locations/${businessId}/`)
+        .then(r => r.json())
+        .then(data => {
+            select.innerHTML = '<option value="">-- Select Pickup Location --</option>';
+            if (data.success && data.locations.length) {
+                data.locations.forEach(loc => {
+                    const opt = document.createElement('option');
+                    opt.value = loc.id;
+                    opt.textContent = loc.name + (loc.address ? ' — ' + loc.address : '');
+                    if (loc.is_fulfilment_center) opt.selected = true;
+                    select.appendChild(opt);
+                });
+                // Auto-select first if none pre-selected
+                if (!select.value) select.options[1] && (select.options[1].selected = true);
+                group.style.display = '';
+            } else {
+                group.style.display = 'none';
+            }
+        })
+        .catch(() => { group.style.display = 'none'; });
+}
+
 function clearFile() {
     fileInput.value = '';
     fileInfo.classList.remove('visible');
@@ -489,6 +544,11 @@ function getSelectedBusinessId() {
         return businessIdInput.value;
     }
     return null;
+}
+
+function getPickupLocationId() {
+    const sel = document.getElementById('pickupLocationSelect');
+    return sel ? sel.value : null;
 }
 
 function goToStep(step) {
@@ -671,7 +731,7 @@ function buildPreviewTable() {
         bodyHtml += `<tr data-row-index="${index}"><td>${index + 1}</td>`;
         visibleFields.forEach(field => {
             const value = row[field.name] || '';
-            bodyHtml += `<td contenteditable="true" data-field="${field.name}">${value}</td>`;
+            bodyHtml += `<td contenteditable="true" data-field="${field.name}">${escapeHtml(value)}</td>`;
         });
         bodyHtml += '</tr>';
     });
@@ -723,6 +783,7 @@ async function saveOrders() {
                     row: row,
                     row_index: i,
                     business_id: businessId,
+                    pickup_location_id: getPickupLocationId(),
                     import_log_id: uploadedData.import_log_id
                 })
             });
@@ -912,6 +973,7 @@ async function retryFailedOrders() {
                     row: row,
                     row_index: row._originalIndex,
                     business_id: businessId,
+                    pickup_location_id: getPickupLocationId(),
                     import_log_id: uploadedData.import_log_id
                 })
             });

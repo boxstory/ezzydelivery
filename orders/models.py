@@ -26,7 +26,6 @@ from delivery import models as delivery_models
 from core import models as core_models
 from fleet import models as fleet_models
 from business import models as business_models
-from orders import models as orders_models
 from webpages import models as webpages_models
 from product import models as product_models
 
@@ -107,15 +106,31 @@ class Order(models.Model):
         max_length=100, choices=COD_STATUS_BY_CLIENT, blank=True, null=True)
     cod_status_by_staff = models.CharField(
         max_length=100, choices=COD_STATUS_BY_STAFF, blank=True, null=True)
-    cod_amount = models.IntegerField(default=0)
+    cod_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     dl_included = models.BooleanField(default=True)
-    dl_amount = models.IntegerField(default=0)
+    dl_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     order_type = models.CharField(
         max_length=20, choices=ORDER_TYPE_CHOICES, default='normal_delivery',
         help_text="Order type: normal delivery or pick and drop")
     scheduled_delivery = models.BooleanField(default=False, help_text="Whether delivery is scheduled for a specific time")
     scheduled_date = models.DateField(blank=True, null=True, help_text="Scheduled delivery date if scheduled_delivery is True")
     scheduled_time = models.TimeField(blank=True, null=True, help_text="Scheduled delivery time if scheduled_delivery is True")
+
+    # Preferred delivery time slot
+    TIME_SLOT_CHOICES = [
+        ('', 'No Preference'),
+        ('morning', 'Morning (8 AM - 12 PM)'),
+        ('afternoon', 'Afternoon (12 PM - 4 PM)'),
+        ('evening', 'Evening (4 PM - 8 PM)'),
+        ('night', 'Night (8 PM - 10 PM)'),
+    ]
+    preferred_time_slot = models.CharField(
+        max_length=20, choices=TIME_SLOT_CHOICES, blank=True, default='',
+        help_text="Customer's preferred delivery time window")
+
+    # COD lock — prevents staff editing cod_amount after driver collects
+    cod_amount_locked = models.BooleanField(default=False,
+        help_text="True after driver collects COD — prevents amount edits")
 
     # Verification tracking
     VERIFICATION_STATUS = (
@@ -176,7 +191,7 @@ class Order(models.Model):
     customer_name = models.CharField(max_length=100, blank=True)
     customer_phone = models.CharField(max_length=100, blank=True)
     customer_whatsapp = models.CharField(max_length=100, blank=True)
-    customer_address = models.CharField(max_length=100, blank=True)
+    customer_address = models.CharField(max_length=255, blank=True)
     deadline_date = models.CharField(max_length=100, blank=True)
     order_date = models.DateField(auto_now_add=True)
     dl_zone = models.PositiveIntegerField(blank=True, null=True, default=None)
@@ -300,6 +315,44 @@ class Order(models.Model):
                 parts.append(f'{item.notes} x{item.quantity}')
         return ', '.join(parts) if parts else ''
 
+    @property
+    def stock_flag(self):
+        """
+        Check stock availability for this order's items.
+        Only applicable for businesses with fulfillment_service_enabled.
+        Returns: 'ok', 'low_stock', 'out_of_stock', or None (no fulfillment)
+        """
+        if not self.business or not getattr(self.business, 'fulfillment_service_enabled', False):
+            return None
+
+        from warehouse import models as wh_models
+        linked_warehouse_ids = list(
+            wh_models.SellerWarehouseLink.objects.filter(
+                business=self.business, is_active=True
+            ).values_list('warehouse_id', flat=True)
+        )
+        if not linked_warehouse_ids:
+            return None
+
+        items = getattr(self, '_prefetched_objects_cache', {}).get('order_items')
+        if items is None:
+            items = self.order_items.select_related('product').all()
+
+        has_low = False
+        for item in items:
+            if not item.product:
+                continue
+            stock = wh_models.StockLevel.objects.filter(
+                product=item.product,
+                warehouse_id__in=linked_warehouse_ids
+            ).first()
+            if not stock or stock.quantity_available <= 0:
+                return 'out_of_stock'
+            if stock.quantity_available < item.quantity:
+                has_low = True
+
+        return 'low_stock' if has_low else 'ok'
+
     def __str__(self):
         return f'({self.business}-{self.order_number}-{self.client_order_code})'
 
@@ -332,7 +385,7 @@ class OrderLog(models.Model):
 
 class OrderComments(models.Model):
     order =  models.ForeignKey(
-        orders_models.Order, on_delete=models.CASCADE, related_name='order_comments')
+        Order, on_delete=models.CASCADE, related_name='order_comments')
     name = models.CharField(max_length=255, blank=True, null=True,)
     body =  models.TextField()
 
@@ -356,7 +409,7 @@ def upload_path_handler(instance, filename):
 
 class OrderBarcode(models.Model):
     order =  models.ForeignKey(
-        orders_models.Order, on_delete=models.CASCADE, related_name='order_barcode')
+        Order, on_delete=models.CASCADE, related_name='order_barcode')
     order_number = models.CharField(max_length=255, blank=True, null=True,)
     barcode =  models.ImageField(
         upload_to="business/orders/", default="business/orders/barcode.png", blank=True, null=True)
@@ -391,11 +444,23 @@ class OrderBarcode(models.Model):
 
 class OrderItem(models.Model):
     """Individual items in an order (replaces OrderProductList with proper many-to-many)"""
+    ITEM_DELIVERY_STATUS = [
+        ('pending', 'Pending'),
+        ('delivered', 'Delivered'),
+        ('returned', 'Returned'),
+        ('partial', 'Partially Returned'),
+    ]
+
     order = models.ForeignKey(
-        orders_models.Order, on_delete=models.CASCADE, related_name='order_items')
+        Order, on_delete=models.CASCADE, related_name='order_items')
     product = models.ForeignKey(
         product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
+    quantity_delivered = models.PositiveIntegerField(default=0, help_text="Quantity actually delivered to customer")
+    quantity_returned = models.PositiveIntegerField(default=0, help_text="Quantity returned by customer")
+    delivery_status = models.CharField(
+        max_length=20, choices=ITEM_DELIVERY_STATUS, default='pending', db_index=True
+    )
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     notes = models.CharField(max_length=255, blank=True, null=True)
@@ -407,6 +472,18 @@ class OrderItem(models.Model):
         # Auto-calculate total_price if unit_price and quantity are provided
         if self.unit_price and self.quantity:
             self.total_price = self.unit_price * self.quantity
+
+        # Validate product belongs to order's business (fulfillment only)
+        if self.product and self.order_id:
+            business = self.order.business
+            if business and getattr(business, 'fulfillment_service_enabled', False):
+                # Product must belong to the same business
+                if self.product.business_id and self.product.business_id != business.pk:
+                    raise ValueError(
+                        f"Product '{self.product}' belongs to a different business. "
+                        f"Only products from '{business.business_name}' are allowed."
+                    )
+
         super().save(*args, **kwargs)
 
     @property
@@ -539,7 +616,7 @@ class AddressVerification(models.Model):
     def generate_token(self):
         """Generate a unique verification token"""
         import secrets
-        self.verification_token = secrets.token_urlsafe(4)
+        self.verification_token = secrets.token_urlsafe(32)
         from django.utils import timezone
         from datetime import timedelta
         self.token_expires_at = timezone.now() + timedelta(days=7)  # Token valid for 7 days
@@ -565,6 +642,10 @@ class OneDriveSource(models.Model):
     last_import_max_row = models.PositiveIntegerField(default=0)
     last_imported_rows = models.JSONField(default=list, blank=True, help_text="List of row numbers imported in last batch")
     last_column_mapping = models.JSONField(default=dict, blank=True)
+    last_headers = models.JSONField(default=list, blank=True,
+        help_text="Column headers from last sync/fetch")
+    is_default_mapping = models.BooleanField(default=False,
+        help_text="Default source for mapping manager — headers loaded on page open")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -899,3 +980,62 @@ class ImportLog(models.Model):
                 cells = [str(row)]
             result.append([str(c) if c else '' for c in cells])
         return result
+
+
+# =============================================================================
+# RETURNS MANAGEMENT
+# =============================================================================
+
+class ReturnRequest(models.Model):
+    """Track return requests for delivered orders."""
+    RETURN_REASON_CHOICES = [
+        ('wrong_item', 'Wrong Item Received'),
+        ('damaged', 'Item Damaged'),
+        ('not_as_described', 'Not As Described'),
+        ('customer_changed_mind', 'Customer Changed Mind'),
+        ('duplicate_order', 'Duplicate Order'),
+        ('other', 'Other'),
+    ]
+    RETURN_STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('pickup_scheduled', 'Pickup Scheduled'),
+        ('picked_up', 'Picked Up'),
+        ('received', 'Received'),
+        ('refunded', 'Refunded'),
+        ('closed', 'Closed'),
+    ]
+    return_number = models.CharField(max_length=64, unique=True, db_index=True)
+    order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='return_requests')
+    business = models.ForeignKey('business.Business', on_delete=models.CASCADE, related_name='return_requests')
+    reason = models.CharField(max_length=30, choices=RETURN_REASON_CHOICES)
+    reason_notes = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=RETURN_STATUS_CHOICES, default='pending', db_index=True)
+    cod_reversal_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cod_reversal_processed = models.BooleanField(default=False)
+    reviewed_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_returns')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'orders_returnrequest'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"RET-{self.return_number}"
+
+
+class ReturnItem(models.Model):
+    """Individual items being returned as part of a ReturnRequest."""
+    return_request = models.ForeignKey(ReturnRequest, on_delete=models.CASCADE, related_name='return_items')
+    order_item = models.ForeignKey('OrderItem', on_delete=models.CASCADE, related_name='return_items')
+    quantity_returned = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        db_table = 'orders_returnitem'
+
+    def __str__(self):
+        return f"{self.return_request} - {self.order_item} x{self.quantity_returned}"

@@ -1,0 +1,154 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block head_title %}Tracking Page Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+
+      <!-- Page Header -->
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+          <h1 class="h4 mb-1 fw-bold">Tracking Page Settings</h1>
+          <p class="text-muted mb-0">Customize the branded tracking page your customers see when they track their orders.</p>
+        </div>
+        {% if sample_url %}
+        <a href="{{ sample_url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+          <i class="fa-solid fa-external-link-alt me-1"></i> Preview
+        </a>
+        {% endif %}
+      </div>
+
+      {% if messages %}
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      <form method="post" action="{% url 'business:branded_tracking_settings' %}">
+        {% csrf_token %}
+
+        <!-- Active Toggle -->
+        <div class="card mb-3">
+          <div class="card-body d-flex align-items-center justify-content-between">
+            <div>
+              <h6 class="mb-1 fw-bold">Enable Tracking Page</h6>
+              <p class="text-muted mb-0 small">When enabled, customers can view their delivery status via a tracking link.</p>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_active" id="id_is_active"
+                     {% if config.is_active %}checked{% endif %} style="width:3rem; height:1.5rem;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Brand Colors -->
+        <div class="card mb-3">
+          <div class="card-header bg-transparent">
+            <h6 class="mb-0 fw-bold"><i class="fa-solid fa-palette me-2"></i>Brand Colors</h6>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-6">
+                <label for="id_primary_color" class="form-label fw-semibold">Primary Color</label>
+                <div class="d-flex align-items-center gap-2">
+                  <input type="color" class="form-control form-control-color" name="primary_color"
+                         id="id_primary_color" value="{{ config.primary_color }}" style="width:50px; height:40px;">
+                  <input type="text" class="form-control form-control-sm" value="{{ config.primary_color }}"
+                         id="id_primary_color_text" maxlength="7" style="max-width:100px;"
+                         oninput="document.getElementById('id_primary_color').value=this.value">
+                </div>
+                <small class="text-muted">Header, buttons, accents</small>
+              </div>
+              <div class="col-6">
+                <label for="id_secondary_color" class="form-label fw-semibold">Secondary Color</label>
+                <div class="d-flex align-items-center gap-2">
+                  <input type="color" class="form-control form-control-color" name="secondary_color"
+                         id="id_secondary_color" value="{{ config.secondary_color }}" style="width:50px; height:40px;">
+                  <input type="text" class="form-control form-control-sm" value="{{ config.secondary_color }}"
+                         id="id_secondary_color_text" maxlength="7" style="max-width:100px;"
+                         oninput="document.getElementById('id_secondary_color').value=this.value">
+                </div>
+                <small class="text-muted">Background, text</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display Options -->
+        <div class="card mb-3">
+          <div class="card-header bg-transparent">
+            <h6 class="mb-0 fw-bold"><i class="fa-solid fa-eye me-2"></i>Display Options</h6>
+          </div>
+          <div class="card-body">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="show_driver_name" id="id_show_driver_name"
+                     {% if config.show_driver_name %}checked{% endif %}>
+              <label class="form-check-label" for="id_show_driver_name">Show driver name</label>
+            </div>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="show_driver_phone" id="id_show_driver_phone"
+                     {% if config.show_driver_phone %}checked{% endif %}>
+              <label class="form-check-label" for="id_show_driver_phone">Show driver phone number</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="show_eta" id="id_show_eta"
+                     {% if config.show_eta %}checked{% endif %}>
+              <label class="form-check-label" for="id_show_eta">Show estimated delivery time</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Footer -->
+        <div class="card mb-3">
+          <div class="card-header bg-transparent">
+            <h6 class="mb-0 fw-bold"><i class="fa-solid fa-quote-right me-2"></i>Custom Footer</h6>
+          </div>
+          <div class="card-body">
+            <label for="id_custom_footer_text" class="form-label">Footer message shown on the tracking page</label>
+            <input type="text" class="form-control" name="custom_footer_text" id="id_custom_footer_text"
+                   value="{{ config.custom_footer_text }}" maxlength="255"
+                   placeholder="e.g. Thank you for ordering from our store!">
+            <small class="text-muted">Leave empty for default: "Thank you for choosing [Business Name]"</small>
+          </div>
+        </div>
+
+        <!-- How it works -->
+        <div class="card mb-3 border-0 bg-light">
+          <div class="card-body">
+            <h6 class="fw-bold mb-2"><i class="fa-solid fa-circle-info me-2 text-primary"></i>How It Works</h6>
+            <ol class="mb-0 small text-muted ps-3">
+              <li class="mb-1">Every delivery task gets a unique tracking link automatically.</li>
+              <li class="mb-1">Share the link with customers via WhatsApp from the order details page.</li>
+              <li class="mb-1">Customers see a branded page with live delivery status and driver location.</li>
+              <li>The page auto-refreshes every 30 seconds with the latest GPS data.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="fa-solid fa-save me-1"></i> Save Settings
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // Sync color picker <-> text input
+  document.getElementById('id_primary_color').addEventListener('input', function() {
+    document.getElementById('id_primary_color_text').value = this.value;
+  });
+  document.getElementById('id_secondary_color').addEventListener('input', function() {
+    document.getElementById('id_secondary_color_text').value = this.value;
+  });
+</script>
+{% endblock %}

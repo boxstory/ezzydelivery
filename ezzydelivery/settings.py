@@ -33,7 +33,7 @@ SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
 
 # Content Security
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True  # Legacy, but still useful for older browsers
+# SECURE_BROWSER_XSS_FILTER removed — deprecated since Django 4.0, has no effect
 X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (for dev tools)
 
 # Cookie Security
@@ -190,6 +190,7 @@ SESSION_COOKIE_NAME = 'ezzy_sessionid'  # Custom session cookie name for added s
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -200,8 +201,12 @@ MIDDLEWARE = [
     'core.middleware.SessionTimeoutMiddleware',
     'core.middleware.SessionWarningMiddleware',
     'core.middleware.NoCacheAuthMiddleware',
+    # Fix 18: Force logout deactivated drivers accessing fleet pages
+    'core.middleware.DriverStatusCheckMiddleware',
     # SQL query inspector - disabled (high CPU overhead per request in DEBUG mode)
     # 'core.middleware.QueryInspectorMiddleware',
+    # Security headers for SEO (CSP + Permissions-Policy)
+    'core.middleware.SecurityHeadersMiddleware',
 ]
 
 # Add debug toolbar only in DEBUG mode (skip during tests as Django forces DEBUG=False)
@@ -244,6 +249,7 @@ TEMPLATES = [
                 'fleet.context_processors.driver_wallet_status',
                 # Fleet PWA bottom nav: pending tasks badge count
                 'core.context_processors.driver_pending_tasks',
+                'core.context_processors.dl_task_status_choices',
             ],
         },
     },
@@ -300,7 +306,17 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
+
+from django.utils.translation import gettext_lazy as _
+LANGUAGES = [
+    ('en', _('English')),
+    ('ar', _('العربية')),
+]
+
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR, 'locale'),
+]
 
 TIME_ZONE = 'Asia/Qatar'
 
@@ -616,6 +632,10 @@ LOGGING = {
         'django.request': {
             'handlers': ['file_error'],
             'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.security.DisallowedHost': {
+            'handlers': [],
             'propagate': False,
         },
         'django.db.backends': {

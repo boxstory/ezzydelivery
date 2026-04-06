@@ -1,0 +1,77 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  {% include "includes/head.html" %}
+  <meta name="csrf-token" content="{{ csrf_token }}">
+
+  <!-- Form & Plugin CSS (moved from head.html for performance) -->
+  <link rel="stylesheet" href="{% static 'base-forms.css' %}">
+  <link rel="stylesheet" href="{% static 'mobile-app.css' %}?v=20260329a">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+
+  <!-- Core CSS -->
+  <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}?v=20260318a" type="text/css" />
+  <link rel="stylesheet" href="{% static 'webpages/css/pagination.css' %}?v=20260120" type="text/css" />
+  <link rel="stylesheet" href="{% static 'brand-kit-pro.css' %}?v=20260226" type="text/css" />
+
+  <!-- Warehouse CSS -->
+  <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260326c" type="text/css" />
+
+  <!-- Modern Dashboard UI Libraries -->
+  {% include "includes/head-dashboard.html" %}
+
+  {% block extra_css %}
+  {% endblock extra_css %}
+  <title>{% block title %}Warehouse{% endblock title %} | Ezzy Delivery</title>
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+  <!-- HTMX Loading Indicator -->
+  <div id="htmx-loading-indicator" class="htmx-indicator">
+    <div class="htmx-loader__overlay">
+      <div class="htmx-loader__spinner">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="htmx-loader__text mt-2 mb-0">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  {% include "includes/toast_notifications.html" %}
+
+  <!-- Desktop Navbar - Hidden on mobile -->
+  <div class="d-none d-md-block">
+    {% include "includes/navbar.html" %}
+  </div>
+
+  <main class="flex-grow-1" style="min-width:0;display:flex;flex-direction:column;">
+    <!-- Mobile sidebar toggle -->
+    {% include "warehouse/parts/wh_sidebar_mobile.html" %}
+    <div class="d-flex align-items-stretch flex-grow-1" style="min-width:0;max-width:100%;overflow-x:hidden;">
+      {% block sidebar %}
+      {% include "warehouse/parts/wh_sidebar.html" %}
+      {% endblock sidebar %}
+      <!-- Dashboard body content -->
+      <div id="main-content" class="flex-fill m-0" style="min-width:0;overflow-x:auto" hx-indicator="#htmx-loading-indicator">
+        {% include "includes/messages.html" %}
+        {% block content %}
+        {% endblock content %}
+        {% block extra_js %}
+        {% endblock extra_js %}
+      </div>
+    </div>
+  </main>
+
+  <!-- Core JS -->
+  {% include "includes/scripts.html" %}
+  {% include "includes/main_dashboard_scripts.html" %}
+  {% include "includes/scripts-dashboard.html" %}
+
+  <!-- Session timeout monitor -->
+  <script src="{% static 'webpages/js/session-monitor.js' %}"></script>
+</body>
+</html>

@@ -42,14 +42,19 @@
             </h1>
             <p class="woe__hero-sub">Editing order {{ order.order_number }}</p>
         </div>
-        <a href="{% url 'workforce:order_detail' order.id %}" class="woe__btn woe__btn--outline-light"
-           hx-get="{% url 'workforce:order_detail' order.id %}"
-           hx-target="#main-content"
-           hx-select="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-            <i class="fa-solid fa-times me-1"></i> Cancel
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{% url 'workforce:dl_list_all' %}" class="woe__btn woe__btn--outline-light">
+                <i class="fa-solid fa-truck me-1"></i> Go to Tasks
+            </a>
+            <a href="{% url 'workforce:order_detail' order.id %}" class="woe__btn woe__btn--outline-light"
+               hx-get="{% url 'workforce:order_detail' order.id %}"
+               hx-target="#main-content"
+               hx-select="#main-content"
+               hx-swap="outerHTML"
+               hx-push-url="true">
+                <i class="fa-solid fa-times me-1"></i> Cancel
+            </a>
+        </div>
     </div>
 
     <form method="post" id="orderEditForm" novalidate>
@@ -225,7 +230,7 @@
                             {% for location in pickup_locations %}
                             <option value="{{ location.id }}"
                                     {% if order.pickup_location_id == location.id %}selected{% endif %}>
-                                {{ location.pickup_location_title }} - {{ location.locality|truncatechars:40 }}
+                                {% if location.is_fulfilment_center %}[FC] {% endif %}{{ location.pickup_location_title }}{% if location.locality %} · {{ location.locality|truncatechars:40 }}{% endif %}
                             </option>
                             {% endfor %}
                         </select>

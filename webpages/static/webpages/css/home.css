@@ -653,14 +653,23 @@
   }
 }
 
-/* Scroll-triggered reveal */
+/* Scroll-triggered reveal
+   Content is visible by default for SEO (crawlers see opacity:1).
+   JS adds .ez-reveal--init to enable animations after page load. */
 .ez-reveal {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ez-reveal--init .ez-reveal,
+.ez-reveal--init.ez-reveal {
   opacity: 0;
   transform: translateY(32px);
   transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.ez-reveal--visible {
+.ez-reveal--init .ez-reveal.ez-reveal--visible,
+.ez-reveal--init.ez-reveal.ez-reveal--visible {
   opacity: 1;
   transform: translateY(0);
 }

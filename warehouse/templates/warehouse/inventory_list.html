@@ -1,11 +1,8 @@
-{% extends 'wf_dashboard_base.html' %}
+{% extends 'wh_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Inventory List{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219c" type="text/css" />
-{% endblock extra_css %}
 
 {% block content %}
 <div class="wh">
@@ -87,7 +84,7 @@
         <select name="category" id="category" class="wh__filter-select">
           <option value="">All Categories</option>
           {% for cat in categories %}
-          <option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
+          <option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.category_name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -176,7 +173,7 @@
             </td>
             <td class="wh__td">
               {% if stock.product.product_category %}
-              <span class="wh__badge wh__badge--info">{{ stock.product.product_category.name }}</span>
+              <span class="wh__badge wh__badge--info">{{ stock.product.product_category.category_name }}</span>
               {% else %}
               <span class="wh__muted">-</span>
               {% endif %}

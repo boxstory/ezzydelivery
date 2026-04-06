@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from warehouse import models as warehouse_models
 from business import models as business_models
 from product import models as product_models
+from delivery import models as delivery_models
 from core.context_processors import get_cached_business
 
 # Import seller-warehouse link views
@@ -41,14 +42,60 @@ def get_user_business(request):
     return get_cached_business(request)
 
 
+def _is_superadmin(user):
+    """Check Profile.is_superadmin or Django is_superuser."""
+    if getattr(user, 'is_superuser', False):
+        return True
+    profile = getattr(user, 'profile', None)
+    return bool(profile and getattr(profile, 'is_superadmin', False))
+
+
+def _is_staff(user):
+    """Check Profile.is_staff or Django is_staff."""
+    if getattr(user, 'is_staff', False):
+        return True
+    profile = getattr(user, 'profile', None)
+    return bool(profile and getattr(profile, 'is_staff', False))
+
+
 def is_staff_user(request):
     """Check if user is a staff member (can access all warehouses)"""
-    return request.user.is_staff or request.user.is_superuser
+    return _is_staff(request.user) or _is_superadmin(request.user)
 
 
 def is_superuser_only(user):
-    """Check if user is staff or superuser (required for warehouse setup/config)"""
-    return user.is_staff or user.is_superuser
+    """Check if user is superadmin (required for warehouse setup/config)"""
+    return _is_superadmin(user)
+
+
+def has_warehouse_access(user):
+    """
+    Check if user can access the warehouse section.
+    Allowed: superadmins, staff, or users whose business has an active SellerWarehouseLink.
+    """
+    if not user.is_authenticated:
+        return False
+    if _is_staff(user) or _is_superadmin(user):
+        return True
+    # Check if user's business is linked to any warehouse
+    business = get_cached_business_for_user(user)
+    if business:
+        return warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).exists()
+    return False
+
+
+def get_cached_business_for_user(user):
+    """Get business for a user object (not request) — for use in decorators."""
+    try:
+        from business.models import BusinessTeam
+        team = BusinessTeam.objects.select_related('business').filter(
+            user=user, status='active'
+        ).first()
+        return team.business if team else None
+    except Exception:
+        return None
 
 
 def get_business_filter(request):
@@ -68,6 +115,7 @@ def get_business_filter(request):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def dashboard(request):
     """Warehouse dashboard with live summary stats"""
     business, is_staff = get_business_filter(request)
@@ -119,6 +167,16 @@ def dashboard(request):
 
     pending_counts = warehouse_models.CycleCount.objects.filter(
         **count_filter
+    ).count()
+
+    # Pickup tasks — orders ready for warehouse pickup
+    pickup_task_filter = {
+        'dl_task_status__in': ['pending', 'assigned', 'accepted'],
+    }
+    if not is_staff and business:
+        pickup_task_filter['business'] = business
+    pending_pickup_tasks = delivery_models.DeliveryTask.objects.filter(
+        **pickup_task_filter
     ).count()
 
     # Recent transactions
@@ -175,6 +233,7 @@ def dashboard(request):
         'low_stock_count': low_stock_count,
         'pending_picks': pending_picks,
         'pending_counts': pending_counts,
+        'pending_pickup_tasks': pending_pickup_tasks,
         'recent_transactions': recent_transactions,
         'storage_locations': storage_locations,
         'seller_links': seller_links,
@@ -194,6 +253,7 @@ def dashboard(request):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def inventory_list(request):
     """List all inventory items with detailed product information"""
     try:
@@ -265,7 +325,7 @@ def inventory_list(request):
         category_ids = stock_levels.values_list('product__product_category_id', flat=True).distinct()
         categories = product_models.ProductCategory.objects.filter(
             id__in=[cat_id for cat_id in category_ids if cat_id is not None]
-        ).order_by('name')
+        ).order_by('category_name')
     except Exception as e:
         logger.error(f"Error fetching categories: {e}")
         categories = product_models.ProductCategory.objects.none()
@@ -300,6 +360,7 @@ def inventory_list(request):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def stock_card(request, product_id):
     """Stock card - detailed view for a single product"""
     business, is_staff = get_business_filter(request)
@@ -337,6 +398,7 @@ def stock_card(request, product_id):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def transaction_list(request):
     """List all inventory transactions"""
     business, is_staff = get_business_filter(request)
@@ -388,6 +450,7 @@ def transaction_list(request):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def receive_stock(request):
     """Receive new stock into warehouse — from inbound request or manual entry"""
     business, is_staff = get_business_filter(request)
@@ -438,6 +501,7 @@ def receive_stock(request):
 
             # Process each product
             received_products = []
+            put_away_items = []  # for auto-creating put-away task
             total_items = 0
             fulfilled_items = {}  # product_id → qty for updating request items
 
@@ -493,6 +557,7 @@ def receive_stock(request):
                 )
 
                 received_products.append(f"{product.item_name} ({quantity} units)")
+                put_away_items.append({'product': product, 'quantity': quantity, 'source_location': location})
                 total_items += quantity
                 fulfilled_items[int(product_id)] = quantity
 
@@ -523,6 +588,16 @@ def receive_stock(request):
                     inbound_req.completed_at = timezone.now()
                     inbound_req.save(update_fields=['status', 'completed_by', 'completed_at', 'updated_at'])
 
+            # Auto-create put-away task
+            pa_task = None
+            if put_away_items:
+                pa_task = _create_put_away_task(
+                    warehouse=warehouse,
+                    products_received=put_away_items,
+                    user=request.user,
+                    inbound_request=inbound_req,
+                )
+
             # Success message
             if len(received_products) == 1:
                 msg = f"Received {received_products[0]}"
@@ -538,8 +613,13 @@ def receive_stock(request):
                     msg += f" — Inbound request {inbound_req.request_number} fully completed."
                 else:
                     msg += f" — Inbound request {inbound_req.request_number} partially received (still open)."
+            if pa_task:
+                msg += f" Put-away task {pa_task.task_number} created."
             messages.success(request, msg)
 
+            # Redirect to put-away task if one was created
+            if pa_task:
+                return redirect('warehouse:put_away_detail', pk=pa_task.pk)
             return redirect('warehouse:inventory_list')
 
         except Exception as e:
@@ -583,6 +663,7 @@ def receive_stock(request):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def confirm_receive(request):
     """AJAX endpoint to confirm receipt"""
     # Placeholder for barcode scanning confirmation
@@ -594,6 +675,7 @@ def confirm_receive(request):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def pick_list_list(request):
     """List all pick lists"""
     business, is_staff = get_business_filter(request)
@@ -611,35 +693,199 @@ def pick_list_list(request):
         ).values_list('warehouse_id', flat=True)
         pick_lists = warehouse_models.PickList.objects.filter(warehouse_id__in=linked_warehouse_ids)
 
-    pick_lists = pick_lists.select_related('warehouse', 'assigned_to').order_by('-created_at')
+    pick_lists = pick_lists.select_related(
+        'warehouse', 'assigned_to', 'business', 'zone'
+    ).order_by('-created_at')
 
-    # Filter by status
+    # Filters
     status = request.GET.get('status')
     if status:
         pick_lists = pick_lists.filter(status=status)
+
+    biz_filter = request.GET.get('business')
+    if biz_filter:
+        pick_lists = pick_lists.filter(business_id=biz_filter)
+
+    zone_filter = request.GET.get('zone')
+    if zone_filter:
+        pick_lists = pick_lists.filter(zone_id=zone_filter)
 
     paginator = Paginator(pick_lists, 25)
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
+    # Choices for filters
+    businesses = business_models.Business.objects.filter(
+        pick_lists__isnull=False
+    ).distinct().order_by('business_name')
+
+    zones = warehouse_models.StorageLocation.objects.filter(
+        location_type='zone', pick_lists__isnull=False
+    ).distinct().order_by('code')
+
     context = {
         'pick_lists': items,
         'status_choices': warehouse_models.PICKLIST_STATUS_CHOICES,
         'selected_status': status,
+        'businesses': businesses,
+        'selected_business': biz_filter,
+        'zones': zones,
+        'selected_zone': zone_filter,
         'is_staff': is_staff,
+        'is_superadmin': _is_superadmin(request.user),
     }
     return render(request, 'warehouse/pick_list_list.html', context)
 
 
 @login_required(login_url='account_login')
-def create_pick_list(request):
-    """Create a new pick list from pending orders"""
-    # Placeholder - implement wave picking logic
-    messages.info(request, "Pick list creation coming soon")
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def bulk_drop_pick_lists(request):
+    """
+    Bulk drop items back to shelf — superadmin only.
+    Returns all picked items to their shelf locations, resets pick list to pending,
+    and clears all pick/pack progress.
+    """
+    if not _is_superadmin(request.user):
+        messages.error(request, "Only superadmins can perform this action.")
+        return redirect('warehouse:pick_list_list')
+
+    pk_ids = request.POST.getlist('pk_ids')
+    if not pk_ids:
+        messages.warning(request, "No pick lists selected.")
+        return redirect('warehouse:pick_list_list')
+
+    pick_lists = warehouse_models.PickList.objects.filter(pk__in=pk_ids)
+    total_returned = 0
+
+    for pl in pick_lists.prefetch_related('items'):
+        items_returned = 0
+        for item in pl.items.filter(is_picked=True).select_related('product', 'location'):
+            if item.location and item.product:
+                stock = warehouse_models.StockLevel.objects.filter(
+                    product=item.product,
+                    warehouse=pl.warehouse,
+                    location=item.location,
+                ).first()
+                if stock:
+                    old_qty = stock.quantity_on_hand
+                    stock.quantity_on_hand += item.quantity_to_pick
+                    stock.save(update_fields=['quantity_on_hand'])
+
+                    # Log transaction
+                    warehouse_models.InventoryTransaction.objects.create(
+                        product=item.product,
+                        warehouse=pl.warehouse,
+                        location=item.location,
+                        transaction_type='return',
+                        quantity=item.quantity_to_pick,
+                        quantity_before=old_qty,
+                        quantity_after=stock.quantity_on_hand,
+                        reference_type='pick_list',
+                        reference_id=pl.pick_number,
+                        notes=f"Bulk drop to shelf by {request.user.username}",
+                        created_by=request.user,
+                    )
+                    items_returned += 1
+
+            # Reset item state
+            item.is_picked = False
+            item.picked_at = None
+            item.picked_by = None
+            item.quantity_picked = 0
+            item.is_packed = False
+            item.packed_at = None
+            item.save(update_fields=[
+                'is_picked', 'picked_at', 'picked_by', 'quantity_picked',
+                'is_packed', 'packed_at',
+            ])
+
+        # Reset pick list to pending
+        pl.status = 'pending'
+        pl.picked_items = 0
+        pl.assigned_to = None
+        pl.assigned_at = None
+        pl.started_at = None
+        pl.completed_at = None
+        pl.save(update_fields=[
+            'status', 'picked_items', 'assigned_to', 'assigned_at',
+            'started_at', 'completed_at', 'updated_at',
+        ])
+        total_returned += items_returned
+
+    count = pick_lists.count()
+    messages.success(
+        request,
+        f"Dropped {total_returned} items back to shelf across {count} pick list{'s' if count != 1 else ''}. "
+        f"All reset to Pending."
+    )
     return redirect('warehouse:pick_list_list')
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def create_pick_list(request):
+    """Create a product-grouped pick list from orders ready for pickup."""
+    from orders.models import Order, OrderItem
+    business, is_staff = get_business_filter(request)
+
+    if request.method == 'POST':
+        order_ids = request.POST.getlist('order_ids')
+        if not order_ids:
+            messages.warning(request, "Select at least one order.")
+            return redirect('warehouse:create_pick_list')
+
+        orders = Order.objects.filter(pk__in=order_ids).select_related('business')
+        if not orders.exists():
+            messages.error(request, "No valid orders selected.")
+            return redirect('warehouse:create_pick_list')
+
+        # Group all selected orders into one pick list per warehouse
+        from warehouse.signals import create_pick_list_for_order
+        pick_list = None
+        for order in orders:
+            result = create_pick_list_for_order(order)
+            if result:
+                pick_list = result
+
+        if pick_list:
+            messages.success(request, f"Pick list {pick_list.pick_number} created with {pick_list.total_items} items from {orders.count()} orders.")
+            return redirect('warehouse:pick_list_detail', pk=pick_list.pk)
+        else:
+            messages.warning(request, "No items could be added. Orders may already have pick lists or no products.")
+            return redirect('warehouse:pick_list_list')
+
+    # GET — show orders ready for picking (have products, no existing pick list)
+    if is_staff:
+        ready_orders = Order.objects.filter(
+            order_status='ready_to_pickup',
+        ).exclude(
+            pick_list_items__isnull=False,
+        ).select_related('business').order_by('-created_at')[:50]
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('business:business_dashboard')
+        ready_orders = Order.objects.filter(
+            business=business,
+            order_status='ready_to_pickup',
+        ).exclude(
+            pick_list_items__isnull=False,
+        ).order_by('-created_at')[:50]
+
+    # Annotate with item count
+    for o in ready_orders:
+        o.product_count = OrderItem.objects.filter(order=o, product__isnull=False).count()
+
+    context = {
+        'ready_orders': ready_orders,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/create_pick_list.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def pick_list_detail(request, pk):
     """View pick list details"""
     business, is_staff = get_business_filter(request)
@@ -664,15 +910,51 @@ def pick_list_detail(request, pk):
         'product', 'location', 'order'
     ).order_by('location__code')
 
+    # Product-grouped view: aggregate by product + location
+    from collections import OrderedDict
+    product_groups = OrderedDict()
+    for item in items:
+        key = (item.product_id, item.location_id)
+        if key not in product_groups:
+            product_groups[key] = {
+                'product': item.product,
+                'location': item.location,
+                'total_qty': 0,
+                'picked_qty': 0,
+                'orders': [],
+                'items': [],
+                'all_picked': True,
+            }
+        grp = product_groups[key]
+        grp['total_qty'] += item.quantity_to_pick
+        grp['picked_qty'] += item.quantity_picked
+        if item.order:
+            grp['orders'].append(item.order)
+        grp['items'].append(item)
+        if not item.is_picked:
+            grp['all_picked'] = False
+    grouped_items = list(product_groups.values())
+
+    # Prev/next navigation
+    base_qs = warehouse_models.PickList.objects.all()
+    if not is_staff:
+        base_qs = base_qs.filter(warehouse_id__in=linked_warehouse_ids)
+    prev_pl = base_qs.filter(pk__lt=pk).order_by('-pk').values_list('pk', flat=True).first()
+    next_pl = base_qs.filter(pk__gt=pk).order_by('pk').values_list('pk', flat=True).first()
+
     context = {
         'pick_list': pick_list,
         'items': items,
+        'grouped_items': grouped_items,
         'is_staff': is_staff,
+        'prev_pk': prev_pl,
+        'next_pk': next_pl,
     }
     return render(request, 'warehouse/pick_list_detail.html', context)
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def assign_pick_list(request, pk):
     """Assign pick list to a user"""
     business, is_staff = get_business_filter(request)
@@ -703,6 +985,7 @@ def assign_pick_list(request, pk):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 @require_http_methods(["POST"])
 def start_pick_list(request, pk):
     """Start picking — changes status to in_progress"""
@@ -724,6 +1007,7 @@ def start_pick_list(request, pk):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 @require_http_methods(["POST"])
 def pick_item(request, pk, item_id):
     """AJAX: Mark a single pick list item as picked (or update quantity)"""
@@ -767,6 +1051,7 @@ def pick_item(request, pk, item_id):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 @require_http_methods(["POST"])
 def unpick_item(request, pk, item_id):
     """AJAX: Reset a picked item back to pending"""
@@ -798,10 +1083,606 @@ def unpick_item(request, pk, item_id):
 
 
 # =============================================================================
+# PACKING STATION
+# =============================================================================
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def pack_station(request, pk):
+    """
+    Pack station view for a completed pick list.
+    Shows items grouped by ORDER so the packer can sort picked products
+    back into individual orders and mark each order as packed.
+    """
+    pick_list = get_object_or_404(warehouse_models.PickList, pk=pk)
+
+    # Allow packing from 'completed' (all picked) or 'packing' status
+    if pick_list.status == 'completed':
+        pick_list.status = 'packing'
+        pick_list.save(update_fields=['status', 'updated_at'])
+
+    items = pick_list.items.select_related(
+        'product', 'location', 'order', 'order__business'
+    ).order_by('order__order_number', 'product__item_name')
+
+    # Group by order
+    from collections import OrderedDict
+    order_groups = OrderedDict()
+    for item in items:
+        oid = item.order_id
+        if oid not in order_groups:
+            order_groups[oid] = {
+                'order': item.order,
+                'items': [],
+                'total_qty': 0,
+                'packed_qty': 0,
+                'all_packed': True,
+            }
+        grp = order_groups[oid]
+        grp['items'].append(item)
+        grp['total_qty'] += item.quantity_to_pick
+        if item.is_packed:
+            grp['packed_qty'] += item.quantity_to_pick
+        else:
+            grp['all_packed'] = False
+
+    order_list = list(order_groups.values())
+    total_orders = len(order_list)
+    packed_orders = sum(1 for g in order_list if g['all_packed'])
+
+    context = {
+        'pick_list': pick_list,
+        'order_list': order_list,
+        'total_orders': total_orders,
+        'packed_orders': packed_orders,
+    }
+    return render(request, 'warehouse/pack_station.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def pack_order(request, pk, order_id):
+    """AJAX: Mark all items in an order as packed (or unpack)."""
+    pick_list = get_object_or_404(warehouse_models.PickList, pk=pk)
+    items = pick_list.items.filter(order_id=order_id)
+
+    if not items.exists():
+        return JsonResponse({'success': False, 'error': 'No items found'}, status=404)
+
+    # Toggle: if all packed -> unpack, else pack all
+    all_packed = all(i.is_packed for i in items)
+    now = timezone.now()
+
+    for item in items:
+        item.is_packed = not all_packed
+        item.packed_at = now if not all_packed else None
+        item.save(update_fields=['is_packed', 'packed_at'])
+
+    # Check if entire pick list is now packed
+    total_items = pick_list.items.count()
+    packed_items = pick_list.items.filter(is_packed=True).count()
+    all_done = packed_items == total_items
+
+    if all_done and pick_list.status != 'packed':
+        pick_list.status = 'packed'
+        pick_list.save(update_fields=['status', 'updated_at'])
+    elif not all_done and pick_list.status == 'packed':
+        pick_list.status = 'packing'
+        pick_list.save(update_fields=['status', 'updated_at'])
+
+    # Count packed orders
+    order_ids = pick_list.items.values_list('order_id', flat=True).distinct()
+    packed_orders = 0
+    for oid in order_ids:
+        if not pick_list.items.filter(order_id=oid, is_packed=False).exists():
+            packed_orders += 1
+
+    return JsonResponse({
+        'success': True,
+        'order_id': order_id,
+        'is_packed': not all_packed,
+        'packed_orders': packed_orders,
+        'total_orders': order_ids.count(),
+        'all_done': all_done,
+        'pick_list_status': pick_list.status,
+    })
+
+
+# =============================================================================
+# DISPATCH
+# =============================================================================
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def dispatch_queue(request):
+    """
+    Dispatch queue: shows packed orders ready for driver assignment,
+    and existing dispatch batches.
+    """
+    business, is_staff = get_business_filter(request)
+
+    # Packed orders not yet in a dispatch batch
+    from orders.models import Order
+    packed_order_ids = warehouse_models.PickListItem.objects.filter(
+        pick_list__status='packed', is_packed=True
+    ).values_list('order_id', flat=True).distinct()
+
+    # Exclude orders already in a dispatch batch
+    dispatched_order_ids = warehouse_models.DispatchItem.objects.values_list('order_id', flat=True)
+    ready_orders = Order.objects.filter(
+        pk__in=packed_order_ids
+    ).exclude(
+        pk__in=dispatched_order_ids
+    ).select_related('business').order_by('-created_at')
+
+    if not is_staff and business:
+        ready_orders = ready_orders.filter(business=business)
+
+    # Existing dispatch batches
+    if is_staff:
+        batches = warehouse_models.DispatchBatch.objects.all()
+    else:
+        linked_wh_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        batches = warehouse_models.DispatchBatch.objects.filter(warehouse_id__in=linked_wh_ids)
+
+    batches = batches.select_related('warehouse', 'driver').order_by('-created_at')[:20]
+
+    # Available drivers
+    from fleet.models import Driver
+    drivers = Driver.objects.filter(
+        driver_status='approved', driver_availability__in=['online', 'available']
+    ).select_related('user')
+
+    context = {
+        'ready_orders': ready_orders,
+        'batches': batches,
+        'drivers': drivers,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/dispatch_queue.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def dispatch_create(request):
+    """Create a dispatch batch from selected orders + driver."""
+    from orders.models import Order
+
+    order_ids = request.POST.getlist('order_ids')
+    driver_id = request.POST.get('driver_id')
+
+    if not order_ids:
+        messages.warning(request, "Select at least one order.")
+        return redirect('warehouse:dispatch_queue')
+
+    orders = Order.objects.filter(pk__in=order_ids).select_related('business')
+
+    # Determine warehouse from first order's pick list
+    first_item = warehouse_models.PickListItem.objects.filter(
+        order__in=orders
+    ).select_related('pick_list__warehouse').first()
+    wh = first_item.pick_list.warehouse if first_item else None
+
+    if not wh:
+        messages.error(request, "Could not determine warehouse for these orders.")
+        return redirect('warehouse:dispatch_queue')
+
+    # Calculate total COD
+    total_cod = sum(o.cod_amount or 0 for o in orders)
+
+    # Get driver if assigned
+    driver = None
+    if driver_id:
+        from fleet.models import Driver
+        driver = Driver.objects.filter(pk=driver_id).first()
+
+    batch = warehouse_models.DispatchBatch.objects.create(
+        warehouse=wh,
+        driver=driver,
+        status='assigned' if driver else 'ready',
+        total_orders=orders.count(),
+        total_cod_amount=total_cod,
+        assigned_at=timezone.now() if driver else None,
+        created_by=request.user,
+    )
+
+    for order in orders:
+        warehouse_models.DispatchItem.objects.create(
+            batch=batch,
+            order=order,
+            pick_list=warehouse_models.PickListItem.objects.filter(
+                order=order
+            ).first().pick_list if warehouse_models.PickListItem.objects.filter(order=order).exists() else None,
+            cod_amount=order.cod_amount or 0,
+        )
+
+    driver_name = driver.user.get_full_name() if driver else 'unassigned'
+    messages.success(
+        request,
+        f"Dispatch batch {batch.batch_number} created with {orders.count()} orders "
+        f"({driver_name}). COD: QAR {total_cod:.2f}"
+    )
+    return redirect('warehouse:dispatch_detail', pk=batch.pk)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def dispatch_detail(request, pk):
+    """Dispatch batch detail — handover orders to driver one by one."""
+    batch = get_object_or_404(
+        warehouse_models.DispatchBatch.objects.select_related('warehouse', 'driver', 'driver__user'),
+        pk=pk
+    )
+    items = batch.items.select_related('order', 'order__business').order_by('order__order_number')
+    total = items.count()
+    handed = items.filter(is_handed_over=True).count()
+
+    context = {
+        'batch': batch,
+        'items': items,
+        'total': total,
+        'handed': handed,
+    }
+    return render(request, 'warehouse/dispatch_detail.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def dispatch_handover_item(request, pk, item_id):
+    """AJAX: Mark a single order as handed over to driver."""
+    batch = get_object_or_404(warehouse_models.DispatchBatch, pk=pk)
+    item = get_object_or_404(warehouse_models.DispatchItem, pk=item_id, batch=batch)
+
+    item.is_handed_over = True
+    item.handed_over_at = timezone.now()
+    item.save(update_fields=['is_handed_over', 'handed_over_at'])
+
+    total = batch.items.count()
+    handed = batch.items.filter(is_handed_over=True).count()
+    all_done = handed == total
+
+    if all_done and batch.status != 'handed_over':
+        batch.status = 'handed_over'
+        batch.handed_over_at = timezone.now()
+        batch.save(update_fields=['status', 'handed_over_at', 'updated_at'])
+
+    return JsonResponse({
+        'success': True,
+        'item_id': item.id,
+        'handed': handed,
+        'total': total,
+        'all_done': all_done,
+    })
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def dispatch_confirm(request, pk):
+    """Confirm dispatch — driver leaves the warehouse."""
+    batch = get_object_or_404(warehouse_models.DispatchBatch, pk=pk)
+
+    batch.status = 'dispatched'
+    batch.dispatched_at = timezone.now()
+    batch.save(update_fields=['status', 'dispatched_at', 'updated_at'])
+
+    messages.success(request, f"Batch {batch.batch_number} dispatched! Driver is on the way.")
+    return redirect('warehouse:dispatch_queue')
+
+
+# =============================================================================
+# CUSTOMER RETURNS / RMA
+# =============================================================================
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def rma_list(request):
+    """List all customer returns."""
+    business, is_staff = get_business_filter(request)
+
+    if is_staff:
+        returns = warehouse_models.CustomerReturn.objects.all()
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('business:business_dashboard')
+        returns = warehouse_models.CustomerReturn.objects.filter(business=business)
+
+    status = request.GET.get('status')
+    if status:
+        returns = returns.filter(status=status)
+
+    returns = returns.select_related('order', 'business', 'warehouse').order_by('-created_at')
+
+    paginator = Paginator(returns, 20)
+    returns = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'returns': returns,
+        'status_choices': warehouse_models.RMA_STATUS_CHOICES,
+        'selected_status': status,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/rma_list.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def rma_create(request, order_id):
+    """Create a return request for an order."""
+    from orders.models import Order, OrderItem
+
+    order = get_object_or_404(Order.objects.select_related('business'), pk=order_id)
+    order_items = OrderItem.objects.filter(order=order, product__isnull=False).select_related('product')
+
+    if request.method == 'POST':
+        reason = request.POST.get('reason', 'other')
+        notes = request.POST.get('customer_notes', '')
+        item_ids = request.POST.getlist('item_ids')
+
+        if not item_ids:
+            messages.warning(request, "Select at least one item to return.")
+            return redirect('warehouse:rma_create', order_id=order.pk)
+
+        # Find warehouse
+        wh_link = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=order.business, is_active=True
+        ).select_related('warehouse').first()
+
+        rma = warehouse_models.CustomerReturn.objects.create(
+            order=order,
+            business=order.business,
+            warehouse=wh_link.warehouse if wh_link else None,
+            reason=reason,
+            customer_notes=notes,
+            requested_by=request.user,
+        )
+
+        for oi in order_items.filter(pk__in=item_ids):
+            qty = request.POST.get(f'qty_{oi.pk}', oi.quantity)
+            try:
+                qty = int(qty)
+            except (ValueError, TypeError):
+                qty = oi.quantity
+
+            warehouse_models.CustomerReturnItem.objects.create(
+                customer_return=rma,
+                product=oi.product,
+                quantity=min(qty, oi.quantity),
+                reason=reason,
+            )
+
+        messages.success(request, f"Return request {rma.rma_number} created for order {order.order_number}.")
+        return redirect('warehouse:rma_detail', pk=rma.pk)
+
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'reason_choices': warehouse_models.RMA_REASON_CHOICES,
+    }
+    return render(request, 'warehouse/rma_create.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def rma_detail(request, pk):
+    """View return detail — receive, inspect, and resolve items."""
+    rma = get_object_or_404(
+        warehouse_models.CustomerReturn.objects.select_related('order', 'business', 'warehouse'),
+        pk=pk
+    )
+    items = rma.items.select_related('product', 'location').order_by('product__item_name')
+    total = items.count()
+    received = items.filter(is_received=True).count()
+    inspected = items.filter(is_inspected=True).count()
+    restocked = items.filter(is_restocked=True).count()
+
+    context = {
+        'rma': rma,
+        'items': items,
+        'total': total,
+        'received': received,
+        'inspected': inspected,
+        'restocked': restocked,
+        'disposition_choices': warehouse_models.RMA_DISPOSITION_CHOICES,
+    }
+    return render(request, 'warehouse/rma_detail.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def rma_receive(request, pk):
+    """Mark all items in an RMA as received at warehouse."""
+    rma = get_object_or_404(warehouse_models.CustomerReturn, pk=pk)
+
+    rma.items.filter(is_received=False).update(is_received=True)
+    rma.status = 'received'
+    rma.received_at = timezone.now()
+    rma.save(update_fields=['status', 'received_at', 'updated_at'])
+
+    messages.success(request, f"Return {rma.rma_number} marked as received. Now inspect each item.")
+    return redirect('warehouse:rma_detail', pk=rma.pk)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def rma_inspect_item(request, pk, item_id):
+    """AJAX: Inspect a return item — set condition and disposition."""
+    rma = get_object_or_404(warehouse_models.CustomerReturn, pk=pk)
+    item = get_object_or_404(warehouse_models.CustomerReturnItem, pk=item_id, customer_return=rma)
+
+    condition = request.POST.get('condition', 'good')
+    disposition = request.POST.get('disposition', 'restock')
+
+    item.condition = condition
+    item.disposition = disposition
+    item.is_inspected = True
+    item.inspected_at = timezone.now()
+    item.save(update_fields=['condition', 'disposition', 'is_inspected', 'inspected_at'])
+
+    # Auto-restock if good condition
+    if disposition == 'restock' and rma.warehouse:
+        stock = warehouse_models.StockLevel.objects.filter(
+            product=item.product,
+            warehouse=rma.warehouse,
+        ).first()
+        if stock:
+            old_qty = stock.quantity_on_hand
+            stock.quantity_on_hand += item.quantity
+            stock.save(update_fields=['quantity_on_hand'])
+
+            warehouse_models.InventoryTransaction.objects.create(
+                product=item.product,
+                warehouse=rma.warehouse,
+                location=stock.location,
+                transaction_type='return',
+                quantity=item.quantity,
+                quantity_before=old_qty,
+                quantity_after=stock.quantity_on_hand,
+                reference_type='rma',
+                reference_id=rma.rma_number,
+                notes=f"Customer return restocked — {item.get_condition_display()}",
+                created_by=request.user,
+            )
+            item.is_restocked = True
+            item.restocked_at = timezone.now()
+            item.location = stock.location
+            item.save(update_fields=['is_restocked', 'restocked_at', 'location'])
+
+    # Check if all inspected
+    total = rma.items.count()
+    inspected_count = rma.items.filter(is_inspected=True).count()
+    all_done = inspected_count == total
+
+    if all_done:
+        rma.status = 'resolved'
+        rma.inspected_at = timezone.now()
+        rma.resolved_at = timezone.now()
+        rma.save(update_fields=['status', 'inspected_at', 'resolved_at', 'updated_at'])
+
+    return JsonResponse({
+        'success': True,
+        'item_id': item.id,
+        'condition': condition,
+        'disposition': disposition,
+        'is_restocked': item.is_restocked,
+        'inspected': inspected_count,
+        'total': total,
+        'all_done': all_done,
+    })
+
+
+# =============================================================================
+# RETURN TASKS
+# =============================================================================
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def return_task_list(request):
+    """List all return tasks for warehouse staff."""
+    business, is_staff = get_business_filter(request)
+
+    if is_staff:
+        returns = warehouse_models.ReturnTask.objects.all()
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('business:business_dashboard')
+        linked_wh_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        returns = warehouse_models.ReturnTask.objects.filter(warehouse_id__in=linked_wh_ids)
+
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        returns = returns.filter(status=status_filter)
+
+    returns = returns.select_related('warehouse', 'order', 'pick_list').order_by('-created_at')
+
+    paginator = Paginator(returns, 20)
+    page = request.GET.get('page')
+    returns = paginator.get_page(page)
+
+    context = {
+        'returns': returns,
+        'status_choices': warehouse_models.RETURN_STATUS_CHOICES,
+        'selected_status': status_filter,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/return_task_list.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def return_task_detail(request, pk):
+    """View return task detail — staff marks items as returned to shelf."""
+    return_task = get_object_or_404(
+        warehouse_models.ReturnTask.objects.select_related('warehouse', 'order', 'pick_list'),
+        pk=pk
+    )
+
+    if return_task.status == 'pending':
+        return_task.status = 'in_progress'
+        return_task.assigned_to = request.user
+        return_task.save(update_fields=['status', 'assigned_to', 'updated_at'])
+
+    items = return_task.items.select_related('product', 'location').order_by('location__code')
+    total_items = items.count()
+    returned_items = items.filter(is_returned=True).count()
+
+    context = {
+        'return_task': return_task,
+        'items': items,
+        'total_items': total_items,
+        'returned_items': returned_items,
+    }
+    return render(request, 'warehouse/return_task_detail.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def return_item(request, pk, item_id):
+    """AJAX: Mark an item as returned to shelf. Updates stock on_hand."""
+    return_task = get_object_or_404(warehouse_models.ReturnTask, pk=pk)
+    item = get_object_or_404(warehouse_models.ReturnTaskItem, pk=item_id, return_task=return_task)
+
+    from warehouse.signals import complete_return_item
+    complete_return_item(item, user=request.user)
+
+    # Check if all items returned
+    total = return_task.items.count()
+    returned = return_task.items.filter(is_returned=True).count()
+    all_done = returned == total
+
+    if all_done:
+        return_task.status = 'completed'
+        return_task.completed_at = timezone.now()
+        return_task.save(update_fields=['status', 'completed_at', 'updated_at'])
+
+    return JsonResponse({
+        'success': True,
+        'item_id': item.id,
+        'is_returned': True,
+        'returned_items': returned,
+        'total_items': total,
+        'all_done': all_done,
+    })
+
+
+# =============================================================================
 # CYCLE COUNTING
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def cycle_count_list(request):
     """List all cycle counts"""
     business, is_staff = get_business_filter(request)
@@ -838,17 +1719,119 @@ def cycle_count_list(request):
     return render(request, 'warehouse/cycle_count_list.html', context)
 
 
+def _get_descendant_location_ids(parent_location):
+    """Get all descendant StorageLocation IDs recursively (max 5 levels)."""
+    ids = []
+    children = list(warehouse_models.StorageLocation.objects.filter(parent=parent_location).values_list('pk', flat=True))
+    ids.extend(children)
+    for child_id in children:
+        child = warehouse_models.StorageLocation.objects.filter(pk=child_id).first()
+        if child:
+            ids.extend(_get_descendant_location_ids(child))
+    return ids
+
+
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def create_cycle_count(request):
-    """Create a new cycle count"""
-    # Placeholder
-    messages.info(request, "Cycle count creation coming soon")
-    return redirect('warehouse:cycle_count_list')
+    """Create a new cycle count — select warehouse, location (optional), and scheduled date."""
+    business, is_staff = get_business_filter(request)
+
+    if request.method == 'POST':
+        warehouse_id = request.POST.get('warehouse')
+        location_id = request.POST.get('location')
+        scheduled_date = request.POST.get('scheduled_date')
+        assigned_to_id = request.POST.get('assigned_to')
+        notes = request.POST.get('notes', '')
+
+        if not warehouse_id or not scheduled_date:
+            messages.error(request, 'Warehouse and scheduled date are required.')
+            return redirect('warehouse:create_cycle_count')
+
+        try:
+            warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id, is_active=True)
+        except warehouse_models.Warehouse.DoesNotExist:
+            messages.error(request, 'Invalid warehouse selected.')
+            return redirect('warehouse:create_cycle_count')
+
+        location = None
+        if location_id:
+            location = warehouse_models.StorageLocation.objects.filter(
+                pk=location_id, warehouse=warehouse
+            ).first()
+
+        assigned_to = None
+        if assigned_to_id:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            assigned_to = User.objects.filter(pk=assigned_to_id, is_staff=True).first()
+
+        # Create the cycle count
+        cycle_count = warehouse_models.CycleCount.objects.create(
+            warehouse=warehouse,
+            location=location,
+            scheduled_date=scheduled_date,
+            assigned_to=assigned_to,
+            notes=notes,
+            created_by=request.user,
+            status='scheduled',
+        )
+
+        # Auto-populate count items from StockLevel
+        stock_filter = {'warehouse': warehouse, 'quantity_on_hand__gt': 0}
+        if location:
+            # If a specific zone is selected, include all bins under it
+            if location.location_type == 'zone':
+                descendant_ids = _get_descendant_location_ids(location)
+                descendant_ids.append(location.pk)
+                stock_filter['location_id__in'] = descendant_ids
+            else:
+                stock_filter['location'] = location
+
+        stock_levels = warehouse_models.StockLevel.objects.filter(
+            **stock_filter
+        ).select_related('product', 'location')
+
+        count_items = []
+        for sl in stock_levels:
+            count_items.append(warehouse_models.CycleCountItem(
+                cycle_count=cycle_count,
+                product=sl.product,
+                location=sl.location,
+                system_quantity=sl.quantity_on_hand,
+            ))
+        if count_items:
+            warehouse_models.CycleCountItem.objects.bulk_create(count_items)
+
+        logger.info(f"Cycle count {cycle_count.count_number} created with {len(count_items)} items by {request.user.username}")
+        messages.success(request, f'Cycle count {cycle_count.count_number} created with {len(count_items)} items.')
+        return redirect('warehouse:cycle_count_detail', pk=cycle_count.pk)
+
+    # GET — render form
+    if is_staff:
+        warehouses = warehouse_models.Warehouse.objects.filter(is_active=True).order_by('name')
+    else:
+        linked_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        warehouses = warehouse_models.Warehouse.objects.filter(pk__in=linked_ids, is_active=True).order_by('name')
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    staff_users = User.objects.filter(is_staff=True, is_active=True).order_by('first_name', 'username')
+
+    context = {
+        'warehouses': warehouses,
+        'staff_users': staff_users,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/create_cycle_count.html', context)
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def cycle_count_detail(request, pk):
-    """View cycle count details"""
+    """View cycle count details with counting and approval actions"""
     business, is_staff = get_business_filter(request)
 
     if is_staff:
@@ -857,7 +1840,6 @@ def cycle_count_detail(request, pk):
         if not business:
             messages.error(request, "No business associated with your account")
             return redirect('business:business_dashboard')
-        # Get warehouses linked to this business
         linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
             business=business, is_active=True
         ).values_list('warehouse_id', flat=True)
@@ -868,15 +1850,190 @@ def cycle_count_detail(request, pk):
         )
 
     items = cycle_count.items.select_related(
-        'product', 'location'
+        'product', 'location', 'counted_by'
     ).order_by('location__code')
+
+    total_items = items.count()
+    counted_items = items.filter(is_counted=True).count()
+    variance_items = items.filter(variance__isnull=False).exclude(variance=0).count()
 
     context = {
         'cycle_count': cycle_count,
         'items': items,
         'is_staff': is_staff,
+        'total_items': total_items,
+        'counted_items': counted_items,
+        'variance_items': variance_items,
     }
     return render(request, 'warehouse/cycle_count_detail.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def start_cycle_count(request, pk):
+    """Start a cycle count — assign to self and set in_progress"""
+    cycle_count = get_object_or_404(warehouse_models.CycleCount, pk=pk)
+
+    if cycle_count.status not in ('scheduled',):
+        messages.error(request, 'This cycle count has already been started.')
+        return redirect('warehouse:cycle_count_detail', pk=pk)
+
+    cycle_count.status = 'in_progress'
+    cycle_count.started_at = timezone.now()
+    if not cycle_count.assigned_to:
+        cycle_count.assigned_to = request.user
+    cycle_count.save(update_fields=['status', 'started_at', 'assigned_to'])
+
+    logger.info(f"Cycle count {cycle_count.count_number} started by {request.user.username}")
+    messages.success(request, 'Cycle count started. Begin counting items.')
+    return redirect('warehouse:cycle_count_detail', pk=pk)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def count_item(request, pk, item_id):
+    """AJAX: Record counted quantity for a single item"""
+    cycle_count = get_object_or_404(warehouse_models.CycleCount, pk=pk)
+
+    if cycle_count.status not in ('in_progress',):
+        return JsonResponse({'error': 'Count is not in progress'}, status=400)
+
+    item = get_object_or_404(warehouse_models.CycleCountItem, pk=item_id, cycle_count=cycle_count)
+
+    try:
+        counted_qty = int(request.POST.get('counted_quantity', 0))
+        if counted_qty < 0:
+            return JsonResponse({'error': 'Quantity cannot be negative'}, status=400)
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid quantity'}, status=400)
+
+    variance_reason = request.POST.get('variance_reason', '')
+
+    item.counted_quantity = counted_qty
+    item.variance = counted_qty - item.system_quantity
+    item.is_counted = True
+    item.counted_at = timezone.now()
+    item.counted_by = request.user
+    if variance_reason:
+        item.variance_reason = variance_reason
+    item.save()
+
+    # Check progress
+    total = cycle_count.items.count()
+    counted = cycle_count.items.filter(is_counted=True).count()
+
+    return JsonResponse({
+        'success': True,
+        'item_id': item.id,
+        'counted_quantity': counted_qty,
+        'variance': item.variance,
+        'counted_items': counted,
+        'total_items': total,
+        'all_done': counted >= total,
+    })
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def submit_cycle_count(request, pk):
+    """Submit cycle count for review after all items counted"""
+    cycle_count = get_object_or_404(warehouse_models.CycleCount, pk=pk)
+
+    if cycle_count.status != 'in_progress':
+        messages.error(request, 'This cycle count is not in progress.')
+        return redirect('warehouse:cycle_count_detail', pk=pk)
+
+    # Check all items are counted
+    uncounted = cycle_count.items.filter(is_counted=False).count()
+    if uncounted > 0:
+        messages.error(request, f'{uncounted} items still need to be counted.')
+        return redirect('warehouse:cycle_count_detail', pk=pk)
+
+    cycle_count.status = 'pending_review'
+    cycle_count.completed_at = timezone.now()
+    cycle_count.save(update_fields=['status', 'completed_at'])
+
+    logger.info(f"Cycle count {cycle_count.count_number} submitted for review by {request.user.username}")
+    messages.success(request, 'Cycle count submitted for review.')
+    return redirect('warehouse:cycle_count_detail', pk=pk)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def approve_cycle_count(request, pk):
+    """Approve cycle count and adjust stock levels for variances"""
+    cycle_count = get_object_or_404(warehouse_models.CycleCount, pk=pk)
+
+    if not _is_staff(request.user):
+        messages.error(request, 'Only staff can approve cycle counts.')
+        return redirect('warehouse:cycle_count_detail', pk=pk)
+
+    if cycle_count.status != 'pending_review':
+        messages.error(request, 'This cycle count is not pending review.')
+        return redirect('warehouse:cycle_count_detail', pk=pk)
+
+    from django.db import transaction as db_transaction
+    adjustments_made = 0
+
+    with db_transaction.atomic():
+        items_with_variance = cycle_count.items.filter(
+            is_counted=True
+        ).exclude(variance=0).select_related('product', 'location')
+
+        for item in items_with_variance:
+            if item.variance is None or item.variance == 0:
+                continue
+
+            # Find the matching StockLevel
+            stock_level = warehouse_models.StockLevel.objects.filter(
+                product=item.product,
+                warehouse=cycle_count.warehouse,
+                location=item.location
+            ).first()
+
+            if not stock_level:
+                continue
+
+            old_qty = stock_level.quantity_on_hand
+            new_qty = max(0, item.counted_quantity)
+            adjustment = new_qty - old_qty
+
+            if adjustment == 0:
+                continue
+
+            stock_level.quantity_on_hand = new_qty
+            stock_level.last_count_date = timezone.now()
+            stock_level.last_count_quantity = new_qty
+            stock_level.save(update_fields=['quantity_on_hand', 'last_count_date', 'last_count_quantity', 'updated_at'])
+
+            # Create inventory transaction
+            txn_type = 'adjust_in' if adjustment > 0 else 'adjust_out'
+            warehouse_models.InventoryTransaction.objects.create(
+                product=item.product,
+                warehouse=cycle_count.warehouse,
+                location=item.location,
+                transaction_type=txn_type,
+                quantity=adjustment,
+                quantity_before=old_qty,
+                quantity_after=new_qty,
+                reference_type='cycle_count',
+                reference_id=cycle_count.count_number,
+                notes=f"Cycle count adjustment. Variance: {item.variance}. Reason: {item.variance_reason or 'N/A'}",
+                created_by=request.user,
+            )
+            adjustments_made += 1
+
+        cycle_count.status = 'completed'
+        cycle_count.approved_by = request.user
+        cycle_count.approved_at = timezone.now()
+        cycle_count.save(update_fields=['status', 'approved_by', 'approved_at'])
+
+    logger.info(f"Cycle count {cycle_count.count_number} approved by {request.user.username} with {adjustments_made} adjustments")
+    messages.success(request, f'Cycle count approved. {adjustments_made} stock adjustment(s) applied.')
+    return redirect('warehouse:cycle_count_detail', pk=pk)
 
 
 # =============================================================================
@@ -884,6 +2041,7 @@ def cycle_count_detail(request, pk):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def low_stock_alerts(request):
     """List low stock alerts"""
     business, is_staff = get_business_filter(request)
@@ -921,6 +2079,7 @@ def low_stock_alerts(request):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def acknowledge_alert(request, pk):
     """Acknowledge a low stock alert"""
     business, is_staff = get_business_filter(request)
@@ -1638,14 +2797,15 @@ def location_delete(request, pk):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def api_warehouse_locations(request, warehouse_id):
     """
     API endpoint to get pickup/dispatch locations for a specific warehouse.
     Returns JSON list of warehouse locations.
     Superuser access required.
     """
-    # Check if user is superuser
-    if not request.user.is_superuser:
+    # Check if user is superadmin
+    if not _is_superadmin(request.user):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     try:
@@ -1670,6 +2830,7 @@ def api_warehouse_locations(request, warehouse_id):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def api_storage_locations(request, warehouse_id):
     """
     API endpoint to get storage locations for a specific warehouse.
@@ -1700,6 +2861,7 @@ def api_storage_locations(request, warehouse_id):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def api_business_products(request, business_id):
     """API endpoint to get products for a specific business."""
     try:
@@ -1721,6 +2883,7 @@ def api_business_products(request, business_id):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def api_inbound_request_items(request, request_id):
     """API endpoint to get items for a specific inbound request (for receive stock page)."""
     try:
@@ -1865,3 +3028,261 @@ def warehouse_location_add(request):
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/warehouse_location_add.html', context)
+
+
+# =============================================================================
+# PUT-AWAY TASKS
+# =============================================================================
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def put_away_list(request):
+    """List all put-away tasks."""
+    business, is_staff = get_business_filter(request)
+
+    if is_staff:
+        tasks = warehouse_models.PutAwayTask.objects.all()
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('business:business_dashboard')
+        linked_wh_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        tasks = warehouse_models.PutAwayTask.objects.filter(warehouse_id__in=linked_wh_ids)
+
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        tasks = tasks.filter(status=status_filter)
+
+    tasks = tasks.select_related('warehouse', 'assigned_to', 'inbound_request').order_by('-created_at')
+
+    paginator = Paginator(tasks, 20)
+    page = request.GET.get('page')
+    tasks = paginator.get_page(page)
+
+    context = {
+        'tasks': tasks,
+        'status_choices': warehouse_models.PUTAWAY_STATUS_CHOICES,
+        'selected_status': status_filter,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/put_away_list.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def put_away_detail(request, pk):
+    """View put-away task detail — staff places items at suggested locations."""
+    task = get_object_or_404(
+        warehouse_models.PutAwayTask.objects.select_related('warehouse', 'assigned_to', 'inbound_request'),
+        pk=pk
+    )
+
+    # Auto-start when first viewed
+    if task.status == 'pending':
+        task.status = 'in_progress'
+        task.assigned_to = request.user
+        task.started_at = timezone.now()
+        task.save(update_fields=['status', 'assigned_to', 'started_at', 'updated_at'])
+
+    items = task.items.select_related(
+        'product', 'suggested_location', 'actual_location', 'completed_by'
+    ).order_by('suggested_location__code')
+    total_items = items.count()
+    completed_items = items.filter(is_completed=True).count()
+
+    # Get available storage locations for the warehouse (for override dropdown)
+    storage_locations = warehouse_models.StorageLocation.objects.filter(
+        warehouse=task.warehouse, location_type='bin', is_active=True
+    ).order_by('code')
+
+    context = {
+        'task': task,
+        'items': items,
+        'total_items': total_items,
+        'completed_items': completed_items,
+        'storage_locations': storage_locations,
+    }
+    return render(request, 'warehouse/put_away_detail.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def put_away_assign(request, pk):
+    """Assign a put-away task to a staff member."""
+    task = get_object_or_404(warehouse_models.PutAwayTask, pk=pk)
+
+    if task.status not in ('pending', 'assigned'):
+        return JsonResponse({'success': False, 'error': 'Task cannot be reassigned in current status'})
+
+    task.assigned_to = request.user
+    task.status = 'assigned'
+    task.assigned_at = timezone.now()
+    task.save(update_fields=['assigned_to', 'status', 'assigned_at', 'updated_at'])
+
+    messages.success(request, f"Put-away task {task.task_number} assigned to you.")
+    return redirect('warehouse:put_away_detail', pk=task.pk)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+@require_http_methods(["POST"])
+def put_away_confirm_item(request, pk, item_id):
+    """AJAX: Confirm an item has been placed at its storage location."""
+    task = get_object_or_404(warehouse_models.PutAwayTask, pk=pk)
+    item = get_object_or_404(
+        warehouse_models.PutAwayTaskItem, pk=item_id, put_away_task=task
+    )
+
+    if item.is_completed:
+        return JsonResponse({'success': False, 'error': 'Item already completed'})
+
+    # Check if staff overrode the suggested location
+    override_location_id = request.POST.get('location_id', '')
+    if override_location_id:
+        actual_location = get_object_or_404(
+            warehouse_models.StorageLocation, pk=override_location_id,
+            warehouse=task.warehouse
+        )
+    else:
+        actual_location = item.suggested_location
+
+    if not actual_location:
+        return JsonResponse({'success': False, 'error': 'No location specified'})
+
+    # Transfer stock: deduct from source location, add to destination
+    # 1. Deduct from source location (where stock was received)
+    if item.source_location:
+        source_stock = warehouse_models.StockLevel.objects.filter(
+            product=item.product, warehouse=task.warehouse, location=item.source_location
+        ).first()
+        if source_stock:
+            old_src = source_stock.quantity_on_hand
+            source_stock.quantity_on_hand = max(0, source_stock.quantity_on_hand - item.quantity)
+            source_stock.save(update_fields=['quantity_on_hand', 'updated_at'])
+            warehouse_models.InventoryTransaction.objects.create(
+                product=item.product, warehouse=task.warehouse,
+                location=item.source_location,
+                transaction_type='transfer_out', quantity=-item.quantity,
+                quantity_before=old_src, quantity_after=source_stock.quantity_on_hand,
+                reference_type='put_away', reference_id=task.task_number,
+                notes=f"Put-away transfer out by {request.user.username}",
+                created_by=request.user,
+            )
+    else:
+        # Source was no-location (staging area) — deduct from null-location stock
+        source_stock = warehouse_models.StockLevel.objects.filter(
+            product=item.product, warehouse=task.warehouse, location__isnull=True
+        ).first()
+        if source_stock:
+            old_src = source_stock.quantity_on_hand
+            source_stock.quantity_on_hand = max(0, source_stock.quantity_on_hand - item.quantity)
+            source_stock.save(update_fields=['quantity_on_hand', 'updated_at'])
+            warehouse_models.InventoryTransaction.objects.create(
+                product=item.product, warehouse=task.warehouse,
+                location=None,
+                transaction_type='transfer_out', quantity=-item.quantity,
+                quantity_before=old_src, quantity_after=source_stock.quantity_on_hand,
+                reference_type='put_away', reference_id=task.task_number,
+                notes=f"Put-away transfer out from staging by {request.user.username}",
+                created_by=request.user,
+            )
+
+    # 2. Add to destination location
+    dest_stock, created = warehouse_models.StockLevel.objects.get_or_create(
+        product=item.product, warehouse=task.warehouse, location=actual_location,
+        defaults={'quantity_on_hand': 0}
+    )
+    old_dest = dest_stock.quantity_on_hand
+    dest_stock.quantity_on_hand += item.quantity
+    dest_stock.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+    warehouse_models.InventoryTransaction.objects.create(
+        product=item.product, warehouse=task.warehouse,
+        location=actual_location,
+        transaction_type='transfer_in', quantity=item.quantity,
+        quantity_before=old_dest, quantity_after=dest_stock.quantity_on_hand,
+        reference_type='put_away', reference_id=task.task_number,
+        notes=f"Put-away confirmed by {request.user.username}",
+        created_by=request.user,
+    )
+
+    # Mark item as completed
+    item.is_completed = True
+    item.actual_location = actual_location
+    item.completed_at = timezone.now()
+    item.completed_by = request.user
+    item.save(update_fields=[
+        'is_completed', 'actual_location', 'completed_at', 'completed_by'
+    ])
+
+    # Update task progress
+    total = task.items.count()
+    completed = task.items.filter(is_completed=True).count()
+    task.completed_items = completed
+    all_done = completed == total
+
+    if all_done:
+        task.status = 'completed'
+        task.completed_at = timezone.now()
+        task.save(update_fields=['completed_items', 'status', 'completed_at', 'updated_at'])
+    else:
+        task.save(update_fields=['completed_items', 'updated_at'])
+
+    return JsonResponse({
+        'success': True,
+        'item_id': item.id,
+        'actual_location': actual_location.code,
+        'completed_items': completed,
+        'total_items': total,
+        'all_done': all_done,
+    })
+
+
+def _create_put_away_task(warehouse, products_received, user, inbound_request=None):
+    """
+    Helper to create a put-away task after stock is received.
+    products_received: list of dicts with 'product', 'quantity', 'location' (receiving dock location)
+    Suggests optimal storage location for each product.
+    """
+    if not products_received:
+        return None
+
+    task = warehouse_models.PutAwayTask.objects.create(
+        warehouse=warehouse,
+        inbound_request=inbound_request,
+        total_items=len(products_received),
+        created_by=user,
+    )
+
+    for item_data in products_received:
+        product = item_data['product']
+        quantity = item_data['quantity']
+        source_location = item_data.get('source_location')
+
+        # Suggest optimal location:
+        # 1. Where this product already has stock (consolidate)
+        # 2. Fall back to None (staff picks location manually)
+        suggested = None
+        existing_stock = warehouse_models.StockLevel.objects.filter(
+            product=product,
+            warehouse=warehouse,
+            location__isnull=False,
+            location__is_active=True,
+            location__location_type='bin',
+        ).select_related('location').order_by('-quantity_on_hand').first()
+
+        if existing_stock and existing_stock.location != source_location:
+            suggested = existing_stock.location
+
+        warehouse_models.PutAwayTaskItem.objects.create(
+            put_away_task=task,
+            product=product,
+            quantity=quantity,
+            source_location=source_location,
+            suggested_location=suggested,
+        )
+
+    return task

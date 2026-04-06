@@ -187,6 +187,110 @@ Use this skill when designing UI components, creating landing pages, or building
 2. If YES — use the Bootstrap class as base, only add BEM for custom visual modifications
 3. If NO — write full BEM component styles as needed
 
+---
+
+## BEM Styling — Naming, Prefixes & Application Process
+
+### BEM Syntax
+```
+block__element--modifier
+```
+- **Block** — standalone component (e.g. `wexp__hero`)
+- **Element** — child of block, joined with `__` (e.g. `wexp__hero-title`)
+- **Modifier** — variant/state, joined with `--` (e.g. `wexp__tab--active`)
+
+Use a short app-specific prefix (2–4 letters) on the block to avoid class collisions across apps.
+
+### App Prefix Reference
+
+| App | Prefixes |
+|-----|---------|
+| **Business** | `bsb__` `bapi__` `bpf__` `bdb__` `btl__` `bor__` `bir__` `bsl__` `bwg__` `btp__` `blu__` `bdd__` `bpl-*` `bta__` `btrc__` `bab__` |
+| **Fleet** | `fva__` `fdp__` `fpm__` `ffs__` `fth__` `fhp__` `flt__` `csb__` `fleet-scan-task__` `task-history__` `fleet-avail__` |
+| **Core** | `cnav__` `cpr__` `cprc__` `cprv__` `cau__` `cps__` `cjd__` `cjb__` `caf__` `cve__` `cdr__` `cbr__` |
+| **Product** | `ppc__` `ppc2__` `pal__` `plt__` `psa__` `pu__` `pct__` `piv__` `pdl__` `ivl__` `txl__` `skc__` `plc__` |
+| **Workforce** | `wdd__` `dpd__` `dpb__` `dpc__` `dpf__` `dps__` `dpsd__` `dpsf__` `dpk__` `dpr__` `wsm__` `bld__` `wle__` `wh__` `wfp__` `bpt__` `bll__` `odp__` `pg-hdr__` `pg-filter__` `tsk-card__` `wf-sidebar__` `wexp__` |
+| **Orders** | `odt__` `oal__` `oap__` `ocm` `ofb` `ob__` `bim__` `ulv__` `ocl__` `ovr__` `be__` `okb` `otl` `ou__` |
+| **Delivery** | `adt__` `dad__` `avi__` `djb__` `dla__` `tnv__` `atk__` `znl__` `zng__` `zna__` `znm__` `zpe__` `dal__` `dtk__` |
+| **AI Agent** | `aim__` `ai-chat__` |
+| **Dispatch** | `dsp__` |
+| **Warehouse** | `wh__` `whc__` `whdt__` `whsl__` |
+| **Ezzy API** | `api__` |
+| **Webpages** | `wpa__` `wpc__` `wpt__` `wpk__` `wpfl__` `wpaff__` `wphc__` `wphg__` `wpp__` `wpfaq__` `wpgd__` `wpdr__` `wpful__` `pgn__` `site-nav__` `ez-*` |
+| **Shared** | `site-footer__` `site-nav__` `empty-state__` `stat-card__` `status-badge--` `qnas-verify__` `pgn__` `htmx-loader__` `biz-dash__` `chart-card__` |
+
+When adding a new page, pick a short unique prefix (e.g. `wexp__` for workforce export) and register it above.
+
+### Step-by-Step: Applying BEM to an Existing Template
+
+Follow this process whenever a template has `<style>` blocks or inline styles:
+
+**1. Create a dedicated CSS file**
+```
+workforce/static/workforce/css/wf_export.css   ← page-specific
+```
+Name it `{app}_{page_slug}.css`. Use `{% block extra_css %}` only for pages that do **not** use HTMX navigation (see CSS Architecture rule below).
+
+**2. Move `<style>` block content into the CSS file**
+- Pick a 4-6 char BEM prefix for this page (e.g. `wexp__`)
+- Paste all rules verbatim, then refactor with the prefix
+
+**3. Replace inline styles with BEM classes**
+
+| Inline style | BEM replacement |
+|---|---|
+| `style="color:var(--brand-primary)"` | `class="wexp__hero-icon"` |
+| `style="font-size:.82rem"` | `class="wexp__hero-subtitle"` |
+| `style="font-weight:600;color:#333"` | `class="wexp__crumb-active"` |
+| `style="min-width:130px"` | `class="wexp__filter-input--date"` |
+| `style="display:none"` (JS-toggled) | use `.wexp__sel-bar` + `.wexp__sel-bar--visible` toggled via `classList.toggle()` |
+
+**4. Keep dynamic inline styles** — only when the value comes from a template variable:
+```html
+<!-- OK: dynamic color from context variable -->
+<div class="wexp__source-card" style="border-color:{{ src.color }}22;">
+```
+
+**5. Collect static & reload**
+```bash
+source venvezzy/bin/activate && python manage.py collectstatic --noinput
+kill -HUP $(pgrep -f "gunicorn.*ezzydelivery" | head -1)
+```
+
+### Example — Before / After
+
+**Before (inline styles + `<style>` block):**
+```html
+<style>
+.wexp__hero { display:flex; padding:.75rem 1rem; background:#fff; }
+</style>
+<div style="min-width:0;max-width:100%">
+  <div class="wexp__hero">
+    <i class="fa-solid fa-file-export" style="color:var(--brand-primary)"></i>
+    <span style="font-size:.82rem;color:#888">Subtitle</span>
+  </div>
+</div>
+```
+
+**After (CSS file + BEM classes):**
+```css
+/* wf_export.css */
+.wexp__wrapper  { min-width: 0; max-width: 100%; }
+.wexp__hero     { display: flex; padding: .75rem 1rem; background: #fff; }
+.wexp__hero-icon     { color: var(--brand-primary); }
+.wexp__hero-subtitle { font-size: .82rem; color: #888; }
+```
+```html
+<div class="wexp__wrapper">
+  <div class="wexp__hero">
+    <i class="fa-solid fa-file-export wexp__hero-icon"></i>
+    <span class="wexp__hero-subtitle">Subtitle</span>
+  </div>
+</div>
+```
+
+---
+
 ### 1. Mobile-First Responsive Design
 Always design for mobile first, then enhance for larger screens.
 

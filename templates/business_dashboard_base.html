@@ -1,9 +1,13 @@
 {% load static %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE }}" dir="{% if LANGUAGE_CODE == 'ar' %}rtl{% else %}ltr{% endif %}">
   <head>
     {% include "includes/head.html" %}
+    {% if LANGUAGE_CODE == 'ar' %}
+    <link rel="stylesheet" href="{% static 'css/rtl.css' %}?v=20260402a">
+    {% endif %}
     <meta name="csrf-token" content="{{ csrf_token }}">
 
     <!-- Favicon -->
@@ -17,6 +21,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="EzzyBusiness">
     <link rel="manifest" href="{% static 'manifest-business.json' %}">
+
+    <!-- Form & Plugin CSS (moved from head.html for performance) -->
+    <link rel="stylesheet" href="{% static 'base-forms.css' %}">
+    <link rel="stylesheet" href="{% static 'mobile-app.css' %}?v=20260329a">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
 
     <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
     <link rel="stylesheet" href="{% static 'business_dashboard_base.css' %}?v=20260212c">

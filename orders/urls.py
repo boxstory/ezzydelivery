@@ -1,6 +1,4 @@
 from django.urls import path
-from webpages import views as webpages_views
-from delivery import views as delivery_views
 from orders import views as orders_views
 
 # /orders/
@@ -18,7 +16,7 @@ urlpatterns = [
     path('add_order/', orders_views.add_order, name='add_order'),
     path('add_order_bulk/', orders_views.add_order_bulk, name='add_order_bulk'),
     path('add_order_with_product/', orders_views.add_order_with_product, name='add_order_with_product'),
-    path('add_order/<int:pickup_id>', orders_views.deliver_to_here, name='deliver_to_here'),
+    path('add_order/<int:pickup_id>/', orders_views.deliver_to_here, name='deliver_to_here'),
     path('pick_from_here/<int:pickup_id>/', orders_views.pick_from_here, name='pick_from_here'),
     path('order_update/<int:order_id>/',
          orders_views.order_update, name='order_update'),
@@ -59,6 +57,7 @@ urlpatterns = [
 
      # orders by API
      path('api/all/', orders_views.get_order_by_api, name='get_order_by_api'),
+     path('api/import/', orders_views.import_shopify_orders, name='import_shopify_orders'),
      path('api/shopify_orders/', orders_views.get_orders_by_base_api, name='get_orders_by_base_api'),
 
      # Location Verification (Public URL)

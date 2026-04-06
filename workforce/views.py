@@ -58,6 +58,7 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from datetime import timedelta
 import csv
 import os
 from django.contrib.auth.decorators import login_required
@@ -97,6 +98,22 @@ DriverDocument = fleet_models.DriverDocument
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_date_param(value):
+    """Parse a date string from query params, accepting YYYY-MM-DD or human-readable formats."""
+    if not value:
+        return ''
+    # Already ISO format
+    if len(value) == 10 and value[4] == '-' and value[7] == '-':
+        return value
+    # Try dateutil-style parsing for formats like "March 25, 2026"
+    from dateutil import parser as dateutil_parser
+    try:
+        return dateutil_parser.parse(value).strftime('%Y-%m-%d')
+    except (ValueError, TypeError):
+        return ''
+
+
 # Import shared utilities from core
 from core.utils import (
     contains_arabic,
@@ -105,6 +122,238 @@ from core.utils import (
     format_whatsapp_number,
 )
 
+
+# =============================================================================
+# IMPORT MAPPING CONSTANTS
+# =============================================================================
+
+IMPORT_FIELD_LABELS = {
+    'client_order_code': 'Order ID',
+    'platform_id':       'Platform Order ID',
+    'platform':          'Source Platform',
+    'order_date':        'Order Date',
+    'customer_name':     'Customer Name',
+    'customer_phone':    'Phone 1',
+    'customer_whatsapp': 'Phone 2 / WhatsApp',
+    'customer_email':    'Email',
+    'customer_address':  'Customer Address',
+    'dl_landmark':       'City / Landmark',
+    'dl_building':       'Villa / Building No',
+    'dl_street':         'Street No',
+    'dl_zone':           'Zone No',
+    'location_link':     'Location Link',
+    'dl_latitude':       'Latitude',
+    'dl_longitude':      'Longitude',
+    'deadline_date':     'Deadline / Day & Time',
+    'package_desc':      'Package Description',
+    'sku':               'SKU',
+    'product_url':       'Product URL',
+    'package_qty':       'Package Qty',
+    'cod_amount':           'Price / COD Amount',
+    'cod_status_by_client': 'COD / Payment Status',
+    'financial_status':     'Platform Payment Status',
+    'payment_method':       'Payment Method',
+    'dl_amount':            'Delivery Fee',
+    'seller_notes':         'Seller Notes',
+    'internal_notes':       'Internal Notes',
+}
+for _i in range(1, 11):
+    IMPORT_FIELD_LABELS[f'product_{_i}'] = f'Product {_i}'
+    IMPORT_FIELD_LABELS[f'count_{_i}']   = f'Count {_i}'
+
+SHOPIFY_VIRTUAL_COLS = [
+    # ── Order ──────────────────────────────────────────────────────────────
+    'order.id', 'order.name', 'order.number', 'order.created_at',
+    'order.updated_at', 'order.processed_at', 'order.cancelled_at',
+    'order.currency', 'order.source_name', 'order.tags',
+    'order.contact_email', 'order.phone', 'order.token',
+    'order.cancel_reason', 'order.confirmation_number', 'order.po_number',
+    'order.total_weight', 'order.total_outstanding',
+    # ── Customer ───────────────────────────────────────────────────────────
+    'customer.id', 'customer.name', 'customer.first_name', 'customer.last_name',
+    'customer.email', 'customer.phone',
+    'customer.tags', 'customer.orders_count', 'customer.total_spent',
+    'customer.verified_email', 'customer.note',
+    # ── Shipping address ───────────────────────────────────────────────────
+    'shipping.name', 'shipping.first_name', 'shipping.last_name',
+    'shipping.company', 'shipping.phone',
+    'shipping.address', 'shipping.address2',
+    'shipping.city', 'shipping.province', 'shipping.province_code',
+    'shipping.zip', 'shipping.country', 'shipping.country_code',
+    # ── Billing address ────────────────────────────────────────────────────
+    'billing.name', 'billing.first_name', 'billing.last_name',
+    'billing.company', 'billing.phone',
+    'billing.address', 'billing.address2',
+    'billing.city', 'billing.province', 'billing.province_code',
+    'billing.zip', 'billing.country', 'billing.country_code',
+    # ── Financials ─────────────────────────────────────────────────────────
+    'total_price', 'subtotal_price', 'total_line_items_price',
+    'total_shipping', 'total_tax', 'total_discounts',
+    'total_outstanding', 'total_tip_received',
+    'current_total_price', 'current_subtotal_price',
+    'financial_status', 'fulfillment_status',
+    # ── Discount ───────────────────────────────────────────────────────────
+    'discount_code', 'discount_amount', 'discount_type',
+    # ── Payment ────────────────────────────────────────────────────────────
+    'payment_gateway', 'payment_terms',
+    # ── Notes / attributes ─────────────────────────────────────────────────
+    'note',
+    'note_attribute.1.name', 'note_attribute.1.value',
+    'note_attribute.2.name', 'note_attribute.2.value',
+    'note_attribute.3.name', 'note_attribute.3.value',
+    # ── Line items (up to 5) ───────────────────────────────────────────────
+    'line_item_1.title', 'line_item_1.variant_title',
+    'line_item_1.quantity', 'line_item_1.sku', 'line_item_1.price',
+    'line_item_1.total_discount', 'line_item_1.vendor', 'line_item_1.fulfillment_status',
+    'line_item_2.title', 'line_item_2.variant_title',
+    'line_item_2.quantity', 'line_item_2.sku', 'line_item_2.price',
+    'line_item_2.total_discount', 'line_item_2.vendor', 'line_item_2.fulfillment_status',
+    'line_item_3.title', 'line_item_3.variant_title',
+    'line_item_3.quantity', 'line_item_3.sku', 'line_item_3.price',
+    'line_item_3.total_discount', 'line_item_3.vendor', 'line_item_3.fulfillment_status',
+    'line_item_4.title', 'line_item_4.variant_title',
+    'line_item_4.quantity', 'line_item_4.sku', 'line_item_4.price',
+    'line_item_4.total_discount', 'line_item_4.vendor', 'line_item_4.fulfillment_status',
+    'line_item_5.title', 'line_item_5.variant_title',
+    'line_item_5.quantity', 'line_item_5.sku', 'line_item_5.price',
+    'line_item_5.total_discount', 'line_item_5.vendor', 'line_item_5.fulfillment_status',
+    'line_item_6.title', 'line_item_6.quantity', 'line_item_6.sku', 'line_item_6.price',
+    'line_item_7.title', 'line_item_7.quantity', 'line_item_7.sku', 'line_item_7.price',
+    'line_item_8.title', 'line_item_8.quantity', 'line_item_8.sku', 'line_item_8.price',
+    'line_item_9.title', 'line_item_9.quantity', 'line_item_9.sku', 'line_item_9.price',
+    'line_item_10.title', 'line_item_10.quantity', 'line_item_10.sku', 'line_item_10.price',
+    # ── Aggregated line items ──────────────────────────────────────────────
+    'line_items.titles', 'line_items.skus', 'line_items.total_qty',
+    'line_items.vendors', 'line_items.titles_with_qty',
+    # ── Shipping lines ─────────────────────────────────────────────────────
+    'shipping_line_1.title', 'shipping_line_1.price', 'shipping_line_1.code',
+    'shipping_line_1.discounted_price', 'shipping_line_1.source',
+    'shipping_line_2.title', 'shipping_line_2.price', 'shipping_line_2.code',
+    # ── Additional order fields ────────────────────────────────────────────
+    'order.landing_site', 'order.referring_site', 'order.customer_locale',
+    'order.buyer_accepts_marketing', 'order.test', 'order.closed_at',
+    'order.taxes_included', 'order.estimated_taxes',
+    # ── Extended line item fields ──────────────────────────────────────────
+    'line_item_1.product_id', 'line_item_1.variant_id', 'line_item_1.name',
+    'line_item_1.grams', 'line_item_1.requires_shipping', 'line_item_1.taxable',
+    'line_item_2.product_id', 'line_item_2.variant_id', 'line_item_2.name',
+    'line_item_2.grams', 'line_item_2.requires_shipping', 'line_item_2.taxable',
+    'line_item_3.product_id', 'line_item_3.variant_id', 'line_item_3.name',
+    'line_item_3.grams', 'line_item_3.requires_shipping', 'line_item_3.taxable',
+    # ── COD specific ───────────────────────────────────────────────────────
+    'cod.amount', 'cod.status', 'cod.currency',
+]
+WOO_VIRTUAL_COLS = [
+    # Order
+    'order.id', 'order.number', 'order.date_created',
+    # Customer
+    'billing.first_name + last_name', 'billing.email', 'billing.phone',
+    'shipping.phone',
+    # Shipping address
+    'shipping.address_1', 'shipping.address_2', 'shipping.city',
+    'shipping.state', 'shipping.postcode', 'shipping.country',
+    # Billing address
+    'billing.address_1', 'billing.address_2', 'billing.city', 'billing.state',
+    # Financials
+    'total', 'subtotal', 'shipping_total', 'total_tax', 'discount_total',
+    'status', 'payment_method_title', 'payment_method',
+    # Notes
+    'customer_note',
+    # Line items (up to 5)
+    'line_item_1.name', 'line_item_1.quantity', 'line_item_1.sku', 'line_item_1.price',
+    'line_item_2.name', 'line_item_2.quantity', 'line_item_2.sku', 'line_item_2.price',
+    'line_item_3.name', 'line_item_3.quantity', 'line_item_3.sku', 'line_item_3.price',
+    'line_item_4.name', 'line_item_4.quantity', 'line_item_4.sku', 'line_item_4.price',
+    'line_item_5.name', 'line_item_5.quantity', 'line_item_5.sku', 'line_item_5.price',
+    'line_item_6.name', 'line_item_6.quantity', 'line_item_6.sku', 'line_item_6.price',
+    'line_item_7.name', 'line_item_7.quantity', 'line_item_7.sku', 'line_item_7.price',
+    'line_item_8.name', 'line_item_8.quantity', 'line_item_8.sku', 'line_item_8.price',
+    'line_item_9.name', 'line_item_9.quantity', 'line_item_9.sku', 'line_item_9.price',
+    'line_item_10.name', 'line_item_10.quantity', 'line_item_10.sku', 'line_item_10.price',
+    # Aggregated
+    'line_items.names', 'line_items.total_qty',
+]
+SHOPIFY_DEFAULT_MAPPING = {
+    'client_order_code':    'order.name',
+    'platform_id':          'order.id',
+    'order_date':           'order.created_at',
+    'customer_name':        'customer.name',
+    'customer_phone':       'shipping.phone',
+    'customer_whatsapp':    'customer.phone',
+    'customer_email':       'customer.email',
+    'customer_address':     'shipping.address',
+    'dl_building':          'shipping.address2',
+    'dl_landmark':          'shipping.city',
+    'dl_zone':              'shipping.province',
+    'cod_amount':           'total_price',
+    'cod_status_by_client': 'financial_status',
+    'financial_status':     'financial_status',
+    'payment_method':       'payment_gateway',
+    'package_desc':         'line_items.titles_with_qty',
+    'package_qty':          'line_items.total_qty',
+    'seller_notes':         'note',
+    'product_1':            'line_item_1.title',
+    'count_1':              'line_item_1.quantity',
+    'product_2':            'line_item_2.title',
+    'count_2':              'line_item_2.quantity',
+    'product_3':            'line_item_3.title',
+    'count_3':              'line_item_3.quantity',
+    'product_4':            'line_item_4.title',
+    'count_4':              'line_item_4.quantity',
+    'product_5':            'line_item_5.title',
+    'count_5':              'line_item_5.quantity',
+    'product_6':            'line_item_6.title',
+    'count_6':              'line_item_6.quantity',
+    'product_7':            'line_item_7.title',
+    'count_7':              'line_item_7.quantity',
+    'product_8':            'line_item_8.title',
+    'count_8':              'line_item_8.quantity',
+    'product_9':            'line_item_9.title',
+    'count_9':              'line_item_9.quantity',
+    'product_10':           'line_item_10.title',
+    'count_10':             'line_item_10.quantity',
+}
+WOO_DEFAULT_MAPPING = {
+    'client_order_code':    'order.number',
+    'platform_id':          'order.id',
+    'order_date':           'order.date_created',
+    'customer_name':        'billing.first_name + last_name',
+    'customer_phone':       'billing.phone',
+    'customer_whatsapp':    'shipping.phone',
+    'customer_email':       'billing.email',
+    'customer_address':     'shipping.address_1',
+    'dl_building':          'shipping.address_2',
+    'dl_landmark':          'shipping.city',
+    'dl_zone':              'shipping.state',
+    'cod_amount':           'total',
+    'cod_status_by_client': 'status',
+    'financial_status':     'status',
+    'payment_method':       'payment_method_title',
+    'package_desc':         'line_items.names',
+    'package_qty':          'line_items.total_qty',
+    'seller_notes':         'customer_note',
+    'internal_notes':       'customer_note',
+    'product_1':            'line_item_1.name',
+    'count_1':              'line_item_1.quantity',
+    'product_2':            'line_item_2.name',
+    'count_2':              'line_item_2.quantity',
+    'product_3':            'line_item_3.name',
+    'count_3':              'line_item_3.quantity',
+    'product_4':            'line_item_4.name',
+    'count_4':              'line_item_4.quantity',
+    'product_5':            'line_item_5.name',
+    'count_5':              'line_item_5.quantity',
+    'product_6':            'line_item_6.name',
+    'count_6':              'line_item_6.quantity',
+    'product_7':            'line_item_7.name',
+    'count_7':              'line_item_7.quantity',
+    'product_8':            'line_item_8.name',
+    'count_8':              'line_item_8.quantity',
+    'product_9':            'line_item_9.name',
+    'count_9':              'line_item_9.quantity',
+    'product_10':           'line_item_10.name',
+    'count_10':             'line_item_10.quantity',
+}
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -236,26 +485,41 @@ def wf_dashboard(request):
     # Recent orders (last 10 updated)
     orders = Order.objects.select_related('business').order_by('-updated_at')[:10]
 
-    # Orders trend data for the last 7 days - based on delivered_at date
+    # Trend data for the last 7 days
     from django.db.models.functions import TruncDate
     week_ago = today - timedelta(days=6)
-    order_counts_by_date = dict(
+
+    # Orders trend - based on created_at date
+    order_created_by_date = dict(
+        Order.objects.filter(created_at__date__gte=week_ago, created_at__date__lte=today)
+        .annotate(created_date=TruncDate('created_at'))
+        .values('created_date')
+        .annotate(count=Count('id'))
+        .values_list('created_date', 'count')
+    )
+
+    # Deliveries trend - based on delivered_at date
+    delivery_counts_by_date = dict(
         Order.objects.filter(delivered_at__date__gte=week_ago, delivered_at__date__lte=today)
         .annotate(delivered_date=TruncDate('delivered_at'))
         .values('delivered_date')
         .annotate(count=Count('id'))
         .values_list('delivered_date', 'count')
     )
+
     orders_trend = []
     max_orders = 1  # Prevent division by zero
     for i in range(6, -1, -1):
         date = today - timedelta(days=i)
-        count = order_counts_by_date.get(date, 0)
-        if count > max_orders:
-            max_orders = count
+        o_count = order_created_by_date.get(date, 0)
+        d_count = delivery_counts_by_date.get(date, 0)
+        peak = max(o_count, d_count)
+        if peak > max_orders:
+            max_orders = peak
         orders_trend.append({
             'date': date.strftime('%a'),
-            'count': count
+            'orders': o_count,
+            'deliveries': d_count,
         })
 
     data = {
@@ -303,9 +567,10 @@ def all_orders(request):
     c_status = request.GET.get('cStatus', '').strip()
     dl_task_status = request.GET.get('dlTaskStatus', '').strip()
     business_id = request.GET.get('business', '').strip()
-    date_from = request.GET.get('dateFrom', '').strip()
-    date_to = request.GET.get('dateTo', '').strip()
+    date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
+    date_to = _parse_date_param(request.GET.get('dateTo', '').strip())
     date_preset = request.GET.get('datePreset', '').strip()
+    sort = request.GET.get('sort', 'date_desc').strip()
 
     # Filter by Business ID
     if business_id:
@@ -338,8 +603,14 @@ def all_orders(request):
     # Annotate with comment count (for now, all comments are counted as unread)
     orders = orders.annotate(unread_comments_count=Count('order_comments'))
 
-    # Order by created date
-    orders = orders.order_by('-created_at')
+    # Sorting
+    sort_map = {
+        'date_desc': '-created_at',
+        'date_asc': 'created_at',
+        'cod_desc': '-cod_amount',
+        'cod_asc': 'cod_amount',
+    }
+    orders = orders.order_by(sort_map.get(sort, '-created_at'))
 
     # Paginate results
     orders = paginate_queryset(request, orders)
@@ -359,6 +630,8 @@ def all_orders(request):
         filter_params_list.append(f'dlTaskStatus={dl_task_status}')
     if business_id:
         filter_params_list.append(f'business={business_id}')
+    if sort and sort != 'date_desc':
+        filter_params_list.append(f'sort={sort}')
 
     filter_params = '&'.join(filter_params_list)
 
@@ -376,6 +649,7 @@ def all_orders(request):
             'datePreset': date_preset,
         },
         'filter_params': filter_params,
+        'sort': sort,
         'per_page': request.GET.get('per_page', '25'),
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -391,7 +665,7 @@ def fulfilled_clients_orders(request):
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
     ).prefetch_related('order_comments', 'delivery_task', 'order_items').filter(
-        business__fulfillment_service_enabled=True
+        business__fulfillment_service_status='active',
     )
 
     # Apply filters based on GET parameters
@@ -419,9 +693,10 @@ def fulfilled_clients_orders(request):
     orders = orders.order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
-    # Get all fulfillment-enabled businesses for filter
+    # Get all fulfillment-active businesses for filter
     all_businesses = business_models.Business.objects.filter(
-        fulfillment_service_enabled=True
+        business_status='active',
+        fulfillment_service_status='active',
     ).order_by('business_name')
 
     # Build filter_params string for pagination
@@ -459,14 +734,14 @@ def fulfilled_clients_orders(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def non_fulfilled_clients_orders(request):
-    """Orders from businesses without fulfillment service"""
+    """Orders from businesses without active fulfillment service"""
     from django.db.models import Count
 
     # Filter orders from businesses without active fulfillment service
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
     ).prefetch_related('order_comments', 'delivery_task', 'order_items').exclude(
-        business__fulfillment_service_status='active'
+        business__fulfillment_service_status='active',
     )
 
     # Apply filters based on GET parameters
@@ -495,8 +770,9 @@ def non_fulfilled_clients_orders(request):
     orders = paginate_queryset(request, orders)
 
     # Get all non-fulfillment businesses for filter
-    all_businesses = business_models.Business.objects.exclude(
-        fulfillment_service_status='active'
+    all_businesses = business_models.Business.objects.filter(
+        business_status='active',
+        fulfillment_service_status__in=['none', 'not_required'],
     ).order_by('business_name')
 
     # Build filter_params string for pagination
@@ -1260,9 +1536,154 @@ def preview_api_import(request):
     except business_models.Business.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
 
-    if api.api_type != 'google_sheet':
-        # For Shopify/WooCommerce, just return the platform_ids as-is (preview not needed)
-        return JsonResponse({'success': True, 'preview': [], 'api_type': api.api_type})
+    if api.api_type == 'shopify':
+        SHOPIFY_FIELDS = [
+            {'name': 'row_number',          'label': '#',                'sheet_col': ''},
+            {'name': 'client_order_code',   'label': 'Order ID',         'sheet_col': 'Shopify'},
+            {'name': 'customer_name',       'label': 'Customer Name',    'sheet_col': 'Shopify'},
+            {'name': 'customer_phone',      'label': 'Phone',            'sheet_col': 'Shopify'},
+            {'name': 'customer_address',    'label': 'Address',          'sheet_col': 'Shopify'},
+            {'name': 'cod_amount',          'label': 'Total Price (QAR)', 'sheet_col': 'Shopify'},
+            {'name': 'financial_status',    'label': 'Payment Status',   'sheet_col': 'Shopify'},
+            {'name': 'fulfillment_status',  'label': 'Fulfillment',      'sheet_col': 'Shopify'},
+        ]
+        preview_rows = []
+        already_imported = []
+        errors = []
+        try:
+            import shopify as _shopify
+            shop_name = (api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+            session = _shopify.Session(shop_name, api.api_version or '2023-10', api.api_access_token)
+            _shopify.ShopifyResource.activate_session(session)
+            for i, pid in enumerate(platform_ids):
+                try:
+                    already = orders_models.Order.objects.filter(
+                        business=business,
+                        original_order_data__platform_id=str(pid),
+                        original_order_data__source='shopify',
+                    ).exists()
+                    if already:
+                        already_imported.append(str(pid))
+
+                    o = _shopify.Order.find(pid)
+                    shipping = getattr(o, 'shipping_address', None)
+                    billing  = getattr(o, 'billing_address', None)
+                    addr     = shipping or billing
+                    addr_str = ' '.join(filter(None, [
+                        getattr(addr, 'address1', '') or '',
+                        getattr(addr, 'city',     '') or '',
+                    ])) if addr else ''
+                    phone    = getattr(addr, 'phone', '') or getattr(getattr(o, 'customer', None), 'phone', '') or ''
+                    customer = getattr(o, 'customer', None)
+                    cname    = f"{getattr(customer,'first_name','') or ''} {getattr(customer,'last_name','') or ''}".strip() or getattr(o, 'name', str(pid))
+                    # Build product_matches from line items
+                    li_items = getattr(o, 'line_items', []) or []
+                    product_matches = []
+                    for li in li_items:
+                        li_title = getattr(li, 'title', '') or getattr(li, 'name', '') or ''
+                        li_qty = int(getattr(li, 'quantity', 1) or 1)
+                        if li_title:
+                            matched, mtype = match_product(business, li_title)
+                            product_matches.append({
+                                'raw': li_title,
+                                'qty': li_qty,
+                                'matched_name': matched.item_name if matched else None,
+                                'match_type': mtype,
+                            })
+                    # Build package description
+                    pkg_parts = [f"{pm['raw']} x{pm['qty']}" for pm in product_matches]
+                    preview_rows.append({
+                        'row_number':         str(pid),
+                        'client_order_code':  getattr(o, 'name', str(pid)),
+                        'customer_name':      cname,
+                        'customer_phone':     phone,
+                        'customer_address':   addr_str,
+                        'cod_amount':         str(getattr(o, 'total_price', '') or ''),
+                        'financial_status':   getattr(o, 'financial_status', '') or '',
+                        'fulfillment_status': getattr(o, 'fulfillment_status', '') or 'unfulfilled',
+                        'package_desc':       ', '.join(pkg_parts)[:255] if pkg_parts else '',
+                        'product_matches':    product_matches,
+                    })
+                except Exception as e:
+                    errors.append(f"{pid}: {e}")
+            _shopify.ShopifyResource.clear_session()
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Shopify connection failed: {e}'})
+        return JsonResponse({
+            'success': True,
+            'preview': preview_rows,
+            'fields': SHOPIFY_FIELDS,
+            'total_rows': len(platform_ids),
+            'already_imported': already_imported,
+            'errors': errors,
+        })
+
+    elif api.api_type == 'woocommerce':
+        WOO_FIELDS = [
+            {'name': 'row_number',          'label': '#',                'sheet_col': ''},
+            {'name': 'client_order_code',   'label': 'Order ID',         'sheet_col': 'WooCommerce'},
+            {'name': 'customer_name',       'label': 'Customer Name',    'sheet_col': 'WooCommerce'},
+            {'name': 'customer_phone',      'label': 'Phone',            'sheet_col': 'WooCommerce'},
+            {'name': 'customer_address',    'label': 'Address',          'sheet_col': 'WooCommerce'},
+            {'name': 'cod_amount',          'label': 'Total Price (QAR)', 'sheet_col': 'WooCommerce'},
+            {'name': 'financial_status',    'label': 'Payment Status',   'sheet_col': 'WooCommerce'},
+        ]
+        preview_rows = []
+        already_imported = []
+        try:
+            from woocommerce import API as _WooAPI
+            wcapi = _WooAPI(
+                url=api.site_api_url or '',
+                consumer_key=api.api_key or '',
+                consumer_secret=api.api_secret or '',
+                version='wc/v3',
+                timeout=15,
+            )
+            for pid in platform_ids:
+                already = orders_models.Order.objects.filter(
+                    business=business,
+                    original_order_data__platform_id=str(pid),
+                    original_order_data__source='woocommerce',
+                ).exists()
+                if already:
+                    already_imported.append(str(pid))
+                try:
+                    r = wcapi.get(f'orders/{pid}')
+                    if r.status_code != 200:
+                        continue
+                    o = r.json()
+                    billing  = o.get('billing', {})
+                    shipping = o.get('shipping', {})
+                    addr     = shipping if any(shipping.values()) else billing
+                    addr_str = ' '.join(filter(None, [
+                        addr.get('address_1', ''),
+                        addr.get('city', ''),
+                    ]))
+                    phone  = billing.get('phone', '') or ''
+                    cname  = f"{billing.get('first_name','') or ''} {billing.get('last_name','') or ''}".strip() or str(pid)
+                    preview_rows.append({
+                        'row_number':        str(pid),
+                        'client_order_code': str(o.get('number', pid)),
+                        'customer_name':     cname,
+                        'customer_phone':    phone,
+                        'customer_address':  addr_str,
+                        'cod_amount':        str(o.get('total', '')),
+                        'financial_status':  o.get('status', ''),
+                    })
+                except Exception:
+                    pass
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'WooCommerce connection failed: {e}'})
+        return JsonResponse({
+            'success': True,
+            'preview': preview_rows,
+            'fields': WOO_FIELDS,
+            'total_rows': len(platform_ids),
+            'already_imported': already_imported,
+        })
+
+    elif api.api_type not in ('google_sheet',):
+        return JsonResponse({'success': False, 'error': f'Preview not supported for source: {api.api_type}'})
 
     try:
         import gspread
@@ -1651,6 +2072,17 @@ def import_api_orders(request):
                     phone = getattr(addr, 'phone', '') or ''
                     customer = getattr(o, 'customer', None)
                     customer_name = f"{getattr(customer, 'first_name', '')} {getattr(customer, 'last_name', '')}".strip() if customer else ''
+                    # Extract line items for storage
+                    line_items_raw = getattr(o, 'line_items', []) or []
+                    line_items_data = []
+                    for li in line_items_raw:
+                        line_items_data.append({
+                            'title': getattr(li, 'title', '') or '',
+                            'name': getattr(li, 'name', '') or '',
+                            'quantity': int(getattr(li, 'quantity', 1) or 1),
+                            'price': str(getattr(li, 'price', 0) or 0),
+                            'sku': getattr(li, 'sku', '') or '',
+                        })
                     original_data = {
                         'source': 'shopify',
                         'platform_id': str(o.id),
@@ -1660,18 +2092,82 @@ def import_api_orders(request):
                         'total_price': str(o.total_price),
                         'currency': o.currency,
                         'created_at': str(o.created_at),
+                        'line_items': line_items_data,
                     }
+
+                    _cod = 0
+                    try:
+                        _cod = int(float(str(o.total_price).replace(',', '').strip()))
+                    except (ValueError, TypeError):
+                        pass
+
+                    # Apply row overrides from editable verify UI
+                    import re as _re_shopify
+                    ovr = row_overrides.get(str(pid), row_overrides.get(pid, {}))
+                    if ovr:
+                        if 'customer_name' in ovr:
+                            customer_name = ovr['customer_name']
+                        if 'customer_phone' in ovr:
+                            phone = ovr['customer_phone']
+                        if 'customer_address' in ovr:
+                            addr_str = ovr['customer_address']
+                        if 'cod_amount' in ovr:
+                            try:
+                                _cod = int(float(_re_shopify.sub(r'[^\d.]', '', ovr['cod_amount']))) if ovr['cod_amount'] else 0
+                            except (ValueError, TypeError):
+                                pass
+                        if 'package_desc' in ovr:
+                            pass  # Will be used below
+
+                    # Build package description from line items
+                    line_items = getattr(o, 'line_items', []) or []
+                    pkg_parts = []
+                    total_qty = 0
+                    for li in line_items:
+                        title = getattr(li, 'title', '') or getattr(li, 'name', '') or ''
+                        qty = int(getattr(li, 'quantity', 1) or 1)
+                        if title:
+                            pkg_parts.append(f"{title} x{qty}")
+                            total_qty += qty
+
+                    _pkg_desc = ovr.get('package_desc', ', '.join(pkg_parts))[:255] if ovr else ', '.join(pkg_parts)[:255]
+                    _client_order_code = ovr.get('client_order_code', '') if ovr else ''
 
                     order = orders_models.Order.objects.create(
                         business=business,
+                        client_order_code=_client_order_code or getattr(o, 'name', str(pid)),
                         customer_name=customer_name or o.name,
                         customer_phone=phone,
                         customer_address=addr_str,
-                        cod_amount=o.total_price,
+                        cod_amount=_cod,
+                        package_description=_pkg_desc if _pkg_desc else '',
+                        package_qty=total_qty or 1,
                         order_status='to_review',
                         is_transferred=False,
                         original_order_data=original_data,
                     )
+
+                    # Create OrderItems from Shopify line items
+                    for li in line_items:
+                        li_title = getattr(li, 'title', '') or getattr(li, 'name', '') or ''
+                        li_qty = int(getattr(li, 'quantity', 1) or 1)
+                        li_price = 0
+                        try:
+                            li_price = float(str(getattr(li, 'price', 0) or 0).replace(',', ''))
+                        except (ValueError, TypeError):
+                            pass
+                        if li_title:
+                            matched, mtype = match_product(business, li_title)
+                            orders_models.OrderItem.objects.create(
+                                order=order,
+                                product=matched,
+                                quantity=li_qty,
+                                unit_price=matched.item_price if matched else li_price,
+                                notes=li_title if not matched else matched.item_name,
+                            )
+                            if matched and mtype == 'fuzzy':
+                                matched.add_client_name(li_title)
+
                     created_orders.append(order)
                     created += 1
                 except Exception as e:
@@ -1712,6 +2208,16 @@ def import_api_orders(request):
                     addr_str = ', '.join(filter(None, addr_parts))
                     customer_name = f"{billing.get('first_name','')} {billing.get('last_name','')}".strip()
 
+                    # Extract line items for storage
+                    wc_li_raw = o.get('line_items', []) or []
+                    wc_li_data = []
+                    for li in wc_li_raw:
+                        wc_li_data.append({
+                            'name': li.get('name', '') or '',
+                            'quantity': int(li.get('quantity', 1) or 1),
+                            'price': str(li.get('price', 0) or 0),
+                            'sku': li.get('sku', '') or '',
+                        })
                     original_data = {
                         'source': 'woocommerce',
                         'platform_id': str(o.get('id')),
@@ -1720,18 +2226,81 @@ def import_api_orders(request):
                         'total': str(o.get('total')),
                         'currency': o.get('currency'),
                         'date_created': o.get('date_created'),
+                        'line_items': wc_li_data,
                     }
+
+                    _wc_cod = 0
+                    try:
+                        _wc_cod = int(float(str(o.get('total') or 0).replace(',', '').strip()))
+                    except (ValueError, TypeError):
+                        pass
+                    _wc_phone = billing.get('phone', '')
+
+                    # Apply row overrides from editable verify UI
+                    import re as _re_woo
+                    ovr = row_overrides.get(str(pid), row_overrides.get(pid, {}))
+                    if ovr:
+                        if 'customer_name' in ovr:
+                            customer_name = ovr['customer_name']
+                        if 'customer_phone' in ovr:
+                            _wc_phone = ovr['customer_phone']
+                        if 'customer_address' in ovr:
+                            addr_str = ovr['customer_address']
+                        if 'cod_amount' in ovr:
+                            try:
+                                _wc_cod = int(float(_re_woo.sub(r'[^\d.]', '', ovr['cod_amount']))) if ovr['cod_amount'] else 0
+                            except (ValueError, TypeError):
+                                pass
+
+                    # Build package description from line items
+                    wc_line_items = o.get('line_items', []) or []
+                    pkg_parts = []
+                    total_qty = 0
+                    for li in wc_line_items:
+                        li_name = li.get('name', '') or ''
+                        li_qty = int(li.get('quantity', 1) or 1)
+                        if li_name:
+                            pkg_parts.append(f"{li_name} x{li_qty}")
+                            total_qty += li_qty
+
+                    _wc_pkg_desc = ovr.get('package_desc', ', '.join(pkg_parts))[:255] if ovr else ', '.join(pkg_parts)[:255]
+                    _wc_order_code = ovr.get('client_order_code', '') if ovr else ''
 
                     order = orders_models.Order.objects.create(
                         business=business,
+                        client_order_code=_wc_order_code or str(o.get('number', '')),
                         customer_name=customer_name or f"#{o.get('number')}",
-                        customer_phone=billing.get('phone', ''),
+                        customer_phone=_wc_phone,
                         customer_address=addr_str,
-                        cod_amount=o.get('total') or 0,
+                        cod_amount=_wc_cod,
+                        package_description=_wc_pkg_desc if _wc_pkg_desc else '',
+                        package_qty=total_qty or 1,
                         order_status='to_review',
                         is_transferred=False,
                         original_order_data=original_data,
                     )
+
+                    # Create OrderItems from WooCommerce line items
+                    for li in wc_line_items:
+                        li_name = li.get('name', '') or ''
+                        li_qty = int(li.get('quantity', 1) or 1)
+                        li_price = 0
+                        try:
+                            li_price = float(str(li.get('price', 0) or 0).replace(',', ''))
+                        except (ValueError, TypeError):
+                            pass
+                        if li_name:
+                            matched, mtype = match_product(business, li_name)
+                            orders_models.OrderItem.objects.create(
+                                order=order,
+                                product=matched,
+                                quantity=li_qty,
+                                unit_price=matched.item_price if matched else li_price,
+                                notes=li_name if not matched else matched.item_name,
+                            )
+                            if matched and mtype == 'fuzzy':
+                                matched.add_client_name(li_name)
+
                     created_orders.append(order)
                     created += 1
                 except Exception as e:
@@ -2236,6 +2805,173 @@ def wf_sheet_headers(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def wf_source_headers(request):
+    """GET: Return column headers for a business source (onedrive or google_sheet)."""
+    business_id = request.GET.get('business_id', '').strip()
+    platform = request.GET.get('platform', '').strip()
+    if not business_id or not platform:
+        return JsonResponse({'success': False, 'error': 'Missing business_id or platform'}, status=400)
+
+    if platform == 'google_sheet':
+        # Delegate to existing Google Sheet header fetch
+        return wf_sheet_headers(request)
+
+    if platform == 'onedrive':
+        try:
+            source_id = request.GET.get('source_id', '').strip()
+            if source_id:
+                source = orders_models.OneDriveSource.objects.filter(
+                    id=source_id, business__business_id=business_id, is_active=True
+                ).first()
+            else:
+                # Default: pick default source, then any with sheet name, then any
+                source = orders_models.OneDriveSource.objects.filter(
+                    business__business_id=business_id, is_active=True, is_default_mapping=True
+                ).first()
+                if not source:
+                    source = orders_models.OneDriveSource.objects.filter(
+                        business__business_id=business_id, is_active=True
+                    ).exclude(last_sheet_name='').first()
+                if not source:
+                    source = orders_models.OneDriveSource.objects.filter(
+                        business__business_id=business_id, is_active=True
+                    ).first()
+            if not source:
+                return JsonResponse({'success': False, 'error': 'No active OneDrive source for this business'}, status=404)
+
+            file_bytes, err = _onedrive_download_file(source)
+            if err:
+                return JsonResponse({'success': False, 'error': err}, status=500)
+
+            wb = _safe_load_workbook(file_bytes)
+            sheet_name = source.last_sheet_name
+            if not sheet_name or sheet_name not in wb.sheetnames:
+                sheet_name = wb.sheetnames[0]
+            ws = wb[sheet_name]
+            all_rows = list(ws.iter_rows(values_only=True, max_row=2))
+            wb.close()
+
+            headers = [str(c).strip() if c is not None else '' for c in all_rows[0]] if all_rows else []
+            sample = [str(c).strip() if c is not None else '' for c in all_rows[1]] if len(all_rows) > 1 else []
+
+            # Save sheet name and headers back
+            update_fields = []
+            if not source.last_sheet_name and sheet_name:
+                source.last_sheet_name = sheet_name
+                update_fields.append('last_sheet_name')
+            if headers != (source.last_headers or []):
+                source.last_headers = headers
+                update_fields.append('last_headers')
+            if update_fields:
+                source.save(update_fields=update_fields)
+
+            return JsonResponse({
+                'success': True,
+                'headers': headers,
+                'sample': sample,
+                'source_label': source.label,
+                'sheet_name': sheet_name,
+            })
+        except Exception as e:
+            logger.exception("OneDrive header fetch error")
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    if platform == 'public_link':
+        try:
+            source_id = request.GET.get('source_id', '').strip()
+            if source_id:
+                source = orders_models.PublicLinkSource.objects.filter(
+                    id=source_id, business__business_id=business_id, is_active=True
+                ).first()
+            else:
+                source = orders_models.PublicLinkSource.objects.filter(
+                    business__business_id=business_id, is_active=True
+                ).first()
+            if not source:
+                return JsonResponse({'success': False, 'error': 'No active Public Link source for this business'}, status=404)
+
+            # Fetch headers from the public link URL
+            import requests as http_requests
+            from bs4 import BeautifulSoup
+            resp = http_requests.get(source.url, timeout=30)
+            resp.raise_for_status()
+            resp.encoding = resp.apparent_encoding or 'utf-8'
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            table = soup.find('table')
+            if not table:
+                return JsonResponse({'success': False, 'error': 'No table found at URL'}, status=400)
+            header_row = table.find('tr')
+            headers = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])] if header_row else []
+            # Sample data from second row
+            rows = table.find_all('tr')
+            sample = [td.get_text(strip=True) for td in rows[1].find_all(['td', 'th'])] if len(rows) > 1 else []
+
+            # Save headers
+            if headers != (source.last_headers or []):
+                source.last_headers = headers
+                source.save(update_fields=['last_headers'])
+
+            return JsonResponse({
+                'success': True,
+                'headers': headers,
+                'sample': sample,
+                'source_label': source.label,
+            })
+        except Exception as e:
+            logger.exception("Public Link header fetch error")
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': f'Unsupported platform: {platform}'}, status=400)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_upload_sample_headers(request):
+    """POST: Upload a sample Excel/CSV file and return column headers."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    uploaded = request.FILES.get('file')
+    if not uploaded:
+        return JsonResponse({'success': False, 'error': 'No file uploaded'}, status=400)
+
+    try:
+        fname = uploaded.name.lower()
+        if fname.endswith(('.xlsx', '.xls')):
+            from openpyxl import load_workbook
+            wb = load_workbook(uploaded, read_only=True, data_only=True)
+            ws = wb[wb.sheetnames[0]]
+            hdr_row = next(ws.iter_rows(values_only=True, max_row=1), ())
+            sample_row = None
+            for row in ws.iter_rows(values_only=True, min_row=2, max_row=2):
+                sample_row = row
+            wb.close()
+            headers = [str(c).strip() for c in hdr_row if c is not None and str(c).strip()]
+            sample = [str(c).strip() if c is not None else '' for c in sample_row] if sample_row else []
+        elif fname.endswith('.csv'):
+            import csv as csv_mod, io
+            text = uploaded.read().decode('utf-8-sig')
+            reader = csv_mod.reader(io.StringIO(text))
+            header_row = next(reader, [])
+            sample_row = next(reader, [])
+            headers = [h.strip() for h in header_row if h.strip()]
+            sample = [s.strip() for s in sample_row]
+        else:
+            return JsonResponse({'success': False, 'error': 'Unsupported file type. Upload .xlsx, .xls, or .csv'}, status=400)
+
+        return JsonResponse({
+            'success': True,
+            'headers': headers,
+            'sample': sample,
+            'filename': uploaded.name,
+        })
+    except Exception as e:
+        logger.exception("Sample upload header parse error")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def wf_save_column_mapping(request):
     """POST: Save column mapping for a business's Google Sheet config."""
     if request.method != 'POST':
@@ -2262,6 +2998,12 @@ def wf_save_column_mapping(request):
 
     api.column_mapping = mapping
     api.save(update_fields=['column_mapping'])
+    # Sync to shared business import mapping (nested format, google_sheet key)
+    if mapping:
+        existing = api.business.import_mapping or {}
+        existing['google_sheet'] = mapping
+        api.business.import_mapping = existing
+        api.business.save(update_fields=['import_mapping'])
     return JsonResponse({'success': True, 'mapping': mapping})
 
 
@@ -2324,7 +3066,7 @@ def import_wizard_prepare(request):
     if source in ('google_sheet', 'shopify', 'woocommerce'):
         platform_ids = request.POST.getlist('platform_ids[]')
         meta['platform_ids'] = platform_ids
-        meta['needs_mapping'] = (source == 'google_sheet')
+        meta['needs_mapping'] = source in ('google_sheet', 'shopify', 'woocommerce')
 
         # Get API config for the business
         api = business.business_settings_api.filter(is_verify_api=True).first()
@@ -2387,17 +3129,23 @@ def import_wizard_prepare(request):
         # Use temp order's business
         import_log.business = first_temp.business
 
-        # Get headers from source
+        # Get headers from source — prefer shared business mapping, fall back to per-source
         headers = []
         saved_mapping = {}
-        if first_temp.onedrive_source:
-            # OneDriveSource stores last_column_mapping {col_idx: db_field} but no header names.
-            # Generate positional headers from raw_row length and build mapping.
-            od_mapping = first_temp.onedrive_source.last_column_mapping or {}
+        # Resolve the canonical mapping (business-level preferred)
+        biz_mapping = first_temp.business.import_mapping if first_temp.business_id else {}
+        src_mapping = (
+            (first_temp.onedrive_source.last_column_mapping if first_temp.onedrive_source else None)
+            or (first_temp.public_link_source.last_column_mapping if first_temp.public_link_source else None)
+            or {}
+        )
+        canonical_mapping = biz_mapping or src_mapping  # {col_idx_str: db_field}
+
+        if canonical_mapping:
             raw_len = max(len(first_temp.raw_row) if first_temp.raw_row else 0,
-                         max((int(k) for k in od_mapping if str(k).isdigit()), default=0) + 1)
+                         max((int(k) for k in canonical_mapping if str(k).isdigit()), default=0) + 1)
             headers = [f'Column {i}' for i in range(raw_len)]
-            for col_idx, db_field in od_mapping.items():
+            for col_idx, db_field in canonical_mapping.items():
                 idx = int(col_idx) if str(col_idx).isdigit() else -1
                 if db_field and 0 <= idx < len(headers):
                     saved_mapping[db_field] = headers[idx]
@@ -2411,7 +3159,12 @@ def import_wizard_prepare(request):
         elif first_temp.api_settings:
             # Google Sheet: column_mapping is {db_field: header_name}
             saved_mapping = first_temp.api_settings.column_mapping or {}
-            headers = list(set(saved_mapping.values()))
+            # Preserve insertion order — dict.values() is ordered in Python 3.7+
+            seen_hdrs = {}
+            for v in saved_mapping.values():
+                if v:
+                    seen_hdrs[v] = True
+            headers = list(seen_hdrs.keys())
 
         # Convert raw_row to dicts using headers (list sources) or directly (dict sources like Shopify)
         raw_data = []
@@ -2502,19 +3255,71 @@ def import_wizard(request, import_log_id):
     source = meta.get('source_type', import_log.source)
     needs_mapping = meta.get('needs_mapping', source in ('csv_upload', 'google_sheet', 'onedrive', 'temp_order'))
 
+    # API imports (Shopify/WooCommerce) always show the mapping step too
+    if source in ('shopify', 'woocommerce'):
+        needs_mapping = True
+
     # Load columns and saved mapping based on source
     columns = []
     saved_mapping = import_log.column_mapping or {}
     raw_rows = import_log.raw_data or []
 
-    if source in ('csv_upload', 'onedrive', 'temp_order'):
+    # ── Helper: extract per-platform mapping from nested or flat Business.import_mapping ──
+    def _biz_platform_mapping(src):
+        raw = business.import_mapping or {}
+        is_nested = any(k in raw for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive'))
+        if is_nested:
+            return raw.get(src, {})
+        return raw  # legacy flat — use as-is for any source
+
+    # ── Shopify / WooCommerce: virtual columns + mapping manager only ──
+    if source in ('shopify', 'woocommerce'):
+        if source == 'shopify':
+            columns = SHOPIFY_VIRTUAL_COLS
+            # Only load from mapping manager — no fallback to ImportLog or defaults
+            saved_mapping = _biz_platform_mapping('shopify') or {}
+        else:
+            columns = WOO_VIRTUAL_COLS
+            saved_mapping = _biz_platform_mapping('woocommerce') or {}
+
+        # Fetch first selected order as sample row for the mapping table
+        if not raw_rows:
+            _platform_ids = meta.get('platform_ids', [])
+            _api = business.business_settings_api.filter(is_verify_api=True).first()
+            if _platform_ids and _api:
+                _first_pid = _platform_ids[0]
+                try:
+                    if source == 'shopify':
+                        import shopify as _shopify
+                        _shop = (_api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+                        _session = _shopify.Session(_shop, _api.api_version or '2023-10', _api.api_access_token)
+                        _shopify.ShopifyResource.activate_session(_session)
+                        _o = _shopify.Order.find(_first_pid)
+                        raw_rows = [_shopify_extract_row(_o, _first_pid)]
+                        _shopify.ShopifyResource.clear_session()
+                    else:
+                        from woocommerce import API as _WooAPI
+                        _wc = _WooAPI(url=_api.site_api_url or '', consumer_key=_api.api_key or '', consumer_secret=_api.api_secret or '', version='wc/v3', timeout=10)
+                        _r = _wc.get(f'orders/{_first_pid}')
+                        if _r.status_code == 200:
+                            raw_rows = [_woo_extract_row(_r.json())]
+                except Exception as _e:
+                    logger.warning(f'Sample row fetch failed for {source} wizard: {_e}')
+
+    elif source in ('csv_upload', 'onedrive', 'temp_order'):
         # Columns from stored order (preserves file order), fallback to dict keys
         columns = meta.get('columns_order', [])
         if not columns and raw_rows:
             columns = list(raw_rows[0].keys()) if isinstance(raw_rows[0], dict) else []
         # Filter out internal fields
         columns = [c for c in columns if not c.startswith('__')]
-        # Check for previous saved mapping
+        # Priority: 1) mapping manager  2) previous ImportLog  3) OneDriveSource
+        biz_key = 'onedrive' if source == 'onedrive' else 'csv'
+        saved_mapping = (
+            _biz_platform_mapping(biz_key)
+            or saved_mapping
+            or None
+        )
         if not saved_mapping:
             prev_source = 'csv_upload' if source == 'csv_upload' else 'onedrive'
             prev_log = orders_models.ImportLog.objects.filter(
@@ -2522,15 +3327,17 @@ def import_wizard(request, import_log_id):
             ).exclude(column_mapping={}).exclude(id=import_log_id).order_by('-id').first()
             if prev_log and prev_log.column_mapping:
                 saved_mapping = prev_log.column_mapping
-        # For OneDrive, also check OneDriveSource saved mapping
         if source == 'onedrive' and not saved_mapping:
             od_source = import_log.onedrive_source
             if od_source and od_source.last_column_mapping:
                 saved_mapping = od_source.last_column_mapping
+        saved_mapping = saved_mapping or {}
 
     elif source == 'google_sheet':
         api = business.business_settings_api.filter(is_verify_api=True).first()
-        if api and api.column_mapping:
+        # Prefer mapping manager saved mapping, fallback to API settings
+        saved_mapping = _biz_platform_mapping('google_sheet')
+        if not saved_mapping and api and api.column_mapping:
             saved_mapping = api.column_mapping
         # Load Google Sheet headers as columns
         if api:
@@ -2576,9 +3383,22 @@ def import_wizard(request, import_log_id):
                             worksheet = spreadsheet.sheet1
                         all_values = worksheet.get_all_values()
                         if all_values:
-                            columns = [h for h in all_values[0] if h.strip()]
+                            headers_row = [h.strip() for h in all_values[0]]
+                            columns = [h for h in headers_row if h]
+                            # Build sample row from first data row
+                            if len(all_values) > 1 and not raw_rows:
+                                sample_vals = all_values[1]
+                                raw_rows = [{
+                                    headers_row[i]: str(sample_vals[i]).strip() if i < len(sample_vals) else ''
+                                    for i in range(len(headers_row)) if headers_row[i]
+                                }]
             except Exception as e:
                 logger.warning(f'Failed to load Google Sheet headers for wizard: {e}')
+
+    pickup_locations = business_models.PickupLocation.objects.filter(
+        business=business, pickup_status='active'
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
+    default_pickup_location = pickup_locations.filter(is_fulfilment_center=True).first() or pickup_locations.first()
 
     context = {
         'import_log': import_log,
@@ -2589,11 +3409,255 @@ def import_wizard(request, import_log_id):
         'needs_mapping': needs_mapping,
         'columns_json': json.dumps(columns),
         'saved_mapping_json': json.dumps(saved_mapping),
+        'sample_row_json': json.dumps(raw_rows[0] if raw_rows else {}),
         'raw_rows_count': len(raw_rows),
         'platform_ids_json': json.dumps(meta.get('platform_ids', [])),
         'source_label': dict(orders_models.ImportLog.SOURCE_CHOICES).get(source, source),
+        'pickup_locations': pickup_locations,
+        'default_pickup_location_id': default_pickup_location.id if default_pickup_location else '',
     }
     return render(request, 'workforce/import_wizard.html', context)
+
+
+# ── Shared extraction helpers (used by import_wizard + import_wizard_preview) ─
+
+import re as _re_mapping
+
+def _resolve_mapping_value(template, raw_row):
+    """
+    Resolve a mapping value against a source row dict.
+    Supports:
+      - plain key:     'Column A'           → raw_row['Column A']
+      - template:      '{Col A} {Col B}'    → 'value_a value_b'
+      - with sep:      '{Col A}, {Col B}'   → 'value_a, value_b'
+    Extra whitespace between empty substitutions is collapsed.
+    """
+    if not template or not isinstance(raw_row, dict):
+        return ''
+    if '{' not in template:
+        return str(raw_row.get(template, '') or '')
+    def _sub(m):
+        return str(raw_row.get(m.group(1), '') or '')
+    result = _re_mapping.sub(r'\{([^}]+)\}', _sub, template)
+    # Collapse multiple spaces / leading-trailing junk from empty substitutions
+    result = _re_mapping.sub(r'[ \t]{2,}', ' ', result).strip(' ,;/\\-')
+    return result
+
+
+def _shopify_extract_row(o, pid):
+    """Extract ALL Shopify order JSON fields as virtual columns."""
+    def _ga(obj, *attrs, default=''):
+        for a in attrs:
+            obj = getattr(obj, a, None)
+            if obj is None:
+                return default
+        return str(obj) if obj is not None else default
+
+    def _sv(val, default=''):
+        return default if val is None else str(val)
+
+    ship = getattr(o, 'shipping_address', None)
+    bill = getattr(o, 'billing_address', None)
+    cust = getattr(o, 'customer', None)
+    items = getattr(o, 'line_items', []) or []
+    note_attrs = getattr(o, 'note_attributes', []) or []
+    disc_codes = getattr(o, 'discount_codes', []) or []
+    disc = disc_codes[0] if disc_codes else None
+    pgw = getattr(o, 'payment_gateway_names', None) or []
+
+    cname = f"{_ga(cust,'first_name')} {_ga(cust,'last_name')}".strip()
+
+    ship_total = ''
+    try:
+        ship_total = str(o.total_shipping_price_set.shop_money.amount or '')
+    except Exception:
+        pass
+
+    row = {
+        'order.id':                   str(getattr(o, 'id', pid)),
+        'order.name':                 _ga(o, 'name') or str(pid),
+        'order.number':               str(getattr(o, 'order_number', '') or ''),
+        'order.created_at':           str(getattr(o, 'created_at', '') or '')[:10],
+        'order.updated_at':           str(getattr(o, 'updated_at', '') or '')[:10],
+        'order.processed_at':         str(getattr(o, 'processed_at', '') or '')[:10],
+        'order.cancelled_at':         str(getattr(o, 'cancelled_at', '') or '')[:10],
+        'order.currency':             _ga(o, 'currency'),
+        'order.source_name':          _ga(o, 'source_name'),
+        'order.tags':                 _ga(o, 'tags'),
+        'order.contact_email':        _ga(o, 'contact_email'),
+        'order.phone':                _ga(o, 'phone'),
+        'order.token':                _ga(o, 'token'),
+        'order.cancel_reason':        _ga(o, 'cancel_reason'),
+        'order.confirmation_number':  _ga(o, 'confirmation_number'),
+        'order.po_number':            _ga(o, 'po_number'),
+        'order.total_weight':         str(getattr(o, 'total_weight', '') or ''),
+        'order.total_outstanding':    str(getattr(o, 'total_outstanding', '') or ''),
+        'customer.id':                str(getattr(cust, 'id', '') or '') if cust else '',
+        'customer.name':              cname,
+        'customer.email':             _ga(cust, 'email'),
+        'customer.phone':             _ga(cust, 'phone'),
+        'customer.first_name':        _ga(cust, 'first_name'),
+        'customer.last_name':         _ga(cust, 'last_name'),
+        'customer.orders_count':      str(getattr(cust, 'orders_count', '') or '') if cust else '',
+        'customer.total_spent':       str(getattr(cust, 'total_spent', '') or '') if cust else '',
+        'customer.tags':              _ga(cust, 'tags'),
+        'customer.verified_email':    str(getattr(cust, 'verified_email', '') or '') if cust else '',
+        'customer.note':              _ga(cust, 'note'),
+        'shipping.name':              _ga(ship, 'name'),
+        'shipping.first_name':        _ga(ship, 'first_name'),
+        'shipping.last_name':         _ga(ship, 'last_name'),
+        'shipping.address1':          _ga(ship, 'address1'),
+        'shipping.address':           _ga(ship, 'address1'),   # alias used by mapping manager
+        'shipping.address2':          _ga(ship, 'address2'),
+        'shipping.city':              _ga(ship, 'city'),
+        'shipping.province':          _ga(ship, 'province'),
+        'shipping.province_code':     _ga(ship, 'province_code'),
+        'shipping.zip':               _ga(ship, 'zip'),
+        'shipping.country':           _ga(ship, 'country'),
+        'shipping.country_code':      _ga(ship, 'country_code'),
+        'shipping.company':           _ga(ship, 'company'),
+        'shipping.phone':             _ga(ship, 'phone'),
+        'billing.name':               _ga(bill, 'name'),
+        'billing.first_name':         _ga(bill, 'first_name'),
+        'billing.last_name':          _ga(bill, 'last_name'),
+        'billing.address1':           _ga(bill, 'address1'),
+        'billing.address':            _ga(bill, 'address1'),   # alias
+        'billing.address2':           _ga(bill, 'address2'),
+        'billing.city':               _ga(bill, 'city'),
+        'billing.province':           _ga(bill, 'province'),
+        'billing.zip':                _ga(bill, 'zip'),
+        'billing.country':            _ga(bill, 'country'),
+        'billing.company':            _ga(bill, 'company'),
+        'billing.phone':              _ga(bill, 'phone'),
+        'financial_status':           _ga(o, 'financial_status'),
+        'fulfillment_status':         _ga(o, 'fulfillment_status'),
+        'total_price':                _sv(getattr(o, 'total_price', None)),
+        'subtotal_price':             _sv(getattr(o, 'subtotal_price', None)),
+        'total_tax':                  _sv(getattr(o, 'total_tax', None)),
+        'total_discounts':            _sv(getattr(o, 'total_discounts', None)),
+        'total_shipping_price':       ship_total,
+        'payment_gateway':            _ga(o, 'payment_gateway'),
+        'payment_gateway_names':      ', '.join(str(p) for p in pgw),
+        'note':                       _ga(o, 'note'),
+        'discount.code':              _ga(disc, 'code'),
+        'discount.amount':            _sv(getattr(disc, 'amount', None)) if disc else '',
+        'discount.type':              _ga(disc, 'type'),
+        'cod.amount':                 _sv(getattr(o, 'total_price', None)),
+        'cod.status':                 _ga(o, 'financial_status'),
+        'cod.currency':               _ga(o, 'currency'),
+    }
+
+    ship_lines = getattr(o, 'shipping_lines', []) or []
+    for n in range(1, 3):
+        sl = ship_lines[n - 1] if len(ship_lines) >= n else None
+        row[f'shipping_line_{n}.title']            = _ga(sl, 'title') if sl else ''
+        row[f'shipping_line_{n}.price']            = _sv(getattr(sl, 'price', None)) if sl else ''
+        row[f'shipping_line_{n}.code']             = _ga(sl, 'code') if sl else ''
+        row[f'shipping_line_{n}.discounted_price'] = _sv(getattr(sl, 'discounted_price', None)) if sl else ''
+        row[f'shipping_line_{n}.source']           = _ga(sl, 'source') if sl else ''
+
+    for n in range(1, 4):
+        na = note_attrs[n - 1] if len(note_attrs) >= n else None
+        row[f'note_attribute.{n}.name']  = getattr(na, 'name', '') or '' if na else ''
+        row[f'note_attribute.{n}.value'] = getattr(na, 'value', '') or '' if na else ''
+
+    for n in range(1, 11):
+        item = items[n - 1] if len(items) >= n else None
+        row[f'line_item_{n}.title']              = _ga(item, 'title') if item else ''
+        row[f'line_item_{n}.name']               = _ga(item, 'name') if item else ''
+        row[f'line_item_{n}.variant_title']      = _ga(item, 'variant_title') if item else ''
+        row[f'line_item_{n}.product_id']         = _sv(getattr(item, 'product_id', None)) if item else ''
+        row[f'line_item_{n}.variant_id']         = _sv(getattr(item, 'variant_id', None)) if item else ''
+        row[f'line_item_{n}.quantity']           = _sv(getattr(item, 'quantity', None)) if item else ''
+        row[f'line_item_{n}.sku']                = _ga(item, 'sku') if item else ''
+        row[f'line_item_{n}.price']              = _sv(getattr(item, 'price', None)) if item else ''
+        row[f'line_item_{n}.total_discount']     = _sv(getattr(item, 'total_discount', None)) if item else ''
+        row[f'line_item_{n}.grams']              = _sv(getattr(item, 'grams', None)) if item else ''
+        row[f'line_item_{n}.vendor']             = _ga(item, 'vendor') if item else ''
+        row[f'line_item_{n}.requires_shipping']  = _sv(getattr(item, 'requires_shipping', None)) if item else ''
+        row[f'line_item_{n}.taxable']            = _sv(getattr(item, 'taxable', None)) if item else ''
+        row[f'line_item_{n}.fulfillment_status'] = _ga(item, 'fulfillment_status') if item else ''
+
+    row['line_items.titles']          = ', '.join(_ga(i, 'title') for i in items)
+    row['line_items.skus']            = ', '.join(_ga(i, 'sku') for i in items if _ga(i, 'sku'))
+    row['line_items.vendors']         = ', '.join(_ga(i, 'vendor') for i in items if _ga(i, 'vendor'))
+    row['line_items.total_qty']       = str(sum(int(getattr(i, 'quantity', 0) or 0) for i in items)) if items else ''
+    row['line_items.titles_with_qty'] = ', '.join(
+        f"{_ga(i,'title')} x{getattr(i,'quantity',0)}" for i in items
+    )
+    return row
+
+
+def _woo_extract_row(o):
+    """Extract all virtual column values from a WooCommerce order dict."""
+    billing  = o.get('billing', {})
+    shipping = o.get('shipping', {})
+    cname    = f"{billing.get('first_name','') or ''} {billing.get('last_name','') or ''}".strip()
+    items    = o.get('line_items', []) or []
+
+    row = {
+        'order.number':                   str(o.get('number', o.get('id', ''))),
+        'order.date_created':             str(o.get('date_created', '') or '')[:10],
+        'billing.first_name + last_name': cname,
+        'billing.email':                  billing.get('email', '') or '',
+        'billing.phone':                  billing.get('phone', '') or '',
+        'shipping.address_1':             shipping.get('address_1', '') or '',
+        'shipping.address_2':             shipping.get('address_2', '') or '',
+        'shipping.city':                  (shipping.get('city', '') or billing.get('city', '') or ''),
+        'shipping.state':                 (shipping.get('state', '') or billing.get('state', '') or ''),
+        'shipping.postcode':              (shipping.get('postcode', '') or billing.get('postcode', '') or ''),
+        'shipping.country':               (shipping.get('country', '') or billing.get('country', '') or ''),
+        'total':                          str(o.get('total', '')),
+        'subtotal':                       str(o.get('subtotal', '')),
+        'shipping_total':                 str(o.get('shipping_total', '')),
+        'total_tax':                      str(o.get('total_tax', '')),
+        'discount_total':                 str(o.get('discount_total', '')),
+        'status':                         o.get('status', '') or '',
+        'payment_method_title':           o.get('payment_method_title', '') or '',
+        'customer_note':                  o.get('customer_note', '') or '',
+        'line_items.names':               ', '.join(i.get('name', '') or '' for i in items),
+        'line_items.total_qty':           str(sum(int(i.get('quantity', 0) or 0) for i in items)),
+    }
+    for n in range(1, 6):
+        item = items[n - 1] if len(items) >= n else None
+        row[f'line_item_{n}.name']     = item.get('name', '') or '' if item else ''
+        row[f'line_item_{n}.quantity'] = str(item.get('quantity', '') or '') if item else ''
+        row[f'line_item_{n}.sku']      = item.get('sku', '') or '' if item else ''
+        row[f'line_item_{n}.price']    = str(item.get('price', '') or '') if item else ''
+    return row
+
+
+class _NullObj:
+    """Null object: returns None for any attribute access — used to derive column keys."""
+    def __getattr__(self, _): return None
+
+
+def _shopify_col_keys():
+    """Return the canonical Shopify virtual column list derived from _shopify_extract_row."""
+    keys = list(_shopify_extract_row(_NullObj(), '').keys())
+    # Preserve a sensible display order: order.* first, then customer, shipping, billing, etc.
+    prefix_order = ['order.', 'customer.', 'shipping.', 'billing.', 'total', 'subtotal',
+                    'financial', 'fulfillment', 'payment', 'discount', 'note',
+                    'shipping_line', 'note_attribute', 'line_item', 'line_items', 'cod.']
+    def _sort_key(k):
+        for i, p in enumerate(prefix_order):
+            if k.startswith(p):
+                return (i, k)
+        return (len(prefix_order), k)
+    return sorted(keys, key=_sort_key)
+
+
+def _woo_col_keys():
+    """Return the canonical WooCommerce virtual column list derived from _woo_extract_row."""
+    keys = list(_woo_extract_row({}).keys())
+    prefix_order = ['order.', 'billing.', 'shipping.', 'total', 'subtotal', 'shipping_total',
+                    'total_tax', 'discount', 'status', 'payment', 'customer_note', 'line_item', 'line_items']
+    def _sort_key(k):
+        for i, p in enumerate(prefix_order):
+            if k.startswith(p):
+                return (i, k)
+        return (len(prefix_order), k)
+    return sorted(keys, key=_sort_key)
 
 
 @login_required(login_url='/accounts/login/')
@@ -2623,17 +3687,14 @@ def import_wizard_preview(request):
     meta = import_log.source_meta or {}
     source = meta.get('source_type', import_log.source)
 
-    if source in ('google_sheet', 'shopify', 'woocommerce'):
-        # Delegate to existing preview_api_import logic
+    if source == 'google_sheet':
+        # Delegate to existing preview_api_import logic (Google Sheet)
         platform_ids = meta.get('platform_ids', [])
         if not platform_ids:
             return JsonResponse({'success': False, 'error': 'No platform_ids found'})
-
-        # Reuse existing preview logic by calling it internally
         from django.http import QueryDict
         from django.test import RequestFactory
         factory = RequestFactory()
-        # Build POST data with multiple platform_ids[] values
         post_data = QueryDict(mutable=True)
         post_data['business_id'] = str(business.business_id)
         for pid in platform_ids:
@@ -2642,6 +3703,347 @@ def import_wizard_preview(request):
         fake_request.POST = post_data
         fake_request.user = request.user
         return preview_api_import(fake_request)
+
+    elif source in ('shopify', 'woocommerce'):
+        # Fetch raw order data from API, then apply user's mapping {db_field: virtual_col}
+        platform_ids = meta.get('platform_ids', [])
+        if not platform_ids:
+            return JsonResponse({'success': False, 'error': 'No platform_ids found'})
+
+        api = business.business_settings_api.filter(is_verify_api=True).first()
+        if not api:
+            return JsonResponse({'success': False, 'error': 'No approved API config'})
+
+        _extract_shopify_row = _shopify_extract_row
+
+        def _noop_shopify_row(o, pid):
+            """Placeholder — actual logic now in module-level _shopify_extract_row."""
+            def _ga(obj, *attrs, default=''):
+                for a in attrs:
+                    obj = getattr(obj, a, None)
+                    if obj is None:
+                        return default
+                return str(obj) if obj is not None else default
+
+            def _sv(val, default=''):
+                return default if val is None else str(val)
+
+            ship = getattr(o, 'shipping_address', None)
+            bill = getattr(o, 'billing_address', None)
+            cust = getattr(o, 'customer', None)
+            items = getattr(o, 'line_items', []) or []
+            note_attrs = getattr(o, 'note_attributes', []) or []
+            disc_codes = getattr(o, 'discount_codes', []) or []
+            disc = disc_codes[0] if disc_codes else None
+            pgw = getattr(o, 'payment_gateway_names', None) or []
+
+            cname = f"{_ga(cust,'first_name')} {_ga(cust,'last_name')}".strip()
+
+            # shipping total via nested set
+            ship_total = ''
+            try:
+                ship_total = str(o.total_shipping_price_set.shop_money.amount or '')
+            except Exception:
+                pass
+
+            row = {
+                # ── Order ──────────────────────────────────────────────────
+                'order.id':                   str(getattr(o, 'id', pid)),
+                'order.name':                 _ga(o, 'name') or str(pid),
+                'order.number':               str(getattr(o, 'order_number', '') or ''),
+                'order.created_at':           str(getattr(o, 'created_at', '') or '')[:10],
+                'order.updated_at':           str(getattr(o, 'updated_at', '') or '')[:10],
+                'order.processed_at':         str(getattr(o, 'processed_at', '') or '')[:10],
+                'order.cancelled_at':         str(getattr(o, 'cancelled_at', '') or '')[:10],
+                'order.currency':             _ga(o, 'currency'),
+                'order.source_name':          _ga(o, 'source_name'),
+                'order.tags':                 _ga(o, 'tags'),
+                'order.contact_email':        _ga(o, 'contact_email'),
+                'order.phone':                _ga(o, 'phone'),
+                'order.token':                _ga(o, 'token'),
+                'order.cancel_reason':        _ga(o, 'cancel_reason'),
+                'order.confirmation_number':  _ga(o, 'confirmation_number'),
+                'order.po_number':            _ga(o, 'po_number'),
+                'order.total_weight':         str(getattr(o, 'total_weight', '') or ''),
+                'order.total_outstanding':    str(getattr(o, 'total_outstanding', '') or ''),
+                # ── Customer ───────────────────────────────────────────────
+                'customer.id':              str(getattr(cust, 'id', '') or '') if cust else '',
+                'customer.name':            cname,
+                'customer.first_name':      _ga(cust, 'first_name') if cust else '',
+                'customer.last_name':       _ga(cust, 'last_name') if cust else '',
+                'customer.email':           _ga(cust, 'email') if cust else '',
+                'customer.phone':           _ga(cust, 'phone') if cust else '',
+                'customer.tags':            _ga(cust, 'tags') if cust else '',
+                'customer.orders_count':    str(getattr(cust, 'orders_count', '') or '') if cust else '',
+                'customer.total_spent':     str(getattr(cust, 'total_spent', '') or '') if cust else '',
+                'customer.verified_email':  str(getattr(cust, 'verified_email', '') or '') if cust else '',
+                'customer.note':            _ga(cust, 'note') if cust else '',
+                # ── Shipping ───────────────────────────────────────────────
+                'shipping.name':          _ga(ship, 'name') if ship else '',
+                'shipping.first_name':    _ga(ship, 'first_name') if ship else '',
+                'shipping.last_name':     _ga(ship, 'last_name') if ship else '',
+                'shipping.company':       _ga(ship, 'company') if ship else '',
+                'shipping.phone':         (_ga(ship, 'phone') or _ga(cust, 'phone') if cust else '') if ship else '',
+                'shipping.address':       _ga(ship, 'address1') if ship else '',
+                'shipping.address2':      _ga(ship, 'address2') if ship else '',
+                'shipping.city':          _ga(ship, 'city') if ship else '',
+                'shipping.province':      _ga(ship, 'province') if ship else '',
+                'shipping.province_code': _ga(ship, 'province_code') if ship else '',
+                'shipping.zip':           _ga(ship, 'zip') if ship else '',
+                'shipping.country':       _ga(ship, 'country') if ship else '',
+                'shipping.country_code':  _ga(ship, 'country_code') if ship else '',
+                # ── Billing ────────────────────────────────────────────────
+                'billing.name':          _ga(bill, 'name') if bill else '',
+                'billing.first_name':    _ga(bill, 'first_name') if bill else '',
+                'billing.last_name':     _ga(bill, 'last_name') if bill else '',
+                'billing.company':       _ga(bill, 'company') if bill else '',
+                'billing.phone':         _ga(bill, 'phone') if bill else '',
+                'billing.address':       _ga(bill, 'address1') if bill else '',
+                'billing.address2':      _ga(bill, 'address2') if bill else '',
+                'billing.city':          _ga(bill, 'city') if bill else '',
+                'billing.province':      _ga(bill, 'province') if bill else '',
+                'billing.province_code': _ga(bill, 'province_code') if bill else '',
+                'billing.zip':           _ga(bill, 'zip') if bill else '',
+                'billing.country':       _ga(bill, 'country') if bill else '',
+                'billing.country_code':  _ga(bill, 'country_code') if bill else '',
+                # ── Financials ─────────────────────────────────────────────
+                'total_price':             _sv(getattr(o, 'total_price', None)),
+                'subtotal_price':          _sv(getattr(o, 'subtotal_price', None)),
+                'total_line_items_price':  _sv(getattr(o, 'total_line_items_price', None)),
+                'total_shipping':          ship_total,
+                'total_tax':               _sv(getattr(o, 'total_tax', None)),
+                'total_discounts':         _sv(getattr(o, 'total_discounts', None)),
+                'total_outstanding':       _sv(getattr(o, 'total_outstanding', None)),
+                'total_tip_received':      _sv(getattr(o, 'total_tip_received', None)),
+                'current_total_price':     _sv(getattr(o, 'current_total_price', None)),
+                'current_subtotal_price':  _sv(getattr(o, 'current_subtotal_price', None)),
+                'financial_status':        _ga(o, 'financial_status'),
+                'fulfillment_status':      _ga(o, 'fulfillment_status') or 'unfulfilled',
+                # ── Discount ───────────────────────────────────────────────
+                'discount_code':   getattr(disc, 'code', '') if disc else '',
+                'discount_amount': _sv(getattr(disc, 'amount', None)) if disc else '',
+                'discount_type':   getattr(disc, 'type', '') if disc else '',
+                # ── Payment ────────────────────────────────────────────────
+                'payment_gateway': pgw[0] if pgw else '',
+                'payment_terms':   str(getattr(o, 'payment_terms', '') or ''),
+                # ── Notes ──────────────────────────────────────────────────
+                'note': _ga(o, 'note'),
+            }
+
+            # Additional order fields
+            row.update({
+                'order.landing_site':            _ga(o, 'landing_site'),
+                'order.referring_site':          _ga(o, 'referring_site'),
+                'order.customer_locale':         _ga(o, 'customer_locale'),
+                'order.buyer_accepts_marketing': str(getattr(o, 'buyer_accepts_marketing', '') or ''),
+                'order.test':                    str(getattr(o, 'test', '') or ''),
+                'order.closed_at':               str(getattr(o, 'closed_at', '') or '')[:10],
+                'order.taxes_included':          str(getattr(o, 'taxes_included', '') or ''),
+                'order.estimated_taxes':         str(getattr(o, 'estimated_taxes', '') or ''),
+                # COD specific (derived)
+                'cod.amount':    _sv(getattr(o, 'total_price', None)),
+                'cod.status':    _ga(o, 'financial_status'),
+                'cod.currency':  _ga(o, 'currency'),
+            })
+
+            # Shipping lines (up to 2)
+            ship_lines = getattr(o, 'shipping_lines', []) or []
+            for n in range(1, 3):
+                sl = ship_lines[n - 1] if len(ship_lines) >= n else None
+                row[f'shipping_line_{n}.title']            = _ga(sl, 'title') if sl else ''
+                row[f'shipping_line_{n}.price']            = _sv(getattr(sl, 'price', None)) if sl else ''
+                row[f'shipping_line_{n}.code']             = _ga(sl, 'code') if sl else ''
+                row[f'shipping_line_{n}.discounted_price'] = _sv(getattr(sl, 'discounted_price', None)) if sl else ''
+                row[f'shipping_line_{n}.source']           = _ga(sl, 'source') if sl else ''
+
+            # Note attributes (up to 3)
+            for n in range(1, 4):
+                na = note_attrs[n - 1] if len(note_attrs) >= n else None
+                row[f'note_attribute.{n}.name']  = getattr(na, 'name', '') or '' if na else ''
+                row[f'note_attribute.{n}.value'] = getattr(na, 'value', '') or '' if na else ''
+
+            # Line items (up to 10)
+            for n in range(1, 11):
+                item = items[n - 1] if len(items) >= n else None
+                row[f'line_item_{n}.title']              = _ga(item, 'title') if item else ''
+                row[f'line_item_{n}.name']               = _ga(item, 'name') if item else ''
+                row[f'line_item_{n}.variant_title']      = _ga(item, 'variant_title') if item else ''
+                row[f'line_item_{n}.product_id']         = _sv(getattr(item, 'product_id', None)) if item else ''
+                row[f'line_item_{n}.variant_id']         = _sv(getattr(item, 'variant_id', None)) if item else ''
+                row[f'line_item_{n}.quantity']           = _sv(getattr(item, 'quantity', None)) if item else ''
+                row[f'line_item_{n}.sku']                = _ga(item, 'sku') if item else ''
+                row[f'line_item_{n}.price']              = _sv(getattr(item, 'price', None)) if item else ''
+                row[f'line_item_{n}.total_discount']     = _sv(getattr(item, 'total_discount', None)) if item else ''
+                row[f'line_item_{n}.grams']              = _sv(getattr(item, 'grams', None)) if item else ''
+                row[f'line_item_{n}.vendor']             = _ga(item, 'vendor') if item else ''
+                row[f'line_item_{n}.requires_shipping']  = _sv(getattr(item, 'requires_shipping', None)) if item else ''
+                row[f'line_item_{n}.taxable']            = _sv(getattr(item, 'taxable', None)) if item else ''
+                row[f'line_item_{n}.fulfillment_status'] = _ga(item, 'fulfillment_status') if item else ''
+
+            # Aggregated
+            row['line_items.titles']          = ', '.join(_ga(i, 'title') for i in items)
+            row['line_items.skus']            = ', '.join(_ga(i, 'sku') for i in items if _ga(i, 'sku'))
+            row['line_items.vendors']         = ', '.join(_ga(i, 'vendor') for i in items if _ga(i, 'vendor'))
+            row['line_items.total_qty']       = str(sum(int(getattr(i, 'quantity', 0) or 0) for i in items)) if items else ''
+            row['line_items.titles_with_qty'] = ', '.join(
+                f"{_ga(i,'title')} x{getattr(i,'quantity',0)}" for i in items
+            )
+            return row
+
+        def _extract_woo_row(o):
+            """Extract all virtual column values from a WooCommerce order dict."""
+            billing  = o.get('billing', {})
+            shipping = o.get('shipping', {})
+            cname    = f"{billing.get('first_name','') or ''} {billing.get('last_name','') or ''}".strip()
+            items    = o.get('line_items', []) or []
+
+            row = {
+                'order.number':                   str(o.get('number', o.get('id', ''))),
+                'order.date_created':             str(o.get('date_created', '') or '')[:10],
+                'billing.first_name + last_name': cname,
+                'billing.email':                  billing.get('email', '') or '',
+                'billing.phone':                  billing.get('phone', '') or '',
+                'shipping.address_1':             shipping.get('address_1', '') or '',
+                'shipping.address_2':             shipping.get('address_2', '') or '',
+                'shipping.city':                  (shipping.get('city', '') or billing.get('city', '') or ''),
+                'shipping.state':                 (shipping.get('state', '') or billing.get('state', '') or ''),
+                'shipping.postcode':              (shipping.get('postcode', '') or billing.get('postcode', '') or ''),
+                'shipping.country':               (shipping.get('country', '') or billing.get('country', '') or ''),
+                'total':                          str(o.get('total', '')),
+                'subtotal':                       str(o.get('subtotal', '')),
+                'shipping_total':                 str(o.get('shipping_total', '')),
+                'total_tax':                      str(o.get('total_tax', '')),
+                'discount_total':                 str(o.get('discount_total', '')),
+                'status':                         o.get('status', '') or '',
+                'payment_method_title':           o.get('payment_method_title', '') or '',
+                'customer_note':                  o.get('customer_note', '') or '',
+                'line_items.names':               ', '.join(i.get('name', '') or '' for i in items),
+                'line_items.total_qty':           str(sum(int(i.get('quantity', 0) or 0) for i in items)),
+            }
+            for n in range(1, 6):
+                item = items[n - 1] if len(items) >= n else None
+                row[f'line_item_{n}.name']     = item.get('name', '') or '' if item else ''
+                row[f'line_item_{n}.quantity'] = str(item.get('quantity', '') or '') if item else ''
+                row[f'line_item_{n}.sku']      = item.get('sku', '') or '' if item else ''
+                row[f'line_item_{n}.price']    = str(item.get('price', '') or '') if item else ''
+            return row
+
+        # Save updated mapping to ImportLog
+        if mapping:
+            import_log.column_mapping = mapping
+            import_log.save(update_fields=['column_mapping'])
+
+        preview_rows = []
+        already_imported = []
+        errors = []
+
+        if source == 'shopify':
+            try:
+                import shopify as _shopify
+                shop_name = (api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+                session = _shopify.Session(shop_name, api.api_version or '2023-10', api.api_access_token)
+                _shopify.ShopifyResource.activate_session(session)
+                for i, pid in enumerate(platform_ids):
+                    try:
+                        already = orders_models.Order.objects.filter(
+                            business=business,
+                            original_order_data__platform_id=str(pid),
+                            original_order_data__source='shopify',
+                        ).exists()
+                        if already:
+                            already_imported.append(str(pid))
+                        o = _shopify.Order.find(pid)
+                        raw = _extract_shopify_row(o, pid)
+                        row_data = {'row_number': str(pid)}
+                        for db_field, virtual_col in mapping.items():
+                            row_data[db_field] = _resolve_mapping_value(virtual_col, raw)
+                        # Build product_matches from line items
+                        li_items = getattr(o, 'line_items', []) or []
+                        product_matches = []
+                        for li in li_items:
+                            li_title = getattr(li, 'title', '') or getattr(li, 'name', '') or ''
+                            li_qty = int(getattr(li, 'quantity', 1) or 1)
+                            if li_title:
+                                matched, mtype = match_product(business, li_title)
+                                product_matches.append({
+                                    'raw': li_title,
+                                    'qty': li_qty,
+                                    'matched_name': matched.item_name if matched else None,
+                                    'match_type': mtype,
+                                })
+                        row_data['product_matches'] = product_matches
+                        preview_rows.append(row_data)
+                    except Exception as e:
+                        errors.append(f"{pid}: {e}")
+                _shopify.ShopifyResource.clear_session()
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f'Shopify connection failed: {e}'})
+
+        else:  # woocommerce
+            try:
+                from woocommerce import API as _WooAPI
+                wcapi = _WooAPI(
+                    url=api.site_api_url or '',
+                    consumer_key=api.api_key or '',
+                    consumer_secret=api.api_secret or '',
+                    version='wc/v3',
+                    timeout=15,
+                )
+                for pid in platform_ids:
+                    try:
+                        already = orders_models.Order.objects.filter(
+                            business=business,
+                            original_order_data__platform_id=str(pid),
+                            original_order_data__source='woocommerce',
+                        ).exists()
+                        if already:
+                            already_imported.append(str(pid))
+                        r = wcapi.get(f'orders/{pid}')
+                        if r.status_code != 200:
+                            errors.append(f"{pid}: HTTP {r.status_code}")
+                            continue
+                        wc_order = r.json()
+                        raw = _extract_woo_row(wc_order)
+                        row_data = {'row_number': str(pid)}
+                        for db_field, virtual_col in mapping.items():
+                            row_data[db_field] = _resolve_mapping_value(virtual_col, raw)
+                        # Build product_matches from line items
+                        wc_li_items = wc_order.get('line_items', []) or []
+                        product_matches = []
+                        for li in wc_li_items:
+                            li_name = li.get('name', '') or ''
+                            li_qty = int(li.get('quantity', 1) or 1)
+                            if li_name:
+                                matched, mtype = match_product(business, li_name)
+                                product_matches.append({
+                                    'raw': li_name,
+                                    'qty': li_qty,
+                                    'matched_name': matched.item_name if matched else None,
+                                    'match_type': mtype,
+                                })
+                        row_data['product_matches'] = product_matches
+                        preview_rows.append(row_data)
+                    except Exception as e:
+                        errors.append(f"{pid}: {e}")
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f'WooCommerce connection failed: {e}'})
+
+        fields = [{'name': 'row_number', 'label': '#', 'sheet_col': ''}]
+        for db_field, virtual_col in mapping.items():
+            fields.append({
+                'name': db_field,
+                'label': IMPORT_FIELD_LABELS.get(db_field, db_field.replace('_', ' ').title()),
+                'sheet_col': virtual_col,
+            })
+
+        return JsonResponse({
+            'success': True,
+            'preview': preview_rows,
+            'fields': fields,
+            'total_rows': len(platform_ids),
+            'already_imported': already_imported,
+            'errors': errors,
+        })
 
     elif source in ('csv_upload', 'onedrive', 'temp_order'):
         # Transform raw_data using mapping
@@ -2655,35 +4057,14 @@ def import_wizard_preview(request):
         for i, raw_row in enumerate(raw_rows[:100]):  # Limit preview
             row_data = {'row_number': raw_row.get('__row_num__', i + 1)}
             for db_field, src_col in mapping.items():
-                if src_col and isinstance(raw_row, dict):
-                    row_data[db_field] = raw_row.get(src_col, '')
-                else:
-                    row_data[db_field] = ''
+                row_data[db_field] = _resolve_mapping_value(src_col, raw_row) if src_col else ''
             preview.append(row_data)
-
-        # Build fields list from mapping with proper labels
-        FIELD_LABELS = {
-            'client_order_code': 'Order ID', 'order_date': 'Order Date',
-            'customer_name': 'Customer Name', 'customer_phone': 'Phone 1',
-            'customer_whatsapp': 'Phone 2 / WhatsApp', 'customer_email': 'Email',
-            'customer_address': 'Customer Address', 'dl_landmark': 'City / Landmark',
-            'dl_building': 'Villa / Building No', 'dl_street': 'Street No',
-            'dl_zone': 'Zone No', 'location_link': 'Location Link',
-            'dl_latitude': 'Latitude', 'dl_longitude': 'Longitude',
-            'deadline_date': 'Day & Time', 'package_desc': 'Package Desc',
-            'sku': 'SKU', 'product_url': 'Product URL', 'package_qty': 'Package Qty',
-            'cod_amount': 'Price / COD Amount', 'dl_amount': 'Delivery Fee',
-            'seller_notes': 'Seller Notes', 'internal_notes': 'Internal Notes',
-        }
-        for i in range(1, 6):
-            FIELD_LABELS[f'product_{i}'] = f'Product {i}'
-            FIELD_LABELS[f'count_{i}'] = f'Count {i}'
 
         fields = [{'name': 'row_number', 'label': '#', 'sheet_col': ''}]
         for db_field, src_col in mapping.items():
             fields.append({
                 'name': db_field,
-                'label': FIELD_LABELS.get(db_field, db_field.replace('_', ' ').title()),
+                'label': IMPORT_FIELD_LABELS.get(db_field, db_field.replace('_', ' ').title()),
                 'sheet_col': src_col,
             })
 
@@ -2711,6 +4092,7 @@ def import_wizard_confirm(request):
     import_log_id = request.POST.get('import_log_id', '')
     row_overrides_json = request.POST.get('row_overrides', '{}')
     mapping_json = request.POST.get('mapping', '{}')
+    pickup_location_id = request.POST.get('pickup_location_id', '')
 
     try:
         import_log = orders_models.ImportLog.objects.get(id=import_log_id)
@@ -2751,7 +4133,17 @@ def import_wizard_confirm(request):
             post_data.appendlist('platform_ids[]', pid)
         fake_request.POST = post_data
         fake_request.user = request.user
-        return import_api_orders(fake_request)
+        response = import_api_orders(fake_request)
+        # After API import, apply selected pickup location to newly created orders
+        if pickup_location_id:
+            try:
+                pl = business_models.PickupLocation.objects.get(id=pickup_location_id, business=business)
+                import_log.refresh_from_db()
+                import_log.orders.filter(pickup_location__isnull=True).update(pickup_location=pl)
+                import_log.orders.update(pickup_location=pl)
+            except business_models.PickupLocation.DoesNotExist:
+                pass
+        return response
 
     elif source in ('csv_upload', 'onedrive', 'temp_order'):
         # Process rows using mapping + overrides
@@ -2777,10 +4169,7 @@ def import_wizard_confirm(request):
                 # Apply mapping: transform raw_row to mapped_row
                 mapped_row = {}
                 for db_field, src_col in mapping.items():
-                    if src_col and isinstance(raw_row, dict):
-                        mapped_row[db_field] = raw_row.get(src_col, '')
-                    else:
-                        mapped_row[db_field] = ''
+                    mapped_row[db_field] = _resolve_mapping_value(src_col, raw_row) if src_col else ''
 
                 # Apply row overrides (key matches row_number from preview)
                 row_key = str(raw_row.get('__row_num__', i + 1))
@@ -2795,6 +4184,7 @@ def import_wizard_confirm(request):
                         'row': mapped_row,
                         'row_index': i,
                         'import_log_id': import_log.id,
+                        'pickup_location_id': pickup_location_id or None,
                     }),
                     content_type='application/json'
                 )
@@ -2863,7 +4253,459 @@ def import_wizard_save_mapping(request):
             api.column_mapping = mapping
             api.save(update_fields=['column_mapping'])
 
+    # Sync to Business.import_mapping — preserve nested structure per platform
+    if mapping:
+        biz = import_log.business
+        raw = biz.import_mapping or {}
+        is_nested = any(k in raw for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive'))
+        if is_nested:
+            # Update only the relevant platform key, keep other platforms intact
+            platform_key = {
+                'shopify': 'shopify', 'woocommerce': 'woocommerce',
+                'google_sheet': 'google_sheet', 'onedrive': 'onedrive',
+            }.get(source, 'csv')
+            raw[platform_key] = mapping
+            biz.import_mapping = raw
+        else:
+            # No nested structure yet — init it
+            platform_key = {
+                'shopify': 'shopify', 'woocommerce': 'woocommerce',
+                'google_sheet': 'google_sheet', 'onedrive': 'onedrive',
+            }.get(source, 'csv')
+            biz.import_mapping = {platform_key: mapping}
+        biz.save(update_fields=['import_mapping'])
+
     return JsonResponse({'success': True})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_mapping_manager(request):
+    """
+    Dedicated column mapping manager — per-platform tabs.
+    Mappings stored as nested dict in Business.import_mapping:
+      {"shopify": {db_field: src_col}, "woocommerce": {...}, "csv": {...}, "google_sheet": {...}}
+    Flat (legacy) format is shown on the csv tab as-is.
+    """
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    selected_business_id = request.GET.get('business', '')
+    # Auto-resolve business from logged-in user if not specified
+    if not selected_business_id:
+        user_biz = get_cached_business(request)
+        if user_biz:
+            selected_business_id = str(user_biz.business_id)
+    selected_business = None
+    platform_mappings = {}
+    active_api_types = []
+    od_sources_list = []
+    gs_sources_list = []
+    pl_sources_list = []
+
+    PLATFORMS = [
+        {'key': 'shopify',      'label': 'Shopify',         'icon': 'fab fa-shopify',   'src_type': 'select', 'cols': _shopify_col_keys(),  'default': SHOPIFY_DEFAULT_MAPPING},
+        {'key': 'woocommerce',  'label': 'WooCommerce',     'icon': 'fab fa-wordpress', 'src_type': 'select', 'cols': _woo_col_keys(),      'default': WOO_DEFAULT_MAPPING},
+        {'key': 'public_link',  'label': 'Public Link',     'icon': 'fas fa-link',      'src_type': 'select', 'cols': [],                   'default': {}},
+        {'key': 'csv',          'label': 'CSV / Excel',     'icon': 'fas fa-file-csv',  'src_type': 'text',   'cols': [],                   'default': {}},
+        {'key': 'google_sheet', 'label': 'Google Sheet',    'icon': 'fas fa-table',     'src_type': 'select', 'cols': [],                   'default': {}},
+        {'key': 'onedrive',     'label': 'OneDrive',        'icon': 'fab fa-microsoft', 'src_type': 'select', 'cols': [],                   'default': {}},
+    ]
+
+    if selected_business_id:
+        try:
+            selected_business = businesses.prefetch_related('business_settings_api').get(
+                business_id=selected_business_id
+            )
+        except business_models.Business.DoesNotExist:
+            selected_business = None
+
+        if selected_business:
+            raw = selected_business.import_mapping or {}
+            active_api_types = list(
+                selected_business.business_settings_api.filter(is_verify_api=True)
+                .values_list('api_type', flat=True).distinct()
+            )
+
+            # Build source lists for platforms with multiple sources
+            od_sources_list = []
+            od_default_source = None
+            for s in orders_models.OneDriveSource.objects.filter(
+                business=selected_business, is_active=True
+            ).order_by('-is_default_mapping', 'label'):
+                od_sources_list.append({
+                    'id': s.id, 'label': s.label,
+                    'is_default': s.is_default_mapping,
+                    'sheet': s.last_sheet_name or '',
+                })
+                if s.is_default_mapping or od_default_source is None:
+                    od_default_source = s
+
+            gs_sources_list = []
+            gs_default_source = None
+            for a in selected_business.business_settings_api.filter(
+                api_type='google_sheet', is_verify_api=True
+            ).order_by('-is_default', 'id'):
+                label = a.google_sheet_url or a.site_api_url or f'Sheet #{a.id}'
+                # Truncate URL for display
+                if len(label) > 50:
+                    label = label[:47] + '...'
+                gs_sources_list.append({
+                    'id': a.id, 'label': label,
+                    'is_default': a.is_default,
+                })
+                if a.is_default or gs_default_source is None:
+                    gs_default_source = a
+
+            # Build public link source list
+            pl_sources_list = []
+            pl_default_source = None
+            for p in orders_models.PublicLinkSource.objects.filter(
+                business=selected_business, is_active=True
+            ).order_by('label'):
+                pl_sources_list.append({
+                    'id': p.id, 'label': p.label,
+                    'is_default': False,
+                    'sheet': '',
+                })
+                if pl_default_source is None:
+                    pl_default_source = p
+
+            # Include onedrive in active types if sources exist
+            if od_sources_list and 'onedrive' not in active_api_types:
+                active_api_types.append('onedrive')
+            # Include public_link in active types if public link sources exist
+            if pl_sources_list and 'public_link' not in active_api_types:
+                active_api_types.append('public_link')
+
+            # OneDrive headers are fetched on demand via "Fetch Headers" button
+            # to avoid slow page loads from downloading Excel files
+
+            # Load per-source mapping for the default source (overrides business-level)
+            # Detect nested vs flat (legacy) format
+            is_nested = any(k in raw for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
+            if is_nested:
+                platform_mappings = raw
+            else:
+                # Legacy flat — put on csv tab as starting point
+                platform_mappings = {'csv': raw}
+
+            # Pre-load saved headers into platform cols (no auto-fetch needed)
+            if od_default_source and getattr(od_default_source, 'last_headers', None):
+                for p in PLATFORMS:
+                    if p['key'] == 'onedrive':
+                        p['cols'] = od_default_source.last_headers
+                        p['src_type'] = 'select'
+                        break
+
+            # Override with per-source mapping if the source has one saved
+            if od_default_source and od_default_source.last_column_mapping:
+                src_map = od_default_source.last_column_mapping
+                # Convert index-based to header-name if needed
+                if src_map and not all(str(k).isdigit() for k in src_map):
+                    platform_mappings['onedrive'] = src_map
+            if gs_default_source and gs_default_source.column_mapping:
+                platform_mappings['google_sheet'] = gs_default_source.column_mapping
+            # Load public link headers and mapping
+            if pl_default_source:
+                if pl_default_source.last_headers:
+                    for p in PLATFORMS:
+                        if p['key'] == 'public_link':
+                            p['cols'] = pl_default_source.last_headers
+                            p['src_type'] = 'select'
+                            break
+                # Convert old-format mapping to new-format for public_link tab
+                if not platform_mappings.get('public_link') and pl_default_source.last_column_mapping:
+                    pl_map = pl_default_source.last_column_mapping
+                    pl_headers = pl_default_source.last_headers or []
+                    if pl_map and all(str(k).isdigit() for k in pl_map):
+                        pl_mapping = {}
+                        for col_idx_str, db_field in pl_map.items():
+                            if db_field:
+                                idx = int(col_idx_str)
+                                if idx < len(pl_headers) and pl_headers[idx]:
+                                    pl_mapping[db_field] = pl_headers[idx]
+                        if pl_mapping:
+                            platform_mappings['public_link'] = pl_mapping
+
+    # Build DB field list (required first)
+    REQUIRED = {'customer_name', 'customer_phone', 'customer_address', 'cod_amount'}
+    all_fields = [
+        {'name': k, 'label': v, 'required': k in REQUIRED}
+        for k, v in IMPORT_FIELD_LABELS.items()
+    ]
+
+    # Source lists for JS
+    source_lists = {
+        'onedrive': od_sources_list if selected_business else [],
+        'google_sheet': gs_sources_list if selected_business else [],
+        'public_link': pl_sources_list if selected_business else [],
+    }
+
+    # Default platform from saved preference
+    default_platform = ''
+    if selected_business and platform_mappings:
+        default_platform = platform_mappings.get('_default', '')
+
+    context = {
+        'businesses': businesses,
+        'selected_business': selected_business,
+        'selected_business_id': selected_business_id,
+        'platforms_json': json.dumps(PLATFORMS),
+        'platform_mappings_json': json.dumps(platform_mappings),
+        'all_fields_json': json.dumps(all_fields),
+        'active_api_types_json': json.dumps(active_api_types),
+        'source_lists_json': json.dumps(source_lists),
+        'default_platform': default_platform,
+    }
+    return render(request, 'workforce/mapping_manager.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_mapping_manager_save(request):
+    """POST (AJAX): Save ALL platform mappings at once.
+    Receives: {business_id, all_mappings: {platform: {db_field: src_col}},
+               source_ids: {onedrive: id, google_sheet: id}}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    business_id    = request.POST.get('business_id', '').strip()
+    all_maps_json  = request.POST.get('all_mappings', '{}')
+    source_ids_json = request.POST.get('source_ids', '{}')
+    active_platform = request.POST.get('active_platform', '').strip()
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+    try:
+        all_maps = json.loads(all_maps_json)
+        source_ids = json.loads(source_ids_json)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    # Clean each platform's mapping — remove empty entries
+    nested = {}
+    total = 0
+    for platform, mapping in all_maps.items():
+        if isinstance(mapping, dict):
+            cleaned = {k: v for k, v in mapping.items() if k and v}
+            nested[platform] = cleaned
+            total += len(cleaned)
+
+    # Save active platform as default tab preference
+    if active_platform:
+        nested['_default'] = active_platform
+    business.import_mapping = nested
+    business.save(update_fields=['import_mapping'])
+
+    # Clear all source defaults if a different platform is now default
+    if active_platform and active_platform != 'onedrive':
+        orders_models.OneDriveSource.objects.filter(
+            business=business, is_default_mapping=True
+        ).update(is_default_mapping=False)
+    if active_platform and active_platform != 'google_sheet':
+        business.business_settings_api.filter(
+            api_type='google_sheet', is_default=True
+        ).update(is_default=False)
+
+    # Save per-source mapping for OneDrive
+    od_source_id = source_ids.get('onedrive')
+    if od_source_id and 'onedrive' in nested:
+        od_src = orders_models.OneDriveSource.objects.filter(
+            id=od_source_id, business=business
+        ).first()
+        if od_src:
+            od_src.last_column_mapping = nested['onedrive']
+            if active_platform == 'onedrive':
+                orders_models.OneDriveSource.objects.filter(
+                    business=business, is_default_mapping=True
+                ).exclude(id=od_src.id).update(is_default_mapping=False)
+                od_src.is_default_mapping = True
+                od_src.save(update_fields=['last_column_mapping', 'is_default_mapping'])
+            else:
+                od_src.save(update_fields=['last_column_mapping'])
+
+    # Save per-source mapping for Google Sheet
+    gs_source_id = source_ids.get('google_sheet')
+    if gs_source_id and 'google_sheet' in nested:
+        gs_api = business.business_settings_api.filter(id=gs_source_id).first()
+        if gs_api:
+            gs_api.column_mapping = nested['google_sheet']
+            if active_platform == 'google_sheet':
+                gs_api.is_default = True
+                gs_api.save(update_fields=['column_mapping', 'is_default'])
+                business.business_settings_api.filter(
+                    api_type='google_sheet', is_default=True
+                ).exclude(id=gs_api.id).update(is_default=False)
+            else:
+                gs_api.save(update_fields=['column_mapping'])
+    elif 'google_sheet' in nested:
+        # Fallback: save to first Google Sheet API settings
+        gs_api = business.business_settings_api.filter(
+            is_verify_api=True, api_type='google_sheet'
+        ).first()
+        if gs_api:
+            gs_api.column_mapping = nested['google_sheet']
+            gs_api.save(update_fields=['column_mapping'])
+
+    # Save per-source mapping for Public Link
+    pl_source_id = source_ids.get('public_link')
+    if pl_source_id and 'public_link' in nested:
+        pl_src = orders_models.PublicLinkSource.objects.filter(
+            id=pl_source_id, business=business
+        ).first()
+        if pl_src:
+            # Convert new-format {db_field: header_name} to old-format {col_idx: db_field}
+            pl_headers = pl_src.last_headers or []
+            header_lower = [h.lower() for h in pl_headers]
+            idx_mapping = {}
+            for db_field, header_name in nested['public_link'].items():
+                if db_field and header_name:
+                    try:
+                        idx = header_lower.index(str(header_name).lower())
+                        idx_mapping[str(idx)] = db_field
+                    except ValueError:
+                        pass
+            pl_src.last_column_mapping = idx_mapping
+            pl_src.save(update_fields=['last_column_mapping'])
+
+    platform_counts = {k: len(v) for k, v in nested.items()}
+    return JsonResponse({'success': True, 'total': total, 'platform_counts': platform_counts})
+
+
+def _resolve_shopify_cols(order):
+    """Delegate to _shopify_extract_row — single source of truth."""
+    return _shopify_extract_row(order, str(getattr(order, 'id', '')))
+
+
+def _resolve_woo_cols(order_dict):
+    """Delegate to _woo_extract_row — single source of truth."""
+    return _woo_extract_row(order_dict)
+
+
+
+def _resolve_formula(formula, col_values):
+    """Resolve a formula like '{col1} {col2}' using col_values dict."""
+    import re
+    def replace_col(m):
+        col = m.group(1).strip()
+        return col_values.get(col, '')
+    return re.sub(r'\{([^}]+)\}', replace_col, formula)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_mapping_manager_test(request):
+    """AJAX GET: Fetch latest 1 order from the platform and resolve all virtual columns.
+    Returns JSON with col_values and resolved_mapping for the active platform.
+    """
+    business_id = request.GET.get('business_id', '').strip()
+    platform    = request.GET.get('platform', '').strip()
+
+    if not business_id or not platform:
+        return JsonResponse({'success': False, 'error': 'business_id and platform required'}, status=400)
+
+    try:
+        business = business_models.Business.objects.prefetch_related('business_settings_api').get(
+            business_id=business_id
+        )
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+    api_cfg = business.business_settings_api.filter(is_verify_api=True, api_type=platform).first()
+    if not api_cfg:
+        return JsonResponse({'success': False, 'error': f'No active {platform} API config found'}, status=400)
+
+    # Load current platform mapping
+    raw_mapping = business.import_mapping or {}
+    is_nested = any(k in raw_mapping for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive'))
+    platform_mapping = raw_mapping.get(platform, {}) if is_nested else {}
+
+    col_values = {}
+    order_info = {}
+    raw_order  = {}
+
+    try:
+        if platform == 'shopify':
+            import shopify
+            shop_name = (api_cfg.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+            session = shopify.Session(shop_name, api_cfg.api_version or '2023-10', api_cfg.api_access_token)
+            shopify.ShopifyResource.activate_session(session)
+            orders = shopify.Order.find(limit=1, status='any')
+            shopify.ShopifyResource.clear_session()
+            if not orders:
+                return JsonResponse({'success': False, 'error': 'No orders found in this Shopify store'})
+            col_values = _resolve_shopify_cols(orders[0])
+            try:
+                parsed = json.loads(orders[0].to_json())
+                # to_json() wraps in {"order": {...}} — unwrap
+                raw_order = parsed.get('order', parsed)
+            except Exception:
+                try:
+                    raw_order = orders[0].to_dict()
+                except Exception:
+                    raw_order = col_values  # fallback: resolved cols
+            order_info = {
+                'id':   col_values.get('order.id', ''),
+                'name': col_values.get('order.name', ''),
+                'date': col_values.get('order.created_at', ''),
+                'source': 'shopify',
+            }
+
+        elif platform == 'woocommerce':
+            from woocommerce import API as WooAPI
+            wcapi = WooAPI(
+                url=api_cfg.site_api_url or '',
+                consumer_key=api_cfg.api_key or '',
+                consumer_secret=api_cfg.api_secret or '',
+                version='wc/v3',
+                timeout=15,
+            )
+            r = wcapi.get('orders', params={'per_page': 1, 'orderby': 'date', 'order': 'desc'})
+            if r.status_code != 200:
+                return JsonResponse({'success': False, 'error': f'WooCommerce API error {r.status_code}'})
+            orders = r.json()
+            if not orders:
+                return JsonResponse({'success': False, 'error': 'No orders found in this WooCommerce store'})
+            raw_order  = orders[0]
+            col_values = _resolve_woo_cols(orders[0])
+            order_info = {
+                'id':   col_values.get('order.id', ''),
+                'name': f"#{col_values.get('order.number', '')}",
+                'date': col_values.get('order.date_created', ''),
+                'source': 'woocommerce',
+            }
+
+        else:
+            return JsonResponse({'success': False, 'error': f'Test not supported for platform: {platform}'})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+    # Build resolved_mapping: for each db_field in the platform mapping, resolve value
+    resolved_mapping = {}
+    for db_field, src_col in platform_mapping.items():
+        if not src_col:
+            continue
+        if '{' in src_col:
+            value = _resolve_formula(src_col, col_values)
+        else:
+            value = col_values.get(src_col, '')
+        resolved_mapping[db_field] = {'col': src_col, 'value': value}
+
+    return JsonResponse({
+        'success': True,
+        'platform': platform,
+        'order_info': order_info,
+        'raw_order': raw_order,
+        'col_values': col_values,
+        'resolved_mapping': resolved_mapping,
+    })
 
 
 @login_required(login_url='/accounts/login/')
@@ -2909,19 +4751,34 @@ def wf_api_orders(request):
                 orders = shopify.Order.find(limit=50, status='any')
                 for o in orders:
                     ship = getattr(o, 'shipping_address', None)
+                    items = [
+                        {'name': li.name, 'qty': li.quantity, 'price': li.price}
+                        for li in (o.line_items or [])
+                    ] if hasattr(o, 'line_items') and o.line_items else []
+                    cust = o.customer if hasattr(o, 'customer') and o.customer else None
+                    cust_name = ''
+                    if cust:
+                        cust_name = f"{getattr(cust, 'first_name', '')} {getattr(cust, 'last_name', '')}".strip() or getattr(cust, 'email', '')
+                    raw_shipping_lines = getattr(o, 'shipping_lines', None) or []
                     live_orders.append({
                         'platform_id': str(o.id),
                         'name': o.name,
-                        'customer': getattr(o, 'contact_email', '') or (getattr(o.customer, 'email', '') if hasattr(o, 'customer') and o.customer else ''),
+                        'customer': cust_name or getattr(o, 'contact_email', ''),
                         'phone': getattr(ship, 'phone', '') if ship else '',
                         'address': getattr(ship, 'address1', '') if ship else '',
                         'country': getattr(ship, 'country', '') if ship else '',
                         'cod': o.total_price,
+                        'subtotal': getattr(o, 'subtotal_price', None),
+                        'shipping_lines': [
+                            {'title': getattr(sl, 'title', ''), 'price': getattr(sl, 'price', '0.00')}
+                            for sl in raw_shipping_lines
+                        ],
                         'currency': o.currency,
                         'status': o.financial_status,
                         'fulfillment': o.fulfillment_status or 'unfulfilled',
                         'date': o.created_at,
                         'source': 'shopify',
+                        'items': items,
                     })
                 try:
                     live_total = shopify.Order.count(status='any')
@@ -2945,6 +4802,15 @@ def wf_api_orders(request):
                         billing = o.get('billing', {})
                         shipping = o.get('shipping', {})
                         addr_parts = [shipping.get('address_1') or billing.get('address_1'), shipping.get('city') or billing.get('city')]
+                        items = [
+                            {'name': li.get('name', ''), 'qty': li.get('quantity', 1), 'price': li.get('price', '')}
+                            for li in o.get('line_items', [])
+                        ]
+                        wc_subtotal = str(sum(float(li.get('subtotal', 0)) for li in o.get('line_items', [])))
+                        wc_shipping_lines = [
+                            {'title': sl.get('method_title', ''), 'price': sl.get('total', '0.00')}
+                            for sl in o.get('shipping_lines', [])
+                        ]
                         live_orders.append({
                             'platform_id': str(o.get('id')),
                             'name': f"#{o.get('number')}",
@@ -2953,11 +4819,14 @@ def wf_api_orders(request):
                             'address': ', '.join(filter(None, addr_parts)),
                             'country': shipping.get('country') or billing.get('country', ''),
                             'cod': o.get('total'),
+                            'subtotal': wc_subtotal,
+                            'shipping_lines': wc_shipping_lines,
                             'currency': o.get('currency'),
                             'status': o.get('status'),
                             'fulfillment': None,
                             'date': o.get('date_created'),
                             'source': 'woocommerce',
+                            'items': items,
                         })
                 else:
                     live_error = f"API error {r.status_code}: {r.text[:200]}"
@@ -3413,15 +5282,39 @@ def dl_list_all(request):
 
     dl_tasks = paginate_queryset(request, dl_tasks)
 
+    # Build filter_params for pagination links (preserves filters across pages)
+    filter_params_list = []
+    if dl_code: filter_params_list.append(f'dlCode={dl_code}')
+    if c_code: filter_params_list.append(f'cCode={c_code}')
+    if mobile: filter_params_list.append(f'mobile={mobile}')
+    if driver_name: filter_params_list.append(f'driverName={driver_name}')
+    if c_status: filter_params_list.append(f'cStatus={c_status}')
+    if dl_status: filter_params_list.append(f'dlStatus={dl_status}')
+    if date_from: filter_params_list.append(f'dateFrom={date_from}')
+    if date_to: filter_params_list.append(f'dateTo={date_to}')
+    if business_id: filter_params_list.append(f'business={business_id}')
+    if sort_field: filter_params_list.append(f'sort={sort_field}&order={sort_order}')
+    filter_params = '&'.join(filter_params_list)
+
+    unpublished_count = delivery_models.DeliveryTask.objects.filter(
+        order__business__business_status='active',
+        dl_task_publish=False,
+    ).exclude(
+        dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
+    ).count()
+
     data = {
         'dl_tasks': dl_tasks,
         'businesses': businesses,
         'today': timezone.localtime().date(),
+        'unpublished_count': unpublished_count,
         'page_title': 'All Delivery Tasks',
         'page_subtitle': 'Manage and track',
         'page_icon': 'fa-tasks',
         'list_type': 'all',
         'show_filters': True,
+        'filter_params': filter_params,
+        'per_page': request.GET.get('per_page', '25'),
         'filters': {
             'dlCode': dl_code,
             'cCode': c_code,
@@ -3450,7 +5343,7 @@ def fulfilled_clients_tasks(request):
         'task_qrcode',
     ).filter(
         order__business__business_status='active',
-        order__business__fulfillment_service_enabled=True,
+        order__business__fulfillment_service_status='active',
     ).order_by('-created_at')
 
     # Get filter parameters
@@ -3486,10 +5379,10 @@ def fulfilled_clients_tasks(request):
     if business_id:
         dl_tasks = dl_tasks.filter(order__business_id=business_id)
 
-    # Get fulfillment-enabled businesses
+    # Get fulfillment-active businesses
     businesses = business_models.Business.objects.filter(
         business_status='active',
-        fulfillment_service_enabled=True
+        fulfillment_service_status='active',
     ).order_by('business_name')
 
     dl_tasks = paginate_queryset(request, dl_tasks)
@@ -3521,7 +5414,7 @@ def fulfilled_clients_tasks(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def non_fulfilled_clients_tasks(request):
-    """Tasks from businesses without fulfillment service"""
+    """Tasks from businesses without active fulfillment service"""
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).prefetch_related(
@@ -3529,10 +5422,8 @@ def non_fulfilled_clients_tasks(request):
         'order__order_items',
         'order__order_items__product',
         'task_qrcode',
-    ).filter(
-        order__business__business_status='active',
     ).exclude(
-        order__business__fulfillment_service_status='active'
+        order__business__fulfillment_service_status='active',
     ).order_by('-created_at')
 
     # Get filter parameters
@@ -3571,7 +5462,7 @@ def non_fulfilled_clients_tasks(request):
     # Get non-fulfillment businesses (only active)
     businesses = business_models.Business.objects.filter(
         business_status='active',
-        fulfillment_service_enabled=False
+        fulfillment_service_status__in=['none', 'not_required'],
     ).order_by('business_name')
 
     dl_tasks = paginate_queryset(request, dl_tasks)
@@ -4048,6 +5939,104 @@ def cancel_order(request, order_id):
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
+def partial_return_order(request, order_id):
+    """
+    Process partial return for a delivered order.
+    Expects JSON body: { "items": [{"item_id": 42, "quantity": 1}, ...] }
+    Restores stock for returned items and auto-creates RMA.
+    """
+    try:
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id
+        )
+
+        if order.order_status != 'delivered':
+            return JsonResponse({
+                'success': False,
+                'error': f'Can only process returns for delivered orders (current: {order.get_order_status_display()})'
+            }, status=400)
+
+        data = json.loads(request.body)
+        returned_items = data.get('items', [])
+
+        if not returned_items:
+            return JsonResponse({
+                'success': False,
+                'error': 'No items specified for return'
+            }, status=400)
+
+        # Validate items
+        for ret in returned_items:
+            if not ret.get('item_id') or not ret.get('quantity') or ret['quantity'] < 1:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Invalid return item: {ret}. Each item needs item_id and quantity >= 1'
+                }, status=400)
+
+            # Check the item exists and quantity is valid
+            try:
+                item = orders_models.OrderItem.objects.get(pk=ret['item_id'], order=order)
+                max_returnable = item.quantity - (item.quantity_returned or 0)
+                if ret['quantity'] > max_returnable:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Cannot return {ret["quantity"]} of "{item.display_name}" — max returnable is {max_returnable}'
+                    }, status=400)
+            except orders_models.OrderItem.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Order item {ret["item_id"]} not found in this order'
+                }, status=400)
+
+        # Process the partial return
+        from django.db import transaction as db_transaction
+        from warehouse.signals import process_partial_return
+
+        with db_transaction.atomic():
+            returned = process_partial_return(order, returned_items)
+
+        # Log the action
+        item_summary = ', '.join(
+            f'{r["quantity"]}x item#{r["item_id"]}' for r in returned_items
+        )
+        orders_models.OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action='partial_return',
+            notes=f'Partial return processed: {item_summary}'
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'{len(returned)} item(s) returned successfully',
+            'returned_items': [
+                {
+                    'item_id': item.id,
+                    'product': item.display_name,
+                    'delivery_status': item.delivery_status,
+                    'quantity_delivered': item.quantity_delivered,
+                    'quantity_returned': item.quantity_returned,
+                }
+                for item in returned
+            ]
+        })
+
+    except Http404:
+        raise
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger.exception("Error processing partial return for order %s: %s", order_id, str(e))
+        return JsonResponse({
+            'success': False,
+            'error': 'An error occurred while processing the return'
+        }, status=500)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
 def assign_driver_to_order(request, order_id):
     """Assign a driver to an order (from AI suggest result)"""
     try:
@@ -4286,6 +6275,57 @@ def update_order_zone(request, order_id):
         }, status=400)
 
 
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def resolve_location_link(request):
+    """AJAX: resolve a Google Maps short link or Plus Code to lat/lng (staff version)."""
+    try:
+        data = json.loads(request.body) if request.body else {}
+        text = data.get('text', '').strip()
+        if not text:
+            return JsonResponse({'error': 'No text provided'}, status=400)
+
+        from ai_agent.tools.address_tools import extract_coords_from_text
+
+        lat, lng, source, link = extract_coords_from_text(text)
+        if lat and lng:
+            return JsonResponse({'lat': float(lat), 'lng': float(lng), 'source': source})
+
+        import re
+        plus_code_match = re.match(r'^([A-Z0-9]{4,8}\+[A-Z0-9]{1,4})\s*(.*)', text, re.IGNORECASE)
+        if plus_code_match:
+            code = plus_code_match.group(1)
+            locality = plus_code_match.group(2).strip() or 'Doha Qatar'
+            try:
+                import requests as http_requests
+                resp = http_requests.get(
+                    'https://nominatim.openstreetmap.org/search',
+                    params={'q': f'{code} {locality}', 'format': 'json', 'limit': 1},
+                    headers={'User-Agent': 'EzzyDelivery/1.0'},
+                    timeout=5,
+                )
+                results = resp.json()
+                if results:
+                    lat = float(results[0]['lat'])
+                    lng = float(results[0]['lon'])
+                    if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
+                        return JsonResponse({'lat': lat, 'lng': lng, 'source': 'plus_code'})
+            except Exception:
+                pass
+            try:
+                from openlocationcode import openlocationcode as olc
+                if olc.isValid(code) and olc.isFull(code):
+                    area = olc.decode(code)
+                    return JsonResponse({'lat': area.latitudeCenter, 'lng': area.longitudeCenter, 'source': 'plus_code'})
+            except ImportError:
+                pass
+
+        return JsonResponse({'error': 'Could not resolve coordinates'}, status=404)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
 # AJAX Endpoints for Orders List ------------------------------------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
@@ -4424,7 +6464,7 @@ def update_order_status(request, order_id):
 def bulk_update_order_status(request):
     """Bulk update order status for multiple orders"""
     VALID_ORDER_STATUSES = [
-        'to_review', 'to_publish', 'published', 'processing', 'ready_to_pickup',
+        'to_review', 'to_publish', 'publish', 'published', 'processing', 'ready_to_pickup',
         'in_transit', 'delivered', 'failed', 'cancelled', 'returned', 'reported'
     ]
     try:
@@ -4450,14 +6490,17 @@ def bulk_update_order_status(request):
                 'error': f'Invalid status: {status}'
             }, status=400)
 
+        from orders.models import OrderVerificationLog
+        from orders.signals import _create_delivery_task_from_order
+
         orders = orders_models.Order.objects.filter(id__in=order_ids)
         updated = 0
+        tasks_created = 0
         for order in orders:
             old_status = order.order_status
             if old_status != status:
                 order.order_status = status
                 order.save(update_fields=['order_status'])
-                from orders.models import OrderVerificationLog
                 OrderVerificationLog.objects.create(
                     order=order,
                     verified_by=request.user,
@@ -4466,10 +6509,20 @@ def bulk_update_order_status(request):
                 )
                 updated += 1
 
+            # Explicitly create delivery task for publish — signal may not fire
+            # when order was already in publish state or update_fields skips it
+            if status == 'publish' and not order.task_created:
+                order.refresh_from_db()
+                if not order.task_created:
+                    task = _create_delivery_task_from_order(order)
+                    if task:
+                        tasks_created += 1
+
         return JsonResponse({
             'success': True,
-            'message': f'{updated} order(s) updated to {status}',
-            'updated_count': updated
+            'message': f'{updated} order(s) updated to {status}' + (f', {tasks_created} task(s) created' if tasks_created else ''),
+            'updated_count': updated,
+            'tasks_created': tasks_created,
         })
     except Exception as e:
         logger.exception("Error in bulk order status update: %s", str(e))
@@ -4778,14 +6831,6 @@ def assign_driver_to_task(request, task_id):
                     'error': 'Cannot assign driver — order is cancelled'
                 }, status=400)
 
-            # Block if task already assigned to a different driver
-            if task.driver_id and task.driver_id != driver.driver_id:
-                existing_name = task.driver.user.get_full_name() if task.driver and task.driver.user else str(task.driver_id)
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Task already assigned to {existing_name}. Unassign first.'
-                }, status=400)
-
             task.driver = driver
             task.dl_task_status = 'assigned'
             task._status_actor = 'staff'
@@ -4813,6 +6858,27 @@ def assign_driver_to_task(request, task_id):
         }, status=400)
 
 
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def unassign_driver_from_task(request, task_id):
+    """AJAX endpoint to unassign driver from delivery task"""
+    from django.db import transaction
+    try:
+        with transaction.atomic():
+            task = get_object_or_404(
+                delivery_models.DeliveryTask.objects.select_for_update(),
+                id=task_id)
+            task.driver = None
+            task.dl_task_status = 'pending'
+            task._status_actor = 'staff'
+            task.save()
+        return JsonResponse({'success': True, 'message': 'Driver unassigned successfully', 'task_id': task.id})
+    except Exception as e:
+        logger.exception("Error unassigning driver from task %s: %s", task_id, str(e))
+        return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'}, status=400)
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def api_drivers_list(request):
@@ -4836,6 +6902,7 @@ def update_task_status(request, task_id):
         'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
         'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
         'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
+        'dropsownlost',
     ]
     try:
         task = get_object_or_404(
@@ -4894,17 +6961,22 @@ def update_task_status(request, task_id):
             'failed': 'rejected',
             'rejected': 'rejected',
             'cancelled': '9',
+            'dropsownlost': 'rejected',
         }
 
         # Optional fields
         driver_id = data.get('driver_id')
         notes = data.get('notes', '')
         time_str = data.get('time', '')
+        delivered_date_str = data.get('delivered_date', '')
+        cod_amount_str = data.get('cod_amount', '')
 
         # Validate transition — admin/superuser can go backward, staff forward only
         from delivery.state_machine import can_transition, get_allowed_transitions
         current_status = task.dl_task_status
-        actor = 'admin' if request.user.is_superuser or request.user.groups.filter(name='admin').exists() else 'staff'
+        _profile = getattr(request.user, 'profile', None)
+        _is_sa = getattr(_profile, 'is_superadmin', False) if _profile else request.user.is_superuser
+        actor = 'admin' if _is_sa or request.user.groups.filter(name='admin').exists() else 'staff'
         allowed, reason = can_transition(current_status, status, actor=actor)
         if not allowed:
             allowed_next = get_allowed_transitions(current_status, actor=actor)
@@ -4928,7 +7000,7 @@ def update_task_status(request, task_id):
         # Assign driver if provided
         if driver_id:
             try:
-                driver = fleet_models.Driver.objects.get(id=driver_id)
+                driver = fleet_models.Driver.objects.get(pk=driver_id)
                 task.driver = driver
                 update_fields.append('driver')
             except fleet_models.Driver.DoesNotExist:
@@ -4952,12 +7024,84 @@ def update_task_status(request, task_id):
                 task.completed_at = timezone.now()
                 update_fields.append('completed_at')
 
+        # Update delivered date (completed_at) if provided
+        if delivered_date_str:
+            from django.utils.dateparse import parse_date
+            parsed_date = parse_date(delivered_date_str)
+            if parsed_date:
+                task.completed_at = timezone.make_aware(
+                    timezone.datetime.combine(parsed_date, timezone.datetime.min.time())
+                )
+                if 'completed_at' not in update_fields:
+                    update_fields.append('completed_at')
+
+        # Update COD amount on order if provided
+        # Fix 12: Skip if COD is locked after collection (superadmin can override)
+        if cod_amount_str and task.order:
+            _is_sa = getattr(_profile, 'is_superadmin', False) if _profile else request.user.is_superuser
+            if getattr(task.order, 'cod_amount_locked', False) and not _is_sa:
+                pass  # COD locked — only superadmin can edit
+            else:
+                try:
+                    task.order.cod_amount = int(float(cod_amount_str))
+                    task.order.save(update_fields=['cod_amount'])
+                except (ValueError, TypeError):
+                    pass
+
         # Save notes to task description if provided
         if notes:
             task.dl_task_description = notes
             update_fields.append('dl_task_description')
 
+        # COD handling on delivered — sync with driver API flow
+        # Staff can pass cod_amount in the request to indicate partial collection
+        if status == 'delivered' and task.order and task.order.cod_amount and task.order.cod_amount > 0:
+            if not task.cod_collected:
+                from decimal import Decimal
+                expected = Decimal(str(task.order.cod_amount))
+                # Use staff-provided cod_amount if present, otherwise assume full collection
+                staff_cod = Decimal(str(cod_amount_str)) if cod_amount_str else expected
+                task.cod_collected = True
+                task.cod_collected_at = timezone.now()
+                task.cod_collected_amount = staff_cod
+                update_fields.extend(['cod_collected', 'cod_collected_at', 'cod_collected_amount'])
+
         task.save(update_fields=update_fields)
+
+        # Post-save: update order COD status + driver wallet (same as driver API)
+        if status == 'delivered' and task.order and task.cod_collected and task.cod_collected_amount and task.driver:
+            try:
+                from decimal import Decimal
+                expected = Decimal(str(task.order.cod_amount)) if task.order.cod_amount else Decimal('0')
+                collected = Decimal(str(task.cod_collected_amount))
+
+                # Set correct COD status: partial or full
+                if task.order.cod_status_by_staff not in ('cod_with_ezzy', 'cod_settled_with_business'):
+                    if expected > 0 and collected < expected:
+                        task.order.cod_status_by_staff = 'partially_collected'
+                    else:
+                        task.order.cod_status_by_staff = 'cod_with_driver'
+                    task.order.save(update_fields=['cod_status_by_staff'])
+
+                # Record COD in driver wallet (actual collected amount)
+                from fleet.wallet_service import WalletService
+                existing = fleet_models.DriverTransaction.objects.filter(
+                    delivery_task=task,
+                    transaction_type='cod_collection',
+                ).exists()
+                if not existing:
+                    WalletService.record_transaction(
+                        driver=task.driver,
+                        transaction_type='cod_collection',
+                        amount=collected,
+                        description=f"COD collected for order {task.order.order_number}"
+                                 f"{' (partial: ' + str(collected) + ' of ' + str(expected) + ')' if collected < expected else ''}"
+                                 f" (staff update)",
+                        delivery_task=task,
+                        created_by=request.user,
+                    )
+            except Exception as e:
+                logger.warning(f"COD wallet update failed for task {task.id}: {e}")
 
         return JsonResponse({
             'success': True,
@@ -5337,13 +7481,23 @@ def orders_reported(request):
 @staff_required
 def tasks_followup_list(request):
     """View for follow-up tasks list — latest driver updates sorted by time"""
-    # All task statuses including delivered for follow-up tracking
-    active_statuses = [
-        'pending', 'assigned', 'accepted', 'picked_up',
-        'start_ride', 'out_for_delivery', 'in_transit',
-        'contacted', 'non_reachable', 'failed', 'rejected',
-        'delivered',
+    # Task statuses for follow-up (excludes delivered)
+    active_statuses_choices = [
+        ('pending', 'Pending'),
+        ('assigned', 'Assigned'),
+        ('accepted', 'Accepted'),
+        ('picked_up', 'Picked Up'),
+        ('start_ride', 'Start Ride'),
+        ('out_for_delivery', 'Out for Delivery'),
+        ('in_transit', 'In Transit'),
+        ('contacted', 'Contacted & Confirmed'),
+        ('non_reachable', 'Non Reachable'),
+        ('failed', 'Failed'),
+        ('rejected', 'Rejected'),
     ]
+    active_statuses = [v for v, _ in active_statuses_choices]
+
+    seven_days_ago = timezone.now().date() - timedelta(days=7)
 
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
@@ -5352,14 +7506,15 @@ def tasks_followup_list(request):
     ).filter(
         order__business__business_status='active',
         dl_task_status__in=active_statuses,
+        dl_task_date__gte=seven_days_ago,
     )
 
     # Optional filters
-    status_filter = request.GET.get('status', '')
+    status_filters = request.GET.getlist('status')
     driver_filter = request.GET.get('driver', '')
 
-    if status_filter:
-        tasks_list = tasks_list.filter(dl_task_status=status_filter)
+    if status_filters:
+        tasks_list = tasks_list.filter(dl_task_status__in=status_filters)
     if driver_filter:
         tasks_list = tasks_list.filter(driver_id=driver_filter)
 
@@ -5391,11 +7546,12 @@ def tasks_followup_list(request):
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=30)
 
     # Build filter params for pagination
-    filter_params = ''
-    if status_filter:
-        filter_params += f'&status={status_filter}'
+    filter_params_nosort = ''
+    for s in status_filters:
+        filter_params_nosort += f'&status={s}'
     if driver_filter:
-        filter_params += f'&driver={driver_filter}'
+        filter_params_nosort += f'&driver={driver_filter}'
+    filter_params = filter_params_nosort
     if sort_param and sort_param != 'updated':
         filter_params += f'&sort={sort_param}'
 
@@ -5406,12 +7562,13 @@ def tasks_followup_list(request):
         'page_icon': 'fa-flag',
         'list_type': 'followup',
         'active_drivers': active_drivers,
-        'active_statuses': active_statuses,
-        'current_status': status_filter,
+        'active_statuses': active_statuses_choices,
+        'current_statuses': status_filters,
         'current_driver': driver_filter,
         'current_sort': current_sort,
         'current_dir': sort_dir,
         'filter_params': filter_params,
+        'filter_params_nosort': filter_params_nosort,
         'show_followup_filters': True,
     }
     return render(request, 'workforce/parts/lists/dl_list_followup.html', context)
@@ -6017,12 +8174,16 @@ def earnings_verification_action(request):
                 task.driver_earnings = final_earnings
                 task.save()
 
-                # Update driver's pending_earnings atomically using F() and Coalesce to prevent race conditions
+                # Update driver's pending_earnings and create audit trail via WalletService
                 if task.driver:
-                    from django.db.models import F
-                    from django.db.models.functions import Coalesce
-                    fleet_models.Driver.objects.filter(driver_id=task.driver.driver_id).update(
-                        pending_earnings=Coalesce(F('pending_earnings'), Decimal('0')) + Decimal(str(final_earnings))
+                    from fleet.wallet_service import WalletService
+                    WalletService.record_transaction(
+                        driver=task.driver,
+                        transaction_type='earning',
+                        amount=Decimal(str(final_earnings)),
+                        description=f"Earnings published for task {task.dl_task_number}",
+                        delivery_task=task,
+                        created_by=request.user,
                     )
 
                 updated_count += 1
@@ -7396,8 +9557,8 @@ def business_license_detail(request, business_id):
                             business=business,
                             warehouse=warehouse_location.warehouse,
                             defaults={
-                                'pickup_location_title': f"{warehouse_location.warehouse.name} - Fulfillment",
-                                'locality': warehouse_location.address or warehouse_location.warehouse.city or 'Warehouse Location',
+                                'pickup_location_title': f"{warehouse_location.warehouse.name}",
+                                'locality': warehouse_location.warehouse.address or warehouse_location.address or warehouse_location.warehouse.city or 'Warehouse Location',
                                 'is_fulfilment_center': True,
                                 'pickup_status': 'active',
                                 'pickup_zone_no': warehouse_location.zone_number,
@@ -9435,25 +11596,13 @@ def delivery_task_edit(request, task_id):
         driver_status='approved'
     ).order_by('user__first_name')
 
-    # Pickup locations scoped to the task's business, including fulfillment center
+    # Pickup locations scoped to the task's business only
     from business.models import PickupLocation
-    from warehouse.models import SellerWarehouseLink
-    from django.db.models import Q
     task_business = task.business or (task.order.business if task.order else None)
 
     if task_business:
-        # Get the linked warehouse (if any) for this business
-        wh_link = SellerWarehouseLink.objects.filter(
-            business=task_business
-        ).select_related('warehouse').first()
-        linked_wh = wh_link.warehouse if wh_link else None
-
-        # Include: business's own pickup locations + any fulfillment center linked to their warehouse
-        q = Q(business=task_business)
-        if linked_wh:
-            q |= Q(warehouse=linked_wh, is_fulfilment_center=True)
         pickup_locations = list(
-            PickupLocation.objects.filter(q)
+            PickupLocation.objects.filter(business=task_business)
             .select_related('warehouse')
             .order_by('-is_fulfilment_center', 'pickup_location_title')
         )
@@ -9882,10 +12031,13 @@ def order_edit(request, order_id):
             dl_amount = request.POST.get('dl_amount', '0')
             order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
 
-            # Pickup location
+            # Pickup location — validate it belongs to the order's business
             pickup_id = request.POST.get('pickup_location')
             if pickup_id:
-                order.pickup_location_id = pickup_id
+                if business_models.PickupLocation.objects.filter(
+                    id=pickup_id, business=order.business
+                ).exists():
+                    order.pickup_location_id = pickup_id
 
             # Coordinates
             lat_raw = request.POST.get('latitude', '').strip()
@@ -10683,8 +12835,10 @@ def pricing_inquiry_delete_activity(request, inquiry_id, activity_id):
         webpages_models.PricingEnquiryActivity,
         pk=activity_id, inquiry_id=inquiry_id
     )
-    # Only allow deletion by the creator or superuser
-    if activity.created_by_id != request.user.pk and not request.user.is_superuser:
+    # Only allow deletion by the creator or superadmin
+    _prof = getattr(request.user, 'profile', None)
+    _is_superadmin = getattr(_prof, 'is_superadmin', False) if _prof else request.user.is_superuser
+    if activity.created_by_id != request.user.pk and not _is_superadmin:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     activity.delete()
     return JsonResponse({'success': True})
@@ -10976,6 +13130,7 @@ def team_verification_list(request):
 def tasks_live_map(request):
     """Live map showing all active delivery task pins and driver locations."""
     from django.db.models import Subquery, OuterRef
+    import datetime as _dt
 
     active_statuses = [
         'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
@@ -10983,12 +13138,27 @@ def tasks_live_map(request):
         'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
     ]
 
-    # Get all active tasks with coordinates
+    today = _dt.date.today()
+    three_days_ago = today - _dt.timedelta(days=3)
+    try:
+        date_from = _dt.date.fromisoformat(request.GET.get('date_from', '')) if request.GET.get('date_from') else three_days_ago
+    except ValueError:
+        date_from = three_days_ago
+    try:
+        date_to = _dt.date.fromisoformat(request.GET.get('date_to', '')) if request.GET.get('date_to') else today
+    except ValueError:
+        date_to = today
+    if date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    # Get all active tasks with coordinates filtered by date range
     tasks = delivery_models.DeliveryTask.objects.select_related(
-        'order', 'order__business', 'driver', 'driver__user', 'dl_to_address',
+        'order', 'order__business', 'order__pickup_location', 'driver', 'driver__user', 'dl_to_address',
     ).filter(
         order__business__business_status='active',
         dl_task_status__in=active_statuses,
+        dl_task_date__gte=date_from,
+        dl_task_date__lte=date_to,
     )
 
     pins = []
@@ -11001,6 +13171,7 @@ def tasks_live_map(request):
             lat = float(t.dl_to_address.dl_latitude)
             lng = float(t.dl_to_address.dl_longitude)
 
+        pickup = t.order.pickup_location
         pins.append({
             'id': t.id,
             'task_number': t.dl_task_number or str(t.id),
@@ -11015,6 +13186,9 @@ def tasks_live_map(request):
             'driver_name': str(t.driver) if t.driver else 'Unassigned',
             'driver_id': t.driver_id,
             'business_name': t.order.business.business_name if t.order.business else '',
+            'pickup_id': pickup.id if pickup else None,
+            'pickup_name': pickup.pickup_location_title if pickup else '',
+            'task_date': t.dl_task_date.strftime('%d %b %Y') if t.dl_task_date else '',
             'lat': lat,
             'lng': lng,
         })
@@ -11141,12 +13315,23 @@ def tasks_live_map(request):
             'mode': mode,
         })
 
+    # Build unique pickup locations from task data
+    pickup_map = {}
+    for p in pins:
+        if p['pickup_id'] and p['pickup_id'] not in pickup_map:
+            pickup_map[p['pickup_id']] = p['pickup_name']
+    pickups_list = [{'id': k, 'name': v} for k, v in sorted(pickup_map.items(), key=lambda x: x[1])]
+
     context = {
         'pins_json': json.dumps(pins),
         'drivers_json': json.dumps(driver_locations),
+        'pickups_json': json.dumps(pickups_list),
         'pin_count': len([p for p in pins if p['lat']]),
         'total_count': len(pins),
         'driver_count': len(driver_locations),
+        'pickup_count': len(pickups_list),
+        'date_from': date_from.isoformat(),
+        'date_to': date_to.isoformat(),
     }
     return render(request, 'workforce/tasks_live_map.html', context)
 
@@ -11162,7 +13347,7 @@ def import_history(request):
     source_filter = request.GET.get('source', '')
     logs = orders_models.ImportLog.objects.select_related(
         'business', 'initiated_by', 'onedrive_source'
-    ).order_by('-started_at')
+    ).prefetch_related('orders').order_by('-started_at')
 
     if source_filter:
         logs = logs.filter(source=source_filter)
@@ -11185,7 +13370,7 @@ def temp_orders(request):
     Staff can trigger a manual sync or rely on the daily Celery task.
     """
     business_id = request.GET.get('business', '').strip()
-    status_filter = request.GET.get('status', '').strip()
+    status_filter = request.GET.get('status', '').strip()  # empty = show all statuses
     source_type_filter = request.GET.get('source_type', '').strip()
     sort = request.GET.get('sort', '').strip()
 
@@ -11193,6 +13378,8 @@ def temp_orders(request):
 
     qs = orders_models.TempOrder.objects.select_related(
         'business', 'onedrive_source', 'api_settings', 'public_link_source', 'imported_order'
+    ).filter(
+        business__temp_order_enabled=True
     ).exclude(
         # Exclude orphaned records with no source FK
         Q(source_type='onedrive', onedrive_source__isnull=True) |
@@ -11201,32 +13388,32 @@ def temp_orders(request):
         Q(source_type='public_link', public_link_source__isnull=True)
     )
 
+    # Build default source filter per business (from import_mapping._default)
+    enabled_businesses = business_models.Business.objects.filter(temp_order_enabled=True)
+    default_filter = Q()
+    platform_to_source = {
+        'public_link': 'public_link', 'onedrive': 'onedrive',
+        'google_sheet': 'google_sheet', 'shopify': 'shopify',
+        'woocommerce': 'woocommerce', 'csv': 'onedrive',
+    }
+    for biz in enabled_businesses:
+        biz_default = (biz.import_mapping or {}).get('_default', '')
+        if biz_default and biz_default in platform_to_source:
+            default_filter |= Q(business_id=biz.business_id, source_type=platform_to_source[biz_default])
+        else:
+            # No default set — show all sources for this business
+            default_filter |= Q(business_id=biz.business_id)
+
+    # Apply default source filter (skip if user explicitly filters by source_type)
+    if not source_type_filter:
+        qs = qs.filter(default_filter)
+
     if business_id:
         qs = qs.filter(business_id=business_id)
     if status_filter:
         qs = qs.filter(status=status_filter)
     if source_type_filter:
         qs = qs.filter(source_type=source_type_filter)
-
-    # Get the last N rows per source group (onedrive_source, api_settings, or public_link_source)
-    # When filtered by a specific business, show all rows (no cap); otherwise cap at 25 per source
-    row_cap = None if business_id else 25
-    keep_ids = []
-    od_source_ids = qs.filter(source_type='onedrive').values_list('onedrive_source_id', flat=True).distinct()
-    for sid in od_source_ids:
-        source_qs = qs.filter(onedrive_source_id=sid).order_by('-row_num').values_list('id', flat=True)
-        ids = list(source_qs[:row_cap] if row_cap else source_qs)
-        keep_ids.extend(ids)
-    api_groups = qs.filter(source_type__in=['google_sheet', 'shopify', 'woocommerce']).values_list('api_settings_id', 'source_type').distinct()
-    for api_id, st in api_groups:
-        source_qs = qs.filter(api_settings_id=api_id, source_type=st).order_by('-row_num').values_list('id', flat=True)
-        ids = list(source_qs[:row_cap] if row_cap else source_qs)
-        keep_ids.extend(ids)
-    pl_source_ids = qs.filter(source_type='public_link').values_list('public_link_source_id', flat=True).distinct()
-    for sid in pl_source_ids:
-        source_qs = qs.filter(public_link_source_id=sid).order_by('-row_num').values_list('id', flat=True)
-        ids = list(source_qs[:row_cap] if row_cap else source_qs)
-        keep_ids.extend(ids)
 
     # Sort options
     SORT_OPTIONS = {
@@ -11241,11 +13428,44 @@ def temp_orders(request):
     if isinstance(order_by, str):
         order_by = (order_by,)
 
-    temp_rows = qs.filter(id__in=keep_ids).order_by(*order_by)
+    # Per-business pagination: 10 rows per business, direct LIMIT/OFFSET per business
+    PAGE_SIZE = 10
+    biz_page_offsets = {}
+    for key, val in request.GET.items():
+        if key.startswith('biz_') and val.isdigit():
+            biz_id_str = key[4:]
+            if biz_id_str.isdigit():
+                biz_page_offsets[int(biz_id_str)] = int(val)
 
-    # Business counts (all, not filtered by status)
-    from django.db.models import Count
-    biz_qs = orders_models.TempOrder.objects.values(
+    biz_ids_ordered = list(qs.order_by('business_id').values_list('business_id', flat=True).distinct())
+    biz_groups = []
+    for biz_id in biz_ids_ordered:
+        biz_qs = qs.filter(business_id=biz_id).order_by(*order_by)
+        offset = biz_page_offsets.get(biz_id, 0)
+        # Fetch PAGE_SIZE+1 to detect has_more without a COUNT query
+        rows = list(biz_qs[offset:offset + PAGE_SIZE + 1])
+        has_more = len(rows) > PAGE_SIZE
+        rows = rows[:PAGE_SIZE]
+        all_new = bool(rows) and all(r.status == 'new' for r in rows)
+        biz_groups.append({
+            'business': rows[0].business if rows else None,
+            'business_id': biz_id,
+            'rows': rows,
+            'offset': offset,
+            'has_more': has_more,
+            'all_new': all_new,
+            'next_offset': offset + PAGE_SIZE,
+            'prev_offset': max(0, offset - PAGE_SIZE),
+            'has_prev': offset > 0,
+        })
+
+    # Business counts (all statuses — only enabled businesses, default source only)
+    biz_count_qs = orders_models.TempOrder.objects.filter(
+        business__temp_order_enabled=True
+    )
+    if default_filter:
+        biz_count_qs = biz_count_qs.filter(default_filter)
+    biz_qs = biz_count_qs.values(
         'business_id', 'business__business_name'
     ).annotate(count=Count('id')).order_by('-count')
     biz_counts_list = [
@@ -11253,39 +13473,70 @@ def temp_orders(request):
         for b in biz_qs
     ]
 
-    # Status counts
+    # Count of temp orders with status='new' that don't exist in main orders
+    # Match by client_order_code OR (customer_name + customer_phone) per business
+    from datetime import timedelta
+    thirty_days_ago = (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    existing_codes = set(
+        orders_models.Order.objects.filter(
+            client_order_code__gt=''
+        ).values_list('business_id', 'client_order_code')
+    )
+    existing_customers = set(
+        orders_models.Order.objects.filter(
+            customer_name__gt='', customer_phone__gt=''
+        ).values_list('business_id', 'customer_name', 'customer_phone')
+    )
+    temp_count_qs = orders_models.TempOrder.objects.filter(
+        status='new', order_date__gte=thirty_days_ago,
+        business__temp_order_enabled=True
+    )
+    if default_filter:
+        temp_count_qs = temp_count_qs.filter(default_filter)
+    temp_qs = temp_count_qs.values_list(
+        'business_id', 'client_order_code', 'customer_name', 'customer_phone'
+    )
+    new_count = 0
+    for biz_id, code, name, phone in temp_qs:
+        matched = False
+        if code and (biz_id, code) in existing_codes:
+            matched = True
+        elif name and phone and (biz_id, name, phone) in existing_customers:
+            matched = True
+        if not matched:
+            new_count += 1
+
+    # Status counts (only enabled businesses, default source only)
+    enabled_temps = orders_models.TempOrder.objects.filter(business__temp_order_enabled=True)
+    if default_filter:
+        enabled_temps = enabled_temps.filter(default_filter)
     status_counts = dict(
-        orders_models.TempOrder.objects.values_list('status').annotate(Count('id')).order_by()
+        enabled_temps.values_list('status').annotate(Count('id')).order_by()
     )
 
     # Source type counts
     source_type_counts = dict(
-        orders_models.TempOrder.objects.values_list('source_type').annotate(Count('id')).order_by()
+        enabled_temps.values_list('source_type').annotate(Count('id')).order_by()
     )
 
     # Last sync time
-    last_sync = orders_models.TempOrder.objects.order_by('-synced_at').values_list('synced_at', flat=True).first()
+    last_sync = enabled_temps.order_by('-synced_at').values_list('synced_at', flat=True).first()
 
     # All businesses for filter dropdown
     all_businesses = business_models.Business.objects.filter(
         business_status='active'
     ).order_by('business_name')
 
-    # Active sources
-    sources = orders_models.OneDriveSource.objects.filter(
-        is_active=True,
-    ).exclude(
-        last_column_mapping={},
-    ).select_related('business').order_by('business__business_name')
+    # Sources and unmapped detection deferred — only loaded on sync click
 
     context = {
-        'temp_rows': temp_rows,
-        'total_count': temp_rows.count(),
+        'biz_groups': biz_groups,
+        'total_count': sum(b['count'] for b in biz_counts_list),
+        'new_count': new_count,
         'biz_counts': biz_counts_list,
         'status_counts': status_counts,
         'source_type_counts': source_type_counts,
         'last_sync': last_sync,
-        'sources': sources,
         'all_businesses': all_businesses,
         'filters': {
             'business': business_id,
@@ -11463,6 +13714,33 @@ def temp_orders_preview(request):
         id__in=ids
     ).select_related('business', 'onedrive_source', 'api_settings', 'public_link_source').order_by('-order_date')
 
+    # Check for businesses without any mapping configured
+    unmapped_biz = {}
+    checked_biz = set()
+    for r in rows:
+        bid = r.business_id
+        if bid in checked_biz:
+            continue
+        checked_biz.add(bid)
+        has_mapping = False
+        if r.business and r.business.import_mapping:
+            has_mapping = True
+        elif r.onedrive_source and r.onedrive_source.last_column_mapping:
+            has_mapping = True
+        elif r.public_link_source and getattr(r.public_link_source, 'last_column_mapping', None):
+            has_mapping = True
+        elif r.api_settings and getattr(r.api_settings, 'column_mapping', None):
+            has_mapping = True
+        if not has_mapping:
+            unmapped_biz[str(bid)] = r.business.business_name if r.business else str(bid)
+    if unmapped_biz:
+        names = ', '.join(unmapped_biz.values())
+        return JsonResponse({
+            'success': False,
+            'error': f'No import mapping configured for: {names}. Please set up column mapping in the Mapping Manager before importing.',
+            'unmapped_businesses': unmapped_biz,
+        }, status=400)
+
     # All mappable DB fields (same as OneDrive mapping UI)
     ALL_DB_FIELDS = [
         'client_order_code', 'order_date', 'customer_name', 'customer_phone',
@@ -11502,34 +13780,83 @@ def temp_orders_preview(request):
         for f in DIRECT_FIELDS:
             row_data[f] = getattr(r, f, '')
 
-        # Extract extra fields from raw_row using saved column mapping
-        col_mapping = {}
-        if r.onedrive_source and hasattr(r.onedrive_source, 'last_column_mapping'):
-            col_mapping = r.onedrive_source.last_column_mapping or {}
-        elif r.api_settings and hasattr(r.api_settings, 'column_mapping'):
-            col_mapping = r.api_settings.column_mapping or {}
-        elif r.public_link_source and hasattr(r.public_link_source, 'last_column_mapping'):
-            col_mapping = r.public_link_source.last_column_mapping or {}
+        # Get raw headers for column lookup (used for new-format mappings)
+        raw_headers = []
+        if r.onedrive_source and getattr(r.onedrive_source, 'last_headers', None):
+            raw_headers = r.onedrive_source.last_headers
+        elif r.public_link_source and getattr(r.public_link_source, 'last_headers', None):
+            raw_headers = r.public_link_source.last_headers
+
+        # Extract extra fields from raw_row — prefer shared business mapping, fall back to per-source
+        # Map source_type to the nested platform key used in business.import_mapping
+        # NOTE: Shopify/WooCommerce TempOrders store raw_row in normalized CSV-style keys
+        # (e.g. 'count_1', 'cod', 'name') not Shopify virtual columns — always use CSV mapping for dict rows
+        _src_to_platform = {
+            'onedrive': 'onedrive', 'google_sheet': 'google_sheet',
+            'shopify': 'shopify', 'woocommerce': 'woocommerce',
+            'public_link': 'public_link', 'csv': 'csv', 'csv_upload': 'csv',
+        }
+        _raw_is_dict_src = isinstance(r.raw_row, dict)
+        _platform_key = 'csv' if _raw_is_dict_src else _src_to_platform.get(r.source_type, 'csv')
+        _biz_mapping_raw = r.business.import_mapping if r.business_id else None
+        if _biz_mapping_raw:
+            _nested_keys = ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link')
+            if any(k in _biz_mapping_raw for k in _nested_keys):
+                # Nested format — extract the platform-specific flat mapping
+                col_mapping = _biz_mapping_raw.get(_platform_key) or {}
+            else:
+                col_mapping = _biz_mapping_raw  # legacy flat
+        else:
+            col_mapping = (
+                (r.onedrive_source.last_column_mapping if r.onedrive_source else None)
+                or (r.api_settings.column_mapping if r.api_settings else None)
+                or (r.public_link_source.last_column_mapping if r.public_link_source else None)
+                or {}
+            )
 
         # Build reverse mapping: db_field -> col_index
+        # Handles two formats:
+        #   Old: {col_idx_str: db_field}  e.g. {'0': 'client_order_code'}
+        #   New: {db_field: header_name}  e.g. {'client_order_code': 'Order ID'}
         reverse_map = {}
-        for col_idx, db_field in col_mapping.items():
-            if db_field:
-                reverse_map[db_field] = int(col_idx)
+        is_new_format = col_mapping and not all(str(k).isdigit() for k in col_mapping)
+        if is_new_format:
+            # New format: look up header_name position in raw_headers
+            header_lower = [h.lower() for h in raw_headers]
+            for db_field, header_name in col_mapping.items():
+                if db_field and header_name:
+                    try:
+                        idx = header_lower.index(str(header_name).lower())
+                        reverse_map[db_field] = idx
+                    except ValueError:
+                        pass
+        else:
+            # Old format: keys are numeric col indices
+            for col_idx, db_field in col_mapping.items():
+                if db_field:
+                    try:
+                        reverse_map[db_field] = int(col_idx)
+                    except (ValueError, TypeError):
+                        pass
 
         # Fill in extra fields from raw_row
-        raw = r.raw_row if isinstance(r.raw_row, list) else []
+        # raw_row may be a list (indexed by col) or a dict (keyed by header_name)
+        raw_row = r.raw_row
+        raw_is_dict = isinstance(raw_row, dict)
+        raw_list = raw_row if isinstance(raw_row, list) else []
+        # Build {db_field: header_name} from new-format mapping for dict lookup
+        db_to_header = col_mapping if is_new_format else {}
+
         for f in ALL_DB_FIELDS:
             if f not in DIRECT_FIELDS and f not in row_data:
-                if f in reverse_map and reverse_map[f] < len(raw):
-                    row_data[f] = str(raw[reverse_map[f]] or '')
-                else:
-                    row_data[f] = ''
-
-        # Also get column headers from the source for display
-        raw_headers = []
-        if r.onedrive_source and hasattr(r.onedrive_source, 'last_headers'):
-            raw_headers = r.onedrive_source.last_headers or []
+                val = ''
+                if raw_is_dict and f in db_to_header:
+                    # dict raw_row: look up by header_name
+                    val = str(raw_row.get(db_to_header[f]) or '')
+                elif not raw_is_dict and f in reverse_map and reverse_map[f] < len(raw_list):
+                    # list raw_row: look up by col index
+                    val = str(raw_list[reverse_map[f]] or '')
+                row_data[f] = val
 
         row_data['raw_headers'] = raw_headers
         row_data['col_mapping'] = col_mapping
@@ -11583,15 +13910,21 @@ def _match_product_by_name(pname, business):
     if matched:
         return matched
 
+    # Try client_names (aliases) match
+    raw_stripped = pname.strip()
+    for product in ProductModel.objects.filter(business=business, client_names__isnull=False):
+        if product.client_names and raw_stripped.lower() in [n.lower() for n in product.get_client_names_list()]:
+            return product
+
     # Try original raw name as fallback (for non-coded formats)
-    if clean_name != pname.strip():
+    if clean_name != raw_stripped:
         matched = ProductModel.objects.filter(
-            business=business, item_name__iexact=pname.strip()
+            business=business, item_name__iexact=raw_stripped
         ).first()
         if matched:
             return matched
         matched = ProductModel.objects.filter(
-            business=business, item_sku__iexact=pname.strip()
+            business=business, item_sku__iexact=raw_stripped
         ).first()
         if matched:
             return matched
@@ -11601,13 +13934,14 @@ def _match_product_by_name(pname, business):
 
 def _extract_products_from_raw_row(temp_order):
     """Extract product_1/count_1..3 from raw_row using column mapping."""
-    col_mapping = {}
-    if temp_order.onedrive_source and hasattr(temp_order.onedrive_source, 'last_column_mapping'):
-        col_mapping = temp_order.onedrive_source.last_column_mapping or {}
-    elif temp_order.api_settings and hasattr(temp_order.api_settings, 'column_mapping'):
-        col_mapping = temp_order.api_settings.column_mapping or {}
-    elif temp_order.public_link_source and hasattr(temp_order.public_link_source, 'last_column_mapping'):
-        col_mapping = temp_order.public_link_source.last_column_mapping or {}
+    # Prefer shared business mapping; fall back to per-source mapping
+    col_mapping = (
+        (temp_order.business.import_mapping if temp_order.business_id else None)
+        or (temp_order.onedrive_source.last_column_mapping if temp_order.onedrive_source else None)
+        or (temp_order.api_settings.column_mapping if temp_order.api_settings else None)
+        or (temp_order.public_link_source.last_column_mapping if temp_order.public_link_source else None)
+        or {}
+    )
 
     if not col_mapping:
         return []
@@ -11731,8 +14065,10 @@ def temp_orders_transfer(request):
         dl_zone = safe_int_or_none(row_data.get('dl_zone', temp_order.dl_zone))
         dl_street = safe_int_or_none(row_data.get('dl_street', temp_order.dl_street))
         dl_building = safe_int_or_none(row_data.get('dl_building', temp_order.dl_building))
-        package_desc = row_data.get('package_desc', temp_order.package_desc).strip()
-        package_qty = safe_int(row_data.get('package_qty', '1')) or 1
+        raw_row = temp_order.raw_row if isinstance(temp_order.raw_row, dict) else {}
+        package_desc = row_data.get('package_desc', '') or temp_order.package_desc or raw_row.get('package_desc', '')
+        package_desc = package_desc.strip() if package_desc else ''
+        package_qty = safe_int(row_data.get('package_qty', '')) or safe_int(raw_row.get('package_qty', '')) or 1
         deadline_date = row_data.get('deadline_date', '').strip()
         seller_notes = row_data.get('seller_notes', '').strip()
         internal_notes = row_data.get('internal_notes', '').strip()
@@ -11767,13 +14103,21 @@ def temp_orders_transfer(request):
             notes_parts.append(f"Link: {location_link}")
         order_notes = ' | '.join(notes_parts)
 
-        # Build product list from product_1..3 columns
+        # Build product list: prefer row_data (preview modal), fallback to raw_row product_N, then line_items
         products = []
-        for i in range(1, 4):
-            pname = row_data.get(f'product_{i}', '').strip()
-            pcount = safe_int(row_data.get(f'count_{i}', '')) or 1
+        for i in range(1, 6):
+            pname = (row_data.get(f'product_{i}', '') or raw_row.get(f'product_{i}', '')).strip()
+            pcount = safe_int(row_data.get(f'count_{i}', '') or raw_row.get(f'count_{i}', '')) or 1
             if pname:
                 products.append({'name': pname, 'qty': pcount})
+
+        # If still no products, fall back to raw line_items (Shopify API orders)
+        if not products:
+            for li in raw_row.get('line_items', []):
+                li_name = li.get('name', '')
+                li_qty = li.get('qty', 1)
+                if li_name:
+                    products.append({'name': li_name, 'qty': li_qty})
 
         # Parse coded product names and build clean package description
         clean_product_names = []
@@ -11787,6 +14131,10 @@ def temp_orders_transfer(request):
             package_desc = ', '.join(desc_parts)
             package_qty = sum(p['qty'] for p in clean_product_names)
 
+        # Determine cod_status_by_client from platform financial_status
+        fin_status = (temp_order.financial_status or '').lower()
+        cod_status_by_client = 'online_paid' if fin_status == 'paid' else None
+
         try:
             order = orders_models.Order(
                 business=business,
@@ -11799,6 +14147,7 @@ def temp_orders_transfer(request):
                 dl_street=dl_street,
                 dl_building=dl_building,
                 cod_amount=cod_amount,
+                cod_status_by_client=cod_status_by_client,
                 deadline_date=deadline_date[:100] if deadline_date else '',
                 latitude=dl_latitude,
                 longitude=dl_longitude,
@@ -11826,16 +14175,20 @@ def temp_orders_transfer(request):
             created_orders.append(order)
 
             # Match product names to Product records → create OrderItems
+            # Use line_items prices for API orders, fallback to product record price
+            li_price_map = {li.get('name', ''): li.get('price', 0) for li in raw_row.get('line_items', [])}
             for p in products:
                 pname = p['name']
                 pqty = p['qty']
                 matched = _match_product_by_name(pname, business)
-                if matched:
-                    orders_models.OrderItem.objects.create(
-                        order=order, product=matched, quantity=pqty,
-                        unit_price=matched.item_price or 0,
-                        notes=matched.item_name
-                    )
+                unit_price = float(li_price_map.get(pname, 0) or 0) or (matched.item_price or 0 if matched else 0)
+                orders_models.OrderItem.objects.create(
+                    order=order,
+                    product=matched,
+                    quantity=pqty,
+                    unit_price=unit_price,
+                    notes=matched.item_name if matched else pname,
+                )
 
             # Mark temp order as imported
             temp_order.status = 'imported'
@@ -12292,9 +14645,23 @@ def public_link_save_mapping(request, source_id):
     except (json_lib.JSONDecodeError, ValueError):
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
 
-    mapping = body.get('mapping', {})
+    mapping = body.get('mapping', {})  # {col_idx_str: db_field}
     source.last_column_mapping = mapping
     source.save(update_fields=['last_column_mapping', 'updated_at'])
+    # Sync to shared business import mapping (nested format, csv key for public links)
+    if mapping:
+        headers = source.last_headers or []
+        biz_mapping = {}
+        for col_idx_str, db_field in mapping.items():
+            if db_field:
+                idx = int(col_idx_str) if str(col_idx_str).isdigit() else -1
+                if 0 <= idx < len(headers) and headers[idx]:
+                    biz_mapping[db_field] = headers[idx]
+        if biz_mapping:
+            existing = source.business.import_mapping or {}
+            existing['public_link'] = biz_mapping
+            source.business.import_mapping = existing
+            source.business.save(update_fields=['import_mapping'])
 
     # Re-sync with new mapping: delete old temp orders and re-sync
     orders_models.TempOrder.objects.filter(public_link_source=source, status='new').delete()
@@ -12597,11 +14964,25 @@ def onedrive_save_mapping(request, source_id):
         body = json_lib.loads(request.body)
     except (json_lib.JSONDecodeError, ValueError):
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    mapping = body.get('mapping', {})
+    mapping = body.get('mapping', {})  # {col_idx_str: db_field}
+    headers = body.get('headers', [])   # column header names from the sheet
     if not mapping:
         return JsonResponse({'success': False, 'error': 'No mapping provided'}, status=400)
     source.last_column_mapping = mapping
     source.save(update_fields=['last_column_mapping'])
+    # Sync to shared business import mapping (nested format, onedrive key)
+    if headers:
+        biz_mapping = {}
+        for col_idx_str, db_field in mapping.items():
+            if db_field:
+                idx = int(col_idx_str)
+                if idx < len(headers) and headers[idx]:
+                    biz_mapping[db_field] = headers[idx]
+        if biz_mapping:
+            existing = source.business.import_mapping or {}
+            existing['onedrive'] = biz_mapping
+            source.business.import_mapping = existing
+            source.business.save(update_fields=['import_mapping'])
     return JsonResponse({'success': True, 'message': 'Mapping saved'})
 
 
@@ -12945,6 +15326,19 @@ def onedrive_import_trigger(request, source_id):
         source.last_imported_rows = existing_imported
         source.last_column_mapping = column_mapping
         source.save()
+        # Sync to shared business import mapping (nested format, onedrive key)
+        if column_mapping and header_row:
+            biz_mapping = {}
+            for col_idx_str, db_field in column_mapping.items():
+                if db_field:
+                    idx = int(col_idx_str)
+                    if idx < len(header_row) and header_row[idx]:
+                        biz_mapping[db_field] = header_row[idx]
+            if biz_mapping:
+                existing = source.business.import_mapping or {}
+                existing['onedrive'] = biz_mapping
+                source.business.import_mapping = existing
+                source.business.save(update_fields=['import_mapping'])
 
         # Mark corresponding TempOrder rows as imported
         if row_numbers:
@@ -13764,4 +16158,998 @@ def wf_webhook_generate_key(request, business_id):
         'key': wk.key,
         'url': request.build_absolute_uri(f'/api/webhooks/order/inbound/{wk.key}/'),
         'created': created,
+    })
+
+
+# ==================== DRIVER TASKS VIEW (Fleet Account) ====================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_driver_tasks(request):
+    """Staff view: all tasks for a specific driver, filterable by status/date."""
+    from django.db.models import Count, Q, Sum
+    from decimal import Decimal
+
+    # --- Driver selection ---
+    driver_id = request.GET.get('driver_id', '')
+    selected_driver = None
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='approved'
+    ).select_related('user').order_by('user__first_name', 'user__last_name')
+
+    if driver_id:
+        try:
+            selected_driver = fleet_models.Driver.objects.select_related('user').get(
+                driver_id=driver_id, driver_status='approved'
+            )
+        except fleet_models.Driver.DoesNotExist:
+            pass
+
+    tasks = None
+    stats = {}
+
+    if selected_driver:
+        # --- Filters ---
+        status_filter = request.GET.get('status', '')
+        date_from = request.GET.get('date_from', '')
+        date_to = request.GET.get('date_to', '')
+        date_preset = request.GET.get('date_preset', '')
+        search = request.GET.get('q', '')
+
+        from datetime import timedelta
+        today = timezone.now().date()
+
+        if date_preset == 'today':
+            date_from = date_to = today.isoformat()
+        elif date_preset == 'yesterday':
+            y = today - timedelta(days=1)
+            date_from = date_to = y.isoformat()
+        elif date_preset == '7days':
+            date_from = (today - timedelta(days=7)).isoformat()
+            date_to = today.isoformat()
+        elif date_preset == '30days':
+            date_from = (today - timedelta(days=30)).isoformat()
+            date_to = today.isoformat()
+
+        tasks = delivery_models.DeliveryTask.objects.filter(
+            driver=selected_driver
+        ).select_related(
+            'order', 'order__business'
+        ).order_by('-dl_task_date', '-id')
+
+        if status_filter:
+            tasks = tasks.filter(dl_task_status=status_filter)
+        if date_from:
+            tasks = tasks.filter(dl_task_date__gte=date_from)
+        if date_to:
+            tasks = tasks.filter(dl_task_date__lte=date_to)
+        if search:
+            tasks = tasks.filter(
+                Q(dl_task_number__icontains=search) |
+                Q(order__customer_name__icontains=search) |
+                Q(order__customer_phone__icontains=search) |
+                Q(order__order_number__icontains=search)
+            )
+
+        # --- Stats from filtered set ---
+        agg = tasks.aggregate(
+            total=Count('id'),
+            delivered=Count('id', filter=Q(dl_task_status='delivered')),
+            in_progress=Count('id', filter=Q(dl_task_status__in=[
+                'accepted', 'picked_up', 'start_ride',
+                'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'
+            ])),
+            failed=Count('id', filter=Q(dl_task_status__in=['failed', 'cancelled', 'rejected'])),
+            total_earnings=Sum('dl_price', filter=Q(dl_task_status='delivered')),
+            total_cod=Sum('order__cod_amount'),
+        )
+        stats = {
+            'total': agg['total'] or 0,
+            'delivered': agg['delivered'] or 0,
+            'in_progress': agg['in_progress'] or 0,
+            'failed': agg['failed'] or 0,
+            'pending': max(0, (agg['total'] or 0) - (agg['delivered'] or 0) - (agg['in_progress'] or 0) - (agg['failed'] or 0)),
+            'total_earnings': agg['total_earnings'] or Decimal('0.00'),
+            'total_cod': agg['total_cod'] or Decimal('0.00'),
+        }
+        if stats['total'] > 0:
+            stats['completion_rate'] = round((stats['delivered'] / stats['total']) * 100, 1)
+        else:
+            stats['completion_rate'] = 0
+
+    if tasks is not None:
+        # Build zone name lookup for display
+        zone_numbers = set(t.order.dl_zone for t in tasks if t.order and t.order.dl_zone)
+        zone_map = {}
+        if zone_numbers:
+            zone_map = dict(
+                delivery_models.ZoneName.objects.filter(
+                    zone_number__in=zone_numbers
+                ).values_list('zone_number', 'zone_name')
+            )
+
+        # Get last distance for each task from TaskStatusPoint
+        task_ids = [t.id for t in tasks]
+        distance_map = {}
+        if task_ids:
+            from django.db.models import Subquery, OuterRef
+            latest_points = delivery_models.TaskStatusPoint.objects.filter(
+                task_id__in=task_ids,
+                distance_from_delivery__isnull=False,
+            ).order_by('task_id', '-created_at').distinct('task_id')
+            for pt in latest_points:
+                distance_map[pt.task_id] = pt.distance_from_delivery
+
+        # Attach zone_name_display and distance to each task
+        for t in tasks:
+            if t.order and t.order.dl_zone:
+                t.zone_name_display = zone_map.get(t.order.dl_zone, '')
+            else:
+                t.zone_name_display = ''
+            t.delivery_distance_km = distance_map.get(t.id)
+
+    DL_TASK_STATUS_CHOICES = [
+        ('for_review', 'For Review'),
+        ('pending', 'Pending'),
+        ('assigned', 'Assigned'),
+        ('accepted', 'Accepted'),
+        ('picked_up', 'Picked Up'),
+        ('start_ride', 'Start Ride'),
+        ('out_for_delivery', 'Out for Delivery'),
+        ('in_transit', 'In Transit'),
+        ('contacted', 'Contacted'),
+        ('non_reachable', 'Non Reachable'),
+        ('delivered', 'Delivered'),
+        ('failed', 'Failed'),
+        ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    context = {
+        'page_title': 'Driver Tasks',
+        'drivers': drivers,
+        'selected_driver': selected_driver,
+        'tasks': tasks,
+        'stats': stats,
+        'status_choices': DL_TASK_STATUS_CHOICES,
+        'current_filters': {
+            'status': request.GET.get('status', ''),
+            'date_from': request.GET.get('date_from', ''),
+            'date_to': request.GET.get('date_to', ''),
+            'date_preset': request.GET.get('date_preset', ''),
+            'q': request.GET.get('q', ''),
+        },
+    }
+    return render(request, 'workforce/fleet_driver_tasks.html', context)
+
+
+# =============================================================================
+# EXPORT PAGE
+# =============================================================================
+
+def _fetch_shopify_live_orders(business_id, date_from, date_to):
+    """Fetch orders live from Shopify API for a given business and date range.
+    Returns list of dicts compatible with the export table."""
+    import shopify
+    from business.models import BusinessApiSettings
+
+    qs = BusinessApiSettings.objects.filter(
+        business_id=business_id, api_type='shopify', is_verify_api=True,
+    )
+    api_settings = qs.first()
+    if not api_settings:
+        return None, 'No verified Shopify API settings found for this business.'
+
+    shop_name = (api_settings.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+    if not shop_name:
+        return None, 'Shopify store URL is not configured.'
+
+    session = shopify.Session(shop_name, api_settings.api_version or '2023-10', api_settings.api_access_token)
+    shopify.ShopifyResource.activate_session(session)
+
+    try:
+        params = {'limit': 250, 'status': 'any'}
+        if date_from:
+            params['created_at_min'] = f'{date_from}T00:00:00+03:00'
+        if date_to:
+            params['created_at_max'] = f'{date_to}T23:59:59+03:00'
+
+        result = []
+        orders = shopify.Order.find(**params)
+        while True:
+            for o in orders:
+                ship = getattr(o, 'shipping_address', None)
+                line_items = getattr(o, 'line_items', []) or []
+                items_data = []
+                for li in line_items:
+                    variant = getattr(li, 'variant_title', '') or ''
+                    name = li.title or ''
+                    if variant and variant.lower() != 'default title':
+                        name = f'{name} - {variant}'
+                    items_data.append({'name': name, 'qty': li.quantity, 'price': li.price})
+
+                customer_name = ''
+                if ship:
+                    customer_name = f"{getattr(ship, 'first_name', '') or ''} {getattr(ship, 'last_name', '') or ''}".strip()
+                if not customer_name:
+                    cust = getattr(o, 'customer', None)
+                    if cust:
+                        customer_name = f"{getattr(cust, 'first_name', '') or ''} {getattr(cust, 'last_name', '') or ''}".strip()
+
+                fin_status = getattr(o, 'financial_status', '') or ''
+                shipping_lines = getattr(o, 'shipping_lines', []) or []
+                shipping_method = ', '.join(
+                    getattr(sl, 'title', '') or '' for sl in shipping_lines if getattr(sl, 'title', '')
+                )
+                result.append({
+                    'order_id': o.name,
+                    'date': str(getattr(o, 'created_at', '') or ''),
+                    'customer_name': customer_name,
+                    'address': getattr(ship, 'address1', '') if ship else '',
+                    'city': getattr(ship, 'city', '') if ship else '',
+                    'province': getattr(ship, 'province', '') if ship else '',
+                    'phone1': getattr(ship, 'phone', '') if ship else '',
+                    'email': getattr(o, 'contact_email', '') or getattr(o, 'email', '') or '',
+                    'cod': '' if fin_status == 'paid' else str(o.total_price),
+                    'financial_status': fin_status,
+                    'shipping_method': shipping_method,
+                    'note': getattr(o, 'note', '') or '',
+                    'items': items_data,
+                })
+            if orders.has_next_page():
+                orders = orders.next_page()
+            else:
+                break
+        return result, None
+    except Exception as exc:
+        logger.exception('Shopify live fetch error for business %s', business_id)
+        return None, str(exc)
+    finally:
+        shopify.ShopifyResource.clear_session()
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_export_page(request):
+    """Export orders — 3-step flow: pick business → pick source → filter & export."""
+    from business.models import BusinessApiSettings
+
+    business_id = request.GET.get('business', '').strip()
+    source      = request.GET.get('source', '').strip()       # 'db' | 'shopify_api'
+    platform    = request.GET.get('platform', 'shopify').strip()
+    date_from   = request.GET.get('dateFrom', '').strip()
+    date_to     = request.GET.get('dateTo', '').strip()
+    c_status    = request.GET.get('cStatus', '').strip()
+    export_format = request.GET.get('export', '').strip()
+
+    base_ctx = {'page_title': 'Export Orders'}
+
+    # ── STEP 1: no business selected — show business cards ──────────────────
+    if not business_id:
+        all_businesses = business_models.Business.objects.filter(
+            business_status='active'
+        ).order_by('business_name').annotate(
+            order_count=Count('order')
+        )
+        # Attach available API sources per business
+        api_map = {}
+        for api in BusinessApiSettings.objects.filter(is_verify_api=True).values('business_id', 'api_type'):
+            api_map.setdefault(api['business_id'], []).append(api['api_type'])
+        for biz in all_businesses:
+            biz.api_sources = api_map.get(biz.business_id, [])
+        return render(request, 'workforce/export_page.html', {
+            **base_ctx,
+            'step': 'select_business',
+            'all_businesses': all_businesses,
+        })
+
+    # Resolve selected business object
+    try:
+        selected_business = business_models.Business.objects.get(pk=business_id)
+    except business_models.Business.DoesNotExist:
+        return redirect('workforce:wf_export_page')
+
+    # ── STEP 2: business selected but no source — show source cards ─────────
+    if not source:
+        api_settings = BusinessApiSettings.objects.filter(
+            business_id=business_id, is_verify_api=True
+        ).values('api_type', 'site_api_url')
+        available_sources = []
+        available_sources.append({
+            'key': 'db',
+            'label': 'EzzyDelivery Database',
+            'icon': 'fa-solid fa-database',
+            'desc': 'Orders already imported and stored in the system.',
+            'color': '#1a1a2e',
+        })
+        for a in api_settings:
+            if a['api_type'] == 'shopify':
+                available_sources.append({
+                    'key': 'shopify_api',
+                    'label': 'Shopify API (Live)',
+                    'icon': 'fa-brands fa-shopify',
+                    'desc': f"Fetch orders directly from Shopify store: {a['site_api_url'] or ''}",
+                    'color': '#96bf48',
+                })
+            elif a['api_type'] == 'woocommerce':
+                available_sources.append({
+                    'key': 'woocommerce_api',
+                    'label': 'WooCommerce API (Live)',
+                    'icon': 'fa-brands fa-wordpress',
+                    'desc': f"Fetch orders directly from WooCommerce: {a['site_api_url'] or ''}",
+                    'color': '#7f54b3',
+                })
+        return render(request, 'workforce/export_page.html', {
+            **base_ctx,
+            'step': 'select_source',
+            'selected_business': selected_business,
+            'available_sources': available_sources,
+            'business_id': business_id,
+        })
+
+    # ── STEP 3: business + source selected — filter & show orders ───────────
+    from datetime import timedelta
+    today = timezone.now().date()
+    if not date_from:
+        date_from = (today - timedelta(days=1)).isoformat()
+    if not date_to:
+        date_to = today.isoformat()
+    filters = {'business': business_id, 'dateFrom': date_from, 'dateTo': date_to, 'cStatus': c_status}
+
+    # Shopify live API
+    if source == 'shopify_api':
+        shopify_api_orders, shopify_api_error = None, None
+        if any([date_from, date_to, c_status]) or export_format:
+            shopify_api_orders, shopify_api_error = _fetch_shopify_live_orders(business_id, date_from, date_to)
+
+        if export_format in ('excel', 'csv') and shopify_api_orders:
+            return _export_shopify_api_orders_file(shopify_api_orders, export_format)
+
+        import json as _json
+        return render(request, 'workforce/export_page.html', {
+            **base_ctx,
+            'step': 'results',
+            'source': source,
+            'platform': 'shopify',
+            'selected_business': selected_business,
+            'business_id': business_id,
+            'shopify_api_orders': shopify_api_orders,
+            'shopify_api_orders_json': _json.dumps(shopify_api_orders or []).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026'),
+            'shopify_api_error': shopify_api_error,
+            'total_count': len(shopify_api_orders) if shopify_api_orders else 0,
+            'filters': filters,
+        })
+
+    # Database source
+    orders = None
+    total_count = 0
+    has_filter = any([date_from, date_to, c_status, export_format])
+    if has_filter:
+        orders = orders_models.Order.objects.select_related('business').prefetch_related(
+            'order_items__product'
+        ).filter(business_id=business_id)
+        if platform == 'shopify':
+            orders = orders.filter(platform__in=[platform, ''])
+        else:
+            orders = orders.filter(platform=platform)
+        if date_from:
+            orders = orders.filter(order_date__gte=date_from)
+        if date_to:
+            orders = orders.filter(order_date__lte=date_to)
+        if c_status:
+            orders = orders.filter(order_status=c_status)
+        orders = orders.order_by('-created_at')
+        total_count = orders.count()
+
+    if export_format in ('excel', 'csv') and orders is not None:
+        return _export_platform_orders_file(orders, platform, export_format)
+
+    page_obj = None
+    if orders is not None:
+        paginator = Paginator(orders, 50)
+        page_num = request.GET.get('page', 1)
+        try:
+            page_obj = paginator.page(page_num)
+        except (PageNotAnInteger, EmptyPage):
+            page_obj = paginator.page(1)
+
+    return render(request, 'workforce/export_page.html', {
+        **base_ctx,
+        'step': 'results',
+        'source': source,
+        'platform': platform,
+        'selected_business': selected_business,
+        'business_id': business_id,
+        'page_obj': page_obj,
+        'total_count': total_count,
+        'filters': filters,
+    })
+
+
+def _export_shopify_api_orders_file(orders, fmt):
+    """Export Shopify live API orders to CSV or Excel."""
+    from io import BytesIO
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    headers = [
+        'Order ID', 'Date', 'Customer Name', 'Address', 'City', 'Phone', 'Email',
+        'COD', 'Payment Status', 'Shipping Method', 'Note',
+        'Product:1', 'Qty:1', 'Product:2', 'Qty:2', 'Product:3', 'Qty:3',
+        'Product:4', 'Qty:4', 'Product:5', 'Qty:5',
+    ]
+
+    def build_row(o):
+        items = o.get('items', [])
+        item_cols = []
+        for i in range(5):
+            it = items[i] if i < len(items) else {}
+            item_cols += [it.get('name', ''), str(it.get('qty', '')) if it else '']
+        return [
+            o.get('order_id', ''), o.get('date', '')[:10], o.get('customer_name', ''),
+            o.get('address', ''), o.get('city', '') or o.get('province', ''),
+            o.get('phone1', ''), o.get('email', ''),
+            o.get('cod', ''), o.get('financial_status', ''), o.get('shipping_method', ''),
+            o.get('note', ''),
+        ] + item_cols
+
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+
+    if fmt == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="shopify_live_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(headers)
+        for o in orders:
+            writer.writerow(build_row(o))
+        return response
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Shopify Live Orders'
+    ws.append(headers)
+    hfill = PatternFill(start_color='1a1a2e', end_color='1a1a2e', fill_type='solid')
+    for cell in ws[1]:
+        cell.fill = hfill
+        cell.font = Font(bold=True, color='FFFFFF', size=10)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 30
+    for o in orders:
+        ws.append(build_row(o))
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = min(
+            max(len(str(c.value or '')) for c in col) + 4, 40)
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = HttpResponse(buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="shopify_live_{timestamp}.xlsx"'
+    return response
+
+
+def _export_platform_orders_file(orders, platform, fmt):
+    """Build and return the export file response."""
+    from io import BytesIO
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    headers = [
+        'Order ID', 'Date', 'Customer Name', 'Customer Address',
+        'Customer City/Land mark', 'Villa/Building No', 'Street No', 'Zone No',
+        'LocLink', 'Day & Time (If them have demand)', 'Phone 1', 'Phone 2/Whatsapp',
+        'Email', 'Latitude', 'Longitude', 'LocLink2',
+        'Product Name', 'Qty', 'Price', 'Note',
+        'Product:1', 'Count:1', 'Product:2', 'Count:2',
+        'Product:3', 'Count:3', 'Product:4', 'Count:4',
+        'Product:5', 'Count:5',
+    ]
+
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+
+    if fmt == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{platform}_orders_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(headers)
+        for order in orders[:10000]:
+            writer.writerow(_build_export_row(order))
+        return response
+
+    # Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f'{platform.capitalize()} Orders'
+
+    header_fill = PatternFill(start_color='1a1a2e', end_color='1a1a2e', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF', size=10)
+    center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_align
+    ws.row_dimensions[1].height = 36
+
+    for order in orders[:10000]:
+        ws.append(_build_export_row(order))
+
+    for col in ws.columns:
+        max_len = max((len(str(cell.value or '')) for cell in col), default=10)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{platform}_orders_{timestamp}.xlsx"'
+    return response
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def wf_export_selected(request):
+    """Export a user-selected subset of Shopify live orders to file."""
+    try:
+        orders = json.loads(request.POST.get('orders', '[]'))
+    except (ValueError, TypeError):
+        return HttpResponse('Invalid data', status=400)
+    fmt = request.POST.get('fmt', 'excel')
+    if not isinstance(orders, list):
+        return HttpResponse('Invalid data', status=400)
+    return _export_shopify_api_orders_file(orders, fmt)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_export_api(request):
+    """JSON API: return export orders as JSON array with same filters as wf_export_page."""
+    platform = request.GET.get('platform', 'shopify')
+    business_id = request.GET.get('business', '').strip()
+    date_from = request.GET.get('dateFrom', '').strip()
+    date_to = request.GET.get('dateTo', '').strip()
+    c_status = request.GET.get('cStatus', '').strip()
+    source = request.GET.get('source', 'db')
+
+    # --- Shopify Live API source ---
+    if source == 'shopify_api' and platform == 'shopify':
+        if not business_id:
+            return JsonResponse({'error': 'business parameter is required for shopify_api source'}, status=400)
+        live_orders, error = _fetch_shopify_live_orders(business_id, date_from, date_to)
+        if error:
+            return JsonResponse({'error': error}, status=502)
+        return JsonResponse({'source': 'shopify_api', 'count': len(live_orders), 'orders': live_orders})
+
+    orders = orders_models.Order.objects.select_related(
+        'business'
+    ).prefetch_related(
+        'order_items__product'
+    ).filter(platform__in=[platform, ''] if platform == 'shopify' else [platform])
+
+    if business_id:
+        orders = orders.filter(business_id=business_id)
+    if date_from:
+        orders = orders.filter(order_date__gte=date_from)
+    if date_to:
+        orders = orders.filter(order_date__lte=date_to)
+    if c_status:
+        orders = orders.filter(order_status=c_status)
+
+    orders = orders.order_by('-created_at')[:10000]
+
+    data = []
+    for order in orders:
+        loc_link = loc_link2 = ''
+        if order.latitude and order.longitude:
+            lat, lng = order.latitude, order.longitude
+            loc_link = f'https://maps.google.com/?q={lat},{lng}'
+            loc_link2 = f'https://www.google.com/maps/search/?api=1&query={lat},{lng}'
+
+        day_time = ''
+        if order.scheduled_delivery and order.scheduled_date:
+            day_time = str(order.scheduled_date)
+            if order.scheduled_time:
+                day_time += f' {order.scheduled_time}'
+
+        email = city_landmark = ''
+        if order.original_order_data and isinstance(order.original_order_data, dict):
+            email = order.original_order_data.get('email', '') or ''
+            shipping = order.original_order_data.get('shipping_address') or {}
+            city_landmark = shipping.get('city', '') or shipping.get('province', '') or ''
+
+        items = list(order.order_items.all()[:5])
+        item_list = []
+        for it in items:
+            item_list.append({
+                'name': it.product.item_name if it.product else (it.notes or ''),
+                'qty': it.quantity,
+            })
+
+        data.append({
+            'order_id': order.client_order_code or order.order_number,
+            'date': str(order.order_date) if order.order_date else '',
+            'customer_name': order.customer_name or '',
+            'customer_address': order.customer_address or '',
+            'city_landmark': city_landmark,
+            'building_no': str(order.dl_building) if order.dl_building else '',
+            'street_no': str(order.dl_street) if order.dl_street else '',
+            'zone_no': str(order.dl_zone) if order.dl_zone else '',
+            'loc_link': loc_link,
+            'day_time': day_time,
+            'phone1': order.customer_phone or '',
+            'phone2_whatsapp': order.customer_whatsapp or '',
+            'email': email,
+            'latitude': str(order.latitude) if order.latitude else '',
+            'longitude': str(order.longitude) if order.longitude else '',
+            'loc_link2': loc_link2,
+            'price': str(order.cod_amount) if order.cod_amount else '',
+            'note': order.order_notes or '',
+            'status': order.order_status or '',
+            'business': order.business.business_name if order.business else '',
+            'items': item_list,
+        })
+
+    return JsonResponse({'count': len(data), 'orders': data})
+
+
+def _build_export_row(order):
+    """Build a single export data row for an order."""
+    loc_link = loc_link2 = ''
+    if order.latitude and order.longitude:
+        lat, lng = order.latitude, order.longitude
+        loc_link = f'https://maps.google.com/?q={lat},{lng}'
+        loc_link2 = f'https://www.google.com/maps/search/?api=1&query={lat},{lng}'
+
+    day_time = ''
+    if order.scheduled_delivery and order.scheduled_date:
+        day_time = str(order.scheduled_date)
+        if order.scheduled_time:
+            day_time += f' {order.scheduled_time}'
+
+    email = city_landmark = ''
+    if order.original_order_data and isinstance(order.original_order_data, dict):
+        email = order.original_order_data.get('email', '') or ''
+        shipping = order.original_order_data.get('shipping_address') or {}
+        city_landmark = shipping.get('city', '') or shipping.get('province', '') or ''
+
+    items = list(order.order_items.all()[:5])
+
+    first_name = first_qty = ''
+    if items:
+        fi = items[0]
+        first_name = fi.product.item_name if fi.product else (fi.notes or '')
+        first_qty = str(fi.quantity)
+
+    item_cols = []
+    for i in range(5):
+        if i < len(items):
+            it = items[i]
+            name = it.product.item_name if it.product else (it.notes or '')
+            item_cols.extend([name, str(it.quantity)])
+        else:
+            item_cols.extend(['', ''])
+
+    return [
+        order.client_order_code or order.order_number,
+        str(order.order_date) if order.order_date else '',
+        order.customer_name or '',
+        order.customer_address or '',
+        city_landmark,
+        str(order.dl_building) if order.dl_building else '',
+        str(order.dl_street) if order.dl_street else '',
+        str(order.dl_zone) if order.dl_zone else '',
+        loc_link,
+        day_time,
+        order.customer_phone or '',
+        order.customer_whatsapp or '',
+        email,
+        str(order.latitude) if order.latitude else '',
+        str(order.longitude) if order.longitude else '',
+        loc_link2,
+        first_name,
+        first_qty,
+        str(order.cod_amount) if order.cod_amount else '',
+        order.order_notes or '',
+    ] + item_cols
+
+
+# =============================================================================
+# DL TASKS EXPORT PAGE
+# =============================================================================
+
+@login_required
+def dl_tasks_export_page(request):
+    """Export delivery tasks — 2-step flow: pick business → filter & view tasks."""
+    from datetime import timedelta
+    from django.db.models import Count
+
+    business_id  = request.GET.get('business', '').strip()
+    date_from    = request.GET.get('dateFrom', '').strip()
+    date_to      = request.GET.get('dateTo', '').strip()
+    status_filter = request.GET.get('taskStatus', '').strip()
+    export_fmt   = request.GET.get('export', '').strip()
+
+    base_ctx = {'page_title': 'DL Tasks Export'}
+
+    # ── STEP 1: no business selected ────────────────────────────────────────
+    if not business_id:
+        all_businesses = business_models.Business.objects.filter(
+            business_status='active'
+        ).order_by('business_name').annotate(
+            task_count=Count('deliverytask')
+        )
+        return render(request, 'workforce/dl_tasks_export_page.html', {
+            **base_ctx,
+            'step': 'select_business',
+            'all_businesses': all_businesses,
+        })
+
+    # Resolve selected business
+    try:
+        selected_business = business_models.Business.objects.get(pk=business_id)
+    except business_models.Business.DoesNotExist:
+        return redirect('workforce:dl_tasks_export_page')
+
+    # ── STEP 2: filter & results ─────────────────────────────────────────────
+    today = timezone.now().date()
+    if not date_from:
+        date_from = (today - timedelta(days=1)).isoformat()
+    if not date_to:
+        date_to = today.isoformat()
+
+    qs = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'driver__user', 'business', 'pickup_location',
+        'order__business',
+    ).filter(business_id=business_id)
+
+    try:
+        qs = qs.filter(dl_task_date__gte=date_from, dl_task_date__lte=date_to)
+    except Exception:
+        pass
+
+    if status_filter:
+        qs = qs.filter(dl_task_status=status_filter)
+
+    qs = qs.order_by('-dl_task_date', '-created_at')
+
+    # ── Excel/CSV export ─────────────────────────────────────────────────────
+    if export_fmt in ('excel', 'csv'):
+        import io, openpyxl
+        headers = [
+            'Task #', 'Task Date', 'Task Status', 'Driver',
+            'Order Code', 'Customer Name', 'Customer Phone', 'Customer Address',
+            'Zone', 'Street', 'Building', 'COD Amount', 'COD Collected',
+            'DL Price', 'DL Speed', 'Preferred Time', 'Completed At',
+            'Failure Reason', 'Order Status',
+        ]
+        rows = []
+        for t in qs:
+            o = t.order
+            rows.append([
+                t.dl_task_number or '',
+                str(t.dl_task_date) if t.dl_task_date else '',
+                t.get_dl_task_status_display() if hasattr(t, 'get_dl_task_status_display') else t.dl_task_status,
+                str(t.driver) if t.driver else '',
+                o.client_order_code if o else '',
+                o.customer_name if o else '',
+                o.customer_phone if o else '',
+                o.customer_address if o else '',
+                str(o.dl_zone) if o and o.dl_zone else '',
+                str(o.dl_street) if o and o.dl_street else '',
+                str(o.dl_building) if o and o.dl_building else '',
+                str(o.cod_amount) if o else '',
+                'Yes' if t.cod_collected else 'No',
+                str(t.dl_price) if t.dl_price else '',
+                t.dl_speed or '',
+                t.preferred_time or '',
+                str(t.completed_at) if t.completed_at else '',
+                t.failure_reason or '',
+                o.order_status if o else '',
+            ])
+
+        if export_fmt == 'excel':
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = 'DL Tasks'
+            ws.append(headers)
+            for r in rows:
+                ws.append(r)
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            fname = f"dl_tasks_{date_from}_{date_to}.xlsx"
+            response = HttpResponse(buf.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = f'attachment; filename="{fname}"'
+            return response
+        else:
+            import csv as csv_module
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="dl_tasks_{date_from}_{date_to}.csv"'
+            writer = csv_module.writer(response)
+            writer.writerow(headers)
+            for r in rows:
+                writer.writerow(r)
+            return response
+
+    total_count = qs.count()
+
+    return render(request, 'workforce/dl_tasks_export_page.html', {
+        **base_ctx,
+        'step': 'results',
+        'selected_business': selected_business,
+        'business_id': business_id,
+        'tasks': qs,
+        'total_count': total_count,
+        'filters': {
+            'dateFrom': date_from,
+            'dateTo': date_to,
+            'taskStatus': status_filter,
+        },
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_order_config(request):
+    """Configure which businesses are enabled for temp order sync."""
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        business_id = request.POST.get('business_id')
+
+        if action == 'toggle' and business_id:
+            biz = get_object_or_404(business_models.Business, business_id=business_id)
+            biz.temp_order_enabled = not biz.temp_order_enabled
+            biz.save(update_fields=['temp_order_enabled'])
+            return JsonResponse({'ok': True, 'enabled': biz.temp_order_enabled})
+
+        if action == 'bulk_update':
+            enabled_ids = request.POST.getlist('enabled_businesses')
+            # Disable all, then enable selected
+            business_models.Business.objects.all().update(temp_order_enabled=False)
+            if enabled_ids:
+                business_models.Business.objects.filter(business_id__in=enabled_ids).update(temp_order_enabled=True)
+            messages.success(request, f'Temp order config updated — {len(enabled_ids)} businesses enabled.')
+            return redirect('workforce:temp_order_config')
+
+    businesses = business_models.Business.objects.all().order_by('business_name')
+
+    # Count temp orders per business
+    from django.db.models import Count
+    temp_counts = dict(
+        orders_models.TempOrder.objects.values_list('business_id').annotate(Count('id'))
+    )
+    # Count sources per business
+    onedrive_counts = dict(
+        orders_models.OneDriveSource.objects.filter(is_active=True).values_list('business_id').annotate(Count('id'))
+    )
+    api_counts = dict(
+        business_models.BusinessApiSettings.objects.values_list('business_id').annotate(Count('id'))
+    )
+    public_link_counts = dict(
+        orders_models.PublicLinkSource.objects.filter(is_active=True).values_list('business_id').annotate(Count('id'))
+    )
+
+    biz_list = []
+    for biz in businesses:
+        biz_list.append({
+            'business': biz,
+            'temp_count': temp_counts.get(biz.business_id, 0),
+            'onedrive_count': onedrive_counts.get(biz.business_id, 0),
+            'api_count': api_counts.get(biz.business_id, 0),
+            'public_link_count': public_link_counts.get(biz.business_id, 0),
+        })
+
+    enabled_count = sum(1 for b in biz_list if b['business'].temp_order_enabled)
+
+    return render(request, 'workforce/temp_order_config.html', {
+        'biz_list': biz_list,
+        'enabled_count': enabled_count,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def public_link_sources_page(request):
+    """Standalone page to manage public link import sources."""
+    import json as json_lib
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add':
+            business_id = request.POST.get('business_id')
+            label = request.POST.get('label', '').strip()
+            url = request.POST.get('url', '').strip()
+            if not business_id or not url:
+                messages.error(request, 'Business and URL are required.')
+                return redirect('workforce:public_link_sources_page')
+            try:
+                business = business_models.Business.objects.get(business_id=business_id)
+            except business_models.Business.DoesNotExist:
+                messages.error(request, 'Business not found.')
+                return redirect('workforce:public_link_sources_page')
+            if not label:
+                label = f"Public Link - {business.business_name}"
+            source = orders_models.PublicLinkSource.objects.create(
+                business=business, label=label, url=url, is_active=True,
+            )
+            try:
+                from orders.tasks import _sync_public_link_source
+                created, updated = _sync_public_link_source(source)
+                messages.success(request, f'Source added. {created} orders synced.')
+            except Exception as e:
+                messages.warning(request, f'Source added but sync failed: {e}')
+            return redirect('workforce:public_link_sources_page')
+
+        elif action == 'delete':
+            source_id = request.POST.get('source_id')
+            orders_models.PublicLinkSource.objects.filter(id=source_id).delete()
+            messages.success(request, 'Source deleted.')
+            return redirect('workforce:public_link_sources_page')
+
+        elif action == 'toggle':
+            source_id = request.POST.get('source_id')
+            source = get_object_or_404(orders_models.PublicLinkSource, id=source_id)
+            source.is_active = not source.is_active
+            source.save(update_fields=['is_active'])
+            return JsonResponse({'ok': True, 'is_active': source.is_active})
+
+    sources = orders_models.PublicLinkSource.objects.select_related('business').order_by('-created_at')
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    return render(request, 'workforce/public_link_sources.html', {
+        'sources': sources,
+        'businesses': businesses,
+    })
+
+
+# COD Return Processing -------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def process_cod_return(request, task_id):
+    """Staff triggers COD return/refund for a delivery task."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    task = get_object_or_404(
+        delivery_models.DeliveryTask.objects.select_related('order', 'driver'),
+        id=task_id
+    )
+
+    if not task.cod_collected or not task.cod_collected_amount:
+        return JsonResponse({'error': 'No COD collected on this task'}, status=400)
+
+    if not task.driver:
+        return JsonResponse({'error': 'No driver assigned to this task'}, status=400)
+
+    data = json.loads(request.body) if request.content_type == 'application/json' else {}
+    amount = data.get('amount', task.cod_collected_amount)
+    notes = data.get('notes', '')
+
+    from fleet.wallet_service import WalletService
+    from decimal import Decimal
+
+    WalletService.record_cod_return(
+        driver=task.driver,
+        delivery_task=task,
+        amount=Decimal(str(amount)),
+        created_by=request.user,
+        notes=notes or f'COD return for order {task.order.order_number}',
+    )
+
+    # Update order status
+    task.order.cod_status_by_staff = 'not_collected'
+    task.order.save(update_fields=['cod_status_by_staff'])
+
+    return JsonResponse({
+        'success': True,
+        'message': f'COD return of {amount} QAR processed for {task.order.order_number}'
     })

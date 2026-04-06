@@ -155,16 +155,23 @@
     }
 
     function showEmpty() {
-        coordsSpan.textContent = 'Paste a link or plus code';
-        preview.classList.remove('td-edit-loc__preview--found');
-        preview.classList.remove('td-edit-loc__preview--loading');
+        coordsSpan.innerHTML = '<i class="fa-solid fa-link" style="opacity:.4;margin-right:4px;"></i>Paste a link or plus code';
+        preview.classList.remove('td-edit-loc__preview--found', 'td-edit-loc__preview--loading', 'td-edit-loc__preview--error');
+        latInput.value = '';
+        lngInput.value = '';
+    }
+
+    function showError(msg) {
+        coordsSpan.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;"></i>' + (msg || 'Could not extract coordinates');
+        preview.classList.remove('td-edit-loc__preview--found', 'td-edit-loc__preview--loading');
+        preview.classList.add('td-edit-loc__preview--error');
         latInput.value = '';
         lngInput.value = '';
     }
 
     function showLoading() {
-        coordsSpan.textContent = 'Resolving...';
-        preview.classList.remove('td-edit-loc__preview--found');
+        coordsSpan.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:4px;"></i>Resolving...';
+        preview.classList.remove('td-edit-loc__preview--found', 'td-edit-loc__preview--error');
         preview.classList.add('td-edit-loc__preview--loading');
     }
 
@@ -184,10 +191,10 @@
             if (data.lat && data.lng) {
                 showFound(data.lat, data.lng);
             } else {
-                showEmpty();
+                showError('Could not extract coordinates from this link');
             }
         })
-        .catch(function() { showEmpty(); });
+        .catch(function() { showError('Network error — try again'); });
     }
 
     function update() {

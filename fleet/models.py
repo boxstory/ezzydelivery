@@ -101,8 +101,8 @@ class DriverVacancyAplication(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     full_name = models.CharField(max_length=100)
-    mobile_no = models.IntegerField()
-    whatsapp_no = models.IntegerField()
+    mobile_no = models.CharField(max_length=20)
+    whatsapp_no = models.CharField(max_length=20)
     landmark = models.CharField(max_length=100)
     zone_name = models.CharField(max_length=100)
     licence = models.CharField(max_length=100, choices=LICENCE_CHOICES)
@@ -177,6 +177,12 @@ class Driver(models.Model):
         help_text="Last date when earnings were settled/paid"
     )
 
+    # Miscellaneous metadata (push tokens, app settings, etc.)
+    driver_meta = models.JSONField(
+        default=dict, blank=True,
+        help_text="Miscellaneous driver metadata (push notification tokens, app settings, etc.)"
+    )
+
     # Zone Preferences
     preferred_zone_groups = models.ManyToManyField(
         'delivery.ZoneGroup',
@@ -245,7 +251,7 @@ class DriverVehicle(models.Model):
         ('inactive', 'Inactive'),
     )
     vehicle_status = models.CharField(
-        max_length=100, choices=VEHICLE_STATUS, default='Inactive', db_index=True)  # INDEX: Filtered for active vehicles
+        max_length=100, choices=VEHICLE_STATUS, default='inactive', db_index=True)  # INDEX: Filtered for active vehicles
     vehicle_photo = models.ImageField(
         upload_to='fleet/vehicles/', blank=True, null=True)
     vehicle_date = models.DateField(auto_now_add=True)
@@ -334,7 +340,7 @@ class DriverTransaction(models.Model):
         'bonus': 'BONS',
         'adjustment': 'ADJT',
         # Legacy (backward compat)
-        'cod_deposit': 'CODS',
+        'cod_deposit': 'CODD',  # Legacy
     }
 
     TRANSACTION_TYPES = [
@@ -427,8 +433,18 @@ class DriverTransaction(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.transaction_code:
-            self.transaction_code = self._generate_transaction_code()
-        super().save(*args, **kwargs)
+            from django.db import IntegrityError
+            for attempt in range(5):
+                self.transaction_code = self._generate_transaction_code()
+                try:
+                    super().save(*args, **kwargs)
+                    return
+                except IntegrityError:
+                    if attempt == 4:
+                        raise
+                    continue
+        else:
+            super().save(*args, **kwargs)
 
     def _generate_transaction_code(self):
         """Generate transaction code: {TYPECODE}-{YYYYMMDD}-{daily_seq:04d}"""

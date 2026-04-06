@@ -23,33 +23,52 @@
 <div class="col-12 p-3" role="main" aria-label="Follow-Up Tasks List">
 
     <!-- Quick Filters Bar -->
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <form method="get" class="d-flex flex-wrap align-items-center gap-2 w-100" id="followupFilterForm">
+    <form method="get" id="followupFilterForm" class="mb-3">
+        {% if current_sort and current_sort != 'updated' %}<input type="hidden" name="sort" value="{{ current_sort }}{% if current_dir == 'desc' %}-desc{% endif %}">{% endif %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
             <!-- Driver Filter -->
-            <select class="form-select form-select-sm" name="driver" style="max-width: 200px;" onchange="this.form.submit()">
+            <select class="form-select form-select-sm" name="driver" style="max-width: 210px;" onchange="this.form.submit()">
                 <option value="">All Drivers</option>
                 {% for d in active_drivers %}
-                <option value="{{ d.id }}" {% if current_driver == d.id|stringformat:"s" %}selected{% endif %}>
+                <option value="{{ d.driver_id }}" {% if current_driver == d.driver_id|stringformat:"s" %}selected{% endif %}>
                     {{ d.user.first_name }} {{ d.user.last_name }}
                 </option>
                 {% endfor %}
             </select>
-            <!-- Status Filter -->
-            <select class="form-select form-select-sm" name="status" style="max-width: 180px;" onchange="this.form.submit()">
-                <option value="">All Statuses</option>
-                {% for s in active_statuses %}
-                <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>
-                    {{ s|title }}
-                </option>
-                {% endfor %}
-            </select>
-            {% if current_status or current_driver %}
-            <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">
-                <i class="fa-solid fa-xmark me-1"></i>Clear
+            <span class="text-muted small">Filter by status:</span>
+            {% if current_statuses or current_driver %}
+            <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary ms-1">
+                <i class="fa-solid fa-xmark me-1"></i>Clear filters
             </a>
             {% endif %}
-        </form>
-    </div>
+        </div>
+        <!-- Status Checkbox Pills -->
+        <div class="d-flex flex-wrap gap-2">
+            {% for s_val, s_label in active_statuses %}
+            <label class="followup-filter-pill {% if s_val in current_statuses %}followup-filter-pill--active{% endif %}">
+                <input type="checkbox" name="status" value="{{ s_val }}" class="visually-hidden" {% if s_val in current_statuses %}checked{% endif %} onchange="this.form.submit()">
+                {{ s_label }}
+            </label>
+            {% endfor %}
+        </div>
+    </form>
+    <style>
+    .followup-filter-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        background: #fff;
+        color: #495057;
+        transition: all 0.15s;
+        user-select: none;
+    }
+    .followup-filter-pill:hover { border-color: var(--brand-primary, #0d6efd); color: var(--brand-primary, #0d6efd); }
+    .followup-filter-pill--active { background: var(--brand-primary, #0d6efd); border-color: var(--brand-primary, #0d6efd); color: #fff; font-weight: 600; }
+    </style>
 
     <!-- Tasks Table -->
     {% if dl_tasks %}
@@ -94,26 +113,26 @@
                             <input type="checkbox" class="form-check-input" id="selectAllTasks" onchange="toggleSelectAll(this)">
                         </th>
                         <th class="dl-table__th-id">
-                            <a href="?sort={% if current_sort == 'task' and current_dir == 'asc' %}task-desc{% else %}task{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_driver %}&driver={{ current_driver }}{% endif %}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'task' %} dl-table__sort--active{% endif %}">
+                            <a href="?sort={% if current_sort == 'task' and current_dir == 'asc' %}task-desc{% else %}task{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'task' %} dl-table__sort--active{% endif %}">
                                 <span>Task #</span>
                                 <span class="dl-table__sort-sub">Order #</span>
                                 <i class="fa-solid fa-sort{% if current_sort == 'task' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
                             </a>
                         </th>
                         <th>
-                            <a href="?sort={% if current_sort == 'updated' and current_dir == 'desc' %}updated-asc{% else %}updated{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_driver %}&driver={{ current_driver }}{% endif %}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'updated' %} dl-table__sort--active{% endif %}">
+                            <a href="?sort={% if current_sort == 'updated' and current_dir == 'desc' %}updated-asc{% else %}updated{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'updated' %} dl-table__sort--active{% endif %}">
                                 <span>Updated</span>
                                 <span class="dl-table__sort-sub">Date / Time</span>
                                 <i class="fa-solid fa-sort{% if current_sort == 'updated' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
                             </a>
                         </th>
                         <th class="dl-table__th-driver">
-                            <a href="?sort={% if current_sort == 'driver' and current_dir == 'asc' %}driver-desc{% else %}driver{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_driver %}&driver={{ current_driver }}{% endif %}" class="dl-table__sort{% if current_sort == 'driver' %} dl-table__sort--active{% endif %}">
+                            <a href="?sort={% if current_sort == 'driver' and current_dir == 'asc' %}driver-desc{% else %}driver{% endif %}{{ filter_params_nosort }}" class="dl-table__sort{% if current_sort == 'driver' %} dl-table__sort--active{% endif %}">
                                 Driver <i class="fa-solid fa-sort{% if current_sort == 'driver' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
                             </a>
                         </th>
                         <th class="dl-table__th-status">
-                            <a href="?sort={% if current_sort == 'status' and current_dir == 'asc' %}status-desc{% else %}status{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_driver %}&driver={{ current_driver }}{% endif %}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'status' %} dl-table__sort--active{% endif %}">
+                            <a href="?sort={% if current_sort == 'status' and current_dir == 'asc' %}status-desc{% else %}status{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'status' %} dl-table__sort--active{% endif %}">
                                 <span>DL Status</span>
                                 <span class="dl-table__sort-sub">Publish</span>
                                 <i class="fa-solid fa-sort{% if current_sort == 'status' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
@@ -132,7 +151,7 @@
                             </div>
                         </th>
                         <th class="dl-table__th-cod">
-                            <a href="?sort={% if current_sort == 'cod' and current_dir == 'desc' %}cod-asc{% else %}cod{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_driver %}&driver={{ current_driver }}{% endif %}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'cod' %} dl-table__sort--active{% endif %}">
+                            <a href="?sort={% if current_sort == 'cod' and current_dir == 'desc' %}cod-asc{% else %}cod{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'cod' %} dl-table__sort--active{% endif %}">
                                 <span>COD</span>
                                 <span class="dl-table__sort-sub">Status</span>
                                 <i class="fa-solid fa-sort{% if current_sort == 'cod' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
@@ -278,13 +297,13 @@
         </div>
         <h4 class="text-muted mb-3">No Active Tasks</h4>
         <p class="text-muted mb-4">
-            {% if current_status or current_driver %}
+            {% if current_statuses or current_driver %}
             No tasks match your current filters.
             {% else %}
             There are no active tasks requiring follow-up.
             {% endif %}
         </p>
-        {% if current_status or current_driver %}
+        {% if current_statuses or current_driver %}
         <a href="{{ request.path }}" class="btn btn-primary">
             <i class="fa fa-times me-2"></i>Clear Filters
         </a>

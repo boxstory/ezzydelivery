@@ -66,6 +66,9 @@ urlpatterns = [
     path('sw.js', service_worker_view, name='service_worker'),
      
 
+    # Language switching (i18n)
+    path('i18n/', include('django.conf.urls.i18n')),
+
     path('accounts/', include('allauth.urls')),
 
     path('api-auth/', include('rest_framework.urls')),
@@ -95,6 +98,10 @@ urlpatterns = [
 
     # AI Operations Agent
     path('api/ai-agent/', include('ai_agent.urls', namespace='ai_agent')),
+
+    # Public Customer Tracking Page
+    path('track/<str:token>/', orders_views.customer_tracking, name='customer_tracking'),
+    path('track/<str:token>/data/', orders_views.customer_tracking_data, name='customer_tracking_data'),
 
 ]
 

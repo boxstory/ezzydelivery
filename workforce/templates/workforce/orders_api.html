@@ -3,6 +3,10 @@
 
 {% block title %}Order Auto/API — Staff Dashboard{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'orders/css/order_api_get.css' %}?v=20260322c">
+{% endblock extra_css %}
+
 {% block content %}
 <div class="woa">
     <!-- Header -->
@@ -13,7 +17,10 @@
             </h1>
             <p class="woa__hero-sub">Orders imported via Shopify, WooCommerce, TikTok Shop &amp; other integrations</p>
         </div>
-        <div class="p-3">
+        <div class="p-3 d-flex gap-2">
+            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-light btn-sm">
+                <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
+            </a>
             <a href="{% url 'workforce:import_history' %}" class="btn btn-outline-light btn-sm">
                 <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
             </a>
@@ -121,27 +128,18 @@
             </div>
             <div class="woa__card-body p-0">
                 {% if live_orders %}
+
+                {% if selected_api.api_type == 'google_sheet' and gs_headers %}
+                <!-- Google Sheet: keep dynamic table layout -->
                 <div class="table-responsive">
                     <table class="table table-hover table-sm mb-0">
                         <thead class="table-light">
                             <tr>
                                 <th style="width:36px;"></th>
-                                {% if selected_api.api_type == 'google_sheet' and gs_headers %}
                                 <th class="text-muted">Row</th>
                                 {% for h in gs_headers %}
                                 <th class="small">{{ h }}</th>
                                 {% endfor %}
-                                {% else %}
-                                <th>Order #</th>
-                                <th>Customer</th>
-                                <th>Phone</th>
-                                <th>Address</th>
-                                <th>COD</th>
-                                <th>Country</th>
-                                <th>Status</th>
-                                {% if selected_api.api_type == 'shopify' %}<th>Fulfillment</th>{% endif %}
-                                <th>Date</th>
-                                {% endif %}
                                 <th>Imported</th>
                             </tr>
                         </thead>
@@ -155,27 +153,13 @@
                                     <i class="fa-solid fa-circle-check text-success"></i>
                                     {% endif %}
                                 </td>
-                                {% if selected_api.api_type == 'google_sheet' and gs_headers %}
                                 <td class="text-muted small">{{ o.row_number }}</td>
                                 {% for h in gs_headers %}
                                 <td class="small text-truncate" style="max-width:160px;" title="{{ o.cells|get_item:h }}">{{ o.cells|get_item:h }}</td>
                                 {% endfor %}
-                                {% else %}
-                                <td class="fw-semibold">{{ o.name }}</td>
-                                <td>{{ o.customer|default:'—'|truncatechars:20 }}</td>
-                                <td class="text-muted small">{{ o.phone|default:'—' }}</td>
-                                <td class="text-muted small">{{ o.address|default:'—'|truncatechars:30 }}</td>
-                                <td>{% if o.cod %}<span class="fw-semibold">{{ o.cod }} {{ o.currency }}</span>{% else %}—{% endif %}</td>
-                                <td class="text-muted small">{{ o.country|default:'—' }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ o.status|default:'—' }}</span></td>
-                                {% if selected_api.api_type == 'shopify' %}<td><span class="badge bg-light text-dark border">{{ o.fulfillment|default:'—' }}</span></td>{% endif %}
-                                <td class="text-muted small">{{ o.date|default:'—' }}</td>
-                                {% endif %}
                                 <td>
                                     {% if o.imported %}
-                                    <a href="{% url 'workforce:order_detail' o.imported_order_id %}"
-                                       class="badge bg-success text-decoration-none"
-                                       title="View imported order">
+                                    <a href="{% url 'workforce:order_detail' o.imported_order_id %}" class="badge bg-success text-decoration-none">
                                         <i class="fa-solid fa-circle-check me-1"></i>{{ o.imported_order_number }}
                                     </a>
                                     {% else %}
@@ -187,6 +171,135 @@
                         </tbody>
                     </table>
                 </div>
+
+                {% else %}
+                <!-- Shopify / WooCommerce: Receipt card layout -->
+                <div class="oag__list p-3">
+                    {% for o in live_orders %}
+                    <div class="oag__receipt {% if o.imported %}oag__receipt--imported{% endif %}" id="row-{{ o.row_number }}" style="animation-delay: {{ forloop.counter0 }}0ms">
+
+                        <!-- Receipt Header -->
+                        <div class="oag__receipt-header">
+                            <div class="oag__receipt-header-left">
+                                {% if not o.imported %}
+                                <input type="checkbox" class="wfapi-check woa__check" value="{{ o.platform_id }}" data-source="{{ o.source }}">
+                                {% else %}
+                                <i class="fa-solid fa-circle-check" style="color:#4ade80;"></i>
+                                {% endif %}
+                                <span class="oag__order-num">{{ o.name }}</span>
+                                <span class="oag__fin-badge oag__fin-badge--{{ o.status }}">{{ o.status|default:'—' }}</span>
+                                {% if o.fulfillment %}
+                                <span class="oag__fin-badge" style="background:#1e3a5f;color:#93c5fd;">{{ o.fulfillment }}</span>
+                                {% endif %}
+                                <span class="oag__source-tag">{{ o.source|upper }}</span>
+                            </div>
+                            <div class="oag__receipt-header-right">
+                                {% if o.imported %}
+                                <a href="{% url 'workforce:order_detail' o.imported_order_id %}" class="oag__imported-link">
+                                    <i class="fa-solid fa-circle-check me-1"></i>{{ o.imported_order_number }}
+                                </a>
+                                {% endif %}
+                                <span class="oag__receipt-date">
+                                    <i class="far fa-calendar-alt"></i>
+                                    {{ o.date|default:'—'|slice:":10" }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Receipt Body -->
+                        <div class="oag__receipt-body">
+
+                            <!-- Left: Customer & Address -->
+                            <div class="oag__receipt-left">
+                                <div class="oag__info-block">
+                                    <div class="oag__info-eyebrow">Customer</div>
+                                    <div class="oag__info-primary">{{ o.customer|default:'Unknown' }}</div>
+                                    {% if o.phone %}
+                                    <div class="oag__info-secondary"><i class="fas fa-phone fa-xs me-1"></i>{{ o.phone }}</div>
+                                    {% endif %}
+                                </div>
+                                {% if o.address %}
+                                <div class="oag__info-block">
+                                    <div class="oag__info-eyebrow"><i class="fas fa-map-marker-alt"></i> Address</div>
+                                    <div class="oag__info-secondary">{{ o.address }}</div>
+                                    {% if o.country %}
+                                    <div class="oag__info-secondary">{{ o.country }}</div>
+                                    {% endif %}
+                                    {% for sl in o.shipping_lines %}{% if sl.title %}
+                                    <div class="oag__shipping-type-badge" data-type="{{ sl.title|lower }}"><i class="fas fa-shipping-fast"></i> {{ sl.title }}</div>
+                                    {% endif %}{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Right: COD Ledger -->
+                            <div class="oag__receipt-right">
+                                <div class="oag__ledger">
+                                    {% if o.subtotal %}
+                                    <div class="oag__ledger-row">
+                                        <span class="oag__ledger-label">Subtotal</span>
+                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.subtotal }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% for sl in o.shipping_lines %}
+                                    <div class="oag__ledger-row">
+                                        <span class="oag__ledger-label">Shipping{% if sl.title %}<span class="oag__shipping-type-badge" data-type="{{ sl.title|lower }}"><i class="fas fa-shipping-fast"></i> {{ sl.title }}</span>{% endif %}</span>
+                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ sl.price }}</span>
+                                    </div>
+                                    {% endfor %}
+                                    <div class="oag__ledger-divider"></div>
+                                    <div class="oag__ledger-row oag__ledger-row--total">
+                                        <span class="oag__ledger-label">Total</span>
+                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.cod|default:'0.00' }}</span>
+                                    </div>
+                                    <div class="oag__ledger-divider oag__ledger-divider--light"></div>
+                                    {% if o.status == 'paid' %}
+                                    <div class="oag__ledger-row oag__ledger-row--paid">
+                                        <span class="oag__ledger-label"><i class="fas fa-check-circle"></i> Paid</span>
+                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.cod|default:'0.00' }}</span>
+                                    </div>
+                                    <div class="oag__ledger-row oag__ledger-row--cod">
+                                        <span class="oag__ledger-label"><i class="fas fa-money-bill-wave"></i> COD</span>
+                                        <span class="oag__ledger-value">{{ o.currency|default:'' }} 0.00</span>
+                                    </div>
+                                    {% else %}
+                                    <div class="oag__ledger-row oag__ledger-row--paid">
+                                        <span class="oag__ledger-label"><i class="fas fa-check-circle"></i> Paid</span>
+                                        <span class="oag__ledger-value">{{ o.currency|default:'' }} 0.00</span>
+                                    </div>
+                                    <div class="oag__ledger-row oag__ledger-row--cod oag__ledger-row--cod-due">
+                                        <span class="oag__ledger-label"><i class="fas fa-money-bill-wave"></i> COD Due</span>
+                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.cod|default:'0.00' }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Line Items -->
+                        {% if o.items %}
+                        <div class="oag__items">
+                            <div class="oag__items-header">
+                                <i class="fas fa-cubes"></i> Items ({{ o.items|length }})
+                            </div>
+                            <div class="oag__items-grid">
+                                {% for item in o.items %}
+                                <div class="oag__item">
+                                    <span class="oag__item-qty">{{ item.qty }}×</span>
+                                    <span class="oag__item-name">{{ item.name }}</span>
+                                    <span class="oag__item-price">{% if o.currency %}{{ o.currency }} {% endif %}{{ item.price }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
                 {% elif not live_error %}
                 <div class="woa__empty">
                     <i class="fa-solid fa-inbox"></i>

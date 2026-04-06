@@ -532,6 +532,15 @@ def driver_update_location(request):
 @permission_classes([IsAuthenticated])
 def driver_latest_location(request, driver_id):
     """Get the latest GPS location for a driver (admin/workforce use)."""
+    if not request.user.is_staff:
+        # Allow drivers to get only their own location
+        try:
+            own_driver = fleet_models.Driver.objects.get(user=request.user)
+            if own_driver.driver_id != driver_id:
+                return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+        except fleet_models.Driver.DoesNotExist:
+            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+
     loc = fleet_models.DriverLocation.objects.filter(
         driver_id=driver_id
     ).order_by('-created_at').first()
@@ -805,57 +814,155 @@ def driver_complete_task(request, task_id):
         notes = serializer.validated_data.get('notes', '')
         cod_collected = serializer.validated_data.get('cod_collected', False)
         cod_amount_collected = serializer.validated_data.get('cod_amount_collected')
-        
-        # Update task status with DMS mapping
-        task.dl_task_status = status_value
-        task._status_actor = 'driver'
-        task._status_changed_by = request.user
-        # Attach notes so delivery/signals.py can pass them to OrderStatusHistory
-        if notes:
-            task._status_notes = notes
 
-        if status_value in ('delivered', 'failed', 'cancelled'):
-            task.completed_at = timezone.now()
+        # Block delivery without COD confirmation when order has COD
+        if status_value == 'delivered' and task.order and task.order.cod_amount and task.order.cod_amount > 0:
+            if not cod_collected and not task.cod_collected:
+                return Response({
+                    'error': f'This order has COD of {task.order.cod_amount} QAR. '
+                             f'Please confirm COD collection before marking as delivered.'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Save proof-of-delivery GPS coordinates
-        comp_lat = serializer.validated_data.get('completion_latitude')
-        comp_lng = serializer.validated_data.get('completion_longitude')
-        if comp_lat is not None and comp_lng is not None:
-            task.completion_latitude = comp_lat
-            task.completion_longitude = comp_lng
+        with transaction.atomic():
+            # Re-fetch with row lock inside atomic block
+            task = delivery_models.DeliveryTask.objects.select_for_update().select_related('order').get(id=task_id)
 
-        # Track COD on task-level fields
-        if cod_collected:
-            task.cod_collected = True
-            task.cod_collected_at = timezone.now()
-        if cod_amount_collected:
-            task.cod_collected_amount = cod_amount_collected
+            # Capture original COD state for idempotency
+            was_already_cod_collected = task.cod_collected
 
-        # Save payment method from driver
-        payment_method = request.data.get('payment_method', '') if hasattr(request.data, 'get') else request.POST.get('payment_method', '')
-        if payment_method in ('cash', 'pos', 'fawran'):
-            task.payment_method = payment_method
+            # Update task status with DMS mapping
+            task.dl_task_status = status_value
+            task._status_actor = 'driver'
+            task._status_changed_by = request.user
+            # Attach notes so delivery/signals.py can pass them to OrderStatusHistory
+            if notes:
+                task._status_notes = notes
 
-        task.save()
+            if status_value in ('delivered', 'failed', 'cancelled'):
+                task.completed_at = timezone.now()
 
-        # COD collection tracking (only on successful delivery)
-        # Note: order status sync is handled by delivery/signals.py post_save
-        if task.order and status_value == 'delivered' and cod_collected and cod_amount_collected:
-            task.order.cod_status_by_staff = 'cod_with_driver'
-            task.order.save(update_fields=['cod_status_by_staff'])
+            # Save proof-of-delivery GPS coordinates
+            comp_lat = serializer.validated_data.get('completion_latitude')
+            comp_lng = serializer.validated_data.get('completion_longitude')
+            if comp_lat is not None and comp_lng is not None:
+                task.completion_latitude = comp_lat
+                task.completion_longitude = comp_lng
 
-            # Record COD collection in driver wallet
-            from fleet.wallet_service import WalletService
-            from decimal import Decimal
-            WalletService.record_transaction(
-                driver=task.driver,
-                transaction_type='cod_collection',
-                amount=Decimal(str(cod_amount_collected)),
-                description=f"COD collected for order {task.order.order_number}",
-                delivery_task=task,
-                created_by=request.user,
-            )
-        
+            # Track COD on task-level fields
+            if cod_collected:
+                task.cod_collected = True
+                task.cod_collected_at = timezone.now()
+            if cod_amount_collected:
+                task.cod_collected_amount = cod_amount_collected
+
+            # Save payment method from driver
+            payment_method = request.data.get('payment_method', '') if hasattr(request.data, 'get') else request.POST.get('payment_method', '')
+            if payment_method in ('cash', 'pos', 'fawran'):
+                task.payment_method = payment_method
+
+            task.save()
+
+            # COD collection tracking (only on successful delivery, idempotent)
+            # Note: order status sync is handled by delivery/signals.py post_save
+            if task.order and status_value == 'delivered' and cod_collected and cod_amount_collected and not was_already_cod_collected:
+                from decimal import Decimal
+                expected = Decimal(str(task.order.cod_amount)) if task.order.cod_amount else Decimal('0')
+                collected = Decimal(str(cod_amount_collected))
+
+                # Fix 19: Cap COD inflation — prevent driver from reporting more than 110% of expected
+                if expected > 0 and collected > expected * Decimal('1.1'):
+                    logger.warning(
+                        f"COD INFLATION: Driver sent {collected}, expected {expected} "
+                        f"for order {task.order.order_number}"
+                    )
+                    collected = expected  # Cap at expected amount
+                    task.cod_collected_amount = collected
+                    task.save(update_fields=['cod_collected_amount'])
+
+                # Set correct COD status: partial or full
+                if expected > 0 and collected < expected:
+                    task.order.cod_status_by_staff = 'partially_collected'
+                else:
+                    task.order.cod_status_by_staff = 'cod_with_driver'
+                task.order.save(update_fields=['cod_status_by_staff'])
+
+                # Record COD collection in driver wallet (actual amount collected)
+                from fleet.wallet_service import WalletService
+                WalletService.record_transaction(
+                    driver=task.driver,
+                    transaction_type='cod_collection',
+                    amount=collected,
+                    description=f"COD collected for order {task.order.order_number}"
+                             f"{' (partial: ' + str(collected) + ' of ' + str(expected) + ')' if collected < expected else ''}",
+                    delivery_task=task,
+                    created_by=request.user,
+                )
+
+            # Fix 14: Allow additional COD collection on partially collected orders
+            elif (task.order and status_value == 'delivered' and cod_collected and cod_amount_collected
+                  and was_already_cod_collected
+                  and task.order.cod_status_by_staff == 'partially_collected'):
+                from decimal import Decimal
+                additional = Decimal(str(cod_amount_collected))
+                expected = Decimal(str(task.order.cod_amount)) if task.order.cod_amount else Decimal('0')
+                new_total = task.cod_collected_amount + additional
+
+                # Update task with new total
+                task.cod_collected_amount = new_total
+                task.save(update_fields=['cod_collected_amount'])
+
+                # Update order status
+                if new_total >= expected:
+                    task.order.cod_status_by_staff = 'cod_with_driver'
+                task.order.save(update_fields=['cod_status_by_staff'])
+
+                # Record additional wallet transaction
+                from fleet.wallet_service import WalletService
+                WalletService.record_transaction(
+                    driver=task.driver,
+                    transaction_type='cod_collection',
+                    amount=additional,
+                    description=f"Additional COD for order {task.order.order_number} (remaining: {additional} of {expected})",
+                    delivery_task=task,
+                    created_by=request.user,
+                )
+
+            # Log COD amount mismatch warning
+            if task.order and cod_amount_collected and task.order.cod_amount:
+                from decimal import Decimal
+                expected = Decimal(str(task.order.cod_amount))
+                collected = Decimal(str(cod_amount_collected))
+                if expected > 0 and abs(collected - expected) / expected > Decimal('0.1'):
+                    logger.warning(
+                        f"COD mismatch for order {task.order.order_number}: "
+                        f"expected {expected}, collected {collected} "
+                        f"(driver {driver.driver_id})"
+                    )
+                    # Fix 6: Create driver notification for COD mismatch
+                    try:
+                        fleet_models.DriverNotification.objects.create(
+                            driver=task.driver,
+                            title=f'COD Mismatch: {task.order.order_number}',
+                            message=f'Expected {expected} QAR, collected {collected} QAR ({abs(collected - expected)} QAR difference)',
+                            notification_type='alert',
+                            related_task=task,
+                        )
+                    except Exception:
+                        pass
+
+            # Fix 11: Payment method audit log
+            if payment_method and task.driver and task.order:
+                try:
+                    fleet_models.DriverActivityLog.objects.create(
+                        driver=task.driver,
+                        activity_type='cod_collected',
+                        task=task,
+                        description=f'COD {cod_amount_collected or 0} QAR via {payment_method} for {task.order.order_number}',
+                        meta={'payment_method': payment_method, 'amount': str(cod_amount_collected or 0), 'expected': str(task.order.cod_amount or 0)},
+                    )
+                except Exception:
+                    pass
+
         # Upload documents
         documents_created = []
         if 'delivery_proof' in request.FILES:
@@ -1159,6 +1266,9 @@ def import_shopify_orders(request):
     
     try:
         business = business_models.Business.objects.get(business_id=business_id)
+        # Verify user owns this business
+        if not request.user.is_staff and business.user != request.user:
+            return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='shopify',
@@ -1260,6 +1370,9 @@ def import_woocommerce_orders(request):
     
     try:
         business = business_models.Business.objects.get(business_id=business_id)
+        # Verify user owns this business
+        if not request.user.is_staff and business.user != request.user:
+            return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='woocommerce',
@@ -1362,6 +1475,8 @@ def list_integrations(request):
     if business_id:
         try:
             business = business_models.Business.objects.get(business_id=business_id)
+            if not request.user.is_staff and business.user != request.user:
+                return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
             integrations = ezzy_api_models.EcommerceIntegration.objects.filter(business=business)
         except business_models.Business.DoesNotExist:
             return Response(
@@ -1412,6 +1527,9 @@ def import_tiktokshop_orders(request):
 
     try:
         business = business_models.Business.objects.get(business_id=business_id)
+        # Verify user owns this business
+        if not request.user.is_staff and business.user != request.user:
+            return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='tiktokshop',
@@ -1533,6 +1651,9 @@ def test_tiktokshop_connection(request):
 
     try:
         business = business_models.Business.objects.get(business_id=business_id)
+        # Verify user owns this business
+        if not request.user.is_staff and business.user != request.user:
+            return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='tiktokshop'
@@ -1950,6 +2071,9 @@ def webhook_receive_task_completion(request):
                 elif status_value == 'rejected':
                     pass
 
+                # Capture original COD state for idempotency
+                was_already_cod_collected = task.cod_collected
+
                 # Track COD on task-level fields
                 if cod_collected:
                     task.cod_collected = True
@@ -1982,7 +2106,19 @@ def webhook_receive_task_completion(request):
 
                     if order_changed:
                         order.save()
-            
+
+                    # Record COD collection in driver wallet (idempotent)
+                    if task.driver and cod_collected and cod_amount_collected and not was_already_cod_collected:
+                        from fleet.wallet_service import WalletService
+                        from decimal import Decimal
+                        WalletService.record_transaction(
+                            driver=task.driver,
+                            transaction_type='cod_collection',
+                            amount=Decimal(str(cod_amount_collected)),
+                            description=f"COD collected for order {task.order.order_number} (via webhook)",
+                            delivery_task=task,
+                        )
+
             # Trigger webhooks
             webhook_payload = {
                 'task_id': task_id,
@@ -2967,6 +3103,7 @@ def _make_qnas_request(request, endpoint, method='GET', data=None):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_get_zones(request):
     """
     Proxy endpoint for QNAS get_zones API.
@@ -2993,6 +3130,7 @@ def qnas_get_zones(request):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_get_streets(request):
     """
     Proxy endpoint for QNAS get_streets API.
@@ -3026,6 +3164,7 @@ def qnas_get_streets(request):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_get_buildings(request):
     """
     Proxy endpoint for QNAS get_buildings API.
@@ -3062,6 +3201,7 @@ def qnas_get_buildings(request):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_search_address(request):
     """
     Proxy endpoint for QNAS address search API.
@@ -3099,6 +3239,7 @@ def qnas_search_address(request):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_get_address_details(request):
     """
     Proxy endpoint for QNAS address details API.
@@ -3140,6 +3281,7 @@ def qnas_get_address_details(request):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_geocode(request):
     """
     Proxy endpoint for QNAS geocoding API.
@@ -3179,6 +3321,7 @@ def qnas_geocode(request):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_get_zone_polygon(request, zone_number):
     """
     Proxy endpoint for QNAS get_zone_polygon API.
@@ -3212,6 +3355,7 @@ def qnas_get_zone_polygon(request, zone_number):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_get_coordinates(request):
     """
     POST endpoint to get latitude/longitude from QNAS by zone, street, and building.
@@ -3326,6 +3470,7 @@ def qnas_get_coordinates(request):
 
 
 @csrf_exempt
+@login_required(login_url='/accounts/login/')
 def qnas_get_location(request, zone_number, street_number, building_number=None):
     """
     GET endpoint to get coordinates by zone/street/building using path parameters.
@@ -3393,10 +3538,64 @@ def qnas_get_location(request, zone_number, street_number, building_number=None)
             }, status=502)
 
         if not buildings or len(buildings) == 0:
-            logger.warning(f"QNAS location: No buildings found for zone={zone}, street={street}")
+            # Street has no geocoded buildings yet.
+            # Confirm the street actually exists in this zone via get_streets.
+            logger.info(f"QNAS location: No buildings for zone={zone}, street={street} — checking street exists")
+            street_exists = False
+            try:
+                streets_resp = _make_qnas_request(request, f"get_streets/{zone}")
+                if streets_resp and streets_resp.status_code == 200:
+                    streets_data = streets_resp.json()
+                    for s in (streets_data if isinstance(streets_data, list) else []):
+                        if str(s.get('street_number', '')) == str(street):
+                            street_exists = True
+                            break
+            except Exception as e:
+                logger.warning(f"QNAS street existence check error: {e}")
+
+            if street_exists:
+                # Address is real — use street polygon centroid (same as QNAS website)
+                zone_name = None
+                try:
+                    from delivery.models import ZoneName
+                    zn = ZoneName.objects.filter(zone_number=int(zone)).first()
+                    if zn:
+                        zone_name = zn.zone_name
+                except Exception:
+                    pass
+
+                poly_resp = _make_qnas_request(request, f"get_street_polygon/{zone}/{street}")
+                if poly_resp and poly_resp.status_code == 200:
+                    try:
+                        poly_data = poly_resp.json()
+                        pts = poly_data.get('polygon', [])
+                        if pts:
+                            clat = sum(p['lat'] for p in pts) / len(pts)
+                            clng = sum(p['lng'] for p in pts) / len(pts)
+                            logger.info(f"QNAS street polygon centroid: zone={zone}, street={street}, lat={clat}, lng={clng}")
+                            return JsonResponse({
+                                'success': True,
+                                'latitude': round(clat, 7),
+                                'longitude': round(clng, 7),
+                                'building_number': '',
+                                'match_type': 'street_level',
+                                'total_buildings': 0,
+                                'zone_name': zone_name,
+                            })
+                    except Exception as e:
+                        logger.warning(f"QNAS street polygon parse error: {e}")
+
+                # Street confirmed but polygon unavailable — return informative error
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Street {street} exists in Zone {zone} but has no GPS coordinates yet',
+                    'street_exists': True,
+                }, status=404)
+
+            logger.warning(f"QNAS location: zone={zone} street={street} not found")
             return JsonResponse({
                 'success': False,
-                'error': 'No buildings found for this zone and street'
+                'error': 'Address not found in QNAS',
             }, status=404)
 
         # Find matching building or use first one
@@ -3585,7 +3784,7 @@ def webhook_inbound_order(request, webhook_key):
         # Handle nested line_items
         line_items = order_data.get('line_items', [])
         if isinstance(line_items, list) and line_items:
-            for idx, li in enumerate(line_items[:5], 1):
+            for idx, li in enumerate(line_items[:10], 1):
                 if isinstance(li, dict):
                     li_name = li.get('name') or li.get('title', '')
                     li_qty = li.get('quantity') or li.get('qty', 1)
@@ -3628,3 +3827,949 @@ def webhook_inbound_order(request, webhook_key):
         'message': f'{created_count} order(s) received',
         'orders_created': created_count,
     }, status=201)
+
+
+# ==================== COD APIs ====================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_cod_submit(request):
+    """Driver submits collected COD cash to admin for a specific task."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    task_id = request.data.get('task_id')
+    payment_method = request.data.get('payment_method', 'cash')
+    notes = request.data.get('notes', '')
+
+    if not task_id:
+        return Response({'error': 'task_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    valid_payment_methods = [c[0] for c in fleet_models.DriverTransaction.PAYMENT_METHOD_CHOICES]
+    if payment_method not in valid_payment_methods:
+        return Response(
+            {'error': f'Invalid payment_method. Must be one of: {valid_payment_methods}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'driver'
+        ).get(id=task_id, driver=driver)
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return Response({'error': 'Task not found or not assigned to you'}, status=status.HTTP_404_NOT_FOUND)
+
+    if not task.cod_collected:
+        return Response({'error': 'COD has not been collected for this task yet'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if task.cod_settled:
+        return Response({'error': 'COD for this task has already been submitted'}, status=status.HTTP_400_BAD_REQUEST)
+
+    cod_amount = task.cod_collected_amount
+    if not cod_amount or cod_amount <= 0:
+        return Response({'error': 'No COD amount to submit'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from fleet.wallet_service import WalletService
+        with transaction.atomic():
+            txn = WalletService.submit_cod_to_admin(
+                driver=driver,
+                amount=cod_amount,
+                created_by=request.user,
+                payment_method=payment_method,
+                notes=notes or f'COD submission for task #{task.dl_task_number}',
+                delivery_ids=[task.id],
+            )
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    driver.refresh_from_db()
+    task.refresh_from_db()
+
+    return Response({
+        'success': True,
+        'transaction_code': txn.transaction_code,
+        'task_id': task.id,
+        'task_number': task.dl_task_number,
+        'cod_amount': str(cod_amount),
+        'cod_in_hand': str(driver.cod_in_hand),
+        'submitted_at': task.cod_settled_at.isoformat() if task.cod_settled_at else timezone.now().isoformat(),
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_cod_pending(request):
+    """List tasks where COD was collected but not yet submitted to admin."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        cod_collected=True,
+        cod_settled=False,
+    ).select_related('order').order_by('-cod_collected_at')
+
+    data = []
+    for task in tasks:
+        data.append({
+            'task_id': task.id,
+            'task_number': task.dl_task_number,
+            'order_number': task.order.order_number if task.order else None,
+            'customer_name': task.order.customer_name if task.order else None,
+            'cod_collected_amount': str(task.cod_collected_amount),
+            'cod_collected_at': task.cod_collected_at.isoformat() if task.cod_collected_at else None,
+        })
+
+    return Response({
+        'count': len(data),
+        'total_pending_cod': str(driver.cod_in_hand),
+        'tasks': data,
+    }, status=status.HTTP_200_OK)
+
+
+# ==================== DRIVER TRANSACTION APIs ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_transactions(request):
+    """List all financial transactions for the authenticated driver."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    txns = fleet_models.DriverTransaction.objects.filter(
+        driver=driver
+    ).select_related('delivery_task', 'settlement').order_by('-created_at')
+
+    transaction_type = request.query_params.get('type')
+    if transaction_type:
+        txns = txns.filter(transaction_type=transaction_type)
+
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+    if start_date:
+        try:
+            txns = txns.filter(created_at__date__gte=datetime.strptime(start_date, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            txns = txns.filter(created_at__date__lte=datetime.strptime(end_date, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+
+    data = []
+    for txn in txns:
+        data.append({
+            'transaction_code': txn.transaction_code,
+            'transaction_type': txn.transaction_type,
+            'transaction_type_display': txn.get_transaction_type_display(),
+            'amount': str(txn.amount),
+            'description': txn.description,
+            'payment_method': txn.payment_method,
+            'reference_number': txn.reference_number,
+            'task_id': txn.delivery_task_id,
+            'task_number': txn.delivery_task.dl_task_number if txn.delivery_task else None,
+            'settlement_code': txn.settlement.settlement_code if txn.settlement else None,
+            'cod_in_hand_after': str(txn.cod_in_hand_after),
+            'wallet_balance_after': str(txn.wallet_balance_after),
+            'pending_earnings_after': str(txn.pending_earnings_after),
+            'created_at': txn.created_at.isoformat(),
+        })
+
+    return Response({'count': len(data), 'transactions': data}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_transaction_detail(request, code):
+    """Get details of a single transaction by its code."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        txn = fleet_models.DriverTransaction.objects.select_related(
+            'delivery_task', 'settlement', 'created_by'
+        ).get(transaction_code=code, driver=driver)
+    except fleet_models.DriverTransaction.DoesNotExist:
+        return Response({'error': 'Transaction not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'transaction_code': txn.transaction_code,
+        'transaction_type': txn.transaction_type,
+        'transaction_type_display': txn.get_transaction_type_display(),
+        'amount': str(txn.amount),
+        'description': txn.description,
+        'payment_method': txn.payment_method,
+        'reference_number': txn.reference_number,
+        'notes': txn.notes,
+        'task_id': txn.delivery_task_id,
+        'task_number': txn.delivery_task.dl_task_number if txn.delivery_task else None,
+        'settlement_code': txn.settlement.settlement_code if txn.settlement else None,
+        'cod_in_hand_after': str(txn.cod_in_hand_after),
+        'wallet_balance_after': str(txn.wallet_balance_after),
+        'pending_earnings_after': str(txn.pending_earnings_after),
+        'created_at': txn.created_at.isoformat(),
+    }, status=status.HTTP_200_OK)
+
+
+# ==================== DRIVER SETTLEMENT APIs ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_settlements(request):
+    """List all earnings settlements for the authenticated driver."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    settlements = fleet_models.DriverSettlement.objects.filter(
+        driver=driver
+    ).order_by('-created_at')
+
+    settlement_status = request.query_params.get('status')
+    if settlement_status:
+        settlements = settlements.filter(status=settlement_status)
+
+    data = []
+    for s in settlements:
+        data.append({
+            'settlement_code': s.settlement_code,
+            'status': s.status,
+            'status_display': s.get_status_display(),
+            'period_start': s.period_start.isoformat(),
+            'period_end': s.period_end.isoformat(),
+            'total_deliveries': s.total_deliveries,
+            'gross_earnings': str(s.gross_earnings),
+            'deductions': str(s.deductions),
+            'bonuses': str(s.bonuses),
+            'net_amount': str(s.net_amount),
+            'payment_method': s.payment_method,
+            'payment_reference': s.payment_reference,
+            'created_at': s.created_at.isoformat(),
+            'approved_at': s.approved_at.isoformat() if s.approved_at else None,
+            'paid_at': s.paid_at.isoformat() if s.paid_at else None,
+        })
+
+    return Response({'count': len(data), 'settlements': data}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_settlement_detail(request, code):
+    """Get full details of a single settlement including its transactions."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        s = fleet_models.DriverSettlement.objects.prefetch_related(
+            'transactions'
+        ).get(settlement_code=code, driver=driver)
+    except fleet_models.DriverSettlement.DoesNotExist:
+        return Response({'error': 'Settlement not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    txns = []
+    for txn in s.transactions.all().order_by('-created_at'):
+        txns.append({
+            'transaction_code': txn.transaction_code,
+            'transaction_type': txn.transaction_type,
+            'transaction_type_display': txn.get_transaction_type_display(),
+            'amount': str(txn.amount),
+            'description': txn.description,
+            'created_at': txn.created_at.isoformat(),
+        })
+
+    return Response({
+        'settlement_code': s.settlement_code,
+        'status': s.status,
+        'status_display': s.get_status_display(),
+        'period_start': s.period_start.isoformat(),
+        'period_end': s.period_end.isoformat(),
+        'total_deliveries': s.total_deliveries,
+        'total_delivery_charges': str(s.total_delivery_charges),
+        'gross_earnings': str(s.gross_earnings),
+        'deductions': str(s.deductions),
+        'bonuses': str(s.bonuses),
+        'net_amount': str(s.net_amount),
+        'payment_method': s.payment_method,
+        'payment_reference': s.payment_reference,
+        'notes': s.notes,
+        'created_at': s.created_at.isoformat(),
+        'approved_at': s.approved_at.isoformat() if s.approved_at else None,
+        'paid_at': s.paid_at.isoformat() if s.paid_at else None,
+        'transactions': txns,
+    }, status=status.HTTP_200_OK)
+
+
+# ==================== DRIVER NOTIFICATION APIs ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_notifications(request):
+    """List notifications for the authenticated driver."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    notifs = fleet_models.DriverNotification.objects.filter(
+        driver=driver
+    ).order_by('-created_at')
+
+    unread_only = request.query_params.get('unread')
+    if unread_only == '1' or unread_only == 'true':
+        notifs = notifs.filter(is_read=False)
+
+    # Limit to last 100 notifications
+    notifs = notifs[:100]
+
+    data = []
+    for n in notifs:
+        data.append({
+            'id': n.id,
+            'title': n.title,
+            'message': n.message,
+            'notification_type': n.notification_type,
+            'related_task_id': n.related_task_id,
+            'is_read': n.is_read,
+            'created_at': n.created_at.isoformat(),
+            'read_at': n.read_at.isoformat() if n.read_at else None,
+        })
+
+    unread_count = fleet_models.DriverNotification.objects.filter(
+        driver=driver, is_read=False
+    ).count()
+
+    return Response({
+        'unread_count': unread_count,
+        'notifications': data,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_notifications_mark_read(request):
+    """Mark one or more notifications as read.
+
+    Body (optional): {"ids": [1, 2, 3]}
+    If ids is omitted, ALL unread notifications are marked read.
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    ids = request.data.get('ids')
+    now = timezone.now()
+
+    qs = fleet_models.DriverNotification.objects.filter(driver=driver, is_read=False)
+    if ids:
+        if not isinstance(ids, list):
+            return Response({'error': 'ids must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(id__in=ids)
+
+    updated = qs.update(is_read=True, read_at=now)
+
+    return Response({'success': True, 'marked_read': updated}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_device_token(request):
+    """Store or update the FCM/APNs push notification device token for the driver.
+
+    Body: {"token": "<device_token>", "platform": "android"|"ios"|"web"}
+    Stored on the Driver profile in driver_meta JSON field.
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    token = request.data.get('token', '').strip()
+    platform = request.data.get('platform', 'android')
+
+    if not token:
+        return Response({'error': 'token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    valid_platforms = ['android', 'ios', 'web']
+    if platform not in valid_platforms:
+        return Response(
+            {'error': f'platform must be one of: {valid_platforms}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Store in driver_meta JSON field (create if not exists)
+    meta = driver.driver_meta or {}
+    meta['push_token'] = token
+    meta['push_platform'] = platform
+    meta['push_token_updated_at'] = timezone.now().isoformat()
+    driver.driver_meta = meta
+    driver.save(update_fields=['driver_meta'])
+
+    return Response({'success': True, 'platform': platform}, status=status.HTTP_200_OK)
+
+
+# ==================== DRIVER AUTH / STATUS / DASHBOARD APIs ====================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_logout(request):
+    """Invalidate the driver's auth token and set availability to offline."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+        driver.driver_availability = 'offline'
+        driver.save(update_fields=['driver_availability'])
+    except fleet_models.Driver.DoesNotExist:
+        pass  # Still delete the token even if driver profile is missing
+
+    try:
+        request.user.auth_token.delete()
+    except Exception:
+        pass
+
+    return Response({'success': True}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_set_status(request):
+    """Update driver availability status.
+
+    Body: {"availability": "available"|"on_break"|"offline"|"on_delivery"|"returning"}
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    availability = request.data.get('availability', '').strip()
+    valid = [c[0] for c in fleet_models.DRIVER_AVAILABILITY_CHOICES]
+    if availability not in valid:
+        return Response(
+            {'error': f'Invalid availability. Must be one of: {valid}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    driver.driver_availability = availability
+    driver.save(update_fields=['driver_availability'])
+
+    return Response({
+        'success': True,
+        'availability': driver.driver_availability,
+        'availability_display': driver.get_driver_availability_display(),
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_dashboard(request):
+    """Aggregated dashboard data for the driver app home screen.
+
+    Returns:
+      - wallet snapshot (cod_in_hand, credit_limit, pending_earnings, wallet_usage_pct)
+      - today's task stats (total, completed, in_progress)
+      - active task (first in-progress task with order info)
+      - pending COD count
+      - unread notification count
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    today = timezone.localdate()
+
+    ACTIVE_STATUSES = [
+        'accepted', 'picked_up', 'start_ride',
+        'out_for_delivery', 'in_transit', 'contacted', 'non_reachable',
+    ]
+
+    today_tasks = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        dl_task_publish=True,
+        dl_task_date=today,
+    ).exclude(order__order_status='cancelled')
+
+    total_today = today_tasks.count()
+    completed_today = today_tasks.filter(dl_task_status='delivered').count()
+    in_progress_today = today_tasks.filter(dl_task_status__in=ACTIVE_STATUSES).count()
+
+    # First active task for quick access
+    active_task_qs = today_tasks.filter(
+        dl_task_status__in=ACTIVE_STATUSES
+    ).select_related('order').order_by('dl_task_date', 'id').first()
+
+    active_task = None
+    if active_task_qs:
+        t = active_task_qs
+        active_task = {
+            'task_id': t.id,
+            'task_number': t.dl_task_number,
+            'status': t.dl_task_status,
+            'order_number': t.order.order_number if t.order else None,
+            'customer_name': t.order.customer_name if t.order else None,
+            'customer_phone': t.order.customer_phone if t.order else None,
+            'delivery_address': t.order.delivery_address if t.order else None,
+            'cod_amount': str(t.order.cod_amount) if t.order else '0',
+            'cod_collected': t.cod_collected,
+        }
+
+    # Pending COD (collected but not submitted)
+    pending_cod_count = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        cod_collected=True,
+        cod_settled=False,
+    ).count()
+
+    # Unread notifications
+    unread_notif_count = fleet_models.DriverNotification.objects.filter(
+        driver=driver, is_read=False
+    ).count()
+
+    return Response({
+        'driver': {
+            'driver_id': driver.driver_id,
+            'driver_code': driver.driver_code,
+            'driver_name': str(driver),
+            'availability': driver.driver_availability,
+            'availability_display': driver.get_driver_availability_display(),
+            'driver_rating': driver.driver_rating,
+        },
+        'wallet': {
+            'cod_in_hand': str(driver.cod_in_hand),
+            'credit_limit': str(driver.credit_limit),
+            'available_credit': str(driver.available_credit),
+            'pending_earnings': str(driver.pending_earnings),
+            'wallet_usage_pct': round(float(driver.wallet_usage_percentage), 1),
+            'is_wallet_warning': driver.is_wallet_warning,
+            'is_wallet_blocked': driver.is_wallet_blocked,
+        },
+        'today_stats': {
+            'total': total_today,
+            'completed': completed_today,
+            'in_progress': in_progress_today,
+            'pending': total_today - completed_today - in_progress_today,
+        },
+        'active_task': active_task,
+        'pending_cod_count': pending_cod_count,
+        'unread_notifications': unread_notif_count,
+    }, status=status.HTTP_200_OK)
+
+
+# ==================== NEW DRIVER APP ENDPOINTS ====================
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_cod_submit_bulk(request):
+    """Bulk COD submission — submit multiple tasks at once.
+
+    Body:
+        task_ids (list, required): List of DeliveryTask IDs to settle
+        payment_method (str): cash | bank | atm | fawran
+        notes (str, optional)
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    task_ids = request.data.get('task_ids', [])
+    payment_method = request.data.get('payment_method', 'cash')
+    notes = request.data.get('notes', '')
+
+    if not task_ids or not isinstance(task_ids, list):
+        return Response({'error': 'task_ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+    valid_methods = ['cash', 'bank', 'atm', 'fawran']
+    if payment_method not in valid_methods:
+        return Response({'error': f'payment_method must be one of {valid_methods}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        id__in=task_ids, driver=driver, cod_collected=True, cod_settled=False,
+    )
+    if tasks.count() != len(task_ids):
+        return Response({'error': 'One or more task_ids are invalid, not assigned to you, or COD not yet collected'}, status=status.HTTP_400_BAD_REQUEST)
+
+    total_amount = sum(t.cod_collected_amount or 0 for t in tasks)
+    if total_amount <= 0:
+        return Response({'error': 'Total COD amount is zero'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from fleet.wallet_service import WalletService
+    cod_in_hand_before = driver.cod_in_hand
+
+    try:
+        with transaction.atomic():
+            txn = WalletService.submit_cod_to_admin(
+                driver=driver,
+                amount=total_amount,
+                created_by=request.user,
+                payment_method=payment_method,
+                notes=notes,
+                delivery_ids=list(task_ids),
+            )
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    driver.refresh_from_db()
+    return Response({
+        'transaction_code': txn.transaction_code,
+        'submitted_amount': str(total_amount),
+        'payment_method': payment_method,
+        'cod_in_hand_before': str(cod_in_hand_before),
+        'cod_in_hand_after': str(driver.cod_in_hand),
+        'tasks_settled': len(task_ids),
+        'submitted_at': txn.created_at.isoformat(),
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_order_lookup(request):
+    """Look up an order by order_number or client_order_code (barcode scan at pickup).
+
+    Query params:
+        q (str, required): Order number or client order code
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    q = request.query_params.get('q', '').strip()
+    if not q:
+        return Response({'error': 'Query parameter q is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    order = orders_models.Order.objects.filter(
+        Q(order_number=q) | Q(client_order_code=q)
+    ).first()
+    if not order:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    task = delivery_models.DeliveryTask.objects.filter(
+        order=order, driver=driver,
+    ).select_related('order').first()
+    if not task:
+        return Response({'error': 'This order is not assigned to you'}, status=status.HTTP_403_FORBIDDEN)
+
+    return Response({
+        'task_id': task.id,
+        'task_number': task.dl_task_number,
+        'task_status': task.dl_task_status,
+        'order_number': order.order_number,
+        'customer_name': order.customer_name,
+        'customer_phone': order.customer_phone,
+        'delivery_address': order.customer_address,
+        'cod_amount': str(order.cod_amount),
+        'cod_collected': task.cod_collected,
+        'package_description': order.package_description,
+        'package_qty': order.package_qty,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_report_task_issue(request, task_id):
+    """Driver reports a problem with a delivery task.
+
+    Body:
+        issue_type (str): wrong_address | customer_refused | damaged_package |
+                          access_denied | customer_unreachable | other
+        description (str, required)
+        latitude (decimal, optional)
+        longitude (decimal, optional)
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        task = delivery_models.DeliveryTask.objects.get(id=task_id, driver=driver)
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return Response({'error': 'Task not found or not assigned to you'}, status=status.HTTP_404_NOT_FOUND)
+
+    VALID_ISSUE_TYPES = [
+        'wrong_address', 'customer_refused', 'damaged_package',
+        'access_denied', 'customer_unreachable', 'other',
+    ]
+    issue_type = request.data.get('issue_type', 'other')
+    description = request.data.get('description', '').strip()
+    latitude = request.data.get('latitude')
+    longitude = request.data.get('longitude')
+
+    if not description:
+        return Response({'error': 'description is required'}, status=status.HTTP_400_BAD_REQUEST)
+    if issue_type not in VALID_ISSUE_TYPES:
+        return Response({'error': f'issue_type must be one of {VALID_ISSUE_TYPES}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    issue_note = f"[DRIVER ISSUE — {issue_type.upper()}] {description}"
+    if latitude and longitude:
+        issue_note += f" | GPS: {latitude}, {longitude}"
+
+    comment = None
+    if task.order:
+        comment = orders_models.OrderComments.objects.create(
+            order=task.order,
+            body=issue_note,
+            user=request.user,
+        )
+
+    if issue_type == 'customer_unreachable' and task.dl_task_status not in ['delivered', 'failed', 'cancelled']:
+        task.dl_task_status = 'non_reachable'
+        task.save(update_fields=['dl_task_status'])
+
+    return Response({
+        'issue_id': comment.id if comment else None,
+        'task_id': task.id,
+        'task_number': task.dl_task_number,
+        'issue_type': issue_type,
+        'status': 'reported',
+        'reported_at': timezone.now().isoformat(),
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_pickup_locations(request):
+    """List active pickup locations for tasks currently assigned to this driver."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    location_ids = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        dl_task_publish=True,
+        dl_task_status__in=['pending', 'assigned', 'accepted'],
+        order__pickup_location__isnull=False,
+    ).values_list('order__pickup_location_id', flat=True).distinct()
+
+    locations = business_models.PickupLocation.objects.filter(
+        id__in=location_ids,
+        pickup_status='active',
+    ).select_related('business')
+
+    data = [{
+        'id': loc.id,
+        'name': loc.pickup_location_title,
+        'locality': loc.locality,
+        'zone': loc.pickup_zone_no,
+        'street': loc.pickup_street_no,
+        'building': loc.pickup_building_no,
+        'latitude': str(loc.pickup_lat) if loc.pickup_lat else None,
+        'longitude': str(loc.pickup_lon) if loc.pickup_lon else None,
+        'business_name': loc.business.business_name if loc.business else None,
+        'is_default': loc.is_default,
+        'is_fulfilment_center': loc.is_fulfilment_center,
+    } for loc in locations]
+
+    return Response({'count': len(data), 'locations': data}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_task_items(request, task_id):
+    """Get package contents (order items) for a delivery task."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        task = delivery_models.DeliveryTask.objects.select_related('order').get(
+            id=task_id, driver=driver,
+        )
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return Response({'error': 'Task not found or not assigned to you'}, status=status.HTTP_404_NOT_FOUND)
+
+    if not task.order:
+        return Response({'error': 'No order linked to this task'}, status=status.HTTP_404_NOT_FOUND)
+
+    order = task.order
+    items_qs = orders_models.OrderItem.objects.filter(order=order).select_related('product')
+
+    items = []
+    for item in items_qs:
+        product = item.product
+        items.append({
+            'id': item.id,
+            'name': product.product_name if product else (item.notes or 'Item'),
+            'sku': product.product_sku if product else None,
+            'quantity': item.quantity,
+            'unit_price': str(item.unit_price) if item.unit_price else None,
+            'total_price': str(item.total_price) if item.total_price else None,
+            'notes': item.notes,
+            'weight_kg': float(product.product_weight) if product and getattr(product, 'product_weight', None) else None,
+            'is_fragile': getattr(product, 'is_fragile', False) if product else False,
+        })
+
+    return Response({
+        'task_id': task.id,
+        'task_number': task.dl_task_number,
+        'order_number': order.order_number,
+        'package_description': order.package_description,
+        'package_qty': order.package_qty,
+        'special_instructions': order.order_notes,
+        'total_items': len(items),
+        'items': items,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_document_upload(request):
+    """Driver uploads or updates their own identity document.
+
+    Body (multipart):
+        document_type: QID | Driving License | Passport | National Identification
+        document_no (str, required)
+        document_expiry_date (str, optional): YYYY-MM-DD
+        document_file (file): Front image
+        document_file_back (file, optional): Back image
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    VALID_DOC_TYPES = ['QID', 'Driving License', 'Passport', 'National Identification']
+    document_type = request.data.get('document_type', '').strip()
+    document_no = request.data.get('document_no', '').strip()
+    document_expiry_date = request.data.get('document_expiry_date') or None
+    document_file = request.FILES.get('document_file')
+    document_file_back = request.FILES.get('document_file_back')
+
+    if document_type not in VALID_DOC_TYPES:
+        return Response({'error': f'document_type must be one of {VALID_DOC_TYPES}'}, status=status.HTTP_400_BAD_REQUEST)
+    if not document_no:
+        return Response({'error': 'document_no is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    doc, created = fleet_models.DriverDocument.objects.update_or_create(
+        driver=driver,
+        document_type=document_type,
+        defaults={
+            'document_no': document_no,
+            'document_expiry_date': document_expiry_date,
+        },
+    )
+    if document_file:
+        doc.document_file = document_file
+    if document_file_back:
+        doc.document_file_back = document_file_back
+    doc.save()
+
+    return Response({
+        'document_id': doc.id,
+        'document_type': doc.document_type,
+        'document_no': doc.document_no,
+        'document_expiry_date': str(doc.document_expiry_date) if doc.document_expiry_date else None,
+        'action': 'created' if created else 'updated',
+        'status': 'pending_review',
+        'message': 'Document uploaded. Pending admin review.',
+    }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_performance_metrics(request):
+    """Driver performance metrics — success rate, earnings, rating.
+
+    Query params:
+        period (str): week | month | all  (default: month)
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    period = request.query_params.get('period', 'month')
+    now = timezone.now()
+
+    if period == 'week':
+        start_date = now - timedelta(days=7)
+    elif period == 'month':
+        start_date = now - timedelta(days=30)
+    else:
+        start_date = None
+
+    tasks_qs = delivery_models.DeliveryTask.objects.filter(
+        driver=driver, dl_task_publish=True,
+    ).exclude(order__order_status='cancelled')
+    if start_date:
+        tasks_qs = tasks_qs.filter(dl_task_date__gte=start_date.date())
+
+    total = tasks_qs.count()
+    completed = tasks_qs.filter(dl_task_status='delivered').count()
+    failed = tasks_qs.filter(dl_task_status='failed').count()
+    success_rate = round((completed / total) * 100, 1) if total > 0 else 0.0
+
+    earnings_qs = fleet_models.DriverTransaction.objects.filter(
+        driver=driver, transaction_type='earning',
+    )
+    if start_date:
+        earnings_qs = earnings_qs.filter(created_at__gte=start_date)
+    earnings_total = earnings_qs.aggregate(total=Sum('amount'))['total'] or 0
+
+    pending_settlement = fleet_models.DriverSettlement.objects.filter(
+        driver=driver, status='pending',
+    ).aggregate(total=Sum('net_amount'))['total'] or 0
+
+    return Response({
+        'period': period,
+        'total_deliveries': total,
+        'completed_deliveries': completed,
+        'failed_deliveries': failed,
+        'success_rate': success_rate,
+        'customer_rating': driver.driver_rating,
+        'rating_count': driver.driver_rating_count,
+        'earnings_this_period': str(earnings_total),
+        'pending_earnings': str(driver.pending_earnings),
+        'pending_settlement_amount': str(pending_settlement),
+        'total_lifetime_earnings': str(driver.total_earnings),
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def driver_app_config(request):
+    """App configuration for the Flutter driver app — public, no auth required.
+
+    Flutter checks this on every launch to gate outdated app versions
+    and display announcement banners.
+    """
+    from django.conf import settings as django_settings
+
+    min_version = getattr(django_settings, 'DRIVER_APP_MIN_VERSION', '1.0.0')
+    latest_version = getattr(django_settings, 'DRIVER_APP_LATEST_VERSION', '1.0.0')
+    force_update = getattr(django_settings, 'DRIVER_APP_FORCE_UPDATE', False)
+
+    return Response({
+        'min_app_version': min_version,
+        'latest_app_version': latest_version,
+        'force_update': force_update,
+        'store_url_android': 'https://play.google.com/store/apps/details?id=com.ezzydelivery.driver',
+        'store_url_ios': 'https://apps.apple.com/app/ezzydelivery-driver/id0000000000',
+        'announcements': [],
+        'features': {
+            'bulk_cod_submit': True,
+            'barcode_scan': True,
+            'signature_capture': True,
+            'photo_proof': True,
+            'hub_batches': True,
+        },
+        'support_whatsapp': getattr(django_settings, 'DRIVER_SUPPORT_WHATSAPP', ''),
+        'support_email': getattr(django_settings, 'DRIVER_SUPPORT_EMAIL', 'support@ezzydelivery.qa'),
+    }, status=status.HTTP_200_OK)

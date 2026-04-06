@@ -1,0 +1,175 @@
+{% load static %}
+<!-- Warehouse Sidebar — Desktop -->
+<div class="dashboard-sidebar col-md-3 col-lg-2 d-none d-md-block p-0">
+  <div class="wf-sidebar__sticky" style="overflow-y:auto;max-height:100vh;padding:0.5rem;">
+    <ul class="nav flex-column p-0 m-0">
+
+      <!-- Sidebar Header -->
+      <li class="nav-item sidebar-header mb-2">
+        <a class="nav-link dashboard-title" href="{% url 'warehouse:dashboard' %}">
+          <span>Fulfillment</span>
+          <span><i class="fa-solid fa-warehouse me-1"></i> Warehouse</span>
+        </a>
+      </li>
+
+      <!-- Dashboard -->
+      <li class="nav-item {% if request.resolver_match.url_name == 'dashboard' and request.resolver_match.app_name == 'warehouse' %}active{% endif %}">
+        <a class="nav-link btn {% if request.resolver_match.url_name == 'dashboard' and request.resolver_match.app_name == 'warehouse' %}active{% endif %}"
+           href="{% url 'warehouse:dashboard' %}"
+           hx-get="{% url 'warehouse:dashboard' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-gauge-high me-2"></i> Dashboard
+        </a>
+      </li>
+
+      <!-- Inventory Section -->
+      <li class="nav-item mt-2">
+        <div class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#wh-sub-inventory" data-title="Inventory">
+          <i class="fa-solid fa-boxes-stacked me-2"></i>
+          <span>Inventory</span>
+          <i class="fa-solid fa-chevron-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,receive_stock,confirm_receive' %}show{% endif %}" id="wh-sub-inventory">
+          <ul class="nav flex-column">
+            <li class="nav-item {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}"
+                 href="{% url 'warehouse:inventory_list' %}"
+                 hx-get="{% url 'warehouse:inventory_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-list me-2"></i> Stock Levels
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'receive_stock' or request.resolver_match.url_name == 'confirm_receive' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'receive_stock' or request.resolver_match.url_name == 'confirm_receive' %}active{% endif %}"
+                 href="{% url 'warehouse:receive_stock' %}"
+                 hx-get="{% url 'warehouse:receive_stock' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-truck-loading me-2"></i> Receive Stock
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}"
+                 href="{% url 'warehouse:transaction_list' %}"
+                 hx-get="{% url 'warehouse:transaction_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-arrow-right-arrow-left me-2"></i> Transactions
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'low_stock_alerts' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'low_stock_alerts' %}active{% endif %}"
+                 href="{% url 'warehouse:low_stock_alerts' %}"
+                 hx-get="{% url 'warehouse:low_stock_alerts' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                <span class="flex-grow-1">Low Stock Alerts</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Operations Section -->
+      <li class="nav-item mt-1">
+        <div class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#wh-sub-ops" data-title="Operations">
+          <i class="fa-solid fa-clipboard-list me-2"></i>
+          <span>Operations</span>
+          <i class="fa-solid fa-chevron-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'pick_list_list,create_pick_list,pick_list_detail,pack_station,dispatch_queue,dispatch_detail,rma_list,rma_detail,rma_create,cycle_count_list,create_cycle_count,cycle_count_detail,return_task_list,return_task_detail,put_away_list,put_away_detail' %}show{% endif %}" id="wh-sub-ops">
+          <ul class="nav flex-column">
+            <li class="nav-item {% if request.resolver_match.url_name == 'pick_list_list' or request.resolver_match.url_name == 'create_pick_list' or request.resolver_match.url_name == 'pick_list_detail' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'pick_list_list' or request.resolver_match.url_name == 'create_pick_list' or request.resolver_match.url_name == 'pick_list_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:pick_list_list' %}"
+                 hx-get="{% url 'warehouse:pick_list_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-clipboard-check me-2"></i> Pick Lists
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'put_away_list' or request.resolver_match.url_name == 'put_away_detail' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'put_away_list' or request.resolver_match.url_name == 'put_away_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:put_away_list' %}"
+                 hx-get="{% url 'warehouse:put_away_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-dolly me-2"></i> Put-Away
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'cycle_count_list' or request.resolver_match.url_name == 'create_cycle_count' or request.resolver_match.url_name == 'cycle_count_detail' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'cycle_count_list' or request.resolver_match.url_name == 'create_cycle_count' or request.resolver_match.url_name == 'cycle_count_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:cycle_count_list' %}"
+                 hx-get="{% url 'warehouse:cycle_count_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-rotate me-2"></i> Cycle Counts
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'rma_list' or request.resolver_match.url_name == 'rma_detail' or request.resolver_match.url_name == 'rma_create' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'rma_list' or request.resolver_match.url_name == 'rma_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:rma_list' %}"
+                 hx-get="{% url 'warehouse:rma_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-undo-alt me-2"></i> Customer Returns
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'dispatch_queue' or request.resolver_match.url_name == 'dispatch_detail' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'dispatch_queue' or request.resolver_match.url_name == 'dispatch_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:dispatch_queue' %}"
+                 hx-get="{% url 'warehouse:dispatch_queue' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-truck me-2"></i> Dispatch
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'return_task_list' or request.resolver_match.url_name == 'return_task_detail' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'return_task_list' or request.resolver_match.url_name == 'return_task_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:return_task_list' %}"
+                 hx-get="{% url 'warehouse:return_task_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-rotate-left me-2"></i> Returns
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      {% if user.profile.is_staff or user.profile.is_superadmin %}
+      <!-- Setup Section (Staff only) -->
+      <li class="nav-item mt-1">
+        <div class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#wh-sub-setup" data-title="Setup">
+          <i class="fa-solid fa-cogs me-2"></i>
+          <span>Setup</span>
+          <i class="fa-solid fa-chevron-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'warehouse_list,warehouse_add,warehouse_detail,warehouse_edit,warehouse_capacity_configure,warehouse_capacity_preview,location_list,location_add,location_edit,location_delete,warehouse_location_list,warehouse_location_add,seller_warehouse_links,seller_warehouse_link_detail,seller_warehouse_link_add,seller_warehouse_link_edit,seller_warehouse_link_delete' %}show{% endif %}" id="wh-sub-setup">
+          <ul class="nav flex-column">
+            <li class="nav-item {% if request.resolver_match.url_name == 'warehouse_list' or request.resolver_match.url_name == 'warehouse_add' or request.resolver_match.url_name == 'warehouse_detail' or request.resolver_match.url_name == 'warehouse_edit' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'warehouse_list' or request.resolver_match.url_name == 'warehouse_add' or request.resolver_match.url_name == 'warehouse_detail' or request.resolver_match.url_name == 'warehouse_edit' %}active{% endif %}"
+                 href="{% url 'warehouse:warehouse_list' %}"
+                 hx-get="{% url 'warehouse:warehouse_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-building-warehouse me-2"></i> Warehouses
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'location_list' or request.resolver_match.url_name == 'location_add' or request.resolver_match.url_name == 'location_edit' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'location_list' or request.resolver_match.url_name == 'location_add' or request.resolver_match.url_name == 'location_edit' %}active{% endif %}"
+                 href="{% url 'warehouse:location_list' %}"
+                 hx-get="{% url 'warehouse:location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-sitemap me-2"></i> Storage Locations
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'warehouse_location_list' or request.resolver_match.url_name == 'warehouse_location_add' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'warehouse_location_list' or request.resolver_match.url_name == 'warehouse_location_add' %}active{% endif %}"
+                 href="{% url 'warehouse:warehouse_location_list' %}"
+                 hx-get="{% url 'warehouse:warehouse_location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-map-marker-alt me-2"></i> Pickup/Dispatch
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'seller_warehouse_links' or request.resolver_match.url_name == 'seller_warehouse_link_detail' or request.resolver_match.url_name == 'seller_warehouse_link_add' or request.resolver_match.url_name == 'seller_warehouse_link_edit' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'seller_warehouse_links' or request.resolver_match.url_name == 'seller_warehouse_link_detail' or request.resolver_match.url_name == 'seller_warehouse_link_add' or request.resolver_match.url_name == 'seller_warehouse_link_edit' %}active{% endif %}"
+                 href="{% url 'warehouse:seller_warehouse_links' %}"
+                 hx-get="{% url 'warehouse:seller_warehouse_links' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-link me-2"></i> Seller Links
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      {% endif %}
+
+      <!-- Back to Workforce (Staff only) -->
+      {% if user.profile.is_staff or user.profile.is_superadmin %}
+      <li class="nav-item mt-3 pt-2" style="border-top: 1px solid var(--brand-grey-200, #eee);">
+        <a class="nav-link btn" href="{% url 'workforce:wf_dashboard' %}">
+          <i class="fa-solid fa-arrow-left me-2"></i> Workforce
+        </a>
+      </li>
+      {% endif %}
+
+    </ul>
+  </div>
+</div>

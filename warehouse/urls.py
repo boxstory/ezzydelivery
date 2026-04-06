@@ -18,6 +18,7 @@ urlpatterns = [
 
     # Picking
     path('pick-lists/', warehouse_views.pick_list_list, name='pick_list_list'),
+    path('pick-lists/bulk-drop/', warehouse_views.bulk_drop_pick_lists, name='bulk_drop_pick_lists'),
     path('pick-lists/create/', warehouse_views.create_pick_list, name='create_pick_list'),
     path('pick-lists/<int:pk>/', warehouse_views.pick_list_detail, name='pick_list_detail'),
     path('pick-lists/<int:pk>/assign/', warehouse_views.assign_pick_list, name='assign_pick_list'),
@@ -25,10 +26,43 @@ urlpatterns = [
     path('pick-lists/<int:pk>/items/<int:item_id>/pick/', warehouse_views.pick_item, name='pick_item'),
     path('pick-lists/<int:pk>/items/<int:item_id>/unpick/', warehouse_views.unpick_item, name='unpick_item'),
 
+    # Packing
+    path('pick-lists/<int:pk>/pack/', warehouse_views.pack_station, name='pack_station'),
+    path('pick-lists/<int:pk>/pack-order/<int:order_id>/', warehouse_views.pack_order, name='pack_order'),
+
+    # Dispatch
+    path('dispatch/', warehouse_views.dispatch_queue, name='dispatch_queue'),
+    path('dispatch/create/', warehouse_views.dispatch_create, name='dispatch_create'),
+    path('dispatch/<int:pk>/', warehouse_views.dispatch_detail, name='dispatch_detail'),
+    path('dispatch/<int:pk>/handover/<int:item_id>/', warehouse_views.dispatch_handover_item, name='dispatch_handover_item'),
+    path('dispatch/<int:pk>/confirm/', warehouse_views.dispatch_confirm, name='dispatch_confirm'),
+
+    # Customer Returns / RMA
+    path('rma/', warehouse_views.rma_list, name='rma_list'),
+    path('rma/create/<int:order_id>/', warehouse_views.rma_create, name='rma_create'),
+    path('rma/<int:pk>/', warehouse_views.rma_detail, name='rma_detail'),
+    path('rma/<int:pk>/receive/', warehouse_views.rma_receive, name='rma_receive'),
+    path('rma/<int:pk>/inspect/<int:item_id>/', warehouse_views.rma_inspect_item, name='rma_inspect_item'),
+
+    # Put-Away Tasks
+    path('put-away/', warehouse_views.put_away_list, name='put_away_list'),
+    path('put-away/<int:pk>/', warehouse_views.put_away_detail, name='put_away_detail'),
+    path('put-away/<int:pk>/assign/', warehouse_views.put_away_assign, name='put_away_assign'),
+    path('put-away/<int:pk>/items/<int:item_id>/confirm/', warehouse_views.put_away_confirm_item, name='put_away_confirm_item'),
+
+    # Return Tasks (cancel-after-pickup)
+    path('returns/', warehouse_views.return_task_list, name='return_task_list'),
+    path('returns/<int:pk>/', warehouse_views.return_task_detail, name='return_task_detail'),
+    path('returns/<int:pk>/return-item/<int:item_id>/', warehouse_views.return_item, name='return_item'),
+
     # Cycle Counting
     path('cycle-counts/', warehouse_views.cycle_count_list, name='cycle_count_list'),
     path('cycle-counts/create/', warehouse_views.create_cycle_count, name='create_cycle_count'),
     path('cycle-counts/<int:pk>/', warehouse_views.cycle_count_detail, name='cycle_count_detail'),
+    path('cycle-counts/<int:pk>/start/', warehouse_views.start_cycle_count, name='start_cycle_count'),
+    path('cycle-counts/<int:pk>/items/<int:item_id>/count/', warehouse_views.count_item, name='count_item'),
+    path('cycle-counts/<int:pk>/submit/', warehouse_views.submit_cycle_count, name='submit_cycle_count'),
+    path('cycle-counts/<int:pk>/approve/', warehouse_views.approve_cycle_count, name='approve_cycle_count'),
 
     # Alerts
     path('alerts/', warehouse_views.low_stock_alerts, name='low_stock_alerts'),

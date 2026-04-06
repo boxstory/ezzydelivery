@@ -59,6 +59,12 @@ Parameters:
                     <span class="odp__field__value">{{ order.order_date|date:"d M Y" }}</span>
                 </div>
             </div>
+            <div class="col-6">
+                <div class="odp__field">
+                    <span class="odp__field__label">Pickup Location</span>
+                    <span class="odp__field__value">{% if order.pickup_location %}{{ order.pickup_location.pickup_location_title }}{% else %}<span class="text-muted">—</span>{% endif %}</span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -242,6 +248,21 @@ Parameters:
                 <div class="odp__field">
                     <span class="odp__cod-label">Delivery Fee</span>
                     <span class="odp__field__value">{{ order.dl_amount|default:"0" }} QAR</span>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="odp__field">
+                    <span class="odp__cod-label">COD Status</span>
+                    <span class="odp__field__value">
+                        {% if order.cod_status_by_client == 'online_paid' %}<span class="odp__badge odp__badge--success">Online Paid</span>
+                        {% elif order.cod_status_by_client == 'unpaid' %}<span class="odp__badge odp__badge--danger">Unpaid</span>
+                        {% elif order.cod_status_by_client == 'partial_paid' %}<span class="odp__badge odp__badge--warning">Partial Paid</span>
+                        {% elif order.cod_status_by_client == 'pending' %}<span class="odp__badge odp__badge--muted">COD Pending</span>
+                        {% elif order.cod_status_by_client == 'collected' %}<span class="odp__badge odp__badge--info">Collected</span>
+                        {% elif order.cod_status_by_client == 'settled' %}<span class="odp__badge odp__badge--success">Settled</span>
+                        {% elif order.cod_status_by_client %}<span class="odp__badge odp__badge--muted">{{ order.cod_status_by_client }}</span>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </span>
                 </div>
             </div>
         </div>

@@ -85,7 +85,6 @@ logger = logging.getLogger('fleet')
 # =============================================================================
 
 @login_required(login_url='/accounts/login/')
-@driver_required
 def fleets(request):
     """
     Display all drivers with their vehicles.
@@ -96,6 +95,9 @@ def fleets(request):
 
     Expected query reduction: 90-95% (100 drivers: 101 queries → 2 queries)
     """
+    if not request.user.is_staff:
+        return redirect('fleet:fleet_dashboard')
+
     # N+1 FIX: Use prefetch_related to fetch all driver vehicles in one query
     fleets = fleet_models.Driver.objects.prefetch_related(
         'driver_vehicle'  # Reverse FK: Driver ← DriverVehicle (related_name='driver_vehicle')
@@ -398,10 +400,10 @@ def vehicle_add(request):
             return redirect('/fleet/vehicle_own/')
     else:
         form = fleet_forms.DriverVehicleForm()
-        context = {
-            'form': form,
-        }
 
+    context = {
+        'form': form,
+    }
     return render(request, 'fleet/parts/vehicle_add.html', context)
 
 
@@ -417,7 +419,7 @@ def vehicle_delete(request, fleet_id, vehicle_id):
 
     if fleet_id != request.user.id:
         return redirect('/fleet/vehicles/')
-    vehicle = fleet_models.DriverVehicle.objects.filter(id=vehicle_id)
+    vehicle = fleet_models.DriverVehicle.objects.filter(id=vehicle_id, driver__user=request.user)
     vehicle.delete()
     messages.success(request, 'Vehicle deleted successfully.')
     return redirect('/fleet/vehicle_own/')
@@ -583,6 +585,7 @@ def cod_submission(request):
             return render(request, 'fleet/cod_submission_pwa.html', context)
 
         if request.method == 'POST':
+            from django.db import transaction as db_transaction
             amount = request.POST.get('amount')
             received_by = request.POST.get('received_by', '').strip()
             reference_number = request.POST.get('reference_number', '')
@@ -600,21 +603,25 @@ def cod_submission(request):
                 amount = Decimal(str(amount))
                 if amount <= 0:
                     messages.error(request, 'Amount must be greater than zero.')
-                elif amount > driver.cod_in_hand:
-                    messages.error(request, f'You only have {driver.cod_in_hand} QR in hand.')
                 else:
-                    # Process COD submission
-                    transaction = WalletService.submit_cod_to_admin(
-                        driver=driver,
-                        amount=amount,
-                        created_by=request.user,
-                        reference_number=reference_number,
-                        notes=notes,
-                        payment_method=payment_method,
-                        delivery_ids=delivery_ids
-                    )
-                    messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
-                    return redirect('fleet:cod_collection')
+                    # Re-fetch driver with lock to prevent race condition
+                    with db_transaction.atomic():
+                        driver = fleet_models.Driver.objects.select_for_update().get(user_id=request.user.id)
+                        if amount > driver.cod_in_hand:
+                            messages.error(request, f'You only have {driver.cod_in_hand} QR in hand.')
+                        else:
+                            # Process COD submission
+                            transaction = WalletService.submit_cod_to_admin(
+                                driver=driver,
+                                amount=amount,
+                                created_by=request.user,
+                                reference_number=reference_number,
+                                notes=notes,
+                                payment_method=payment_method,
+                                delivery_ids=delivery_ids
+                            )
+                            messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
+                            return redirect('fleet:cod_collection')
             except (ValueError, InvalidOperation) as e:
                 messages.error(request, str(e))
             except Exception as e:
@@ -693,7 +700,7 @@ def cod_export(request):
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
         export_format = request.GET.get('format', 'csv')
         ids = request.GET.get('ids', '')
-        submit_settlement = request.GET.get('submit', '') == '1'
+        submit_settlement = request.method == 'POST' and request.POST.get('submit', '') == '1'
 
         # Parse delivery IDs
         if ids:
@@ -733,15 +740,13 @@ def cod_export(request):
                     amount=total_cod,
                     created_by=request.user,
                     reference_number=f"COD-SUBMIT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
-                    notes=f"COD submission for {len(delivery_ids)} deliveries",
-                    payment_method='cash'
+                    notes=f"COD submission for {deliveries.count()} deliveries",
+                    payment_method='cash',
+                    delivery_ids=list(deliveries.values_list('id', flat=True))
                 )
 
-                # Mark deliveries as COD settled
-                deliveries.update(cod_settled=True, cod_settled_at=timezone.now())
-
                 messages.success(request, f'COD settlement of {total_cod} QR submitted successfully! Transaction: {txn.transaction_code}')
-                logger.info(f"Driver {driver.driver_id} submitted COD: {total_cod} QR for {len(delivery_ids)} deliveries")
+                logger.info(f"Driver {driver.driver_id} submitted COD: {total_cod} QR for {deliveries.count()} deliveries")
 
                 # Redirect to show success message instead of returning PDF
                 return redirect('fleet:cod_collection')
@@ -2935,6 +2940,11 @@ def fleet_task_edit_location(request, task_id):
         messages.error(request, "Task not found.")
         return redirect('fleet:driver_tasks')
 
+    # Fix 7: Lock location edit after delivery
+    if task.dl_task_status in ('delivered', 'failed', 'cancelled', 'rejected'):
+        messages.error(request, "Cannot edit location after task is completed.")
+        return redirect('fleet:driver_tasks')
+
     addr = task.dl_to_address
 
     if request.method == 'POST':
@@ -3077,13 +3087,26 @@ def fleet_tasks_map(request):
         'assigned', 'accepted', 'picked_up', 'start_ride',
         'out_for_delivery', 'in_transit', 'contacted', 'non_reachable',
     ]
+    new_statuses = ['for_review', 'pending']
 
-    tasks = delivery_models.DeliveryTask.objects.select_related(
+    # Driver's own active tasks
+    active_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'order__business', 'dl_to_address',
     ).filter(
         driver=driver,
         dl_task_status__in=active_statuses,
     ).exclude(order__order_status='cancelled')
+
+    # New/pending tasks not yet assigned to any driver
+    new_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'dl_to_address',
+    ).filter(
+        dl_task_status__in=new_statuses,
+        driver__isnull=True,
+    ).exclude(order__order_status='cancelled')
+
+    from itertools import chain
+    tasks = list(chain(active_tasks, new_tasks))
 
     pins = []
     for t in tasks:
@@ -3102,6 +3125,7 @@ def fleet_tasks_map(request):
             'task_number': t.dl_task_number or str(t.id),
             'status': t.dl_task_status,
             'status_display': t.get_dl_task_status_display(),
+            'is_new': t.dl_task_status in new_statuses,
             'customer_name': t.order.customer_name or '',
             'customer_phone': t.order.customer_phone or '',
             'zone': t.order.dl_zone or '',
@@ -3117,11 +3141,49 @@ def fleet_tasks_map(request):
         driver=driver, is_read=False
     ).count()
 
+    new_pin_count = len([p for p in pins if p['lat'] and p['is_new']])
+    active_pin_count = len([p for p in pins if p['lat'] and not p['is_new']])
     context = {
         'driver': driver,
         'pins_json': json.dumps(pins),
-        'pin_count': len([p for p in pins if p['lat']]),
+        'pin_count': new_pin_count + active_pin_count,
+        'new_pin_count': new_pin_count,
+        'active_pin_count': active_pin_count,
         'total_count': len(pins),
         'unread_notifications': unread_notifications,
     }
     return render(request, 'fleet/tasks_map_pwa.html', context)
+
+
+# =============================================================================
+# DELIVERY PROOF UPLOAD
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def upload_delivery_proof(request, task_id):
+    """Driver uploads proof of delivery photo."""
+    from delivery.models import DeliveryProof
+    from django.shortcuts import get_object_or_404
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    task = get_object_or_404(DeliveryTask, pk=task_id, driver__user=request.user)
+
+    photo = request.FILES.get('photo')
+    if not photo:
+        return JsonResponse({'error': 'No photo uploaded'}, status=400)
+
+    proof = DeliveryProof.objects.create(
+        delivery_task=task,
+        proof_type=request.POST.get('proof_type', 'photo'),
+        photo=photo,
+        notes=request.POST.get('notes', ''),
+        barcode_data=request.POST.get('barcode_data', ''),
+        latitude=request.POST.get('latitude') or None,
+        longitude=request.POST.get('longitude') or None,
+        uploaded_by=request.user,
+    )
+
+    return JsonResponse({'success': True, 'proof_id': proof.id})

@@ -81,6 +81,15 @@
         <span>Map</span>
       </a>
       {% endif %}
+      {% if delivery_task and delivery_task.tracking_token %}
+      <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number|default:order.customer_phone }}?text=Track%20your%20order%20%23{{ order.order_number|urlencode }}%20here:%20https://ezzydelivery.qa/track/{{ delivery_task.tracking_token }}/"
+         class="pwa-detail-action" hx-boost="false" target="_blank">
+        <div class="pwa-detail-action__icon" style="background:var(--brand-primary, #f7c000); color:#001f3f;">
+          <i class="fas fa-location-arrow"></i>
+        </div>
+        <span>Track</span>
+      </a>
+      {% endif %}
     </div>
 
     <!-- Customer section -->
@@ -181,6 +190,14 @@
             {% endif %}
           </span>
         </div>
+        {% if order.preferred_time_slot %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label"><i class="fas fa-clock me-1"></i>Time Slot</span>
+          <span class="pwa-detail-row__value">
+            <span class="badge bg-info text-dark">{{ order.get_preferred_time_slot_display }}</span>
+          </span>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -226,6 +243,34 @@
           <span class="pwa-detail-row__value">{{ delivery_task.completed_at|date:"d M Y H:i" }}</span>
         </div>
         {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Proof of Delivery section (mobile) -->
+    {% if delivery_proofs %}
+    <div class="pwa-detail-section">
+      <div class="pwa-detail-section__header">
+        <i class="fas fa-camera"></i>
+        <span>Proof of Delivery</span>
+      </div>
+      <div class="pwa-detail-section__body">
+        <div class="d-flex flex-wrap gap-2">
+          {% for proof in delivery_proofs %}
+          <a href="{{ proof.photo.url }}" target="_blank">
+            <img src="{{ proof.photo.url }}" alt="Delivery proof {{ proof.get_proof_type_display }}"
+                 style="max-width:120px; max-height:120px; border-radius:8px; object-fit:cover; border:1px solid var(--brand-grey-200, #e5e7eb);">
+          </a>
+          {% endfor %}
+        </div>
+        {% for proof in delivery_proofs %}
+          {% if proof.barcode_data %}
+          <div class="pwa-detail-row mt-2">
+            <span class="pwa-detail-row__label">Barcode</span>
+            <span class="pwa-detail-row__value">{{ proof.barcode_data }}</span>
+          </div>
+          {% endif %}
+        {% endfor %}
       </div>
     </div>
     {% endif %}
@@ -316,6 +361,9 @@
           {% endwith %}
         </div>
         <div class="odt__page-header__actions" id="order_details_nav_actions">
+          <a class="odt__header-btn odt__header-btn--secondary" href="{% url 'delivery:all_delivery_tasks' %}" id="order_details_btn_go_tasks">
+            <i class="fa-solid fa-truck"></i> Go to Tasks
+          </a>
           {% if can_edit_order %}
           {% if order.order_status == 'publish' %}
           <span class="odt__header-btn odt__header-btn--secondary odt__header-btn--disabled" id="order_details_btn_edit" title="Cannot edit a published order">
@@ -330,6 +378,19 @@
           {% if order.customer_whatsapp %}
           <a class="odt__header-btn odt__header-btn--whatsapp" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" hx-boost="false">
             <i class="fa-brands fa-whatsapp"></i> WhatsApp
+          </a>
+          {% endif %}
+          {% if delivery_task and delivery_task.tracking_token %}
+          <a class="odt__header-btn odt__header-btn--secondary"
+             href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number|default:order.customer_phone }}?text=Track%20your%20order%20%23{{ order.order_number|urlencode }}%20here:%20https://ezzydelivery.qa/track/{{ delivery_task.tracking_token }}/"
+             target="_blank" hx-boost="false"
+             title="Share tracking link via WhatsApp">
+            <i class="fa-solid fa-location-arrow"></i> Share Tracking
+          </a>
+          {% endif %}
+          {% if order.order_status == 'delivered' or order.order_status == 'fulfilled' %}
+          <a class="odt__header-btn odt__header-btn--secondary" href="{% url 'business:return_create' order.id %}" id="order_details_btn_return">
+            <i class="fa-solid fa-rotate-left"></i> Request Return
           </a>
           {% endif %}
         </div>
@@ -744,6 +805,29 @@
                 <strong>Failure reason:</strong> {{ fail_notes }}
               </div>
               {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Proof of Delivery (desktop) -->
+          {% if delivery_proofs %}
+          <div class="odt__section mt-3">
+            <h6 class="odt__section-title">
+              <i class="fa-solid fa-camera me-2"></i>Proof of Delivery
+            </h6>
+            <div class="d-flex flex-wrap gap-3 mt-2">
+              {% for proof in delivery_proofs %}
+              <div class="text-center">
+                <a href="{{ proof.photo.url }}" target="_blank">
+                  <img src="{{ proof.photo.url }}" alt="Delivery proof {{ proof.get_proof_type_display }}"
+                       style="max-width:120px; max-height:120px; border-radius:8px; object-fit:cover; border:1px solid var(--brand-grey-200, #e5e7eb);">
+                </a>
+                <div class="small text-muted mt-1">{{ proof.created_at|date:"d M H:i" }}</div>
+                {% if proof.barcode_data %}
+                <div class="small"><i class="fa-solid fa-barcode me-1"></i>{{ proof.barcode_data }}</div>
+                {% endif %}
+              </div>
+              {% endfor %}
             </div>
           </div>
           {% endif %}

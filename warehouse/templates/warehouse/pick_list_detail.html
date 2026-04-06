@@ -1,88 +1,205 @@
-{% extends 'wf_dashboard_base.html' %}
+{% extends 'wh_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Pick List {{ pick_list.pick_number }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260311a" type="text/css" />
 <style>
-/* Pick List Detail — pkl__ prefix */
+/* ═══ Pick List Detail — pkl__ prefix ═══ */
+
+/* Progress */
 .pkl__progress-wrap { margin-bottom: 0.5rem; }
 .pkl__progress-bar {
-    height: 8px; background: var(--brand-grey-200); border-radius: 4px; overflow: hidden;
+    height: 8px; background: var(--wh-border-light, #eef0f4); border-radius: 4px; overflow: hidden;
 }
+.pkl__progress-bar--lg { height: 10px; }
 .pkl__progress-fill {
     height: 100%; border-radius: 4px; transition: width 0.4s ease;
-    background: linear-gradient(90deg, var(--brand-primary), #f59e0b);
+    background: linear-gradient(90deg, var(--wh-accent, #f7c000), #f59e0b);
 }
 .pkl__progress-fill--done { background: linear-gradient(90deg, #15803d, #22c55e); }
 .pkl__progress-label {
     display: flex; justify-content: space-between;
     font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;
-    color: var(--brand-grey-500); margin-bottom: 0.25rem; font-weight: 600;
+    color: var(--wh-muted); margin-bottom: 0.25rem; font-weight: 600;
 }
 
-/* Item rows */
-.pkl__item {
-    display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--brand-grey-100);
-    transition: background 0.15s ease;
+/* Detail rows */
+.pkl__detail-row {
+    display: flex; justify-content: space-between; padding: 0.375rem 0;
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
 }
-.pkl__item:last-child { border-bottom: none; }
-.pkl__item:hover { background: var(--brand-grey-100); }
-.pkl__item--picked { background: #f0fdf4; }
-.pkl__item--picked:hover { background: #dcfce7; }
+.pkl__detail-row:last-child { border-bottom: none; }
+.pkl__badge--lg { font-size: 0.8125rem; padding: 0.35rem 0.75rem; }
+.pkl__action-hint { font-size: 0.75rem; color: var(--wh-muted); margin-bottom: 0.75rem; }
+.pkl__action-body { text-align: center; padding: 1.25rem; }
+.pkl__status-label { font-size: 0.75rem; color: var(--wh-blue, #2563eb); font-weight: 600; margin-bottom: 0.75rem; }
+.pkl__completed-time { color: var(--wh-green, #059669); }
 
-.pkl__item-check {
-    width: 32px; height: 32px; border-radius: 50%;
-    border: 2px solid var(--brand-grey-300); background: #fff;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.2s ease; flex-shrink: 0;
+/* Buttons */
+.pkl__btn {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.5rem 1.25rem; border-radius: 6px;
+    font-size: 0.8125rem; font-weight: 600; border: none; cursor: pointer;
+    transition: all 0.2s ease; text-decoration: none;
 }
-.pkl__item-check:hover { border-color: var(--brand-primary); transform: scale(1.1); }
-.pkl__item-check--done {
-    background: #15803d; border-color: #15803d; color: #fff;
-}
-.pkl__item-check--done:hover { background: #dc2626; border-color: #dc2626; }
-
-.pkl__item-info { flex: 1; min-width: 0; }
-.pkl__item-name { font-size: 0.8125rem; font-weight: 600; color: var(--brand-grey-800); }
-.pkl__item-meta {
-    font-size: 0.7rem; color: var(--brand-grey-500);
-    display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.125rem;
-}
-.pkl__item-qty {
-    font-size: 0.8125rem; font-weight: 700; color: var(--brand-grey-800);
-    min-width: 50px; text-align: center;
-}
-.pkl__item-qty--picked { color: #15803d; }
+.pkl__btn:hover { transform: translateY(-1px); box-shadow: var(--wh-shadow); }
+.pkl__btn--start { background: #15803d; color: #fff; }
+.pkl__btn--start:hover { background: #166534; color: #fff; }
 
 /* Complete banner */
 .pkl__complete-banner {
     background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    border: 1px solid #86efac; border-radius: var(--brand-radius-sm);
+    border: 1px solid #86efac; border-radius: 6px;
     padding: 1rem 1.25rem; text-align: center; margin-top: 1rem;
 }
 .pkl__complete-banner i { font-size: 1.5rem; color: #15803d; margin-bottom: 0.25rem; }
 .pkl__complete-banner p { font-size: 0.8125rem; font-weight: 600; color: #15803d; margin: 0; }
 
-/* Action buttons */
-.pkl__btn {
-    display: inline-flex; align-items: center; gap: 0.375rem;
-    padding: 0.5rem 1.25rem; border-radius: var(--brand-radius-sm);
-    font-size: 0.8125rem; font-weight: 600; border: none; cursor: pointer;
-    transition: all 0.2s ease; text-decoration: none;
+/* ═══ PRODUCT-GROUPED PICK VIEW ═══ */
+.pkl__group {
+    border-bottom: 1px solid var(--wh-border, #e2e6ed);
+    transition: background 0.15s ease;
 }
-.pkl__btn:hover { transform: translateY(-1px); box-shadow: var(--brand-shadow-md); }
-.pkl__btn--start { background: #15803d; color: #fff; }
-.pkl__btn--start:hover { background: #166534; color: #fff; }
-.pkl__btn--assign { background: var(--brand-navy); color: #fff; }
-.pkl__btn--assign:hover { background: var(--brand-navy-light); color: #fff; }
+.pkl__group:last-child { border-bottom: none; }
+.pkl__group--done { background: #f0fdf4; }
+
+/* Group header — clickable to expand orders */
+.pkl__group-header {
+    display: flex; align-items: center; gap: 0.625rem;
+    padding: 0.75rem 1rem; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+.pkl__group-header:hover { background: var(--wh-surface-alt, #f8f9fb); }
+.pkl__group--done .pkl__group-header:hover { background: #dcfce7; }
+
+/* Check circle */
+.pkl__grp-check {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid var(--wh-border, #e2e6ed); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 0.6875rem; color: transparent;
+    transition: all 0.2s ease;
+}
+.pkl__group--done .pkl__grp-check {
+    background: #15803d; border-color: #15803d; color: #fff;
+}
+
+/* Product info */
+.pkl__grp-info { flex: 1; min-width: 0; }
+.pkl__grp-name {
+    font-size: 0.8125rem; font-weight: 600; color: var(--wh-navy, #0c1a2e);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pkl__grp-meta {
+    font-size: 0.6875rem; color: var(--wh-muted, #64748b);
+    display: flex; gap: 0.625rem; flex-wrap: wrap; margin-top: 0.125rem;
+}
+.pkl__grp-meta i { font-size: 0.5625rem; width: 10px; text-align: center; }
+
+/* Quantity badge */
+.pkl__grp-qty {
+    display: flex; align-items: center; gap: 0.375rem;
+    font-family: var(--wh-mono, monospace);
+    font-size: 0.875rem; font-weight: 700; color: var(--wh-navy, #0c1a2e);
+    flex-shrink: 0;
+}
+.pkl__group--done .pkl__grp-qty { color: #15803d; }
+.pkl__grp-unit {
+    font-size: 0.625rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--wh-dim, #94a3b8);
+}
+
+/* Chevron */
+.pkl__grp-chevron {
+    font-size: 0.5rem; color: var(--wh-dim, #94a3b8);
+    transition: transform 0.2s ease; flex-shrink: 0;
+}
+.pkl__grp-chevron.open { transform: rotate(180deg); }
+
+/* Expanded order list */
+.pkl__grp-orders {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.25s ease-out;
+    background: var(--wh-surface-alt, #f8f9fb);
+    border-top: 1px solid var(--wh-border-light, #eef0f4);
+}
+.pkl__grp-orders.open {
+    max-height: 600px;
+    transition: max-height 0.35s ease-in;
+}
+.pkl__grp-order {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.375rem 1rem 0.375rem 3.5rem;
+    font-size: 0.75rem; color: var(--wh-slate, #334155);
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+}
+.pkl__grp-order:last-child { border-bottom: none; }
+.pkl__grp-order i { font-size: 0.5625rem; color: var(--wh-dim, #94a3b8); width: 12px; text-align: center; }
+.pkl__grp-order-num { font-weight: 600; color: var(--wh-blue, #2563eb); text-decoration: none; }
+.pkl__grp-order-num:hover { text-decoration: underline; }
+.pkl__grp-order-qty { margin-left: auto; font-family: var(--wh-mono, monospace); font-weight: 600; font-size: 0.6875rem; }
+
+/* Interactive pick items within group (in_progress) */
+.pkl__grp-items {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.25s ease-out;
+    background: var(--wh-surface-alt, #f8f9fb);
+    border-top: 1px solid var(--wh-border-light, #eef0f4);
+}
+.pkl__grp-items.open {
+    max-height: 800px;
+    transition: max-height 0.35s ease-in;
+}
+.pkl__grp-item {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+    transition: background 0.12s ease;
+}
+.pkl__grp-item:last-child { border-bottom: none; }
+.pkl__grp-item--picked { background: #f0fdf4; }
+.pkl__grp-item-check {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid var(--wh-border, #e2e6ed); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; font-size: 0.5625rem;
+    transition: all 0.2s ease; color: transparent;
+    -webkit-tap-highlight-color: transparent;
+}
+.pkl__grp-item-check:hover { border-color: var(--wh-accent, #f7c000); transform: scale(1.1); }
+.pkl__grp-item-check--done { background: #15803d; border-color: #15803d; color: #fff; }
+.pkl__grp-item-check--done:hover { background: #dc2626; border-color: #dc2626; }
+.pkl__grp-item-info { flex: 1; min-width: 0; }
+.pkl__grp-item-order {
+    font-size: 0.75rem; font-weight: 600; color: var(--wh-blue, #2563eb);
+    text-decoration: none;
+}
+.pkl__grp-item-order:hover { text-decoration: underline; }
+.pkl__grp-item-meta { font-size: 0.6875rem; color: var(--wh-muted); }
+.pkl__grp-item-qty {
+    font-family: var(--wh-mono, monospace); font-size: 0.75rem; font-weight: 700;
+    min-width: 36px; text-align: center;
+}
+.pkl__grp-item--picked .pkl__grp-item-qty { color: #15803d; }
+
+/* ═══ MOBILE TWEAKS ═══ */
+@media (max-width: 767.98px) {
+    .pkl__group-header { padding: 0.625rem 0.75rem; gap: 0.5rem; }
+    .pkl__grp-name { font-size: 0.75rem; }
+    .pkl__grp-meta { font-size: 0.625rem; }
+    .pkl__grp-qty { font-size: 0.8125rem; }
+    .pkl__grp-order { padding-left: 2.5rem; }
+    .pkl__grp-item { padding-left: 1.75rem; }
+    .pkl__grp-check { width: 24px; height: 24px; font-size: 0.5625rem; }
+}
 </style>
 {% endblock extra_css %}
 
 {% block content %}
 {% csrf_token %}
+{% include "warehouse/parts/qr_scanner.html" %}
 <div class="wh">
   <!-- Breadcrumb -->
   <div class="wh__breadcrumb">
@@ -94,99 +211,89 @@
   <!-- Header -->
   <div class="wh__header">
     <div class="wh__header-left">
-      <div class="wh__header-icon">
-        <i class="fas fa-clipboard-check"></i>
-      </div>
+      <div class="wh__header-icon"><i class="fas fa-clipboard-check"></i></div>
       <div>
         <h1 class="wh__title">{{ pick_list.pick_number }}</h1>
-        <p class="wh__subtitle">{{ pick_list.warehouse.name }}</p>
+        <p class="wh__subtitle">{{ pick_list.warehouse.name }}{% if pick_list.zone %} &middot; {{ pick_list.zone.code }}{% endif %}{% if pick_list.business %} &middot; {{ pick_list.business.business_name }}{% endif %}</p>
       </div>
     </div>
-    <span class="wh__badge
-      {% if pick_list.status == 'completed' %}wh__badge--success
-      {% elif pick_list.status == 'in_progress' %}wh__badge--primary
-      {% elif pick_list.status == 'assigned' %}wh__badge--info
-      {% else %}wh__badge--warning{% endif %}"
-      style="font-size: 0.8125rem; padding: 0.35rem 0.75rem;"
-      id="pkl_status_badge">
-      {{ pick_list.get_status_display }}
-    </span>
+    <div class="d-flex align-items-center gap-2">
+      {% if pick_list.status == 'in_progress' %}
+      <button class="wh__btn wh__btn--primary" onclick="openQrScanner(onProductScanned)" title="Scan product QR code">
+        <i class="fas fa-qrcode"></i> <span class="d-none d-md-inline">Scan</span>
+      </button>
+      {% endif %}
+      <span class="wh__badge pkl__badge--lg
+        {% if pick_list.status == 'completed' %}wh__badge--success
+        {% elif pick_list.status == 'in_progress' %}wh__badge--primary
+        {% elif pick_list.status == 'packing' %}wh__badge--info
+        {% elif pick_list.status == 'packed' %}wh__badge--success
+        {% elif pick_list.status == 'assigned' %}wh__badge--info
+        {% else %}wh__badge--warning{% endif %}"
+        id="pkl_status_badge">
+        {{ pick_list.get_status_display }}
+      </span>
+      <div class="d-flex gap-1">
+        {% if prev_pk %}
+        <a href="{% url 'warehouse:pick_list_detail' prev_pk %}" class="wh__btn wh__btn--secondary" title="Previous"
+           hx-get="{% url 'warehouse:pick_list_detail' prev_pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fas fa-chevron-left"></i>
+        </a>
+        {% endif %}
+        <a href="{% url 'warehouse:pick_list_list' %}" class="wh__btn wh__btn--secondary" title="All pick lists"
+           hx-get="{% url 'warehouse:pick_list_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fas fa-list"></i>
+        </a>
+        {% if next_pk %}
+        <a href="{% url 'warehouse:pick_list_detail' next_pk %}" class="wh__btn wh__btn--secondary" title="Next"
+           hx-get="{% url 'warehouse:pick_list_detail' next_pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 
-  <!-- Info + Actions Row -->
+  <!-- Info + Actions -->
   <div class="row g-3">
     <div class="col-md-6">
       <div class="wh__card">
         <div class="wh__card-header">
-          <div class="wh__card-header-left">
-            <i class="fas fa-info-circle"></i>
-            <span>Details</span>
-          </div>
+          <div class="wh__card-header-left"><i class="fas fa-info-circle"></i> <span>Details</span></div>
         </div>
         <div class="wh__card-body">
-          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--brand-grey-100) !important;">
-            <span class="wh__meta">Warehouse</span>
-            <strong>{{ pick_list.warehouse.name }}</strong>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--brand-grey-100) !important;">
-            <span class="wh__meta">Created</span>
-            <strong>{{ pick_list.created_at|date:"d M Y H:i" }}</strong>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--brand-grey-100) !important;">
-            <span class="wh__meta">Assigned To</span>
-            <strong>{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username|default:"Unassigned" }}</strong>
-          </div>
+          <div class="pkl__detail-row"><span class="wh__meta">Warehouse</span><strong>{{ pick_list.warehouse.name }}</strong></div>
+          <div class="pkl__detail-row"><span class="wh__meta">Created</span><strong>{{ pick_list.created_at|date:"d M Y H:i" }}</strong></div>
+          <div class="pkl__detail-row"><span class="wh__meta">Assigned To</span><strong>{% if pick_list.assigned_to %}{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}{% else %}Unassigned{% endif %}</strong></div>
           {% if pick_list.started_at %}
-          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--brand-grey-100) !important;">
-            <span class="wh__meta">Started</span>
-            <strong>{{ pick_list.started_at|date:"d M Y H:i" }}</strong>
-          </div>
+          <div class="pkl__detail-row"><span class="wh__meta">Started</span><strong>{{ pick_list.started_at|date:"d M Y H:i" }}</strong></div>
           {% endif %}
           {% if pick_list.completed_at %}
-          <div class="d-flex justify-content-between py-1" style="border-color: var(--brand-grey-100) !important;">
-            <span class="wh__meta">Completed</span>
-            <strong style="color:#15803d;">{{ pick_list.completed_at|date:"d M Y H:i" }}</strong>
-          </div>
+          <div class="pkl__detail-row"><span class="wh__meta">Completed</span><strong class="pkl__completed-time">{{ pick_list.completed_at|date:"d M Y H:i" }}</strong></div>
           {% endif %}
         </div>
       </div>
     </div>
-
     <div class="col-md-6">
       <div class="wh__card">
         <div class="wh__card-header">
-          <div class="wh__card-header-left">
-            <i class="fas fa-hand-pointer"></i>
-            <span>Actions</span>
-          </div>
+          <div class="wh__card-header-left"><i class="fas fa-hand-pointer"></i> <span>Actions</span></div>
         </div>
-        <div class="wh__card-body" style="text-align: center; padding: 1.25rem;">
+        <div class="wh__card-body pkl__action-body">
           {% if pick_list.status == 'pending' %}
-            <p style="font-size:0.75rem;color:var(--brand-grey-500);margin-bottom:0.75rem;">Assign this pick list and start picking items.</p>
+            <p class="pkl__action-hint">Assign this pick list and start picking items.</p>
             <form method="POST" action="{% url 'warehouse:start_pick_list' pick_list.pk %}" novalidate>
               {% csrf_token %}
-              <button type="submit" class="pkl__btn pkl__btn--start">
-                <i class="fas fa-play"></i> Assign & Start Picking
-              </button>
+              <button type="submit" class="pkl__btn pkl__btn--start"><i class="fas fa-play"></i> Assign & Start Picking</button>
             </form>
-
           {% elif pick_list.status == 'assigned' %}
-            <p style="font-size:0.75rem;color:var(--brand-grey-500);margin-bottom:0.5rem;">
-              <i class="fas fa-user-check" style="color:#2563eb;"></i>
-              Assigned to <strong>{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}</strong>
-            </p>
+            <p class="pkl__action-hint"><i class="fas fa-user-check pkl__status-label"></i> Assigned to <strong>{% if pick_list.assigned_to %}{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}{% else %}Unassigned{% endif %}</strong></p>
             <form method="POST" action="{% url 'warehouse:start_pick_list' pick_list.pk %}" novalidate>
               {% csrf_token %}
-              <button type="submit" class="pkl__btn pkl__btn--start">
-                <i class="fas fa-play"></i> Start Picking
-              </button>
+              <button type="submit" class="pkl__btn pkl__btn--start"><i class="fas fa-play"></i> Start Picking</button>
             </form>
-
           {% elif pick_list.status == 'in_progress' %}
-            <div style="font-size:0.75rem;color:#2563eb;font-weight:600;margin-bottom:0.75rem;">
-              <i class="fas fa-spinner fa-spin"></i> Picking in Progress
-            </div>
-            <!-- Progress -->
+            <div class="pkl__status-label"><i class="fas fa-spinner fa-spin"></i> Picking in Progress</div>
             <div class="pkl__progress-wrap" id="pkl_progress_wrap">
               <div class="pkl__progress-label">
                 <span>Progress</span>
@@ -194,16 +301,22 @@
               </div>
               <div class="pkl__progress-bar">
                 <div class="pkl__progress-fill {% if pick_list.progress_percentage == 100 %}pkl__progress-fill--done{% endif %}"
-                     id="pkl_progress_fill"
-                     style="width:{{ pick_list.progress_percentage }}%;"></div>
+                     id="pkl_progress_fill" style="width:{{ pick_list.progress_percentage }}%;"></div>
               </div>
             </div>
-            <p style="font-size:0.7rem;color:var(--brand-grey-400);margin:0;">Click items below to mark as picked</p>
-
-          {% elif pick_list.status == 'completed' %}
+            <p class="wh__meta mb-0">Tap a product to expand, then mark each order item as picked</p>
+          {% elif pick_list.status == 'completed' or pick_list.status == 'packing' %}
             <div class="pkl__complete-banner">
               <i class="fas fa-circle-check d-block"></i>
               <p>All items picked!</p>
+            </div>
+            <a href="{% url 'warehouse:pack_station' pick_list.pk %}" class="pkl__btn pkl__btn--start mt-3">
+              <i class="fas fa-box-open"></i> Start Packing Orders
+            </a>
+          {% elif pick_list.status == 'packed' %}
+            <div class="pkl__complete-banner">
+              <i class="fas fa-box d-block"></i>
+              <p>All orders packed &amp; ready!</p>
             </div>
           {% endif %}
         </div>
@@ -211,111 +324,123 @@
     </div>
   </div>
 
-  <!-- Progress bar (shown during in_progress — duplicated outside cards for visibility) -->
+  <!-- Main progress (in_progress) -->
   {% if pick_list.status == 'in_progress' %}
   <div class="pkl__progress-wrap mt-3" id="pkl_progress_wrap_main">
     <div class="pkl__progress-label">
       <span>Picking Progress</span>
       <span id="pkl_progress_text_main">{{ pick_list.picked_items }} of {{ pick_list.total_items }} items</span>
     </div>
-    <div class="pkl__progress-bar" style="height:10px;">
+    <div class="pkl__progress-bar pkl__progress-bar--lg">
       <div class="pkl__progress-fill {% if pick_list.progress_percentage == 100 %}pkl__progress-fill--done{% endif %}"
-           id="pkl_progress_fill_main"
-           style="width:{{ pick_list.progress_percentage }}%;"></div>
+           id="pkl_progress_fill_main" style="width:{{ pick_list.progress_percentage }}%;"></div>
     </div>
   </div>
   {% endif %}
 
-  <!-- Pick Items -->
+  <!-- ═══ PRODUCT-GROUPED PICK VIEW ═══ -->
   <div class="wh__card mt-3">
     <div class="wh__card-header">
       <div class="wh__card-header-left">
         <i class="fas fa-box-open"></i>
-        <span>Items to Pick</span>
+        <span>Products to Pick</span>
       </div>
-      <span class="wh__count-badge" id="pkl_items_count">{{ items|length }} items</span>
+      <span class="wh__count-badge" id="pkl_items_count">{{ grouped_items|length }} products &middot; {{ items|length }} items</span>
     </div>
 
-    {% if pick_list.status == 'in_progress' or pick_list.status == 'completed' %}
-    <!-- Interactive picking mode -->
-    <div id="pkl_items_list">
-      {% for item in items %}
-      <div class="pkl__item {% if item.is_picked %}pkl__item--picked{% endif %}" id="pkl_item_{{ item.id }}">
-        <!-- Pick toggle -->
-        {% if pick_list.status == 'in_progress' %}
-        <div class="pkl__item-check {% if item.is_picked %}pkl__item-check--done{% endif %}"
-             id="pkl_check_{{ item.id }}"
-             onclick="togglePickItem({{ item.id }}, {{ item.is_picked|yesno:'true,false' }})"
-             title="{% if item.is_picked %}Undo pick{% else %}Mark as picked{% endif %}">
-          {% if item.is_picked %}
-          <i class="fas fa-check" style="font-size:0.75rem;"></i>
-          {% endif %}
+    {% if grouped_items %}
+    <div id="pkl_groups_list">
+      {% for grp in grouped_items %}
+      <div class="pkl__group {% if grp.all_picked %}pkl__group--done{% endif %}" id="pkl_grp_{{ forloop.counter }}">
+        <!-- Product row — tap to expand -->
+        <div class="pkl__group-header" onclick="toggleGrpExpand({{ forloop.counter }})">
+          <div class="pkl__grp-check">
+            {% if grp.all_picked %}<i class="fas fa-check"></i>{% endif %}
+          </div>
+          <div class="pkl__grp-info">
+            <div class="pkl__grp-name">{{ grp.product.item_name }}</div>
+            <div class="pkl__grp-meta">
+              {% if grp.location %}<span><i class="fas fa-location-dot"></i> {{ grp.location.code }}</span>{% endif %}
+              <span><i class="fas fa-hashtag"></i> {{ grp.product.item_sku }}</span>
+              <span><i class="fas fa-file-invoice"></i> {{ grp.orders|length }} order{{ grp.orders|length|pluralize }}</span>
+            </div>
+          </div>
+          <div class="pkl__grp-qty">
+            {% if grp.all_picked %}
+            <i class="fas fa-circle-check" style="color:#15803d;"></i>
+            {% else %}
+            {{ grp.picked_qty }}/{{ grp.total_qty }}
+            {% endif %}
+            <span class="pkl__grp-unit">pcs</span>
+          </div>
+          <i class="fas fa-chevron-down pkl__grp-chevron" id="pkl_chev_{{ forloop.counter }}"></i>
         </div>
-        {% elif pick_list.status == 'completed' %}
-        <div class="pkl__item-check pkl__item-check--done">
-          <i class="fas fa-check" style="font-size:0.75rem;"></i>
+
+        {% if pick_list.status == 'in_progress' or pick_list.status == 'completed' %}
+        <!-- Expandable: individual order items (interactive pick) -->
+        <div class="pkl__grp-items" id="pkl_exp_{{ forloop.counter }}">
+          {% for item in grp.items %}
+          <div class="pkl__grp-item {% if item.is_picked %}pkl__grp-item--picked{% endif %}" id="pkl_item_{{ item.id }}">
+            {% if pick_list.status == 'in_progress' %}
+            <div class="pkl__grp-item-check {% if item.is_picked %}pkl__grp-item-check--done{% endif %}"
+                 id="pkl_check_{{ item.id }}"
+                 onclick="event.stopPropagation(); togglePickItem({{ item.id }}, {{ item.is_picked|yesno:'true,false' }})"
+                 title="{% if item.is_picked %}Undo pick{% else %}Mark as picked{% endif %}">
+              {% if item.is_picked %}<i class="fas fa-check"></i>{% endif %}
+            </div>
+            {% elif pick_list.status == 'completed' %}
+            <div class="pkl__grp-item-check pkl__grp-item-check--done">
+              <i class="fas fa-check"></i>
+            </div>
+            {% endif %}
+            <div class="pkl__grp-item-info">
+              {% if item.order %}
+              <a href="{% url 'workforce:order_detail' item.order.pk %}" class="pkl__grp-item-order"
+                 onclick="event.stopPropagation()"
+                 hx-get="{% url 'workforce:order_detail' item.order.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fas fa-file-invoice"></i> {{ item.order.order_number }}
+              </a>
+              {% endif %}
+              <div class="pkl__grp-item-meta">Qty: {{ item.quantity_to_pick }}</div>
+            </div>
+            <div class="pkl__grp-item-qty" id="pkl_qty_{{ item.id }}">
+              {% if item.is_picked %}<i class="fas fa-circle-check" style="color:#15803d;"></i>{% else %}{{ item.quantity_picked }}/{{ item.quantity_to_pick }}{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% else %}
+        <!-- Expandable: read-only order list (pending/assigned) -->
+        <div class="pkl__grp-orders" id="pkl_exp_{{ forloop.counter }}">
+          {% for item in grp.items %}
+          <div class="pkl__grp-order">
+            <i class="fas fa-file-invoice"></i>
+            {% if item.order %}
+            <a href="{% url 'workforce:order_detail' item.order.pk %}" class="pkl__grp-order-num"
+               onclick="event.stopPropagation()"
+               hx-get="{% url 'workforce:order_detail' item.order.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+              {{ item.order.order_number }}
+            </a>
+            {% else %}<span>-</span>{% endif %}
+            <span class="pkl__grp-order-qty">&times;{{ item.quantity_to_pick }}</span>
+          </div>
+          {% endfor %}
         </div>
         {% endif %}
-
-        <!-- Item info -->
-        <div class="pkl__item-info">
-          <div class="pkl__item-name">{{ item.product.item_name }}</div>
-          <div class="pkl__item-meta">
-            {% if item.location %}
-            <span><i class="fas fa-location-dot"></i> {{ item.location.code }}</span>
-            {% endif %}
-            <span><i class="fas fa-hashtag"></i> {{ item.product.item_sku }}</span>
-            <span><i class="fas fa-file-invoice"></i> {{ item.order.order_number }}</span>
-          </div>
-        </div>
-
-        <!-- Quantity -->
-        <div class="pkl__item-qty {% if item.is_picked %}pkl__item-qty--picked{% endif %}"
-             id="pkl_qty_{{ item.id }}">
-          {% if item.is_picked %}
-          <i class="fas fa-circle-check" style="font-size:1rem;"></i>
-          {% else %}
-          {{ item.quantity_picked }}/{{ item.quantity_to_pick }}
-          {% endif %}
-        </div>
-      </div>
-      {% empty %}
-      <div style="padding:2rem;text-align:center;color:var(--brand-grey-400);">
-        <i class="fas fa-box-open" style="font-size:2rem;"></i>
-        <p style="margin:0.5rem 0 0;">No items in this pick list</p>
       </div>
       {% endfor %}
     </div>
 
     {% else %}
-    <!-- Read-only table for pending/assigned -->
-    <div class="wh__table-wrap">
-      <table class="wh__table">
-        <thead>
-          <tr>
-            <th class="wh__th">Location</th>
-            <th class="wh__th">Product</th>
-            <th class="wh__th">SKU</th>
-            <th class="wh__th">Order #</th>
-            <th class="wh__th wh__th--center">Qty</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in items %}
-          <tr>
-            <td class="wh__td"><code class="wh__code">{{ item.location.code|default:"-" }}</code></td>
-            <td class="wh__td">{{ item.product.item_name }}</td>
-            <td class="wh__td"><code class="wh__code">{{ item.product.item_sku }}</code></td>
-            <td class="wh__td">{{ item.order.order_number|default:"-" }}</td>
-            <td class="wh__td wh__td--center"><strong>{{ item.quantity_to_pick }}</strong></td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="5" class="wh__empty"><p>No items in this pick list</p></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="wh__empty">
+      <i class="fas fa-box-open"></i>
+      <p><strong>No items in this pick list</strong></p>
+      <p>This pick list has no items. Items may have been removed or the list was created empty.</p>
+      <a href="{% url 'warehouse:pick_list_list' %}" class="wh__btn wh__btn--secondary mt-2"
+         hx-get="{% url 'warehouse:pick_list_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+        <i class="fas fa-arrow-left"></i> Back to Pick Lists
+      </a>
     </div>
     {% endif %}
   </div>
@@ -323,13 +448,50 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if pick_list.status == 'in_progress' %}
 <script>
+/* Toggle product group expand */
+function toggleGrpExpand(idx) {
+    var exp = document.getElementById('pkl_exp_' + idx);
+    var chev = document.getElementById('pkl_chev_' + idx);
+    if (exp) exp.classList.toggle('open');
+    if (chev) chev.classList.toggle('open');
+}
+
+/* QR scan callback — match scanned code to product SKU */
+var _productSkuMap = {
+    {% for grp in grouped_items %}
+    '{{ grp.product.item_sku|escapejs }}': { idx: {{ forloop.counter }}, name: '{{ grp.product.item_name|escapejs }}' },
+    {% endfor %}
+};
+
+function onProductScanned(code) {
+    code = code.trim();
+    var match = _productSkuMap[code];
+    if (match) {
+        // Expand the matched product group
+        var exp = document.getElementById('pkl_exp_' + match.idx);
+        var chev = document.getElementById('pkl_chev_' + match.idx);
+        if (exp && !exp.classList.contains('open')) {
+            exp.classList.add('open');
+            if (chev) chev.classList.add('open');
+        }
+        // Scroll to it
+        var grp = document.getElementById('pkl_grp_' + match.idx);
+        if (grp) grp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Flash highlight
+        if (grp) {
+            grp.style.background = 'rgba(247,192,0,0.15)';
+            setTimeout(function() { grp.style.background = ''; }, 1500);
+        }
+    } else {
+        alert('Product not found in this pick list: ' + code);
+    }
+}
+
+{% if pick_list.status == 'in_progress' %}
 function getCsrfToken() {
-    // Hidden input from {% csrf_token %} — works even with CSRF_COOKIE_HTTPONLY=True
     var el = document.querySelector('[name=csrfmiddlewaretoken]');
     if (el) return el.value;
-    // Fallback: cookie (only if CSRF_COOKIE_HTTPONLY=False)
     var c = document.cookie.split(';');
     for (var i = 0; i < c.length; i++) {
         var t = c[i].trim();
@@ -346,14 +508,11 @@ function togglePickItem(itemId, isPicked) {
     var url = baseUrl.replace('999999', itemId);
 
     var check = document.getElementById('pkl_check_' + itemId);
-    check.style.opacity = '0.5';
+    if (check) check.style.opacity = '0.5';
 
     fetch(url, {
         method: 'POST',
-        headers: {
-            'X-CSRFToken': getCsrfToken(),
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
+        headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/x-www-form-urlencoded' }
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -364,57 +523,41 @@ function togglePickItem(itemId, isPicked) {
         var qtyEl = document.getElementById('pkl_qty_' + itemId);
 
         if (data.is_picked) {
-            row.classList.add('pkl__item--picked');
-            checkEl.classList.add('pkl__item-check--done');
-            checkEl.innerHTML = '<i class="fas fa-check" style="font-size:0.75rem;"></i>';
-            checkEl.setAttribute('onclick', 'togglePickItem(' + itemId + ', true)');
+            if (row) row.classList.add('pkl__grp-item--picked');
+            if (checkEl) { checkEl.classList.add('pkl__grp-item-check--done'); checkEl.innerHTML = '<i class="fas fa-check"></i>'; }
+            checkEl.setAttribute('onclick', 'event.stopPropagation(); togglePickItem(' + itemId + ', true)');
             checkEl.title = 'Undo pick';
-            qtyEl.classList.add('pkl__item-qty--picked');
-            qtyEl.innerHTML = '<i class="fas fa-circle-check" style="font-size:1rem;"></i>';
+            if (qtyEl) { qtyEl.classList.add('pkl__grp-item--picked'); qtyEl.innerHTML = '<i class="fas fa-circle-check" style="color:#15803d;"></i>'; }
         } else {
-            row.classList.remove('pkl__item--picked');
-            checkEl.classList.remove('pkl__item-check--done');
-            checkEl.innerHTML = '';
-            checkEl.setAttribute('onclick', 'togglePickItem(' + itemId + ', false)');
+            if (row) row.classList.remove('pkl__grp-item--picked');
+            if (checkEl) { checkEl.classList.remove('pkl__grp-item-check--done'); checkEl.innerHTML = ''; }
+            checkEl.setAttribute('onclick', 'event.stopPropagation(); togglePickItem(' + itemId + ', false)');
             checkEl.title = 'Mark as picked';
-            qtyEl.classList.remove('pkl__item-qty--picked');
-            qtyEl.textContent = '0/' + data.quantity_to_pick;
+            if (qtyEl) { qtyEl.classList.remove('pkl__grp-item--picked'); qtyEl.textContent = '0/' + data.quantity_to_pick; }
         }
-        checkEl.style.opacity = '1';
+        if (checkEl) checkEl.style.opacity = '1';
 
-        // Update progress bars
         updateProgress(data.picked_items, data.total_items, data.progress, data.pick_list_status);
     })
     .catch(function() {
-        check.style.opacity = '1';
+        if (check) check.style.opacity = '1';
         alert('Network error. Please try again.');
     });
 }
 
 function updateProgress(picked, total, pct, status) {
-    // Action card progress
     var pText = document.getElementById('pkl_progress_text');
     var pFill = document.getElementById('pkl_progress_fill');
     if (pText) pText.textContent = picked + '/' + total;
-    if (pFill) {
-        pFill.style.width = pct + '%';
-        pFill.className = 'pkl__progress-fill' + (pct >= 100 ? ' pkl__progress-fill--done' : '');
-    }
+    if (pFill) { pFill.style.width = pct + '%'; pFill.className = 'pkl__progress-fill' + (pct >= 100 ? ' pkl__progress-fill--done' : ''); }
 
-    // Main progress bar
     var pTextMain = document.getElementById('pkl_progress_text_main');
     var pFillMain = document.getElementById('pkl_progress_fill_main');
     if (pTextMain) pTextMain.textContent = picked + ' of ' + total + ' items';
-    if (pFillMain) {
-        pFillMain.style.width = pct + '%';
-        pFillMain.className = 'pkl__progress-fill' + (pct >= 100 ? ' pkl__progress-fill--done' : '');
-    }
+    if (pFillMain) { pFillMain.style.width = pct + '%'; pFillMain.className = 'pkl__progress-fill' + (pct >= 100 ? ' pkl__progress-fill--done' : ''); }
 
-    // Auto-complete: show banner
-    if (status === 'completed') {
-        setTimeout(function() { location.reload(); }, 800);
-    }
+    if (status === 'completed') { setTimeout(function() { location.reload(); }, 800); }
 }
-</script>
 {% endif %}
+</script>
 {% endblock extra_js %}

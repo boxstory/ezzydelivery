@@ -36,7 +36,6 @@ Related Apps:
     - product: Business manages products
 """
 
-from email.policy import default
 import os
 from django.conf import settings
 from django.db import models
@@ -141,6 +140,7 @@ class Business(models.Model):
     )
     FULFILLMENT_STATUS_CHOICES = [
         ('none', 'Not Requested'),
+        ('not_required', 'Not Required'),
         ('requested', 'Requested'),
         ('active', 'Active'),
     ]
@@ -148,12 +148,23 @@ class Business(models.Model):
         max_length=20,
         choices=FULFILLMENT_STATUS_CHOICES,
         default='none',
-        help_text="Fulfillment service status: none, requested, or active"
+        help_text="Fulfillment service status: none, not_required, requested, or active"
     )
     fulfillment_activated_at = models.DateTimeField(
         blank=True, null=True,
         help_text="When the fulfillment service was activated"
     )
+
+    # Temp order sync — only businesses with this flag will appear in temp orders
+    temp_order_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable temp order sync for this business"
+    )
+
+    # Shared column mapping used across all import sources (OneDrive, Google Sheet, CSV, Public Link)
+    # Format: {db_field: source_column_header}  e.g. {"customer_name": "Customer Name", "customer_phone": "Phone"}
+    import_mapping = models.JSONField(default=dict, blank=True,
+        help_text='Shared import column mapping for all sources: {db_field: source_column_header}')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -415,7 +426,7 @@ class BusinessTeamProfile(models.Model):
     team_email = models.CharField(max_length=100, blank=True, null=True)
     team_bio = models.CharField(max_length=225, blank=True, null=True)
     team_logo = models.ImageField(
-        upload_to=upload_path_handler,
+        upload_to='business/team_logos/',
         default="business/avatar.png",
         blank=True, null=True
     )
@@ -749,3 +760,62 @@ class BusinessSocialInfo(models.Model):
     class Meta:
         verbose_name_plural = "Business Social Info"
         db_table = 'client_businesssocialinfo'
+
+
+class BrandedTrackingConfig(models.Model):
+    """
+    Configuration for the branded customer tracking page.
+
+    Each business can customize their public tracking page with brand colors,
+    display options (driver name, phone, ETA), and a custom footer message.
+    Customers access this page via a WhatsApp link to track their delivery.
+    """
+    business = models.OneToOneField(
+        Business, on_delete=models.CASCADE, related_name='tracking_config'
+    )
+    primary_color = models.CharField(
+        max_length=7, default='#f7c000',
+        help_text="Hex color for header/buttons"
+    )
+    secondary_color = models.CharField(
+        max_length=7, default='#001f3f',
+        help_text="Hex color for text/accents"
+    )
+    show_driver_name = models.BooleanField(default=True)
+    show_driver_phone = models.BooleanField(default=False)
+    show_eta = models.BooleanField(default=True)
+    custom_footer_text = models.CharField(max_length=255, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'business_branded_tracking_config'
+
+    def __str__(self):
+        return f"Tracking config for {self.business}"
+
+
+class WhatsAppNotificationTrigger(models.Model):
+    """Per-business configuration for auto WhatsApp notifications on status changes."""
+    TRIGGER_STATUS_CHOICES = [
+        ('assigned', 'Driver Assigned'),
+        ('picked_up', 'Picked Up'),
+        ('start_ride', 'Start Ride'),
+        ('out_for_delivery', 'Out for Delivery'),
+        ('delivered', 'Delivered'),
+        ('failed', 'Failed'),
+    ]
+    business = models.ForeignKey('Business', on_delete=models.CASCADE, related_name='whatsapp_triggers')
+    trigger_status = models.CharField(max_length=30, choices=TRIGGER_STATUS_CHOICES)
+    is_active = models.BooleanField(default=True)
+    custom_message = models.TextField(blank=True, default='', help_text="Custom message template. Use {customer_name}, {order_number}, {driver_name}, {driver_phone}.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('business', 'trigger_status')
+        db_table = 'business_whatsapp_trigger'
+
+    def __str__(self):
+        return f"{self.business} - {self.trigger_status} ({'active' if self.is_active else 'inactive'})"

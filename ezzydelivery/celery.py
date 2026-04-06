@@ -56,10 +56,17 @@ app.conf.beat_schedule = {
         'options': {'queue': 'dispatch'},
     },
 
-    # Sync temp orders from all external sources - every 1 hour
+    # Delivery task health check — stale tasks, GPS heartbeat, COD issues
+    'check-delivery-health': {
+        'task': 'delivery.tasks.check_delivery_task_health',
+        'schedule': 300.0,
+    },
+
+    # Sync temp orders from all external sources
+    # 6am, 8am-7pm hourly (Qatar business hours)
     'sync-temp-orders': {
         'task': 'orders.tasks.sync_all_temp_orders',
-        'schedule': 3600.0,
+        'schedule': crontab(hour='6,8,9,10,11,12,13,14,15,16,17,18,19', minute=0),
     },
 }
 

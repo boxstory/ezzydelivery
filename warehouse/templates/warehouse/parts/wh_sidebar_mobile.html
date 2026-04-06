@@ -1,0 +1,332 @@
+{% load static %}
+<!-- Warehouse Mobile Sidebar — matches workforce pattern -->
+<div id="wh_mob_sidebar_wrapper" class="wh-mob d-block d-md-none">
+  <div class="wh-mob__header">
+    <a class="wh-mob__title" href="{% url 'warehouse:dashboard' %}">
+      <i class="fa-solid fa-warehouse"></i>
+      Warehouse
+    </a>
+    <button class="wh-mob__toggle" onclick="toggleWhMobileSidebar()" id="wh_mob_toggle">
+      <i class="fa-solid fa-bars"></i>
+      <span>Menu</span>
+    </button>
+  </div>
+
+  <div class="wh-mob__menu" id="whMobileMenu">
+
+    <!-- Dashboard -->
+    <a class="wh-mob__link {% if request.resolver_match.url_name == 'dashboard' and request.resolver_match.app_name == 'warehouse' %}wh-mob__link--active{% endif %}"
+       href="{% url 'warehouse:dashboard' %}" onclick="closeWhMobileSidebar()">
+      <i class="fa-solid fa-gauge-high"></i> Dashboard
+    </a>
+
+    <!-- Inventory Section -->
+    <div class="wh-mob__section">
+      <div class="wh-mob__section-header" onclick="toggleWhSection('inventory')">
+        <div class="wh-mob__section-title">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          <span>Inventory</span>
+        </div>
+        <i class="fa-solid fa-chevron-down wh-mob__chevron" id="wh_chev_inventory"></i>
+      </div>
+      <div class="wh-mob__section-body {% if request.resolver_match.url_name in 'inventory_list,stock_card,receive_stock,confirm_receive,transaction_list,low_stock_alerts' %}wh-mob__section-body--open{% endif %}" id="wh_sec_inventory">
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:inventory_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-list"></i> Stock Levels
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'receive_stock' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:receive_stock' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-truck-loading"></i> Receive Stock
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'transaction_list' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:transaction_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-arrow-right-arrow-left"></i> Transactions
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'low_stock_alerts' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:low_stock_alerts' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-triangle-exclamation"></i> Low Stock Alerts
+        </a>
+      </div>
+    </div>
+
+    <!-- Operations Section -->
+    <div class="wh-mob__section">
+      <div class="wh-mob__section-header" onclick="toggleWhSection('ops')">
+        <div class="wh-mob__section-title">
+          <i class="fa-solid fa-clipboard-list"></i>
+          <span>Operations</span>
+        </div>
+        <i class="fa-solid fa-chevron-down wh-mob__chevron" id="wh_chev_ops"></i>
+      </div>
+      <div class="wh-mob__section-body {% if request.resolver_match.url_name in 'pick_list_list,create_pick_list,pick_list_detail,put_away_list,put_away_detail,cycle_count_list,create_cycle_count,cycle_count_detail' %}wh-mob__section-body--open{% endif %}" id="wh_sec_ops">
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'pick_list_list' or request.resolver_match.url_name == 'pick_list_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:pick_list_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-clipboard-check"></i> Pick Lists
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'put_away_list' or request.resolver_match.url_name == 'put_away_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:put_away_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-dolly"></i> Put-Away
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'cycle_count_list' or request.resolver_match.url_name == 'cycle_count_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:cycle_count_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-rotate"></i> Cycle Counts
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'rma_list' or request.resolver_match.url_name == 'rma_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:rma_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-undo-alt"></i> Customer Returns
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'dispatch_queue' or request.resolver_match.url_name == 'dispatch_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:dispatch_queue' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-truck"></i> Dispatch
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'return_task_list' or request.resolver_match.url_name == 'return_task_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:return_task_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-rotate-left"></i> Returns
+        </a>
+      </div>
+    </div>
+
+    {% if user.profile.is_staff or user.profile.is_superadmin %}
+    <!-- Setup Section -->
+    <div class="wh-mob__section">
+      <div class="wh-mob__section-header" onclick="toggleWhSection('setup')">
+        <div class="wh-mob__section-title">
+          <i class="fa-solid fa-cogs"></i>
+          <span>Setup</span>
+        </div>
+        <i class="fa-solid fa-chevron-down wh-mob__chevron" id="wh_chev_setup"></i>
+      </div>
+      <div class="wh-mob__section-body {% if request.resolver_match.url_name in 'warehouse_list,warehouse_add,warehouse_detail,warehouse_edit,warehouse_capacity_configure,location_list,location_add,location_edit,warehouse_location_list,warehouse_location_add,seller_warehouse_links,seller_warehouse_link_detail,seller_warehouse_link_add,seller_warehouse_link_edit' %}wh-mob__section-body--open{% endif %}" id="wh_sec_setup">
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'warehouse_list' or request.resolver_match.url_name == 'warehouse_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:warehouse_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-building-warehouse"></i> Warehouses
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'location_list' or request.resolver_match.url_name == 'location_add' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:location_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-sitemap"></i> Storage Locations
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'warehouse_location_list' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:warehouse_location_list' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-map-marker-alt"></i> Pickup/Dispatch
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'seller_warehouse_links' or request.resolver_match.url_name == 'seller_warehouse_link_detail' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:seller_warehouse_links' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-link"></i> Seller Links
+        </a>
+      </div>
+    </div>
+
+    <!-- Back to Workforce -->
+    <div class="wh-mob__divider"></div>
+    <a class="wh-mob__link" href="{% url 'workforce:wf_dashboard' %}">
+      <i class="fa-solid fa-arrow-left"></i> Workforce Dashboard
+    </a>
+    {% endif %}
+
+  </div>
+</div>
+
+<style>
+/* Warehouse Mobile Sidebar — wh-mob__ prefix */
+.wh-mob {
+    position: relative;
+    z-index: 1050;
+}
+.wh-mob__header {
+    background: linear-gradient(135deg, var(--wh-navy, #0c1a2e) 0%, #1a2d47 100%);
+    padding: 0.625rem 0.75rem;
+    min-height: 3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.wh-mob__title {
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.875rem;
+    margin: 0;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.wh-mob__title:hover { color: #fff; }
+.wh-mob__title i { color: var(--wh-accent, #f7c000); }
+.wh-mob__toggle {
+    background: var(--wh-accent, #f7c000);
+    color: var(--wh-navy, #0c1a2e);
+    border: none;
+    padding: 0.4rem 0.875rem;
+    min-height: 2.5rem;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s ease;
+}
+.wh-mob__toggle:hover { filter: brightness(1.05); }
+.wh-mob__toggle:active { transform: scale(0.97); }
+
+/* Dropdown Menu */
+.wh-mob__menu {
+    background: #fff;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    box-shadow: 0 4px 16px rgba(12, 26, 46, 0.15);
+    z-index: 1040;
+}
+.wh-mob__menu.show {
+    max-height: calc(100dvh - 3.5rem);
+    overflow-y: auto;
+    transition: max-height 0.35s ease-in;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Links */
+.wh-mob__link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    color: var(--wh-slate, #334155);
+    text-decoration: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-left: 3px solid transparent;
+    transition: all 0.12s ease;
+}
+.wh-mob__link:hover {
+    background: var(--wh-surface-alt, #f8f9fb);
+    color: var(--wh-navy, #0c1a2e);
+}
+.wh-mob__link--active {
+    background: rgba(247, 192, 0, 0.08);
+    border-left-color: var(--wh-accent, #f7c000);
+    color: var(--wh-navy, #0c1a2e);
+}
+.wh-mob__link i {
+    width: 18px;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--wh-muted, #64748b);
+    flex-shrink: 0;
+}
+.wh-mob__link--active i { color: var(--wh-accent, #f7c000); }
+
+/* Sections */
+.wh-mob__section {
+    border-bottom: 1px solid var(--wh-border-light, #eef0f4);
+}
+.wh-mob__section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.625rem 1rem;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+.wh-mob__section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--wh-muted, #64748b);
+}
+.wh-mob__section-title i { font-size: 0.6875rem; width: 16px; text-align: center; }
+.wh-mob__chevron {
+    font-size: 0.5rem;
+    color: var(--wh-dim, #94a3b8);
+    transition: transform 0.2s ease;
+}
+.wh-mob__chevron.rotated { transform: rotate(180deg); }
+
+.wh-mob__section-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease-out;
+    padding-left: 0.5rem;
+}
+.wh-mob__section-body--open {
+    max-height: 500px;
+    transition: max-height 0.3s ease-in;
+}
+
+/* Sublinks */
+.wh-mob__sublink {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    color: var(--wh-slate, #334155);
+    text-decoration: none;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    border-left: 2px solid transparent;
+    transition: all 0.12s ease;
+}
+.wh-mob__sublink:hover {
+    background: var(--wh-surface-alt, #f8f9fb);
+    border-left-color: var(--wh-border, #e2e6ed);
+}
+.wh-mob__sublink--active {
+    background: rgba(247, 192, 0, 0.06);
+    border-left-color: var(--wh-accent, #f7c000);
+    color: var(--wh-navy, #0c1a2e);
+    font-weight: 600;
+}
+.wh-mob__sublink i {
+    width: 16px;
+    text-align: center;
+    font-size: 0.6875rem;
+    color: var(--wh-dim, #94a3b8);
+    flex-shrink: 0;
+}
+.wh-mob__sublink--active i { color: var(--wh-accent, #f7c000); }
+
+/* Divider */
+.wh-mob__divider {
+    height: 1px;
+    background: var(--wh-border-light, #eef0f4);
+    margin: 0.25rem 0;
+}
+</style>
+
+<script>
+function toggleWhMobileSidebar() {
+    var menu = document.getElementById('whMobileMenu');
+    menu.classList.toggle('show');
+}
+function closeWhMobileSidebar() {
+    var menu = document.getElementById('whMobileMenu');
+    if (menu) menu.classList.remove('show');
+}
+function toggleWhSection(name) {
+    var body = document.getElementById('wh_sec_' + name);
+    var chev = document.getElementById('wh_chev_' + name);
+    if (body) body.classList.toggle('wh-mob__section-body--open');
+    if (chev) chev.classList.toggle('rotated');
+}
+// Close on outside click
+document.addEventListener('click', function(e) {
+    var wrapper = document.getElementById('wh_mob_sidebar_wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        closeWhMobileSidebar();
+    }
+});
+</script>

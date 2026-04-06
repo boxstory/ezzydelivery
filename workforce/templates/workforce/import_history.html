@@ -8,6 +8,9 @@
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h4 class="mb-0"><i class="fa-solid fa-clock-rotate-left me-2"></i>Import History</h4>
         <div class="d-flex gap-2">
+            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
+            </a>
             <select class="form-select form-select-sm" style="width:auto;" onchange="window.location='?source='+this.value">
                 <option value="">All Sources</option>
                 {% for val, label in source_choices %}
@@ -110,6 +113,20 @@
                                         <td class="ps-0">{{ log.completed_at|date:"d M Y H:i:s" }}</td>
                                     </tr>
                                     {% endif %}
+                                    {% with log_orders=log.orders.all %}
+                                    {% if log_orders %}
+                                    <tr>
+                                        <td class="text-muted fw-semibold ps-0 align-top">Orders</td>
+                                        <td class="ps-0">
+                                            <div class="d-flex flex-wrap gap-1">
+                                                {% for order in log_orders %}
+                                                <a href="{% url 'workforce:order_detail' order_id=order.pk %}" class="badge bg-light text-dark border text-decoration-none" style="font-size:0.7rem">{{ order.order_number }}</a>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endwith %}
                                 </tbody>
                             </table>
                         </div>

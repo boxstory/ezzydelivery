@@ -1,0 +1,74 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Create Return — {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:rma_list' %}">Returns</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">Create</span>
+  </div>
+
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-undo-alt"></i></div>
+      <div>
+        <h1 class="wh__title">Create Return Request</h1>
+        <p class="wh__subtitle">Order {{ order.order_number }} &mdash; {{ order.business.business_name|default:"-" }}</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="POST">
+    {% csrf_token %}
+
+    <!-- Reason -->
+    <div class="wh__card mb-3">
+      <div class="wh__card-header"><div class="wh__card-header-left"><i class="fas fa-question-circle"></i> <span>Return Reason</span></div></div>
+      <div class="wh__card-body">
+        <select name="reason" class="wh__filter-select" required>
+          {% for val, label in reason_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <textarea name="customer_notes" class="form-control mt-2" rows="2" placeholder="Additional notes (optional)"></textarea>
+      </div>
+    </div>
+
+    <!-- Select Items -->
+    <div class="wh__card mb-3">
+      <div class="wh__card-header">
+        <div class="wh__card-header-left"><i class="fas fa-box"></i> <span>Items to Return</span></div>
+      </div>
+      <div class="d-flex align-items-center gap-2 px-3 py-2" style="border-bottom:1px solid var(--wh-border-light);">
+        <input type="checkbox" id="rma_select_all" class="form-check-input" onchange="document.querySelectorAll('.rma-cb').forEach(function(c){c.checked=this.checked}.bind(this))">
+        <label for="rma_select_all" class="wh__meta mb-0" style="cursor:pointer;">Select All</label>
+      </div>
+
+      {% for oi in order_items %}
+      <label class="pkl-create__row" for="rma_item_{{ oi.pk }}">
+        <input type="checkbox" name="item_ids" value="{{ oi.pk }}" id="rma_item_{{ oi.pk }}" class="form-check-input rma-cb" checked>
+        <div class="pkl-create__info">
+          <div class="pkl-create__order-num">{{ oi.product.item_name }}</div>
+          <div class="pkl-create__meta">
+            <span><i class="fas fa-hashtag"></i> {{ oi.product.item_sku }}</span>
+            <span><i class="fas fa-cubes"></i> Ordered: {{ oi.quantity }}</span>
+          </div>
+        </div>
+        <div>
+          <input type="number" name="qty_{{ oi.pk }}" value="{{ oi.quantity }}" min="1" max="{{ oi.quantity }}"
+                 class="form-control form-control-sm" style="width:60px;text-align:center;font-weight:700;" onclick="event.stopPropagation()">
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="{% url 'warehouse:rma_list' %}" class="wh__btn wh__btn--secondary"><i class="fas fa-arrow-left"></i> Cancel</a>
+      <button type="submit" class="wh__btn wh__btn--primary"><i class="fas fa-undo-alt"></i> Create Return Request</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

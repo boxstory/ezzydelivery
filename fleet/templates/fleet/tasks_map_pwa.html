@@ -91,6 +91,8 @@
         text-transform: uppercase;
         letter-spacing: 0.03em;
     }
+    .task-popup__badge--for_review   { background: #ede9fe; color: #6d28d9; }
+    .task-popup__badge--pending      { background: #f3e8ff; color: #7c3aed; }
     .task-popup__badge--accepted    { background: #dbeafe; color: #2563eb; }
     .task-popup__badge--assigned    { background: #e0e7ff; color: #4338ca; }
     .task-popup__badge--picked_up   { background: #fef3c7; color: #92400e; }
@@ -158,6 +160,7 @@
     .task-marker--picked   { background: var(--fleet-warning); }
     .task-marker--transit   { background: var(--fleet-success); }
     .task-marker--issue    { background: var(--fleet-danger); }
+    .task-marker--new      { background: #8b5cf6; /* purple for new/pending tasks */ }
 
     /* Recenter button */
     .map-recenter {
@@ -224,8 +227,12 @@
 {% if pin_count > 0 %}
 <div style="position:relative;">
     <div class="map-summary">
-        <span class="map-summary__count">{{ pin_count }}</span>
-        delivery locations
+        <span class="map-summary__count">{{ active_pin_count }}</span>
+        active
+        {% if new_pin_count > 0 %}
+        <span style="margin-left:4px; background:#8b5cf6; color:#fff; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">{{ new_pin_count }}</span>
+        new
+        {% endif %}
     </div>
     <div id="fleet-tasks-map"></div>
     <button type="button" class="map-recenter" onclick="recenterMap()" title="Fit all pins">
@@ -272,11 +279,17 @@
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
     // Status -> marker color class
-    function markerClass(status) {
+    function markerClass(status, isNew) {
+        if (isNew) return 'task-marker--new';
         if (status === 'picked_up') return 'task-marker--picked';
         if (['out_for_delivery','in_transit','start_ride','contacted'].indexOf(status) !== -1) return 'task-marker--transit';
         if (status === 'non_reachable') return 'task-marker--issue';
         return 'task-marker--active'; // assigned, accepted
+    }
+
+    function escHtml(s) {
+        if (!s) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // Zone/address line
@@ -292,21 +305,21 @@
     function popupHtml(p) {
         var html = '<div class="task-popup">';
         html += '<div class="task-popup__header">';
-        html += '<span class="task-popup__task-num">#' + p.task_number + '</span>';
-        html += '<span class="task-popup__badge task-popup__badge--' + p.status + '">' + p.status_display + '</span>';
+        html += '<span class="task-popup__task-num">#' + escHtml(p.task_number) + '</span>';
+        html += '<span class="task-popup__badge task-popup__badge--' + p.status + '">' + escHtml(p.status_display) + '</span>';
         html += '</div>';
 
         if (p.customer_name) {
-            html += '<div class="task-popup__row"><i class="fa-solid fa-user"></i>' + p.customer_name + '</div>';
+            html += '<div class="task-popup__row"><i class="fa-solid fa-user"></i>' + escHtml(p.customer_name) + '</div>';
         }
         if (p.customer_phone) {
             html += '<div class="task-popup__row"><i class="fa-solid fa-phone"></i>';
-            html += '<a href="tel:' + p.customer_phone + '">' + p.customer_phone + '</a></div>';
+            html += '<a href="tel:' + escHtml(p.customer_phone) + '">' + escHtml(p.customer_phone) + '</a></div>';
         }
         html += '<div class="task-popup__row"><i class="fa-solid fa-location-dot"></i>' + addrLine(p) + '</div>';
 
         html += '<a href="/fleet/tasks/' + p.id + '/navigate/" class="task-popup__nav-btn">';
-        html += '<i class="fa-solid fa-diamond-turn-right me-1"></i>Navigate</a>';
+        html += '<i class="fa-solid fa-route me-1"></i>Navigate</a>';
         html += '</div>';
         return html;
     }
@@ -315,10 +328,12 @@
     var markers = [];
 
     mapPins.forEach(function(p) {
+        var pinIcon = p.is_new ? '' : 'fa-solid fa-box-open';
+        var pinInner = p.is_new ? '?' : '<i class="' + pinIcon + '" style="font-size:13px;"></i>';
         var icon = L.divIcon({
             className: '',
-            html: '<div class="task-marker ' + markerClass(p.status) + '"><span class="task-marker__inner">' +
-                  '<i class="fa-solid fa-box-open" style="font-size:13px;"></i></span></div>',
+            html: '<div class="task-marker ' + markerClass(p.status, p.is_new) + '"><span class="task-marker__inner">' +
+                  pinInner + '</span></div>',
             iconSize: [32, 32],
             iconAnchor: [16, 32],
             popupAnchor: [0, -28]

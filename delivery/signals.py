@@ -22,6 +22,10 @@ TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled']
 def delivery_task_pre_save(sender, instance, **kwargs):
     """Track old delivery task status for change detection in post_save.
     Enforces state machine rules and blocks invalid transitions."""
+    # Auto-generate tracking token for customer tracking page
+    if not instance.tracking_token:
+        instance.tracking_token = uuid.uuid4().hex[:12]
+
     if instance.pk:
         try:
             old = DeliveryTask.objects.get(pk=instance.pk)
@@ -275,7 +279,7 @@ def _create_task_status_point(task, old_status, new_status):
             completion_longitude=driver_lng,
         )
 
-    delivery_models.TaskStatusPoint.objects.create(
+    status_point = delivery_models.TaskStatusPoint.objects.create(
         task=task,
         driver=task.driver,
         old_status=old_status,
@@ -292,6 +296,51 @@ def _create_task_status_point(task, old_status, new_status):
         f"{old_status} → {new_status} "
         f"(driver GPS: {driver_lat},{driver_lng}, dist: {distance_km} km)"
     )
+
+    # Fix 17: Proximity check — flag deliveries completed >5km from destination
+    if new_status == 'delivered' and distance_km is not None and distance_km > 5.0:
+        logger.warning(
+            f"PROXIMITY FLAG: Task {task.dl_task_number} completed "
+            f"{distance_km:.1f}km from delivery address"
+        )
+        DeliveryTask.objects.filter(pk=task.pk).update(delivery_distance_flag=True)
+
+    # Fix 16: GPS spoofing detection — impossible jump between status points
+    if distance_km is not None:
+        prev_point = delivery_models.TaskStatusPoint.objects.filter(
+            task=task
+        ).exclude(pk=status_point.pk).order_by('-created_at').first()
+        if prev_point and prev_point.latitude and prev_point.longitude:
+            time_diff = (status_point.created_at - prev_point.created_at).total_seconds()
+            if time_diff > 0 and time_diff < 300:  # Within 5 minutes
+                jump_km = delivery_models.TaskStatusPoint.haversine_km(
+                    prev_point.latitude, prev_point.longitude,
+                    status_point.latitude, status_point.longitude
+                )
+                if jump_km > 50:
+                    logger.warning(
+                        f"GPS SPOOF SUSPECT: Driver jumped {jump_km:.1f}km in "
+                        f"{time_diff:.0f}s for task {task.dl_task_number}"
+                    )
+
+    # Fix 22: Time slot miss check
+    if new_status == 'delivered' and task.order and getattr(task.order, 'preferred_time_slot', None):
+        try:
+            current_hour = timezone.localtime().hour
+            slot = task.order.preferred_time_slot
+            SLOT_HOURS = {
+                'morning': (8, 12), 'afternoon': (12, 16),
+                'evening': (16, 20), 'night': (20, 22),
+            }
+            slot_range = SLOT_HOURS.get(slot)
+            if slot_range and not (slot_range[0] <= current_hour < slot_range[1]):
+                logger.warning(
+                    f"TIME SLOT MISSED: Task {task.dl_task_number} delivered at "
+                    f"{current_hour}:00, slot was {slot}"
+                )
+                DeliveryTask.objects.filter(pk=task.pk).update(time_slot_missed=True)
+        except Exception as e:
+            logger.error(f"Error checking time slot for task {task.pk}: {e}")
 
 
 @receiver(post_save, sender=DeliveryTask)
@@ -359,6 +408,14 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                 execute_flows_for_trigger('wh_cod_collected', task=instance)
             except Exception as e:
                 logger.warning(f"Auto flow failed for COD collected {instance.pk}: {e}")
+
+            # Fix 12: Lock COD amount after collection
+            if instance.order_id and not instance.order.cod_amount_locked:
+                try:
+                    orders_models.Order.objects.filter(pk=instance.order.pk).update(cod_amount_locked=True)
+                    logger.info(f"COD amount locked for order {instance.order.order_number}")
+                except Exception as e:
+                    logger.error(f"Error locking COD for order {instance.order.pk}: {e}")
 
         # Increment failed_attempt_count when task transitions to 'failed'
         if old_status is not None and old_status != 'failed' and new_status == 'failed':

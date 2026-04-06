@@ -827,6 +827,20 @@
                     _process.addLog('AI parsed zone: ' + (result.zone_number || 'Not detected'), result.zone_number ? 'success' : 'info');
                     _process.addLog('AI parsed street: ' + (result.street_number || 'Not detected'), result.street_number ? 'success' : 'info');
                     _process.addLog('AI confidence: ' + Math.round(result.confidence * 100) + '%', result.confidence > 0.7 ? 'success' : 'info');
+
+                    // Merge existing page values for any fields AI couldn't extract
+                    if (!result.zone_number && zone) {
+                        result.zone_number = zone;
+                        _process.addLog('Using existing Zone ' + zone + ' (AI did not detect zone)', 'info');
+                    }
+                    if (!result.street_number && street) {
+                        result.street_number = street;
+                        _process.addLog('Using existing Street ' + street + ' (AI did not detect street)', 'info');
+                    }
+                    if (!result.building_number && building) {
+                        result.building_number = building;
+                        _process.addLog('Using existing Building ' + building + ' (AI did not detect building)', 'info');
+                    }
                 } else {
                     _process.addLog('AI parse failed: ' + (data.error || 'Unknown error'), 'error');
                 }

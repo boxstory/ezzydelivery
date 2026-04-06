@@ -1,0 +1,71 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Return Tasks{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-rotate-left"></i></div>
+      <div>
+        <h1 class="wh__title">Return Tasks</h1>
+        <p class="wh__subtitle">Items to return to warehouse shelves</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wh__filter-bar">
+    <form method="GET" class="wh__filter-form">
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Status</label>
+        <select name="status" class="wh__filter-select">
+          <option value="">All</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if selected_status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="wh__filter-group--sm">
+        <button type="submit" class="wh__filter-btn"><i class="fas fa-filter"></i> Filter</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Return task cards (mobile-first) -->
+  {% for rt in returns %}
+  <a href="{% url 'warehouse:return_task_detail' rt.pk %}" class="wh__card mb-2 d-block" style="text-decoration:none;color:inherit;">
+    <div class="wh__card-body">
+      <div class="d-flex align-items-center gap-3">
+        <div class="wh__stat-icon {% if rt.status == 'completed' %}wh__stat-icon--success{% elif rt.status == 'in_progress' %}wh__stat-icon--info{% else %}wh__stat-icon--warning{% endif %}">
+          <i class="fas {% if rt.status == 'completed' %}fa-check{% elif rt.status == 'in_progress' %}fa-spinner fa-spin{% else %}fa-rotate-left{% endif %}"></i>
+        </div>
+        <div class="flex-grow-1" style="min-width:0;">
+          <div style="font-family:var(--wh-mono);font-size:0.8125rem;font-weight:700;color:var(--wh-navy);">{{ rt.return_number }}</div>
+          <div class="wh__meta">
+            <i class="fas fa-file-invoice"></i> {{ rt.order.order_number }}
+            &middot; <i class="fas fa-warehouse"></i> {{ rt.warehouse.name }}
+            &middot; {{ rt.items.count }} item{{ rt.items.count|pluralize }}
+          </div>
+        </div>
+        <span class="wh__badge {% if rt.status == 'completed' %}wh__badge--success{% elif rt.status == 'in_progress' %}wh__badge--primary{% else %}wh__badge--warning{% endif %}">
+          {{ rt.get_status_display }}
+        </span>
+      </div>
+    </div>
+  </a>
+  {% empty %}
+  <div class="wh__card">
+    <div class="wh__empty">
+      <i class="fas fa-check-circle" style="color:var(--wh-green);"></i>
+      <p><strong>No return tasks</strong></p>
+      <p>All items are accounted for. Return tasks are created when orders are cancelled after pickup.</p>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="wh__card-footer">
+    {% include "includes/components/_pagination.html" with page_obj=returns %}
+  </div>
+</div>
+{% endblock %}

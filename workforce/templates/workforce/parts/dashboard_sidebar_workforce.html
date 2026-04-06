@@ -15,20 +15,22 @@
     <ul id="workforce_sidebar_menu_main" class="navbar-nav">
 
       <!-- Import Section -->
-      <li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,export_orders_csv' %}active{% endif %}">
+      <li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}active{% endif %}">
         <div id="workforce_sidebar_link_import" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-import" data-title="Import">
           <i class="fa-solid fa-file-import me-2"></i>
           <span>Import</span>
+          {% if temp_orders_sync_errors %}<span class="badge ms-1" style="background:#dc3545;color:#fff;padding:.2rem .4rem;font-size:0.55rem;"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
           {% if temp_orders_count %}<span class="badge ms-1" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;">{{ temp_orders_count }}</span>{% endif %}
           <i class="fa-solid fa-chevron-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,export_orders_csv' %}show{% endif %}" id="submenu-import">
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}show{% endif %}" id="submenu-import">
           <ul class="nav flex-column">
             <li class="nav-item {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}">
               <a id="workforce_sidebar_link_temp_orders" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}"
                  href="{% url 'workforce:temp_orders' %}">
                 <i class="fa-solid fa-inbox me-2"></i>
                 <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Temp Orders</span>
+                {% if temp_orders_sync_errors %}<span class="badge" style="flex:0 0 auto;background:#dc3545;color:#fff;padding:.2rem .4rem;font-size:0.55rem;line-height:1.2;" title="Sync errors: {{ temp_orders_sync_errors|length }} source(s) failed" data-badge="sync_errors"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
                 {% if temp_orders_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders">{{ temp_orders_count }}</span>{% endif %}
               </a>
             </li>
@@ -50,21 +52,14 @@
               <a id="workforce_sidebar_link_onedrive" class="nav-link btn {% if request.resolver_match.url_name == 'onedrive_sources' %}active{% endif %}"
                  href="{% url 'workforce:onedrive_sources' %}">
                 <i class="fa-solid fa-cloud-arrow-down me-2"></i>
-                OneDrive Import
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'export_orders_csv' %}active{% endif %}">
-              <a id="workforce_sidebar_menu_export" class="nav-link btn {% if request.resolver_match.url_name == 'export_orders_csv' %}active{% endif %}"
-                 href="{% url 'workforce:export_orders_csv' %}">
-                <i class="fa-solid fa-file-export me-2"></i>
-                Export Orders
+                Shared Sheet / Excel
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'wf_api_orders' %}active{% endif %}">
               <a id="workforce_sidebar_link_wf_api_orders" class="nav-link btn {% if request.resolver_match.url_name == 'wf_api_orders' %}active{% endif %}"
                  href="{% url 'workforce:wf_api_orders' %}">
                 <i class="fa-solid fa-plug me-2"></i>
-                Order Auto/API
+                API/Auto Trigger
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'import_history' %}active{% endif %}">
@@ -74,11 +69,32 @@
                 Import History
               </a>
             </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'wf_mapping_manager' %}active{% endif %}">
+              <a id="workforce_sidebar_link_mapping_manager" class="nav-link btn {% if request.resolver_match.url_name == 'wf_mapping_manager' %}active{% endif %}"
+                 href="{% url 'workforce:wf_mapping_manager' %}">
+                <i class="fa-solid fa-sliders me-2"></i>
+                Column Mapping
+              </a>
+            </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'wf_webhook_imports' %}active{% endif %}">
               <a id="workforce_sidebar_link_webhook_imports" class="nav-link btn {% if request.resolver_match.url_name == 'wf_webhook_imports' %}active{% endif %}"
                  href="{% url 'workforce:wf_webhook_imports' %}">
                 <i class="fa-solid fa-satellite-dish me-2"></i>
                 Webhook Imports
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'wf_export_page' %}active{% endif %}">
+              <a id="workforce_sidebar_link_wf_export_page" class="nav-link btn {% if request.resolver_match.url_name == 'wf_export_page' %}active{% endif %}"
+                 href="{% url 'workforce:wf_export_page' %}">
+                <i class="fa-solid fa-file-arrow-down me-2"></i>
+                Export Orders
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'dl_tasks_export_page' %}active{% endif %}">
+              <a id="workforce_sidebar_link_dl_tasks_export" class="nav-link btn {% if request.resolver_match.url_name == 'dl_tasks_export_page' %}active{% endif %}"
+                 href="{% url 'workforce:dl_tasks_export_page' %}">
+                <i class="fa-solid fa-truck-fast me-2"></i>
+                Export DL Tasks
               </a>
             </li>
           </ul>
@@ -160,7 +176,8 @@
         <div id="workforce_sidebar_link_tasks" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-deliveries" data-title="Tasks">
           <i class="fa-solid fa-truck-fast me-2"></i>
           <span>Tasks</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
+          <span class="badge ms-auto me-2" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="unpublished_tasks_parent">{{ unpublished_tasks_count|default:"0" }}</span>
+          <i class="fa-solid fa-chevron-down"></i>
         </div>
         <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_reported,tasks_live_map,delivery_task_detail,delivery_task_edit,hub_batch_list,hub_batch_create,hub_batch_detail' %}show{% endif %}" id="submenu-deliveries">
           <ul class="nav flex-column">
@@ -205,7 +222,7 @@
                  href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}">
                 <i class="fa-solid fa-spinner me-2"></i>
                 <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Unpublished Tasks</span>
-                {% if unpublished_tasks_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="unpublished_tasks">{{ unpublished_tasks_count }}</span>{% endif %}
+                <span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="unpublished_tasks">{{ unpublished_tasks_count|default:"0" }}</span>
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'dl_list_incompleted_details' %}active{% endif %}">
@@ -234,13 +251,13 @@
       </li>
 
       <!-- Fleet Accounts Section -->
-      <li id="workforce_sidebar_menu_fleet" class="nav-item {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail' %}active{% endif %}">
+      <li id="workforce_sidebar_menu_fleet" class="nav-item {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}active{% endif %}">
         <div id="workforce_sidebar_link_fleet" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-accounts" data-title="Fleet A/Cs">
           <i class="fa-solid fa-wallet me-2"></i>
           <span>Fleet A/Cs</span>
           <i class="fa-solid fa-chevron-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail' %}show{% endif %}" id="submenu-accounts">
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}show{% endif %}" id="submenu-accounts">
           <ul class="nav flex-column">
             <li class="nav-item {% if request.resolver_match.url_name in 'drivers_list,driver_detail' %}active{% endif %}">
               <a id="workforce_sidebar_link_all_drivers" class="nav-link btn {% if request.resolver_match.url_name in 'drivers_list,driver_detail' %}active{% endif %}"
@@ -261,6 +278,13 @@
                  href="{% url 'workforce:drivers_inactive' %}">
                 <i class="fa-solid fa-circle-xmark me-2"></i>
                 Inactive
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'wf_driver_tasks' %}active{% endif %}">
+              <a id="workforce_sidebar_link_driver_tasks" class="nav-link btn {% if request.resolver_match.url_name == 'wf_driver_tasks' %}active{% endif %}"
+                 href="{% url 'workforce:wf_driver_tasks' %}">
+                <i class="fa-solid fa-list-check me-2"></i>
+                Driver Tasks
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'fleet_cod_in_hand' %}active{% endif %}">
@@ -534,7 +558,7 @@
       </li>
 
       <!-- Auto Triggers Section (superuser only) -->
-      {% if user.is_superuser %}
+      {% if user.profile.is_superadmin %}
       <li id="workforce_sidebar_menu_triggers" class="nav-item {% if request.resolver_match.url_name in 'auto_triggers_list,auto_flows_list,auto_flow_add,auto_flow_edit,auto_flow_logs,whatsapp_instances_list' %}active{% endif %}">
         <div id="workforce_sidebar_link_triggers" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-triggers" data-title="Auto Triggers">
           <i class="fa-solid fa-bolt me-2"></i>
@@ -722,7 +746,7 @@
 
       <p class="dsb-section">Reports & Tools</p>
 
-      <!-- Reports Section -->
+<!-- Reports Section -->
       <li id="workforce_sidebar_menu_reports" class="nav-item {% if request.resolver_match.url_name in 'staff_reports,fleet_task_sheet,fleet_task_sheets_list,receipt_templates_list,receipt_template_create,receipt_template_edit,receipt_template_preview,driver_documents_list,driver_document_detail,vehicle_documents_list,vehicle_document_detail,store_documents_list,store_document_detail,business_licenses_list,business_license_detail' %}active{% endif %}">
         <div id="workforce_sidebar_link_reports" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-reports" data-title="Reports">
           <i class="fa-solid fa-chart-bar me-2"></i>
@@ -831,7 +855,7 @@
       </li>
       {% endif %}
 
-      {% if user.is_superuser %}
+      {% if user.profile.is_superadmin %}
       <li id="workforce_sidebar_menu_admin" class="nav-item">
         <a id="workforce_sidebar_link_admin" class="nav-link btn"
            href="{% url 'admin:index' %}" target="_blank" data-title="Django Admin">
@@ -858,6 +882,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/onedrive-sources\//,                menu: 'submenu-import',       link: 'workforce_sidebar_link_onedrive'},
         {re: /^\/workforce\/import-wizard\//,                   menu: 'submenu-import',       link: 'workforce_sidebar_link_temp_orders'},
         {re: /^\/workforce\/import-history\//,                  menu: 'submenu-import',       link: 'workforce_sidebar_link_import_history'},
+        {re: /^\/workforce\/import-wizard\/mapping-manager\//,  menu: 'submenu-import',       link: 'workforce_sidebar_link_mapping_manager'},
         {re: /^\/workforce\/webhook-imports\//,                  menu: 'submenu-import',       link: 'workforce_sidebar_link_webhook_imports'},
         {re: /^\/workforce\/orders\/pending-verification\//,    menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},
         {re: /^\/workforce\/orders\/\d+/,                       menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},
@@ -865,6 +890,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/delivery-task\/\d+/,                menu: 'submenu-deliveries',   link: 'workforce_sidebar_link_all_tasks'},
         {re: /^\/workforce\/hub\//,                             menu: 'submenu-deliveries',   link: 'workforce_sidebar_link_all_tasks'},
         {re: /^\/workforce\/tasks\//,                           menu: 'submenu-deliveries',   link: null},
+        {re: /^\/workforce\/fleet\/driver-tasks/,               menu: 'submenu-accounts',     link: 'workforce_sidebar_link_driver_tasks'},
         {re: /^\/workforce\/fleet\/task-sheet/,                 menu: 'submenu-reports',      link: 'workforce_sidebar_link_task_sheets'},
         {re: /^\/workforce\/fleet\/cod-settlement\//,           menu: 'submenu-accounts',     link: 'workforce_sidebar_link_fleet_transactions'},
         {re: /^\/workforce\/drivers\/\d+/,                      menu: 'submenu-accounts',     link: 'workforce_sidebar_link_all_drivers'},

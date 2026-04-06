@@ -1090,7 +1090,7 @@ def business_settings_api_test_result(request, business_id, api_id):
         'status': status,
         'result': result,
         'error_message': error_message,
-        'sheets_info': sheets_info if 'sheets_info' in dir() else None,
+        'sheets_info': sheets_info if 'sheets_info' in locals() else None,
     }
     return render(request, 'business/parts/business_settings_api_test_result.html', context)
 
@@ -2143,7 +2143,8 @@ def inbound_requests_list(request):
     from warehouse.models import InboundProductRequest
     from django.core.paginator import Paginator
 
-    is_staff = request.user.is_staff or request.user.is_superuser
+    _prof = getattr(request.user, 'profile', None)
+    is_staff = request.user.is_staff or getattr(_prof, 'is_staff', False) or getattr(_prof, 'is_superadmin', False)
     business = get_cached_business(request)
 
     if is_staff:
@@ -2198,7 +2199,8 @@ def inbound_request_detail(request, pk):
     """Detail view for a single inbound product request."""
     from warehouse.models import InboundProductRequest
 
-    is_staff = request.user.is_staff or request.user.is_superuser
+    _prof = getattr(request.user, 'profile', None)
+    is_staff = request.user.is_staff or getattr(_prof, 'is_staff', False) or getattr(_prof, 'is_superadmin', False)
     business = get_cached_business(request)
 
     qs = InboundProductRequest.objects.select_related(
@@ -2228,7 +2230,8 @@ def inbound_request_create(request):
     from product.models import Product
     from business.models import Business
 
-    is_staff = request.user.is_staff or request.user.is_superuser
+    _prof = getattr(request.user, 'profile', None)
+    is_staff = request.user.is_staff or getattr(_prof, 'is_staff', False) or getattr(_prof, 'is_superadmin', False)
     business = get_cached_business(request)
 
     if is_staff:
@@ -2660,3 +2663,535 @@ def business_join_request_action(request, business_id, req_id):
         join_req.status = 'rejected'
         join_req.save(update_fields=['status', 'responded_at', 'responded_by'])
         return JsonResponse({'success': True})
+
+
+# ─── Live Tracking Map ──────────────────────────────────────────────
+@login_required
+@business_required
+def live_tracking_map(request):
+    """Live tracking map showing active deliveries for this business."""
+    from delivery.models import DeliveryTask
+    active_statuses = ['start_ride', 'in_transit', 'out_for_delivery']
+    active_tasks = DeliveryTask.objects.filter(
+        business=request.current_business,
+        dl_task_status__in=active_statuses
+    ).select_related('order', 'driver').count()
+
+    return render(request, 'business/live_tracking_map.html', {
+        'active_count': active_tasks,
+        'user_business': request.current_business,
+    })
+
+
+@login_required
+@business_required
+def live_tracking_data(request):
+    """JSON endpoint returning driver locations for active tasks."""
+    from delivery.models import DeliveryTask
+    from fleet.models import DriverLocation
+
+    active_statuses = ['start_ride', 'in_transit', 'out_for_delivery']
+    tasks = DeliveryTask.objects.filter(
+        business=request.current_business,
+        dl_task_status__in=active_statuses
+    ).select_related('order', 'driver')
+
+    pins = []
+    for task in tasks:
+        # Get latest driver location
+        driver_loc = None
+        if task.driver_id:
+            driver_loc = DriverLocation.objects.filter(
+                driver_id=task.driver_id
+            ).order_by('-created_at').first()
+
+        order = task.order
+        pin = {
+            'task_number': task.dl_task_number,
+            'status': task.dl_task_status,
+            'status_display': task.get_dl_task_status_display(),
+            'customer_name': order.customer_name if order else '',
+            'customer_phone': order.customer_phone if order else '',
+            'delivery_lat': float(order.latitude) if order and order.latitude else None,
+            'delivery_lng': float(order.longitude) if order and order.longitude else None,
+            'delivery_address': order.customer_address if order else '',
+            'zone': order.dl_zone if order else None,
+            'street': order.dl_street if order else None,
+            'building': order.dl_building if order else None,
+            'driver_name': str(task.driver) if task.driver else 'Unassigned',
+            'driver_lat': float(driver_loc.latitude) if driver_loc else None,
+            'driver_lng': float(driver_loc.longitude) if driver_loc else None,
+        }
+        pins.append(pin)
+
+    return JsonResponse({'tasks': pins})
+
+
+# ============================================================
+# Reports & CSV Export
+# ============================================================
+
+@login_required
+@business_required
+def reports_dashboard(request):
+    """Reports & export dashboard."""
+    from datetime import date, timedelta
+    today = date.today()
+    return render(request, 'business/reports_dashboard.html', {
+        'user_business': request.current_business,
+        'is_business_owner': request.access_type == 'owner',
+        'default_from': (today - timedelta(days=30)).isoformat(),
+        'default_to': today.isoformat(),
+    })
+
+
+@login_required
+@business_required
+def export_orders_csv(request):
+    """Export orders as CSV with date range and status filters."""
+    import csv
+    from orders.models import Order
+
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    status = request.GET.get('status', 'all')
+
+    orders = Order.objects.filter(business=request.current_business).select_related('pickup_location')
+    if date_from:
+        orders = orders.filter(created_at__date__gte=datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        orders = orders.filter(created_at__date__lte=datetime.strptime(date_to, '%Y-%m-%d').date())
+    if status != 'all':
+        orders = orders.filter(order_status=status)
+    orders = orders.order_by('-created_at')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="orders_{request.current_business.business_code}_{date_from or "all"}_{date_to or "all"}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Order #', 'Client Code', 'Customer', 'Phone', 'Address', 'Zone', 'Street', 'Building', 'Status', 'COD Amount', 'COD Status', 'Time Slot', 'Created', 'Delivered At'])
+
+    for o in orders:
+        writer.writerow([
+            o.order_number, o.client_order_code, o.customer_name, o.customer_phone,
+            o.customer_address, o.dl_zone or '', o.dl_street or '', o.dl_building or '',
+            o.get_order_status_display(), o.cod_amount or 0, o.get_cod_status_by_client_display(),
+            o.get_preferred_time_slot_display() if hasattr(o, 'preferred_time_slot') and o.preferred_time_slot else '',
+            o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '',
+            o.delivered_at.strftime('%Y-%m-%d %H:%M') if o.delivered_at else '',
+        ])
+
+    return response
+
+
+@login_required
+@business_required
+def export_cod_csv(request):
+    """Export COD reconciliation report as CSV."""
+    import csv
+    from orders.models import Order
+
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    orders = Order.objects.filter(
+        business=request.current_business,
+        cod_amount__gt=0
+    ).select_related('pickup_location')
+    if date_from:
+        orders = orders.filter(created_at__date__gte=datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        orders = orders.filter(created_at__date__lte=datetime.strptime(date_to, '%Y-%m-%d').date())
+    orders = orders.order_by('-created_at')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="cod_report_{request.current_business.business_code}_{date_from or "all"}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Order #', 'Customer', 'COD Amount', 'Client COD Status', 'Staff COD Status', 'Order Status', 'Created', 'Delivered At'])
+
+    for o in orders:
+        writer.writerow([
+            o.order_number, o.customer_name, o.cod_amount,
+            o.get_cod_status_by_client_display(), o.get_cod_status_by_staff_display(),
+            o.get_order_status_display(),
+            o.created_at.strftime('%Y-%m-%d') if o.created_at else '',
+            o.delivered_at.strftime('%Y-%m-%d') if o.delivered_at else '',
+        ])
+
+    return response
+
+
+@login_required
+@business_required
+def export_performance_csv(request):
+    """Export delivery performance report as CSV."""
+    import csv
+    from delivery.models import DeliveryTask
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    tasks = DeliveryTask.objects.filter(business=request.current_business)
+    if date_from:
+        tasks = tasks.filter(created_at__date__gte=datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        tasks = tasks.filter(created_at__date__lte=datetime.strptime(date_to, '%Y-%m-%d').date())
+
+    # Daily aggregation
+    daily = tasks.annotate(date=TruncDate('created_at')).values('date').annotate(
+        total=Count('id'),
+        delivered=Count('id', filter=Q(dl_task_status='delivered')),
+        failed=Count('id', filter=Q(dl_task_status='failed')),
+        cancelled=Count('id', filter=Q(dl_task_status='cancelled')),
+    ).order_by('-date')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="performance_{request.current_business.business_code}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Date', 'Total Tasks', 'Delivered', 'Failed', 'Cancelled', 'Success Rate %'])
+
+    for d in daily:
+        rate = round(d['delivered'] / d['total'] * 100, 1) if d['total'] > 0 else 0
+        writer.writerow([
+            d['date'].strftime('%Y-%m-%d') if d['date'] else '',
+            d['total'], d['delivered'], d['failed'], d['cancelled'], rate
+        ])
+
+    return response
+
+
+# ─── WhatsApp Notification Triggers ─────────────────────────────────
+
+@login_required(login_url='/accounts/login/')
+@business_required
+def whatsapp_triggers_list(request):
+    """Settings page for WhatsApp notification triggers."""
+    from business.models import WhatsAppNotificationTrigger
+
+    triggers = {}
+    for status, label in WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES:
+        trigger = WhatsAppNotificationTrigger.objects.filter(
+            business=request.current_business, trigger_status=status
+        ).first()
+        triggers[status] = {
+            'label': label,
+            'is_active': trigger.is_active if trigger else False,
+            'custom_message': trigger.custom_message if trigger else '',
+        }
+
+    return render(request, 'business/whatsapp_triggers.html', {
+        'triggers': triggers,
+        'user_business': request.current_business,
+        'is_business_owner': request.access_type == 'owner',
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@business_required
+def whatsapp_trigger_toggle(request):
+    """HTMX POST endpoint to toggle a WhatsApp trigger."""
+    from business.models import WhatsAppNotificationTrigger
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    status = request.POST.get('trigger_status')
+    is_active = request.POST.get('is_active') == 'true'
+    custom_message = request.POST.get('custom_message', '')
+
+    valid_statuses = [s[0] for s in WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES]
+    if status not in valid_statuses:
+        return JsonResponse({'error': 'Invalid status'}, status=400)
+
+    trigger, created = WhatsAppNotificationTrigger.objects.update_or_create(
+        business=request.current_business,
+        trigger_status=status,
+        defaults={'is_active': is_active, 'custom_message': custom_message}
+    )
+
+    return JsonResponse({'success': True, 'is_active': trigger.is_active})
+
+
+@login_required
+@business_required
+def bulk_print_labels(request):
+    """Generate and display multiple shipping labels for printing."""
+    from orders.models import Order
+    from delivery.models import ShippingLabel, DeliveryTask
+    from delivery.label_utils import create_shipping_label
+
+    if request.method != 'POST':
+        return render(request, 'business/bulk_print_labels.html', {
+            'labels': [],
+            'user_business': request.current_business,
+        })
+
+    order_ids = request.POST.getlist('order_ids')
+    if not order_ids:
+        from django.contrib import messages
+        messages.warning(request, 'No orders selected for printing.')
+        return redirect('orders:orders_all_list')
+
+    orders = Order.objects.filter(
+        id__in=order_ids,
+        business=request.current_business,
+    ).select_related('pickup_location')
+
+    labels = []
+    for order in orders:
+        # Get or create shipping label
+        label = ShippingLabel.objects.filter(order=order, status='generated').first()
+        if not label:
+            # Need a delivery task to create label
+            task = DeliveryTask.objects.filter(order=order).first()
+            if task:
+                label = create_shipping_label(order, task)
+        if label and label.label_file:
+            labels.append({
+                'order_number': order.order_number,
+                'label_url': label.label_file.url,
+                'customer_name': order.customer_name,
+            })
+
+    return render(request, 'business/bulk_print_labels.html', {
+        'labels': labels,
+        'user_business': request.current_business,
+    })
+
+
+# =============================================================================
+# BRANDED TRACKING SETTINGS
+# =============================================================================
+
+@login_required(login_url='account_login')
+@business_required
+def branded_tracking_settings(request):
+    """Settings page for configuring the branded customer tracking page."""
+    business = request.current_business
+    BrandedTrackingConfig = business_models.BrandedTrackingConfig
+
+    config, created = BrandedTrackingConfig.objects.get_or_create(
+        business=business,
+        defaults={
+            'primary_color': '#f7c000',
+            'secondary_color': '#001f3f',
+        }
+    )
+
+    if request.method == 'POST':
+        config.primary_color = request.POST.get('primary_color', '#f7c000').strip()
+        config.secondary_color = request.POST.get('secondary_color', '#001f3f').strip()
+        config.show_driver_name = request.POST.get('show_driver_name') == 'on'
+        config.show_driver_phone = request.POST.get('show_driver_phone') == 'on'
+        config.show_eta = request.POST.get('show_eta') == 'on'
+        config.custom_footer_text = request.POST.get('custom_footer_text', '').strip()[:255]
+        config.is_active = request.POST.get('is_active') == 'on'
+        config.save()
+        messages.success(request, 'Tracking page settings saved successfully.')
+        return redirect('business:branded_tracking_settings')
+
+    # Build a sample tracking URL for preview
+    sample_task = delivery_models.DeliveryTask.objects.filter(
+        business=business, tracking_token__isnull=False,
+    ).order_by('-created_at').first()
+    sample_url = None
+    if sample_task:
+        sample_url = request.build_absolute_uri(f'/track/{sample_task.tracking_token}/')
+
+    return render(request, 'business/branded_tracking_settings.html', {
+        'config': config,
+        'sample_url': sample_url,
+        'user_business': business,
+    })
+
+
+# =============================================================================
+# RETURNS MANAGEMENT VIEWS
+# =============================================================================
+
+
+@login_required(login_url='account_login')
+@business_required
+def returns_list(request):
+    """List all return requests for the business with optional status filter."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    from orders.models import ReturnRequest
+    status_filter = request.GET.get('status', '')
+    returns_qs = ReturnRequest.objects.filter(
+        business=business
+    ).select_related('order', 'reviewed_by').order_by('-created_at')
+
+    if status_filter:
+        returns_qs = returns_qs.filter(status=status_filter)
+
+    return render(request, 'business/returns_list.html', {
+        'returns': returns_qs,
+        'status_filter': status_filter,
+        'status_choices': ReturnRequest.RETURN_STATUS_CHOICES,
+        'user_business': business,
+    })
+
+
+@login_required(login_url='account_login')
+@business_required
+def return_detail(request, return_id):
+    """Detail view for a single return request with status timeline."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    from orders.models import ReturnRequest
+    ret = get_object_or_404(
+        ReturnRequest.objects.select_related('order', 'business', 'reviewed_by').prefetch_related('return_items__order_item__product'),
+        id=return_id, business=business
+    )
+
+    # Timeline steps
+    all_steps = ['pending', 'approved', 'pickup_scheduled', 'picked_up', 'received', 'refunded', 'closed']
+    if ret.status == 'rejected':
+        timeline = ['pending', 'rejected']
+    else:
+        timeline = all_steps
+
+    return render(request, 'business/return_detail.html', {
+        'ret': ret,
+        'timeline': timeline,
+        'status_choices': dict(ReturnRequest.RETURN_STATUS_CHOICES),
+        'user_business': business,
+    })
+
+
+@login_required(login_url='account_login')
+@business_required
+def return_create(request, order_id):
+    """Create a return request from a delivered order."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related('business').prefetch_related('order_items__product'),
+        id=order_id, business=business
+    )
+
+    if order.order_status not in ('delivered', 'fulfilled'):
+        messages.warning(request, "Returns can only be requested for delivered orders.")
+        return redirect('orders:order_details', order.id)
+
+    from orders.models import ReturnRequest, ReturnItem
+    import uuid
+
+    if request.method == 'POST':
+        reason = request.POST.get('reason', '')
+        reason_notes = request.POST.get('reason_notes', '')
+
+        if not reason:
+            messages.error(request, "Please select a return reason.")
+            return render(request, 'business/return_create.html', {
+                'order': order,
+                'reason_choices': ReturnRequest.RETURN_REASON_CHOICES,
+                'user_business': business,
+            })
+
+        # Collect selected items
+        selected_items = []
+        for item in order.order_items.all():
+            qty_key = f'qty_{item.id}'
+            chk_key = f'item_{item.id}'
+            if request.POST.get(chk_key):
+                qty = int(request.POST.get(qty_key, 1))
+                if qty > 0:
+                    selected_items.append((item, min(qty, item.quantity)))
+
+        if not selected_items:
+            messages.error(request, "Please select at least one item to return.")
+            return render(request, 'business/return_create.html', {
+                'order': order,
+                'reason_choices': ReturnRequest.RETURN_REASON_CHOICES,
+                'user_business': business,
+            })
+
+        # Generate return number
+        biz_code = business.business_name[:3].upper() if business.business_name else 'BIZ'
+        return_number = f"{biz_code}-{uuid.uuid4().hex[:8].upper()}"
+
+        ret = ReturnRequest.objects.create(
+            return_number=return_number,
+            order=order,
+            business=business,
+            reason=reason,
+            reason_notes=reason_notes,
+            cod_reversal_amount=order.cod_amount or 0,
+        )
+
+        for item, qty in selected_items:
+            ReturnItem.objects.create(
+                return_request=ret,
+                order_item=item,
+                quantity_returned=qty,
+            )
+
+        messages.success(request, f"Return request RET-{return_number} created successfully.")
+        return redirect('business:return_detail', ret.id)
+
+    return render(request, 'business/return_create.html', {
+        'order': order,
+        'reason_choices': ReturnRequest.RETURN_REASON_CHOICES,
+        'user_business': business,
+    })
+
+
+@login_required(login_url='account_login')
+@business_required
+def return_update_status(request, return_id):
+    """Update the status of a return request (approve/reject)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    business = get_cached_business(request)
+    if not business:
+        return JsonResponse({'error': 'No business'}, status=403)
+
+    from orders.models import ReturnRequest
+    from django.utils import timezone
+
+    ret = get_object_or_404(ReturnRequest, id=return_id, business=business)
+    new_status = request.POST.get('status', '')
+    review_notes = request.POST.get('review_notes', '')
+
+    valid_statuses = [s[0] for s in ReturnRequest.RETURN_STATUS_CHOICES]
+    if new_status not in valid_statuses:
+        messages.error(request, "Invalid status.")
+        return redirect('business:return_detail', ret.id)
+
+    ret.status = new_status
+    ret.review_notes = review_notes
+
+    if new_status in ('approved', 'rejected'):
+        ret.reviewed_by = request.user
+        ret.reviewed_at = timezone.now()
+
+    # When approved, update OrderItem quantities
+    if new_status == 'approved':
+        for ri in ret.return_items.select_related('order_item').all():
+            oi = ri.order_item
+            oi.quantity_returned = (oi.quantity_returned or 0) + ri.quantity_returned
+            if oi.quantity_returned >= oi.quantity:
+                oi.delivery_status = 'returned'
+            elif oi.quantity_returned > 0:
+                oi.delivery_status = 'partial'
+            oi.save()
+
+    ret.save()
+    messages.success(request, f"Return status updated to {ret.get_status_display()}.")
+    return redirect('business:return_detail', ret.id)

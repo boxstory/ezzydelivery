@@ -1,0 +1,122 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Dispatch Queue{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-truck"></i></div>
+      <div>
+        <h1 class="wh__title">Dispatch Queue</h1>
+        <p class="wh__subtitle">Assign packed orders to drivers for delivery</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ready Orders — select and assign to driver -->
+  <div class="wh__card mb-3">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left"><i class="fas fa-box"></i> <span>Packed Orders Ready for Dispatch</span></div>
+      <span class="wh__count-badge">{{ ready_orders|length }}</span>
+    </div>
+
+    {% if ready_orders %}
+    <form method="POST" action="{% url 'warehouse:dispatch_create' %}" id="dispatch_form">
+      {% csrf_token %}
+      <div class="d-flex align-items-center gap-2 px-3 py-2 flex-wrap" style="border-bottom:1px solid var(--wh-border-light);">
+        <input type="checkbox" id="dsp_select_all" class="form-check-input" onchange="dspToggleAll(this.checked)">
+        <label for="dsp_select_all" class="wh__meta mb-0" style="cursor:pointer;">Select All</label>
+        <span class="wh__meta" id="dsp_sel_count">0 selected</span>
+        <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+          <select name="driver_id" class="wh__filter-select" style="min-width:160px;">
+            <option value="">No Driver (assign later)</option>
+            {% for d in drivers %}
+            <option value="{{ d.driver_id }}">{{ d.user.get_full_name|default:d.user.username }} ({{ d.driver_code }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="wh__btn wh__btn--primary" id="dsp_create_btn" disabled>
+            <i class="fas fa-truck"></i> Create Dispatch
+          </button>
+        </div>
+      </div>
+
+      {% for order in ready_orders %}
+      <label class="pkl-create__row" for="dsp_order_{{ order.pk }}">
+        <input type="checkbox" name="order_ids" value="{{ order.pk }}" id="dsp_order_{{ order.pk }}" class="form-check-input dsp-cb" onchange="dspUpdateCount()">
+        <div class="pkl-create__info">
+          <div class="pkl-create__order-num">{{ order.order_number }}</div>
+          <div class="pkl-create__meta">
+            <span><i class="fas fa-store"></i> {{ order.business.business_name|default:"-" }}</span>
+            {% if order.customer_name %}<span><i class="fas fa-user"></i> {{ order.customer_name }}</span>{% endif %}
+            {% if order.cod_amount %}<span><i class="fas fa-coins"></i> QAR {{ order.cod_amount }}</span>{% endif %}
+          </div>
+        </div>
+        {% if order.cod_amount %}
+        <span class="wh__badge wh__badge--warning">COD</span>
+        {% endif %}
+        <span class="wh__badge wh__badge--success">Packed</span>
+      </label>
+      {% endfor %}
+    </form>
+    {% else %}
+    <div class="wh__empty">
+      <i class="fas fa-check-circle" style="color:var(--wh-green);"></i>
+      <p><strong>No orders waiting</strong></p>
+      <p>All packed orders have been dispatched.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Existing Dispatch Batches -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left"><i class="fas fa-list"></i> <span>Recent Dispatch Batches</span></div>
+    </div>
+
+    {% for batch in batches %}
+    <a href="{% url 'warehouse:dispatch_detail' batch.pk %}" class="pkl-create__row" style="text-decoration:none;color:inherit;">
+      <div class="pkl-create__info">
+        <div class="pkl-create__order-num">{{ batch.batch_number }}</div>
+        <div class="pkl-create__meta">
+          <span><i class="fas fa-warehouse"></i> {{ batch.warehouse.name }}</span>
+          <span><i class="fas fa-file-invoice"></i> {{ batch.total_orders }} orders</span>
+          {% if batch.driver %}<span><i class="fas fa-user"></i> {{ batch.driver.user.get_full_name|default:batch.driver.driver_code }}</span>{% endif %}
+          {% if batch.total_cod_amount %}<span><i class="fas fa-coins"></i> QAR {{ batch.total_cod_amount }}</span>{% endif %}
+          <span><i class="fas fa-calendar"></i> {{ batch.created_at|date:"d M H:i" }}</span>
+        </div>
+      </div>
+      <span class="wh__badge
+        {% if batch.status == 'dispatched' or batch.status == 'completed' %}wh__badge--success
+        {% elif batch.status == 'handed_over' %}wh__badge--primary
+        {% elif batch.status == 'assigned' %}wh__badge--info
+        {% else %}wh__badge--warning{% endif %}">
+        {{ batch.get_status_display }}
+      </span>
+    </a>
+    {% empty %}
+    <div class="wh__empty">
+      <i class="fas fa-truck"></i>
+      <p><strong>No dispatch batches yet</strong></p>
+      <p>Create a dispatch by selecting packed orders above.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function dspToggleAll(checked) {
+    document.querySelectorAll('.dsp-cb').forEach(function(cb) { cb.checked = checked; });
+    dspUpdateCount();
+}
+function dspUpdateCount() {
+    var count = document.querySelectorAll('.dsp-cb:checked').length;
+    document.getElementById('dsp_sel_count').textContent = count + ' selected';
+    document.getElementById('dsp_create_btn').disabled = count === 0;
+    var allCb = document.getElementById('dsp_select_all');
+    var total = document.querySelectorAll('.dsp-cb').length;
+    if (allCb) allCb.checked = count === total && total > 0;
+}
+</script>
+{% endblock %}

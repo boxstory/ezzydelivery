@@ -1,0 +1,373 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/wf_export.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wexp__wrapper">
+
+  <!-- Page Header -->
+  <div class="wexp__hero">
+    <div class="wexp__hero-title">
+      <i class="fa-solid fa-file-export wexp__hero-icon"></i>
+      Export Orders
+    </div>
+    <span class="wexp__hero-subtitle">Download orders by platform in Excel or CSV format</span>
+    <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-light btn-sm mt-2">
+      <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
+    </a>
+  </div>
+
+  <!-- Breadcrumb (steps 2 & 3) -->
+  {% if step != 'select_business' %}
+  <div class="wexp__breadcrumb">
+    <a href="{% url 'workforce:wf_export_page' %}"><i class="fa-solid fa-store me-1"></i>Businesses</a>
+    <span>/</span>
+    {% if step == 'select_source' %}
+    <span class="wexp__crumb-active">{{ selected_business.business_name }}</span>
+    {% else %}
+    <a href="{% url 'workforce:wf_export_page' %}?business={{ business_id }}">{{ selected_business.business_name }}</a>
+    <span>/</span>
+    <span class="wexp__crumb-active">
+      {% if source == 'shopify_api' %}<i class="fa-brands fa-shopify me-1 wexp__crumb-shopify"></i>Shopify API (Live)
+      {% else %}<i class="fa-solid fa-database me-1"></i>Database{% endif %}
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+
+  {# ════════════════════════════════════════════════════════════ #}
+  {# STEP 1 — SELECT BUSINESS                                    #}
+  {# ════════════════════════════════════════════════════════════ #}
+  {% if step == 'select_business' %}
+  <div class="wexp__step-intro">Select a business to continue:</div>
+  <div class="wexp__biz-grid">
+    {% for biz in all_businesses %}
+    <a href="{% url 'workforce:wf_export_page' %}?business={{ biz.business_id }}" class="wexp__biz-card">
+      <div class="wexp__biz-card__name">{{ biz.business_name }}</div>
+      <div class="wexp__biz-card__count"><i class="fa-solid fa-box me-1"></i>{{ biz.order_count }} order{{ biz.order_count|pluralize }} in DB</div>
+      <div class="wexp__biz-card__sources">
+        <span class="wexp__src-badge wexp__src-badge--db"><i class="fa-solid fa-database me-1"></i>Database</span>
+        {% for src in biz.api_sources %}
+          {% if src == 'shopify' %}<span class="wexp__src-badge wexp__src-badge--shopify"><i class="fa-brands fa-shopify me-1"></i>Shopify API</span>{% endif %}
+          {% if src == 'woocommerce' %}<span class="wexp__src-badge wexp__src-badge--woo"><i class="fa-brands fa-wordpress me-1"></i>WooCommerce</span>{% endif %}
+        {% endfor %}
+      </div>
+    </a>
+    {% empty %}
+    <div class="wexp__empty"><i class="fa-solid fa-store"></i><p>No active businesses found.</p></div>
+    {% endfor %}
+  </div>
+
+
+  {# ════════════════════════════════════════════════════════════ #}
+  {# STEP 2 — SELECT SOURCE                                      #}
+  {# ════════════════════════════════════════════════════════════ #}
+  {% elif step == 'select_source' %}
+  <div class="wexp__step-intro">Choose a data source for <strong>{{ selected_business.business_name }}</strong>:</div>
+  <div class="wexp__source-grid">
+    {% for src in available_sources %}
+    <a href="{% url 'workforce:wf_export_page' %}?business={{ business_id }}&source={{ src.key }}{% if src.key == 'shopify_api' %}&platform=shopify{% elif src.key == 'woocommerce_api' %}&platform=woocommerce{% else %}&platform=shopify{% endif %}"
+       class="wexp__source-card" style="border-color:{{ src.color }}22;">
+      <div class="wexp__source-card__icon" style="color:{{ src.color }};"><i class="{{ src.icon }}"></i></div>
+      <div class="wexp__source-card__label" style="color:{{ src.color }};">{{ src.label }}</div>
+      <div class="wexp__source-card__desc">{{ src.desc }}</div>
+    </a>
+    {% endfor %}
+  </div>
+
+
+  {# ════════════════════════════════════════════════════════════ #}
+  {# STEP 3 — FILTER & RESULTS                                   #}
+  {# ════════════════════════════════════════════════════════════ #}
+  {% elif step == 'results' %}
+
+  <!-- Filter Bar -->
+  <form method="get" action="{% url 'workforce:wf_export_page' %}" id="exportFilterForm">
+    <input type="hidden" name="business" value="{{ business_id }}">
+    <input type="hidden" name="source" value="{{ source }}">
+    <input type="hidden" name="platform" value="{{ platform }}">
+    <div class="wexp__filter-bar">
+
+      <div>
+        <label>Date From</label>
+        <input type="date" name="dateFrom" class="form-control wexp__filter-input--date" value="{{ filters.dateFrom }}">
+      </div>
+      <div>
+        <label>Date To</label>
+        <input type="date" name="dateTo" class="form-control wexp__filter-input--date" value="{{ filters.dateTo }}">
+      </div>
+
+      {% if source == 'db' %}
+      <div>
+        <label>Order Status</label>
+        <select name="cStatus" class="form-select wexp__filter-input--status">
+          <option value="">All Statuses</option>
+          <option value="to_review" {% if filters.cStatus == 'to_review' %}selected{% endif %}>Hold for Review</option>
+          <option value="ready_to_pickup" {% if filters.cStatus == 'ready_to_pickup' %}selected{% endif %}>Ready to Pickup</option>
+          <option value="publish" {% if filters.cStatus == 'publish' %}selected{% endif %}>Published</option>
+          <option value="delivered" {% if filters.cStatus == 'delivered' %}selected{% endif %}>Delivered</option>
+          <option value="cancelled" {% if filters.cStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="wexp__actions">
+        <button type="submit" class="btn btn-dark btn-sm">
+          <i class="fa-solid fa-magnifying-glass me-1"></i>Filter
+        </button>
+        {% if source == 'shopify_api' and shopify_api_orders %}
+        <button type="button" class="btn btn-outline-danger btn-sm" id="clearSel" style="display:none;">
+          <i class="fa-solid fa-xmark me-1"></i>Clear
+        </button>
+        {% endif %}
+        {% if page_obj or shopify_api_orders %}
+        <a href="?business={{ business_id }}&source={{ source }}&platform={{ platform }}{% if filters.dateFrom %}&dateFrom={{ filters.dateFrom }}{% endif %}{% if filters.dateTo %}&dateTo={{ filters.dateTo }}{% endif %}{% if filters.cStatus %}&cStatus={{ filters.cStatus }}{% endif %}&export=excel"
+           class="btn btn-success btn-sm" id="exportExcelBtn">
+          <i class="fa-solid fa-file-excel me-1"></i>Export Excel
+        </a>
+        <a href="?business={{ business_id }}&source={{ source }}&platform={{ platform }}{% if filters.dateFrom %}&dateFrom={{ filters.dateFrom }}{% endif %}{% if filters.dateTo %}&dateTo={{ filters.dateTo }}{% endif %}{% if filters.cStatus %}&cStatus={{ filters.cStatus }}{% endif %}&export=csv"
+           class="btn btn-outline-secondary btn-sm" id="exportCsvBtn">
+          <i class="fa-solid fa-file-csv me-1"></i>Export CSV
+        </a>
+        {% endif %}
+        {% if total_count %}
+        <span class="wexp__count-badge" id="totalCountBadge">{{ total_count }} order{{ total_count|pluralize }}</span>
+        {% endif %}
+      </div>
+
+    </div>
+  </form>
+
+  <!-- Results -->
+  {% if shopify_api_error %}
+  <div class="alert alert-danger mx-3 mt-3" style="font-size:.82rem;">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ shopify_api_error }}
+  </div>
+
+  {% elif source == 'shopify_api' and shopify_api_orders is not None %}
+    {% if shopify_api_orders %}
+    <div class="wexp__table-wrap">
+      <table class="wexp__table w-100" id="shopifyApiTable">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="selAll" title="Select all"></th>
+            <th>#</th><th>Order ID</th><th>Date</th><th>Customer</th>
+            <th>Address</th><th>City</th><th>Phone</th><th>Email</th>
+            <th>COD</th><th>Payment</th><th>Shipping Method</th><th>Note</th>
+            <th>Product:1</th><th>Qty:1</th>
+            <th>Product:2</th><th>Qty:2</th>
+            <th>Product:3</th><th>Qty:3</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in shopify_api_orders %}
+          <tr>
+            <td><input type="checkbox" class="row-sel" value="{{ forloop.counter0 }}"></td>
+            <td class="wexp__row-num">{{ forloop.counter }}</td>
+            <td class="fw-bold">{{ o.order_id }}</td>
+            <td>{{ o.date|slice:":10" }}</td>
+            <td>{{ o.customer_name|default:"-" }}</td>
+            <td title="{{ o.address }}">{{ o.address|truncatechars:30|default:"-" }}</td>
+            <td>{{ o.city|default:o.province|default:"-" }}</td>
+            <td>{{ o.phone1|default:"-" }}</td>
+            <td>{{ o.email|default:"-" }}</td>
+            <td>{{ o.cod|default:"-" }}</td>
+            <td><span class="badge {% if o.financial_status == 'paid' %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size:.7rem;">{{ o.financial_status|default:"-" }}</span></td>
+            <td>{{ o.shipping_method|default:"-" }}</td>
+            <td title="{{ o.note }}">{{ o.note|truncatechars:20|default:"-" }}</td>
+            {% with items=o.items %}
+            <td>{% if items.0 %}{{ items.0.name|truncatechars:20 }}{% endif %}</td><td>{% if items.0 %}{{ items.0.qty }}{% endif %}</td>
+            <td>{% if items.1 %}{{ items.1.name|truncatechars:20 }}{% endif %}</td><td>{% if items.1 %}{{ items.1.qty }}{% endif %}</td>
+            <td>{% if items.2 %}{{ items.2.name|truncatechars:20 }}{% endif %}</td><td>{% if items.2 %}{{ items.2.qty }}{% endif %}</td>
+            {% endwith %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Embed order data for JS export -->
+    <script>
+    (function () {
+    var SHOPIFY_ORDERS;
+    try { SHOPIFY_ORDERS = {{ shopify_api_orders_json|safe }}; } catch(e) { SHOPIFY_ORDERS = []; }
+
+    var clearBtn  = document.getElementById('clearSel');
+    var selAllCb  = document.getElementById('selAll');
+    var cntBadge  = document.getElementById('totalCountBadge');
+    var totalOrds = {{ total_count|default:0 }};
+    if (!selAllCb) return;
+
+    function allRows()     { return Array.prototype.slice.call(document.querySelectorAll('.row-sel')); }
+    function checkedRows() { return allRows().filter(function(cb){ return cb.checked; }); }
+
+    function refreshBar(skipHeaderSync) {
+      var rows    = allRows();
+      var checked = checkedRows();
+      var n       = checked.length;
+      var total   = rows.length;
+
+      // show/hide Clear button in filter bar
+      if (clearBtn) clearBtn.style.display = n > 0 ? '' : 'none';
+
+      // update filter-bar count badge
+      if (cntBadge) {
+        if (n > 0) {
+          cntBadge.textContent = n + ' of ' + totalOrds + ' selected';
+          cntBadge.style.background = '#e9a800';
+        } else {
+          cntBadge.textContent = totalOrds + ' order' + (totalOrds !== 1 ? 's' : '');
+          cntBadge.style.background = '';
+        }
+      }
+
+      if (!skipHeaderSync) {
+        selAllCb.indeterminate = (n > 0 && n < total);
+        selAllCb.checked       = (n > 0 && n === total);
+      }
+    }
+
+    // Attach change listener to every row checkbox
+    allRows().forEach(function(cb) {
+      cb.addEventListener('change', function() { refreshBar(false); });
+    });
+
+    // Header select-all
+    selAllCb.addEventListener('change', function() {
+      var state = this.checked;
+      allRows().forEach(function(cb) { cb.checked = state; });
+      this.indeterminate = false;
+      refreshBar(true);
+    });
+
+    document.getElementById('clearSel').addEventListener('click', function() {
+      allRows().forEach(function(cb) { cb.checked = false; });
+      selAllCb.checked = false;
+      selAllCb.indeterminate = false;
+      refreshBar(true);
+    });
+
+    function exportSelected(fmt) {
+      var idxs = checkedRows().map(function(cb){ return parseInt(cb.value); });
+      var selected = idxs.length > 0 ? idxs.map(function(i){ return SHOPIFY_ORDERS[i]; }) : SHOPIFY_ORDERS;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/workforce/export/api/selected/';
+      form.style.display = 'none';
+      const csrfInput = document.createElement('input');
+      csrfInput.name = 'csrfmiddlewaretoken';
+      csrfInput.value = '{{ csrf_token }}';
+      form.appendChild(csrfInput);
+      const dataInput = document.createElement('input');
+      dataInput.name = 'orders';
+      dataInput.value = JSON.stringify(selected);
+      form.appendChild(dataInput);
+      const fmtInput = document.createElement('input');
+      fmtInput.name = 'fmt';
+      fmtInput.value = fmt;
+      form.appendChild(fmtInput);
+      document.body.appendChild(form);
+      form.submit();
+      form.remove();
+    }
+    var excelBtn = document.getElementById('exportExcelBtn');
+    var csvBtn   = document.getElementById('exportCsvBtn');
+    if (excelBtn) excelBtn.addEventListener('click', function(e) { if (checkedRows().length) { e.preventDefault(); exportSelected('excel'); } });
+    if (csvBtn)   csvBtn.addEventListener('click',   function(e) { if (checkedRows().length) { e.preventDefault(); exportSelected('csv'); } });
+
+    refreshBar(false); // init
+    })();
+    </script>
+    {% else %}
+    <div class="wexp__empty py-5">
+      <i class="fa-solid fa-inbox fa-2x d-block mb-3 text-muted opacity-25"></i>
+      <p class="text-muted">No orders returned from Shopify API for the selected date range.</p>
+    </div>
+    {% endif %}
+
+  {% elif source == 'shopify_api' %}
+  <div class="wexp__empty py-5">
+    <i class="fa-brands fa-shopify fa-2x d-block mb-3 wexp__crumb-shopify opacity-25"></i>
+    <p class="text-muted">Select a date range and click <strong>Filter</strong> to fetch live orders from Shopify.</p>
+  </div>
+
+  {% elif page_obj %}
+  <div class="wexp__table-wrap">
+    <table class="wexp__table w-100">
+      <thead>
+        <tr>
+          <th>#</th><th>Order ID</th><th>Date</th><th>Customer Name</th>
+          <th>Customer Address</th><th>City/Landmark</th><th>Building No</th>
+          <th>Street No</th><th>Zone No</th><th>LocLink</th><th>Day &amp; Time</th>
+          <th>Phone 1</th><th>Phone 2/WA</th><th>Email</th>
+          <th>Latitude</th><th>Longitude</th><th>LocLink2</th>
+          <th>Product Name</th><th>Qty</th><th>Price</th><th>Note</th>
+          <th>Product:1</th><th>Count:1</th><th>Product:2</th><th>Count:2</th>
+          <th>Product:3</th><th>Count:3</th><th>Product:4</th><th>Count:4</th>
+          <th>Product:5</th><th>Count:5</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in page_obj %}
+        {% with items=order.order_items.all %}
+        <tr>
+          <td class="wexp__row-num">{{ forloop.counter0|add:page_obj.start_index }}</td>
+          <td><a href="{% url 'workforce:order_detail' order.id %}" target="_blank" class="wexp__order-link">{{ order.client_order_code|default:order.order_number }}</a></td>
+          <td>{{ order.order_date|date:"d/m/Y" }}</td>
+          <td>{{ order.customer_name|default:"-" }}</td>
+          <td title="{{ order.customer_address }}">{{ order.customer_address|truncatechars:30 }}</td>
+          <td>{% if order.original_order_data.shipping_address.city %}{{ order.original_order_data.shipping_address.city }}{% elif order.original_order_data.shipping_address.province %}{{ order.original_order_data.shipping_address.province }}{% else %}-{% endif %}</td>
+          <td>{{ order.dl_building|default:"-" }}</td>
+          <td>{{ order.dl_street|default:"-" }}</td>
+          <td>{{ order.dl_zone|default:"-" }}</td>
+          <td class="wexp__cell--link">{% if order.latitude and order.longitude %}<a href="https://maps.google.com/?q={{ order.latitude }},{{ order.longitude }}" target="_blank"><i class="fa-solid fa-location-dot me-1"></i>Map</a>{% else %}-{% endif %}</td>
+          <td>{% if order.scheduled_delivery and order.scheduled_date %}{{ order.scheduled_date|date:"d/m/Y" }}{% if order.scheduled_time %} {{ order.scheduled_time|time:"H:i" }}{% endif %}{% else %}-{% endif %}</td>
+          <td>{{ order.customer_phone|default:"-" }}</td>
+          <td>{{ order.customer_whatsapp|default:"-" }}</td>
+          <td>{% if order.original_order_data %}{{ order.original_order_data.email|default:"-" }}{% else %}-{% endif %}</td>
+          <td>{{ order.latitude|default:"-" }}</td>
+          <td>{{ order.longitude|default:"-" }}</td>
+          <td class="wexp__cell--link">{% if order.latitude and order.longitude %}<a href="https://www.google.com/maps/search/?api=1&query={{ order.latitude }},{{ order.longitude }}" target="_blank"><i class="fa-solid fa-map-pin me-1"></i>Maps2</a>{% else %}-{% endif %}</td>
+          {% with first=items.first %}
+          <td title="{% if first %}{% if first.product %}{{ first.product.item_name }}{% else %}{{ first.notes }}{% endif %}{% endif %}">{% if first %}{% if first.product %}{{ first.product.item_name|truncatechars:20 }}{% else %}{{ first.notes|truncatechars:20 }}{% endif %}{% else %}-{% endif %}</td>
+          <td>{% if first %}{{ first.quantity }}{% else %}-{% endif %}</td>
+          {% endwith %}
+          <td>{{ order.cod_amount|default:"-" }}</td>
+          <td title="{{ order.order_notes }}">{{ order.order_notes|truncatechars:20|default:"-" }}</td>
+          {% with single=items.0 %}<td>{% if single %}{% if single.product %}{{ single.product.item_name|truncatechars:18 }}{% else %}{{ single.notes|truncatechars:18 }}{% endif %}{% endif %}</td><td>{% if single %}{{ single.quantity }}{% endif %}</td>{% endwith %}
+          {% with single=items.1 %}<td>{% if single %}{% if single.product %}{{ single.product.item_name|truncatechars:18 }}{% else %}{{ single.notes|truncatechars:18 }}{% endif %}{% endif %}</td><td>{% if single %}{{ single.quantity }}{% endif %}</td>{% endwith %}
+          {% with single=items.2 %}<td>{% if single %}{% if single.product %}{{ single.product.item_name|truncatechars:18 }}{% else %}{{ single.notes|truncatechars:18 }}{% endif %}{% endif %}</td><td>{% if single %}{{ single.quantity }}{% endif %}</td>{% endwith %}
+          {% with single=items.3 %}<td>{% if single %}{% if single.product %}{{ single.product.item_name|truncatechars:18 }}{% else %}{{ single.notes|truncatechars:18 }}{% endif %}{% endif %}</td><td>{% if single %}{{ single.quantity }}{% endif %}</td>{% endwith %}
+          {% with single=items.4 %}<td>{% if single %}{% if single.product %}{{ single.product.item_name|truncatechars:18 }}{% else %}{{ single.notes|truncatechars:18 }}{% endif %}{% endif %}</td><td>{% if single %}{{ single.quantity }}{% endif %}</td>{% endwith %}
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="31" class="wexp__empty"><i class="fa-solid fa-inbox"></i>No orders found for this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="d-flex justify-content-center align-items-center gap-2 py-3" style="font-size:.82rem;">
+    {% if page_obj.has_previous %}<a href="?business={{ business_id }}&source={{ source }}&platform={{ platform }}{% if filters.dateFrom %}&dateFrom={{ filters.dateFrom }}{% endif %}{% if filters.dateTo %}&dateTo={{ filters.dateTo }}{% endif %}{% if filters.cStatus %}&cStatus={{ filters.cStatus }}{% endif %}&page={{ page_obj.previous_page_number }}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-chevron-left"></i></a>{% endif %}
+    <span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a href="?business={{ business_id }}&source={{ source }}&platform={{ platform }}{% if filters.dateFrom %}&dateFrom={{ filters.dateFrom }}{% endif %}{% if filters.dateTo %}&dateTo={{ filters.dateTo }}{% endif %}{% if filters.cStatus %}&cStatus={{ filters.cStatus }}{% endif %}&page={{ page_obj.next_page_number }}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="wexp__empty py-5">
+    <i class="fa-solid fa-filter fa-2x d-block mb-3 text-muted opacity-25"></i>
+    <p class="text-muted">Select a date range and click <strong>Filter</strong> to preview orders.</p>
+    <p class="text-muted small">Supports up to 10,000 rows per export.</p>
+  </div>
+  {% endif %}
+
+  {% endif %}{# end step #}
+
+</div>
+{% endblock content %}

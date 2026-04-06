@@ -183,8 +183,8 @@
     .wf-driver-marker--no-gps .wf-driver-marker__pulse { background: rgba(245,158,11,0.2); animation: none; }
     @keyframes wf-pulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.5); opacity: 0; } }
 
-    .wf-popup { min-width: 220px; font-family: inherit; }
-    .wf-popup__header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 2px solid #f3f4f6; }
+    .wf-popup { min-width: 260px; font-family: inherit; }
+    .wf-popup__header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 2px solid #f3f4f6; }
     .wf-popup__task-num { font-size: 14px; font-weight: 800; color: #001f3f; }
     .wf-popup__badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
     .wf-popup__badge--assigned    { background: #e0e7ff; color: #4338ca; }
@@ -201,11 +201,15 @@
     .wf-popup__badge--failed      { background: #fee2e2; color: #991b1b; }
     .wf-popup__badge--rejected    { background: #fee2e2; color: #991b1b; }
     .wf-popup__badge--cancelled   { background: #f3f4f6; color: #374151; }
-    .wf-popup__row { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px; color: #374151; }
-    .wf-popup__row i { width: 14px; text-align: center; color: #9ca3af; font-size: 11px; }
+    .wf-popup__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 8px; }
+    .wf-popup__grid--full { grid-column: 1 / -1; }
+    .wf-popup__row { display: flex; align-items: center; gap: 5px; padding: 2px 0; font-size: 12px; color: #374151; min-width: 0; }
+    .wf-popup__row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wf-popup__row--wrap span { white-space: normal; overflow: visible; text-overflow: unset; word-break: break-word; }
+    .wf-popup__row i { width: 13px; text-align: center; color: #9ca3af; font-size: 11px; flex-shrink: 0; }
     .wf-popup__row a { color: #3b82f6; text-decoration: none; font-weight: 600; }
     .wf-popup__link {
-        display: block; margin-top: 8px; padding: 7px;
+        display: block; margin-top: 6px; padding: 6px;
         background: #001f3f; color: #fff !important;
         border-radius: 6px; text-align: center;
         text-decoration: none !important; font-weight: 700; font-size: 12px;
@@ -226,19 +230,240 @@
         font-size: 16px; color: #001f3f; cursor: pointer;
     }
     .map-recenter:active { background: #f3f4f6; }
+
+    .map-daterange {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 400;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #fff;
+        padding: 5px 10px;
+        border-radius: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+        font-size: 12px;
+    }
+    .map-daterange__input {
+        border: none;
+        outline: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+        background: transparent;
+        width: 112px;
+        cursor: pointer;
+    }
+    .map-daterange__sep { color: #d1d5db; font-weight: 400; }
+    .map-daterange__btn {
+        background: var(--brand-primary, #001f3f);
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        padding: 3px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .map-daterange__btn:hover { background: #003366; }
+
+    .map-bar__chip--deliveries { cursor: pointer; user-select: none; pointer-events: auto; }
+    .map-bar__chip--deliveries:hover { background: #003366; }
+    .map-bar__chip--deliveries i { transition: transform 0.2s; }
+    .map-bar__chip--deliveries.open i { transform: rotate(180deg); }
+
+    .map-bar__chip--drivers { cursor: pointer; user-select: none; pointer-events: auto; }
+    .map-bar__chip--drivers:hover { background: #2563eb; }
+    .map-bar__chip--drivers i { transition: transform 0.2s; }
+    .map-bar__chip--drivers.open i { transform: rotate(180deg); }
+
+    .map-pickup-filter {
+        position: absolute;
+        top: 50px;
+        left: 50%;
+        transform: translateX(-70%);
+        z-index: 500;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+        min-width: 220px;
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+    }
+    .map-pickup-filter.open { display: block; }
+    .map-pickup-filter__header {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        padding: 8px 14px 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 1;
+    }
+    .map-pickup-filter__clear {
+        font-size: 11px;
+        color: #3b82f6;
+        cursor: pointer;
+        font-weight: 700;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+    .map-pickup-filter__clear:hover { text-decoration: underline; }
+    .map-pickup-filter__item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 14px;
+        cursor: pointer;
+        font-size: 12px;
+        color: #374151;
+        transition: background 0.1s;
+    }
+    .map-pickup-filter__item:hover { background: #f9fafb; }
+    .map-pickup-filter__item input[type=checkbox] {
+        width: 14px; height: 14px;
+        accent-color: var(--brand-primary, #001f3f);
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .map-pickup-filter__count {
+        margin-left: auto;
+        font-size: 10px;
+        font-weight: 700;
+        color: #9ca3af;
+        background: #f3f4f6;
+        padding: 1px 6px;
+        border-radius: 8px;
+    }
+    .map-pickup-filter__empty {
+        padding: 14px;
+        text-align: center;
+        color: #9ca3af;
+        font-size: 12px;
+    }
+
+    .map-driver-filter {
+        position: absolute;
+        top: 50px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 500;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+        min-width: 220px;
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+    }
+    .map-driver-filter.open { display: block; }
+    .map-driver-filter__header {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        padding: 8px 14px 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 1;
+    }
+    .map-driver-filter__clear {
+        font-size: 11px;
+        color: #3b82f6;
+        cursor: pointer;
+        font-weight: 700;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+    .map-driver-filter__clear:hover { text-decoration: underline; }
+    .map-driver-filter__item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 14px;
+        cursor: pointer;
+        font-size: 12px;
+        color: #374151;
+        transition: background 0.1s;
+    }
+    .map-driver-filter__item:hover { background: #f9fafb; }
+    .map-driver-filter__item input[type=checkbox] {
+        width: 14px; height: 14px;
+        accent-color: #3b82f6;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .map-driver-filter__dot {
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: #800020;
+        flex-shrink: 0;
+        box-shadow: 0 0 4px rgba(128,0,32,0.4);
+    }
+    .map-driver-filter__dot--stale { background: #9ca3af; box-shadow: none; }
+    .map-driver-filter__dot--no-gps { background: #f59e0b; box-shadow: 0 0 4px rgba(245,158,11,0.4); }
+    .map-driver-filter__empty {
+        padding: 14px;
+        text-align: center;
+        color: #9ca3af;
+        font-size: 12px;
+    }
 </style>
 
 <div style="position: relative;">
+    <!-- Date range filter -->
+    <div class="map-daterange">
+        <i class="fa-solid fa-calendar-days" style="color:#9ca3af;font-size:11px;"></i>
+        <input type="date" id="wf-date-from" class="map-daterange__input" value="{{ date_from }}">
+        <span class="map-daterange__sep">—</span>
+        <input type="date" id="wf-date-to" class="map-daterange__input" value="{{ date_to }}">
+        <button class="map-daterange__btn" onclick="applyDateFilter()">Apply</button>
+    </div>
+
     <!-- Summary chips -->
     <div class="map-bar">
-        <div class="map-bar__chip">
+        <div class="map-bar__chip map-bar__chip--deliveries" id="wf-delivery-chip" onclick="togglePickupFilter(event)" title="Filter by pickup location">
             <span class="map-bar__num">{{ pin_count }}</span>
-            deliveries
+            deliveries <i class="fa-solid fa-chevron-down ms-1" style="font-size:9px;"></i>
         </div>
-        <div class="map-bar__chip map-bar__chip--drivers">
-            <span class="map-bar__num">{{ driver_count }}</span>
-            drivers
+        <div class="map-bar__chip map-bar__chip--drivers" id="wf-driver-chip" onclick="toggleDriverFilter(event)" title="Filter by driver">
+            <span class="map-bar__num" id="wf-driver-count">{{ driver_count }}</span>
+            drivers <i class="fa-solid fa-chevron-down ms-1" style="font-size:9px;"></i>
         </div>
+    </div>
+
+    <!-- Pickup location filter dropdown -->
+    <div class="map-pickup-filter" id="wf-pickup-filter">
+        <div class="map-pickup-filter__header">
+            <span>Filter by Pickup</span>
+            <span class="map-pickup-filter__clear" id="wf-pickup-filter-clear" onclick="clearPickupFilter(event)">Show All</span>
+        </div>
+        <!-- Items injected by JS -->
+    </div>
+
+    <!-- Driver filter dropdown -->
+    <div class="map-driver-filter" id="wf-driver-filter">
+        <div class="map-driver-filter__header">
+            <span>Filter Drivers</span>
+            <span class="map-driver-filter__clear" id="wf-driver-filter-clear" onclick="clearDriverFilter(event)">Show All</span>
+        </div>
+        <!-- Items injected by JS -->
     </div>
 
     <!-- Toggle filters -->
@@ -300,6 +525,7 @@
 (function() {
     var _pins = {{ pins_json|safe }};
     var _drivers = {{ drivers_json|safe }};
+    var _pickups = {{ pickups_json|safe }};
 
     function initMap() {
         var mapEl = document.getElementById('wf-live-map');
@@ -336,6 +562,8 @@
         var allPins = [];
         // Active filters — multi-select. Initial: new + active + transit on, delivered + issue off
         var activeFilters = { new: true, active: true, transit: true, delivered: false, issue: false };
+        var activeDriverIds = null; // null = show all drivers
+        var activePickupIds = null; // null = show all pickups
 
         // Status groups for filtering
         var newStatuses = ['for_review', 'pending'];
@@ -353,6 +581,11 @@
 
         function matchesFilter(status) {
             return activeFilters[statusGroup(status)];
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
         function markerClass(status) {
@@ -378,13 +611,28 @@
             var h = '<div class="wf-popup">';
             h += '<div class="wf-popup__header">';
             h += '<span class="wf-popup__task-num">#' + p.task_number + '</span>';
-            h += '<span class="wf-popup__badge wf-popup__badge--' + p.status + '">' + p.status_display + '</span>';
+            h += '<span class="wf-popup__badge wf-popup__badge--' + p.status + '">' + escHtml(p.status_display) + '</span>';
             h += '</div>';
-            h += '<div class="wf-popup__row"><i class="fa-solid fa-user-tie"></i><strong>' + p.driver_name + '</strong></div>';
-            if (p.customer_name) h += '<div class="wf-popup__row"><i class="fa-solid fa-user"></i>' + p.customer_name + '</div>';
-            if (p.customer_phone) h += '<div class="wf-popup__row"><i class="fa-solid fa-phone"></i><a href="tel:' + p.customer_phone + '">' + p.customer_phone + '</a></div>';
-            h += '<div class="wf-popup__row"><i class="fa-solid fa-location-dot"></i>' + addrLine(p) + '</div>';
-            if (p.business_name) h += '<div class="wf-popup__row"><i class="fa-solid fa-store"></i>' + p.business_name + '</div>';
+            h += '<div class="wf-popup__grid">';
+            // Left: date, Right: driver
+            h += '<div class="wf-popup__row"><i class="fa-solid fa-calendar-day"></i><span>' + (p.task_date || '—') + '</span></div>';
+            h += '<div class="wf-popup__row"><i class="fa-solid fa-user-tie"></i><span><strong>' + escHtml(p.driver_name) + '</strong></span></div>';
+            // Left: customer name, Right: phone
+            if (p.customer_name || p.customer_phone) {
+                h += '<div class="wf-popup__row"><i class="fa-solid fa-user"></i><span>' + (escHtml(p.customer_name) || '—') + '</span></div>';
+                h += '<div class="wf-popup__row"><i class="fa-solid fa-phone"></i><span>' + (p.customer_phone ? '<a href="tel:' + p.customer_phone + '">' + p.customer_phone + '</a>' : '—') + '</span></div>';
+            }
+            if (p.business_name) {
+                var zsb = [];
+                if (p.zone) zsb.push('Z' + p.zone);
+                if (p.street) zsb.push('S' + p.street);
+                if (p.building) zsb.push('B' + p.building);
+                var zsbRight = zsb.length ? '<span style="margin-left:auto;color:#6b7280;font-weight:600;font-size:11px;white-space:nowrap;">' + zsb.join(' ') + '</span>' : '';
+                h += '<div class="wf-popup__row wf-popup__grid--full" style="justify-content:space-between;"><span style="display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-store" style="width:13px;text-align:center;color:#9ca3af;font-size:11px;"></i>' + escHtml(p.business_name) + '</span>' + zsbRight + '</div>';
+            }
+            h += '</div>';
+            // Full address — full width, wraps, last line
+            h += '<div class="wf-popup__row wf-popup__row--wrap" style="margin-top:4px;padding-top:4px;border-top:1px solid #f3f4f6;"><i class="fa-solid fa-location-dot"></i><span>' + (escHtml(p.address) || addrLine(p)) + '</span></div>';
             h += '<a href="/workforce/delivery-task/' + p.id + '/" class="wf-popup__link"><i class="fa-solid fa-eye me-1"></i>View Task</a>';
             h += '</div>';
             return h;
@@ -394,10 +642,17 @@
             if (storeAsPins) allPins = taskList;
             taskLayerGroup.clearLayers();
             var filtered = taskList.filter(function(p) {
-                return p.lat && p.lng && matchesFilter(p.status);
+                if (!p.lat || !p.lng) return false;
+                if (!matchesFilter(p.status)) return false;
+                if (activeDriverIds !== null && activeDriverIds.indexOf(String(p.driver_id)) === -1) return false;
+                if (activePickupIds !== null) {
+                    var pid = p.pickup_id ? String(p.pickup_id) : '__none__';
+                    if (activePickupIds.indexOf(pid) === -1) return false;
+                }
+                return true;
             });
             filtered.forEach(function(p) {
-                var markerIcon = p.status === 'delivered' ? 'fa-circle-check' : p.status === 'cancelled' ? 'fa-ban' : (p.status === 'for_review' || p.status === 'pending') ? 'fa-sparkles' : 'fa-box-open';
+                var markerIcon = p.status === 'delivered' ? 'fa-circle-check' : p.status === 'cancelled' ? 'fa-ban' : (p.status === 'for_review' || p.status === 'pending') ? 'fa-circle-dot' : 'fa-box-open';
                 var icon = L.divIcon({
                     className: '',
                     html: '<div class="wf-marker ' + markerClass(p.status) + '"><span class="wf-marker__inner"><i class="fa-solid ' + markerIcon + '" style="font-size:11px;"></i></span></div>',
@@ -419,12 +674,12 @@
             var noGps = !d.has_gps;
             var stale = d.has_gps && d.minutes_ago > 10;
             var h = '<div class="wf-dpopup">';
-            h += '<div class="wf-dpopup__name"><i class="fa-solid fa-car me-1"></i>' + d.driver_name + '</div>';
+            h += '<div class="wf-dpopup__name"><i class="fa-solid fa-car me-1"></i>' + escHtml(d.driver_name) + '</div>';
             if (noGps) {
                 h += '<div class="wf-dpopup__meta wf-dpopup__meta--stale"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS pings received</div>';
                 h += '<div class="wf-dpopup__meta" style="color:#9ca3af;font-size:11px;"><i class="fa-solid fa-location-dot me-1"></i>Shown at task location (fallback)</div>';
-                if (d.last_status) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-circle-info me-1"></i>' + d.last_status + '</div>';
-                if (d.last_task_number) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-hashtag me-1"></i>Task #' + d.last_task_number + '</div>';
+                if (d.last_status) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-circle-info me-1"></i>' + escHtml(d.last_status) + '</div>';
+                if (d.last_task_number) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-hashtag me-1"></i>Task #' + escHtml(d.last_task_number) + '</div>';
                 if (d.task_count) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-list-check me-1"></i>' + d.task_count + ' active task' + (d.task_count > 1 ? 's' : '') + '</div>';
                 if (d.updated) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-clock me-1"></i>Updated ' + d.updated + '</div>';
             } else {
@@ -447,9 +702,168 @@
             return h;
         }
 
+        function buildDriverFilterList(driverList) {
+            var panel = document.getElementById('wf-driver-filter');
+            if (!panel) return;
+            var header = panel.querySelector('.map-driver-filter__header');
+            panel.innerHTML = '';
+            panel.appendChild(header);
+            if (!driverList || driverList.length === 0) {
+                var empty = document.createElement('div');
+                empty.className = 'map-driver-filter__empty';
+                empty.textContent = 'No drivers online';
+                panel.appendChild(empty);
+                return;
+            }
+            driverList.forEach(function(d) {
+                var noGps = !d.has_gps;
+                var stale = d.has_gps && d.minutes_ago > 10;
+                var dotClass = noGps ? ' map-driver-filter__dot--no-gps' : (stale ? ' map-driver-filter__dot--stale' : '');
+                var isChecked = activeDriverIds === null || activeDriverIds.indexOf(String(d.driver_id)) !== -1;
+                var label = document.createElement('label');
+                label.className = 'map-driver-filter__item';
+                label.innerHTML = '<input type="checkbox"' + (isChecked ? ' checked' : '') + ' data-driver-id="' + d.driver_id + '">'
+                    + '<span class="map-driver-filter__dot' + dotClass + '"></span>'
+                    + '<span>' + d.driver_name + '</span>';
+                label.querySelector('input').addEventListener('change', onDriverFilterChange);
+                panel.appendChild(label);
+            });
+        }
+
+        function onDriverFilterChange() {
+            var checkboxes = document.querySelectorAll('#wf-driver-filter input[type=checkbox]');
+            var checked = [];
+            checkboxes.forEach(function(cb) { if (cb.checked) checked.push(String(cb.dataset.driverId)); });
+            activeDriverIds = (checked.length === checkboxes.length) ? null : checked;
+            var clearBtn = document.getElementById('wf-driver-filter-clear');
+            if (clearBtn) clearBtn.textContent = activeDriverIds === null ? 'Show All' : 'Clear';
+            renderDrivers(drivers);
+            renderTasks(allPins, false);
+        }
+
+        window.clearDriverFilter = function(e) {
+            if (e) e.stopPropagation();
+            activeDriverIds = null;
+            document.querySelectorAll('#wf-driver-filter input[type=checkbox]').forEach(function(cb) { cb.checked = true; });
+            var clearBtn = document.getElementById('wf-driver-filter-clear');
+            if (clearBtn) clearBtn.textContent = 'Show All';
+            renderDrivers(drivers);
+            renderTasks(allPins, false);
+        };
+
+        // === Pickup location filter ===
+        function buildPickupFilterList(pickupList) {
+            var panel = document.getElementById('wf-pickup-filter');
+            if (!panel) return;
+            var header = panel.querySelector('.map-pickup-filter__header');
+            panel.innerHTML = '';
+            panel.appendChild(header);
+            if (!pickupList || pickupList.length === 0) {
+                var empty = document.createElement('div');
+                empty.className = 'map-pickup-filter__empty';
+                empty.textContent = 'No pickup locations';
+                panel.appendChild(empty);
+                return;
+            }
+            // Count tasks per pickup
+            var countMap = {};
+            allPins.forEach(function(p) {
+                var key = p.pickup_id ? String(p.pickup_id) : '__none__';
+                countMap[key] = (countMap[key] || 0) + 1;
+            });
+            pickupList.forEach(function(pk) {
+                var isChecked = activePickupIds === null || activePickupIds.indexOf(String(pk.id)) !== -1;
+                var cnt = countMap[String(pk.id)] || 0;
+                var label = document.createElement('label');
+                label.className = 'map-pickup-filter__item';
+                label.innerHTML = '<input type="checkbox"' + (isChecked ? ' checked' : '') + ' data-pickup-id="' + pk.id + '">'
+                    + '<i class="fa-solid fa-store" style="color:#9ca3af;font-size:11px;"></i>'
+                    + '<span>' + pk.name + '</span>'
+                    + '<span class="map-pickup-filter__count">' + cnt + '</span>';
+                label.querySelector('input').addEventListener('change', onPickupFilterChange);
+                panel.appendChild(label);
+            });
+            // "No pickup" row if any tasks have no pickup
+            var noneCount = countMap['__none__'] || 0;
+            if (noneCount > 0) {
+                var isChecked = activePickupIds === null || activePickupIds.indexOf('__none__') !== -1;
+                var label = document.createElement('label');
+                label.className = 'map-pickup-filter__item';
+                label.innerHTML = '<input type="checkbox"' + (isChecked ? ' checked' : '') + ' data-pickup-id="__none__">'
+                    + '<i class="fa-solid fa-circle-question" style="color:#d1d5db;font-size:11px;"></i>'
+                    + '<span style="color:#9ca3af;">No pickup set</span>'
+                    + '<span class="map-pickup-filter__count">' + noneCount + '</span>';
+                label.querySelector('input').addEventListener('change', onPickupFilterChange);
+                panel.appendChild(label);
+            }
+        }
+
+        function onPickupFilterChange() {
+            var checkboxes = document.querySelectorAll('#wf-pickup-filter input[type=checkbox]');
+            var checked = [];
+            checkboxes.forEach(function(cb) { if (cb.checked) checked.push(cb.dataset.pickupId); });
+            activePickupIds = (checked.length === checkboxes.length) ? null : checked;
+            var clearBtn = document.getElementById('wf-pickup-filter-clear');
+            if (clearBtn) clearBtn.textContent = activePickupIds === null ? 'Show All' : 'Clear';
+            renderTasks(allPins, false);
+        }
+
+        window.clearPickupFilter = function(e) {
+            if (e) e.stopPropagation();
+            activePickupIds = null;
+            document.querySelectorAll('#wf-pickup-filter input[type=checkbox]').forEach(function(cb) { cb.checked = true; });
+            var clearBtn = document.getElementById('wf-pickup-filter-clear');
+            if (clearBtn) clearBtn.textContent = 'Show All';
+            renderTasks(allPins, false);
+        };
+
+        window.togglePickupFilter = function(e) {
+            e.stopPropagation();
+            var panel = document.getElementById('wf-pickup-filter');
+            var chip = document.getElementById('wf-delivery-chip');
+            var isOpen = panel.classList.toggle('open');
+            if (isOpen) chip.classList.add('open'); else chip.classList.remove('open');
+            // Close driver filter if open
+            var dPanel = document.getElementById('wf-driver-filter');
+            var dChip = document.getElementById('wf-driver-chip');
+            if (dPanel) dPanel.classList.remove('open');
+            if (dChip) dChip.classList.remove('open');
+        };
+
+        window.toggleDriverFilter = function(e) {
+            e.stopPropagation();
+            var panel = document.getElementById('wf-driver-filter');
+            var chip = document.getElementById('wf-driver-chip');
+            var isOpen = panel.classList.toggle('open');
+            if (isOpen) chip.classList.add('open'); else chip.classList.remove('open');
+            // Close pickup filter if open
+            var pPanel = document.getElementById('wf-pickup-filter');
+            var pChip = document.getElementById('wf-delivery-chip');
+            if (pPanel) pPanel.classList.remove('open');
+            if (pChip) pChip.classList.remove('open');
+        };
+
+        document.addEventListener('click', function(e) {
+            var panel = document.getElementById('wf-driver-filter');
+            var chip = document.getElementById('wf-driver-chip');
+            if (panel && panel.classList.contains('open') && !panel.contains(e.target) && chip && !chip.contains(e.target)) {
+                panel.classList.remove('open');
+                chip.classList.remove('open');
+            }
+            var pPanel = document.getElementById('wf-pickup-filter');
+            var pChip = document.getElementById('wf-delivery-chip');
+            if (pPanel && pPanel.classList.contains('open') && !pPanel.contains(e.target) && pChip && !pChip.contains(e.target)) {
+                pPanel.classList.remove('open');
+                pChip.classList.remove('open');
+            }
+        });
+
         function renderDrivers(driverList) {
             driverLayerGroup.clearLayers();
-            driverList.forEach(function(d) {
+            var toRender = activeDriverIds !== null
+                ? driverList.filter(function(d) { return activeDriverIds.indexOf(String(d.driver_id)) !== -1; })
+                : driverList;
+            toRender.forEach(function(d) {
                 if (!d.lat || !d.lng) return;
                 var noGps = !d.has_gps;
                 var stale = d.has_gps && d.minutes_ago > 10;
@@ -471,14 +885,35 @@
         // Fetch data from server (live or static mode)
         function refreshData() {
             var mode = isLive ? 'live' : 'static';
-            fetch('/workforce/tasks/live-map/?mode=' + mode, {
+            var df = document.getElementById('wf-date-from').value;
+            var dt = document.getElementById('wf-date-to').value;
+            var params = '?mode=' + mode + (df ? '&date_from=' + df : '') + (dt ? '&date_to=' + dt : '');
+            fetch('/workforce/tasks/live-map/' + params, {
                 credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                renderDrivers(data.drivers || []);
+                var newDrivers = data.drivers || [];
+                // Rebuild driver filter list if driver count changed
+                if (newDrivers.length !== drivers.length) {
+                    drivers = newDrivers;
+                    buildDriverFilterList(drivers);
+                } else {
+                    drivers = newDrivers;
+                }
+                renderDrivers(drivers);
                 renderTasks(data.pins || [], true);
+                // Rebuild pickup filter from new data
+                var pickupMap = {};
+                (data.pins || []).forEach(function(p) {
+                    if (p.pickup_id && !pickupMap[p.pickup_id]) {
+                        pickupMap[p.pickup_id] = p.pickup_name;
+                    }
+                });
+                var newPickups = Object.keys(pickupMap).map(function(k) { return { id: parseInt(k), name: pickupMap[k] }; })
+                    .sort(function(a, b) { return a.name.localeCompare(b.name); });
+                buildPickupFilterList(newPickups);
                 var chipEls = document.querySelectorAll('.map-bar__num');
                 if (chipEls[0]) chipEls[0].textContent = data.pin_count || 0;
                 if (chipEls[1]) chipEls[1].textContent = data.driver_count || 0;
@@ -501,12 +936,19 @@
         // Initial render
         renderTasks(pins, true);
         renderDrivers(drivers);
+        buildDriverFilterList(drivers);
+        buildPickupFilterList(_pickups);
 
         if (bounds.isValid()) {
             map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
         }
 
         setTimeout(function() { map.invalidateSize(); }, 200);
+
+        window.applyDateFilter = function() {
+            bounds = L.latLngBounds(); // reset bounds
+            refreshData();
+        };
 
         window.recenterMap = function() {
             if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });

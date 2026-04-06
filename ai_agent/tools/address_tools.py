@@ -29,6 +29,9 @@ QATAR_PATTERNS = {
         r'شارع\s*(\d{1,4})',
         r'st\.?\s*(\d{1,4})',
         r'\bstreet(\d{1,4})\b',
+        r'\bstr[\s.:,#]*(\d{1,4})\b',    # "str 750", "Str.750"
+        r'\brd\.?\s*(\d{1,4})\b',         # "Rd 23" (road)
+        r'(?<![a-zA-Z])s(\d{2,4})\b',    # compact "S891" (not preceded by letter)
     ],
     'building': [
         r'building\s*[#:]?\s*(\d{1,4})',
@@ -36,7 +39,11 @@ QATAR_PATTERNS = {
         r'مبنى\s*(\d{1,4})',
         r'\bbuilding(\d{1,4})\b',
         r'villa\s*[#:]?\s*(\d{1,4})',
+        r'فيلا\s*(\d{1,4})',              # Arabic villa
         r'house\s*[#:]?\s*(\d{1,4})',
+        r'\bhome\s*[#:]?\s*(\d{1,4})\b', # "Home 17"
+        r'\bh[\s.:,#]*(\d{1,4})\b',      # compact "H37" or "H.37"
+        r'\bno\.?\s*#?\s*(\d{1,4})\b',   # "No. 23" or "No 23"
     ],
     'unit': [
         r'(?:unit|apt|apartment|flat)\s*[#:]?\s*(\w+)',
@@ -116,34 +123,65 @@ def _resolve_google_short_link(short_url: str):
     Returns (lat, lng, full_url) or None.
     """
     import requests as http_requests
+    from urllib.parse import unquote
 
     try:
-        resp = http_requests.head(short_url, allow_redirects=True, timeout=5,
-                                   headers={'User-Agent': 'EzzyDelivery/1.0'})
+        resp = http_requests.head(short_url, allow_redirects=True, timeout=8,
+                                   headers={'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36'})
         final_url = resp.url
         if not final_url or final_url == short_url:
             # Try GET if HEAD didn't redirect
-            resp = http_requests.get(short_url, allow_redirects=True, timeout=5,
-                                      headers={'User-Agent': 'EzzyDelivery/1.0'},
+            resp = http_requests.get(short_url, allow_redirects=True, timeout=8,
+                                      headers={'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36'},
                                       stream=True)
             final_url = resp.url
             resp.close()
 
         if final_url:
-            # Try extracting coords from the resolved URL
+            # Try extracting coords from the resolved URL (@lat,lng format)
             for pattern in GOOGLE_MAPS_PATTERNS:
                 match = re.search(pattern, final_url, re.IGNORECASE)
                 if match:
                     lat, lng = float(match.group(1)), float(match.group(2))
-                    if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
-                        return lat, lng, final_url
+                    return lat, lng, final_url
             # Also try raw coords in URL
             for pattern in RAW_COORDS_PATTERNS:
                 match = re.search(pattern, final_url)
                 if match:
                     lat, lng = float(match.group(1)), float(match.group(2))
-                    if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
-                        return lat, lng, final_url
+                    return lat, lng, final_url
+
+            # Fallback: /maps/place/PLACE_NAME/data=... format with no @lat,lng
+            # Extract the place name and geocode via Nominatim, trying progressively
+            # simpler versions (first segment is often a business name Nominatim won't know)
+            place_match = re.search(r'/maps/place/([^/?]+)', final_url)
+            if place_match:
+                full_name = unquote(place_match.group(1).replace('+', ' '))
+                parts = [p.strip() for p in full_name.split(',') if p.strip()]
+                # Build candidates: full name, then skip first part, then last 3/2 parts
+                candidates = [full_name]
+                if len(parts) > 1:
+                    candidates.append(', '.join(parts[1:]))
+                if len(parts) > 2:
+                    candidates.append(', '.join(parts[-3:]))
+                if len(parts) > 1:
+                    candidates.append(', '.join(parts[-2:]))
+                try:
+                    for candidate in candidates:
+                        nom_resp = http_requests.get(
+                            'https://nominatim.openstreetmap.org/search',
+                            params={'q': candidate, 'format': 'json', 'limit': 1},
+                            headers={'User-Agent': 'EzzyDelivery/1.0'},
+                            timeout=5,
+                        )
+                        results = nom_resp.json()
+                        if results:
+                            lat = float(results[0]['lat'])
+                            lng = float(results[0]['lon'])
+                            return lat, lng, final_url
+                except Exception:
+                    pass
+
     except Exception as e:
         logger.warning(f"Failed to resolve Google short link {short_url}: {e}")
 
@@ -305,10 +343,15 @@ class ParseAddressTool(BaseTool):
         # Step 4: Enrich with zone details + QNAS/geocoding
         if result['zone_number']:
             zone_details = self._get_zone_details(result['zone_number'])
+
+            # Cache zone-level lat/lng immediately — available as fallback throughout
+            zone_lat = zone_lng = None
             if zone_details:
                 if not result['zone_name']:
                     result['zone_name'] = zone_details.get('zone_name')
                     result['parse_notes'].append(f"Zone name: {zone_details.get('zone_name')}")
+                zone_lat = zone_details.get('latitude')
+                zone_lng = zone_details.get('longitude')
 
             # Step 4a: QNAS lookup if we have zone + street
             if result['street_number']:
@@ -317,39 +360,48 @@ class ParseAddressTool(BaseTool):
                     result['street_number'],
                     result.get('building_number')
                 )
-                if qnas_coords:
+                if qnas_coords and qnas_coords.get('exact_match'):
+                    # Building-level match — precise coords
                     result['coordinates']['latitude'] = qnas_coords['latitude']
                     result['coordinates']['longitude'] = qnas_coords['longitude']
+                    result['geocode_source'] = 'qnas_exact'
                     result['confidence'] += 0.15
-                    if qnas_coords.get('exact_match'):
-                        result['geocode_source'] = 'qnas_exact'
-                        result['parse_notes'].append(f"QNAS precise coordinates from building {result.get('building_number')}")
-                    else:
-                        result['geocode_source'] = 'qnas_street'
-                        result['parse_notes'].append("QNAS precise coordinates from street")
+                    result['parse_notes'].append(
+                        f"QNAS building-level coordinates: Zone {result['zone_number']}, "
+                        f"Street {result['street_number']}, Building {qnas_coords.get('building_number')}"
+                    )
+                elif qnas_coords and not qnas_coords.get('exact_match'):
+                    # Street-level match — polygon centroid of all buildings on street
+                    result['coordinates']['latitude'] = qnas_coords['latitude']
+                    result['coordinates']['longitude'] = qnas_coords['longitude']
+                    result['geocode_source'] = 'qnas_street'
+                    result['confidence'] += 0.1
+                    result['parse_notes'].append(
+                        f"QNAS street polygon centroid ({qnas_coords.get('polygon_points', '?')} points): "
+                        f"Zone {result['zone_number']}, Street {result['street_number']}"
+                    )
+                elif zone_lat and zone_lng:
+                    # QNAS found nothing — fall back to zone area coords from DB
+                    result['coordinates']['latitude'] = zone_lat
+                    result['coordinates']['longitude'] = zone_lng
+                    result['geocode_source'] = 'zone_center'
+                    result['parse_notes'].append(f"QNAS not found — using Zone {result['zone_number']} area coordinates")
 
-            # Step 4b: Landmark geocoding if zone but no street (better than zone center)
-            if not result['coordinates']['latitude'] and not result['street_number']:
-                # Pass zone center as hint for picking best geocode result
-                hint_lat = zone_details.get('latitude') if zone_details else None
-                hint_lng = zone_details.get('longitude') if zone_details else None
-                landmark_coords = self._geocode_landmark(address, hint_lat, hint_lng)
+            # Step 4b: Landmark geocoding — only if no coords at all yet
+            if not result['coordinates']['latitude']:
+                landmark_coords = self._geocode_landmark(address, zone_lat, zone_lng)
                 if landmark_coords:
                     result['coordinates']['latitude'] = landmark_coords['latitude']
                     result['coordinates']['longitude'] = landmark_coords['longitude']
                     result['geocode_source'] = 'landmark'
                     result['confidence'] += 0.1
                     result['parse_notes'].append(f"Landmark/area geocoded via {landmark_coords.get('provider', 'geocoder')}")
-
-            # Step 4c: Fallback to zone center if still no coordinates
-            if not result['coordinates']['latitude'] and zone_details and zone_details.get('latitude'):
-                result['coordinates']['latitude'] = zone_details['latitude']
-                result['coordinates']['longitude'] = zone_details['longitude']
-                if not result['geocode_source'] or result['geocode_source'] == 'ai_estimate':
-                    # Keep ai_estimate if that's how we found the zone
-                    if result['geocode_source'] != 'ai_estimate':
-                        result['geocode_source'] = 'zone_center'
-                result['parse_notes'].append(f"Zone {result['zone_number']} center coordinates (approximate)")
+                elif zone_lat and zone_lng:
+                    # No landmark match either — fall back to zone center
+                    result['coordinates']['latitude'] = zone_lat
+                    result['coordinates']['longitude'] = zone_lng
+                    result['geocode_source'] = 'zone_center'
+                    result['parse_notes'].append(f"Zone {result['zone_number']} center coordinates (approximate)")
 
         # Step 5: If still no zone and no coords, try landmark geocoding alone
         if not result['zone_number'] and not result['coordinates']['latitude']:
@@ -589,6 +641,37 @@ class ParseAddressTool(BaseTool):
             candidates.sort(key=lambda x: -x[0])
             return candidates[0][1]
 
+        # Fuzzy fallback: use difflib to catch typos (e.g. "karyityat" → "Kharaitiyat")
+        import difflib
+        all_areas = list(ZoneArea.objects.select_related('zone').filter(is_active=True).values(
+            'area_name', 'area_name_arabic', 'latitude', 'longitude',
+            'zone__zone_number', 'zone__zone_name', 'zone__latitude', 'zone__longitude'
+        ))
+        # Build a flat map of name → record for matching
+        area_names = [a['area_name'].lower() for a in all_areas]
+        # Try matching each meaningful word and the full address against area names
+        fuzzy_candidates = []
+        test_terms = [address_lower] + [w for w in clean_words if len(w) >= 4]
+        for term in test_terms:
+            matches = difflib.get_close_matches(term, area_names, n=3, cutoff=0.6)
+            for match in matches:
+                ratio = difflib.SequenceMatcher(None, term, match).ratio()
+                # Find the area record
+                for a in all_areas:
+                    if a['area_name'].lower() == match:
+                        fuzzy_candidates.append((ratio, {
+                            'zone_number': a['zone__zone_number'],
+                            'zone_name': a['zone__zone_name'],
+                            'area_name': a['area_name'],
+                            'latitude': float(a['latitude']) if a['latitude'] else (float(a['zone__latitude']) if a['zone__latitude'] else None),
+                            'longitude': float(a['longitude']) if a['longitude'] else (float(a['zone__longitude']) if a['zone__longitude'] else None),
+                        }))
+                        break
+
+        if fuzzy_candidates:
+            fuzzy_candidates.sort(key=lambda x: -x[0])
+            return fuzzy_candidates[0][1]
+
         return None
 
     def _lookup_qnas_building(
@@ -617,35 +700,40 @@ class ParseAddressTool(BaseTool):
         }
 
         try:
-            url = f"https://qnas.qa/get_buildings/{zone_number}/{street_number}"
-            resp = requests.get(url, headers=headers, timeout=10)
-
-            if resp.status_code != 200:
-                return None
-
-            buildings = resp.json()
-            if not isinstance(buildings, list) or not buildings:
-                return None
-
-            # Try exact building match first
+            # Step 1: Try exact building match
             if building_number:
-                building_str = str(building_number)
-                for b in buildings:
-                    if str(b.get("building_number", "")) == building_str:
-                        return {
-                            'latitude': float(b["x"]),
-                            'longitude': float(b["y"]),
-                            'exact_match': True,
-                        }
+                url = f"https://qnas.qa/get_buildings/{zone_number}/{street_number}"
+                resp = requests.get(url, headers=headers, timeout=10)
+                if resp.status_code == 200:
+                    buildings = resp.json()
+                    if isinstance(buildings, list):
+                        building_str = str(building_number)
+                        for b in buildings:
+                            if str(b.get("building_number", "")) == building_str:
+                                return {
+                                    'latitude': float(b["x"]),
+                                    'longitude': float(b["y"]),
+                                    'exact_match': True,
+                                    'building_number': b.get("building_number"),
+                                }
 
-            # Fallback to first building on the street
-            first = buildings[0]
-            if first.get("x") and first.get("y"):
-                return {
-                    'latitude': float(first["x"]),
-                    'longitude': float(first["y"]),
-                    'exact_match': False,
-                }
+            # Step 2: No building match — call street polygon API and compute centroid
+            poly_url = f"https://qnas.qa/get_street_polygon/{zone_number}/{street_number}"
+            poly_resp = requests.get(poly_url, headers=headers, timeout=10)
+            if poly_resp.status_code == 200:
+                data = poly_resp.json()
+                if data.get('status') == 'success' and 'coordinates' in data:
+                    coords = data['coordinates']
+                    if isinstance(coords, list) and len(coords) >= 2:
+                        lats = [p['lat'] for p in coords if 'lat' in p]
+                        lngs = [p['lng'] for p in coords if 'lng' in p]
+                        if lats and lngs:
+                            return {
+                                'latitude': sum(lats) / len(lats),
+                                'longitude': sum(lngs) / len(lngs),
+                                'exact_match': False,
+                                'polygon_points': len(lats),
+                            }
 
         except Exception as e:
             logger.warning(f"QNAS lookup error for zone={zone_number}, street={street_number}: {e}")
@@ -698,14 +786,30 @@ class ParseAddressTool(BaseTool):
                 logger.warning(f"AI service not available for zone search: {msg}")
                 return None
 
-            # Get list of available zones for context
+            # Get list of available zones + area names for context
+            from delivery.models import ZoneArea
             zones = list(ZoneName.objects.filter(is_active=True).values('zone_number', 'zone_name')[:100])
-            zones_list = "\n".join([f"Zone {z['zone_number']}: {z['zone_name']}" for z in zones])
+            # Build zone → areas map for richer context
+            areas_qs = ZoneArea.objects.filter(is_active=True).values('zone__zone_number', 'area_name')
+            zone_areas: dict = {}
+            for a in areas_qs:
+                zone_areas.setdefault(a['zone__zone_number'], []).append(a['area_name'])
+            zones_lines = []
+            for z in zones:
+                zn = z['zone_number']
+                areas = zone_areas.get(zn, [])
+                areas_str = (', '.join(areas[:5])) if areas else ''
+                line = f"Zone {zn}: {z['zone_name']}"
+                if areas_str:
+                    line += f" (areas: {areas_str})"
+                zones_lines.append(line)
+            zones_list = "\n".join(zones_lines)
 
             # Create prompt for Claude
             system_prompt = """You are a Qatar address expert. Given an address or location text, identify the most likely Qatar zone number and name.
+The input may contain typos or misspellings of Qatar area names — try to match phonetically or by similarity.
 
-Available Qatar zones:
+Available Qatar zones (with known area/neighbourhood names):
 """ + zones_list + """
 
 Respond ONLY with a valid JSON object in this exact format:
@@ -787,48 +891,75 @@ Do not include any other text, only the JSON."""
         geo_result = None
         disc_result = None
 
-        # 1) HERE Geocode API (good for area/neighborhood names)
-        if here_key:
-            try:
-                resp = requests.get(
-                    "https://geocode.search.hereapi.com/v1/geocode",
-                    params={
-                        'q': f"{address}, Qatar",
-                        'in': 'countryCode:QAT',
-                        'limit': 1,
-                        'apiKey': here_key,
-                    },
-                    timeout=8,
-                )
-                if resp.status_code == 200:
-                    items = resp.json().get('items', [])
-                    if items:
-                        pos = items[0].get('position', {})
-                        if pos.get('lat') and pos.get('lng'):
-                            geo_result = (round(pos['lat'], 8), round(pos['lng'], 8))
-            except Exception as e:
-                logger.warning(f"HERE Geocode error for '{address}': {e}")
+        # Build a list of query attempts: full cleaned query first, then sub-phrases.
+        # This ensures landmark names buried in longer text are still tried.
+        meaningful_words = [
+            w.strip(',.:-') for w in query.split()
+            if len(w.strip(',.:-')) >= 3 and not any(c.isdigit() for c in w)
+        ]
+        query_attempts = [query]
+        # Add n-grams (largest first) of meaningful words as fallback attempts
+        for n in range(min(4, len(meaningful_words)), 1, -1):
+            for i in range(len(meaningful_words) - n + 1):
+                phrase = ' '.join(meaningful_words[i:i + n])
+                if phrase not in query_attempts and len(phrase) >= 4:
+                    query_attempts.append(phrase)
 
-            # 2) HERE Discover API (good for landmarks/places)
-            try:
-                resp = requests.get(
-                    "https://discover.search.hereapi.com/v1/discover",
-                    params={
-                        'q': query,
-                        'in': 'circle:25.3,51.5;r=80000',
-                        'limit': 1,
-                        'apiKey': here_key,
-                    },
-                    timeout=8,
-                )
-                if resp.status_code == 200:
-                    items = resp.json().get('items', [])
-                    if items:
-                        pos = items[0].get('position', {})
-                        if pos.get('lat') and pos.get('lng'):
-                            disc_result = (round(pos['lat'], 8), round(pos['lng'], 8))
-            except Exception as e:
-                logger.warning(f"HERE Discover error for '{address}': {e}")
+        def _valid_qatar(lat, lng):
+            return lat and lng and 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5
+
+        # 1) HERE Geocode API — try each query until we get a Qatar-region result
+        if here_key:
+            for q in query_attempts:
+                if geo_result:
+                    break
+                try:
+                    resp = requests.get(
+                        "https://geocode.search.hereapi.com/v1/geocode",
+                        params={
+                            'q': f"{q}, Qatar",
+                            'in': 'countryCode:QAT',
+                            'limit': 3,
+                            'apiKey': here_key,
+                        },
+                        timeout=8,
+                    )
+                    if resp.status_code == 200:
+                        items = resp.json().get('items', [])
+                        for item in items:
+                            pos = item.get('position', {})
+                            lat, lng = pos.get('lat'), pos.get('lng')
+                            if _valid_qatar(lat, lng):
+                                geo_result = (round(lat, 8), round(lng, 8))
+                                break
+                except Exception as e:
+                    logger.warning(f"HERE Geocode error for '{q}': {e}")
+
+            # 2) HERE Discover API — try each query until we get a Qatar-region result
+            for q in query_attempts:
+                if disc_result:
+                    break
+                try:
+                    resp = requests.get(
+                        "https://discover.search.hereapi.com/v1/discover",
+                        params={
+                            'q': q,
+                            'in': 'circle:25.3548,51.1839;r=100000',
+                            'limit': 3,
+                            'apiKey': here_key,
+                        },
+                        timeout=8,
+                    )
+                    if resp.status_code == 200:
+                        items = resp.json().get('items', [])
+                        for item in items:
+                            pos = item.get('position', {})
+                            lat, lng = pos.get('lat'), pos.get('lng')
+                            if _valid_qatar(lat, lng):
+                                disc_result = (round(lat, 8), round(lng, 8))
+                                break
+                except Exception as e:
+                    logger.warning(f"HERE Discover error for '{q}': {e}")
 
         # 3) Pick best result
         if geo_result and disc_result:

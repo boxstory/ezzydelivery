@@ -610,9 +610,9 @@ class SEOLandingPages:
         return SEOMetadata.get_page_meta(
             title="Delivery Service Al Wakrah | Courier Al Wakrah Qatar",  # 53 chars
             description=(
-                "Fast delivery service in Al Wakrah, Qatar. Same-day pickup & delivery. Coverage includes "
-                "Al Wakrah City, Ezdan Village & surrounding areas. COD available."
-            ),  # 155 chars
+                "Fast delivery service in Al Wakrah, Qatar. Same-day pickup and delivery. "
+                "Coverage includes Al Wakrah City, Ezdan Village and surrounding areas."
+            ),  # 142 chars
         )
 
     @staticmethod

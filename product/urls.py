@@ -42,4 +42,10 @@ urlpatterns = [
     # Test images
     path('test-images/', product_views.test_images, name='test_images'),
 
+    # Product Combos / Bundles
+    path('combos/', product_views.combo_list, name='combo_list'),
+    path('combos/create/', product_views.combo_create, name='combo_create'),
+    path('combos/<int:combo_id>/update/', product_views.combo_update, name='combo_update'),
+    path('combos/<int:combo_id>/delete/', product_views.combo_delete, name='combo_delete'),
+
 ]

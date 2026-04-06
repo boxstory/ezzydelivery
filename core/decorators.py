@@ -94,17 +94,21 @@ def staff_required(view_func=None, redirect_url=None):
     return decorator
 
 
-def superuser_required(view_func):
-    """Decorator to require superuser access. Redirects non-superusers."""
+def superadmin_required(view_func):
+    """Decorator to require superadmin access (Profile.is_superadmin). Redirects non-superadmins."""
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect('account_login')
-        if not request.user.is_superuser:
+        if not is_superadmin(request.user):
             messages.error(request, "This page is restricted to administrators.")
             return redirect('workforce:wf_dashboard')
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+# Keep old name as alias for backwards compatibility
+superuser_required = superadmin_required
 
 
 def api_staff_required(view_func):
@@ -299,6 +303,12 @@ def api_business_required(view_func):
         business, access_type, team_profile = get_user_business_access(request.user, request)
 
         if business and access_type in ('owner', 'team_member'):
+            if access_type == 'team_member' and team_profile:
+                if not getattr(team_profile, 'team_verifed', False) or getattr(team_profile, 'team_status', '') != 'active':
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Team membership not verified or inactive'
+                    }, status=403)
             request.current_business = business
             request.access_type = access_type
             request.team_profile = team_profile

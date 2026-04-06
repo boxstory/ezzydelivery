@@ -1,11 +1,7 @@
-{% extends 'wf_dashboard_base.html' %}
+{% extends 'wh_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Storage Locations{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219e" type="text/css" />
-{% endblock extra_css %}
 
 {% block content %}
 <div class="wh">
@@ -51,12 +47,12 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 {% if wt.type_counts.zone %}<span class="wh__badge loc-badge--zone">{{ wt.type_counts.zone }} Zone{{ wt.type_counts.zone|pluralize }}</span>{% endif %}
                 {% if wt.type_counts.rack %}<span class="wh__badge loc-badge--rack">{{ wt.type_counts.rack }} Rack{{ wt.type_counts.rack|pluralize }}</span>{% endif %}
-                {% if wt.type_counts.shelf %}<span class="wh__badge loc-badge--shelf">{{ wt.type_counts.shelf }} Shel{{ wt.type_counts.shelf|pluralize:"f,ves" }}</span>{% endif %}
+                {% if wt.type_counts.shelf %}<span class="wh__badge loc-badge--shelf">{{ wt.type_counts.shelf }} Shelf{{ wt.type_counts.shelf|pluralize:"ves" }}</span>{% endif %}
                 {% if wt.type_counts.bin %}<span class="wh__badge loc-badge--bin">{{ wt.type_counts.bin }} Bin{{ wt.type_counts.bin|pluralize }}</span>{% endif %}
                 <span class="wh__meta">{{ wt.total }} total</span>
             </div>
         </div>
-        <div class="wh__card-body" style="padding: 0;">
+        <div class="wh__card-body p-0">
             {% for zone in wt.zones %}
             <!-- Zone -->
             <div class="loc-node loc-node--zone">
@@ -170,12 +166,12 @@
         <div class="wh__card-header">
             <div class="wh__card-header-left"><i class="fa-solid fa-tags"></i> <span>WAREHOUSE RACK LABELING GUIDE</span></div>
         </div>
-        <div class="wh__card-body" style="text-align: center;">
+        <div class="wh__card-body text-center">
             <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
                  alt="Warehouse Rack Labeling Guide"
                  style="max-width: 100%; height: auto; border-radius: var(--brand-radius-sm, 0.5rem);"
-                 onerror="this.parentElement.parentElement.style.display='none'">
-            <p class="wh__meta" style="margin-top: 0.75rem;">Zone &rarr; Rack &rarr; Shelf &rarr; Bin hierarchy</p>
+                 onerror="this.style.display='none'">
+            <p class="wh__meta mt-2">Zone &rarr; Rack &rarr; Shelf &rarr; Bin hierarchy</p>
         </div>
     </div>
 </div>

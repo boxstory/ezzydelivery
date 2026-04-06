@@ -34,7 +34,6 @@ from django.db import models
 
 from core import models as core_models
 from orders import models as orders_models
-from delivery import models as delivery_models
 from business import models as business_models
 from fleet import models as fleet_models
 
@@ -186,15 +185,15 @@ class HubPickupBatch(models.Model):
 
 
 class DeliveryTask(models.Model):
-    dl_task_status_client = (
+    DL_TASK_STATUS_CLIENT_CHOICES = [
         ('for_review', 'For Review'),
         ('customer_confiration_pending', 'Customer Confirmation Pending'),
         ('0', 'Assigned to Driver'),
         ('2', 'Delivered'),
         ('rejected', 'Rejected'),
         ('9', 'Cancelled'),
-    )
-    dl_task_status = (
+    ]
+    DL_TASK_STATUS_CHOICES = [
         ('for_review', 'For Review'),
         ('pending', 'Pending'),
         ('assigned', 'Assigned'),
@@ -209,13 +208,14 @@ class DeliveryTask(models.Model):
         ('failed', 'Failed'),
         ('rejected', 'Rejected'),
         ('cancelled', 'Cancelled'),
-    )
+        ('dropsownlost', 'Drops Own Lost'),
+    ]
     dl_task_publish = models.BooleanField(default=False)
     dl_task_number = models.CharField(max_length=100)
     dl_task_description = models.CharField(max_length=100)
     dl_task_status_client = models.CharField(
-        max_length=100, choices=dl_task_status_client)
-    dl_task_status = models.CharField(max_length=100, choices=dl_task_status)
+        max_length=100, choices=DL_TASK_STATUS_CLIENT_CHOICES)
+    dl_task_status = models.CharField(max_length=100, choices=DL_TASK_STATUS_CHOICES)
     dl_task_date = models.DateField(default=datetime.date.today)
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_task')
     dl_address_update = models.ForeignKey(
@@ -229,26 +229,25 @@ class DeliveryTask(models.Model):
         business_models.PickupLocation, on_delete=models.DO_NOTHING, blank=True, null=True)
 
     dl_waight = models.IntegerField(default=1)
-    dl_category_choices = (
+    DL_CATEGORY_CHOICES = [
         ('Food', 'Food'),
         ('Regular', 'Regular'),
         ('Electronics', 'Electronics'),
         ('Others', 'Others'),
-    )
+    ]
     dl_category = models.CharField(
-        max_length=100, choices=dl_category_choices, blank=True)
-    dl_speed_choices = (
+        max_length=100, choices=DL_CATEGORY_CHOICES, blank=True)
+    DL_SPEED_CHOICES = [
         ('Normal', 'Normal'),
         ('Same Day', 'Same Day'),
         ('On Demand',   'On Demand'),
         ('White Glove',   'White Glove'),
-
-    )
+    ]
     dl_speed = models.CharField(
-        max_length=100, choices=dl_speed_choices, blank=True)
+        max_length=100, choices=DL_SPEED_CHOICES, blank=True)
     dl_price = models.IntegerField(null=True, blank=True)
     dl_to_address = models.ForeignKey(
-        delivery_models.DlAddressUpdate, on_delete=models.DO_NOTHING, blank=True, null=True)
+        DlAddressUpdate, on_delete=models.DO_NOTHING, blank=True, null=True)
 
     # Earnings and COD Tracking Fields
     driver_earnings = models.DecimalField(
@@ -448,6 +447,18 @@ class DeliveryTask(models.Model):
         max_length=20, choices=ADDRESS_ACCURACY_CHOICES, default='unverified', blank=True,
         help_text="Who provided/confirmed the delivery address coordinates"
     )
+
+    # --- Customer Tracking ---
+    tracking_token = models.CharField(
+        max_length=64, unique=True, blank=True, null=True, db_index=True,
+        help_text="Public token for customer tracking page URL"
+    )
+
+    # Safety flags
+    delivery_distance_flag = models.BooleanField(default=False,
+        help_text="Flagged: driver completed delivery far from address (>5km)")
+    time_slot_missed = models.BooleanField(default=False,
+        help_text="Delivered outside customer's preferred time slot")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -868,3 +879,51 @@ class ShippingLabel(models.Model):
             models.Index(fields=['label_number'], name='label_number_idx'),
             models.Index(fields=['order', 'delivery_task'], name='label_order_task_idx'),
         ]
+
+
+# =============================================================================
+# DELIVERY PROOF MODELS
+# =============================================================================
+
+
+def delivery_proof_upload_path(instance, filename):
+    import os
+    biz_code = instance.delivery_task.business.business_code if instance.delivery_task and instance.delivery_task.business else 'unknown'
+    return os.path.join('delivery_proofs', str(biz_code), filename)
+
+
+class DeliveryProof(models.Model):
+    """
+    Proof of delivery uploaded by drivers.
+
+    Stores delivery photos, signatures, and barcode scans with
+    optional GPS coordinates for verification.
+    """
+    PROOF_TYPE_CHOICES = [
+        ('photo', 'Delivery Photo'),
+        ('signature', 'Customer Signature'),
+        ('barcode_scan', 'Barcode Scan'),
+    ]
+    delivery_task = models.ForeignKey(
+        'DeliveryTask', on_delete=models.CASCADE, related_name='delivery_proofs'
+    )
+    proof_type = models.CharField(max_length=20, choices=PROOF_TYPE_CHOICES, default='photo')
+    photo = models.ImageField(upload_to=delivery_proof_upload_path)
+    notes = models.CharField(max_length=255, blank=True, default='')
+    barcode_data = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text="Scanned barcode value"
+    )
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    uploaded_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'delivery_proof'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Proof {self.proof_type} for {self.delivery_task.dl_task_number}"

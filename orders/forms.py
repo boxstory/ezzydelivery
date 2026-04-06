@@ -121,7 +121,7 @@ class AddOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
-                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status', 'order_source_text']
+                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status', 'order_source_text', 'preferred_time_slot']
         exclude = ['order_number', 'business', 'delivery_task', 'deadline_date', 'cod_status_by_staff',
                    'updated_at', 'created_at']
         widgets = {
@@ -189,6 +189,41 @@ class AddOrderForm(forms.ModelForm):
             
         
 
+    def clean_customer_phone(self):
+        phone = self.cleaned_data.get('customer_phone', '').strip()
+        if not phone:
+            raise forms.ValidationError('Customer phone is required for delivery contact.')
+        # Normalize: remove +974, spaces, dashes
+        cleaned = phone.replace('+974', '').replace(' ', '').replace('-', '').strip()
+        if cleaned.startswith('974') and len(cleaned) == 11:
+            cleaned = cleaned[3:]
+        # Qatar mobile: 8 digits starting with 3, 5, 6, or 7
+        if len(cleaned) == 8 and cleaned[0] in '3567':
+            return cleaned
+        # Allow full international format
+        if len(cleaned) >= 8:
+            return phone.strip()
+        raise forms.ValidationError('Enter a valid Qatar phone number (8 digits starting with 3, 5, 6, or 7).')
+
+    def clean_cod_amount(self):
+        amount = self.cleaned_data.get('cod_amount', 0)
+        if amount and amount < 0:
+            raise forms.ValidationError('COD amount cannot be negative.')
+        if amount and amount > 50000:
+            raise forms.ValidationError('COD amount cannot exceed 50,000 QAR.')
+        return amount
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cod_amount = cleaned_data.get('cod_amount', 0) or 0
+        cod_status = cleaned_data.get('cod_status_by_client', '')
+        # Auto-correct COD status
+        if cod_amount > 0 and cod_status == 'online_paid':
+            cleaned_data['cod_status_by_client'] = 'unpaid'
+        elif cod_amount == 0 and cod_status in ('unpaid', 'pending', ''):
+            cleaned_data['cod_status_by_client'] = 'online_paid'
+        return cleaned_data
+
     def save(self, commit=True):
         order = super().save(commit=False)
 
@@ -248,6 +283,12 @@ class AddOrderProductsForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['product'].widget.attrs.update({'class': 'form-control'})
         self.fields['notes'].required = False
+
+    def clean_quantity(self):
+        qty = self.cleaned_data.get('quantity', 0)
+        if qty is not None and qty <= 0:
+            raise forms.ValidationError('Quantity must be at least 1.')
+        return qty
 
     def clean_order(self):
         """Fix: Validate order belongs to the user's business to prevent IDOR."""

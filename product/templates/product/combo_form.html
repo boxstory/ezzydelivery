@@ -1,0 +1,260 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260402a">
+{% if mode == 'create' %}Create Combo{% else %}Edit Combo{% endif %}
+{% endblock extra_head %}
+
+{% block extra_css %}
+<style>
+.pco__form-container { padding: var(--spacing-md); max-width: 800px; }
+.pco__form-header {
+    display: flex; align-items: center; gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--brand-navy); color: var(--brand-white);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+}
+.pco__form-header-icon {
+    width: 48px; height: 48px;
+    background: rgba(255,255,255,0.15);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem;
+}
+.pco__form-title { margin: 0; font-size: 1.35rem; font-weight: 700; }
+
+.pco__form-card {
+    background: var(--brand-white);
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+.pco__form-card h4 {
+    font-size: 1rem; font-weight: 700; color: var(--brand-navy);
+    margin: 0 0 var(--spacing-md) 0;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.pco__form-group { margin-bottom: var(--spacing-md); }
+.pco__form-label {
+    display: block; font-size: 0.85rem; font-weight: 600;
+    color: var(--brand-grey-700); margin-bottom: 0.3rem;
+}
+.pco__form-input {
+    width: 100%; padding: 0.5rem 0.75rem;
+    border: 1px solid var(--brand-grey-300); border-radius: var(--radius-sm);
+    font-size: 0.9rem; transition: border-color 0.2s;
+}
+.pco__form-input:focus { border-color: var(--brand-primary); outline: none; box-shadow: 0 0 0 2px rgba(247,192,0,0.2); }
+.pco__form-textarea { min-height: 80px; resize: vertical; }
+.pco__form-hint { font-size: 0.78rem; color: var(--brand-grey-500); margin-top: 0.2rem; }
+
+/* Product rows */
+.pco__product-rows { margin-bottom: var(--spacing-md); }
+.pco__product-row {
+    display: flex; align-items: center; gap: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--brand-grey-100);
+}
+.pco__product-row:last-child { border-bottom: none; }
+.pco__product-select { flex: 1; }
+.pco__product-qty { width: 80px; }
+.pco__btn-remove-row {
+    background: none; border: none; cursor: pointer;
+    color: var(--brand-grey-400); font-size: 1.1rem; padding: 0.25rem;
+    transition: color 0.2s;
+}
+.pco__btn-remove-row:hover { color: #dc3545; }
+
+.pco__btn-add-row {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: var(--brand-secondary); color: var(--brand-navy);
+    padding: 0.4rem 0.9rem; border-radius: var(--radius-sm);
+    font-size: 0.85rem; font-weight: 600; border: none; cursor: pointer;
+    transition: background 0.2s;
+}
+.pco__btn-add-row:hover { background: var(--brand-primary); }
+
+.pco__form-actions {
+    display: flex; gap: var(--spacing-sm);
+}
+.pco__btn-submit {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--brand-primary); color: var(--brand-navy);
+    padding: 0.6rem 1.5rem; border-radius: var(--radius-md);
+    font-weight: 700; font-size: 0.95rem; border: none; cursor: pointer;
+    transition: background 0.2s;
+}
+.pco__btn-submit:hover { background: var(--brand-primary-dark); }
+.pco__btn-cancel {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--brand-grey-100); color: var(--brand-grey-700);
+    padding: 0.6rem 1.5rem; border-radius: var(--radius-md);
+    font-weight: 600; font-size: 0.95rem; text-decoration: none;
+    transition: background 0.2s;
+}
+.pco__btn-cancel:hover { background: var(--brand-grey-200); color: var(--brand-grey-700); }
+
+/* Active toggle */
+.pco__toggle-row { display: flex; align-items: center; gap: var(--spacing-sm); }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="pco__form-container" id="product_combo_form_container">
+
+    <!-- Header -->
+    <div class="pco__form-header">
+        <div class="pco__form-header-icon">
+            <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <h2 class="pco__form-title">{% if mode == 'create' %}Create Combo{% else %}Edit Combo{% endif %}</h2>
+    </div>
+
+    <form method="post" id="product_combo_form">
+        {% csrf_token %}
+
+        <!-- Combo Details -->
+        <div class="pco__form-card">
+            <h4><i class="fa-solid fa-circle-info me-2"></i>Combo Details</h4>
+
+            <div class="pco__form-group">
+                <label class="pco__form-label" for="combo_name">Combo Name *</label>
+                <input type="text" name="combo_name" id="combo_name" class="pco__form-input"
+                       value="{% if combo %}{{ combo.combo_name }}{% endif %}" required
+                       placeholder="e.g. Oud Collection Bundle">
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="pco__form-group">
+                        <label class="pco__form-label" for="combo_sku">Combo SKU</label>
+                        <input type="text" name="combo_sku" id="combo_sku" class="pco__form-input"
+                               value="{% if combo %}{{ combo.combo_sku }}{% endif %}"
+                               placeholder="e.g. BUNDLE-001">
+                        <div class="pco__form-hint">Optional identifier for this combo</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="pco__form-group">
+                        <label class="pco__form-label" for="combo_price">Bundle Price (QAR)</label>
+                        <input type="number" name="combo_price" id="combo_price" class="pco__form-input"
+                               step="0.01" min="0"
+                               value="{% if combo.combo_price %}{{ combo.combo_price }}{% endif %}"
+                               placeholder="Leave blank to use sum of items">
+                        <div class="pco__form-hint">Override price. Leave blank to auto-calculate from items.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pco__form-group">
+                <label class="pco__form-label" for="description">Description</label>
+                <textarea name="description" id="description"
+                          class="pco__form-input pco__form-textarea"
+                          placeholder="Brief description of this combo...">{% if combo %}{{ combo.description }}{% endif %}</textarea>
+            </div>
+
+            {% if mode == 'update' %}
+            <div class="pco__form-group">
+                <div class="pco__toggle-row">
+                    <input type="checkbox" name="is_active" id="is_active" class="form-check-input"
+                           {% if combo.is_active %}checked{% endif %}>
+                    <label class="pco__form-label mb-0" for="is_active">Active</label>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Products -->
+        <div class="pco__form-card">
+            <h4><i class="fa-solid fa-boxes-stacked me-2"></i>Products in Combo</h4>
+
+            <div class="pco__product-rows" id="pco_product_rows">
+                {% if existing_items %}
+                    {% for item in existing_items %}
+                    <div class="pco__product-row" data-row-index="{{ forloop.counter0 }}">
+                        <select name="product_id" class="form-select pco__product-select">
+                            <option value="">-- Select product --</option>
+                            {% for p in products %}
+                            <option value="{{ p.id }}" {% if p.id == item.product_id %}selected{% endif %}>
+                                {{ p.item_name }} ({{ p.item_sku }}) - QAR {{ p.item_price }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" name="quantity" class="form-control pco__product-qty"
+                               value="{{ item.quantity }}" min="1" placeholder="Qty">
+                        <button type="button" class="pco__btn-remove-row" onclick="removeRow(this)" title="Remove">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="pco__product-row" data-row-index="0">
+                        <select name="product_id" class="form-select pco__product-select">
+                            <option value="">-- Select product --</option>
+                            {% for p in products %}
+                            <option value="{{ p.id }}">
+                                {{ p.item_name }} ({{ p.item_sku }}) - QAR {{ p.item_price }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" name="quantity" class="form-control pco__product-qty"
+                               value="1" min="1" placeholder="Qty">
+                        <button type="button" class="pco__btn-remove-row" onclick="removeRow(this)" title="Remove">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <button type="button" class="pco__btn-add-row" id="pco_btn_add_product" onclick="addProductRow()">
+                <i class="fa-solid fa-plus"></i> Add Product
+            </button>
+        </div>
+
+        <!-- Actions -->
+        <div class="pco__form-actions">
+            <button type="submit" class="pco__btn-submit">
+                <i class="fa-solid fa-check"></i>
+                {% if mode == 'create' %}Create Combo{% else %}Save Changes{% endif %}
+            </button>
+            <a href="{% url 'product:combo_list' %}" class="pco__btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+function addProductRow() {
+    var container = document.getElementById('pco_product_rows');
+    var rows = container.querySelectorAll('.pco__product-row');
+    var idx = rows.length;
+
+    // Clone the first row as template
+    var firstRow = rows[0];
+    var newRow = firstRow.cloneNode(true);
+    newRow.setAttribute('data-row-index', idx);
+
+    // Reset select and quantity
+    var select = newRow.querySelector('select');
+    if (select) select.selectedIndex = 0;
+    var qtyInput = newRow.querySelector('input[name="quantity"]');
+    if (qtyInput) qtyInput.value = '1';
+
+    container.appendChild(newRow);
+}
+
+function removeRow(btn) {
+    var container = document.getElementById('pco_product_rows');
+    var rows = container.querySelectorAll('.pco__product-row');
+    if (rows.length <= 1) {
+        alert('At least one product row is required.');
+        return;
+    }
+    btn.closest('.pco__product-row').remove();
+}
+</script>
+{% endblock content %}

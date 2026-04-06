@@ -10,25 +10,34 @@
     <!-- Hero Header -->
     <div class="wod__hero">
         <div class="wod__hero-content">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item">
+            <nav aria-label="breadcrumb" class="wod__breadcrumb-nav">
+                <ol class="wod__breadcrumb-trail">
+                    <li class="wod__breadcrumb-item">
                         <a href="{% url 'workforce:wf_dashboard' %}" class="wod__breadcrumb-link"
                            hx-get="{% url 'workforce:wf_dashboard' %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
                            hx-swap="outerHTML"
-                           hx-push-url="true">Dashboard</a>
+                           hx-push-url="true">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <span>Dashboard</span>
+                        </a>
                     </li>
-                    <li class="breadcrumb-item">
+                    <li class="wod__breadcrumb-item">
                         <a href="{% url 'workforce:wf_orders_all' %}" class="wod__breadcrumb-link"
                            hx-get="{% url 'workforce:wf_orders_all' %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
                            hx-swap="outerHTML"
-                           hx-push-url="true">Orders</a>
+                           hx-push-url="true">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>Orders</span>
+                        </a>
                     </li>
-                    <li class="breadcrumb-item active text-white-50">{{ order.order_number }}</li>
+                    <li class="wod__breadcrumb-item wod__breadcrumb-item--active">
+                        <i class="fa-solid fa-hashtag"></i>
+                        <span>{{ order.order_number }}</span>
+                    </li>
                 </ol>
             </nav>
             <h1 class="wod__hero-title">
@@ -37,6 +46,10 @@
             <p class="wod__hero-sub">Order {{ order.order_number }}</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'workforce:dl_list_all' %}"
+               class="wod__btn wod__btn--light">
+                <i class="fa-solid fa-truck me-1"></i> Go to Tasks
+            </a>
             <a href="{% url 'workforce:wf_orders_all' %}"
                class="wod__btn wod__btn--light"
                hx-get="{% url 'workforce:wf_orders_all' %}"
@@ -132,13 +145,13 @@
                             <label class="form-label text-muted small">Order Status</label>
                             <p class="mb-0">
                                 {% if order.order_status == 'to_review' %}
-                                <span class="badge badge-warning">To Review</span>
+                                <span class="badge bg-warning text-dark">To Review</span>
                                 {% elif order.order_status == 'to_publish' %}
-                                <span class="badge badge-info">To Publish</span>
+                                <span class="badge bg-info">To Publish</span>
                                 {% elif order.order_status == 'published' %}
-                                <span class="badge badge-success">Published</span>
+                                <span class="badge bg-success">Published</span>
                                 {% elif order.order_status == 'cancelled' %}
-                                <span class="badge badge-error">Cancelled</span>
+                                <span class="badge bg-danger">Cancelled</span>
                                 {% else %}
                                 <span class="badge bg-secondary">{{ order.order_status }}</span>
                                 {% endif %}
@@ -321,6 +334,9 @@
                     <button type="button" class="aim__btn-tool" onclick="EzzyAIParse.parse({ address: '{{ order.customer_address|escapejs }}', zone: '{{ order.dl_zone|default:"" }}', street: '{{ order.dl_street|default:"" }}', building: '{{ order.dl_building|default:"" }}', orderId: '{{ order.id }}', orderNumber: '{{ order.order_number }}', showMap: true })" title="Parse address from text">
                         <i class="fa-solid fa-location-dot"></i> Parse Address
                     </button>
+                    <button type="button" class="aim__btn-tool" data-bs-toggle="modal" data-bs-target="#orderLocUpdateModal" title="Update delivery location on map">
+                        <i class="fa-solid fa-location-crosshairs"></i> Update Location
+                    </button>
                 </div>
             </div>
 
@@ -363,7 +379,7 @@
                     {% if order.pickup_location %}
                     <hr>
                     <p class="small mb-1"><strong>Pickup Location:</strong></p>
-                    <p class="text-muted small mb-0">{{ order.pickup_location.location_name }}</p>
+                    <p class="text-muted small mb-0">{{ order.pickup_location.pickup_location_title }}</p>
                     {% endif %}
                 </div>
             </div>
@@ -383,7 +399,7 @@
                     </p>
                     <p class="mb-2">
                         <strong>Status:</strong>
-                        <span class="badge badge-info">{{ delivery_task.dl_task_status }}</span>
+                        <span class="badge bg-info">{{ delivery_task.get_dl_task_status_display }}</span>
                     </p>
                     {% if delivery_task.driver %}
                     <p class="mb-2">
@@ -431,6 +447,90 @@
         </div>
     </div>
 
+</div>
+<!-- Order Location Update Modal -->
+<div class="modal fade" id="orderLocUpdateModal" tabindex="-1" aria-labelledby="orderLocUpdateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border:none;border-radius:10px;overflow:hidden;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#1e293b,#0f172a);color:#cbd5e1;padding:0.75rem 1rem;">
+                <h6 class="modal-title mb-0" id="orderLocUpdateModalLabel">
+                    <i class="fa-solid fa-location-crosshairs me-2"></i>Update Delivery Location
+                    <small class="ms-2 opacity-75" style="font-size:0.65rem;font-weight:400;">{{ order.order_number }}</small>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="font-size:0.6rem;"></button>
+            </div>
+            <div class="modal-body p-3">
+                <!-- Address -->
+                <div class="mb-3">
+                    <label class="form-label" style="font-size:0.7rem;font-weight:600;color:#475569;"><i class="fa-solid fa-location-dot me-1"></i>Address</label>
+                    <input type="text" class="form-control form-control-sm" id="orderLocAddress" style="font-size:0.78rem;"
+                        value="{{ order.customer_address|default:'' }}" placeholder="Customer address">
+                </div>
+                <!-- Zone / Street / Building -->
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <label class="form-label" style="font-size:0.7rem;font-weight:600;color:#475569;">Zone</label>
+                        <input type="number" class="form-control form-control-sm" id="orderLocZone" style="font-size:0.78rem;"
+                            value="{{ order.dl_zone|default:'' }}" placeholder="e.g. 46">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label" style="font-size:0.7rem;font-weight:600;color:#475569;">Street</label>
+                        <input type="number" class="form-control form-control-sm" id="orderLocStreet" style="font-size:0.78rem;"
+                            value="{{ order.dl_street|default:'' }}" placeholder="e.g. 9">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label" style="font-size:0.7rem;font-weight:600;color:#475569;">Building</label>
+                        <input type="number" class="form-control form-control-sm" id="orderLocBuilding" style="font-size:0.78rem;"
+                            value="{{ order.dl_building|default:'' }}" placeholder="e.g. 18">
+                    </div>
+                </div>
+                <!-- Map -->
+                <div class="mb-2">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <label class="form-label mb-0" style="font-size:0.7rem;font-weight:600;color:#475569;"><i class="fa-solid fa-map-pin me-1"></i>Pin Location <span class="text-muted fw-normal">(drag or click to adjust)</span></label>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" style="font-size:0.65rem;padding:0.15rem 0.5rem;" onclick="orderLocGeolocate()">
+                            <i class="fa-solid fa-crosshairs me-1"></i>My Location
+                        </button>
+                    </div>
+                    <div id="orderLocMap" style="height:260px;border-radius:6px;border:1px solid #e2e8f0;"></div>
+                </div>
+                <!-- Coords + Accuracy -->
+                <div class="d-flex gap-3 mt-2">
+                    <div class="flex-fill">
+                        <label class="form-label mb-0" style="font-size:0.65rem;color:#64748b;">Latitude</label>
+                        <input type="text" class="form-control form-control-sm" id="orderLocLat" style="font-size:0.72rem;background:#f8fafc;" readonly placeholder="—">
+                    </div>
+                    <div class="flex-fill">
+                        <label class="form-label mb-0" style="font-size:0.65rem;color:#64748b;">Longitude</label>
+                        <input type="text" class="form-control form-control-sm" id="orderLocLng" style="font-size:0.72rem;background:#f8fafc;" readonly placeholder="—">
+                    </div>
+                    <div style="min-width:110px;">
+                        <label class="form-label mb-0" style="font-size:0.65rem;color:#64748b;">Accuracy</label>
+                        <select class="form-select form-select-sm" id="orderLocAccuracy" style="font-size:0.72rem;">
+                            <option value="exact">Exact</option>
+                            <option value="street">Street</option>
+                            <option value="landmark">Landmark</option>
+                            <option value="zone_center">Zone Center</option>
+                            <option value="ai_estimate">AI Estimate</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- URL / Plus Code input -->
+                <div class="mt-3" style="border-top:1px solid #e2e8f0;padding-top:0.75rem;">
+                    <label class="form-label" style="font-size:0.7rem;font-weight:600;color:#475569;"><i class="fa-solid fa-link me-1"></i>Paste Location Link <span class="text-muted fw-normal">(Google Maps URL or Plus Code)</span></label>
+                    <input type="text" class="form-control form-control-sm" id="orderLocUrlInput" style="font-size:0.75rem;" placeholder="e.g. maps.app.goo.gl/... or 8FM8+MJ Doha">
+                    <div id="orderLocUrlPreview" class="mt-1" style="font-size:0.7rem;color:#64748b;min-height:1.2rem;"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:0.6rem 1rem;border-top:1px solid #e2e8f0;">
+                <span id="orderLocMsg" style="font-size:0.7rem;flex:1;"></span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" style="font-size:0.7rem;">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary" id="orderLocSaveBtn" onclick="orderLocSave()" style="font-size:0.7rem;min-width:110px;">
+                    <i class="fa-solid fa-check me-1"></i>Save Location
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -565,5 +665,198 @@ function getCSRFToken() {
 }
 
 
+</script>
+
+<!-- Order Location Update Modal JS -->
+<script>
+(function() {
+    var orderLocMap = null, orderLocMarker = null;
+    var orderId = {{ order.id }};
+    var initLat = {% if order.latitude %}{{ order.latitude }}{% else %}25.2854{% endif %};
+    var initLng = {% if order.longitude %}{{ order.longitude }}{% else %}51.5310{% endif %};
+    var hasCoords = {% if order.latitude %}true{% else %}false{% endif %};
+
+    var pinIcon = L.divIcon({
+        className: '',
+        html: '<div style="background:#dc2626;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);cursor:grab;"><i class="fa-solid fa-location-dot"></i></div>',
+        iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32]
+    });
+
+    function updateCoords(lat, lng) {
+        document.getElementById('orderLocLat').value = lat.toFixed(6);
+        document.getElementById('orderLocLng').value = lng.toFixed(6);
+    }
+
+    function initMap() {
+        if (orderLocMap) { orderLocMap.invalidateSize(); return; }
+        orderLocMap = L.map('orderLocMap', { zoomControl: true, attributionControl: false }).setView([initLat, initLng], hasCoords ? 16 : 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(orderLocMap);
+        orderLocMarker = L.marker([initLat, initLng], { icon: pinIcon, draggable: true }).addTo(orderLocMap);
+        if (hasCoords) updateCoords(initLat, initLng);
+        orderLocMarker.on('dragend', function(e) {
+            var ll = e.target.getLatLng();
+            updateCoords(ll.lat, ll.lng);
+        });
+        orderLocMap.on('click', function(e) {
+            orderLocMarker.setLatLng(e.latlng);
+            updateCoords(e.latlng.lat, e.latlng.lng);
+        });
+    }
+
+    var modalEl = document.getElementById('orderLocUpdateModal');
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', function() {
+            initMap();
+            setTimeout(function() { if (orderLocMap) orderLocMap.invalidateSize(); }, 200);
+            initOrderUrlInput();
+        });
+    }
+
+    // URL / Plus Code resolution
+    var urlPatterns = [
+        /[?&]q=([-\d.]+),([-\d.]+)/,
+        /@([-\d.]+),([-\d.]+)/,
+        /\/search\/([-\d.]+),([-\d.]+)/,
+        /[?&]ll=([-\d.]+),([-\d.]+)/,
+        /(2[4-6]\.\d{3,8})\s*[,\s]\s*(5[0-2]\.\d{3,8})/
+    ];
+    var needsServer = /maps\.app\.goo\.gl|goo\.gl\/maps|^[A-Z0-9]{4,8}\+[A-Z0-9]/i;
+    var orderUrlTimer = null;
+
+    function extractLocalCoords(text) {
+        for (var i = 0; i < urlPatterns.length; i++) {
+            var m = text.match(urlPatterns[i]);
+            if (m) {
+                var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+                if (lat >= 24 && lat <= 27 && lng >= 50 && lng <= 52.5) return { lat: lat, lng: lng };
+            }
+        }
+        return null;
+    }
+
+    function applyOrderCoords(lat, lng) {
+        updateCoords(lat, lng);
+        if (orderLocMarker && orderLocMap) {
+            orderLocMarker.setLatLng([lat, lng]);
+            orderLocMap.setView([lat, lng], 17);
+        }
+    }
+
+    function setOrderUrlPreview(html, color) {
+        var el = document.getElementById('orderLocUrlPreview');
+        if (el) { el.innerHTML = html; el.style.color = color || '#64748b'; }
+    }
+
+    function resolveOrderUrlServer(text) {
+        setOrderUrlPreview('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Resolving...', '#64748b');
+        fetch('/workforce/api/resolve-location/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify({ text: text })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.lat && data.lng) {
+                applyOrderCoords(data.lat, data.lng);
+                setOrderUrlPreview('<i class="fa-solid fa-circle-check me-1"></i>' + data.lat.toFixed(6) + ', ' + data.lng.toFixed(6), '#16a34a');
+            } else {
+                setOrderUrlPreview('<i class="fa-solid fa-triangle-exclamation me-1"></i>Could not extract coordinates', '#dc2626');
+            }
+        })
+        .catch(function() { setOrderUrlPreview('<i class="fa-solid fa-triangle-exclamation me-1"></i>Network error', '#dc2626'); });
+    }
+
+    function handleOrderUrlInput() {
+        var text = document.getElementById('orderLocUrlInput').value.trim();
+        if (!text) { setOrderUrlPreview(''); return; }
+        var coords = extractLocalCoords(text);
+        if (coords) {
+            applyOrderCoords(coords.lat, coords.lng);
+            setOrderUrlPreview('<i class="fa-solid fa-circle-check me-1"></i>' + coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6), '#16a34a');
+            return;
+        }
+        if (needsServer.test(text)) {
+            clearTimeout(orderUrlTimer);
+            orderUrlTimer = setTimeout(function() { resolveOrderUrlServer(text); }, 350);
+        } else {
+            setOrderUrlPreview('');
+        }
+    }
+
+    function initOrderUrlInput() {
+        var inp = document.getElementById('orderLocUrlInput');
+        if (!inp || inp._orderLocInited) return;
+        inp._orderLocInited = true;
+        inp.addEventListener('input', handleOrderUrlInput);
+        inp.addEventListener('paste', function() { setTimeout(handleOrderUrlInput, 150); });
+    }
+
+    window.orderLocGeolocate = function() {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            var lat = pos.coords.latitude, lng = pos.coords.longitude;
+            if (orderLocMap && orderLocMarker) {
+                orderLocMarker.setLatLng([lat, lng]);
+                orderLocMap.setView([lat, lng], 17);
+                updateCoords(lat, lng);
+            }
+        });
+    };
+
+    window.orderLocSave = function() {
+        var zone = document.getElementById('orderLocZone').value.trim();
+        var street = document.getElementById('orderLocStreet').value.trim();
+        var building = document.getElementById('orderLocBuilding').value.trim();
+        var latVal = document.getElementById('orderLocLat').value.trim();
+        var lngVal = document.getElementById('orderLocLng').value.trim();
+        var accuracy = document.getElementById('orderLocAccuracy').value;
+        var msgEl = document.getElementById('orderLocMsg');
+        var saveBtn = document.getElementById('orderLocSaveBtn');
+
+        if (!zone) {
+            msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Zone is required.</span>';
+            return;
+        }
+
+        var payload = { zone_number: parseInt(zone) };
+        if (street) payload.street_number = parseInt(street);
+        if (building) payload.building_number = parseInt(building);
+        if (latVal && lngVal) {
+            payload.latitude = parseFloat(latVal);
+            payload.longitude = parseFloat(lngVal);
+            payload.coords_accuracy = accuracy;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...';
+        msgEl.innerHTML = '';
+
+        fetch('/workforce/order/' + orderId + '/update-zone/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Location';
+            if (data.success) {
+                msgEl.innerHTML = '<span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>' + (data.message || 'Location updated!') + '</span>';
+                setTimeout(function() {
+                    var bsModal = bootstrap.Modal.getInstance(document.getElementById('orderLocUpdateModal'));
+                    if (bsModal) bsModal.hide();
+                    location.reload();
+                }, 1200);
+            } else {
+                msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>' + (data.error || 'Failed to update.') + '</span>';
+            }
+        })
+        .catch(function() {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Location';
+            msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Network error. Please try again.</span>';
+        });
+    };
+})();
 </script>
 {% endblock %}

@@ -132,7 +132,7 @@
     data-area="{% if addr %}{{ addr.area_name|default:'' }}{% endif %}"
     data-ptype="{% if addr %}{% if addr.is_villa_compound %}Villa{% elif addr.is_flat %}Apartment{% elif addr.is_office %}Office{% endif %}{% endif %}"
     data-timeslot="{% if addr %}{{ addr.time_slot|default:'' }}{% endif %}"
-    data-cod="{{ card.order.cod_amount|default:'' }}"
+    data-cod="{{ card.order.cod_amount|default_if_none:'' }}"
     data-items="{{ card.order.order_items.count }}"
     data-product-desc="{{ card.order.package_description|default:'' }}"
     data-product-qty="{{ card.order.package_qty|default:'' }}"
@@ -146,7 +146,7 @@
     data-order-id="{{ card.order.id }}"
     data-verify-url="{% with av=card.order.address_verifications.first %}{% with phone=addr.mobile_no|default:card.order.customer_phone|default:'' %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url 'verify_location_short' phone av.verification_token %}{% endif %}{% endwith %}{% endwith %}"
 >
-<script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{% if item.product %}{{ item.product.item_name|escapejs }}{% else %}{{ item.notes|default:'Item'|escapejs }}{% endif %}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
+<script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{{ item.display_name|escapejs }}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
 </script>
 {% with av=card.order.address_verifications.first %}
 <script type="application/json" class="task-address-data">{% spaceless %}{
@@ -301,9 +301,22 @@
 
         <!-- Bottom info strip: COD + Items + Earnings + inline action -->
         <div class="task-card__strip">
-            <div class="task-card__strip-item {% if card.order.cod_amount %}task-card__strip-item--cod{% endif %}">
-                <span>{% if card.order.cod_amount %}COD {{ card.order.cod_amount }} QR{% else %}No COD{% endif %}</span>
+            {% if card.order.cod_amount %}
+                {% if card.order.cod_status_by_client == 'online_paid' %}
+                <div class="task-card__strip-item task-card__strip-item--cod-paid">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Online Paid</span>
+                </div>
+                {% else %}
+                <div class="task-card__strip-item task-card__strip-item--cod">
+                    <span>COD {{ card.order.cod_amount }} QR</span>
+                </div>
+                {% endif %}
+            {% else %}
+            <div class="task-card__strip-item">
+                <span>No COD</span>
             </div>
+            {% endif %}
 
             {% with item_count=card.order.order_items.count %}
             {% if item_count %}
