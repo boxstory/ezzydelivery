@@ -1,0 +1,119 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}COD Submissions{% endblock %}
+{% block page_title %}COD Submissions Manager{% endblock %}
+
+{% block content %}
+<div class="biz-dash__main" style="max-width: 1200px; margin: 0 auto;">
+    <!-- Header with Filters -->
+    <div class="fleet-card" style="margin-bottom: var(--spacing-lg);">
+        <div class="fleet-card__header">
+            <h2 class="fleet-card__title">
+                <i class="fa-solid fa-receipt me-2"></i>
+                COD Submissions
+            </h2>
+        </div>
+        <div class="fleet-card__body">
+            <div style="display: flex; gap: var(--spacing-md); flex-wrap: wrap; align-items: center;">
+                <a href="?status=all" class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %} btn-sm">
+                    All
+                </a>
+                <a href="?status=pending" class="btn {% if status_filter == 'pending' %}btn-primary{% else %}btn-outline-secondary{% endif %} btn-sm">
+                    <i class="fa-solid fa-hourglass-end me-1"></i>
+                    Pending
+                </a>
+                <a href="?status=verified" class="btn {% if status_filter == 'verified' %}btn-primary{% else %}btn-outline-secondary{% endif %} btn-sm">
+                    <i class="fa-solid fa-check me-1"></i>
+                    Verified
+                </a>
+                <a href="?status=approved" class="btn {% if status_filter == 'approved' %}btn-primary{% else %}btn-outline-secondary{% endif %} btn-sm">
+                    <i class="fa-solid fa-check-double me-1"></i>
+                    Approved
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submissions List -->
+    {% if submissions %}
+    <div class="fleet-list" style="padding: 0;">
+        {% for item in submissions %}
+        <div class="fleet-card" style="margin-bottom: var(--spacing-md);">
+            <div class="fleet-card__header">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                    <div>
+                        <h3 style="margin: 0 0 var(--spacing-xs) 0; font-size: var(--font-size-lg);">
+                            {{ item.txn.transaction_code }}
+                        </h3>
+                        <p style="margin: 0; color: var(--fleet-grey-600); font-size: var(--font-size-sm);">
+                            <i class="fa-solid fa-user me-1"></i>
+                            {{ item.driver_name }}
+                        </p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--fleet-success);">
+                            {{ item.txn.amount|floatformat:2 }}
+                            <small style="font-size: var(--font-size-sm); font-weight: 500;">QR</small>
+                        </div>
+                        <p style="margin: var(--spacing-xs) 0 0 0; font-size: 0.75rem; color: var(--fleet-grey-500);">
+                            {{ item.txn.created_at|date:"M d, Y H:i" }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fleet-card__body">
+                <!-- Status Badges -->
+                <div style="display: flex; gap: var(--spacing-sm); margin-bottom: var(--spacing-md); flex-wrap: wrap;">
+                    <span class="badge {% if item.txn.is_received %}bg-success{% else %}bg-secondary{% endif %}">
+                        <i class="fa-solid fa-inbox me-1"></i>
+                        {% if item.txn.is_received %}Received{% else %}Awaiting Receipt{% endif %}
+                    </span>
+                    <span class="badge {% if item.txn.is_verified %}bg-success{% else %}bg-secondary{% endif %}">
+                        <i class="fa-solid fa-check-circle me-1"></i>
+                        {% if item.txn.is_verified %}Verified{% else %}Not Verified{% endif %}
+                    </span>
+                    <span class="badge {% if item.txn.is_approved %}bg-success{% else %}bg-warning{% endif %}">
+                        <i class="fa-solid fa-check-double me-1"></i>
+                        {% if item.txn.is_approved %}Approved{% else %}Pending Approval{% endif %}
+                    </span>
+                </div>
+
+                <!-- Task Count -->
+                <div style="font-size: var(--font-size-sm); color: var(--fleet-grey-600); margin-bottom: var(--spacing-md);">
+                    <i class="fa-solid fa-list-check me-1"></i>
+                    <strong>{{ item.task_count }}</strong> {{ item.task_count|pluralize:"task,tasks" }}
+                </div>
+
+                <!-- Edit & View Links -->
+                <div style="display: flex; gap: var(--spacing-sm);">
+                    <a href="{% url 'workforce:staff_cod_submission_edit' item.txn.transaction_code %}" class="btn btn-sm btn-primary">
+                        <i class="fa-solid fa-edit me-1"></i>
+                        Edit & Manage
+                    </a>
+                    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="return false;">
+                        <i class="fa-solid fa-receipt me-1"></i>
+                        View Details
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="fleet-card">
+        <div class="fleet-card__body" style="text-align: center; padding: var(--spacing-3xl);">
+            <i class="fa-solid fa-inbox" style="font-size: 3rem; color: var(--fleet-grey-300); margin-bottom: var(--spacing-lg);"></i>
+            <h4 style="color: var(--fleet-grey-600); margin: var(--spacing-md) 0;">No COD Submissions</h4>
+            <p style="color: var(--fleet-grey-500); margin: 0;">No {% if status_filter != 'all' %}{{ status_filter }}{% endif %} COD submissions found.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .fleet-list { list-style: none; }
+    .badge { padding: 0.5rem 0.75rem; font-size: 0.75rem; font-weight: 600; }
+</style>
+{% endblock %}

@@ -160,11 +160,20 @@ urlpatterns = [
     path('fleet/earnings-verification/action/', workforce_views.earnings_verification_action, name='earnings_verification_action'),
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
     path('fleet/bulk-settle-transactions/', workforce_views.bulk_settle_transactions, name='bulk_settle_transactions'),
+    path('fleet/transactions/<int:txn_id>/cod-details/', workforce_views.fleet_transaction_cod_details, name='fleet_transaction_cod_details'),
+    path('fleet/transactions/<int:txn_id>/update-status/', workforce_views.fleet_transaction_update_status, name='fleet_transaction_update_status'),
 
     # COD Settlement Report URLs
     path('fleet/cod-settlement/', workforce_views.cod_settlement_report, name='cod_settlement_report'),
     path('fleet/cod-settlement/action/', workforce_views.cod_settlement_action, name='cod_settlement_action'),
     path('fleet/cod-settlement/pdf/', workforce_views.cod_settlement_pdf, name='cod_settlement_pdf'),
+
+    # COD Submissions Management (Staff)
+    path('fleet/cod-submissions/', workforce_views.staff_cod_submissions_redirect, name='staff_cod_submissions'),
+    path('fleet/cod-submissions/<str:txn_code>/edit/', workforce_views.staff_cod_submission_edit_redirect, name='staff_cod_submission_edit'),
+    path('fleet/cod-submissions/<str:txn_code>/add-task/', workforce_views.staff_cod_submission_add_task_redirect, name='staff_cod_submission_add_task'),
+    path('fleet/cod-submissions/<str:txn_code>/remove-task/', workforce_views.staff_cod_submission_remove_task_redirect, name='staff_cod_submission_remove_task'),
+    path('fleet/cod-submissions/<str:txn_code>/approve/', workforce_views.staff_cod_submission_approve_redirect, name='staff_cod_submission_approve'),
 
     # Receipt Templates URLs
     path('receipt-templates/', workforce_views.receipt_templates_list, name='receipt_templates_list'),

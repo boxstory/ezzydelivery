@@ -51,7 +51,7 @@ Related:
 import json
 import logging
 from django.db import connection
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
@@ -466,7 +466,6 @@ def vehicle_update(request, vehicle_id):
 
 # cod_collection ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
-@driver_required
 def cod_collection(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -474,45 +473,61 @@ def cod_collection(request):
         # Get wallet status
         wallet_status = WalletService.get_wallet_status(driver)
 
+        # Get filter days parameter (default 7)
+        filter_days = request.GET.get('days', '7')
+        sort_by = request.GET.get('sort', 'delivered')  # 'delivered' or 'order_date'
+
+        # Build date cutoff for filtering
+        from django.utils import timezone as tz
+        from django.db.models import Sum
+        from datetime import timedelta
+        date_cutoff = None
+        if filter_days != 'all':
+            try:
+                days_int = int(filter_days)
+                date_cutoff = tz.now() - timedelta(days=days_int)
+            except (ValueError, TypeError):
+                filter_days = '7'
+                date_cutoff = tz.now() - timedelta(days=7)
+
         # Get COD settlement transactions (deposits/submissions to admin)
-        cod_transactions = fleet_models.DriverTransaction.objects.filter(
+        txn_qs = fleet_models.DriverTransaction.objects.filter(
             driver=driver,
             transaction_type__in=['cod_deposit', 'cod_driver_settle']
-        ).order_by('-created_at')[:20]
+        )
+        if date_cutoff:
+            txn_qs = txn_qs.filter(created_at__gte=date_cutoff)
+        cod_transactions = txn_qs.order_by('-created_at')[:50]
 
-        # Get COD currently in hand (not yet settled/deposited)
-        # Only show COD that hasn't been submitted to admin yet
-        cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
+        # Get COD currently in hand (unsettled) — filter by collection date
+        cod_in_hand_qs = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
             cod_collected=True,
-            cod_settled=False,  # Only unsettled COD
+            cod_settled=False,
             dl_task_status='delivered'
-        ).select_related(
-            'order',
-            'order__business',
-            'dl_to_address'
-        ).order_by('-completed_at')
+        ).select_related('order', 'order__business', 'dl_to_address')
+        if date_cutoff:
+            cod_in_hand_qs = cod_in_hand_qs.filter(completed_at__gte=date_cutoff)
+        sort_field = '-order__created_at' if sort_by == 'order_date' else '-completed_at'
+        cod_in_hand_list = cod_in_hand_qs.order_by(sort_field)
 
-        # Calculate total from actual list items so it matches the displayed list
-        from django.db.models import Sum
-        cod_in_hand_total = cod_in_hand_list.aggregate(
-            total=Sum('cod_collected_amount')
-        )['total'] or 0
+        cod_in_hand_total = cod_in_hand_list.aggregate(total=Sum('cod_collected_amount'))['total'] or 0
         cod_in_hand_count = cod_in_hand_list.count()
 
-        # Get recent COD deliveries (settled/completed - exclude items still in hand)
+        # All-time unsettled COD total (unaffected by date filter) for hero card
+        all_time_cod_total = delivery_models.DeliveryTask.objects.filter(
+            driver=driver, cod_collected=True, cod_settled=False, dl_task_status='delivered'
+        ).aggregate(total=Sum('cod_collected_amount'))['total'] or 0
+
+        # Get recent settled COD deliveries
         cod_in_hand_ids = list(cod_in_hand_list.values_list('id', flat=True))
-        cod_deliveries = delivery_models.DeliveryTask.objects.filter(
-            driver=driver,
-            cod_collected=True
-        ).exclude(
-            id__in=cod_in_hand_ids
-        ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')[:20]
+        settled_qs = delivery_models.DeliveryTask.objects.filter(
+            driver=driver, cod_collected=True
+        ).exclude(id__in=cod_in_hand_ids).select_related('order', 'order__business', 'dl_to_address')
+        if date_cutoff:
+            settled_qs = settled_qs.filter(completed_at__gte=date_cutoff)
+        cod_deliveries = settled_qs.order_by('-completed_at')[:50]
 
-        # Get filter days parameter
-        filter_days = request.GET.get('days', '7')
-
-        # Convert COD in hand tasks to orders format for PWA template
         from orders.models import Order
         cod_orders = Order.objects.filter(
             id__in=cod_in_hand_list.values_list('order_id', flat=True)
@@ -527,10 +542,11 @@ def cod_collection(request):
             'cod_in_hand_total': cod_in_hand_total,
             'cod_in_hand_count': cod_in_hand_count,
             'cod_orders': cod_orders,
-            'total_cod_in_hand': cod_in_hand_total,
+            'total_cod_in_hand': all_time_cod_total,
             'total_orders': cod_in_hand_count,
             'filter_days': filter_days,
             'days_range': filter_days if filter_days != 'all' else 'All',
+            'sort_by': sort_by,
         }
 
         return render(request, 'fleet/cod_collection_pwa.html', context)
@@ -575,18 +591,28 @@ def cod_submission(request):
             delivery_ids_str = ','.join(str(t.id) for t in cod_in_hand_list)
             order_to_delivery = {t.order_id: t.id for t in cod_in_hand_list}
 
+            from core.models import Profile
+            staff_users = Profile.objects.filter(is_staff=True).select_related('user').order_by('first_name', 'last_name')
+
+            order_to_date = {
+                t.order_id: t.completed_at.strftime('%Y-%m-%d') if t.completed_at else ''
+                for t in cod_in_hand_list
+            }
+
             context = {
                 'driver': driver,
                 'total_cod_amount': cod_in_hand_total,
                 'selected_orders': selected_orders,
                 'delivery_ids_str': delivery_ids_str,
                 'order_to_delivery': order_to_delivery,
+                'order_to_date': order_to_date,
+                'staff_users': staff_users,
             }
             return render(request, 'fleet/cod_submission_pwa.html', context)
 
         if request.method == 'POST':
             from django.db import transaction as db_transaction
-            amount = request.POST.get('amount')
+            from decimal import Decimal, InvalidOperation
             received_by = request.POST.get('received_by', '').strip()
             reference_number = request.POST.get('reference_number', '')
             notes = request.POST.get('notes', '')
@@ -599,29 +625,51 @@ def cod_submission(request):
             delivery_ids = [int(x) for x in delivery_ids_str.split(',') if x.strip().isdigit()] if delivery_ids_str else None
 
             try:
-                from decimal import Decimal, InvalidOperation
-                amount = Decimal(str(amount))
-                if amount <= 0:
-                    messages.error(request, 'Amount must be greater than zero.')
+                # Compute amount server-side from the actual delivery tasks being settled
+                # (never trust the client-submitted amount to avoid sync issues)
+                from django.db.models import Sum as _Sum
+                if delivery_ids:
+                    amount = delivery_models.DeliveryTask.objects.filter(
+                        id__in=delivery_ids,
+                        driver=driver,
+                        cod_collected=True,
+                        cod_settled=False
+                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
                 else:
-                    # Re-fetch driver with lock to prevent race condition
+                    amount = delivery_models.DeliveryTask.objects.filter(
+                        driver=driver,
+                        cod_collected=True,
+                        cod_settled=False,
+                        dl_task_status='delivered'
+                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
+
+                if amount <= 0:
+                    messages.error(request, 'No valid COD amount to submit.')
+                else:
                     with db_transaction.atomic():
                         driver = fleet_models.Driver.objects.select_for_update().get(user_id=request.user.id)
-                        if amount > driver.cod_in_hand:
-                            messages.error(request, f'You only have {driver.cod_in_hand} QR in hand.')
-                        else:
-                            # Process COD submission
-                            transaction = WalletService.submit_cod_to_admin(
-                                driver=driver,
-                                amount=amount,
-                                created_by=request.user,
-                                reference_number=reference_number,
-                                notes=notes,
-                                payment_method=payment_method,
-                                delivery_ids=delivery_ids
-                            )
-                            messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
-                            return redirect('fleet:cod_collection')
+                        # Sync cod_in_hand if it's out of date
+                        actual_cod = delivery_models.DeliveryTask.objects.filter(
+                            driver=driver,
+                            cod_collected=True,
+                            cod_settled=False,
+                            dl_task_status='delivered'
+                        ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
+                        if driver.cod_in_hand != actual_cod:
+                            driver.cod_in_hand = actual_cod
+                            driver.save(update_fields=['cod_in_hand'])
+
+                        transaction = WalletService.submit_cod_to_admin(
+                            driver=driver,
+                            amount=amount,
+                            created_by=request.user,
+                            reference_number=reference_number,
+                            notes=notes,
+                            payment_method=payment_method,
+                            delivery_ids=delivery_ids
+                        )
+                        messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
+                        return redirect('fleet:cod_collection')
             except (ValueError, InvalidOperation) as e:
                 messages.error(request, str(e))
             except Exception as e:
@@ -667,6 +715,14 @@ def cod_submission(request):
         delivery_ids_str = ','.join(str(t.id) for t in cod_in_hand_list)
         order_to_delivery = {t.order_id: t.id for t in cod_in_hand_list}
 
+        from core.models import Profile
+        staff_users = Profile.objects.filter(is_staff=True).select_related('user').order_by('first_name', 'last_name')
+
+        order_to_date = {
+            t.order_id: t.completed_at.strftime('%Y-%m-%d') if t.completed_at else ''
+            for t in cod_in_hand_list
+        }
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
@@ -678,6 +734,8 @@ def cod_submission(request):
             'selected_orders': selected_orders,
             'delivery_ids_str': delivery_ids_str,
             'order_to_delivery': order_to_delivery,
+            'order_to_date': order_to_date,
+            'staff_users': staff_users,
         }
 
         return render(request, 'fleet/cod_submission_pwa.html', context)
@@ -3108,6 +3166,19 @@ def fleet_tasks_map(request):
     from itertools import chain
     tasks = list(chain(active_tasks, new_tasks))
 
+    # Build zone number -> name lookup
+    zone_numbers = set()
+    for t in tasks:
+        if t.order.dl_zone:
+            try:
+                zone_numbers.add(int(t.order.dl_zone))
+            except (ValueError, TypeError):
+                pass
+    zone_name_map = {
+        z.zone_number: z.zone_name
+        for z in delivery_models.ZoneName.objects.filter(zone_number__in=zone_numbers).only('zone_number', 'zone_name')
+    }
+
     pins = []
     for t in tasks:
         lat = None
@@ -3120,6 +3191,12 @@ def fleet_tasks_map(request):
             lat = float(t.dl_to_address.dl_latitude)
             lng = float(t.dl_to_address.dl_longitude)
 
+        zone_val = t.order.dl_zone or ''
+        try:
+            zone_name = zone_name_map.get(int(zone_val), '') if zone_val else ''
+        except (ValueError, TypeError):
+            zone_name = ''
+
         pins.append({
             'id': t.id,
             'task_number': t.dl_task_number or str(t.id),
@@ -3128,10 +3205,12 @@ def fleet_tasks_map(request):
             'is_new': t.dl_task_status in new_statuses,
             'customer_name': t.order.customer_name or '',
             'customer_phone': t.order.customer_phone or '',
-            'zone': t.order.dl_zone or '',
+            'zone': zone_val,
+            'zone_name': zone_name,
             'street': t.order.dl_street or '',
             'building': t.order.dl_building or '',
             'address': t.order.customer_address or '',
+            'coords_accuracy': t.order.coords_accuracy or '',
             'lat': lat,
             'lng': lng,
         })
@@ -3187,3 +3266,210 @@ def upload_delivery_proof(request, task_id):
     )
 
     return JsonResponse({'success': True, 'proof_id': proof.id})
+
+
+# Staff COD Submission Management =====================================================
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submissions(request):
+    """List all pending COD submissions for staff review and approval"""
+    if not request.user.is_staff:
+        return redirect('fleet:fleet_dashboard')
+
+    # Get all cod_driver_settle transactions (pending, verified, approved)
+    submissions = DriverTransaction.objects.filter(
+        transaction_type='cod_driver_settle'
+    ).select_related(
+        'driver',
+        'driver__user',
+        'driver__profile',
+        'created_by'
+    ).prefetch_related(
+        'submission_tasks',
+        'submission_tasks__order'
+    ).order_by('-created_at')
+
+    # Filter by status if requested
+    status = request.GET.get('status', 'all')
+    if status == 'pending':
+        submissions = submissions.filter(is_received=False, is_verified=False, is_approved=False)
+    elif status == 'verified':
+        submissions = submissions.filter(is_verified=True, is_approved=False)
+    elif status == 'approved':
+        submissions = submissions.filter(is_approved=True)
+
+    # Build context with task counts
+    submissions_list = []
+    for txn in submissions:
+        task_count = txn.submission_tasks.count()
+        submissions_list.append({
+            'txn': txn,
+            'task_count': task_count,
+            'driver_name': txn.driver.profile.get_full_name() if txn.driver else 'Unknown'
+        })
+
+    context = {
+        'submissions': submissions_list,
+        'status_filter': status,
+    }
+    return render(request, 'fleet/staff_cod_submissions.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_edit(request, txn_code):
+    """Edit a COD submission: add/remove tasks and approve"""
+    if not request.user.is_staff:
+        return redirect('fleet:fleet_dashboard')
+
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+
+    # Get all linked delivery tasks
+    linked_tasks = txn.submission_tasks.select_related(
+        'order', 'driver', 'dl_to_address'
+    ).order_by('-completed_at')
+
+    # Get available tasks to add (same driver, cod_collected, not yet settled or in other submissions)
+    if txn.driver:
+        available_tasks = DeliveryTask.objects.filter(
+            driver=txn.driver,
+            cod_collected=True,
+            cod_settled=False,
+            dl_task_status='delivered'
+        ).exclude(
+            id__in=linked_tasks.values_list('id', flat=True)
+        ).select_related(
+            'order', 'dl_to_address'
+        ).order_by('-completed_at')
+    else:
+        available_tasks = DeliveryTask.objects.none()
+
+    context = {
+        'txn': txn,
+        'linked_tasks': linked_tasks,
+        'available_tasks': available_tasks,
+        'can_edit': not txn.is_approved,  # Can only edit if not approved
+    }
+    return render(request, 'fleet/staff_cod_submission_edit.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_add_task(request, txn_code):
+    """AJAX: Add a delivery task to COD submission"""
+    if not request.user.is_staff or request.method != 'POST':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+
+    if txn.is_approved:
+        return JsonResponse({'error': 'Cannot edit approved submission'}, status=400)
+
+    task_id = request.POST.get('task_id')
+    task = get_object_or_404(DeliveryTask, pk=task_id, cod_collected=True, cod_settled=False)
+
+    # Verify task belongs to same driver
+    if task.driver_id != txn.driver_id:
+        return JsonResponse({'error': 'Task does not belong to this driver'}, status=400)
+
+    # Link task to submission
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        task.cod_submission_txn = txn
+        task.save(update_fields=['cod_submission_txn'])
+
+        # Recalculate submission amount
+        from django.db.models import Sum
+        new_amount = DeliveryTask.objects.filter(
+            cod_submission_txn=txn
+        ).aggregate(total=Sum('cod_collected_amount'))['total'] or 0
+
+        txn.amount = new_amount
+        txn.save(update_fields=['amount'])
+
+    return JsonResponse({
+        'success': True,
+        'new_amount': float(new_amount),
+        'task_count': txn.submission_tasks.count()
+    })
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_remove_task(request, txn_code):
+    """AJAX: Remove a delivery task from COD submission"""
+    if not request.user.is_staff or request.method != 'POST':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+
+    if txn.is_approved:
+        return JsonResponse({'error': 'Cannot edit approved submission'}, status=400)
+
+    task_id = request.POST.get('task_id')
+    task = get_object_or_404(DeliveryTask, pk=task_id, cod_submission_txn=txn)
+
+    # Unlink task from submission
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        task.cod_submission_txn = None
+        task.cod_settled = False
+        task.cod_settled_at = None
+        task.save(update_fields=['cod_submission_txn', 'cod_settled', 'cod_settled_at'])
+
+        # Recalculate submission amount
+        from django.db.models import Sum
+        new_amount = DeliveryTask.objects.filter(
+            cod_submission_txn=txn
+        ).aggregate(total=Sum('cod_collected_amount'))['total'] or 0
+
+        txn.amount = new_amount
+        txn.save(update_fields=['amount'])
+
+    return JsonResponse({
+        'success': True,
+        'new_amount': float(new_amount),
+        'task_count': txn.submission_tasks.count()
+    })
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_approve(request, txn_code):
+    """AJAX: Update COD submission approval status"""
+    if not request.user.is_staff or request.method != 'POST':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+
+    action = request.POST.get('action')  # 'receive', 'verify', 'approve', 'revert'
+
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        if action == 'receive':
+            txn.is_received = True
+        elif action == 'verify':
+            txn.is_received = True
+            txn.is_verified = True
+        elif action == 'approve':
+            txn.is_received = True
+            txn.is_verified = True
+            txn.is_approved = True
+
+            # Mark all linked tasks as settled
+            txn.submission_tasks.all().update(
+                cod_settled=True,
+                cod_settled_at=timezone.now()
+            )
+        elif action == 'revert':
+            # Only revert if not approved
+            if txn.is_approved:
+                return JsonResponse({'error': 'Cannot revert approved submission'}, status=400)
+            txn.is_received = False
+            txn.is_verified = False
+
+        txn.save()
+
+    # Return updated status
+    return JsonResponse({
+        'success': True,
+        'is_received': txn.is_received,
+        'is_verified': txn.is_verified,
+        'is_approved': txn.is_approved,
+    })

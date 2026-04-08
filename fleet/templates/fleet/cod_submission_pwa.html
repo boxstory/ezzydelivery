@@ -5,6 +5,15 @@
 {% block page_title %}Submit COD{% endblock %}
 
 {% block content %}
+{% if messages %}
+<script>
+window.addEventListener('DOMContentLoaded', function() {
+    {% for msg in messages %}
+    showToast("{{ msg|escapejs }}", "{{ msg.tags|default:'info' }}");
+    {% endfor %}
+});
+</script>
+{% endif %}
 <!-- COD Amount Card -->
 <div class="fleet-card--gradient fleet-fade-in">
     <div style="text-align: center; padding: var(--spacing-lg) 0;">
@@ -57,15 +66,21 @@
                     <i class="fa-solid fa-user me-1"></i>
                     Received By *
                 </label>
-                <input
-                    type="text"
+                <select
                     id="received_by"
                     name="received_by"
                     class="fleet-input"
-                    placeholder="Staff member name"
                     required
-                    autocomplete="name"
                 >
+                    <option value="">-- Select staff member --</option>
+                    {% for staff in staff_users %}
+                        <option value="{{ staff.first_name }} {{ staff.last_name }}"{% if staff.user.username == 'ezzystaff' %} selected{% endif %}>
+                            {{ staff.first_name }} {{ staff.last_name }}{% if staff.user.username %} ({{ staff.user.username }}){% endif %}
+                        </option>
+                    {% empty %}
+                        <option value="" disabled>No staff users found</option>
+                    {% endfor %}
+                </select>
             </div>
 
             <!-- Notes -->
@@ -89,15 +104,39 @@
     <!-- Orders Breakdown -->
     <div class="fleet-card fleet-slide-up" style="animation-delay: 0.2s; padding: 0; overflow: hidden;">
         <div class="fleet-card__header" style="padding: var(--spacing-lg); margin-bottom: 0; border-bottom: 1px solid var(--fleet-grey-100);">
-            <h3 class="fleet-card__title">
-                <i class="fa-solid fa-list-check me-2"></i>
-                Orders (<span id="codOrderCount">{{ selected_orders|length }}</span>)
-            </h3>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <h3 class="fleet-card__title" style="margin:0;">
+                    <i class="fa-solid fa-list-check me-2"></i>
+                    Orders (<span id="codOrderCount">{{ selected_orders|length }}</span>)
+                </h3>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <select id="codDatePreset" class="fleet-input" style="font-size:0.75rem; padding:4px 8px; width:auto;">
+                        <option value="all">All Dates</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="3days">Last 3 Days</option>
+                        <option value="7days">Last 7 Days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="codCustomRange" style="display:none; padding:8px var(--spacing-lg); border-bottom:1px solid var(--fleet-grey-100); background:var(--fleet-grey-50);">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:4px; flex:1; min-width:120px;">
+                    <label style="font-size:0.7rem; color:var(--fleet-grey-500); white-space:nowrap;">From</label>
+                    <input type="date" id="codDateFrom" class="fleet-input" style="font-size:0.75rem; padding:4px 6px;">
+                </div>
+                <div style="display:flex; align-items:center; gap:4px; flex:1; min-width:120px;">
+                    <label style="font-size:0.7rem; color:var(--fleet-grey-500); white-space:nowrap;">To</label>
+                    <input type="date" id="codDateTo" class="fleet-input" style="font-size:0.75rem; padding:4px 6px;">
+                </div>
+            </div>
         </div>
 
         <ul class="fleet-list" id="codOrderList" style="margin: 0; max-height: 300px; overflow-y: auto;">
             {% for order in selected_orders %}
-            <li class="fleet-list-item cod-order-item" data-cod="{{ order.cod_amount|floatformat:2 }}" data-delivery-id="{{ order_to_delivery|get_item:order.id }}" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;">
+            <li class="fleet-list-item cod-order-item" data-cod="{{ order.cod_amount|floatformat:2 }}" data-delivery-id="{{ order_to_delivery|get_item:order.id }}" data-date="{{ order_to_date|get_item:order.id }}" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;">
                 <div class="fleet-list-item__content" style="flex:1;min-width:0;">
                     <div class="fleet-list-item__title" style="font-size: var(--font-size-sm);">#{{ order.order_number }}</div>
                     <div class="fleet-list-item__subtitle" style="font-size: 0.625rem;">
@@ -233,5 +272,82 @@
             this.value = val.toFixed(2);
         }
     });
+
+    // Date filter
+    const datePreset = document.getElementById('codDatePreset');
+    const customRange = document.getElementById('codCustomRange');
+    const dateFrom = document.getElementById('codDateFrom');
+    const dateTo = document.getElementById('codDateTo');
+
+    function toYMD(d) {
+        return d.toISOString().slice(0, 10);
+    }
+
+    function applyDateFilter() {
+        const preset = datePreset.value;
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        let fromDate = null, toDate = null;
+
+        if (preset === 'yesterday') {
+            const y = new Date(today); y.setDate(y.getDate() - 1);
+            fromDate = toDate = toYMD(y);
+        } else if (preset === '3days') {
+            const d = new Date(today); d.setDate(d.getDate() - 2);
+            fromDate = toYMD(d);
+            toDate = toYMD(today);
+        } else if (preset === '7days') {
+            const d = new Date(today); d.setDate(d.getDate() - 6);
+            fromDate = toYMD(d);
+            toDate = toYMD(today);
+        } else if (preset === 'custom') {
+            customRange.style.display = 'block';
+            fromDate = dateFrom.value || null;
+            toDate = dateTo.value || null;
+        } else {
+            // all
+            customRange.style.display = 'none';
+        }
+
+        if (preset !== 'custom') customRange.style.display = 'none';
+
+        const allItems = document.querySelectorAll('.cod-order-item:not(.removing)');
+        let visibleCount = 0, visibleTotal = 0;
+
+        allItems.forEach(li => {
+            const itemDate = li.dataset.date || '';
+            let visible = true;
+            if (fromDate && toDate) {
+                visible = itemDate >= fromDate && itemDate <= toDate;
+            } else if (fromDate) {
+                visible = itemDate >= fromDate;
+            } else if (toDate) {
+                visible = itemDate <= toDate;
+            } else if (preset !== 'all') {
+                visible = true;
+            }
+            li.style.display = visible ? '' : 'none';
+            if (visible) { visibleCount++; visibleTotal += parseFloat(li.dataset.cod) || 0; }
+        });
+
+        document.getElementById('codOrderCount').textContent = visibleCount;
+        amountInput.value = visibleTotal.toFixed(2);
+        document.getElementById('codTotalDisplay').textContent = visibleTotal.toFixed(2);
+
+        const visibleIds = Array.from(allItems)
+            .filter(li => li.style.display !== 'none')
+            .map(li => li.dataset.deliveryId).filter(Boolean);
+        document.querySelector('input[name="delivery_ids"]').value = visibleIds.join(',');
+
+        submitBtn.disabled = visibleCount === 0;
+        submitBtn.innerHTML = visibleCount === 0
+            ? '<i class="fa-solid fa-ban me-2"></i>No Orders Selected'
+            : '<i class="fa-solid fa-check-circle me-2"></i>Confirm Submission';
+    }
+
+    datePreset.addEventListener('change', applyDateFilter);
+    dateFrom.addEventListener('change', applyDateFilter);
+    dateTo.addEventListener('change', applyDateFilter);
 </script>
 {% endblock %}

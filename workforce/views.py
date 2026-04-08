@@ -7847,8 +7847,8 @@ def fleet_cod_in_hand(request):
             total=Sum('cod_collected_amount')
         ).values('total')
 
-        # Show all drivers (not just approved) for COD tracking
-        drivers = fleet_models.Driver.objects.all().select_related('user').annotate(
+        # Show only approved drivers for COD tracking
+        drivers = fleet_models.Driver.objects.filter(driver_status='approved').select_related('user').annotate(
             period_cod=Coalesce(
                 Subquery(cod_subquery),
                 Value(0),
@@ -7867,8 +7867,8 @@ def fleet_cod_in_hand(request):
             total=Sum('cod_collected_amount')
         ).values('total')
 
-        # Show all drivers (not just approved) for COD tracking
-        drivers = fleet_models.Driver.objects.all().select_related('user').annotate(
+        # Show only approved drivers for COD tracking
+        drivers = fleet_models.Driver.objects.filter(driver_status='approved').select_related('user').annotate(
             period_cod=Coalesce(
                 Subquery(cod_subquery),
                 Value(0),
@@ -8503,8 +8503,8 @@ def fleet_transactions(request):
         date_to = today.isoformat()
     # For 'custom', use the date_from and date_to from request
 
-    # Default to cod_collection if no type filter specified
-    txn_type = request.GET.get('type', 'cod_collection') if 'type' not in request.GET else request.GET.get('type')
+    # Default to cod_driver_settle (COD submissions) if no type filter specified
+    txn_type = request.GET.get('type', 'cod_driver_settle') if 'type' not in request.GET else request.GET.get('type')
     status = request.GET.get('status', '')
     min_amount = request.GET.get('min_amount', '')
     max_amount = request.GET.get('max_amount', '')
@@ -8514,7 +8514,10 @@ def fleet_transactions(request):
             transactions = transactions.filter(created_at__date__gte=date_from)
         if date_to:
             transactions = transactions.filter(created_at__date__lte=date_to)
-        if txn_type:
+        if txn_type == 'cod_driver_settle':
+            # Include legacy cod_deposit too
+            transactions = transactions.filter(transaction_type__in=['cod_driver_settle', 'cod_deposit'])
+        elif txn_type:
             transactions = transactions.filter(transaction_type=txn_type)
         if status == 'settled':
             transactions = transactions.filter(settlement__isnull=False)
@@ -8610,6 +8613,94 @@ def fleet_transactions(request):
     return render(request, 'workforce/fleet_transactions.html', context)
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+def fleet_transaction_cod_details(request, txn_id):
+    """AJAX: Return list of delivery tasks for a COD submission transaction"""
+    from datetime import timedelta
+    from delivery import models as delivery_models
+
+    try:
+        txn = fleet_models.DriverTransaction.objects.select_related('driver', 'driver__user').get(
+            id=txn_id
+        )
+    except fleet_models.DriverTransaction.DoesNotExist:
+        return JsonResponse({'error': 'Transaction not found'}, status=404)
+
+    tasks = []
+    if txn.transaction_type in ['cod_deposit', 'cod_driver_settle']:
+        window = timedelta(seconds=10)
+        settled_tasks = delivery_models.DeliveryTask.objects.filter(
+            driver=txn.driver,
+            cod_collected=True,
+            cod_settled=True,
+            cod_settled_at__gte=txn.created_at - window,
+            cod_settled_at__lte=txn.created_at + window,
+        ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
+
+        for d in settled_tasks:
+            tasks.append({
+                'task_id': d.id,
+                'task_number': d.dl_task_number or '-',
+                'order_code': d.order.client_order_code if d.order else '-',
+                'business': d.order.business.business_name if d.order and d.order.business else '-',
+                'customer': d.order.customer_name if d.order else '-',
+                'location': d.dl_to_address.area_name if d.dl_to_address else '-',
+                'delivered_at': d.completed_at.strftime('%d %b %Y, %H:%M') if d.completed_at else '-',
+                'amount': float(d.cod_collected_amount or 0),
+                'cod_settled': d.cod_settled,
+            })
+    elif txn.transaction_type == 'cod_collection' and txn.delivery_task:
+        d = txn.delivery_task
+        tasks.append({
+            'task_id': d.id,
+            'task_number': d.dl_task_number or '-',
+            'order_code': d.order.client_order_code if d.order else '-',
+            'business': d.order.business.business_name if d.order and d.order.business else '-',
+            'customer': d.order.customer_name if d.order else '-',
+            'location': d.dl_to_address.area_name if d.dl_to_address else '-',
+            'delivered_at': d.completed_at.strftime('%d %b %Y, %H:%M') if d.completed_at else '-',
+            'amount': float(d.cod_collected_amount or 0),
+            'cod_settled': d.cod_settled,
+        })
+
+    return JsonResponse({
+        'txn_id': txn.id,
+        'transaction_code': txn.transaction_code or '-',
+        'transaction_type': txn.get_transaction_type_display(),
+        'amount': float(txn.amount),
+        'date': txn.created_at.strftime('%d %b %Y, %H:%M'),
+        'payment_method': txn.get_payment_method_display() if txn.payment_method else '-',
+        'notes': txn.notes or '',
+        'is_received': txn.is_received,
+        'is_verified': txn.is_verified,
+        'tasks': tasks,
+        'tasks_count': len(tasks),
+        'tasks_total': sum(t['amount'] for t in tasks),
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def fleet_transaction_update_status(request, txn_id):
+    """AJAX: Toggle is_received or is_verified on a DriverTransaction"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        txn = fleet_models.DriverTransaction.objects.get(id=txn_id)
+    except fleet_models.DriverTransaction.DoesNotExist:
+        return JsonResponse({'error': 'Transaction not found'}, status=404)
+
+    field = request.POST.get('field')
+    if field not in ('is_received', 'is_verified'):
+        return JsonResponse({'error': 'Invalid field'}, status=400)
+
+    new_value = not getattr(txn, field)
+    setattr(txn, field, new_value)
+    txn.save(update_fields=[field])
+
+    return JsonResponse({'success': True, 'field': field, 'value': new_value})
 
 
 @login_required(login_url='/accounts/login/')
@@ -13205,15 +13296,17 @@ def tasks_live_map(request):
         created_at__gte=recent_cutoff,
     ).order_by('driver_id', '-created_at').distinct('driver_id')
 
-    # Build a driver lookup for names
+    # Build a driver lookup — all approved drivers, so they always appear in the filter
     gps_driver_ids = set(loc.driver_id for loc in latest_locs)
-    all_relevant_driver_ids = active_driver_ids | gps_driver_ids
     driver_map = {}
-    if all_relevant_driver_ids:
-        for d in fleet_models.Driver.objects.select_related('user').filter(
-            driver_id__in=all_relevant_driver_ids
-        ):
-            driver_map[d.driver_id] = d
+    all_approved_drivers = fleet_models.Driver.objects.select_related('user').filter(
+        driver_status='approved'
+    )
+    approved_driver_ids = set()
+    for d in all_approved_drivers:
+        driver_map[d.driver_id] = d
+        approved_driver_ids.add(d.driver_id)
+    all_relevant_driver_ids = active_driver_ids | gps_driver_ids | approved_driver_ids
 
     for loc in latest_locs:
         drivers_with_gps.add(loc.driver_id)
@@ -13233,7 +13326,8 @@ def tasks_live_map(request):
         })
 
     # For drivers with active tasks but no GPS pings, show at task location
-    for driver_id in active_driver_ids - drivers_with_gps:
+    # Also include approved drivers with no tasks and no GPS (listed in filter, not on map)
+    for driver_id in (active_driver_ids | approved_driver_ids) - drivers_with_gps:
         driver = driver_map.get(driver_id)
         fallback_lat = fallback_lng = None
         task_count = 0
@@ -13934,42 +14028,89 @@ def _match_product_by_name(pname, business):
 
 def _extract_products_from_raw_row(temp_order):
     """Extract product_1/count_1..3 from raw_row using column mapping."""
-    # Prefer shared business mapping; fall back to per-source mapping
-    col_mapping = (
-        (temp_order.business.import_mapping if temp_order.business_id else None)
-        or (temp_order.onedrive_source.last_column_mapping if temp_order.onedrive_source else None)
-        or (temp_order.api_settings.column_mapping if temp_order.api_settings else None)
-        or (temp_order.public_link_source.last_column_mapping if temp_order.public_link_source else None)
-        or {}
-    )
+    # --- Resolve raw headers (needed for new-format header-name lookups) ---
+    raw_headers = []
+    if temp_order.onedrive_source and getattr(temp_order.onedrive_source, 'last_headers', None):
+        raw_headers = temp_order.onedrive_source.last_headers
+    elif temp_order.public_link_source and getattr(temp_order.public_link_source, 'last_headers', None):
+        raw_headers = temp_order.public_link_source.last_headers
+
+    # --- Resolve col_mapping, handling nested business.import_mapping ---
+    _src_to_platform = {
+        'onedrive': 'onedrive', 'google_sheet': 'google_sheet',
+        'shopify': 'shopify', 'woocommerce': 'woocommerce',
+        'public_link': 'public_link', 'csv': 'csv', 'csv_upload': 'csv',
+    }
+    raw_is_dict = isinstance(temp_order.raw_row, dict)
+    platform_key = 'csv' if raw_is_dict else _src_to_platform.get(temp_order.source_type, 'csv')
+
+    col_mapping = {}
+    biz_mapping_raw = temp_order.business.import_mapping if temp_order.business_id else None
+    if biz_mapping_raw:
+        nested_keys = ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link')
+        if any(k in biz_mapping_raw for k in nested_keys):
+            col_mapping = biz_mapping_raw.get(platform_key) or {}
+        else:
+            col_mapping = biz_mapping_raw  # legacy flat
+    else:
+        col_mapping = (
+            (temp_order.onedrive_source.last_column_mapping if temp_order.onedrive_source else None)
+            or (temp_order.api_settings.column_mapping if temp_order.api_settings else None)
+            or (temp_order.public_link_source.last_column_mapping if temp_order.public_link_source else None)
+            or {}
+        )
 
     if not col_mapping:
         return []
 
-    # Build reverse mapping: db_field -> col_index
+    # --- Build reverse_map: db_field -> col_index ---
+    # New format: {db_field: header_name} — look up header position
+    # Old format: {col_idx_str: db_field} — keys are numeric strings
     reverse_map = {}
-    for col_idx, db_field in col_mapping.items():
-        if db_field:
-            reverse_map[db_field] = int(col_idx)
+    is_new_format = not all(str(k).isdigit() for k in col_mapping)
+    if is_new_format:
+        header_lower = [h.lower() for h in raw_headers]
+        for db_field, header_name in col_mapping.items():
+            if db_field and header_name:
+                try:
+                    reverse_map[db_field] = header_lower.index(str(header_name).lower())
+                except ValueError:
+                    pass
+    else:
+        for col_idx, db_field in col_mapping.items():
+            if db_field:
+                try:
+                    reverse_map[db_field] = int(col_idx)
+                except (ValueError, TypeError):
+                    pass
 
-    raw = temp_order.raw_row if isinstance(temp_order.raw_row, list) else []
-    if not raw:
-        return []
+    # --- Extract product_1..3 / count_1..3 ---
+    raw_list = temp_order.raw_row if isinstance(temp_order.raw_row, list) else []
+    db_to_header = col_mapping if is_new_format else {}
+
+    def _get_val(db_field):
+        """Get value from raw_row by db_field, supporting both list and dict raw_row."""
+        if raw_is_dict:
+            header = db_to_header.get(db_field, '')
+            return str(temp_order.raw_row.get(header) or temp_order.raw_row.get(db_field) or '').strip()
+        idx = reverse_map.get(db_field)
+        if idx is not None and idx < len(raw_list):
+            return str(raw_list[idx] or '').strip()
+        return ''
 
     products = []
     for i in range(1, 4):
-        pf = f'product_{i}'
-        cf = f'count_{i}'
-        if pf in reverse_map and reverse_map[pf] < len(raw):
-            pname = str(raw[reverse_map[pf]] or '').strip()
-            pcount = 1
-            if cf in reverse_map and reverse_map[cf] < len(raw):
-                try:
-                    pcount = int(float(str(raw[reverse_map[cf]] or '1').strip())) or 1
-                except (ValueError, TypeError):
-                    pcount = 1
-            if pname:
-                products.append({'name': pname, 'qty': pcount})
+        pname = _get_val(f'product_{i}')
+        if not pname:
+            continue
+        pcount = 1
+        count_raw = _get_val(f'count_{i}')
+        if count_raw:
+            try:
+                pcount = int(float(count_raw)) or 1
+            except (ValueError, TypeError):
+                pcount = 1
+        products.append({'name': pname, 'qty': pcount})
     return products
 
 
@@ -14337,31 +14478,77 @@ def temp_orders_auto_import(request):
         dl_building = safe_int_or_none(temp_order.dl_building)
         package_desc = (temp_order.package_desc or '').strip()
 
-        # --- Product matching ---
-        products = parse_products_from_desc(package_desc)
+        # Extra fields from raw_row (same sources as transfer flow)
+        raw_row = temp_order.raw_row if isinstance(temp_order.raw_row, dict) else {}
+        package_qty = safe_int(raw_row.get('package_qty', '')) or 1
+        deadline_date = (raw_row.get('deadline_date', '') or '').strip()
+        seller_notes = (raw_row.get('seller_notes', '') or '').strip()
+        internal_notes = (raw_row.get('internal_notes', '') or '').strip()
+        dl_landmark = (raw_row.get('dl_landmark', '') or '').strip()
+        location_link = (raw_row.get('location_link', '') or '').strip()
+        dl_latitude = None
+        dl_longitude = None
+        try:
+            lat_str = str(raw_row.get('dl_latitude', '') or '').strip()
+            if lat_str:
+                dl_latitude = float(lat_str)
+        except (ValueError, TypeError):
+            pass
+        try:
+            lng_str = str(raw_row.get('dl_longitude', '') or '').strip()
+            if lng_str:
+                dl_longitude = float(lng_str)
+        except (ValueError, TypeError):
+            pass
+        fin_status = (temp_order.financial_status or '').lower()
+        cod_status_by_client = 'online_paid' if fin_status == 'paid' else None
 
-        # If no products from package_desc, try product_1/count_1 columns from raw_row
+        # --- Product extraction (mirrors transfer flow exactly) ---
+        # 1. Direct product_N/count_N keys from dict raw_row (Shopify, WooCommerce, CSV)
+        products = []
+        for i in range(1, 6):
+            pname = (raw_row.get(f'product_{i}', '') or '').strip()
+            pcount = safe_int(raw_row.get(f'count_{i}', '')) or 1
+            if pname:
+                products.append({'name': pname, 'qty': pcount})
+
+        # 2. List-type raw_row via column mapping (OneDrive, Google Sheet, Public Link)
         if not products:
             products = _extract_products_from_raw_row(temp_order)
 
-        matched_items = []
+        # 3. parse_products_from_desc fallback (e.g. "Item x2, Other x1")
+        if not products and package_desc:
+            products = parse_products_from_desc(package_desc)
+
+        # 4. line_items fallback (Shopify API orders)
+        if not products:
+            for li in raw_row.get('line_items', []):
+                li_name = li.get('name', '')
+                li_qty = li.get('qty', 1)
+                if li_name:
+                    products.append({'name': li_name, 'qty': li_qty})
+
+        # --- Parse clean names and match to Product records ---
         unmatched_names = []
         clean_product_names = []
+        all_items = []  # [{product, qty, pname, unit_price}] — all products, matched or not
+        li_price_map = {li.get('name', ''): li.get('price', 0) for li in raw_row.get('line_items', [])}
         for p in products:
             pname = p['name']
             pqty = p['qty']
             matched = _match_product_by_name(pname, business)
-            # Store clean name for package description
             clean_name, _ = _parse_coded_product_name(pname)
             clean_product_names.append({'name': clean_name, 'qty': pqty})
-            if matched:
-                matched_items.append({'product': matched, 'qty': pqty})
-            else:
+            unit_price = float(li_price_map.get(pname, 0) or 0) or (matched.item_price or 0 if matched else 0)
+            all_items.append({'product': matched, 'qty': pqty, 'pname': pname, 'unit_price': unit_price})
+            if not matched:
                 unmatched_names.append(f"{clean_name} x{pqty}")
 
-        # Build clean package_desc from parsed product names
+        # Build package_desc from clean product names if not already set
         if not package_desc and clean_product_names:
             package_desc = ', '.join(f"{p['name']} x{p['qty']}" for p in clean_product_names)
+        if not package_qty or package_qty == 1:
+            package_qty = sum(p['qty'] for p in clean_product_names) or 1
 
         if unmatched_names:
             row_warnings.append(f"Unmatched products: {', '.join(unmatched_names)}")
@@ -14384,11 +14571,19 @@ def temp_orders_auto_import(request):
         if not pickup_location:
             row_warnings.append('No default pickup location found — manual assignment required')
 
-        # --- Build order_notes (unmatched items) ---
-        auto_notes = ''
+        # --- Build order_notes (mirrors transfer: seller/internal notes + unmatched) ---
+        notes_parts = []
+        if seller_notes:
+            notes_parts.append(f"Seller: {seller_notes}")
+        if internal_notes:
+            notes_parts.append(f"Ezzy: {internal_notes}")
+        if dl_landmark:
+            notes_parts.append(f"Landmark: {dl_landmark}")
+        if location_link:
+            notes_parts.append(f"Link: {location_link}")
         if unmatched_names:
-            note_str = f"[Auto] Unmatched: {', '.join(unmatched_names)}"
-            auto_notes = note_str[:97] + '...' if len(note_str) > 100 else note_str
+            notes_parts.append(f"Unmatched: {', '.join(unmatched_names)}")
+        auto_notes = ' | '.join(notes_parts)
 
         # --- Create Order ---
         try:
@@ -14404,12 +14599,16 @@ def temp_orders_auto_import(request):
                     dl_street=dl_street,
                     dl_building=dl_building,
                     cod_amount=cod_amount,
+                    cod_status_by_client=cod_status_by_client,
+                    deadline_date=deadline_date[:100] if deadline_date else '',
+                    latitude=dl_latitude,
+                    longitude=dl_longitude,
                     pickup_location=pickup_location,
-                    order_notes=auto_notes,
+                    order_notes=auto_notes[:100] if auto_notes else '',
                     order_status='to_review',
                     verification_status='pending',
                     package_description=package_desc[:255] if package_desc else '',
-                    package_qty=max(sum(p['qty'] for p in products), 1) if products else 1,
+                    package_qty=package_qty,
                     original_order_data={
                         'source': f'{temp_order.source_type}_auto_import',
                         'temp_order_id': temp_order.id,
@@ -14418,19 +14617,20 @@ def temp_orders_auto_import(request):
                         'row_number': temp_order.row_num,
                         'platform_id': temp_order.platform_id,
                         'auto_imported': True,
-                        'products': [{'name': p['name'], 'qty': str(p['qty'])} for p in products],
+                        'products': [{'name': p['name'], 'qty': str(p['qty'])} for p in clean_product_names],
                     },
                 )
                 order.save()
 
-                # Create OrderItems for matched products
-                for item in matched_items:
+                # Create OrderItems for ALL products (matched or not — same as transfer)
+                for item in all_items:
+                    matched = item['product']
                     orders_models.OrderItem.objects.create(
                         order=order,
-                        product=item['product'],
+                        product=matched,
                         quantity=item['qty'],
-                        unit_price=item['product'].item_price or 0,
-                        notes=item['product'].item_name,
+                        unit_price=item['unit_price'],
+                        notes=matched.item_name if matched else item['pname'],
                     )
 
                 # Mark temp order imported
@@ -17153,3 +17353,49 @@ def process_cod_return(request, task_id):
         'success': True,
         'message': f'COD return of {amount} QAR processed for {task.order.order_number}'
     })
+
+
+# COD Submissions Management ===================================================================
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submissions_redirect(request):
+    """Redirect to fleet staff COD submissions page"""
+    if not request.user.is_staff:
+        return redirect('wf_dashboard')
+    return redirect('fleet:staff_cod_submissions')
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_edit_redirect(request, txn_code):
+    """Redirect to edit COD submission"""
+    if not request.user.is_staff:
+        return redirect('wf_dashboard')
+    from fleet import views as fleet_views
+    return fleet_views.staff_cod_submission_edit(request, txn_code)
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_add_task_redirect(request, txn_code):
+    """Redirect to add task endpoint"""
+    if not request.user.is_staff:
+        return redirect('wf_dashboard')
+    from fleet import views as fleet_views
+    return fleet_views.staff_cod_submission_add_task(request, txn_code)
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_remove_task_redirect(request, txn_code):
+    """Redirect to remove task endpoint"""
+    if not request.user.is_staff:
+        return redirect('wf_dashboard')
+    from fleet import views as fleet_views
+    return fleet_views.staff_cod_submission_remove_task(request, txn_code)
+
+
+@login_required(login_url='/accounts/login/')
+def staff_cod_submission_approve_redirect(request, txn_code):
+    """Redirect to approve endpoint"""
+    if not request.user.is_staff:
+        return redirect('wf_dashboard')
+    from fleet import views as fleet_views
+    return fleet_views.staff_cod_submission_approve(request, txn_code)

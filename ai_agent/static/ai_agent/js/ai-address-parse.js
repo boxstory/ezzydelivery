@@ -1153,6 +1153,18 @@
                     }
                     _renderBulkSteps();
 
+                    // Compute accuracy (same logic as _saveToOrderSilent)
+                    var _rLat = (r.coordinates || {}).latitude;
+                    var _rLng = (r.coordinates || {}).longitude;
+                    var _accuracy = null;
+                    if (_rLat && _rLng) {
+                        if (r.building_number && r._qnasExactMatch) _accuracy = 'exact';
+                        else if (r.building_number || r._qnasMatch)  _accuracy = 'street';
+                        else                                          _accuracy = 'ai_estimate';
+                    }
+                    var _accLabels = { exact: 'Exact', street: 'Street Level', ai_estimate: 'AI Est. 10%' };
+                    var _accLabel  = _accuracy ? (_accLabels[_accuracy] || _accuracy) : null;
+
                     // Sub-step 3: Save to Order
                     var saved = false;
                     if (order.id && r.zone_number) {
@@ -1162,7 +1174,8 @@
                         try {
                             await _saveToOrderSilent(order.id, r);
                             saved = true;
-                            subSteps[2].status = 'completed'; subSteps[2].text = 'Saved';
+                            subSteps[2].status = 'completed';
+                            subSteps[2].text = 'Saved' + (_accLabel ? ' · ' + _accLabel : '');
                         } catch (saveErr) {
                             console.error('[BulkParse] Save error for ' + order.orderNumber + ':', saveErr);
                             subSteps[2].status = 'error'; subSteps[2].text = 'Save failed';
@@ -1175,9 +1188,14 @@
 
                     // Mark order completed and add to history
                     var summaryText = 'Z' + (r.zone_number || '?') + ' St' + (r.street_number || '?') +
-                        (saved ? ' — Saved' : '') + ' (' + Math.round(r.confidence * 100) + '%)';
+                        (saved ? ' — Saved' : '') +
+                        (_accLabel ? ' · ' + _accLabel : '') +
+                        ' (' + Math.round(r.confidence * 100) + '%)';
                     completedStepsHtml += _bulkStepHtml(order.orderNumber, 'completed', summaryText);
 
+                    var _accBadge = _accuracy
+                        ? '<span class="task-card__acc-badge task-card__acc-badge--' + _accuracy + ' ms-1">' + _accLabel + '</span>'
+                        : '';
                     var cardHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
                         '<i class="fa-solid fa-location-dot"></i><strong>' + _escapeHtml(order.orderNumber) + '</strong>' +
                         '<span class="ms-auto">' +
@@ -1189,6 +1207,7 @@
                         '<div class="aim__result-item"><span class="label">Street</span><span class="value">' + (r.street_number || '-') + '</span></div>' +
                         '<div class="aim__result-item"><span class="label">Building</span><span class="value">' + (r.building_number || '-') + '</span></div>' +
                         '<div class="aim__result-item"><span class="label">Area</span><span class="value">' + _escapeHtml(r.area_name || '-') + '</span></div>' +
+                        (_accuracy ? '<div class="aim__result-item"><span class="label">Accuracy</span><span class="value">' + _accBadge + '</span></div>' : '') +
                         '</div>';
 
                     if (qc) {

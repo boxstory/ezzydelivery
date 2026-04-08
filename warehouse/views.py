@@ -272,6 +272,25 @@ def inventory_list(request):
     search = request.GET.get('search', '')
     low_stock_only = request.GET.get('low_stock') == '1'
     category_id = request.GET.get('category')
+    business_filter_id = request.GET.get('business') if is_staff else None
+
+    # Sorting
+    sort_field = request.GET.get('sort', 'product__item_name')
+    sort_dir = request.GET.get('dir', 'asc')
+    SORT_FIELDS = {
+        'name': 'product__item_name',
+        'brand': 'product__brand_name',
+        'sku': 'product__item_sku',
+        'category': 'product__product_category__category_name',
+        'warehouse': 'warehouse__name',
+        'location': 'location__code',
+        'price': 'product__item_price',
+        'on_hand': 'quantity_on_hand',
+        'reserved': 'quantity_reserved',
+    }
+    orm_sort = SORT_FIELDS.get(sort_field, 'product__item_name')
+    if sort_dir == 'desc':
+        orm_sort = f'-{orm_sort}'
 
     try:
         if is_staff:
@@ -294,7 +313,7 @@ def inventory_list(request):
             'product__unit',
             'warehouse',
             'location'
-        ).order_by('product__item_name')
+        ).order_by(orm_sort)
     except Exception as e:
         logger.error(f"Error setting up initial queries in inventory_list: {e}", exc_info=True)
         messages.error(request, "An error occurred while loading inventory data.")
@@ -315,6 +334,9 @@ def inventory_list(request):
     if category_id:
         stock_levels = stock_levels.filter(product__product_category_id=category_id)
 
+    if is_staff and business_filter_id:
+        stock_levels = stock_levels.filter(product__business_id=business_filter_id)
+
     if low_stock_only:
         stock_levels = stock_levels.filter(
             quantity_on_hand__lte=F('reorder_point') + F('quantity_reserved')
@@ -329,6 +351,18 @@ def inventory_list(request):
     except Exception as e:
         logger.error(f"Error fetching categories: {e}")
         categories = product_models.ProductCategory.objects.none()
+
+    # Get businesses for filter (staff only — from products in stock)
+    businesses = []
+    if is_staff:
+        try:
+            from business.models import Business as BusinessModel
+            biz_ids = stock_levels.values_list('product__business_id', flat=True).distinct()
+            businesses = BusinessModel.objects.filter(
+                business_id__in=[b for b in biz_ids if b is not None]
+            ).order_by('business_name')
+        except Exception as e:
+            logger.error(f"Error fetching businesses for inventory filter: {e}")
 
     # Pagination
     paginator = Paginator(stock_levels, 25)
@@ -349,12 +383,16 @@ def inventory_list(request):
         'stock_levels': items,
         'warehouses': warehouses,
         'categories': categories,
+        'businesses': businesses,
         'search': search,
         'selected_warehouse': warehouse_id,
         'selected_category': category_id,
+        'selected_business': business_filter_id,
         'low_stock_only': low_stock_only,
         'total_value': total_value,
         'is_staff': is_staff,
+        'sort_field': sort_field,
+        'sort_dir': sort_dir,
     }
     return render(request, 'warehouse/inventory_list.html', context)
 

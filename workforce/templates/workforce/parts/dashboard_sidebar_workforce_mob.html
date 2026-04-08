@@ -101,8 +101,9 @@
                 <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-store"></i><span>By Seller</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_orders_to_publish" href="{% url 'workforce:wf_orders_to_publish' %}" class="wsm__nav-link">
+                <a id="workforce_sidebar_mob_link_orders_to_publish" href="{% url 'workforce:wf_orders_to_publish' %}" class="wsm__nav-link d-flex align-items-center">
                     <i class="fa-solid fa-spinner"></i><span>Publish to Task</span>
+                    <span class="badge ms-auto" style="background:var(--brand-primary);color:#000;font-size:0.6rem;" data-badge="pending_publish">{{ pending_publish_count|default:"0" }}</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_orders_published" href="{% url 'workforce:wf_orders_published' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-circle-check"></i><span>Published Orders</span>
@@ -579,6 +580,9 @@ function closeMobileSidebarOnNav() {
 document.addEventListener('DOMContentLoaded', function() {
     const currentPath = window.location.pathname;
 
+    // Check if current page is a fleet-related page
+    const isFleetPage = /^\/workforce\/(fleet|drivers)\//.test(currentPath);
+
     // Map path prefixes to {section, highlight link} for sub-pages (longer prefixes first)
     var subpageMap = [
         // Import
@@ -661,6 +665,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (subpageMatch.link) {
             var hl = document.getElementById(subpageMatch.link);
             if (hl) hl.classList.add('active');
+        }
+    }
+
+    // Keep sidebar open on fleet pages
+    if (isFleetPage) {
+        var menu = document.getElementById('mobileSidebarMenu');
+        if (menu) {
+            menu.classList.add('show');
         }
     }
 

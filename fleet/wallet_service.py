@@ -216,6 +216,7 @@ class WalletService:
 
         # Mark corresponding delivery tasks as COD settled
         settled_task_ids = []
+        now = timezone.now()
         if delivery_ids:
             # Settle specific deliveries
             settled_task_ids = list(DeliveryTask.objects.filter(
@@ -225,7 +226,7 @@ class WalletService:
                 cod_settled=False
             ).values_list('id', flat=True))
             DeliveryTask.objects.filter(id__in=settled_task_ids).update(
-                cod_settled=True, cod_settled_at=timezone.now()
+                cod_settled=True, cod_settled_at=now, cod_submission_txn=trans
             )
         else:
             # No specific IDs provided - settle oldest unsettled tasks up to the deposit amount
@@ -248,7 +249,7 @@ class WalletService:
 
             if settled_task_ids:
                 DeliveryTask.objects.filter(id__in=settled_task_ids).update(
-                    cod_settled=True, cod_settled_at=timezone.now()
+                    cod_settled=True, cod_settled_at=now, cod_submission_txn=trans
                 )
 
         # Update order COD status to 'cod_with_ezzy' for settled tasks

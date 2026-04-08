@@ -1,6 +1,16 @@
 {% extends 'wh_dashboard_base.html' %}
 {% load static %}
 
+{% comment %}Sort URL helper macro{% endcomment %}
+{% block extra_css %}
+<style>
+.wh__th--sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.wh__th--sortable:hover { background: rgba(0,0,0,.04); }
+.wh__sort-icon { margin-left: 4px; opacity: .35; font-size: .7rem; }
+.wh__th--sorted .wh__sort-icon { opacity: 1; color: var(--brand-primary, #0d6efd); }
+</style>
+{% endblock %}
+
 {% block title %}Inventory List{% endblock %}
 
 
@@ -88,6 +98,17 @@
           {% endfor %}
         </select>
       </div>
+      {% if is_staff and businesses %}
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Business</label>
+        <select name="business" id="business" class="wh__filter-select">
+          <option value="">All Businesses</option>
+          {% for biz in businesses %}
+          <option value="{{ biz.business_id }}" {% if selected_business == biz.business_id|stringformat:'s' %}selected{% endif %}>{{ biz.business_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="wh__filter-group wh__filter-group--lg">
         <label class="wh__filter-label">Search</label>
         <input type="text" class="wh__filter-input" id="search" name="search" value="{{ search }}" placeholder="Name, SKU, Barcode, Product ID...">
@@ -120,15 +141,15 @@
         <thead>
           <tr>
             <th class="wh__th">Image</th>
-            <th class="wh__th">Product Details</th>
-            <th class="wh__th">Brand</th>
-            <th class="wh__th">SKU / Barcode</th>
-            <th class="wh__th">Category</th>
-            <th class="wh__th">Warehouse</th>
-            <th class="wh__th">Location</th>
-            <th class="wh__th wh__th--center">Price</th>
-            <th class="wh__th wh__th--center">On Hand</th>
-            <th class="wh__th wh__th--center">Reserved</th>
+            <th class="wh__th wh__th--sortable {% if sort_field == 'name' %}wh__th--sorted{% endif %}" data-sort="name">Product Details<i class="fas fa-sort{% if sort_field == 'name' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--sortable {% if sort_field == 'brand' %}wh__th--sorted{% endif %}" data-sort="brand">Brand<i class="fas fa-sort{% if sort_field == 'brand' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--sortable {% if sort_field == 'sku' %}wh__th--sorted{% endif %}" data-sort="sku">SKU / Barcode<i class="fas fa-sort{% if sort_field == 'sku' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--sortable {% if sort_field == 'category' %}wh__th--sorted{% endif %}" data-sort="category">Category<i class="fas fa-sort{% if sort_field == 'category' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--sortable {% if sort_field == 'warehouse' %}wh__th--sorted{% endif %}" data-sort="warehouse">Warehouse<i class="fas fa-sort{% if sort_field == 'warehouse' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--sortable {% if sort_field == 'location' %}wh__th--sorted{% endif %}" data-sort="location">Location<i class="fas fa-sort{% if sort_field == 'location' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'price' %}wh__th--sorted{% endif %}" data-sort="price">Price<i class="fas fa-sort{% if sort_field == 'price' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'on_hand' %}wh__th--sorted{% endif %}" data-sort="on_hand">On Hand<i class="fas fa-sort{% if sort_field == 'on_hand' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'reserved' %}wh__th--sorted{% endif %}" data-sort="reserved">Reserved<i class="fas fa-sort{% if sort_field == 'reserved' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
             <th class="wh__th wh__th--center">Available</th>
             <th class="wh__th wh__th--center">Value</th>
             <th class="wh__th wh__th--center">Actions</th>
@@ -151,6 +172,13 @@
                 {% if stock.product.size %} | Size: {{ stock.product.size }}{% endif %}
                 {% if stock.product.color %} | {{ stock.product.color.color_name }}{% endif %}
               </div>
+              {% with aliases=stock.product.get_client_names_list %}
+              {% if aliases %}
+              <div class="wh__meta mt-1">
+                <i class="fas fa-tags text-muted me-1" style="font-size:0.7rem"></i>{% for alias in aliases %}<span class="wh__badge wh__badge--muted me-1" style="font-size:0.65rem">{{ alias }}</span>{% endfor %}
+              </div>
+              {% endif %}
+              {% endwith %}
               {% if stock.quantity_on_hand <= stock.reorder_point %}
               <span class="wh__badge wh__badge--warning"><i class="fas fa-exclamation-triangle"></i> Low Stock</span>
               {% endif %}
@@ -269,4 +297,23 @@
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  const currentSort = '{{ sort_field }}';
+  const currentDir  = '{{ sort_dir }}';
+
+  document.querySelectorAll('.wh__th--sortable[data-sort]').forEach(function (th) {
+    th.addEventListener('click', function () {
+      const field = th.dataset.sort;
+      const dir   = (field === currentSort && currentDir === 'asc') ? 'desc' : 'asc';
+      const params = new URLSearchParams(window.location.search);
+      params.set('sort', field);
+      params.set('dir', dir);
+      params.delete('page');
+      window.location.href = '?' + params.toString();
+    });
+  });
+})();
+</script>
 {% endblock %}

@@ -12,6 +12,7 @@ urlpatterns = [
     path('zones/list/', delivery_views.zone_list, name='zone_list'),
     path('zones/groups/', delivery_views.zone_groups, name='zone_groups'),
     path('zones/areas/', delivery_views.zone_areas, name='zone_areas'),
+    path('zones/areas/update-pin/', delivery_views.update_area_pin, name='update_area_pin'),
 
     # requst to user update address before delivery
     path('<str:dl_task_number>/<int:mobile_no>/',

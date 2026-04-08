@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -66,6 +67,7 @@
             <th>Arabic Name</th>
             <th>Coordinates</th>
             <th>Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -99,6 +101,17 @@
                 {% else %}
                   <span class="zna__status zna__status--inactive"><i class="fa-solid fa-circle-xmark me-1"></i>Inactive</span>
                 {% endif %}
+              </td>
+              <td>
+                <button type="button"
+                  class="zna__pin-edit-btn"
+                  data-area-id="{{ area.id }}"
+                  data-area-name="{{ area.area_name }}"
+                  data-lat="{{ area.latitude|default:'' }}"
+                  data-lng="{{ area.longitude|default:'' }}"
+                  title="Edit pin location">
+                  <i class="fa-solid fa-map-pin"></i> Edit Pin
+                </button>
               </td>
             </tr>
           {% endfor %}
@@ -159,4 +172,173 @@
     </div>
   {% endif %}
 </div>
+<!-- Edit Pin Modal -->
+<div id="zna-pin-modal" class="zna__pin-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="zna-pin-modal-title">
+  <div class="zna__pin-modal-backdrop"></div>
+  <div class="zna__pin-modal-dialog">
+    <div class="zna__pin-modal-header">
+      <h2 class="zna__pin-modal-title" id="zna-pin-modal-title">
+        <i class="fa-solid fa-map-pin me-2"></i>
+        Edit Pin — <span id="zna-pin-modal-area-name"></span>
+      </h2>
+      <button type="button" class="zna__pin-modal-close" id="zna-pin-modal-close" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="zna__pin-modal-hint">
+      <i class="fa-solid fa-circle-info me-1"></i>
+      Drag the pin to the correct location, then click <strong>Save Pin</strong>.
+    </div>
+    <div id="zna-pin-map" class="zna__pin-map"></div>
+    <div class="zna__pin-modal-coords">
+      <span class="zna__pin-coord-label">Lat:</span>
+      <span id="zna-pin-lat-display" class="zna__pin-coord-val">—</span>
+      <span class="zna__pin-coord-label ms-3">Lng:</span>
+      <span id="zna-pin-lng-display" class="zna__pin-coord-val">—</span>
+    </div>
+    <div class="zna__pin-modal-footer">
+      <button type="button" class="btn btn-secondary" id="zna-pin-cancel">Cancel</button>
+      <button type="button" class="btn zna__pin-save-btn" id="zna-pin-save">
+        <i class="fa-solid fa-floppy-disk me-1"></i> Save Pin
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  const UPDATE_URL = '{% url "delivery:update_area_pin" %}';
+  const QATAR_CENTER = [25.2854, 51.5310];
+  const DEFAULT_ZOOM = 13;
+
+  let pinMap = null;
+  let pinMarker = null;
+  let currentAreaId = null;
+
+  const modal = document.getElementById('zna-pin-modal');
+  const backdrop = modal.querySelector('.zna__pin-modal-backdrop');
+  const areaNameEl = document.getElementById('zna-pin-modal-area-name');
+  const latDisplay = document.getElementById('zna-pin-lat-display');
+  const lngDisplay = document.getElementById('zna-pin-lng-display');
+  const saveBtn = document.getElementById('zna-pin-save');
+  const cancelBtn = document.getElementById('zna-pin-cancel');
+  const closeBtn = document.getElementById('zna-pin-modal-close');
+
+  function openModal(areaId, areaName, lat, lng) {
+    currentAreaId = areaId;
+    areaNameEl.textContent = areaName;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    const center = (lat && lng) ? [parseFloat(lat), parseFloat(lng)] : QATAR_CENTER;
+
+    if (!pinMap) {
+      pinMap = L.map('zna-pin-map').setView(center, DEFAULT_ZOOM);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(pinMap);
+    } else {
+      pinMap.setView(center, DEFAULT_ZOOM);
+    }
+
+    if (pinMarker) {
+      pinMap.removeLayer(pinMarker);
+    }
+
+    pinMarker = L.marker(center, { draggable: true }).addTo(pinMap);
+    updateCoordDisplay(center[0], center[1]);
+
+    pinMarker.on('dragend', function (e) {
+      const pos = e.target.getLatLng();
+      updateCoordDisplay(pos.lat, pos.lng);
+    });
+
+    // Fix Leaflet tile rendering after modal open
+    setTimeout(() => pinMap.invalidateSize(), 100);
+  }
+
+  function updateCoordDisplay(lat, lng) {
+    latDisplay.textContent = parseFloat(lat).toFixed(7);
+    lngDisplay.textContent = parseFloat(lng).toFixed(7);
+  }
+
+  function closeModal() {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  // Open modal on Edit Pin click
+  document.querySelectorAll('.zna__pin-edit-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openModal(
+        btn.dataset.areaId,
+        btn.dataset.areaName,
+        btn.dataset.lat,
+        btn.dataset.lng
+      );
+    });
+  });
+
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', closeModal);
+
+  saveBtn.addEventListener('click', function () {
+    if (!pinMarker) return;
+    const pos = pinMarker.getLatLng();
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving…';
+
+    fetch(UPDATE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF_TOKEN
+      },
+      body: JSON.stringify({
+        area_id: currentAreaId,
+        latitude: pos.lat,
+        longitude: pos.lng
+      })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.success) {
+        // Update the row's coordinates display and data attributes
+        const editBtn = document.querySelector('.zna__pin-edit-btn[data-area-id="' + currentAreaId + '"]');
+        if (editBtn) {
+          editBtn.dataset.lat = data.latitude;
+          editBtn.dataset.lng = data.longitude;
+          // Update coords cell (sibling td before actions td)
+          const row = editBtn.closest('tr');
+          const coordsCell = row.querySelector('.zna__coords');
+          if (coordsCell) {
+            coordsCell.textContent = data.latitude + ', ' + data.longitude;
+          } else {
+            // Was empty — rebuild the coords cell
+            const coordsTd = editBtn.closest('tr').querySelectorAll('td')[3];
+            coordsTd.innerHTML = '<span class="zna__coords">' + data.latitude + ', ' + data.longitude + '</span>'
+              + ' <a href="https://www.google.com/maps?q=' + data.latitude + ',' + data.longitude + '" target="_blank" rel="noopener" class="zna__map-link" title="Open in Google Maps"><i class="fa-solid fa-map-pin"></i></a>';
+          }
+        }
+        closeModal();
+      } else {
+        alert('Error: ' + (data.error || 'Unknown error'));
+      }
+    })
+    .catch(function (err) {
+      alert('Network error: ' + err.message);
+    })
+    .finally(function () {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Pin';
+    });
+  });
+})();
+</script>
 {% endblock content %}
