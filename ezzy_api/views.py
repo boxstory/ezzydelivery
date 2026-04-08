@@ -888,14 +888,26 @@ def driver_complete_task(request, task_id):
 
                 # Record COD collection in driver wallet (actual amount collected)
                 from fleet.wallet_service import WalletService
+                has_mismatch = expected > 0 and collected != expected
+                if has_mismatch:
+                    mismatch_label = 'partial' if collected < expected else 'over'
+                    cod_desc = (
+                        f"COD collected for order {task.order.order_number} "
+                        f"[{mismatch_label}: collected {collected}, expected {expected}]"
+                    )
+                    cod_notes = f"COD amount mismatch — expected {expected} QAR, driver collected {collected} QAR"
+                else:
+                    cod_desc = f"COD collected for order {task.order.order_number}"
+                    cod_notes = None
                 WalletService.record_transaction(
                     driver=task.driver,
                     transaction_type='cod_collection',
                     amount=collected,
-                    description=f"COD collected for order {task.order.order_number}"
-                             f"{' (partial: ' + str(collected) + ' of ' + str(expected) + ')' if collected < expected else ''}",
+                    description=cod_desc,
+                    notes=cod_notes,
                     delivery_task=task,
                     created_by=request.user,
+                    payment_method=payment_method if payment_method in ('cash', 'pos', 'fawran') else None,
                 )
 
             # Fix 14: Allow additional COD collection on partially collected orders

@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}All Drivers - Ezzy Delivery{% endblock title %}
 {% block content %}
-<div class="drl">
+<div class="drl" id="main-content">
     <!-- Hero Header -->
     <div class="wfd__hero">
         <div class="wfd__hero-content">
@@ -17,7 +17,12 @@
 
     <!-- Stat Cards -->
     <div class="drl__stats">
-        <div class="drl__stat-card">
+        <button type="button" class="drl__stat-card {% if not status_filter %}drl__stat-card--active{% endif %}" style="cursor: pointer; text-decoration: none; color: inherit; border: none; background: none; padding: 0;"
+                hx-get="{% url 'workforce:drivers_list' %}"
+                hx-target="#drivers-list-panel"
+                hx-select="#drivers-list-panel"
+                hx-swap="outerHTML"
+                hx-push-url="true">
             <div class="drl__stat-icon drl__stat-icon--primary">
                 <i class="fa-solid fa-motorcycle"></i>
             </div>
@@ -25,8 +30,13 @@
                 <div class="drl__stat-value">{{ total_count }}</div>
                 <div class="drl__stat-label">Total Drivers</div>
             </div>
-        </div>
-        <div class="drl__stat-card">
+        </button>
+        <button type="button" class="drl__stat-card {% if status_filter == 'approved' %}drl__stat-card--active{% endif %}" style="cursor: pointer; text-decoration: none; color: inherit; border: none; background: none; padding: 0;"
+                hx-get="{% url 'workforce:drivers_list' %}?status=approved"
+                hx-target="#drivers-list-panel"
+                hx-select="#drivers-list-panel"
+                hx-swap="outerHTML"
+                hx-push-url="true">
             <div class="drl__stat-icon drl__stat-icon--success">
                 <i class="fa-solid fa-circle-check"></i>
             </div>
@@ -34,8 +44,13 @@
                 <div class="drl__stat-value">{{ active_count }}</div>
                 <div class="drl__stat-label">Active Drivers</div>
             </div>
-        </div>
-        <div class="drl__stat-card">
+        </button>
+        <button type="button" class="drl__stat-card {% if status_filter == 'pending' %}drl__stat-card--active{% endif %}" style="cursor: pointer; text-decoration: none; color: inherit; border: none; background: none; padding: 0;"
+                hx-get="{% url 'workforce:drivers_list' %}?status=pending"
+                hx-target="#drivers-list-panel"
+                hx-select="#drivers-list-panel"
+                hx-swap="outerHTML"
+                hx-push-url="true">
             <div class="drl__stat-icon drl__stat-icon--warning">
                 <i class="fa-solid fa-clock"></i>
             </div>
@@ -43,8 +58,13 @@
                 <div class="drl__stat-value">{{ pending_count }}</div>
                 <div class="drl__stat-label">Pending Approval</div>
             </div>
-        </div>
-        <div class="drl__stat-card">
+        </button>
+        <button type="button" class="drl__stat-card {% if request.resolver_match.url_name == 'drivers_inactive' %}drl__stat-card--active{% endif %}" style="cursor: pointer; text-decoration: none; color: inherit; border: none; background: none; padding: 0;"
+                hx-get="{% url 'workforce:drivers_inactive' %}"
+                hx-target="#drivers-list-panel"
+                hx-select="#drivers-list-panel"
+                hx-swap="outerHTML"
+                hx-push-url="true">
             <div class="drl__stat-icon drl__stat-icon--danger">
                 <i class="fa-solid fa-circle-xmark"></i>
             </div>
@@ -52,8 +72,15 @@
                 <div class="drl__stat-value">{{ inactive_count }}</div>
                 <div class="drl__stat-label">Inactive Drivers</div>
             </div>
-        </div>
+        </button>
     </div>
+
+    <style>
+        .drl__stat-card--active {
+            border-bottom: 3px solid #fbbf24;
+            padding-bottom: 8px;
+        }
+    </style>
 
     <!-- Filter -->
     <div class="drl__filter">
@@ -62,12 +89,7 @@
             <span class="drl__filter-header-text">Filters</span>
         </div>
         <form method="get" class="drl__filter-form"
-              id="workforce_drivers_form_filter"
-              hx-get=""
-              hx-target="#main-content"
-              hx-select="#main-content"
-              hx-swap="outerHTML"
-              hx-push-url="true">
+              id="workforce_drivers_form_filter">
             <div class="drl__filter-group drl__filter-group--lg">
                 <label for="searchInput" class="drl__filter-label">
                     <i class="fa-solid fa-search"></i> Search Drivers
@@ -75,13 +97,25 @@
                 <input type="text" id="searchInput" name="search"
                        class="drl__filter-input"
                        placeholder="Search by name, code, phone..."
-                       value="{{ search }}">
+                       value="{{ search }}"
+                       hx-get="{% url 'workforce:drivers_list' %}"
+                       hx-target="#main-content"
+                       hx-select="#main-content"
+                       hx-swap="outerHTML"
+                       hx-push-url="true"
+                       hx-trigger="keyup changed delay:500ms">
             </div>
             <div class="drl__filter-group">
                 <label for="statusFilter" class="drl__filter-label">
                     <i class="fa-solid fa-filter"></i> Driver Status
                 </label>
-                <select id="statusFilter" name="status" class="drl__filter-input">
+                <select id="statusFilter" name="status" class="drl__filter-input"
+                        hx-get="{% url 'workforce:drivers_list' %}"
+                        hx-target="#main-content"
+                        hx-select="#main-content"
+                        hx-swap="outerHTML"
+                        hx-push-url="true"
+                        hx-trigger="change">
                     <option value="">All Status</option>
                     <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
                     <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
@@ -92,7 +126,13 @@
                 </select>
             </div>
             <div class="drl__filter-actions">
-                <button type="submit" class="drl__btn drl__btn--primary">
+                <button type="button" class="drl__btn drl__btn--primary"
+                        hx-get="{% url 'workforce:drivers_list' %}"
+                        hx-target="#main-content"
+                        hx-select="#main-content"
+                        hx-swap="outerHTML"
+                        hx-push-url="true"
+                        hx-include="#searchInput,#statusFilter">
                     <i class="fa-solid fa-search"></i> Filter
                 </button>
                 <a href="{% url 'workforce:export_drivers_csv' %}?{{ request.GET.urlencode }}"
@@ -104,7 +144,8 @@
     </div>
 
     <!-- Table -->
-    <div class="drl__table-wrap">
+    <div id="drivers-list-panel">
+        <div class="drl__table-wrap">
         {% if page_obj %}
         <table class="drl__table" id="workforce_drivers_table_list">
             <thead>
@@ -183,6 +224,7 @@
             <p>{% if search or status_filter %}No drivers match your filter criteria.{% else %}There are no drivers registered yet.{% endif %}</p>
         </div>
         {% endif %}
+        </div>
     </div>
 </div>
 {% endblock content %}

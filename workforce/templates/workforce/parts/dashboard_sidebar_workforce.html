@@ -150,7 +150,7 @@
                  href="{% url 'workforce:wf_orders_to_publish' %}">
                 <i class="fa-solid fa-spinner me-2"></i>
                 <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Publish to Task</span>
-                {% if pending_publish_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="pending_publish">{{ pending_publish_count }}</span>{% endif %}
+                <span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="pending_publish">{{ pending_publish_count|default:"0" }}</span>
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_published' %}active{% endif %}">
@@ -251,33 +251,19 @@
       </li>
 
       <!-- Fleet Accounts Section -->
-      <li id="workforce_sidebar_menu_fleet" class="nav-item {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}active{% endif %}">
+      <li id="workforce_sidebar_menu_fleet" class="nav-item {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}active{% endif %}">
         <div id="workforce_sidebar_link_fleet" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-accounts" data-title="Fleet A/Cs">
           <i class="fa-solid fa-wallet me-2"></i>
           <span>Fleet A/Cs</span>
           <i class="fa-solid fa-chevron-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}show{% endif %}" id="submenu-accounts">
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}show{% endif %}" id="submenu-accounts">
           <ul class="nav flex-column">
             <li class="nav-item {% if request.resolver_match.url_name in 'drivers_list,driver_detail' %}active{% endif %}">
               <a id="workforce_sidebar_link_all_drivers" class="nav-link btn {% if request.resolver_match.url_name in 'drivers_list,driver_detail' %}active{% endif %}"
                  href="{% url 'workforce:drivers_list' %}">
                 <i class="fa-solid fa-motorcycle me-2"></i>
                 All Drivers
-              </a>
-            </li>
-            <li class="nav-item ps-3 {% if request.resolver_match.url_name == 'drivers_active' %}active{% endif %}">
-              <a id="workforce_sidebar_link_drivers_active" class="nav-link btn {% if request.resolver_match.url_name == 'drivers_active' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_active' %}">
-                <i class="fa-solid fa-circle-check me-2"></i>
-                Active
-              </a>
-            </li>
-            <li class="nav-item ps-3 {% if request.resolver_match.url_name == 'drivers_inactive' %}active{% endif %}">
-              <a id="workforce_sidebar_link_drivers_inactive" class="nav-link btn {% if request.resolver_match.url_name == 'drivers_inactive' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_inactive' %}">
-                <i class="fa-solid fa-circle-xmark me-2"></i>
-                Inactive
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'wf_driver_tasks' %}active{% endif %}">
@@ -294,6 +280,13 @@
                 COD with Fleet
               </a>
             </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_fleet_cod_collection" class="nav-link btn"
+                 href="{% url 'fleet:cod_collection' %}">
+                <i class="fa-solid fa-inbox me-2"></i>
+                COD Collection
+              </a>
+            </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'fleet_drivers_earnings' %}active{% endif %}">
               <a id="workforce_sidebar_link_fleet_earnings" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_drivers_earnings' %}active{% endif %}"
                  href="{% url 'workforce:fleet_drivers_earnings' %}">
@@ -306,13 +299,6 @@
                  href="{% url 'workforce:earnings_verification' %}">
                 <i class="fa-solid fa-clipboard-check me-2"></i>
                 Earnings Verification
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}">
-              <a id="workforce_sidebar_link_fleet_transactions" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}"
-                 href="{% url 'workforce:fleet_transactions' %}">
-                <i class="fa-solid fa-money-bill-transfer me-2"></i>
-                Transactions
               </a>
             </li>
           </ul>
@@ -337,8 +323,8 @@
                 Finance Overview
               </a>
             </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_finance_transactions" class="nav-link btn"
+            <li class="nav-item {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}">
+              <a id="workforce_sidebar_link_finance_transactions" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}"
                  href="{% url 'workforce:fleet_transactions' %}">
                 <i class="fa-solid fa-clock-rotate-left me-2"></i>
                 Recent Transactions
@@ -892,7 +878,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/tasks\//,                           menu: 'submenu-deliveries',   link: null},
         {re: /^\/workforce\/fleet\/driver-tasks/,               menu: 'submenu-accounts',     link: 'workforce_sidebar_link_driver_tasks'},
         {re: /^\/workforce\/fleet\/task-sheet/,                 menu: 'submenu-reports',      link: 'workforce_sidebar_link_task_sheets'},
-        {re: /^\/workforce\/fleet\/cod-settlement\//,           menu: 'submenu-accounts',     link: 'workforce_sidebar_link_fleet_transactions'},
+        {re: /^\/workforce\/fleet\/cod-settlement\//,           menu: 'submenu-finance',      link: 'workforce_sidebar_link_cod_settlement'},
         {re: /^\/workforce\/drivers\/\d+/,                      menu: 'submenu-accounts',     link: 'workforce_sidebar_link_all_drivers'},
         {re: /^\/workforce\/drivers\//,                         menu: 'submenu-accounts',     link: null},
         {re: /^\/workforce\/fleet\//,                           menu: 'submenu-accounts',     link: null},

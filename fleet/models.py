@@ -369,9 +369,10 @@ class DriverTransaction(models.Model):
 
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
+        ('pos', 'POS / Card'),
+        ('fawran', 'Fawran'),
         ('bank', 'Bank Transfer'),
         ('atm', 'ATM Deposit'),
-        ('fawran', 'Fawran'),
     ]
 
     transaction_code = models.CharField(
@@ -418,6 +419,20 @@ class DriverTransaction(models.Model):
     )
     pending_earnings_after = models.DecimalField(
         max_digits=10, decimal_places=2, default=0.00
+    )
+
+    # COD Submission Verification (for cod_driver_settle / cod_deposit transactions)
+    is_received = models.BooleanField(
+        default=False,
+        help_text="Admin confirmed cash was physically received from driver"
+    )
+    is_verified = models.BooleanField(
+        default=False,
+        help_text="Admin verified the submitted COD amount is correct"
+    )
+    is_approved = models.BooleanField(
+        default=False,
+        help_text="Admin approved / finalised this COD submission"
     )
 
     # Metadata

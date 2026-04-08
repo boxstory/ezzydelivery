@@ -1122,6 +1122,29 @@ def zone_areas(request):
 
 
 @login_required(login_url='account_login')
+def update_area_pin(request):
+    """AJAX endpoint to update ZoneArea latitude/longitude."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        data = json.loads(request.body)
+        area_id = data.get('area_id')
+        lat = data.get('latitude')
+        lng = data.get('longitude')
+        if area_id is None or lat is None or lng is None:
+            return JsonResponse({'error': 'Missing fields'}, status=400)
+        area = delivery_models.ZoneArea.objects.get(id=area_id)
+        area.latitude = lat
+        area.longitude = lng
+        area.save(update_fields=['latitude', 'longitude', 'updated_at'])
+        return JsonResponse({'success': True, 'latitude': str(area.latitude), 'longitude': str(area.longitude)})
+    except delivery_models.ZoneArea.DoesNotExist:
+        return JsonResponse({'error': 'Area not found'}, status=404)
+    except (ValueError, json.JSONDecodeError) as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required(login_url='account_login')
 def zone_list(request):
     """
     Display all zones in a dashboard-style list view.

@@ -117,4 +117,16 @@ urlpatterns = [
      # Delivery Proof
      path('task/<int:task_id>/proof/upload/',
           fleet_views.upload_delivery_proof, name='upload_delivery_proof'),
+
+     # Staff: COD Submission Management
+     path('staff/cod-submissions/',
+          fleet_views.staff_cod_submissions, name='staff_cod_submissions'),
+     path('staff/cod-submissions/<str:txn_code>/edit/',
+          fleet_views.staff_cod_submission_edit, name='staff_cod_submission_edit'),
+     path('staff/cod-submissions/<str:txn_code>/add-task/',
+          fleet_views.staff_cod_submission_add_task, name='staff_cod_submission_add_task'),
+     path('staff/cod-submissions/<str:txn_code>/remove-task/',
+          fleet_views.staff_cod_submission_remove_task, name='staff_cod_submission_remove_task'),
+     path('staff/cod-submissions/<str:txn_code>/approve/',
+          fleet_views.staff_cod_submission_approve, name='staff_cod_submission_approve'),
 ]

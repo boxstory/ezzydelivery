@@ -278,6 +278,17 @@
 
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
+    // Accuracy type -> color + pct (mirrors task_detail_sheet.html ACCURACY_LABEL)
+    var ACCURACY_META = {
+        by_customer: { color: '#059669', pct: 100, label: 'By Customer' },
+        by_driver:   { color: '#2563eb', pct: 90,  label: 'By Driver'   },
+        exact:       { color: '#27ae60', pct: 100, label: 'Exact'       },
+        street:      { color: '#2ecc71', pct: 75,  label: 'Street Level'},
+        landmark:    { color: '#f39c12', pct: 50,  label: 'Landmark'    },
+        zone_center: { color: '#e67e22', pct: 25,  label: 'Zone Center' },
+        ai_estimate: { color: '#e74c3c', pct: 10,  label: 'AI Estimate' },
+    };
+
     // Status -> marker color class
     function markerClass(status, isNew) {
         if (isNew) return 'task-marker--new';
@@ -295,7 +306,7 @@
     // Zone/address line
     function addrLine(p) {
         var parts = [];
-        if (p.zone) parts.push('Z' + p.zone);
+        if (p.zone) parts.push('Z' + p.zone + (p.zone_name ? ' ' + p.zone_name : ''));
         if (p.street) parts.push('S' + p.street);
         if (p.building) parts.push('B' + p.building);
         return parts.length ? parts.join('/') : (p.address || 'No address');
@@ -317,6 +328,16 @@
             html += '<a href="tel:' + escHtml(p.customer_phone) + '">' + escHtml(p.customer_phone) + '</a></div>';
         }
         html += '<div class="task-popup__row"><i class="fa-solid fa-location-dot"></i>' + addrLine(p) + '</div>';
+
+        if (p.coords_accuracy && ACCURACY_META[p.coords_accuracy]) {
+            var acc = ACCURACY_META[p.coords_accuracy];
+            var accText = acc.label;
+            if (p.coords_accuracy === 'ai_estimate') {
+                accText += ' ' + acc.pct + '%';
+            }
+            html += '<div class="task-popup__row"><i class="fa-solid fa-crosshairs"></i>';
+            html += '<span class="task-card__acc-badge task-card__acc-badge--' + p.coords_accuracy + '">' + accText + '</span></div>';
+        }
 
         html += '<a href="/fleet/tasks/' + p.id + '/navigate/" class="task-popup__nav-btn">';
         html += '<i class="fa-solid fa-route me-1"></i>Navigate</a>';
@@ -343,6 +364,16 @@
             .bindPopup(popupHtml(p), { maxWidth: 260, className: '' })
             .addTo(map);
 
+        if (p.coords_accuracy && ACCURACY_META[p.coords_accuracy]) {
+            var accClr = ACCURACY_META[p.coords_accuracy].color;
+            L.circle([p.lat, p.lng], {
+                radius: 30,
+                color: accClr, fillColor: accClr,
+                fillOpacity: 0.15, weight: 1.5, opacity: 0.6,
+                interactive: false
+            }).addTo(map);
+        }
+
         markers.push(marker);
         bounds.extend([p.lat, p.lng]);
     });
@@ -359,10 +390,17 @@
     var driverMarker = null;
     var accuracyCircle = null;
 
+    function accColor(acc) {
+        if (acc < 20) return '#22c55e';   // green  — good
+        if (acc < 50) return '#f97316';   // orange — moderate
+        return '#ef4444';                 // red    — poor
+    }
+
     function updateDriverPosition(pos) {
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
         var acc = pos.coords.accuracy;
+        var color = accColor(acc);
 
         if (!driverMarker) {
             var driverIcon = L.divIcon({
@@ -376,8 +414,8 @@
                 .addTo(map);
             accuracyCircle = L.circle([lat, lng], {
                 radius: Math.min(acc, 500),
-                color: '#3b82f6', fillColor: '#3b82f6',
-                fillOpacity: 0.08, weight: 1, opacity: 0.3
+                color: color, fillColor: color,
+                fillOpacity: 0.1, weight: 1.5, opacity: 0.5
             }).addTo(map);
             // Include driver position in bounds and refit
             bounds.extend([lat, lng]);
@@ -386,6 +424,7 @@
             driverMarker.setLatLng([lat, lng]);
             accuracyCircle.setLatLng([lat, lng]);
             accuracyCircle.setRadius(Math.min(acc, 500));
+            accuracyCircle.setStyle({ color: color, fillColor: color });
         }
     }
 

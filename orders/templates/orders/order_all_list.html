@@ -446,6 +446,9 @@
                 <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--cancel" id="orders_bulk_btn_cancel">
                   <i class="fa-solid fa-ban"></i> Cancel
                 </button>
+                <button type="button" class="bulk-action-bar__btn" id="orders_bulk_btn_parse" style="background:var(--brand-primary);color:#fff;">
+                  <i class="fa-solid fa-robot"></i> Parse Location
+                </button>
                 <button type="button" class="bulk-action-bar__btn" id="orders_bulk_btn_print" style="background:var(--brand-navy, #001f3f);color:#fff;">
                   <i class="fa-solid fa-print"></i> Print Labels
                 </button>
@@ -925,6 +928,16 @@
     document.getElementById('orders_bulk_btn_confirmed').addEventListener('click', function() { bulkUpdate('ready_to_pickup'); });
     document.getElementById('orders_bulk_btn_publish').addEventListener('click', function() { bulkUpdate('publish'); });
     document.getElementById('orders_bulk_btn_cancel').addEventListener('click', function() { bulkUpdate('cancelled'); });
+
+    // Parse Location
+    document.getElementById('orders_bulk_btn_parse').addEventListener('click', function() {
+      var checked = getChecked();
+      if (!checked.length) return;
+      var orders = Array.from(checked).map(function(cb) {
+        return { id: parseInt(cb.value), orderNumber: cb.dataset.orderNumber, address: cb.dataset.address || '' };
+      });
+      EzzyAIParse.parseBulk(orders);
+    });
 
     // Print Labels - opens in new tab
     document.getElementById('orders_bulk_btn_print').addEventListener('click', function() {

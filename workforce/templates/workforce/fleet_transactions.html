@@ -185,6 +185,7 @@
                         <th>Reference</th>
                         <th>Balance After</th>
                         <th>Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -210,9 +211,17 @@
                         </td>
                         <td>{{ txn.description }}</td>
                         <td>
-                            <span class="{% if txn.amount >= 0 %}ftr__amount--credit{% else %}ftr__amount--debit{% endif %}">
-                                {% if txn.amount >= 0 %}+{% endif %}QAR {{ txn.amount }}
-                            </span>
+                            {% if txn.transaction_type == 'cod_collection' and txn.delivery_task and txn.delivery_task.cod_collected_amount != txn.amount %}
+                                <span class="ftr__cod-changed">
+                                    <del class="ftr__cod-old">QAR {{ txn.amount }}</del>
+                                    <span class="ftr__cod-new">QAR {{ txn.delivery_task.cod_collected_amount }}</span>
+                                    <span class="ftr__cod-flag" title="COD amount was updated after collection"><i class="fa-solid fa-triangle-exclamation"></i> Changed</span>
+                                </span>
+                            {% else %}
+                                <span class="{% if txn.amount >= 0 %}ftr__amount--credit{% else %}ftr__amount--debit{% endif %}">
+                                    {% if txn.amount >= 0 %}+{% endif %}QAR {{ txn.amount }}
+                                </span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if txn.delivery_task %}
@@ -227,7 +236,7 @@
                         </td>
                         <td>
                             <div class="ftr__balance-after">
-                                {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_deposit' %}
+                                {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
                                 COD: QAR {{ txn.cod_in_hand_after }}
                                 {% elif txn.transaction_type == 'earning' or txn.transaction_type == 'settlement' %}
                                 Earnings: QAR {{ txn.pending_earnings_after }}
@@ -237,16 +246,33 @@
                             </div>
                         </td>
                         <td>
-                            {% if txn.settlement %}
+                            {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}
+                            <div class="ftr__sub-status">
+                                <span class="ftr__txn-type {% if txn.is_received %}ftr__txn-type--received{% else %}ftr__txn-type--not-received{% endif %}">
+                                    <i class="fa-solid {% if txn.is_received %}fa-circle-check{% else %}fa-circle-xmark{% endif %} me-1"></i>{% if txn.is_received %}Received{% else %}Not Received{% endif %}
+                                </span>
+                                <span class="ftr__txn-type {% if txn.is_verified %}ftr__txn-type--verified{% else %}ftr__txn-type--not-verified{% endif %}">
+                                    <i class="fa-solid {% if txn.is_verified %}fa-shield-check{% else %}fa-shield{% endif %} me-1"></i>{% if txn.is_verified %}Verified{% else %}Not Verified{% endif %}
+                                </span>
+                            </div>
+                            {% elif txn.settlement %}
                             <span class="ftr__txn-type ftr__txn-type--settlement">Settled</span>
-                            {% elif txn.transaction_type == 'cod_deposit' %}
-                            <span class="ftr__txn-type ftr__txn-type--cod_deposit">Deposited</span>
                             {% elif txn.transaction_type == 'settlement' %}
                             <span class="ftr__txn-type ftr__txn-type--settlement">Paid</span>
                             {% elif txn.transaction_type == 'cod_collection' and txn.reference_number in deposited_refs %}
                             <span class="ftr__txn-type ftr__txn-type--cod_deposit">Deposited</span>
                             {% else %}
                             <span class="ftr__txn-type ftr__txn-type--pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_collection' %}
+                            <button type="button" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#001f3f;color:#fff;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;"
+                                    onclick="openCodDrawer({{ txn.id }}, '{{ txn.transaction_code|default:txn.id }}', {{ txn.is_received|yesno:'true,false' }}, {{ txn.is_verified|yesno:'true,false' }})">
+                                <i class="fa-solid fa-eye"></i> View
+                            </button>
+                            {% else %}
+                            -
                             {% endif %}
                         </td>
                     </tr>
@@ -273,6 +299,38 @@
         <p>Please select a driver from the dropdown above to view their transactions.</p>
     </div>
     {% endif %}
+</div>
+
+<!-- COD Details Drawer Backdrop -->
+<div class="ftr__drawer-backdrop" id="codDrawerBackdrop" onclick="closeCodDrawer()"></div>
+
+<!-- COD Details Drawer -->
+<div class="ftr__drawer" id="codDrawer">
+    <div class="ftr__drawer-header">
+        <h3><i class="fa-solid fa-money-bill-wave me-2"></i>COD Submission Details — <span id="drawerTxnCode">-</span></h3>
+        <button type="button" class="ftr__drawer-close" onclick="closeCodDrawer()">&times;</button>
+    </div>
+    <div class="ftr__drawer-meta" id="drawerMeta"></div>
+    <div class="ftr__drawer-status-row">
+        <span class="ftr__drawer-status-label">Admin Status:</span>
+        <button type="button" id="btnReceived" class="ftr__status-toggle ftr__status-toggle--received" onclick="toggleCodStatus('is_received')">
+            <i class="fa-solid fa-circle-check me-1"></i><span id="lblReceived">Mark Received</span>
+        </button>
+        <button type="button" id="btnVerified" class="ftr__status-toggle ftr__status-toggle--verified" onclick="toggleCodStatus('is_verified')">
+            <i class="fa-solid fa-shield-check me-1"></i><span id="lblVerified">Mark Verified</span>
+        </button>
+    </div>
+    <div class="ftr__drawer-body">
+        <div id="codDrawerContent">
+            <div class="ftr__drawer-spinner">
+                <i class="fa-solid fa-spinner fa-spin"></i> Loading COD details…
+            </div>
+        </div>
+    </div>
+    <div class="ftr__drawer-footer">
+        <div class="ftr__drawer-total">Total: <span id="drawerTotal">QAR 0.00</span></div>
+        <button type="button" class="ftr__btn ftr__btn--outline" onclick="closeCodDrawer()">Close</button>
+    </div>
 </div>
 
 <!-- Settlement Receipt Modal -->
@@ -455,6 +513,150 @@ function exportToCSV() {
 }
 document.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); exportToCSV(); }
+    if (e.key === 'Escape') closeCodDrawer();
 });
+
+// ── COD Details Drawer ────────────────────────────────────────────
+var _currentTxnId = null;
+var _currentIsReceived = false;
+var _currentIsVerified = false;
+
+function openCodDrawer(txnId, txnCode, isReceived, isVerified) {
+    _currentTxnId = txnId;
+    _currentIsReceived = isReceived;
+    _currentIsVerified = isVerified;
+
+    document.getElementById('drawerTxnCode').textContent = txnCode;
+    document.getElementById('drawerMeta').innerHTML = '';
+    document.getElementById('drawerTotal').textContent = 'QAR 0.00';
+    document.getElementById('codDrawerContent').innerHTML = '<div class="ftr__drawer-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading COD details…</div>';
+    updateDrawerStatusButtons();
+
+    document.getElementById('codDrawer').classList.add('ftr__drawer--show');
+    document.getElementById('codDrawerBackdrop').classList.add('ftr__drawer-backdrop--show');
+    document.body.style.overflow = 'hidden';
+
+    fetch('{% url "workforce:fleet_transaction_cod_details" 0 %}'.replace('/0/', '/' + txnId + '/'), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            document.getElementById('codDrawerContent').innerHTML = '<p style="color:#dc2626;padding:1rem;">' + data.error + '</p>';
+            return;
+        }
+        // Meta row
+        var meta = document.getElementById('drawerMeta');
+        meta.innerHTML =
+            '<span class="ftr__drawer-meta-item"><strong>Date:</strong> ' + data.date + '</span>' +
+            '<span class="ftr__drawer-meta-item"><strong>Type:</strong> ' + data.transaction_type + '</span>' +
+            '<span class="ftr__drawer-meta-item"><strong>Amount:</strong> QAR ' + data.amount.toFixed(2) + '</span>' +
+            (data.payment_method && data.payment_method !== '-' ? '<span class="ftr__drawer-meta-item"><strong>Method:</strong> ' + data.payment_method + '</span>' : '') +
+            (data.notes ? '<span class="ftr__drawer-meta-item"><strong>Notes:</strong> ' + data.notes + '</span>' : '');
+
+        document.getElementById('drawerTotal').textContent = 'QAR ' + data.tasks_total.toFixed(2) + ' (' + data.tasks_count + ' order' + (data.tasks_count !== 1 ? 's' : '') + ')';
+
+        if (!data.tasks || data.tasks.length === 0) {
+            document.getElementById('codDrawerContent').innerHTML =
+                '<div class="ftr__empty" style="padding:2rem;"><i class="fa-solid fa-inbox"></i><h3>No COD orders found</h3><p>No delivery tasks linked to this submission.</p></div>';
+            return;
+        }
+
+        var html = '<div class="ftr__cod-list">';
+        data.tasks.forEach(function(t, i) {
+            html += '<div class="ftr__cod-item">' +
+                '<div class="ftr__cod-item-num">' + (i + 1) + '</div>' +
+                '<div class="ftr__cod-item-info">' +
+                    '<div class="ftr__cod-item-task">' + t.task_number + (t.order_code && t.order_code !== '-' ? ' &nbsp;·&nbsp; ' + t.order_code : '') + '</div>' +
+                    '<div class="ftr__cod-item-meta">' + t.customer + (t.business && t.business !== '-' ? ' · ' + t.business : '') + (t.location && t.location !== '-' ? ' · ' + t.location : '') + '</div>' +
+                    '<div class="ftr__cod-item-meta">' + t.delivered_at + '</div>' +
+                '</div>' +
+                '<div class="ftr__cod-item-amount">QAR ' + t.amount.toFixed(2) + '</div>' +
+                '<div class="ftr__cod-item-badges">' +
+                    '<span class="ftr__cod-badge ' + (t.cod_settled ? 'ftr__cod-badge--settled' : 'ftr__cod-badge--pending') + '">' +
+                        '<i class="fa-solid ' + (t.cod_settled ? 'fa-circle-check' : 'fa-clock') + '"></i> ' +
+                        (t.cod_settled ? 'Submitted' : 'Pending') +
+                    '</span>' +
+                '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+        document.getElementById('codDrawerContent').innerHTML = html;
+    })
+    .catch(function(err) {
+        document.getElementById('codDrawerContent').innerHTML = '<p style="color:#dc2626;padding:1rem;">Failed to load details.</p>';
+    });
+}
+
+function closeCodDrawer() {
+    document.getElementById('codDrawer').classList.remove('ftr__drawer--show');
+    document.getElementById('codDrawerBackdrop').classList.remove('ftr__drawer-backdrop--show');
+    document.body.style.overflow = '';
+    _currentTxnId = null;
+}
+
+function updateDrawerStatusButtons() {
+    var btnR = document.getElementById('btnReceived');
+    var lblR = document.getElementById('lblReceived');
+    if (_currentIsReceived) {
+        btnR.classList.add('active');
+        lblR.textContent = 'Received';
+    } else {
+        btnR.classList.remove('active');
+        lblR.textContent = 'Mark Received';
+    }
+    var btnV = document.getElementById('btnVerified');
+    var lblV = document.getElementById('lblVerified');
+    if (_currentIsVerified) {
+        btnV.classList.add('active');
+        lblV.textContent = 'Verified';
+    } else {
+        btnV.classList.remove('active');
+        lblV.textContent = 'Mark Verified';
+    }
+}
+
+function toggleCodStatus(field) {
+    if (!_currentTxnId) return;
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '{{ csrf_token }}';
+    var body = new URLSearchParams({ field: field, csrfmiddlewaretoken: csrfToken });
+    fetch('{% url "workforce:fleet_transaction_update_status" 0 %}'.replace('/0/', '/' + _currentTxnId + '/'), {
+        method: 'POST',
+        body: body,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            if (field === 'is_received') _currentIsReceived = data.value;
+            if (field === 'is_verified') _currentIsVerified = data.value;
+            updateDrawerStatusButtons();
+            // Update the row in the table
+            var row = document.querySelector('tr[data-txn-id="' + _currentTxnId + '"]');
+            if (row) updateRowStatusBadges(row, _currentIsReceived, _currentIsVerified, _currentTxnId);
+        }
+    });
+}
+
+function updateRowStatusBadges(row, isReceived, isVerified, txnId) {
+    var statusTd = row.querySelector('td:nth-child(10)');
+    if (!statusTd) return;
+    var type = row.dataset.type;
+    if (type === 'cod_driver_settle' || type === 'cod_deposit') {
+        statusTd.innerHTML =
+            '<div class="ftr__sub-status">' +
+            '<span class="ftr__txn-type ' + (isReceived ? 'ftr__txn-type--received' : 'ftr__txn-type--not-received') + '">' +
+                '<i class="fa-solid ' + (isReceived ? 'fa-circle-check' : 'fa-circle-xmark') + ' me-1"></i>' + (isReceived ? 'Received' : 'Not Received') +
+            '</span>' +
+            '<span class="ftr__txn-type ' + (isVerified ? 'ftr__txn-type--verified' : 'ftr__txn-type--not-verified') + '">' +
+                '<i class="fa-solid ' + (isVerified ? 'fa-shield-check' : 'fa-shield') + ' me-1"></i>' + (isVerified ? 'Verified' : 'Not Verified') +
+            '</span></div>';
+        // Update View button data
+        var viewBtn = row.querySelector('.ftr__btn--view');
+        if (viewBtn) {
+            viewBtn.setAttribute('onclick', 'openCodDrawer(' + txnId + ', \'' + viewBtn.getAttribute('onclick').match(/'([^']+)'/)[1] + '\', ' + isReceived + ', ' + isVerified + ')');
+        }
+    }
+}
 </script>
 {% endblock extra_js %}

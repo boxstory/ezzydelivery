@@ -278,6 +278,11 @@ class DeliveryTask(models.Model):
         null=True, blank=True,
         help_text="When COD was submitted to admin"
     )
+    cod_submission_txn = models.ForeignKey(
+        'fleet.DriverTransaction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='submission_tasks',
+        help_text="The COD submission transaction this task was settled in"
+    )
     earnings_settled = models.BooleanField(
         default=False,
         help_text="Whether driver earnings have been settled/paid out"

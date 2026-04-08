@@ -36,6 +36,10 @@
                 <div class="fleet-cod-hero__stat-value">{{ days_range|default:7 }}d</div>
                 <div class="fleet-cod-hero__stat-label">Period</div>
             </div>
+            <div>
+                <div class="fleet-cod-hero__stat-value">{{ cod_in_hand_total|floatformat:0 }}</div>
+                <div class="fleet-cod-hero__stat-label">Period COD</div>
+            </div>
         </div>
     </div>
 </div>
@@ -53,6 +57,17 @@
     </button>
     <button type="button" class="fleet-tab {% if filter_days == 'all' %}active{% endif %}" onclick="filterByDays('all')">
         All
+    </button>
+</div>
+
+<!-- Sort Toggle -->
+<div style="display:flex; align-items:center; gap:8px; padding: 4px var(--spacing-md) 0;">
+    <span style="font-size:0.7rem; color:var(--fleet-grey-400); white-space:nowrap;">Sort by</span>
+    <button type="button" onclick="sortBy('delivered')" class="fleet-btn fleet-btn--sm {% if sort_by == 'delivered' or not sort_by %}fleet-btn--primary{% else %}fleet-btn--ghost{% endif %}" style="font-size:0.7rem; padding:3px 10px;">
+        <i class="fa-solid fa-truck-fast me-1"></i>Delivered Time
+    </button>
+    <button type="button" onclick="sortBy('order_date')" class="fleet-btn fleet-btn--sm {% if sort_by == 'order_date' %}fleet-btn--primary{% else %}fleet-btn--ghost{% endif %}" style="font-size:0.7rem; padding:3px 10px;">
+        <i class="fa-solid fa-calendar me-1"></i>Order Date
     </button>
 </div>
 
@@ -154,6 +169,13 @@
         } else {
             url.searchParams.set('days', days);
         }
+        window.location = url;
+    }
+
+    function sortBy(sort) {
+        haptic([10]);
+        const url = new URL(window.location);
+        url.searchParams.set('sort', sort);
         window.location = url;
     }
 
