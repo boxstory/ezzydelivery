@@ -3,9 +3,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta property="fb:pages" content="113704197128320" />
 
-<!-- Preconnect to CDNs for faster resource loading -->
+<!-- DNS Prefetch and Preconnect for faster resource loading -->
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://code.jquery.com">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://code.jquery.com" crossorigin>
+<link rel="preconnect" href="https://cdn.lordicon.com" crossorigin>
 
 <!-- SEO Meta Tags - Dynamic from views or defaults -->
 {% if seo %}
@@ -124,20 +127,22 @@
 
 </style>
 
-<!-- 1. BRANDKIT -->
+<!-- CSS LOAD STRATEGY: Critical first, deferred for performance -->
+
+<!-- 1. CRITICAL: BRANDKIT (Brand colors, variables, core layout) -->
 <link rel="stylesheet" href="{% static 'webpages/css/brandkit.css' %}?v=20260205c">
 <link rel="stylesheet" href="{% static 'webpages/css/brandkit-components.css' %}?v=20260205c">
 
-<!-- 2. BOOTSTRAP -->
+<!-- 2. CRITICAL: BOOTSTRAP (layout framework) -->
 <link rel="stylesheet" href="{% static 'webpages/css/bootstrap-custom.min.css' %}">
 
-<!-- 3. FONT AWESOME (single file replaces 3 separate loads) -->
+<!-- 3. CRITICAL: FONT AWESOME (icons) -->
 <link rel="stylesheet" href="{% static 'fontawesomefree/css/all.min.css' %}">
 
-<!-- 4. BASE CSS -->
+<!-- 4. BASE CSS (page structure) -->
 <link rel="stylesheet" href="{% static 'webpages/css/base.css' %}?v=20260310d">
 
-<!-- 5. BRANDKIT OVERRIDES -->
+<!-- 5. THEME OVERRIDES (brandkit refinements) -->
 <link rel="stylesheet" href="{% static 'webpages/css/brandkit-overrides.css' %}">
 
 <!-- 6. DASHBOARD-ONLY CSS (forms, select2, mobile-app) loaded via dashboard base templates -->

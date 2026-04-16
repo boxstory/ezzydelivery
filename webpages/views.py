@@ -63,7 +63,8 @@ from webpages import models as webpages_models
 from django.core.mail import mail_admins, send_mail
 from business import models as business_models
 from fleet import models as fleet_models
-from core.seo import SEOMetadata
+from core.seo import SEOMetadata, InternalLinkingMap
+from django.urls import reverse
 
 # Local aliases for commonly used models/forms
 WhatsAppInquiry = webpages_models.WhatsAppInquiry
@@ -630,6 +631,17 @@ def driver_guide(request):
 
 # SEO Landing Pages Views (Based on Search Console Data)
 
+def _get_related_pages_with_urls(current_url_name):
+    """Helper to convert related pages map to include full URLs"""
+    related = InternalLinkingMap.get_related_pages(current_url_name)
+    for page in related:
+        try:
+            page['url'] = reverse(page['url'])
+        except:
+            page['url'] = '/'
+    return related
+
+
 def delivery_companies_qatar(request):
     """Landing page for 'delivery companies in qatar' keyword"""
     from core.seo import SEOLandingPages
@@ -665,6 +677,7 @@ def same_day_delivery_qatar(request):
         'seo': meta,
         'page_title': 'Same Day Delivery Qatar',
         'hero_subtitle': 'Express Courier Service - Pickup & Delivery Within Hours',
+        'related_pages': _get_related_pages_with_urls('webpages:same_day_delivery_qatar'),
     }
     return render(request, 'webpages/seo/same_day_delivery_qatar.html', data)
 
@@ -678,6 +691,7 @@ def cod_delivery_qatar(request):
         'seo': meta,
         'page_title': 'COD Delivery Service Qatar',
         'hero_subtitle': 'Secure Cash on Delivery for Online Stores & E-commerce',
+        'related_pages': _get_related_pages_with_urls('webpages:cod_delivery_qatar'),
     }
     return render(request, 'webpages/seo/cod_delivery_qatar.html', data)
 
@@ -691,6 +705,7 @@ def ecommerce_delivery_qatar(request):
         'seo': meta,
         'page_title': 'E-commerce Delivery Solutions Qatar',
         'hero_subtitle': 'Complete Shipping Solutions for Online Stores in Doha',
+        'related_pages': _get_related_pages_with_urls('webpages:ecommerce_delivery_qatar'),
     }
     return render(request, 'webpages/seo/ecommerce_delivery_qatar.html', data)
 
@@ -743,6 +758,7 @@ def three_pl_qatar(request):
         'seo': meta,
         'page_title': '3PL Services Qatar',
         'hero_subtitle': 'Third Party Logistics & Fulfillment Solutions for E-commerce',
+        'related_pages': _get_related_pages_with_urls('webpages:three_pl_qatar'),
     }
     return render(request, 'webpages/seo/3pl_qatar.html', data)
 
@@ -799,6 +815,7 @@ def delivery_doha(request):
         'seo': meta,
         'page_title': 'Delivery Service Doha',
         'hero_subtitle': 'Fast Courier Across All Doha Districts - West Bay to Al Wakra Road',
+        'related_pages': _get_related_pages_with_urls('webpages:delivery_doha'),
     }
     return render(request, 'webpages/seo/delivery_doha.html', data)
 
@@ -838,6 +855,7 @@ def shopify_delivery_qatar(request):
         'seo': meta,
         'page_title': 'Shopify Delivery Qatar',
         'hero_subtitle': 'Seamless Shopify Integration - Auto-Sync Orders in Minutes',
+        'related_pages': _get_related_pages_with_urls('webpages:shopify_delivery_qatar'),
     }
     return render(request, 'webpages/seo/shopify_delivery_qatar.html', data)
 
@@ -892,6 +910,7 @@ def al_wakrah_delivery(request):
         'seo': meta,
         'page_title': 'Delivery Service Al Wakrah',
         'hero_subtitle': 'Fast Courier in Al Wakrah - Same Day Pickup & Delivery',
+        'related_pages': _get_related_pages_with_urls('webpages:al_wakrah_delivery'),
     }
     return render(request, 'webpages/seo/al_wakrah_delivery.html', data)
 
@@ -905,5 +924,6 @@ def lusail_delivery(request):
         'seo': meta,
         'page_title': 'Delivery Service Lusail City',
         'hero_subtitle': 'Premium Courier Service for Lusail - Fox Hills, Marina & More',
+        'related_pages': _get_related_pages_with_urls('webpages:lusail_delivery'),
     }
     return render(request, 'webpages/seo/lusail_delivery.html', data)

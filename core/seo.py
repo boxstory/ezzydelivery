@@ -383,6 +383,148 @@ def generate_json_ld_service(service_name, description, price_range=""):
     }
 
 
+def generate_json_ld_faq(faqs):
+    """
+    Generate JSON-LD FAQ schema for AI and search engines
+
+    Args:
+        faqs: List of dicts with 'question' and 'answer' keys
+
+    Example:
+        faqs = [
+            {'question': 'How fast is delivery?', 'answer': 'Same-day within 2 hours...'},
+            {'question': 'Do you offer COD?', 'answer': 'Yes, COD is available...'}
+        ]
+    """
+    faq_items = []
+    for item in faqs:
+        faq_items.append({
+            "@type": "Question",
+            "name": item.get('question', ''),
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": item.get('answer', '')
+            }
+        })
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": faq_items
+    }
+
+
+def generate_json_ld_article(title, description, author="EzzyDelivery", published_date=None, image_url=None):
+    """
+    Generate JSON-LD Article schema for blog posts
+
+    Args:
+        title: Article title
+        description: Article summary
+        author: Author name
+        published_date: ISO 8601 format (e.g., '2026-04-16')
+        image_url: Featured image URL
+    """
+    schema = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": title,
+        "description": description,
+        "author": {
+            "@type": "Organization",
+            "name": author
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "EzzyDelivery",
+            "logo": {
+                "@type": "ImageObject",
+                "url": f"{SEOMetadata.SITE_URL}/static/images/ezzy-logo.png"
+            }
+        }
+    }
+
+    if published_date:
+        schema["datePublished"] = published_date
+        schema["dateModified"] = published_date
+
+    if image_url:
+        schema["image"] = {
+            "@type": "ImageObject",
+            "url": image_url
+        }
+
+    return schema
+
+
+# =============================================================================
+# INTERNAL LINKING MAP - Related pages for SEO and user navigation
+# =============================================================================
+
+class InternalLinkingMap:
+    """Related pages for internal linking strategy (siloing for SEO)"""
+
+    @staticmethod
+    def get_related_pages(current_page):
+        """
+        Get list of related pages for internal linking.
+
+        Args:
+            current_page: URL name of current page (e.g., 'webpages:same_day_delivery_qatar')
+
+        Returns:
+            list of dicts with 'title', 'url', 'description'
+        """
+        related_map = {
+            'webpages:same_day_delivery_qatar': [
+                {'title': 'Express Delivery Qatar', 'url': 'webpages:express_delivery_qatar', 'description': 'Urgent courier service'},
+                {'title': 'Courier Service Qatar', 'url': 'webpages:courier_service_qatar', 'description': 'Professional logistics'},
+                {'title': 'Delivery Companies', 'url': 'webpages:delivery_companies_qatar', 'description': 'Compare courier options'},
+                {'title': 'Delivery Doha', 'url': 'webpages:delivery_doha', 'description': 'Same-day service in Doha'},
+            ],
+            'webpages:express_delivery_qatar': [
+                {'title': 'Same-Day Delivery', 'url': 'webpages:same_day_delivery_qatar', 'description': 'Fast day delivery'},
+                {'title': 'Courier Service', 'url': 'webpages:courier_service_qatar', 'description': 'Professional couriers'},
+                {'title': '3PL Services', 'url': 'webpages:three_pl_qatar', 'description': 'Logistics fulfillment'},
+            ],
+            'webpages:cod_delivery_qatar': [
+                {'title': 'E-commerce Delivery', 'url': 'webpages:ecommerce_delivery_qatar', 'description': 'Online store solutions'},
+                {'title': 'Shopify Delivery', 'url': 'webpages:shopify_delivery_qatar', 'description': 'Shopify integration'},
+                {'title': 'Instagram Sellers', 'url': 'webpages:instagram_sellers_delivery', 'description': 'Social commerce'},
+            ],
+            'webpages:three_pl_qatar': [
+                {'title': 'E-commerce Delivery', 'url': 'webpages:ecommerce_delivery_qatar', 'description': 'Fulfillment services'},
+                {'title': 'Last-Mile Delivery', 'url': 'webpages:last_mile_delivery_qatar', 'description': 'Final-mile logistics'},
+                {'title': 'Logistics Services', 'url': 'webpages:logistics_services_qatar', 'description': 'Supply chain solutions'},
+                {'title': 'Pricing & Quote', 'url': 'webpages:delivery_pricing', 'description': 'Get your 3PL quote'},
+            ],
+            'webpages:ecommerce_delivery_qatar': [
+                {'title': 'COD Service', 'url': 'webpages:cod_delivery_qatar', 'description': 'Cash on delivery'},
+                {'title': 'Shopify Integration', 'url': 'webpages:shopify_delivery_qatar', 'description': 'Auto-sync orders'},
+                {'title': '3PL Services', 'url': 'webpages:three_pl_qatar', 'description': 'Fulfillment solutions'},
+            ],
+            'webpages:shopify_delivery_qatar': [
+                {'title': 'E-commerce Delivery', 'url': 'webpages:ecommerce_delivery_qatar', 'description': 'Online shipping'},
+                {'title': 'COD Service', 'url': 'webpages:cod_delivery_qatar', 'description': 'Payment collection'},
+                {'title': 'Online Store Delivery', 'url': 'webpages:online_store_delivery_qatar', 'description': 'Store shipping'},
+            ],
+            'webpages:delivery_doha': [
+                {'title': 'Al Wakrah Delivery', 'url': 'webpages:al_wakrah_delivery', 'description': 'Al Wakrah service'},
+                {'title': 'Lusail Delivery', 'url': 'webpages:lusail_delivery', 'description': 'Lusail City service'},
+                {'title': 'Same-Day Delivery', 'url': 'webpages:same_day_delivery_qatar', 'description': 'Fast Doha delivery'},
+            ],
+            'webpages:al_wakrah_delivery': [
+                {'title': 'Delivery Doha', 'url': 'webpages:delivery_doha', 'description': 'Doha coverage'},
+                {'title': 'Lusail Delivery', 'url': 'webpages:lusail_delivery', 'description': 'Lusail service'},
+            ],
+            'webpages:lusail_delivery': [
+                {'title': 'Delivery Doha', 'url': 'webpages:delivery_doha', 'description': 'Doha coverage'},
+                {'title': 'Al Wakrah Delivery', 'url': 'webpages:al_wakrah_delivery', 'description': 'Al Wakrah service'},
+            ],
+        }
+        return related_map.get(current_page, [])
+
+
 # =============================================================================
 # SEO LANDING PAGES - High-conversion pages targeting specific keywords
 # Each MUST have unique title (50-60 chars) and description (140-155 chars)
