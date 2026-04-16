@@ -31,10 +31,18 @@
                                 <h4 class="mb-1 fw-bold">Profile Information</h4>
                                 <p class="text-muted mb-0 small">Manage your personal details and preferences</p>
                             </div>
-                            <a href="{% url 'core:profile_complete_update' %}" class="btn btn-warning fw-bold d-inline-flex align-items-center gap-2 px-4">
-                                <i class="fas fa-edit"></i>
-                                <span>Edit Profile</span>
-                            </a>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                {% if not profile.is_business and not profile.is_driver and profile.verification_status == 'incomplete' %}
+                                <a href="{% url 'core:profile_complete_update' %}#core_profile_complete_section_role" class="btn btn-success fw-bold d-inline-flex align-items-center gap-2 px-4">
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span>Choose Role</span>
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'core:profile_complete_update' %}" class="btn btn-warning fw-bold d-inline-flex align-items-center gap-2 px-4">
+                                    <i class="fas fa-edit"></i>
+                                    <span>Edit Profile</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
 

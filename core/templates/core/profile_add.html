@@ -72,13 +72,18 @@
                                     <hr />
                                     <div class="row">
                                         <div class="col-sm-3">
-                                            <p class="mb-0">Whatsapp</p>
+                                            <p class="mb-0">Whatsapp
+                                                <span id="core_profile_add_whatsapp_status_icon" style="display: none; margin-left: 0.5rem;">
+                                                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                                                </span>
+                                            </p>
                                         </div>
                                         <div class="col-sm-9">
                                             <p class="text-muted mb-0">
                                                 {{ profileaddform.whatsapp.error }}
                                                 {{ profileaddform.whatsapp | as_crispy_field }}
                                             </p>
+                                            <div id="core_profile_add_whatsapp_status_message" class="text-danger small mt-1" style="display: none;"></div>
                                         </div>
                                     </div>
                                     <hr />
@@ -116,4 +121,86 @@
             </div>
         </div>
     </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const whatsappInput = document.querySelector('[name="whatsapp"]');
+    const statusIcon = document.getElementById('core_profile_add_whatsapp_status_icon');
+    const statusMessage = document.getElementById('core_profile_add_whatsapp_status_message');
+    const submitButton = document.getElementById('core_profile_update_btn_submit');
+
+    if (!whatsappInput) return;
+
+    let isWhatsAppAvailable = true;
+
+    function checkWhatsAppAvailability() {
+        const whatsappNumber = whatsappInput.value.trim();
+
+        // Don't check if empty
+        if (!whatsappNumber) {
+            statusIcon.style.display = 'none';
+            statusMessage.style.display = 'none';
+            isWhatsAppAvailable = false;
+            updateButtonStates();
+            return;
+        }
+
+        // Make API call
+        fetch(`{% url 'core:check_whatsapp_availability' %}?whatsapp=${encodeURIComponent(whatsappNumber)}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            isWhatsAppAvailable = data.available;
+
+            if (data.available) {
+                // WhatsApp is available
+                statusIcon.style.display = 'none';
+                statusMessage.style.display = 'none';
+            } else {
+                // WhatsApp is not available - show error
+                statusIcon.style.display = 'inline-block';
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = data.message || 'This WhatsApp number is already in use';
+            }
+
+            updateButtonStates();
+        })
+        .catch(error => {
+            console.error('Error checking WhatsApp availability:', error);
+            isWhatsAppAvailable = false;
+            updateButtonStates();
+        });
+    }
+
+    function updateButtonStates() {
+        if (submitButton) {
+            submitButton.disabled = !isWhatsAppAvailable;
+            submitButton.style.opacity = isWhatsAppAvailable ? '1' : '0.5';
+            submitButton.style.cursor = isWhatsAppAvailable ? 'pointer' : 'not-allowed';
+            submitButton.title = isWhatsAppAvailable ? '' : 'WhatsApp number must be available to submit';
+        }
+    }
+
+    // Check on page load
+    checkWhatsAppAvailability();
+
+    // Check on input change (with debounce)
+    let debounceTimer;
+    whatsappInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            checkWhatsAppAvailability();
+        }, 500);
+    });
+
+    // Check on blur (focus out)
+    whatsappInput.addEventListener('blur', function() {
+        checkWhatsAppAvailability();
+    });
+});
+</script>
 {% endblock content %}

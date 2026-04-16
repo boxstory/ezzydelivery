@@ -14,6 +14,8 @@ urlpatterns = [
     path('profile/add/', core_views.profile_add, name='profile_add'),
     path('profile/photo/update/', core_views.profile_picture_update, name='profile_picture_update'),
     path('profile/complete/', core_views.profile_complete_update, name='profile_complete_update'),
+    path('api/check-whatsapp/', core_views.check_whatsapp_availability, name='check_whatsapp_availability'),
+    path('api/check-phone/', core_views.check_phone_availability, name='check_phone_availability'),
     # Wildcard profile paths
     path('profile/<str:user_number>/', core_views.profile, name='profile'),
     path('profile/<str:user_number>/review/', core_views.profile_completion_test,

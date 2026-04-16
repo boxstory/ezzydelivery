@@ -7,6 +7,8 @@ and error handling for the AI Operations Agent.
 
 import time
 import logging
+import os
+import requests
 from typing import Optional, List, Dict, Any, Generator
 from decimal import Decimal
 
@@ -29,6 +31,56 @@ PRICING = {
     'claude-3-haiku-20240307': {'input': 0.25, 'output': 1.25},
     'claude-3-opus-20240229': {'input': 15.00, 'output': 75.00},
 }
+
+
+def send_whatsapp_alert(message: str) -> bool:
+    """
+    Send WhatsApp alert via Evolution API to multiple recipients.
+    Used for budget limit notifications.
+
+    Returns:
+        bool: True if sent to at least one recipient, False if all failed
+    """
+    phones_str = getattr(settings, 'AI_AGENT_ALERT_PHONES', '')
+    if not phones_str:
+        logger.warning("AI_AGENT_ALERT_PHONES not configured for alerts")
+        return False
+
+    # Parse comma-separated phone numbers
+    phones = [p.strip() for p in phones_str.split(',') if p.strip()]
+    if not phones:
+        logger.warning("No valid phone numbers in AI_AGENT_ALERT_PHONES")
+        return False
+
+    evo_url = getattr(settings, 'EVALUATION_URL', '') or os.environ.get('EVALUATION_URL', '')
+    evo_key = getattr(settings, 'EVALUATION_API_KEY', '') or os.environ.get('EVALUATION_API_KEY', '')
+    evo_instance = getattr(settings, 'EVALUATION_INSTANCE', '') or os.environ.get('EVALUATION_INSTANCE', '')
+
+    if not evo_url or not evo_key or not evo_instance:
+        logger.warning("Evolution API not configured for budget alerts")
+        return False
+
+    success_count = 0
+    evo_url = evo_url.rstrip('/')
+
+    for phone in phones:
+        try:
+            payload = {'number': phone, 'text': message}
+            response = requests.post(
+                f"{evo_url}/message/sendText/{evo_instance}",
+                headers={'apikey': evo_key, 'Content-Type': 'application/json'},
+                json=payload,
+                timeout=10,
+            )
+            if response.status_code in (200, 201):
+                logger.info(f"Budget alert sent successfully to {phone}")
+                success_count += 1
+            else:
+                logger.error(f"Failed to send alert to {phone}: {response.status_code} {response.text[:200]}")
+        except requests.RequestException as e:
+            logger.error(f"Budget alert request failed for {phone}: {e}")
+
+    return success_count > 0
 
 
 class RateLimiter:
@@ -77,11 +129,13 @@ class RateLimiter:
 class BudgetTracker:
     """
     Tracks API spending against daily and monthly budgets.
+    Sends WhatsApp alerts when limits are exceeded.
     """
 
     def __init__(self):
         self.daily_budget = getattr(settings, 'AI_AGENT_DAILY_BUDGET', 50.0)
         self.monthly_budget = getattr(settings, 'AI_AGENT_MONTHLY_BUDGET', 1000.0)
+        self.whatsapp_enabled = getattr(settings, 'AI_AGENT_WHATSAPP_ENABLED', True)
 
     def _get_daily_key(self) -> str:
         today = timezone.now().strftime('%Y-%m-%d')
@@ -90,6 +144,22 @@ class BudgetTracker:
     def _get_monthly_key(self) -> str:
         month = timezone.now().strftime('%Y-%m')
         return f"ai_budget:monthly:{month}"
+
+    def _get_alert_key(self, budget_type: str) -> str:
+        """Get cache key for alert tracking."""
+        if budget_type == 'daily':
+            key = self._get_daily_key()
+        else:
+            key = self._get_monthly_key()
+        return f"{key}:alert_sent"
+
+    def _get_warning_key(self, budget_type: str) -> str:
+        """Get cache key for warning tracking (80% threshold)."""
+        if budget_type == 'daily':
+            key = self._get_daily_key()
+        else:
+            key = self._get_monthly_key()
+        return f"{key}:warning_sent"
 
     def record_cost(self, cost: float) -> None:
         """Record API cost to daily and monthly totals."""
@@ -105,7 +175,11 @@ class BudgetTracker:
 
     def check_budget(self) -> tuple[bool, str]:
         """
-        Check if within budget limits.
+        Check if within budget limits with tiered warnings.
+
+        Behavior:
+        - 80% threshold: Send warning, allow calls
+        - 100% threshold: Send block alert, reject calls
 
         Returns:
             (is_within_budget, message)
@@ -116,11 +190,93 @@ class BudgetTracker:
         monthly_key = self._get_monthly_key()
         monthly_total = cache.get(monthly_key, 0.0)
 
+        # ============================================
+        # DAILY BUDGET CHECKS
+        # ============================================
+
+        # Check if exceeded (100%)
         if daily_total >= self.daily_budget:
+            # Send block alert if not already sent today
+            if self.whatsapp_enabled:
+                alert_key = self._get_alert_key('daily')
+                if not cache.get(alert_key, False):
+                    message = (
+                        f"🚫 *AI Agent - Daily Budget EXCEEDED*\n\n"
+                        f"Website: https://ezzydelivery.qa\n\n"
+                        f"Daily spending: ${daily_total:.2f}\n"
+                        f"Daily limit: ${self.daily_budget:.2f}\n\n"
+                        f"⏸️ *API BLOCKED IMMEDIATELY*\n"
+                        f"All Claude AI calls blocked now.\n"
+                        f"Resumes tomorrow at 12:00 AM UTC."
+                    )
+                    if send_whatsapp_alert(message):
+                        cache.set(alert_key, True, 86400)  # Cache for 24 hours
             return False, f"Daily budget exceeded (${daily_total:.2f}/${self.daily_budget:.2f})"
 
+        # Check warning threshold (80%)
+        daily_warning_threshold = self.daily_budget * 0.80
+        if daily_total >= daily_warning_threshold:
+            # Send warning if not already sent today
+            if self.whatsapp_enabled:
+                warning_key = self._get_warning_key('daily')
+                if not cache.get(warning_key, False):
+                    remaining = self.daily_budget - daily_total
+                    message = (
+                        f"⚠️ *AI Agent - Daily Budget Warning (80%)*\n\n"
+                        f"Website: https://ezzydelivery.qa\n\n"
+                        f"Daily spending: ${daily_total:.2f}\n"
+                        f"Daily limit: ${self.daily_budget:.2f}\n"
+                        f"Remaining: ${remaining:.2f}\n\n"
+                        f"⚡ *API STILL WORKING*\n"
+                        f"Calls allowed until limit reached.\n"
+                        f"⚠️ Monitor usage carefully!"
+                    )
+                    if send_whatsapp_alert(message):
+                        cache.set(warning_key, True, 86400)  # Cache for 24 hours
+
+        # ============================================
+        # MONTHLY BUDGET CHECKS
+        # ============================================
+
+        # Check if exceeded (100%)
         if monthly_total >= self.monthly_budget:
+            # Send block alert if not already sent this month
+            if self.whatsapp_enabled:
+                alert_key = self._get_alert_key('monthly')
+                if not cache.get(alert_key, False):
+                    message = (
+                        f"🚫 *AI Agent - Monthly Budget EXCEEDED*\n\n"
+                        f"Website: https://ezzydelivery.qa\n\n"
+                        f"Monthly spending: ${monthly_total:.2f}\n"
+                        f"Monthly limit: ${self.monthly_budget:.2f}\n\n"
+                        f"⏸️ *API BLOCKED IMMEDIATELY*\n"
+                        f"All Claude AI calls blocked now.\n"
+                        f"Resumes on the 1st of next month."
+                    )
+                    if send_whatsapp_alert(message):
+                        cache.set(alert_key, True, 2678400)  # Cache for 31 days
             return False, f"Monthly budget exceeded (${monthly_total:.2f}/${self.monthly_budget:.2f})"
+
+        # Check warning threshold (80%)
+        monthly_warning_threshold = self.monthly_budget * 0.80
+        if monthly_total >= monthly_warning_threshold:
+            # Send warning if not already sent this month
+            if self.whatsapp_enabled:
+                warning_key = self._get_warning_key('monthly')
+                if not cache.get(warning_key, False):
+                    remaining = self.monthly_budget - monthly_total
+                    message = (
+                        f"⚠️ *AI Agent - Monthly Budget Warning (80%)*\n\n"
+                        f"Website: https://ezzydelivery.qa\n\n"
+                        f"Monthly spending: ${monthly_total:.2f}\n"
+                        f"Monthly limit: ${self.monthly_budget:.2f}\n"
+                        f"Remaining: ${remaining:.2f}\n\n"
+                        f"⚡ *API STILL WORKING*\n"
+                        f"Calls allowed until limit reached.\n"
+                        f"⚠️ Monitor usage carefully!"
+                    )
+                    if send_whatsapp_alert(message):
+                        cache.set(warning_key, True, 2678400)  # Cache for 31 days
 
         return True, "OK"
 

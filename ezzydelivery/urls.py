@@ -7,6 +7,7 @@ from django.contrib.sitemaps.views import sitemap
 from webpages.sitemaps import BusinessSitemap
 from core.sitemaps import StaticViewSitemap, BusinessPagesSitemap, WorkforcePagesSitemap, SEOLandingPageSitemap, BlogPostSitemap, BlogCategorySitemap
 from core.views_seo import robots_txt, security_txt, humans_txt, llms_txt
+from core.views import RateLimitedSignupView, rate_limit_exceeded
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 from django.http import FileResponse, HttpResponseNotFound
@@ -69,6 +70,8 @@ urlpatterns = [
     # Language switching (i18n)
     path('i18n/', include('django.conf.urls.i18n')),
 
+    # Custom signup view with rate limiting and CAPTCHA (override allauth)
+    path('accounts/signup/', RateLimitedSignupView.as_view(), name='account_signup'),
     path('accounts/', include('allauth.urls')),
 
     path('api-auth/', include('rest_framework.urls')),
@@ -106,6 +109,7 @@ urlpatterns = [
 ]
 
 handler404 = 'webpages.views.handler404'
+handler429 = 'core.views.rate_limit_exceeded'
 handler500 = 'webpages.views.handler500'
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

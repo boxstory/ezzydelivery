@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'core/css/account-forms.css' %}?v=20260214a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/account-forms.css' %}?v=20260414c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -13,7 +13,12 @@
     <div class="container-fluid py-4 px-3">
         <div class="row justify-content-center">
             <div class="col-12 col-lg-10 col-xl-8">
-                <div class="card border-0 shadow-lg" id="core_profile_complete_card_main">
+                <!-- Step Indicator -->
+                {% with ob_step=1 ob_role='' %}
+                    {% include "core/includes/ob_step_indicator.html" %}
+                {% endwith %}
+
+                <div class="card border-0 shadow-lg" id="core_profile_complete_card_main" style="border-radius: 0 0 var(--brand-radius-lg, 0.875rem) var(--brand-radius-lg, 0.875rem);">
                     <!-- Header with Progress Circle -->
                     <div class="card-header bg-transparent border-0 text-center pt-5 pb-4" id="core_profile_complete_header">
                         <div class="d-flex justify-content-center mb-4">
@@ -62,6 +67,10 @@
                         </div>
                         {% endif %}
 
+                        <!-- Phone & WhatsApp Validation Alerts (added dynamically by JS) -->
+                        <div id="core_phone_alert_container"></div>
+                        <div id="core_whatsapp_alert_container"></div>
+
                         <form id="core_profile_complete_form_main" method="post" class="needs-validation" novalidate>
                             {% csrf_token %}
 
@@ -73,6 +82,7 @@
                                 Username <span class="text-danger">*</span>
                             </label>
                             {{ form.username }}
+                            <small class="form-text text-muted d-block">8-12 characters. Letters, numbers, and underscore (_) only. Example: john_user123</small>
                             {% if form.username.errors %}
                                 <div class="text-danger small mt-1">{{ form.username.errors }}</div>
                             {% endif %}
@@ -123,11 +133,12 @@
                             <label class="form-label" for="{{ form.phone.id_for_label }}">
                                 <i class="fa-solid fa-phone me-1"></i>
                                 Phone Number <span class="text-danger">*</span>
+                                <span id="core_phone_status_icon" style="display: none; margin-left: 0.5rem; cursor: pointer;" title="Click to see error details">
+                                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                                </span>
                             </label>
                             {{ form.phone }}
-                            {% if form.phone.errors %}
-                                <div class="text-danger small mt-1">{{ form.phone.errors }}</div>
-                            {% endif %}
+                            <div id="core_phone_status_message" class="text-danger small mt-1" style="display: none;"></div>
                         </div>
                     </div>
 
@@ -136,11 +147,13 @@
                             <label class="form-label" for="{{ form.whatsapp.id_for_label }}">
                                 <i class="fa-brands fa-whatsapp me-1"></i>
                                 WhatsApp Number <span class="text-danger">*</span>
+                                <span id="core_whatsapp_status_icon" style="display: none; margin-left: 0.5rem; cursor: pointer;" title="Click to see error details">
+                                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                                </span>
                             </label>
                             {{ form.whatsapp }}
-                            {% if form.whatsapp.errors %}
-                                <div class="text-danger small mt-1">{{ form.whatsapp.errors }}</div>
-                            {% endif %}
+                            <small class="text-muted d-block mt-1">Format: 10-15 digits. Examples: 97433123456 (Qatar), 971501234567 (UAE), 12025551234 (USA), 923001234567 (Pakistan)</small>
+                            <div id="core_whatsapp_status_message" class="text-danger small mt-1" style="display: none;"></div>
                         </div>
                     </div>
 
@@ -278,55 +291,101 @@
                             </div>
                             {% endif %}
 
-                            <!-- Action Buttons -->
-                            <div class="mt-5 pt-4 border-top">
-                                <div class="row g-3">
-                                    <div class="col-12 {% if not profile.is_business and not profile.is_driver %}col-md-4{% elif profile.is_business and profile.is_driver %}col-md-12{% else %}col-md-6{% endif %}">
-                                        <button id="core_profile_complete_btn_save" type="submit" name="action" value="save"
-                                                class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2 py-3">
-                                            <i class="fa-solid fa-floppy-disk"></i>
-                                            <span>Save Progress</span>
-                                        </button>
+                            <!-- What's Next Teaser (< 50%) -->
+                            {% if completion_percentage < 50 %}
+                            <div class="ob__next-steps mt-4 pt-4 border-top" id="core_profile_complete_section_next">
+                                <p class="text-muted small fw-semibold mb-2 text-uppercase" style="letter-spacing: 0.05em;">Your Journey — 3 Steps Coming Up</p>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="ob__next-step-item ob__next-step-item--locked">
+                                        <span class="ob__next-step-num">2</span>
+                                        <span>Choose Your Role <span class="text-muted">(unlocks at 50%)</span></span>
                                     </div>
-
-                                    {% if not profile.is_business %}
-                                    <div class="col-12 {% if not profile.is_driver %}col-md-4{% else %}col-md-6{% endif %}">
-                                        <button id="core_profile_complete_btn_register_business" type="submit" name="action" value="register_business"
-                                                class="btn btn-warning w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold"
-                                                {% if completion_percentage < 100 %}disabled{% endif %}>
-                                            <i class="fa-solid fa-building"></i>
-                                            <span>Register as Business</span>
-                                        </button>
+                                    <div class="ob__next-step-item ob__next-step-item--locked">
+                                        <span class="ob__next-step-num">3</span>
+                                        <span>Add Business or Driver Details</span>
                                     </div>
-                                    {% endif %}
-
-                                    {% if not profile.is_driver %}
-                                    <div class="col-12 {% if not profile.is_business %}col-md-4{% else %}col-md-6{% endif %}">
-                                        <button id="core_profile_complete_btn_join_driver" type="submit" name="action" value="join_driver"
-                                                class="btn btn-warning w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold"
-                                                {% if completion_percentage < 100 %}disabled{% endif %}>
-                                            <i class="fa-solid fa-car"></i>
-                                            <span>Join as Driver</span>
-                                        </button>
+                                    <div class="ob__next-step-item ob__next-step-item--locked">
+                                        <span class="ob__next-step-num">4</span>
+                                        <span>Apply for Verification</span>
                                     </div>
-                                    {% endif %}
-
-                                    {% if profile.is_business or profile.is_driver %}
-                                    <div class="col-12 col-md-6">
-                                        <a href="{% url 'core:main_dashboard' %}"
-                                           class="btn btn-dark w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold text-decoration-none">
-                                            <i class="fa-solid fa-tachometer-alt"></i>
-                                            <span>Go to Dashboard</span>
-                                        </a>
-                                    </div>
-                                    {% endif %}
                                 </div>
+                            </div>
+                            {% endif %}
 
-                                {% if completion_percentage < 100 %}
-                                <p class="text-muted small text-center mt-4 mb-0">
-                                    <i class="fa-solid fa-info-circle me-2"></i>
-                                    Complete all required fields to enable role selection
-                                </p>
+                            <!-- Role Selection (>= 50%) -->
+                            {% if completion_percentage >= 50 %}
+                            <div class="mt-4 pt-4 border-top" id="core_profile_complete_section_role">
+                                <h5 class="fw-bold mb-1 d-flex align-items-center gap-2">
+                                    <span class="badge rounded-circle bg-warning text-dark px-2 py-1">2</span>
+                                    Choose Your Role
+                                </h5>
+                                <p class="text-muted small mb-3">Select how you want to use EzzyDelivery. You can continue updating your profile while your application is being reviewed.</p>
+
+                                {% if not profile.is_business and not profile.is_driver %}
+                                <div class="row g-3">
+                                    <!-- Business Card -->
+                                    <div class="col-12 col-md-6">
+                                        <button type="submit" name="action" value="register_business" form="core_profile_complete_form_main"
+                                                class="ob__role-card w-100"
+                                                id="core_profile_complete_btn_register_business">
+                                            <span class="ob__role-card-icon">
+                                                <i class="fa-solid fa-building"></i>
+                                            </span>
+                                            <span class="ob__role-card-body">
+                                                <strong class="ob__role-card-title">Register as Business</strong>
+                                                <span class="ob__role-card-desc">List your business, manage orders, and access delivery services</span>
+                                            </span>
+                                            <i class="fa-solid fa-arrow-right ob__role-card-arrow"></i>
+                                        </button>
+                                    </div>
+                                    <!-- Driver Card -->
+                                    <div class="col-12 col-md-6">
+                                        <button type="submit" name="action" value="join_driver" form="core_profile_complete_form_main"
+                                                class="ob__role-card w-100"
+                                                id="core_profile_complete_btn_join_driver">
+                                            <span class="ob__role-card-icon">
+                                                <i class="fa-solid fa-car"></i>
+                                            </span>
+                                            <span class="ob__role-card-body">
+                                                <strong class="ob__role-card-title">Join as Driver</strong>
+                                                <span class="ob__role-card-desc">Deliver orders, earn income, and work flexible hours</span>
+                                            </span>
+                                            <i class="fa-solid fa-arrow-right ob__role-card-arrow"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if profile.is_business or profile.is_driver %}
+                                <!-- Role already selected -->
+                                <div class="alert alert-success d-flex align-items-center gap-2 mb-0">
+                                    <i class="fa-solid fa-check-circle"></i>
+                                    <span>Role selected:
+                                        {% if profile.is_business %}<strong>Business</strong>{% endif %}
+                                        {% if profile.is_driver %}<strong>Driver</strong>{% endif %}
+                                        — <a href="{% if profile.is_business %}{% url 'core:business_register' %}{% else %}{% url 'core:driver_register' %}{% endif %}" class="alert-link">Continue to Step 3 &rarr;</a>
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                            <!-- Save Progress Button -->
+                            <div class="mt-5 pt-4 border-top">
+                                <button id="core_profile_complete_btn_save" type="button" name="action" value="save"
+                                        class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2 py-3">
+                                    <i class="fa-solid fa-floppy-disk"></i>
+                                    <span>Save Progress</span>
+                                </button>
+
+                                {% if profile.is_business or profile.is_driver %}
+                                <div class="mt-3">
+                                    <a href="{% url 'core:main_dashboard' %}"
+                                       class="btn btn-dark w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold text-decoration-none">
+                                        <i class="fa-solid fa-tachometer-alt"></i>
+                                        <span>Go to Dashboard</span>
+                                    </a>
+                                </div>
                                 {% endif %}
                             </div>
                         </form>
@@ -336,4 +395,509 @@
         </div>
     </div>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const whatsappInput = document.querySelector('[name="whatsapp"]');
+    const phoneInput = document.querySelector('[name="phone"]');
+    const whatsappStatusIcon = document.getElementById('core_whatsapp_status_icon');
+    const whatsappStatusMessage = document.getElementById('core_whatsapp_status_message');
+    const phoneStatusIcon = document.getElementById('core_phone_status_icon');
+    const phoneStatusMessage = document.getElementById('core_phone_status_message');
+    const phoneAlertContainer = document.getElementById('core_phone_alert_container');
+    const whatsappAlertContainer = document.getElementById('core_whatsapp_alert_container');
+    const saveButton = document.getElementById('core_profile_complete_btn_save');
+    const businessButton = document.getElementById('core_profile_complete_btn_register_business');
+    const driverButton = document.getElementById('core_profile_complete_btn_join_driver');
+    const roleSection = document.getElementById('core_profile_complete_section_role');
+    const percentageDisplay = document.getElementById('core_profile_complete_percentage');
+
+    if (!whatsappInput || !phoneInput) return;
+
+    // Keep WhatsApp as text input, validate on blur (focus out)
+    whatsappInput.type = 'text';
+    whatsappInput.inputMode = 'numeric';
+    whatsappInput.placeholder = 'e.g., 97433123456 or +1-202-555-1234';
+
+    // Keep phone as text input, validate on blur (focus out)
+    phoneInput.type = 'text';
+    phoneInput.inputMode = 'numeric';
+    phoneInput.placeholder = 'e.g., 66451589';
+
+    let isWhatsAppAvailable = false;
+    let isPhoneAvailable = false;
+    let currentErrorMessage = '';
+    let validationComplete = false;
+
+    // Click handler for WhatsApp error icon to show message
+    if (whatsappStatusIcon) {
+        whatsappStatusIcon.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentErrorMessage) {
+                alert('⚠️ WhatsApp Error:\n\n' + currentErrorMessage);
+            }
+        });
+        whatsappStatusIcon.style.cursor = 'pointer';
+    }
+
+    // Click handler for Phone error icon to show message
+    if (phoneStatusIcon) {
+        phoneStatusIcon.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (phoneStatusMessage && phoneStatusMessage.textContent) {
+                alert('⚠️ Phone Error:\n\n' + phoneStatusMessage.textContent);
+            }
+        });
+        phoneStatusIcon.style.cursor = 'pointer';
+    }
+
+    function checkWhatsAppAvailability() {
+        const whatsappNumber = whatsappInput.value.trim();
+
+        // Don't check if empty
+        if (!whatsappNumber) {
+            whatsappStatusIcon.style.display = 'none';
+            whatsappStatusMessage.style.display = 'none';
+            whatsappAlertContainer.innerHTML = '';
+            whatsappInput.style.borderColor = '';
+            whatsappInput.classList.remove('is-invalid');
+            isWhatsAppAvailable = false;
+
+            // Update percentage for empty field
+            if (percentageDisplay) {
+                percentageDisplay.textContent = '90%';
+            }
+
+            updateButtonStates();
+            // Hide role section if WhatsApp is empty
+            if (roleSection) {
+                roleSection.style.display = 'none';
+            }
+            return;
+        }
+
+        // Show loading indicator while checking
+        whatsappStatusIcon.style.display = 'inline-block';
+        whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-warning" style="margin-left: 0.5rem;"></i>';
+        whatsappStatusIcon.title = 'Validating...';
+
+        // Make API call (also pass phone for cross-field validation)
+        const phoneValue = phoneInput.value.trim();
+        const params = new URLSearchParams({
+            whatsapp: whatsappNumber,
+            phone: phoneValue
+        });
+        fetch(`{% url 'core:check_whatsapp_availability' %}?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'  // Include cookies for authentication
+        })
+        .then(response => {
+            if (!response.ok) {
+                // On any error, assume available
+                isWhatsAppAvailable = true;
+                statusIcon.style.display = 'none';
+                statusMessage.style.display = 'none';
+                alertContainer.style.display = 'none';
+                updateButtonStates();
+                return null;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data) return;
+
+            isWhatsAppAvailable = data.available;
+
+            if (data.available) {
+                // WhatsApp is available - show success indicator
+                whatsappStatusIcon.style.display = 'inline-block';
+                whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-check-circle text-success" style="margin-left: 0.5rem;"></i>';
+                whatsappStatusIcon.title = '✅ WhatsApp number is valid';
+
+                whatsappStatusMessage.style.display = 'none';
+                whatsappStatusMessage.textContent = '';
+                whatsappAlertContainer.innerHTML = ''; // Clear the alert
+
+                // Remove error border from input
+                whatsappInput.style.borderColor = '';
+                whatsappInput.classList.remove('is-invalid');
+
+                // Also update percentage to 100%
+                if (percentageDisplay) {
+                    percentageDisplay.textContent = '100%';
+                }
+            } else {
+                // WhatsApp is not available - show error alert
+                const errorMsg = data.message || 'This WhatsApp number is already in use by another account';
+                currentErrorMessage = errorMsg;
+
+                // Show error icon
+                whatsappStatusIcon.style.display = 'inline-block';
+                whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger" style="margin-left: 0.5rem;"></i>';
+                whatsappStatusIcon.title = `Click to see error: ${errorMsg}`;
+
+                // Show error message below field
+                whatsappStatusMessage.style.display = 'block';
+                whatsappStatusMessage.textContent = errorMsg;
+                whatsappStatusMessage.className = 'text-danger small mt-1';
+
+                // Always update alert at top (not just first time)
+                const alertHTML = `
+                    <div class="alert alert-danger d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
+                        <i class="fa-solid fa-circle-xmark fs-5 mt-1"></i>
+                        <div>
+                            <strong class="d-block mb-1">⚠️ WhatsApp Format Error</strong>
+                            <span class="small">${errorMsg}</span>
+                        </div>
+                    </div>
+                `;
+                whatsappAlertContainer.innerHTML = alertHTML;
+
+                // Add red border to input field
+                whatsappInput.style.borderColor = '#dc3545';
+                whatsappInput.classList.add('is-invalid');
+
+                // Scroll to alert so user sees it
+                setTimeout(() => {
+                    alertContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+
+                // Update percentage to 90% since WhatsApp is unavailable
+                if (percentageDisplay) {
+                    percentageDisplay.textContent = '90%';
+                }
+
+            }
+
+            updateButtonStates();
+        })
+        .catch(error => {
+            // On error, assume available to not block the form
+            isWhatsAppAvailable = true;
+            whatsappStatusIcon.style.display = 'none';
+            whatsappStatusMessage.style.display = 'none';
+            whatsappAlertContainer.innerHTML = '';
+
+            updateButtonStates();
+        });
+    }
+
+    function checkPhoneAvailability() {
+        const phoneNumber = phoneInput.value.trim();
+
+        // Don't check if empty
+        if (!phoneNumber) {
+            phoneStatusIcon.style.display = 'none';
+            phoneStatusMessage.style.display = 'none';
+            phoneAlertContainer.innerHTML = '';
+            isPhoneAvailable = false;
+            updateButtonStates();
+            return;
+        }
+
+        // Make API call (also pass whatsapp for cross-field validation)
+        const whatsappValue = whatsappInput.value.trim();
+        const params = new URLSearchParams({
+            phone: phoneNumber,
+            whatsapp: whatsappValue
+        });
+        fetch(`{% url 'core:check_phone_availability' %}?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (!response.ok) {
+                isPhoneAvailable = true;
+                phoneStatusIcon.style.display = 'none';
+                phoneStatusMessage.style.display = 'none';
+                phoneAlertContainer.innerHTML = '';
+                return null;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data) return;
+
+            isPhoneAvailable = data.available;
+
+            if (!data.available) {
+                // Show error icon and message
+                const phoneErrorMsg = data.message || 'This phone number is already in use by another account';
+
+                phoneStatusIcon.style.display = 'inline-block';
+                phoneStatusIcon.title = `Click to see error: ${phoneErrorMsg}`;
+
+                // Show error message below field
+                phoneStatusMessage.style.display = 'block';
+                phoneStatusMessage.textContent = phoneErrorMsg;
+                phoneStatusMessage.className = 'text-danger small mt-1';
+
+                // Add red border to phone field
+                phoneInput.style.borderColor = '#dc3545';
+                phoneInput.classList.add('is-invalid');
+
+                // Show alert at top
+                const alertHTML = `
+                    <div class="alert alert-danger d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
+                        <i class="fa-solid fa-circle-xmark fs-5 mt-1"></i>
+                        <div>
+                            <strong class="d-block mb-1">Phone Number Not Available</strong>
+                            <span class="small">${phoneErrorMsg}</span>
+                        </div>
+                    </div>
+                `;
+                phoneAlertContainer.innerHTML = alertHTML;
+
+                // Scroll to alert so user sees it
+                setTimeout(() => {
+                    phoneAlertContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            } else {
+                // Remove error icon and message
+                phoneStatusIcon.style.display = 'none';
+                phoneStatusMessage.style.display = 'none';
+                phoneStatusMessage.textContent = '';
+                phoneAlertContainer.innerHTML = '';
+
+                // Remove error border from phone input
+                phoneInput.style.borderColor = '';
+                phoneInput.classList.remove('is-invalid');
+            }
+
+            updateButtonStates();
+        })
+        .catch(error => {
+            console.error('Error checking phone availability:', error);
+            isPhoneAvailable = true;
+            phoneStatusIcon.style.display = 'none';
+            phoneStatusMessage.style.display = 'none';
+            phoneAlertContainer.innerHTML = '';
+            updateButtonStates();
+        });
+    }
+
+    function updateButtonStates() {
+        // Both phone and WhatsApp must be available
+        const bothAvailable = isPhoneAvailable && isWhatsAppAvailable;
+
+        if (saveButton) {
+            saveButton.disabled = !bothAvailable;
+            saveButton.style.opacity = bothAvailable ? '1' : '0.6';
+            saveButton.style.cursor = bothAvailable ? 'pointer' : 'not-allowed';
+
+            if (!bothAvailable) {
+                let issues = [];
+                if (!isPhoneAvailable) issues.push('Mobile number');
+                if (!isWhatsAppAvailable) issues.push('WhatsApp number');
+                saveButton.title = `⚠️ Fix ${issues.join(' and ')} (must be available and unique)`;
+                saveButton.classList.add('is-invalid');
+            } else {
+                saveButton.title = 'Save your profile';
+                saveButton.classList.remove('is-invalid');
+            }
+        }
+
+        if (businessButton) {
+            businessButton.disabled = !bothAvailable;
+            businessButton.style.opacity = bothAvailable ? '1' : '0.5';
+            businessButton.style.cursor = bothAvailable ? 'pointer' : 'not-allowed';
+            businessButton.title = bothAvailable ? '' : 'Mobile and WhatsApp numbers must be available';
+        }
+
+        if (driverButton) {
+            driverButton.disabled = !bothAvailable;
+            driverButton.style.opacity = bothAvailable ? '1' : '0.5';
+            driverButton.style.cursor = bothAvailable ? 'pointer' : 'not-allowed';
+            driverButton.title = bothAvailable ? '' : 'Mobile and WhatsApp numbers must be available';
+        }
+
+        // Update percentage display dynamically
+        if (percentageDisplay) {
+            const whatsappNumber = whatsappInput.value.trim();
+
+            // Calculate percentage: 9 out of 10 fields if WhatsApp is taken, 10 out of 10 if available
+            if (!whatsappNumber) {
+                // WhatsApp is empty
+                const currentPercentage = Math.round((9 / 10) * 100);
+                percentageDisplay.textContent = currentPercentage + '%';
+            } else if (isWhatsAppAvailable) {
+                // WhatsApp is available
+                percentageDisplay.textContent = '100%';
+            } else {
+                // WhatsApp is taken
+                percentageDisplay.textContent = '90%';
+            }
+        }
+
+        // Hide/Show role selection section based on WhatsApp availability
+        if (roleSection) {
+            if (isWhatsAppAvailable) {
+                roleSection.style.display = 'block';
+                roleSection.style.opacity = '1';
+            } else {
+                roleSection.style.display = 'none';
+            }
+        }
+    }
+
+    // Handle Save Progress button click
+    const form = document.getElementById('core_profile_complete_form_main');
+    let isSubmitting = false;
+
+    if (saveButton) {
+        saveButton.addEventListener('click', function(e) {
+            e.preventDefault();
+
+            const phoneValue = phoneInput.value.trim();
+            const whatsappValue = whatsappInput.value.trim();
+
+            // Check if fields are filled
+            if (!phoneValue || !whatsappValue) {
+                phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
+            }
+
+            if (isSubmitting) {
+                return false;
+            }
+
+            isSubmitting = true;
+
+            // Force validation check
+            checkPhoneAvailability();
+            checkWhatsAppAvailability();
+
+            // Wait for validation to complete
+            let checkCount = 0;
+            const validationTimer = setInterval(() => {
+                checkCount++;
+
+                // Check if both are available
+                if (isPhoneAvailable && isWhatsAppAvailable) {
+                    clearInterval(validationTimer);
+
+                    // Create hidden input to preserve action value
+                    const actionInput = document.createElement('input');
+                    actionInput.type = 'hidden';
+                    actionInput.name = 'action';
+                    actionInput.value = 'save';
+                    form.appendChild(actionInput);
+
+                    // Submit form directly
+                    form.submit();
+                    return;
+                }
+
+                // Stop after 2 seconds
+                if (checkCount > 20) {
+                    clearInterval(validationTimer);
+                    isSubmitting = false;
+
+                    if (!isPhoneAvailable) {
+                        phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    if (!isWhatsAppAvailable) {
+                        whatsappInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }, 100);
+        });
+    }
+
+    // Prevent form submission if phone or WhatsApp is not available
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (isSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+
+            const phoneValue = phoneInput.value.trim();
+            const whatsappValue = whatsappInput.value.trim();
+
+            // Check if fields are filled
+            if (!phoneValue || !whatsappValue) {
+                e.preventDefault();
+                return false;
+            }
+
+            // Prevent default submission and validate
+            e.preventDefault();
+            isSubmitting = true;
+
+            // Force validation check
+            checkPhoneAvailability();
+            checkWhatsAppAvailability();
+
+            // Wait for validation to complete (API calls take time!)
+            let checkCount = 0;
+            const validationTimer = setInterval(() => {
+                checkCount++;
+
+                // Check if both are available after API calls complete
+                if (isPhoneAvailable && isWhatsAppAvailable) {
+                    clearInterval(validationTimer);
+                    isSubmitting = false;
+                    // Submit using HTMLFormElement.submit() to bypass validation again
+                    HTMLFormElement.prototype.submit.call(form);
+                    return;
+                }
+
+                // If either is not available or still checking, show error and stop
+                if (checkCount > 20) { // 2 seconds (20 * 100ms)
+                    clearInterval(validationTimer);
+                    isSubmitting = false;
+
+                    // Show errors
+                    if (!isPhoneAvailable) {
+                        phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    if (!isWhatsAppAvailable) {
+                        whatsappInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }, 100);
+        });
+    }
+
+    // Check on page load
+    checkWhatsAppAvailability();
+    checkPhoneAvailability();
+
+    // Check on input change (with debounce)
+    let debounceTimer;
+    let phoneDebounceTimer;
+
+    whatsappInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            checkWhatsAppAvailability();
+        }, 1500);
+    });
+
+    phoneInput.addEventListener('input', function() {
+        clearTimeout(phoneDebounceTimer);
+        phoneDebounceTimer = setTimeout(() => {
+            checkPhoneAvailability();
+        }, 1500);
+    });
+
+    // Check on blur (focus out)
+    whatsappInput.addEventListener('blur', function() {
+        checkWhatsAppAvailability();
+    });
+
+    phoneInput.addEventListener('blur', function() {
+        checkPhoneAvailability();
+    });
+});
+</script>
 {% endblock content %}

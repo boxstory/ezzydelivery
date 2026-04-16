@@ -1,0 +1,85 @@
+{% comment %}
+Onboarding Wizard Step Indicator
+BEM Prefix: ob__ (onboarding)
+Context vars: ob_step (1-4), ob_role ('' | 'business' | 'driver')
+{% endcomment %}
+
+<nav class="ob__wizard" aria-label="Registration progress">
+    <ol class="ob__steps" role="list">
+
+        <!-- Step 1: Profile Info -->
+        <li class="ob__step {% if ob_step == 1 %}ob__step--active{% elif ob_step > 1 %}ob__step--complete{% else %}ob__step--future{% endif %}"
+            aria-current="{% if ob_step == 1 %}step{% endif %}">
+            <span class="ob__step-icon" aria-hidden="true">
+                {% if ob_step > 1 %}
+                    <i class="fa-solid fa-check"></i>
+                {% else %}
+                    <span class="ob__step-number">1</span>
+                {% endif %}
+            </span>
+            <span class="ob__step-label">
+                <span class="ob__step-label-primary">Profile Info</span>
+                <span class="ob__step-label-sub d-none d-sm-block">Personal details</span>
+            </span>
+        </li>
+
+        <li class="ob__connector" aria-hidden="true"></li>
+
+        <!-- Step 2: Choose Role -->
+        <li class="ob__step {% if ob_step == 2 %}ob__step--active{% elif ob_step > 2 %}ob__step--complete{% else %}ob__step--future{% endif %}"
+            aria-current="{% if ob_step == 2 %}step{% endif %}">
+            <span class="ob__step-icon" aria-hidden="true">
+                {% if ob_step > 2 %}
+                    <i class="fa-solid fa-check"></i>
+                {% else %}
+                    <span class="ob__step-number">2</span>
+                {% endif %}
+            </span>
+            <span class="ob__step-label">
+                <span class="ob__step-label-primary">Choose Role</span>
+                <span class="ob__step-label-sub d-none d-sm-block">Business or Driver</span>
+            </span>
+        </li>
+
+        <li class="ob__connector" aria-hidden="true"></li>
+
+        <!-- Step 3: Role Details -->
+        <li class="ob__step {% if ob_step == 3 %}ob__step--active{% elif ob_step > 3 %}ob__step--complete{% else %}ob__step--future{% endif %}"
+            aria-current="{% if ob_step == 3 %}step{% endif %}">
+            <span class="ob__step-icon" aria-hidden="true">
+                {% if ob_step > 3 %}
+                    <i class="fa-solid fa-check"></i>
+                {% else %}
+                    <span class="ob__step-number">3</span>
+                {% endif %}
+            </span>
+            <span class="ob__step-label">
+                <span class="ob__step-label-primary">
+                    {% if ob_role == 'business' %}Business Details
+                    {% elif ob_role == 'driver' %}Driver Details
+                    {% else %}Role Details{% endif %}
+                </span>
+                <span class="ob__step-label-sub d-none d-sm-block">Specific information</span>
+            </span>
+        </li>
+
+        <li class="ob__connector" aria-hidden="true"></li>
+
+        <!-- Step 4: Apply -->
+        <li class="ob__step {% if ob_step == 4 %}ob__step--active{% elif ob_step > 4 %}ob__step--complete{% else %}ob__step--future{% endif %}"
+            aria-current="{% if ob_step == 4 %}step{% endif %}">
+            <span class="ob__step-icon" aria-hidden="true">
+                {% if ob_step > 4 %}
+                    <i class="fa-solid fa-check"></i>
+                {% else %}
+                    <span class="ob__step-number">4</span>
+                {% endif %}
+            </span>
+            <span class="ob__step-label">
+                <span class="ob__step-label-primary">Apply</span>
+                <span class="ob__step-label-sub d-none d-sm-block">Submit for review</span>
+            </span>
+        </li>
+
+    </ol>
+</nav>

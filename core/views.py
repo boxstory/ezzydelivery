@@ -48,6 +48,9 @@ from datetime import datetime, timedelta
 from django.utils import timezone as dj_timezone
 from functools import wraps
 
+from allauth.account.views import SignupView
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -89,6 +92,43 @@ VERIFICATION_STATUS_PENDING = 'pending'
 VERIFICATION_STATUS_UNDER_REVIEW = 'under_review'
 VERIFICATION_STATUS_VERIFIED = 'verified'
 VERIFICATION_STATUS_REJECTED = 'rejected'
+
+
+def validate_whatsapp_number(whatsapp_number):
+    """
+    Validate if a WhatsApp number is valid (any country).
+    Requires at least 10 digits total (E.164 format).
+
+    Args:
+        whatsapp_number (str): The WhatsApp number to validate
+
+    Returns:
+        tuple: (is_valid: bool, message: str)
+    """
+    if not whatsapp_number:
+        return False, 'WhatsApp number is required'
+
+    # Remove any non-digit characters (handles +, spaces, dashes, etc.)
+    digits_only = ''.join(filter(str.isdigit, str(whatsapp_number)))
+
+    # Minimum 10 digits required (E.164 standard: country code + local number)
+    # Examples:
+    # - Qatar: 97433123456 (974 + 8 digits)
+    # - USA: 12025551234 (1 + 10 digits)
+    # - Pakistan: 923001234567 (92 + 10 digits)
+    if len(digits_only) < 10:
+        return False, f'WhatsApp number must be at least 10 digits. You provided {len(digits_only)} digits'
+
+    # Maximum 15 digits (E.164 international standard limit)
+    if len(digits_only) > 15:
+        return False, f'WhatsApp number cannot exceed 15 digits. You provided {len(digits_only)} digits'
+
+    # TODO: Integrate with WhatsApp API to verify actual account existence
+    # - Twilio WhatsApp API: Check if number is registered
+    # - WhatsApp Business API: Verify account status
+    # - Third-party validation service
+
+    return True, 'WhatsApp number is valid'
 
 DRIVER_STATUS_PENDING = 'pending'
 DRIVER_STATUS_APPROVED = 'approved'
@@ -687,11 +727,13 @@ def main_dashboard(request):
 
         elif profile.verification_status == VERIFICATION_STATUS_PENDING:
             messages.info(request, "Your application is pending verification. Please wait for staff approval.")
-            return render(request, 'core/verification_pending.html', {'profile': profile})
+            ob_role = 'business' if profile.is_business else ('driver' if profile.is_driver else '')
+            return render(request, 'core/verification_pending.html', {'profile': profile, 'ob_role': ob_role})
 
         elif profile.verification_status == VERIFICATION_STATUS_UNDER_REVIEW:
             messages.info(request, "Your application is under review. We'll notify you once verified.")
-            return render(request, 'core/verification_pending.html', {'profile': profile})
+            ob_role = 'business' if profile.is_business else ('driver' if profile.is_driver else '')
+            return render(request, 'core/verification_pending.html', {'profile': profile, 'ob_role': ob_role})
 
         elif profile.verification_status == VERIFICATION_STATUS_REJECTED:
             rejection_msg = f"Your application was rejected. Reason: {profile.rejection_reason or 'Not specified'}. Please update your information and reapply."
@@ -717,7 +759,8 @@ def main_dashboard(request):
                         return redirect('business:business_dashboard')
                     elif team_profile and team_profile.team_status == 'pending':
                         messages.info(request, "Your team membership is pending staff verification. Please wait for approval.")
-                        return render(request, 'core/verification_pending.html', {'profile': profile})
+                        ob_role = ''
+                        return render(request, 'core/verification_pending.html', {'profile': profile, 'ob_role': ob_role})
                     else:
                         messages.warning(request, "Your team membership is not active. Please contact the business owner.")
                         return redirect('core:profile_complete_update')
@@ -815,8 +858,8 @@ def profile_add(request):
             profile.user_id = request.user.id
             profile.save()
             logger.info(f"Profile created successfully for user {request.user.id}")
-            messages.success(request, 'Your profile has been created!')
-            return redirect('core:profile', user_number=_get_user_number(request.user.id))
+            messages.success(request, 'Profile created! Now complete your details and choose your role.')
+            return redirect('core:profile_complete_update')
         else:
             logger.warning(f"Invalid profile form for user {request.user.id}")
             messages.error(request, "Please correct the errors below.")
@@ -1050,8 +1093,8 @@ def profile_complete_update(request):
                 return redirect('core:profile_complete_update')
 
             elif action == 'register_business' or action == 'join_driver':
-                # Check if profile is 100% complete
-                if completion_percentage == 100:
+                # Check if profile is at least 50% complete
+                if completion_percentage >= 50:
 
                     if action == 'register_business':
                         # Warn if already applied as business
@@ -1107,9 +1150,9 @@ def business_register(request):
         messages.warning(request, "Staff users cannot register as business. Redirecting to staff dashboard.")
         return redirect('workforce:wf_dashboard')
 
-    # Check if profile is completed
-    if not profile.is_profile_completed:
-        messages.error(request, "Please complete your profile before registering a business!")
+    # Check if profile is at least 50% complete
+    if profile.get_profile_completion_percentage() < 50:
+        messages.error(request, "Please complete at least 50% of your profile before proceeding.")
         return redirect('core:profile_complete_update')
 
     # Check if user is set as business
@@ -1198,9 +1241,9 @@ def driver_register(request):
         messages.warning(request, "Staff users cannot register as driver. Redirecting to staff dashboard.")
         return redirect('workforce:wf_dashboard')
 
-    # Check if profile is completed
-    if not profile.is_profile_completed:
-        messages.error(request, "Please complete your profile before joining as a driver!")
+    # Check if profile is at least 50% complete
+    if profile.get_profile_completion_percentage() < 50:
+        messages.error(request, "Please complete at least 50% of your profile before proceeding.")
         return redirect('core:profile_complete_update')
 
     # Check if user is set as driver
@@ -1306,3 +1349,170 @@ def make_staff(request):
     else:
         messages.error(request, "Profile not found!")
         return redirect('core:profile_add')
+
+
+def check_whatsapp_availability(request):
+    """Check if WhatsApp number is available and valid"""
+    from django.http import JsonResponse
+
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+    whatsapp = request.GET.get('whatsapp', '').strip()
+    if not whatsapp:
+        return JsonResponse({'available': True, 'message': 'WhatsApp number is available'})
+
+    # For authenticated users, exclude their own number
+    if request.user.is_authenticated:
+        user_profile = request.user.profile
+
+        # Check 1: Validate WhatsApp number format and account
+        is_valid, validation_msg = validate_whatsapp_number(whatsapp)
+        if not is_valid:
+            return JsonResponse({
+                'available': False,
+                'message': validation_msg
+            })
+
+        # Check 2: Is this WhatsApp number already used by another user?
+        whatsapp_duplicate = core_models.Profile.objects.filter(
+            whatsapp=whatsapp
+        ).exclude(user_id=request.user.id).exists()
+
+        if whatsapp_duplicate:
+            return JsonResponse({
+                'available': False,
+                'message': 'This WhatsApp number is already in use by another account'
+            })
+
+        # Check 3: Is this WhatsApp number used as phone by another user?
+        phone_conflict = core_models.Profile.objects.filter(
+            phone=whatsapp
+        ).exclude(user_id=request.user.id).exists()
+
+        if phone_conflict:
+            return JsonResponse({
+                'available': False,
+                'message': 'This number is already registered as phone number for another account'
+            })
+
+        return JsonResponse({
+            'available': True,
+            'message': 'WhatsApp number is available'
+        })
+
+    # For unauthenticated users, don't check - let form validation handle it
+    # Return available=true to not block the form
+    return JsonResponse({
+        'available': True,
+        'message': 'WhatsApp number is available'
+    })
+
+
+def check_phone_availability(request):
+    """Check if phone number is available and unique"""
+    from django.http import JsonResponse
+
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+    phone = request.GET.get('phone', '').strip()
+    if not phone:
+        return JsonResponse({'available': True, 'message': 'Phone number is available'})
+
+    # For authenticated users, exclude their own number
+    if request.user.is_authenticated:
+        user_profile = request.user.profile
+
+        # Check 1: Validate phone number format (Qatar: 974 + 8 digits OR local 8 digits, minimum 10 digits total if with 974)
+        digits_only = ''.join(filter(str.isdigit, str(phone)))
+
+        # Minimum 10 digits required
+        if len(digits_only) < 10 and not (len(digits_only) == 8 and not digits_only.startswith('974')):
+            return JsonResponse({
+                'available': False,
+                'message': f'Phone number must be at least 10 digits. You provided {len(digits_only)} digits'
+            })
+
+        # Accept either Qatar format (974XXXXXXXX) or local format (8 digits)
+        is_valid_format = False
+        if len(digits_only) == 11 and digits_only.startswith('974'):
+            # International format: 974XXXXXXXX
+            is_valid_format = True
+        elif len(digits_only) == 8:
+            # Local format: XXXXXXXX (e.g., 30330067)
+            is_valid_format = True
+
+        if not is_valid_format:
+            return JsonResponse({
+                'available': False,
+                'message': 'Phone must be 8 digits (30123456) or Qatar format (97430123456)'
+            })
+
+        # Check 2: Is this phone number already used by another user?
+        phone_duplicate = core_models.Profile.objects.filter(
+            phone=phone
+        ).exclude(user_id=request.user.id).exists()
+
+        if phone_duplicate:
+            return JsonResponse({
+                'available': False,
+                'message': 'This phone number is already in use by another account'
+            })
+
+        # Check 3: Is this phone number used as WhatsApp by another user?
+        whatsapp_conflict = core_models.Profile.objects.filter(
+            whatsapp=phone
+        ).exclude(user_id=request.user.id).exists()
+
+        if whatsapp_conflict:
+            return JsonResponse({
+                'available': False,
+                'message': 'This number is already registered as WhatsApp number for another account'
+            })
+
+        return JsonResponse({
+            'available': True,
+            'message': 'Phone number is available'
+        })
+
+    # For unauthenticated users, don't check - let form validation handle it
+    # Return available=true to not block the form
+    return JsonResponse({
+        'available': True,
+        'message': 'Phone number is available'
+    })
+
+
+# ==========================================
+# SIGNUP SECURITY VIEWS
+# ==========================================
+
+@method_decorator(
+    ratelimit(key='ip', rate='5/h', method='POST', block=True),
+    name='dispatch'
+)
+class RateLimitedSignupView(SignupView):
+    """
+    Custom signup view with IP-based rate limiting and CAPTCHA protection.
+
+    Rate limiting:
+        - 5 POST attempts per hour per IP address
+        - Returns HTTP 429 when exceeded
+
+    CAPTCHA:
+        - Google reCAPTCHA v2 checkbox
+        - Verified server-side via Google API
+        - Required field in CustomSignupForm
+    """
+    form_class = core_forms.CustomSignupForm
+    template_name = 'account/signup.html'
+
+    def get_success_url(self):
+        """Redirect to dashboard after successful signup."""
+        return reverse_lazy('core:main_dashboard')
+
+
+def rate_limit_exceeded(request, exception=None):
+    """Handle 429 Too Many Attempts errors."""
+    return render(request, '429.html', status=429)

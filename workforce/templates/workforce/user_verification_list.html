@@ -73,9 +73,6 @@
                 <div>
                     <div class="uvl__name">
                         {{ data.user.first_name }} {{ data.user.last_name }}
-                        <span class="uvl__role {% if data.profile.is_business %}uvl__role--biz{% else %}uvl__role--drv{% endif %}">
-                            {% if data.profile.is_business %}Business{% elif data.profile.is_driver %}Driver{% else %}User{% endif %}
-                        </span>
                     </div>
                     <div class="uvl__contact">
                         <span><i class="fa-solid fa-envelope"></i> {{ data.user.email }}</span>
@@ -298,6 +295,19 @@
                     </div>
                 </div>
                 {% endif %}
+
+                <!-- User Type/Role -->
+                <div class="uvl__tl-bubble uvl__tl-bubble--neutral">
+                    <div class="uvl__tl-bubble__icon">
+                        {% if data.profile.is_business %}<i class="fa-solid fa-building"></i>{% elif data.profile.is_driver %}<i class="fa-solid fa-car"></i>{% else %}<i class="fa-solid fa-user"></i>{% endif %}
+                    </div>
+                    <div class="uvl__tl-bubble__body">
+                        <span class="uvl__tl-bubble__label">User Type</span>
+                        <span class="uvl__role {% if data.profile.is_business %}uvl__role--biz{% else %}uvl__role--drv{% endif %}" style="display: inline-block; margin-top: 0.25rem;">
+                            {% if data.profile.is_business %}Business{% elif data.profile.is_driver %}Driver{% else %}User{% endif %}
+                        </span>
+                    </div>
+                </div>
 
                 <!-- Verified -->
                 {% if data.profile.verified_at %}

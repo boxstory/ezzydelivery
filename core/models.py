@@ -140,7 +140,27 @@ class Profile(models.Model):
             'phone', 'whatsapp', 'zone_name', 'address',
             'nationlity', 'date_of_birth'
         ]
-        completed = sum(1 for field in required_fields if getattr(self, field))
+        completed = 0
+        for field in required_fields:
+            value = getattr(self, field)
+            if not value:
+                continue
+
+            # Special validation for WhatsApp - check if it's unique
+            if field == 'whatsapp':
+                # Check if WhatsApp is taken by another user
+                whatsapp_exists = Profile.objects.filter(
+                    whatsapp=value
+                ).exclude(user_id=self.user_id).exists()
+
+                if not whatsapp_exists:
+                    # WhatsApp is unique, count it as complete
+                    completed += 1
+                # If WhatsApp is taken, don't count it as complete
+            else:
+                # For other fields, just check if they're not empty
+                completed += 1
+
         return int((completed / len(required_fields)) * 100)
 
     def can_apply_for_verification(self):

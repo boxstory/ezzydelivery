@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'crispy_forms',
     'crispy_bootstrap5',
+    'django_recaptcha',
     'fontawesomefree',
     'rest_framework',
     'rest_framework.authtoken',
@@ -357,17 +358,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Configure cache backend for sessions, rate limiting, and general caching
 # For production, use Redis or Memcached
 
+# Cache configuration - supports both local memory and Redis
+_CACHE_BACKEND = config(
+    'CACHE_BACKEND',
+    default='django.core.cache.backends.locmem.LocMemCache'
+)
+_CACHE_OPTIONS = {}
+# MAX_ENTRIES only applies to LocMemCache, not Redis
+if 'locmem' in _CACHE_BACKEND.lower():
+    _CACHE_OPTIONS['MAX_ENTRIES'] = 1000
+
 CACHES = {
     'default': {
-        'BACKEND': config(
-            'CACHE_BACKEND',
-            default='django.core.cache.backends.locmem.LocMemCache'
-        ),
+        'BACKEND': _CACHE_BACKEND,
         'LOCATION': config('CACHE_LOCATION', default='unique-snowflake'),
         'TIMEOUT': 300,  # 5 minutes default
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000,
-        }
+        'OPTIONS': _CACHE_OPTIONS,
     }
 }
 
@@ -376,6 +382,17 @@ CACHES = {
 # CACHE_LOCATION=redis://127.0.0.1:6379/1
 # ==========================================
 # END CACHE CONFIGURATION
+# ==========================================
+
+
+# ==========================================
+# GOOGLE reCAPTCHA CONFIGURATION
+# ==========================================
+RECAPTCHA_PUBLIC_KEY = config('RECAPTCHA_PUBLIC_KEY', default='')
+RECAPTCHA_PRIVATE_KEY = config('RECAPTCHA_PRIVATE_KEY', default='')
+NOCAPTCHA = True  # Use reCAPTCHA v2 checkbox ("I'm not a robot")
+# ==========================================
+# END reCAPTCHA CONFIGURATION
 # ==========================================
 
 
@@ -741,6 +758,7 @@ AI_AGENT_RATE_LIMIT_GLOBAL = config('AI_AGENT_RATE_LIMIT_GLOBAL', default=1000, 
 # Budget Limits (in USD)
 AI_AGENT_DAILY_BUDGET = config('AI_AGENT_DAILY_BUDGET', default=50.0, cast=float)
 AI_AGENT_MONTHLY_BUDGET = config('AI_AGENT_MONTHLY_BUDGET', default=1000.0, cast=float)
+AI_AGENT_ALERT_PHONES = config('AI_AGENT_ALERT_PHONES', default='')  # Comma-separated WhatsApp alert recipients
 
 # Feature Flags
 AI_AGENT_ENABLED = config('AI_AGENT_ENABLED', default=True, cast=bool)

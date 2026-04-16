@@ -1,0 +1,41 @@
+{% extends "account/base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block head_title %}{% trans "Too Many Attempts" %}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'account/css/auth-common.css' %}?v=20260414003">
+{% endblock %}
+
+{% block content %}
+<div class="auth__container" id="error_429_container">
+    <div class="auth__card" id="error_429_card">
+        <div class="auth__header" id="error_429_header">
+            <div class="auth__logo" style="color: #ff6b6b; font-size: 3rem;">
+                <i class="fa-solid fa-hourglass-end"></i>
+            </div>
+            <h1 id="error_429_title">{% trans "Too Many Attempts" %}</h1>
+            <p id="error_429_subtitle">{% trans "Please try again later" %}</p>
+        </div>
+
+        <div class="auth__body" id="error_429_body">
+            <div class="auth__alert auth__alert--warning">
+                <i class="fa-solid fa-exclamation-triangle me-2"></i>
+                {% trans "You have exceeded the maximum number of signup attempts." %}
+            </div>
+
+            <p id="error_429_message" style="text-align: center; color: #666; margin: 2rem 0;">
+                {% trans "For security reasons, we limit signup attempts to 5 per hour per IP address." %}
+                <br>
+                {% trans "Please wait a bit before trying again." %}
+            </p>
+
+            <a href="/" class="btn btn-primary btn-lg w-100" id="error_429_btn_home">
+                <i class="fa-solid fa-home me-2"></i>
+                {% trans "Go to Home" %}
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

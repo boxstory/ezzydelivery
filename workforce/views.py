@@ -16442,6 +16442,8 @@ def wf_driver_tasks(request):
             failed=Count('id', filter=Q(dl_task_status__in=['failed', 'cancelled', 'rejected'])),
             total_earnings=Sum('dl_price', filter=Q(dl_task_status='delivered')),
             total_cod=Sum('order__cod_amount'),
+            cod_in_hand=Sum('cod_collected_amount', filter=Q(cod_collected=True, cod_settled=False)),
+            cod_settled=Sum('cod_collected_amount', filter=Q(cod_settled=True)),
         )
         stats = {
             'total': agg['total'] or 0,
@@ -16451,6 +16453,8 @@ def wf_driver_tasks(request):
             'pending': max(0, (agg['total'] or 0) - (agg['delivered'] or 0) - (agg['in_progress'] or 0) - (agg['failed'] or 0)),
             'total_earnings': agg['total_earnings'] or Decimal('0.00'),
             'total_cod': agg['total_cod'] or Decimal('0.00'),
+            'cod_in_hand': agg['cod_in_hand'] or Decimal('0.00'),
+            'cod_settled': agg['cod_settled'] or Decimal('0.00'),
         }
         if stats['total'] > 0:
             stats['completion_rate'] = round((stats['delivered'] / stats['total']) * 100, 1)

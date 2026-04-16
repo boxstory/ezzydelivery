@@ -7,8 +7,8 @@
 {% block head_title %}{% trans "Sign Up" %}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'account/css/auth-common.css' %}">
-<link rel="stylesheet" href="{% static 'account/css/signup.css' %}">
+<link rel="stylesheet" href="{% static 'account/css/auth-common.css' %}?v=20260414003">
+<link rel="stylesheet" href="{% static 'account/css/signup.css' %}?v=20260414003">
 {% endblock %}
 
 {% block content %}
@@ -113,7 +113,12 @@
                         <i class="fa-solid fa-lock me-1"></i>
                         {{ form.password1.label }}
                     </label>
-                    {{ form.password1 }}
+                    <div class="auth__password-input-wrapper">
+                        {{ form.password1 }}
+                        <button type="button" class="auth__password-toggle" data-target="{{ form.password1.id_for_label }}" aria-label="Toggle password visibility" title="Toggle password visibility">
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
                     {% if form.password1.help_text %}
                         <span class="auth__helptext">{{ form.password1.help_text }}</span>
                     {% endif %}
@@ -156,13 +161,30 @@
                         <i class="fa-solid fa-lock me-1"></i>
                         {{ form.password2.label }}
                     </label>
-                    {{ form.password2 }}
+                    <div class="auth__password-input-wrapper">
+                        {{ form.password2 }}
+                        <button type="button" class="auth__password-toggle" data-target="{{ form.password2.id_for_label }}" aria-label="Toggle password visibility" title="Toggle password visibility">
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
                     {% if form.password2.help_text %}
                         <span class="auth__helptext">{{ form.password2.help_text }}</span>
                     {% endif %}
                     {% if form.password2.errors %}
                         <ul class="auth__errorlist">
                             {% for error in form.password2.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                <!-- CAPTCHA Protection -->
+                <div class="auth__form-group" id="account_signup_form_group_captcha">
+                    {{ form.captcha }}
+                    {% if form.captcha.errors %}
+                        <ul class="auth__errorlist">
+                            {% for error in form.captcha.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
                         </ul>
@@ -231,6 +253,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const requirementsDiv = document.getElementById('account_signup_password_requirements_container');
 
     if (!password1Input || !requirementsDiv) return;
+
+    // Password visibility toggle
+    document.querySelectorAll('.auth__password-toggle').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.dataset.target;
+            const input = document.getElementById(targetId);
+            const icon = this.querySelector('i');
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        });
+    });
 
     // Common passwords list (simplified)
     const commonPasswords = [

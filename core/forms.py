@@ -39,6 +39,8 @@ from core import models as core_models
 from allauth.account.forms import SignupForm
 from crispy_forms.helper import FormHelper, Layout
 from crispy_forms.bootstrap import InlineCheckboxes
+from django_recaptcha.fields import ReCaptchaField
+from django_recaptcha.widgets import ReCaptchaV2Checkbox
 
 from webpages import models as webpages_models
 from fleet import models as fleet_models
@@ -57,15 +59,21 @@ YEARS = [i for i in range(1930, 2020)]
 
 class CustomSignupForm(SignupForm):
     """
-    Extended signup form with first and last name fields.
+    Extended signup form with first and last name fields and username validation.
 
     Extends django-allauth's SignupForm to capture user's full name
-    during registration. The names are saved to the User model.
+    during registration and validate username length (8-12 characters).
+    The names are saved to the User model.
 
     Fields:
         first_name (CharField): User's first name (max 30 chars)
         last_name (CharField): User's last name (max 30 chars)
-        + inherited fields from SignupForm (email, password1, password2)
+        captcha (ReCaptchaField): reCAPTCHA v2 checkbox for bot protection
+        + inherited fields from SignupForm (email, password1, password2, username)
+
+    Validation:
+        - Username: 8-12 characters (required)
+        - CAPTCHA: Verified server-side via Google's API
 
     Usage:
         Used automatically by django-allauth when configured in settings:
@@ -73,6 +81,24 @@ class CustomSignupForm(SignupForm):
     """
     first_name = forms.CharField(max_length=30, label='First Name')
     last_name = forms.CharField(max_length=30, label='Last Name')
+    captcha = ReCaptchaField(widget=ReCaptchaV2Checkbox)
+
+    def clean_username(self):
+        """Validate username: 8-12 chars, only letters, numbers, and underscore."""
+        import re
+        username = self.cleaned_data.get('username', '').strip()
+
+        # Check length
+        if len(username) < 8:
+            raise forms.ValidationError('Username must be at least 8 characters long.')
+        if len(username) > 12:
+            raise forms.ValidationError('Username cannot exceed 12 characters.')
+
+        # Check allowed characters (letters, numbers, underscore only)
+        if not re.match(r'^[a-zA-Z0-9_]+$', username):
+            raise forms.ValidationError('Username can only contain letters, numbers, and underscore (_).')
+
+        return super().clean_username()
 
     def signup(self, request, user):
         """Save first and last name to user model after signup."""
@@ -144,6 +170,30 @@ class ProfileForm(forms.ModelForm):
         self.fields['whatsapp'].required = True
         self.fields['zone_name'].required = True
 
+    def clean_phone(self):
+        """Validate phone number format."""
+        phone = self.cleaned_data.get('phone', '')
+        if phone:
+            # Remove spaces and special characters for validation
+            phone_digits = ''.join(filter(str.isdigit, str(phone)))
+            if len(phone_digits) < 7:
+                raise forms.ValidationError('Phone number must contain at least 7 digits.')
+            if len(phone_digits) > 15:
+                raise forms.ValidationError('Phone number cannot exceed 15 digits.')
+        return phone
+
+    def clean_whatsapp(self):
+        """Validate WhatsApp number format."""
+        whatsapp = self.cleaned_data.get('whatsapp', '')
+        if whatsapp:
+            # Remove spaces and special characters for validation
+            whatsapp_digits = ''.join(filter(str.isdigit, str(whatsapp)))
+            if len(whatsapp_digits) < 7:
+                raise forms.ValidationError('WhatsApp number must contain at least 7 digits.')
+            if len(whatsapp_digits) > 15:
+                raise forms.ValidationError('WhatsApp number cannot exceed 15 digits.')
+        return whatsapp
+
 
 class ProfileUpdateForm(forms.ModelForm):
     """
@@ -201,7 +251,48 @@ class ProfileUpdateForm(forms.ModelForm):
         for field_name in self.fields:
             if field_name != 'instagram':
                 self.fields[field_name].required = True
-        
+
+    def clean_username(self):
+        """Validate username: 8-12 chars, only letters, numbers, and underscore."""
+        import re
+        username = self.cleaned_data.get('username', '').strip()
+
+        # Check length
+        if len(username) < 8:
+            raise forms.ValidationError('Username must be at least 8 characters long.')
+        if len(username) > 12:
+            raise forms.ValidationError('Username cannot exceed 12 characters.')
+
+        # Check allowed characters (letters, numbers, underscore only)
+        if not re.match(r'^[a-zA-Z0-9_]+$', username):
+            raise forms.ValidationError('Username can only contain letters, numbers, and underscore (_).')
+
+        return username
+
+    def clean_phone(self):
+        """Validate phone number format."""
+        phone = self.cleaned_data.get('phone', '')
+        if phone:
+            # Remove spaces and special characters for validation
+            phone_digits = ''.join(filter(str.isdigit, str(phone)))
+            if len(phone_digits) < 7:
+                raise forms.ValidationError('Phone number must contain at least 7 digits.')
+            if len(phone_digits) > 15:
+                raise forms.ValidationError('Phone number cannot exceed 15 digits.')
+        return phone
+
+    def clean_whatsapp(self):
+        """Validate WhatsApp number format."""
+        whatsapp = self.cleaned_data.get('whatsapp', '')
+        if whatsapp:
+            # Remove spaces and special characters for validation
+            whatsapp_digits = ''.join(filter(str.isdigit, str(whatsapp)))
+            if len(whatsapp_digits) < 7:
+                raise forms.ValidationError('WhatsApp number must contain at least 7 digits.')
+            if len(whatsapp_digits) > 15:
+                raise forms.ValidationError('WhatsApp number cannot exceed 15 digits.')
+        return whatsapp
+
 
 
 class ProfilePictureForm(forms.ModelForm):
