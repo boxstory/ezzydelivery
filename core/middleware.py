@@ -16,6 +16,34 @@ logger = logging.getLogger(__name__)
 query_logger = logging.getLogger('queries')
 
 
+class CloudflareIPMiddleware:
+	"""
+	Extracts real client IP from Cloudflare headers and sets REMOTE_ADDR.
+	This is required for django-ratelimit to work correctly with reverse proxies.
+	Cloudflare sets CF-Connecting-IP to the real client IP.
+	"""
+	def __init__(self, get_response):
+		self.get_response = get_response
+
+	def __call__(self, request):
+		# Try Cloudflare's CF-Connecting-IP first (most reliable)
+		ip = request.META.get('HTTP_CF_CONNECTING_IP')
+
+		# Fallback to X-Forwarded-For (take first IP if multiple)
+		if not ip:
+			forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+			if forwarded_for:
+				# X-Forwarded-For can be "ip1, ip2, ip3" - take the first one
+				ip = forwarded_for.split(',')[0].strip()
+
+		# Set REMOTE_ADDR if we found an IP
+		if ip:
+			request.META['REMOTE_ADDR'] = ip
+
+		response = self.get_response(request)
+		return response
+
+
 class SessionTimeoutMiddleware:
     """
     Middleware to automatically logout users after 1 day of inactivity
@@ -243,14 +271,15 @@ class SecurityHeadersMiddleware:
                 "https://cdn.lordicon.com https://unpkg.com "
                 "https://cdn.sheetjs.com https://cdnjs.cloudflare.com "
                 "https://static.cloudflareinsights.com "
-                "https://www.googletagmanager.com https://www.google-analytics.com; "
+                "https://www.googletagmanager.com https://www.google-analytics.com "
+                "https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; "
                 "style-src 'self' 'unsafe-inline' "
                 "https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com "
                 "https://cdn.sheetjs.com https://cdnjs.cloudflare.com; "
                 "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
                 "img-src 'self' data: blob: https:; "
                 "connect-src 'self' https://www.google-analytics.com https://unpkg.com "
-                "https://*.basemaps.cartocdn.com; "
+                "https://*.basemaps.cartocdn.com https://www.google.com/recaptcha/; "
                 "frame-src 'self' https://www.google.com; "
                 "frame-ancestors 'self'"
             )

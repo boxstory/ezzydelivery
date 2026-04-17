@@ -1,0 +1,281 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}Getting Started - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="#" class="nav-link active">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop</a></li>
+      </ul>
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+        <li><a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header">
+      <h1>Getting Started with EzzyDelivery API</h1>
+      <p class="subtitle">Setup your integration in 5 minutes</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>1. Create an API Key</h2>
+      <p>First, you need to generate API keys to authenticate with our API.</p>
+
+      <div class="code-block">
+        <div class="code-header">Steps:</div>
+        <ol>
+          <li>Log in to your EzzyDelivery account</li>
+          <li>Go to <strong>Settings → API Settings</strong></li>
+          <li>Click <strong>"Generate API Key"</strong></li>
+          <li>Give your key a name (e.g., "Shopify Integration")</li>
+          <li>Copy your API Key and Secret (store safely)</li>
+        </ol>
+      </div>
+
+      <div class="demo-box">
+        <h4>📝 Example API Key</h4>
+        <code class="demo-code">
+          <span class="comment">// After creating, you'll receive:</span><br>
+          Key: <span class="highlight">ezz_key_xxxxxxxxxxxxxxxxxxxx</span><br>
+          Secret: <span class="highlight">ezz_secret_xxxxxxxxxxxxxxxxxxxx</span>
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>2. Choose Your Platform</h2>
+      <p>Select which e-commerce platform you want to integrate:</p>
+
+      <div class="platform-options">
+        <div class="option-card">
+          <h3>🛒 Shopify</h3>
+          <p>Best for: Shopify store owners</p>
+          <p class="text-muted">Uses OAuth for secure authorization</p>
+          <a href="{% url 'ezzy_api:docs_shopify' %}" class="btn btn-sm">Setup Guide</a>
+        </div>
+
+        <div class="option-card">
+          <h3>📦 WooCommerce</h3>
+          <p>Best for: WordPress users</p>
+          <p class="text-muted">API key authentication</p>
+          <a href="{% url 'ezzy_api:docs_woocommerce' %}" class="btn btn-sm">Setup Guide</a>
+        </div>
+
+        <div class="option-card">
+          <h3>🎵 TikTok Shop</h3>
+          <p>Best for: TikTok sellers</p>
+          <p class="text-muted">OAuth with TikTok account</p>
+          <a href="{% url 'ezzy_api:docs_tiktok' %}" class="btn btn-sm">Setup Guide</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>3. Authentication</h2>
+      <p>All API requests require authentication. Include your API key in the request header:</p>
+
+      <div class="code-block">
+        <div class="code-header">HTTP Header</div>
+        <code class="demo-code">
+          Authorization: Bearer <span class="highlight">your_api_key_here</span>
+        </code>
+      </div>
+
+      <div class="demo-box">
+        <h4>📝 Example Request</h4>
+        <code class="demo-code">
+          curl -X GET "https://api.ezzydelivery.qa/api/integrations/" \<br>
+          &nbsp;&nbsp;-H "Authorization: Bearer ezz_key_1234567890abcdef"
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>4. Test Your Connection</h2>
+      <p>Once you have your API key, test the connection:</p>
+
+      <div class="test-steps">
+        <div class="step">
+          <span class="step-number">1</span>
+          <div class="step-content">
+            <h4>Make a test request to list your integrations</h4>
+            <code class="demo-code">GET /api/integrations/</code>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-number">2</span>
+          <div class="step-content">
+            <h4>Expected response</h4>
+            <div class="code-block">
+              <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "success",<br>
+&nbsp;&nbsp;"integrations": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 1,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"type": "shopify",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "My Shopify Store",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"status": "active"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}
+              </code>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-number">3</span>
+          <div class="step-content">
+            <h4>If you get an error</h4>
+            <p>Check that your API key is correct and included in the header. See <a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a> for common issues.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Interactive API Testing Tools</h2>
+      <p>Before writing code, test your API integration using our interactive documentation tools:</p>
+
+      <div class="code-block">
+        <div class="code-header">Available Tools</div>
+        <ul class="permission-list" style="margin: 1rem 0 0 0;">
+          <li><strong><a href="/api/schema/swagger/" style="color: #0a66c2; text-decoration: underline;">Swagger UI</a></strong> — Interactive explorer with "Try it out" button to test endpoints in real-time</li>
+          <li><strong><a href="/api/schema/redoc/" style="color: #0a66c2; text-decoration: underline;">ReDoc</a></strong> — Beautiful, responsive API documentation for browsing endpoints</li>
+          <li><strong><a href="/api/schema/" style="color: #0a66c2; text-decoration: underline;">OpenAPI Schema</a></strong> — Raw JSON schema for tooling integration and IDE support</li>
+        </ul>
+      </div>
+
+      <div class="demo-box">
+        <h4>🚀 How to Use Swagger UI</h4>
+        <ol style="margin: 1rem 0;">
+          <li>Open <a href="/api/schema/swagger/" style="color: #0a66c2;">Swagger UI</a></li>
+          <li>Click the <strong>"Authorize"</strong> button</li>
+          <li>Enter your API key in the format: <code>Token your_api_key_here</code></li>
+          <li>Find an endpoint and click <strong>"Try it out"</strong></li>
+          <li>Fill in parameters and click <strong>"Execute"</strong></li>
+          <li>See the request and response in real-time</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>5. Webhook Setup</h2>
+      <p>Enable real-time updates for order status changes:</p>
+
+      <ol class="setup-checklist">
+        <li>
+          <strong>Go to Webhook Settings</strong><br>
+          <span class="text-muted">Settings → Webhooks → Add Webhook Endpoint</span>
+        </li>
+        <li>
+          <strong>Enter Your URL</strong><br>
+          <span class="text-muted">The URL where you want to receive updates (e.g., https://yourstore.com/webhook/order-status)</span>
+        </li>
+        <li>
+          <strong>Select Events</strong><br>
+          <span class="text-muted">Choose which events trigger webhooks (order.created, delivery.updated, etc.)</span>
+        </li>
+        <li>
+          <strong>Verify Webhook</strong><br>
+          <span class="text-muted">We'll send a test request to verify your endpoint is working</span>
+        </li>
+      </ol>
+
+      <div class="info-box">
+        <strong>💡 Tip:</strong> Use webhook events to update your store with delivery status in real-time.
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>6. Sync Your First Order</h2>
+      <p>After setup, you can import orders from your platform:</p>
+
+      <div class="code-block">
+        <div class="code-header">Example: Import from Shopify</div>
+        <code class="demo-code">
+          POST /api/integrations/shopify/import/<br>
+          <br>
+          Request body:<br>
+          {<br>
+          &nbsp;&nbsp;"store_url": "mystore.myshopify.com",<br>
+          &nbsp;&nbsp;"order_ids": [123456, 123457]<br>
+          }
+        </code>
+      </div>
+
+      <div class="demo-box">
+        <h4>📝 Response Example</h4>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "success",<br>
+&nbsp;&nbsp;"imported": 2,<br>
+&nbsp;&nbsp;"orders": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"order_id": "ORD-001",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"customer": "John Doe",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"delivery_address": "123 Main St, Doha",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"status": "imported"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Next Steps</h2>
+      <p>Now that you're set up, explore:</p>
+      <div class="next-steps-grid">
+        <a href="{% url 'ezzy_api:docs_authentication' %}" class="next-step-card">
+          <h3>🔐 Authentication Details</h3>
+          <p>Learn about token-based auth and API key management</p>
+        </a>
+        <a href="{% url 'ezzy_api:docs_api_reference' %}" class="next-step-card">
+          <h3>🔌 API Reference</h3>
+          <p>Complete list of all available endpoints</p>
+        </a>
+        <a href="{% url 'ezzy_api:docs_webhooks' %}" class="next-step-card">
+          <h3>📨 Webhooks</h3>
+          <p>Setup real-time order status updates</p>
+        </a>
+        <a href="{% url 'ezzy_api:docs_examples' %}" class="next-step-card">
+          <h3>💻 Code Examples</h3>
+          <p>Sample integration code for your language</p>
+        </a>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'ezzy_api/js/docs.js' %}"></script>
+{% endblock %}

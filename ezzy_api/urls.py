@@ -5,6 +5,19 @@ from ezzy_api import views as ezzy_api_views
 
 app_name = 'ezzy_api'
 urlpatterns = [
+    # ==================== CLIENT DOCUMENTATION ====================
+    path('docs/', ezzy_api_views.docs_index, name='docs_index'),
+    path('docs/getting-started/', ezzy_api_views.docs_getting_started, name='docs_getting_started'),
+    path('docs/authentication/', ezzy_api_views.docs_authentication, name='docs_authentication'),
+    path('docs/shopify/', ezzy_api_views.docs_shopify, name='docs_shopify'),
+    path('docs/woocommerce/', ezzy_api_views.docs_woocommerce, name='docs_woocommerce'),
+    path('docs/tiktok/', ezzy_api_views.docs_tiktok, name='docs_tiktok'),
+    path('docs/api-reference/', ezzy_api_views.docs_api_reference, name='docs_api_reference'),
+    path('docs/webhooks/', ezzy_api_views.docs_webhooks, name='docs_webhooks'),
+    path('docs/errors/', ezzy_api_views.docs_errors, name='docs_errors'),
+    path('docs/examples/', ezzy_api_views.docs_examples, name='docs_examples'),
+    path('docs/faq/', ezzy_api_views.docs_faq, name='docs_faq'),
+
     # Existing endpoints
     path('orderlist/', ezzy_api_views.OrderList.as_view(), name='order_list_api'),
 

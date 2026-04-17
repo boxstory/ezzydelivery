@@ -1,0 +1,300 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}TikTok Shop Integration - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+    <nav class="api-docs-nav">
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce</a></li>
+        <li><a href="#" class="nav-link active">🎵 TikTok Shop</a></li>
+      </ul>
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header">
+      <h1>🎵 TikTok Shop Integration</h1>
+      <p class="subtitle">Connect your TikTok Shop and manage deliveries</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>How It Works</h2>
+      <p>
+        TikTok Shop integration uses OAuth 2.0 authentication. This allows secure connection to your
+        TikTok seller account without sharing credentials.
+      </p>
+      <div class="info-box">
+        <strong>✓ Supports:</strong> TikTok Shop in Middle East / Asia Pacific regions
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Prerequisites</h2>
+      <ul class="checklist">
+        <li>Active TikTok Shop seller account</li>
+        <li>Verified business information in TikTok Shop</li>
+        <li>EzzyDelivery account</li>
+      </ul>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Setup Steps</h2>
+
+      <div class="step-card">
+        <h3>Step 1: Register Your App with TikTok</h3>
+        <ol>
+          <li>Go to <a href="https://seller.tiktok.com/app/develop/app" target="_blank">TikTok Seller Platform → App Management</a></li>
+          <li>Click <strong>"Create App"</strong></li>
+          <li>Select app type: <strong>"Third-party Application"</strong></li>
+          <li>Fill in:
+            <ul>
+              <li><strong>App Name:</strong> EzzyDelivery Logistics</li>
+              <li><strong>App Type:</strong> Fulfillment Service</li>
+              <li><strong>Description:</strong> Delivery and logistics management platform</li>
+            </ul>
+          </li>
+          <li>Click <strong>"Create"</strong></li>
+        </ol>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 2: Configure OAuth Redirect</h3>
+        <p>Set where TikTok redirects after authorization:</p>
+        <div class="code-block">
+          <div class="code-header">Redirect URI:</div>
+          <code class="demo-code">https://api.ezzydelivery.qa/api/integrations/tiktokshop/callback/</code>
+        </div>
+        <ol>
+          <li>In your TikTok app settings, find <strong>"OAuth Configuration"</strong></li>
+          <li>Add the redirect URI above</li>
+          <li>Save changes</li>
+        </ol>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 3: Get Your Credentials</h3>
+        <p>TikTok will provide you with:</p>
+        <div class="demo-box">
+          <h4>📝 Your App Credentials</h4>
+          <code class="demo-code">
+            App ID: <span class="highlight">123456789</span><br>
+            App Secret: <span class="highlight">abcdef1234567890ghijklmnop</span><br>
+            Client Key: <span class="highlight">cli_abc123def456</span><br>
+            Client Secret: <span class="highlight">sk_live_123456789abcdefghijk</span>
+          </code>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 4: Request Required Permissions</h3>
+        <p>Ensure your app has these scopes:</p>
+        <div class="permission-list">
+          <li><code>seller.order.read</code> - Read orders</li>
+          <li><code>seller.fulfillment.write</code> - Update fulfillment status</li>
+          <li><code>seller.shop.read</code> - Read shop info</li>
+        </li>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 5: Add Integration in EzzyDelivery</h3>
+        <ol>
+          <li>Log in to EzzyDelivery</li>
+          <li>Go to <strong>Settings → API Settings</strong></li>
+          <li>Click <strong>"New Integration"</strong></li>
+          <li>You'll be redirected to TikTok to authorize</li>
+          <li>Log in with your seller account</li>
+          <li>Click <strong>"Allow"</strong> to grant permissions</li>
+          <li>Redirected back to EzzyDelivery (success!)</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Import Orders</h2>
+
+      <div class="code-block">
+        <div class="code-header">API Endpoint</div>
+        <code class="demo-code">
+          POST /api/integrations/tiktokshop/import/
+        </code>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">Request Body</div>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"shop_cipher": "your_shop_cipher_here",<br>
+&nbsp;&nbsp;"order_ids": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"7384932847593842",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"7384932847593843"<br>
+&nbsp;&nbsp;],<br>
+&nbsp;&nbsp;"order_status": "unpaid"<br>
+}
+        </code>
+      </div>
+
+      <div class="demo-box">
+        <h4>📝 Response Example</h4>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "success",<br>
+&nbsp;&nbsp;"imported": 2,<br>
+&nbsp;&nbsp;"orders": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"order_id": "ORD-TK-001",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"tiktok_order_id": "7384932847593842",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"customer_name": "Mohammed Al Mansouri",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"customer_phone": "+97433456789",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"delivery_address": "456 Commercial Ave, Dubai, UAE",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"total_amount": 350.00,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"cod_amount": 350.00,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"status": "imported",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"created_at": "2024-04-17T14:22:00Z"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Sync Fulfillment Status</h2>
+      <p>Update TikTok Shop with delivery status automatically:</p>
+
+      <div class="code-block">
+        <div class="code-header">Send Delivery Status to TikTok</div>
+        <code class="demo-code">
+POST /api/integrations/tiktokshop/update-status/<br>
+<br>
+{<br>
+&nbsp;&nbsp;"tiktok_order_id": "7384932847593842",<br>
+&nbsp;&nbsp;"fulfillment_status": "delivered",<br>
+&nbsp;&nbsp;"tracking_info": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"carrier": "EzzyDelivery",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"tracking_number": "EZZY-2024-123456",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"estimated_delivery": "2024-04-20"<br>
+&nbsp;&nbsp;}<br>
+}
+        </code>
+      </div>
+
+      <div class="status-list">
+        <h4>Supported Fulfillment Status:</h4>
+        <ul>
+          <li><code>processing</code> - Order received, preparing</li>
+          <li><code>in_transit</code> - Package in delivery</li>
+          <li><code>delivered</code> - Successfully delivered</li>
+          <li><code>exception</code> - Delivery exception / issue</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Test Your Connection</h2>
+      <p>Verify your TikTok Shop integration is working:</p>
+
+      <div class="code-block">
+        <div class="code-header">Test Connection Endpoint</div>
+        <code class="demo-code">
+          GET /api/integrations/tiktokshop/test/
+        </code>
+      </div>
+
+      <div class="demo-box">
+        <h4>📝 Success Response</h4>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "success",<br>
+&nbsp;&nbsp;"message": "Connection verified",<br>
+&nbsp;&nbsp;"shop_info": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"shop_name": "Mohammed Store",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"shop_region": "AE",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"shop_status": "active",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"authorized_at": "2024-04-17T10:00:00Z"<br>
+&nbsp;&nbsp;}<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Webhook Events</h2>
+      <p>Configure TikTok to send you real-time order notifications:</p>
+
+      <div class="event-card">
+        <h4>📦 Order Created</h4>
+        <p>Triggered when customer places a new order on TikTok Shop</p>
+      </div>
+
+      <div class="event-card">
+        <h4>💳 Payment Confirmed</h4>
+        <p>Triggered when payment is confirmed (for unpaid orders)</p>
+      </div>
+
+      <div class="event-card">
+        <h4>🚚 Ready to Ship</h4>
+        <p>Order is ready for pickup/shipment</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Troubleshooting</h2>
+
+      <div class="faq-item">
+        <h4>❓ Authorization Failed</h4>
+        <p>
+          <strong>Issue:</strong> TikTok shows "Invalid redirect URI"<br>
+          <strong>Solution:</strong> Verify the URI matches exactly:
+          <code>https://api.ezzydelivery.qa/api/integrations/tiktokshop/callback/</code>
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h4>❓ Permission Denied</h4>
+        <p>
+          <strong>Issue:</strong> "Insufficient permissions" error<br>
+          <strong>Solution:</strong> Ensure your TikTok app has been approved with these scopes:
+          <code>seller.order.read</code>, <code>seller.fulfillment.write</code>
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h4>❓ Orders Not Importing</h4>
+        <p>
+          <strong>Issue:</strong> Orders not showing in EzzyDelivery<br>
+          <strong>Solution:</strong> Run test connection to verify authorization is still valid
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h4>❓ Different Region/Shop</h4>
+        <p>
+          <strong>Issue:</strong> Need to connect different TikTok Shop<br>
+          <strong>Solution:</strong> Disconnect current shop in Settings and create new connection
+        </p>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'ezzy_api/js/docs.js' %}"></script>
+{% endblock %}

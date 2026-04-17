@@ -1,0 +1,151 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}FAQ - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <!-- Sidebar -->
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop Integration</a></li>
+      </ul>
+
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+        <li><a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a></li>
+      </ul>
+
+      <h3>Resources</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_examples' %}">Code Examples</a></li>
+        <li><a href="#faq" class="nav-link active">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header" id="faq">
+      <h1>❓ Frequently Asked Questions</h1>
+      <p class="subtitle">Common questions about EzzyDelivery API</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>General</h2>
+
+      <div class="faq-item">
+        <h4>Q: How do I get started with the EzzyDelivery API?</h4>
+        <p>A: Start with the <a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a> guide. You'll need to create an API key and choose your integration platform (Shopify, WooCommerce, or TikTok Shop).</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: Is the API free to use?</h4>
+        <p>A: API access is included with your EzzyDelivery subscription. Usage limits depend on your plan.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: What are the API rate limits?</h4>
+        <p>A: Currently 1000 requests per hour per API key. Contact support for higher limits.</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Integration</h2>
+
+      <div class="faq-item">
+        <h4>Q: Can I integrate multiple stores?</h4>
+        <p>A: Yes! You can connect multiple Shopify, WooCommerce, or TikTok Shop stores to a single EzzyDelivery account.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: How long does integration setup take?</h4>
+        <p>A: Usually 5-10 minutes. Follow the platform-specific setup guide for your e-commerce platform.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: Can I disconnect an integration?</h4>
+        <p>A: Yes, go to Settings → Integrations and click "Disconnect" next to the integration.</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Orders & Delivery</h2>
+
+      <div class="faq-item">
+        <h4>Q: How are orders imported?</h4>
+        <p>A: Orders can be imported manually via API, automatically via webhooks, or through scheduled syncs.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: Can I import historical orders?</h4>
+        <p>A: Yes, use the <code>date_from</code> parameter to import orders from any date range.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: What order statuses are supported?</h4>
+        <p>A: Each platform supports different statuses (pending, processing, completed, etc.). Check the platform-specific guide.</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Security</h2>
+
+      <div class="faq-item">
+        <h4>Q: How are API keys secured?</h4>
+        <p>A: Use HTTPS for all requests and store keys in environment variables. Never commit keys to version control.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: Can I rotate my API key?</h4>
+        <p>A: Yes, go to Settings → API Keys and click "Rotate" next to your key.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: What if my API key is compromised?</h4>
+        <p>A: Immediately disable the key in Settings, create a new one, and update all integrations.</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Support</h2>
+
+      <div class="faq-item">
+        <h4>Q: How do I get help?</h4>
+        <p>A: Check our documentation, contact support@ezzydelivery.qa, or visit our support portal.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: What are the support hours?</h4>
+        <p>A: We provide 24/7 support for all customers. Response time is typically within 2 hours.</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>Q: Is there a test/sandbox environment?</h4>
+        <p>A: Use your development Shopify/WooCommerce store for testing before going live.</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

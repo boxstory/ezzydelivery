@@ -1,0 +1,141 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}Code Examples - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <!-- Sidebar -->
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop Integration</a></li>
+      </ul>
+
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+        <li><a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a></li>
+      </ul>
+
+      <h3>Resources</h3>
+      <ul>
+        <li><a href="#examples" class="nav-link active">Code Examples</a></li>
+        <li><a href="{% url 'ezzy_api:docs_faq' %}">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header" id="examples">
+      <h1>💻 Code Examples</h1>
+      <p class="subtitle">Ready-to-use integration examples</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Python Example</h2>
+      <div class="demo-box">
+        <code class="demo-code">
+import requests<br>
+import os<br>
+<br>
+api_key = os.getenv('EZZYDELIVERY_API_KEY')<br>
+base_url = "https://api.ezzydelivery.qa"<br>
+<br>
+headers = {<br>
+&nbsp;&nbsp;"Authorization": f"Bearer {api_key}",<br>
+&nbsp;&nbsp;"Content-Type": "application/json"<br>
+}<br>
+<br>
+# Import Shopify orders<br>
+payload = {<br>
+&nbsp;&nbsp;"store_url": "mystore.myshopify.com",<br>
+&nbsp;&nbsp;"order_ids": [123456, 123457]<br>
+}<br>
+<br>
+response = requests.post(<br>
+&nbsp;&nbsp;f"{base_url}/api/integrations/shopify/import/",<br>
+&nbsp;&nbsp;json=payload,<br>
+&nbsp;&nbsp;headers=headers<br>
+)<br>
+<br>
+if response.status_code == 200:<br>
+&nbsp;&nbsp;print("Orders imported successfully")<br>
+else:<br>
+&nbsp;&nbsp;print(f"Error: {response.text}")
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>JavaScript/Node.js Example</h2>
+      <div class="demo-box">
+        <code class="demo-code">
+const axios = require('axios');<br>
+<br>
+const apiKey = process.env.EZZYDELIVERY_API_KEY;<br>
+const baseUrl = 'https://api.ezzydelivery.qa';<br>
+<br>
+const headers = {<br>
+&nbsp;&nbsp;Authorization: `Bearer ${apiKey}`,<br>
+&nbsp;&nbsp;'Content-Type': 'application/json'<br>
+};<br>
+<br>
+async function importOrders() {<br>
+&nbsp;&nbsp;try {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;const response = await axios.post(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`${baseUrl}/api/integrations/shopify/import/`,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;store_url: 'mystore.myshopify.com',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;order_ids: [123456, 123457]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ headers }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;console.log('Success:', response.data);<br>
+&nbsp;&nbsp;} catch (error) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;console.error('Error:', error.response.data);<br>
+&nbsp;&nbsp;}<br>
+}<br>
+<br>
+importOrders();
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>cURL Example</h2>
+      <div class="demo-box">
+        <code class="demo-code">
+curl -X POST https://api.ezzydelivery.qa/api/integrations/shopify/import/ \<br>
+&nbsp;&nbsp;-H "Authorization: Bearer YOUR_API_KEY" \<br>
+&nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+&nbsp;&nbsp;-d '{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"store_url": "mystore.myshopify.com",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"order_ids": [123456, 123457]<br>
+&nbsp;&nbsp;}'
+        </code>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}Webhooks - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <!-- Sidebar -->
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop Integration</a></li>
+      </ul>
+
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="#webhooks" class="nav-link active">Webhooks</a></li>
+        <li><a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a></li>
+      </ul>
+
+      <h3>Resources</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_examples' %}">Code Examples</a></li>
+        <li><a href="{% url 'ezzy_api:docs_faq' %}">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header" id="webhooks">
+      <h1>📨 Webhooks</h1>
+      <p class="subtitle">Receive real-time order and delivery updates</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>What are Webhooks?</h2>
+      <p>Webhooks allow you to receive real-time notifications when events happen in EzzyDelivery. Instead of polling our API repeatedly, we'll send you data whenever an event occurs.</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Webhook Events</h2>
+
+      <div class="event-card">
+        <h4>📦 order.created</h4>
+        <p>Triggered when a new order is imported</p>
+      </div>
+
+      <div class="event-card">
+        <h4>🚚 delivery.assigned</h4>
+        <p>Triggered when an order is assigned to a driver</p>
+      </div>
+
+      <div class="event-card">
+        <h4>📍 delivery.updated</h4>
+        <p>Triggered when delivery status changes</p>
+      </div>
+
+      <div class="event-card">
+        <h4>✅ delivery.completed</h4>
+        <p>Triggered when delivery is completed</p>
+      </div>
+
+      <div class="event-card">
+        <h4>❌ delivery.failed</h4>
+        <p>Triggered when delivery fails</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Webhook Payload</h2>
+      <div class="demo-box">
+        <h4>Example Webhook Data</h4>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"event_type": "delivery.updated",<br>
+&nbsp;&nbsp;"timestamp": "2024-04-17T10:30:00Z",<br>
+&nbsp;&nbsp;"data": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"order_id": "ORD-001",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"status": "in_transit",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"driver_name": "Ahmed",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"estimated_delivery": "2024-04-17T14:00:00Z"<br>
+&nbsp;&nbsp;}<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Setup Your Webhook Endpoint</h2>
+      <ol class="quick-start-steps">
+        <li>Create an endpoint on your server that accepts POST requests</li>
+        <li>Verify webhook signatures for security</li>
+        <li>Respond with 200 OK to acknowledge receipt</li>
+        <li>Log webhook data for debugging</li>
+      </ol>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

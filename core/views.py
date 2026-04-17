@@ -1364,7 +1364,10 @@ def check_whatsapp_availability(request):
 
     # For authenticated users, exclude their own number
     if request.user.is_authenticated:
-        user_profile = request.user.profile
+        try:
+            user_profile = request.user.profile
+        except core_models.Profile.DoesNotExist:
+            user_profile = None
 
         # Check 1: Validate WhatsApp number format and account
         is_valid, validation_msg = validate_whatsapp_number(whatsapp)
@@ -1375,9 +1378,14 @@ def check_whatsapp_availability(request):
             })
 
         # Check 2: Is this WhatsApp number already used by another user?
-        whatsapp_duplicate = core_models.Profile.objects.filter(
-            whatsapp=whatsapp
-        ).exclude(user_id=request.user.id).exists()
+        if user_profile:
+            whatsapp_duplicate = core_models.Profile.objects.filter(
+                whatsapp=whatsapp
+            ).exclude(user_id=request.user.id).exists()
+        else:
+            whatsapp_duplicate = core_models.Profile.objects.filter(
+                whatsapp=whatsapp
+            ).exists()
 
         if whatsapp_duplicate:
             return JsonResponse({
@@ -1386,9 +1394,14 @@ def check_whatsapp_availability(request):
             })
 
         # Check 3: Is this WhatsApp number used as phone by another user?
-        phone_conflict = core_models.Profile.objects.filter(
-            phone=whatsapp
-        ).exclude(user_id=request.user.id).exists()
+        if user_profile:
+            phone_conflict = core_models.Profile.objects.filter(
+                phone=whatsapp
+            ).exclude(user_id=request.user.id).exists()
+        else:
+            phone_conflict = core_models.Profile.objects.filter(
+                phone=whatsapp
+            ).exists()
 
         if phone_conflict:
             return JsonResponse({
@@ -1422,7 +1435,10 @@ def check_phone_availability(request):
 
     # For authenticated users, exclude their own number
     if request.user.is_authenticated:
-        user_profile = request.user.profile
+        try:
+            user_profile = request.user.profile
+        except core_models.Profile.DoesNotExist:
+            user_profile = None
 
         # Check 1: Validate phone number format (Qatar: 974 + 8 digits OR local 8 digits, minimum 10 digits total if with 974)
         digits_only = ''.join(filter(str.isdigit, str(phone)))
@@ -1450,9 +1466,14 @@ def check_phone_availability(request):
             })
 
         # Check 2: Is this phone number already used by another user?
-        phone_duplicate = core_models.Profile.objects.filter(
-            phone=phone
-        ).exclude(user_id=request.user.id).exists()
+        if user_profile:
+            phone_duplicate = core_models.Profile.objects.filter(
+                phone=phone
+            ).exclude(user_id=request.user.id).exists()
+        else:
+            phone_duplicate = core_models.Profile.objects.filter(
+                phone=phone
+            ).exists()
 
         if phone_duplicate:
             return JsonResponse({
@@ -1461,9 +1482,14 @@ def check_phone_availability(request):
             })
 
         # Check 3: Is this phone number used as WhatsApp by another user?
-        whatsapp_conflict = core_models.Profile.objects.filter(
-            whatsapp=phone
-        ).exclude(user_id=request.user.id).exists()
+        if user_profile:
+            whatsapp_conflict = core_models.Profile.objects.filter(
+                whatsapp=phone
+            ).exclude(user_id=request.user.id).exists()
+        else:
+            whatsapp_conflict = core_models.Profile.objects.filter(
+                whatsapp=phone
+            ).exists()
 
         if whatsapp_conflict:
             return JsonResponse({

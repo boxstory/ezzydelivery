@@ -1,0 +1,325 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}Shopify Integration - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="#" class="nav-link active">🛒 Shopify</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop</a></li>
+      </ul>
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header">
+      <h1>🛒 Shopify Integration</h1>
+      <p class="subtitle">Connect your Shopify store with EzzyDelivery</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>How It Works</h2>
+      <p>
+        The Shopify integration uses OAuth 2.0 authentication. This allows you to securely connect
+        your Shopify store without sharing your password.
+      </p>
+      <div class="info-box">
+        <strong>✓ Secure OAuth:</strong> Your store credentials are never shared with EzzyDelivery
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Setup Steps</h2>
+
+      <div class="step-card">
+        <h3>Step 1: Create a Shopify App</h3>
+        <p>Go to your Shopify Admin and create a custom app for EzzyDelivery:</p>
+        <ol>
+          <li>Log in to your Shopify Admin → <strong>Settings → Apps and integrations</strong></li>
+          <li>Click <strong>"Develop an app"</strong></li>
+          <li>Enter app name: <code>EzzyDelivery</code></li>
+          <li>Click <strong>"Create app"</strong></li>
+        </ol>
+        <div class="demo-box">
+          <h4>📝 Example</h4>
+          <p>App name: <code>EzzyDelivery Delivery Integration</code></p>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 2: Configure App Permissions</h3>
+        <p>Grant necessary permissions to read orders:</p>
+        <ol>
+          <li>Go to <strong>Configuration</strong> tab</li>
+          <li>Under <strong>Admin API scopes</strong>, enable:
+            <ul class="permission-list">
+              <li><code>read_orders</code></li>
+              <li><code>read_products</code></li>
+              <li><code>read_customers</code></li>
+            </ul>
+          </li>
+          <li>Click <strong>"Save"</strong></li>
+        </ol>
+        <div class="info-box">
+          <strong>💡 Why these permissions?</strong> We need to read orders and customer details to create delivery tasks.
+        </div>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 3: Set Redirect URI</h3>
+        <p>Configure where Shopify will redirect after authorization:</p>
+        <div class="code-block">
+          <div class="code-header">Redirect URI:</div>
+          <code class="demo-code">https://api.ezzydelivery.qa/business/shopify/oauth/callback/</code>
+        </div>
+        <ol>
+          <li>In Shopify app <strong>Configuration</strong>, find <strong>Redirect URLs</strong></li>
+          <li>Add the redirect URI above</li>
+          <li>Click <strong>"Save"</strong></li>
+        </ol>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 4: Get Your Credentials</h3>
+        <p>Shopify will provide you with:</p>
+        <div class="demo-box">
+          <h4>📝 Your App Credentials</h4>
+          <code class="demo-code">
+            Client ID: <span class="highlight">123abc456def789ghi</span><br>
+            Client Secret: <span class="highlight">shpca_1234567890abcdefghijklmnopqr</span><br>
+            API Version: 2024-01 (recommended)
+          </code>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 5: Add Integration in EzzyDelivery</h3>
+        <p>In your EzzyDelivery business account, set up the integration:</p>
+        <ol>
+          <li>Log in to EzzyDelivery Dashboard</li>
+          <li>Go to <strong>Settings → API Settings</strong></li>
+          <li>Click <strong>"New Integration"</strong> button</li>
+          <li>Select <strong>"Shopify"</strong> from the platform list</li>
+          <li>Enter your Shopify details:
+            <ul class="permission-list">
+              <li><strong>Store URL:</strong> <code>yourstore.myshopify.com</code></li>
+              <li><strong>Client ID:</strong> Copy from Shopify app settings</li>
+              <li><strong>Client Secret:</strong> Copy from Shopify app settings</li>
+            </ul>
+          </li>
+          <li>Click <strong>"Authorize with Shopify"</strong></li>
+        </ol>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 6: Complete OAuth Authorization</h3>
+        <p>You'll be redirected to Shopify's authorization page:</p>
+        <ol>
+          <li>Review the permissions EzzyDelivery is requesting</li>
+          <li>Click <strong>"Allow"</strong> to grant access</li>
+          <li>You'll be redirected back to EzzyDelivery</li>
+          <li>Your Shopify integration status will show <strong>"Active"</strong></li>
+        </ol>
+        <div class="success-box">
+          <strong>✓ Success!</strong> Your Shopify store is now connected and ready to import orders
+        </div>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Import Orders</h2>
+      <p>After connecting, you can import orders from your Shopify store:</p>
+
+      <div class="code-block">
+        <div class="code-header">API Endpoint</div>
+        <code class="demo-code">
+          POST /api/integrations/shopify/import/
+        </code>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">Request Body</div>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"store_url": "mystore.myshopify.com",<br>
+&nbsp;&nbsp;"order_ids": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5548199579,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5548199580<br>
+&nbsp;&nbsp;],<br>
+&nbsp;&nbsp;"date_from": "2024-04-01"<br>
+}
+        </code>
+      </div>
+
+      <div class="demo-box">
+        <h4>📝 Example Response</h4>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "success",<br>
+&nbsp;&nbsp;"imported": 2,<br>
+&nbsp;&nbsp;"orders": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"order_id": "ORD-2024-001",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"order_number": "#5548199579",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"customer_name": "Ahmed Al Dosari",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"delivery_address": "Building 456, Old Airport Rd, Doha",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"total_amount": 250.50,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"cod_amount": 250.50,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"status": "imported",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"created_at": "2024-04-17T10:30:00Z"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Webhook Events</h2>
+      <p>Shopify will send you real-time events when orders are created or updated:</p>
+
+      <div class="event-card">
+        <h4>📦 orders/create</h4>
+        <p>Triggered when a new order is placed in your Shopify store</p>
+        <div class="demo-box">
+          <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"event_type": "orders/create",<br>
+&nbsp;&nbsp;"timestamp": "2024-04-17T10:30:00Z",<br>
+&nbsp;&nbsp;"data": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"order_id": "5548199579",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"order_number": "#5548199579",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"customer": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "Ahmed Al Dosari",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"email": "ahmed@example.com",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"phone": "+97433123456"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"total_price": "250.50",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"line_items": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"title": "Product Name",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"quantity": 2,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"price": "125.25"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"shipping_address": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"address1": "Building 456",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"city": "Doha",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"country": "QA"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;}<br>
+}
+          </code>
+        </div>
+      </div>
+
+      <div class="event-card">
+        <h4>📤 orders/updated</h4>
+        <p>Triggered when an order is updated (e.g., payment received)</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Manual Order Import</h2>
+      <p>Import past orders that were placed before integration:</p>
+
+      <div class="code-block">
+        <div class="code-header">Example: Import Orders from Last 7 Days</div>
+        <code class="demo-code">
+POST /api/integrations/shopify/import/<br>
+<br>
+{<br>
+&nbsp;&nbsp;"store_url": "mystore.myshopify.com",<br>
+&nbsp;&nbsp;"date_from": "2024-04-10",<br>
+&nbsp;&nbsp;"date_to": "2024-04-17"<br>
+}
+        </code>
+      </div>
+
+      <div class="info-box">
+        <strong>💡 Tip:</strong> Use <code>date_from</code> and <code>date_to</code> to import historical orders in batches.
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Troubleshooting</h2>
+
+      <div class="faq-item">
+        <h4>❓ Authorization Failed</h4>
+        <p>
+          <strong>Issue:</strong> Shopify shows "Invalid redirect URI"<br>
+          <strong>Solution:</strong> Verify the redirect URI exactly matches:
+          <code>https://api.ezzydelivery.qa/business/shopify/oauth/callback/</code>
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h4>❓ Orders Not Importing</h4>
+        <p>
+          <strong>Issue:</strong> Orders aren't showing in EzzyDelivery<br>
+          <strong>Solution:</strong> Check that your Shopify app has <code>read_orders</code> permission enabled
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h4>❓ Missing Customer Address</h4>
+        <p>
+          <strong>Issue:</strong> Delivery address is incomplete<br>
+          <strong>Solution:</strong> Ensure customers enter full delivery address at checkout in Shopify
+        </p>
+      </div>
+
+      <p>
+        <strong>Still stuck?</strong> Check <a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a> or
+        contact support@ezzydelivery.qa
+      </p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Next Steps</h2>
+      <div class="next-steps-grid">
+        <a href="{% url 'ezzy_api:docs_api_reference' %}" class="next-step-card">
+          <h3>🔌 API Reference</h3>
+          <p>View all available endpoints</p>
+        </a>
+        <a href="{% url 'ezzy_api:docs_webhooks' %}" class="next-step-card">
+          <h3>📨 Webhooks</h3>
+          <p>Setup real-time updates</p>
+        </a>
+        <a href="{% url 'ezzy_api:docs_examples' %}" class="next-step-card">
+          <h3>💻 Code Examples</h3>
+          <p>Integration examples</p>
+        </a>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'ezzy_api/js/docs.js' %}"></script>
+{% endblock %}

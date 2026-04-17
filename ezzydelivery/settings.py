@@ -93,6 +93,7 @@ INSTALLED_APPS = [
     'fontawesomefree',
     'rest_framework',
     'rest_framework.authtoken',
+    'drf_spectacular',
     'import_export',
     'geocoder',
     'django_initials_avatar', 
@@ -190,6 +191,7 @@ SESSION_COOKIE_NAME = 'ezzy_sessionid'  # Custom session cookie name for added s
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'core.middleware.CloudflareIPMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -397,6 +399,17 @@ NOCAPTCHA = True  # Use reCAPTCHA v2 checkbox ("I'm not a robot")
 
 
 # ==========================================
+# RATE LIMITING CONFIGURATION
+# ==========================================
+# CloudflareIPMiddleware extracts IP from Cloudflare headers and sets REMOTE_ADDR.
+# django-ratelimit will use the standard 'ip' key which reads REMOTE_ADDR.
+# No need to set RATELIMIT_IP_META_KEY since REMOTE_ADDR is properly set by middleware.
+# ==========================================
+# END RATE LIMITING CONFIGURATION
+# ==========================================
+
+
+# ==========================================
 # CELERY CONFIGURATION
 # ==========================================
 # Added: December 2024
@@ -460,6 +473,7 @@ DISPATCH_MAX_ORDERS_PER_RIDER = config('DISPATCH_MAX_ORDERS_PER_RIDER', default=
 
 
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'ezzy_api.schema.UserTypeFilteredSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -489,6 +503,31 @@ REST_FRAMEWORK = {
     # Date/time format
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
     'DATE_FORMAT': '%Y-%m-%d',
+}
+
+# ==========================================
+# DRF SPECTACULAR CONFIGURATION (OpenAPI/Swagger)
+# ==========================================
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'EzzyDelivery API',
+    'DESCRIPTION': 'API documentation for EzzyDelivery integrations with Shopify, WooCommerce, and TikTok Shop',
+    'VERSION': '1.0.0',
+    'SCHEMA_CLASS': 'ezzy_api.schema.UserTypeFilteredSchema',
+    'SCHEMA_GENERATOR_CLASS': 'ezzy_api.schema.UserTypeFilteredSchemaGenerator',
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAuthenticated'],
+    'SCHEMA_PATH_PREFIX': '/api/v1/',
+    'AUTHENTICATION_SCHEMES': [
+        {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'Token',
+            'description': 'Token-based authentication. Include "Token <your_api_key>" in Authorization header.',
+        },
+    ],
+    'CONTACT': {
+        'name': 'Support',
+        'email': 'support@ezzydelivery.qa',
+    },
 }
 
 import mimetypes

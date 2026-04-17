@@ -2,6 +2,12 @@
  * Account Forms - Professional Design
  * Unified styling for profile complete, profile add, and account pages
  * Brand colors: Yellow (#f7c000) + Navy (#001f3f)
+ *
+ * 📱 MB-OPTIMIZATION:
+ * - Desktop-first base styles
+ * - XS-only overrides: @media (max-width: 575.98px)
+ * - Form layout: flex-friendly, touch-sized inputs (48px height min)
+ * - Typography: scales down gracefully for mobile
  */
 
 /* ========================================
@@ -76,6 +82,8 @@
   box-shadow: var(--account-shadow-xl);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 #core_profile_complete_card_main::before {
@@ -353,7 +361,46 @@ textarea {
 }
 
 /* ========================================
-   8. RESPONSIVE DESIGN
+   8. READ-ONLY DISPLAY FIELDS
+   ======================================== */
+.caf__display-field {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  background: var(--account-bg);
+  border: 1px solid var(--account-border);
+  border-radius: var(--account-radius-md);
+}
+
+.caf__display-label {
+  font-size: var(--account-font-sm);
+  font-weight: 600;
+  color: var(--account-navy);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.caf__display-label i {
+  color: var(--account-primary);
+  margin-right: 0.25rem;
+}
+
+.caf__display-value {
+  font-size: var(--account-font-base);
+  font-weight: 700;
+  color: var(--account-navy);
+  margin: 0;
+  flex: 1;
+}
+
+/* ========================================
+   9. RESPONSIVE DESIGN
    ======================================== */
 @media (max-width: 991.98px) {
   #core_profile_complete_section_main {
@@ -374,7 +421,8 @@ textarea {
   }
 }
 
-@media (max-width: 767.98px) {
+/* SM Screens: 576px and up - Balanced mobile */
+@media (min-width: 576px) and (max-width: 767.98px) {
   #core_profile_complete_card_main .card-body {
     padding: var(--account-space-xl) !important;
   }
@@ -390,6 +438,390 @@ textarea {
 
   #core_profile_complete_title_main {
     font-size: var(--account-font-xl);
+  }
+
+  #core_profile_complete_section_main {
+    padding: 0.75rem 0;
+  }
+
+  #core_profile_complete_header {
+    padding: 0.875rem 1rem !important;
+  }
+}
+
+/* XS Screens: Under 576px - Ultra-compact native app feel */
+@media (max-width: 575.98px) {
+  /* Override Bootstrap: remove margin-top from grid columns */
+  .row > * {
+    margin-top: 0 !important;
+    padding-right: calc(var(--bs-gutter-x) * 0.25) !important;
+    padding-left: calc(var(--bs-gutter-x) * 0.25) !important;
+  }
+
+  /* Alert and form spacing */
+  .alert {
+    margin-bottom: 0.75rem !important;
+    margin-top: 0 !important;
+  }
+
+  .form-group {
+    margin-bottom: 0.5rem !important;
+    margin-top: 0 !important;
+  }
+
+  #core_profile_complete_section_main {
+    padding: 0.75rem 0;
+    min-height: auto;
+  }
+
+  /* Override Bootstrap utility padding */
+  .container-fluid.py-4 {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .container-fluid.px-3 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  #core_profile_complete_card_main {
+    border-radius: 0 0 var(--account-radius-md) var(--account-radius-md);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  }
+
+  /* Override card header Bootstrap classes */
+  #core_profile_complete_header.pt-5 {
+    padding-top: 1rem !important;
+  }
+
+  #core_profile_complete_header.pb-4 {
+    padding-bottom: 0.75rem !important;
+  }
+
+  /* Override card body Bootstrap classes */
+  #core_profile_complete_card_main .card-body.px-4 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  #core_profile_complete_card_main .card-body.py-4 {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  /* Minimize vertical margins on mobile */
+  .mt-1 {
+    margin-top: 0.25rem !important;
+  }
+
+  .mt-2 {
+    margin-top: 0.25rem !important;
+  }
+
+  .mt-3 {
+    margin-top: 0.375rem !important;
+  }
+
+  .mt-4 {
+    margin-top: 0.5rem !important;
+  }
+
+  .mt-5 {
+    margin-top: 0.5rem !important;
+  }
+
+  .mb-1 {
+    margin-bottom: 0.25rem !important;
+  }
+
+  .mb-2 {
+    margin-bottom: 0.25rem !important;
+  }
+
+  .mb-3 {
+    margin-bottom: 0.375rem !important;
+  }
+
+  .mb-4 {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .mb-5 {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .pt-4 {
+    padding-top: 0.5rem !important;
+  }
+
+  .pb-4 {
+    padding-bottom: 0.5rem !important;
+  }
+
+  #core_profile_complete_progress_wrapper {
+    margin-bottom: 0.5rem !important;
+  }
+
+  #core_profile_complete_card_main .card-header {
+    gap: 0.5rem !important;
+  }
+
+  .caf__circle {
+    width: 80px;
+    height: 80px;
+  }
+
+  #core_profile_complete_percentage {
+    font-size: var(--account-font-lg);
+    font-weight: 700;
+  }
+
+  #core_profile_complete_percentage + div {
+    font-size: var(--account-font-xs);
+  }
+
+  #core_profile_complete_title_main {
+    font-size: 1.125rem;
+    margin-bottom: 0.25rem;
+  }
+
+  #core_profile_complete_subtitle {
+    font-size: var(--account-font-sm);
+    margin-bottom: 0 !important;
+  }
+
+  #core_profile_complete_card_main .card-body {
+    padding: 0.75rem !important;
+  }
+
+  /* Form Group - Better spacing for breathing room */
+  .form-group {
+    margin-bottom: 0;  /* Row gap handles spacing */
+  }
+
+  /* Form Label - Improved visual hierarchy */
+  .form-label {
+    font-size: 0.75rem !important;
+    margin-bottom: 0.5rem !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 0.375rem !important;
+    min-height: auto !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    color: var(--account-navy) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em !important;
+  }
+
+  .form-label i {
+    flex-shrink: 0 !important;
+    font-size: 0.875rem !important;
+    width: auto !important;
+    text-align: center !important;
+    color: var(--account-primary) !important;
+  }
+
+  /* Asterisk stays inline - MUST be on same line */
+  .form-label .text-danger {
+    flex-shrink: 0 !important;
+    margin-left: 0.125rem !important;
+    white-space: nowrap !important;
+    display: inline !important;
+  }
+
+  /* Form Controls - Touch-friendly (48px min height) + better spacing */
+  .form-control,
+  select {
+    font-size: 1rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--account-radius-md);
+    min-height: 48px;
+    line-height: 1.5;
+    border: 1.5px solid var(--account-input-border);
+    transition: all 0.2s ease;
+  }
+
+  .form-control::placeholder {
+    color: var(--account-text-muted);
+    opacity: 0.7;
+  }
+
+  textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+
+  /* Better focus state on mobile */
+  .form-control:focus,
+  select:focus {
+    border-color: var(--account-input-focus);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.15);
+  }
+
+  /* Tighter grid gap on mobile */
+  .row.g-4 {
+    gap: 0.5rem !important;
+  }
+
+  /* REDESIGN: 1-column layout for breathing room on mobile */
+  .row.g-4 {
+    gap: 1.5rem !important;  /* Increased spacing between fields */
+  }
+
+  .row.g-4 > [class*="col-"] {
+    flex: 0 0 100% !important;  /* Full width, single column */
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Full-width for single column layouts */
+  .row.g-4 > .col-12 {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Better vertical breathing room between sections */
+  #core_profile_complete_card_main .card-body {
+    padding: 1.5rem !important;
+  }
+
+  /* Form section spacing */
+  #core_profile_complete_section_role {
+    margin-top: 1.5rem !important;
+    padding-top: 1.5rem !important;
+    border-top: 1px solid var(--account-border);
+  }
+
+  /* Helper Text - Better mobile readability */
+  .form-text {
+    font-size: var(--account-font-sm);
+    margin-top: 0.625rem;  /* More breathing room */
+    display: block;
+    color: var(--account-text-muted);
+    line-height: 1.4;
+  }
+
+  /* Error Messages */
+  .text-danger {
+    font-size: var(--account-font-sm);
+    margin-top: 0.5rem;  /* More breathing room */
+    display: block;
+    font-weight: 500;
+  }
+
+  .is-invalid {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2 !important;
+  }
+
+  /* Alerts - Better visibility */
+  .alert {
+    padding: 1rem !important;  /* More breathing room inside alert */
+    margin-bottom: 1.25rem !important;  /* More space after alert */
+    font-size: var(--account-font-sm);
+    border-radius: var(--account-radius-md);
+    gap: 0.75rem !important;
+    line-height: 1.5;
+  }
+
+  .alert i {
+    font-size: var(--account-font-base) !important;
+    margin-top: 0.125rem !important;
+    flex-shrink: 0;
+  }
+
+  .alert strong {
+    font-size: var(--account-font-sm) !important;
+    display: block;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .alert .small {
+    font-size: var(--account-font-xs) !important;
+    line-height: 1.4;
+  }
+
+  #core_profile_complete_section_role h5 {
+    font-size: var(--account-font-base);
+    margin-bottom: 0.5rem;
+  }
+
+  #core_profile_complete_section_role > p {
+    font-size: var(--account-font-sm);
+    margin-bottom: 0.75rem;
+  }
+
+  #core_profile_complete_section_role {
+    margin-top: 0.5rem !important;
+    padding-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .ob__role-card {
+    padding: 0.75rem !important;
+    gap: 0.5rem;
+    min-height: auto;
+  }
+
+  .ob__role-card-icon {
+    font-size: 1.5rem;
+  }
+
+  .ob__role-card-title {
+    font-size: var(--account-font-base);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .ob__role-card-desc {
+    font-size: var(--account-font-xs);
+    opacity: 0.85;
+  }
+
+  .ob__role-card-arrow {
+    font-size: var(--account-font-md);
+  }
+
+  .btn {
+    padding: 0.625rem 0.875rem;
+    font-size: var(--account-font-sm);
+    border-radius: var(--account-radius-sm);
+    font-weight: 600;
+  }
+
+  .btn-outline-primary,
+  .btn-dark {
+    width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    font-size: var(--account-font-sm);
+  }
+
+  .btn i {
+    font-size: var(--account-font-base);
+  }
+
+  .ob__next-steps > p {
+    font-size: var(--account-font-xs);
+    margin-bottom: 0.5rem;
+  }
+
+  .ob__next-step-item {
+    padding: 0.5rem;
+    font-size: var(--account-font-sm);
+  }
+
+  .ob__next-step-num {
+    font-size: var(--account-font-base);
+    width: 1.75rem;
+    height: 1.75rem;
   }
 }
 

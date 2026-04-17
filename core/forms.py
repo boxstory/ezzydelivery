@@ -79,9 +79,9 @@ class CustomSignupForm(SignupForm):
         Used automatically by django-allauth when configured in settings:
         ACCOUNT_FORMS = {'signup': 'core.forms.CustomSignupForm'}
     """
-    first_name = forms.CharField(max_length=30, label='First Name')
-    last_name = forms.CharField(max_length=30, label='Last Name')
-    captcha = ReCaptchaField(widget=ReCaptchaV2Checkbox)
+    first_name = forms.CharField(max_length=30, label='First Name', required=False)
+    last_name = forms.CharField(max_length=30, label='Last Name', required=False)
+    captcha = ReCaptchaField(widget=ReCaptchaV2Checkbox, required=True)
 
     def clean_username(self):
         """Validate username: 8-12 chars, only letters, numbers, and underscore."""
@@ -102,8 +102,8 @@ class CustomSignupForm(SignupForm):
 
     def signup(self, request, user):
         """Save first and last name to user model after signup."""
-        user.first_name = self.cleaned_data['first_name']
-        user.last_name = self.cleaned_data['last_name']
+        user.first_name = self.cleaned_data.get('first_name', '')
+        user.last_name = self.cleaned_data.get('last_name', '')
 
         user.save()
         return user

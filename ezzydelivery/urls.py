@@ -12,6 +12,7 @@ from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 from django.http import FileResponse, HttpResponseNotFound
 from django.contrib.staticfiles import finders
+from ezzy_api.schema_views import AuthenticatedSchemaView, AuthenticatedSwaggerView, AuthenticatedRedocView
 import os
 
 
@@ -75,6 +76,12 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
 
     path('api-auth/', include('rest_framework.urls')),
+
+    # OpenAPI Schema & Documentation (requires authentication)
+    path('api/schema/', AuthenticatedSchemaView.as_view(), name='schema'),
+    path('api/schema/swagger/', AuthenticatedSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/redoc/', AuthenticatedRedocView.as_view(url_name='schema'), name='redoc'),
+
     # API versioning: v1 is current version, unversioned path kept for backwards compatibility
     path('api/v1/', include('ezzy_api.urls', namespace='ezzy_api_v1')),
     path('api/', include('ezzy_api.urls')),  # Legacy support (defaults to v1)

@@ -4785,3 +4785,39 @@ def driver_app_config(request):
         'support_whatsapp': getattr(django_settings, 'DRIVER_SUPPORT_WHATSAPP', ''),
         'support_email': getattr(django_settings, 'DRIVER_SUPPORT_EMAIL', 'support@ezzydelivery.qa'),
     }, status=status.HTTP_200_OK)
+
+
+# ==================== CLIENT DOCUMENTATION VIEWS ====================
+
+def docs_index(request):
+    return render(request, 'ezzy_api/docs/index.html')
+
+def docs_getting_started(request):
+    return render(request, 'ezzy_api/docs/getting-started.html')
+
+def docs_authentication(request):
+    return render(request, 'ezzy_api/docs/authentication.html')
+
+def docs_shopify(request):
+    return render(request, 'ezzy_api/docs/shopify.html')
+
+def docs_woocommerce(request):
+    return render(request, 'ezzy_api/docs/woocommerce.html')
+
+def docs_tiktok(request):
+    return render(request, 'ezzy_api/docs/tiktok.html')
+
+def docs_api_reference(request):
+    return render(request, 'ezzy_api/docs/api-reference.html')
+
+def docs_webhooks(request):
+    return render(request, 'ezzy_api/docs/webhooks.html')
+
+def docs_errors(request):
+    return render(request, 'ezzy_api/docs/errors.html')
+
+def docs_examples(request):
+    return render(request, 'ezzy_api/docs/examples.html')
+
+def docs_faq(request):
+    return render(request, 'ezzy_api/docs/faq.html')

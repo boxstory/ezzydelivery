@@ -136,7 +136,8 @@ def business_dashboard(request):
         # Calculate real statistics - single aggregate query instead of 5 separate queries
         all_orders = orders_models.Order.objects.filter(business=business.business_id)
         from datetime import date
-        from django.db.models import Count, Case, When, IntegerField
+        from decimal import Decimal
+        from django.db.models import Count, Case, When, IntegerField, DecimalField
 
         today = date.today()
 
@@ -153,7 +154,8 @@ def business_dashboard(request):
             cod_total=Sum('cod_amount'),
             cod_collected=Sum(Case(
                 When(order_status__in=['delivered', 'fulfilled'], then='cod_amount'),
-                default=0,
+                default=Decimal('0'),
+                output_field=DecimalField()
             )),
         )
 

@@ -1,0 +1,236 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}API Reference - EzzyDelivery{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <!-- Sidebar -->
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop Integration</a></li>
+      </ul>
+
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="#api-reference" class="nav-link active">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+        <li><a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a></li>
+      </ul>
+
+      <h3>Resources</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_examples' %}">Code Examples</a></li>
+        <li><a href="{% url 'ezzy_api:docs_faq' %}">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header" id="api-reference">
+      <h1>🔌 API Reference</h1>
+      <p class="subtitle">Complete list of EzzyDelivery API endpoints</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Interactive API Testing</h2>
+      <p>Test API endpoints interactively using our OpenAPI documentation:</p>
+      <div class="demo-box">
+        <h4>📋 Available Tools</h4>
+        <ul class="permission-list">
+          <li><strong><a href="/api/schema/swagger/" target="_blank">Swagger UI</a></strong> — Interactive API explorer with "Try it out" functionality</li>
+          <li><strong><a href="/api/schema/redoc/" target="_blank">ReDoc</a></strong> — Beautiful, responsive API documentation</li>
+          <li><strong><a href="/api/schema/" target="_blank">OpenAPI Schema</a></strong> — Raw JSON schema for tooling and integrations</li>
+        </ul>
+      </div>
+      <p>You can authenticate using your API token in the Swagger UI. Click the "Authorize" button and enter: <code>Token &lt;your_api_key&gt;</code></p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Integration Endpoints</h2>
+
+      <div class="step-card">
+        <h3>List Integrations</h3>
+        <div class="endpoint-item">
+          <span class="method get">GET</span>
+          <span class="path">/api/integrations/</span>
+        </div>
+        <p><strong>Description:</strong> Get list of all configured integrations</p>
+        <div class="demo-box">
+          <h4>Response Example:</h4>
+          <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "success",<br>
+&nbsp;&nbsp;"integrations": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 1,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"type": "shopify",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "My Store",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"status": "active"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}
+          </code>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <h3>Import Shopify Orders</h3>
+        <div class="endpoint-item">
+          <span class="method post">POST</span>
+          <span class="path">/api/integrations/shopify/import/</span>
+        </div>
+        <p><strong>Description:</strong> Import orders from your Shopify store</p>
+        <div class="demo-box">
+          <h4>Request Body:</h4>
+          <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"store_url": "mystore.myshopify.com",<br>
+&nbsp;&nbsp;"order_ids": [123456, 123457],<br>
+&nbsp;&nbsp;"date_from": "2024-04-01"<br>
+}
+          </code>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <h3>Import WooCommerce Orders</h3>
+        <div class="endpoint-item">
+          <span class="method post">POST</span>
+          <span class="path">/api/integrations/woocommerce/import/</span>
+        </div>
+        <p><strong>Description:</strong> Import orders from your WooCommerce store</p>
+      </div>
+
+      <div class="step-card">
+        <h3>Import TikTok Shop Orders</h3>
+        <div class="endpoint-item">
+          <span class="method post">POST</span>
+          <span class="path">/api/integrations/tiktokshop/import/</span>
+        </div>
+        <p><strong>Description:</strong> Import orders from your TikTok Shop</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Order Management</h2>
+
+      <div class="step-card">
+        <h3>Get Orders</h3>
+        <div class="endpoint-item">
+          <span class="method get">GET</span>
+          <span class="path">/api/business/orders/</span>
+        </div>
+        <p><strong>Query Parameters:</strong></p>
+        <ul class="permission-list">
+          <li><code>status</code> - Filter by order status</li>
+          <li><code>date_from</code> - From date (YYYY-MM-DD)</li>
+          <li><code>date_to</code> - To date (YYYY-MM-DD)</li>
+          <li><code>page</code> - Page number (default: 1)</li>
+        </ul>
+      </div>
+
+      <div class="step-card">
+        <h3>Get Order Detail</h3>
+        <div class="endpoint-item">
+          <span class="method get">GET</span>
+          <span class="path">/api/business/orders/{order_id}/</span>
+        </div>
+        <p><strong>Description:</strong> Get detailed information about a specific order</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>API Key Management</h2>
+
+      <div class="step-card">
+        <h3>Create API Key</h3>
+        <div class="endpoint-item">
+          <span class="method post">POST</span>
+          <span class="path">/api/api-keys/create/</span>
+        </div>
+        <p><strong>Description:</strong> Create a new API key for your account</p>
+      </div>
+
+      <div class="step-card">
+        <h3>List API Keys</h3>
+        <div class="endpoint-item">
+          <span class="method get">GET</span>
+          <span class="path">/api/api-keys/</span>
+        </div>
+        <p><strong>Description:</strong> Get list of all your API keys</p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Common Response Codes</h2>
+
+      <table class="api-docs-table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Meaning</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>200</code></td>
+            <td>Success</td>
+            <td>Request completed successfully</td>
+          </tr>
+          <tr>
+            <td><code>400</code></td>
+            <td>Bad Request</td>
+            <td>Invalid parameters</td>
+          </tr>
+          <tr>
+            <td><code>401</code></td>
+            <td>Unauthorized</td>
+            <td>Invalid API key</td>
+          </tr>
+          <tr>
+            <td><code>403</code></td>
+            <td>Forbidden</td>
+            <td>Insufficient permissions</td>
+          </tr>
+          <tr>
+            <td><code>404</code></td>
+            <td>Not Found</td>
+            <td>Resource doesn't exist</td>
+          </tr>
+          <tr>
+            <td><code>500</code></td>
+            <td>Server Error</td>
+            <td>Internal server error</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'ezzy_api/js/docs.js' %}"></script>
+{% endblock %}

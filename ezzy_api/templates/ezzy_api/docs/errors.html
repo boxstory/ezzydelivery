@@ -1,0 +1,104 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}Error Handling - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <!-- Sidebar -->
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop Integration</a></li>
+      </ul>
+
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+        <li><a href="#errors" class="nav-link active">Error Handling</a></li>
+      </ul>
+
+      <h3>Resources</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_examples' %}">Code Examples</a></li>
+        <li><a href="{% url 'ezzy_api:docs_faq' %}">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header" id="errors">
+      <h1>⚠️ Error Handling</h1>
+      <p class="subtitle">Common errors and how to fix them</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Error Response Format</h2>
+      <div class="demo-box">
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "error",<br>
+&nbsp;&nbsp;"error": "Invalid API key",<br>
+&nbsp;&nbsp;"error_code": "INVALID_AUTH",<br>
+&nbsp;&nbsp;"message": "The provided API key is not valid or has expired"<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Common Errors</h2>
+
+      <div class="faq-item">
+        <h4>401 - Unauthorized</h4>
+        <p><strong>Cause:</strong> Invalid or missing API key</p>
+        <p><strong>Solution:</strong> Check that your API key is correct and included in the Authorization header</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>400 - Bad Request</h4>
+        <p><strong>Cause:</strong> Invalid request parameters</p>
+        <p><strong>Solution:</strong> Check request body format and required fields</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>404 - Not Found</h4>
+        <p><strong>Cause:</strong> Resource doesn't exist</p>
+        <p><strong>Solution:</strong> Verify the order ID or integration ID is correct</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>429 - Too Many Requests</h4>
+        <p><strong>Cause:</strong> Rate limit exceeded</p>
+        <p><strong>Solution:</strong> Wait and retry. Current limit: 1000 requests/hour</p>
+      </div>
+
+      <div class="faq-item">
+        <h4>500 - Server Error</h4>
+        <p><strong>Cause:</strong> Internal server error</p>
+        <p><strong>Solution:</strong> Contact support if the issue persists</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

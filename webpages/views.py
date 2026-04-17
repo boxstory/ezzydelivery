@@ -56,7 +56,8 @@ from urllib.parse import quote
 from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from webpages import forms as webpages_forms
 from webpages import models as webpages_models
@@ -256,6 +257,17 @@ def delivery_inquiry(request):
             _save_step3_to_db(inquiry, all_data)
             inquiry.is_complete = True
             inquiry.save()
+
+            # Send thank you message via WhatsApp to customer
+            from core.whatsapp_utils import send_inquiry_thank_you_message, send_admin_inquiry_notification
+            if inquiry.business_contact_number:
+                send_inquiry_thank_you_message(
+                    phone_number=inquiry.business_contact_number,
+                    business_name=inquiry.business_name
+                )
+
+            # Send admin notification
+            send_admin_inquiry_notification(inquiry)
 
             # Clear session
             request.session.pop('inquiry_data', None)
@@ -613,6 +625,39 @@ def client_guide(request):
     return render(request, 'webpages/client_guide.html', data)
 
 
+@user_passes_test(lambda u: u.is_staff)
+@require_http_methods(["GET", "POST"])
+def edit_client_guide(request):
+    """Staff-only editor for client guide"""
+    import os
+    from django.conf import settings
+
+    template_name = 'webpages/client_guide.html'
+    full_path = os.path.join(settings.BASE_DIR, 'webpages', 'templates', template_name)
+
+    if request.method == 'POST':
+        content = request.POST.get('content', '')
+        try:
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            messages.success(request, '✅ Client guide updated successfully!')
+            return redirect('webpages:client_guide')
+        except Exception as e:
+            messages.error(request, f'❌ Error saving guide: {str(e)}')
+
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        content = f'Error loading file: {str(e)}'
+
+    data = {
+        'content': content,
+        'template_name': template_name,
+    }
+    return render(request, 'webpages/edit_client_guide.html', data)
+
+
 def driver_guide(request):
     """Driver onboarding guide"""
     meta = SEOMetadata.get_page_meta(
@@ -627,6 +672,39 @@ def driver_guide(request):
         'seo': meta,
     }
     return render(request, 'webpages/driver_guide.html', data)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@require_http_methods(["GET", "POST"])
+def edit_driver_guide(request):
+    """Staff-only editor for driver guide"""
+    from django.template.loader import render_to_string
+    import re
+
+    template_path = 'webpages/driver_guide.html'
+    full_path = f'webpages/templates/{template_path}'
+
+    if request.method == 'POST':
+        content = request.POST.get('content', '')
+        try:
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            messages.success(request, '✅ Driver guide updated successfully!')
+            return redirect('webpages:driver_guide')
+        except Exception as e:
+            messages.error(request, f'❌ Error saving guide: {str(e)}')
+
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        content = f'Error loading file: {str(e)}'
+
+    data = {
+        'content': content,
+        'template_name': template_path,
+    }
+    return render(request, 'webpages/edit_driver_guide.html', data)
 
 
 # SEO Landing Pages Views (Based on Search Console Data)

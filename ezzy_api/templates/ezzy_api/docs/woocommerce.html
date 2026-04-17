@@ -1,0 +1,279 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}WooCommerce Integration - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+    <nav class="api-docs-nav">
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify</a></li>
+        <li><a href="#" class="nav-link active">📦 WooCommerce</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop</a></li>
+      </ul>
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header">
+      <h1>📦 WooCommerce Integration</h1>
+      <p class="subtitle">Connect your WordPress/WooCommerce store</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>How It Works</h2>
+      <p>
+        WooCommerce integration uses API key authentication. Generate API credentials in your
+        WordPress admin, then use them to connect with EzzyDelivery.
+      </p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Setup Steps</h2>
+
+      <div class="step-card">
+        <h3>Step 1: Generate API Keys in WordPress</h3>
+        <ol>
+          <li>Log in to your WordPress Admin Dashboard</li>
+          <li>Go to <strong>WooCommerce → Settings → Advanced → REST API</strong></li>
+          <li>Click <strong>"Create an API key"</strong></li>
+          <li>Fill in the form:
+            <ul>
+              <li><strong>Description:</strong> EzzyDelivery Integration</li>
+              <li><strong>User:</strong> Select your admin account</li>
+              <li><strong>Permissions:</strong> Read</li>
+            </ul>
+          </li>
+          <li>Click <strong>"Generate API key"</strong></li>
+        </ol>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 2: Copy Your Credentials</h3>
+        <p>WooCommerce will generate Consumer Key and Consumer Secret:</p>
+        <div class="demo-box">
+          <h4>📝 Example Credentials</h4>
+          <code class="demo-code">
+            Consumer Key: <span class="highlight">ck_live_123abc456def789ghi</span><br>
+            Consumer Secret: <span class="highlight">cs_live_1234567890abcdefghijklmnopqr</span><br>
+            Store URL: <span class="highlight">https://mystore.com</span>
+          </code>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 3: Add Integration in EzzyDelivery</h3>
+        <ol>
+          <li>Log in to EzzyDelivery Dashboard</li>
+          <li>Go to <strong>Settings → API Settings</strong></li>
+          <li>Click <strong>"New Integration"</strong> button</li>
+          <li>Select <strong>"WooCommerce"</strong> from the platform list</li>
+          <li>Enter your WooCommerce credentials:
+            <ul class="permission-list">
+              <li><strong>Store URL:</strong> <code>https://yourstore.com</code></li>
+              <li><strong>Consumer Key:</strong> From WordPress REST API</li>
+              <li><strong>Consumer Secret:</strong> From WordPress REST API</li>
+            </ul>
+          </li>
+          <li>Click <strong>"Test Connection"</strong> to verify</li>
+          <li>Click <strong>"Save Integration"</strong></li>
+        </ol>
+        <div class="success-box">
+          <strong>✓ Success!</strong> Your WooCommerce store is now connected
+        </div>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Import Orders</h2>
+
+      <div class="code-block">
+        <div class="code-header">API Endpoint</div>
+        <code class="demo-code">
+          POST /api/integrations/woocommerce/import/
+        </code>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">Request Body</div>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"store_url": "https://mystore.com",<br>
+&nbsp;&nbsp;"order_ids": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;1234,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;1235<br>
+&nbsp;&nbsp;],<br>
+&nbsp;&nbsp;"status": "completed"<br>
+}
+        </code>
+      </div>
+
+      <div class="demo-box">
+        <h4>📝 Response Example</h4>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"status": "success",<br>
+&nbsp;&nbsp;"imported": 2,<br>
+&nbsp;&nbsp;"orders": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"order_id": "1234",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"order_number": "#1234",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"customer_name": "Fatima Al Khaldi",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"customer_email": "fatima@example.com",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"delivery_address": "123 Pearl St, Doha, Qatar",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"total_amount": 180.00,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"cod_amount": 180.00,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"status": "imported"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Webhook Configuration</h2>
+      <p>
+        Configure WooCommerce webhooks to receive real-time order updates. These are set up in your
+        WordPress admin, not in EzzyDelivery.
+      </p>
+
+      <div class="step-card">
+        <h3>Setup Webhook in WordPress</h3>
+        <ol>
+          <li>Go to <strong>WooCommerce → Settings → Advanced → Webhooks</strong></li>
+          <li>Click <strong>"Add webhook"</strong></li>
+          <li>Fill in:
+            <ul>
+              <li><strong>Name:</strong> EzzyDelivery Order Events</li>
+              <li><strong>Status:</strong> Active</li>
+              <li><strong>Topic:</strong> Order Created / Order Updated</li>
+              <li><strong>Delivery URL:</strong></li>
+              <code class="demo-code">https://api.ezzydelivery.qa/api/webhooks/order/inbound/{YOUR_WEBHOOK_KEY}/</code>
+            </ul>
+          </li>
+          <li>Click <strong>"Save webhook"</strong></li>
+        </ol>
+      </div>
+
+      <div class="info-box">
+        <strong>💡 Get Your Webhook Key:</strong> This is provided when you create the integration in EzzyDelivery
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Filter Orders by Status</h2>
+      <p>You can import orders with specific statuses:</p>
+
+      <div class="code-block">
+        <div class="code-header">Example: Import Only Completed Orders</div>
+        <code class="demo-code">
+POST /api/integrations/woocommerce/import/<br>
+<br>
+{<br>
+&nbsp;&nbsp;"store_url": "https://mystore.com",<br>
+&nbsp;&nbsp;"status": "completed",<br>
+&nbsp;&nbsp;"date_from": "2024-04-10"<br>
+}
+        </code>
+      </div>
+
+      <div class="status-list">
+        <h4>Supported Order Statuses:</h4>
+        <ul>
+          <li><code>pending</code> - Payment pending</li>
+          <li><code>processing</code> - Payment received, processing</li>
+          <li><code>completed</code> - Order completed</li>
+          <li><code>on-hold</code> - Waiting for action</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Example Webhook Event</h2>
+      <p>When an order is created or updated, WooCommerce sends this data:</p>
+
+      <div class="demo-box">
+        <h4>📝 Webhook Payload</h4>
+        <code class="demo-code">
+{<br>
+&nbsp;&nbsp;"id": 1234,<br>
+&nbsp;&nbsp;"number": "1234",<br>
+&nbsp;&nbsp;"status": "completed",<br>
+&nbsp;&nbsp;"customer": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"id": 567,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"first_name": "Fatima",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"last_name": "Al Khaldi",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"email": "fatima@example.com",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"phone": "97455123456"<br>
+&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;"shipping": {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"address_1": "123 Pearl Street",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"city": "Doha",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"postcode": "1234",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"country": "QA"<br>
+&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;"line_items": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 890,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "Product Name",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"quantity": 2,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"total": "180.00"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;],<br>
+&nbsp;&nbsp;"total": "180.00"<br>
+}
+        </code>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Troubleshooting</h2>
+
+      <div class="faq-item">
+        <h4>❓ Connection Failed</h4>
+        <p>
+          <strong>Issue:</strong> "Invalid API credentials"<br>
+          <strong>Solution:</strong> Verify Consumer Key and Consumer Secret are correct.
+          Copy them exactly as shown in WordPress.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h4>❓ Orders Not Syncing</h4>
+        <p>
+          <strong>Issue:</strong> Webhook events aren't triggering<br>
+          <strong>Solution:</strong> Check webhook status in WordPress and verify delivery URL is correct
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h4>❓ Address Format Issues</h4>
+        <p>
+          <strong>Issue:</strong> Delivery address format is wrong<br>
+          <strong>Solution:</strong> Ensure customer shipping address is complete (Street, City, Postcode, Country)
+        </p>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'ezzy_api/js/docs.js' %}"></script>
+{% endblock %}

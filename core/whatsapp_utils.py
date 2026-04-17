@@ -150,6 +150,18 @@ Your account verification code is:
 *{verification_code}*
 
 This code will expire in 10 minutes.
+        """,
+        'inquiry_thanks': f"""
+✅ *Thank You for Your 3PL Inquiry!*
+
+We've received your inquiry and appreciate your interest in EZZY Delivery.
+
+Our team will review your business requirements and contact you within 24 hours with a customized quote.
+
+In the meantime, feel free to reach out to us if you have any questions.
+
+Best regards,
+*EZZY Delivery Team* 🚚
         """
     }
 
@@ -436,6 +448,128 @@ Thank you for choosing EZZY Delivery! 🚚"""
             'success': False,
             'error': f'Failed to send WhatsApp message: {str(e)}'
         }
+
+
+def send_whatsapp_message_api(phone_number, message):
+    """
+    Send WhatsApp message via Evolution API
+
+    Args:
+        phone_number: Phone number with country code (e.g., 97466451589)
+        message: Message text to send
+
+    Returns:
+        dict: Response with success status
+    """
+    api_url = getattr(settings, 'EVALUATION_URL', None)
+    api_key = getattr(settings, 'EVALUATION_API_KEY', None)
+    instance = getattr(settings, 'EVALUATION_INSTANCE', None)
+
+    if not api_url or not api_key or not instance:
+        return {
+            'success': False,
+            'error': 'Evolution API not configured'
+        }
+
+    # Clean phone number
+    phone = str(phone_number).strip()
+    phone = phone.replace('+', '').replace(' ', '').replace('-', '')
+
+    # Evolution API endpoint
+    endpoint = f"{api_url}/message/sendText/{instance}"
+
+    payload = {
+        'number': phone,
+        'text': message.strip()
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'apikey': api_key
+    }
+
+    try:
+        response = requests.post(
+            endpoint,
+            json=payload,
+            headers=headers,
+            timeout=10,
+            verify=True
+        )
+
+        return {
+            'success': response.status_code in [200, 201],
+            'status_code': response.status_code,
+            'response': response.json() if response.text else {}
+        }
+
+    except requests.exceptions.RequestException as e:
+        return {
+            'success': False,
+            'error': f'Failed to send WhatsApp message: {str(e)}'
+        }
+
+
+def send_inquiry_thank_you_message(phone_number, business_name):
+    """
+    Send thank you message to customer after 3PL inquiry submission via WhatsApp API
+
+    Args:
+        phone_number: Customer phone number
+        business_name: Customer business name
+
+    Returns:
+        dict: Response with success status
+    """
+    message = f"""✅ *Thank You for Your 3PL Inquiry!*
+
+Hi {business_name},
+
+We've received your inquiry and appreciate your interest in EZZY Delivery.
+
+Our team will review your business requirements and contact you within 24 hours with a customized quote.
+
+In the meantime, feel free to reach out to us if you have any questions.
+
+Best regards,
+*EZZY Delivery Team* 🚚
+"""
+    return send_whatsapp_message_api(phone_number, message)
+
+
+def send_admin_inquiry_notification(inquiry):
+    """
+    Send notification to admin about new 3PL inquiry submission via WhatsApp API
+
+    Args:
+        inquiry: PricingEnquiry object
+
+    Returns:
+        dict: Response with success status
+    """
+    # Build notification message with inquiry details
+    message = f"""📩 *NEW 3PL INQUIRY RECEIVED*
+
+*Company:* {inquiry.business_name}
+*Contact:* {inquiry.full_name}
+*Phone:* {inquiry.business_contact_number}
+
+*Product Category:* {inquiry.product_category}
+*Order Volume (Last Month):* {inquiry.avarage_number_of_order_done_last_month}
+*Preferred Start:* {inquiry.preferred_start_date}
+
+*Services Required:*
+• COD: {'Yes' if inquiry.is_required_COD_service else 'No'}
+• Fulfillment (Outside QA): {'Yes' if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar else 'No'}
+• Return Logistics: {'Yes' if inquiry.is_return_logistics_required else 'No'}
+
+*Submitted:* {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
+*Inquiry ID:* {inquiry.id}
+
+👉 Login to dashboard to view full details
+"""
+
+    return send_whatsapp_message_api('97466451589', message)
 
 
 def verify_code(phone_number, code, verification_type):

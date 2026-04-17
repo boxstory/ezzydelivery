@@ -1,0 +1,207 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}EzzyDelivery API Documentation - Client Integration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <!-- Sidebar -->
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="#overview" class="nav-link active">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_getting_started' %}">Getting Started</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce Integration</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop Integration</a></li>
+      </ul>
+
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+        <li><a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a></li>
+      </ul>
+
+      <h3>Resources</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_examples' %}">Code Examples</a></li>
+        <li><a href="{% url 'ezzy_api:docs_faq' %}">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="api-docs-content">
+    <!-- Header -->
+    <div class="api-docs-header">
+      <h1>EzzyDelivery API Documentation</h1>
+      <p class="subtitle">Connect your e-commerce store and start delivering with EzzyDelivery</p>
+    </div>
+
+    <!-- Content Grid -->
+    <div class="api-docs-grid">
+
+      <!-- Introduction Card -->
+      <section class="api-docs-card">
+        <h2 id="overview">📖 Overview</h2>
+        <p>
+          EzzyDelivery API allows you to integrate your e-commerce store (Shopify, WooCommerce, TikTok Shop)
+          with our delivery management platform. Automatically sync orders, track deliveries, and manage COD payments.
+        </p>
+        <div class="feature-list">
+          <div class="feature-item">
+            <span class="icon">✓</span>
+            <span class="text">Order Management</span>
+          </div>
+          <div class="feature-item">
+            <span class="icon">✓</span>
+            <span class="text">Real-time Tracking</span>
+          </div>
+          <div class="feature-item">
+            <span class="icon">✓</span>
+            <span class="text">Webhook Updates</span>
+          </div>
+          <div class="feature-item">
+            <span class="icon">✓</span>
+            <span class="text">COD Handling</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Start Card -->
+      <section class="api-docs-card">
+        <h2>🚀 Quick Start</h2>
+        <ol class="quick-start-steps">
+          <li>
+            <strong>Create API Key</strong><br>
+            <span class="text-muted">Generate credentials in your Settings page</span>
+          </li>
+          <li>
+            <strong>Choose Your Platform</strong><br>
+            <span class="text-muted">Select Shopify, WooCommerce, or TikTok Shop</span>
+          </li>
+          <li>
+            <strong>Configure Integration</strong><br>
+            <span class="text-muted">Follow platform-specific setup guide</span>
+          </li>
+          <li>
+            <strong>Test Connection</strong><br>
+            <span class="text-muted">Verify orders are syncing correctly</span>
+          </li>
+        </ol>
+        <a href="{% url 'ezzy_api:docs_getting_started' %}" class="btn btn-primary">Get Started →</a>
+      </section>
+
+      <!-- Platforms Card -->
+      <section class="api-docs-card full-width">
+        <h2>🌐 Supported Platforms</h2>
+        <div class="platforms-grid">
+          <div class="platform-card">
+            <div class="platform-icon">🛒</div>
+            <h3>Shopify</h3>
+            <p>Connect your Shopify store with OAuth authentication</p>
+            <a href="{% url 'ezzy_api:docs_shopify' %}" class="btn-link">Learn more →</a>
+          </div>
+          <div class="platform-card">
+            <div class="platform-icon">📦</div>
+            <h3>WooCommerce</h3>
+            <p>WordPress-based e-commerce integration</p>
+            <a href="{% url 'ezzy_api:docs_woocommerce' %}" class="btn-link">Learn more →</a>
+          </div>
+          <div class="platform-card">
+            <div class="platform-icon">🎵</div>
+            <h3>TikTok Shop</h3>
+            <p>Sell on TikTok with EzzyDelivery logistics</p>
+            <a href="{% url 'ezzy_api:docs_tiktok' %}" class="btn-link">Learn more →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features Card -->
+      <section class="api-docs-card">
+        <h2>✨ Key Features</h2>
+        <ul class="feature-list-detailed">
+          <li><strong>Order Import:</strong> Automatically sync orders from your platform</li>
+          <li><strong>Real-time Updates:</strong> Webhook notifications for delivery status</li>
+          <li><strong>COD Management:</strong> Handle cash-on-delivery transactions</li>
+          <li><strong>Tracking:</strong> Provide customers with delivery tracking links</li>
+          <li><strong>API Keys:</strong> Secure token-based authentication</li>
+        </ul>
+      </section>
+
+      <!-- API Endpoints Card -->
+      <section class="api-docs-card">
+        <h2>🔌 API Endpoints</h2>
+        <div class="endpoint-preview">
+          <div class="endpoint-item">
+            <span class="method post">POST</span>
+            <span class="path">/api/integrations/shopify/import/</span>
+          </div>
+          <div class="endpoint-item">
+            <span class="method post">POST</span>
+            <span class="path">/api/integrations/woocommerce/import/</span>
+          </div>
+          <div class="endpoint-item">
+            <span class="method post">POST</span>
+            <span class="path">/api/integrations/tiktokshop/import/</span>
+          </div>
+          <div class="endpoint-item">
+            <span class="method post">POST</span>
+            <span class="path">/api/webhooks/order/inbound/{key}/</span>
+          </div>
+        </div>
+        <a href="{% url 'ezzy_api:docs_api_reference' %}" class="btn-link">View all endpoints →</a>
+      </section>
+
+      <!-- Interactive Testing Card -->
+      <section class="api-docs-card">
+        <h2>⚡ Test API Endpoints</h2>
+        <p>Use our interactive API documentation to test endpoints in real-time:</p>
+        <div class="feature-list-detailed">
+          <li><strong><a href="/api/schema/swagger/" style="color: #0a66c2; text-decoration: none;">Swagger UI</a></strong> — Interactive testing with "Try it out" button</li>
+          <li><strong><a href="/api/schema/redoc/" style="color: #0a66c2; text-decoration: none;">ReDoc</a></strong> — Beautiful, responsive documentation</li>
+          <li><strong><a href="/api/schema/" style="color: #0a66c2; text-decoration: none;">OpenAPI Schema</a></strong> — Raw JSON schema for integrations</li>
+        </div>
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <a href="/api/schema/swagger/" class="btn" style="flex: 1; min-width: 150px; text-align: center;">Swagger UI</a>
+          <a href="/api/schema/redoc/" class="btn btn-secondary" style="flex: 1; min-width: 150px; text-align: center;">ReDoc</a>
+          <a href="/api/schema/" class="btn btn-secondary" style="flex: 1; min-width: 150px; text-align: center;">OpenAPI Schema</a>
+        </div>
+      </section>
+
+      <!-- Support Card -->
+      <section class="api-docs-card">
+        <h2>💬 Need Help?</h2>
+        <p>
+          Check our <a href="{% url 'ezzy_api:docs_faq' %}">FAQ</a> for common questions,
+          or review <a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a> to troubleshoot issues.
+        </p>
+        <div class="support-links">
+          <a href="{% url 'ezzy_api:docs_examples' %}" class="btn btn-secondary">View Code Examples</a>
+          <a href="mailto:support@ezzydelivery.qa" class="btn btn-secondary">Contact Support</a>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'ezzy_api/js/docs.js' %}"></script>
+{% endblock %}
