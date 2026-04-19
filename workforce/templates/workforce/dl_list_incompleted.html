@@ -31,6 +31,7 @@
                         <th class="dli__th">Mobile</th>
                         <th class="dli__th">Status</th>
                         <th class="dli__th">DMS Status</th>
+                        <th class="dli__th">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -45,6 +46,22 @@
                         </td>
                         <td class="dli__td">
                             <span class="dli__badge dli__badge--blue">{{ order.dl_task.get_dl_task_status_display }}</span>
+                        </td>
+                        <td class="dli__td">
+                            {% if order.dl_task.dl_task_status == 'failed' and order.dl_task.failed_attempt_count < 3 %}
+                            <button type="button" class="btn btn-sm btn-warning dli-retry-btn"
+                                    data-task-id="{{ order.dl_task.id }}"
+                                    data-task-number="{{ order.dl_task.dl_task_number }}"
+                                    title="Retry delivery task">
+                                <i class="fa-solid fa-rotate-right me-1"></i> Retry
+                            </button>
+                            {% elif order.dl_task.dl_task_status == 'failed' and order.dl_task.failed_attempt_count >= 3 %}
+                            <span class="badge bg-danger" title="Max retries reached">Max Retries</span>
+                            {% else %}
+                            <a href="/workforce/delivery-task/{{ order.dl_task.id }}/" class="btn btn-sm btn-outline-primary" title="View Details">
+                                <i class="fa-solid fa-eye me-1"></i> View
+                            </a>
+                            {% endif %}
                         </td>
                     </tr>
                     <tr class="dli__row-detail">
@@ -82,4 +99,95 @@
 {% block extra_js %}
 <script type="text/javascript" language="JavaScript" charset="UTF-8"
     src="{% static 'orders/js/orders_main.js' %}"></script>
+
+<script>
+console.log('✅ Incompleted tasks page script loaded');
+
+// CSRF helper
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Retry failed task handlers - event delegation
+console.log('📝 Setting up retry handler');
+
+// Check if buttons exist on page load
+document.addEventListener('DOMContentLoaded', function() {
+    var retryBtns = document.querySelectorAll('.dli-retry-btn');
+    console.log('🔧 Found ' + retryBtns.length + ' retry buttons on page');
+    retryBtns.forEach(function(btn, idx) {
+        console.log('Button ' + idx + ':', btn.dataset.taskNumber, btn.dataset.taskId);
+    });
+});
+
+// Attach click listener to document
+document.addEventListener('click', function(e) {
+        var retryBtn = e.target.closest('.dli-retry-btn');
+        if (!retryBtn) return;
+
+        console.log('🔄 Retry button clicked:', retryBtn.dataset.taskNumber);
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        var taskId = retryBtn.dataset.taskId;
+        var taskNumber = retryBtn.dataset.taskNumber;
+
+        console.log('Task ID:', taskId, 'Task Number:', taskNumber);
+
+        if (!confirm('Retry delivery task #' + taskNumber + '? The driver will see it in their app.')) {
+            console.log('User cancelled retry');
+            return;
+        }
+
+        retryBtn.disabled = true;
+        var originalHTML = retryBtn.innerHTML;
+        retryBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing...';
+
+        var el1 = document.querySelector('[name="csrfmiddlewaretoken"]');
+        var el2 = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = (el1 && el1.value) || (el2 && el2.content) || getCookie('csrftoken');
+
+        console.log('CSRF Token found:', !!csrfToken);
+
+        fetch('/delivery/task/' + taskId + '/retry/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken || ''
+            }
+        })
+        .then(r => {
+            console.log('Response status:', r.status);
+            return r.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            if (data.success) {
+                alert('Task #' + taskNumber + ' retry successful!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+                retryBtn.disabled = false;
+                retryBtn.innerHTML = originalHTML;
+            }
+        })
+        .catch(err => {
+            console.error('Retry fetch failed:', err);
+            alert('Request failed: ' + err);
+            retryBtn.disabled = false;
+            retryBtn.innerHTML = originalHTML;
+        });
+    });
+</script>
 {% endblock extra_js %}
