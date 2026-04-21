@@ -96,11 +96,29 @@
 <div class="fleet-slide-up" style="animation-delay: 0.2s;">
     {% if cod_in_hand_list %}
     <div class="fleet-card" style="padding: 0; overflow: hidden;">
-        <div class="fleet-card__header" style="padding: var(--spacing-md) var(--spacing-lg); margin-bottom: 0; border-bottom: 1px solid var(--fleet-grey-100);">
+        <div class="fleet-card__header" style="padding: var(--spacing-md) var(--spacing-lg); margin-bottom: 0; border-bottom: 1px solid var(--fleet-grey-100); display: flex; align-items: center; justify-content: space-between;">
             <h3 class="fleet-card__title">
                 <i class="fa-solid fa-list me-2"></i>
                 COD In Hand ({{ cod_in_hand_count }})
             </h3>
+            <!-- Filtered Payment Method Split Icons -->
+            {% if payment_method_breakdown %}
+            <div style="display: flex; gap: 8px; align-items: center;">
+                {% for row in payment_method_breakdown %}
+                {% if row.total %}
+                <div title="{{ row.payment_method|default:'Unknown'|title }}: {{ row.total|floatformat:2 }} QR" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--fleet-grey-100); cursor: help;">
+                    {% if row.payment_method == 'cash' %}<i class="fa-solid fa-money-bill" style="color: #059669; font-size: 0.9rem;"></i>{% endif %}
+                    {% if row.payment_method == 'pos' %}<i class="fa-solid fa-credit-card" style="color: #2563eb; font-size: 0.9rem;"></i>{% endif %}
+                    {% if row.payment_method == 'fawran' %}<i class="fa-solid fa-mobile-screen" style="color: #7c3aed; font-size: 0.9rem;"></i>{% endif %}
+                    {% if row.payment_method == 'card' %}<i class="fa-solid fa-wallet" style="color: #34d399; font-size: 0.9rem;"></i>{% endif %}
+                    {% if row.payment_method == 'bank' %}<i class="fa-solid fa-building-columns" style="color: #818cf8; font-size: 0.9rem;"></i>{% endif %}
+                    {% if row.payment_method == 'atm' %}<i class="fa-solid fa-money-bills" style="color: #f87171; font-size: 0.9rem;"></i>{% endif %}
+                    {% if not row.payment_method %}<i class="fa-solid fa-circle-question" style="color: #9ca3af; font-size: 0.9rem;"></i>{% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="fleet-card__body" style="padding: 0;">
