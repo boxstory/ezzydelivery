@@ -6,7 +6,8 @@
 /**
  * Format currency (QAR)
  */
-function formatCurrency(amount, decimals = 2) {
+function formatCurrency(amount, decimals) {
+  decimals = decimals || 2;
   return `QAR ${parseFloat(amount).toFixed(decimals).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
 }
 
@@ -20,9 +21,10 @@ function formatNumber(num) {
 /**
  * Format date (YYYY-MM-DD to readable format)
  */
-function formatDate(dateString, format = 'full') {
-  const date = new Date(dateString);
-  const options = {
+function formatDate(dateString, format) {
+  format = format || 'full';
+  var date = new Date(dateString);
+  var options = {
     full: { year: 'numeric', month: 'long', day: 'numeric' },
     short: { year: 'numeric', month: 'short', day: 'numeric' },
     time: { hour: '2-digit', minute: '2-digit' }
@@ -42,12 +44,14 @@ function calculatePercentage(value, total) {
 /**
  * Debounce function (for search inputs)
  */
-function debounce(func, wait = 300) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
+function debounce(func, wait) {
+  wait = wait || 300;
+  var timeout;
+  return function executedFunction() {
+    var args = Array.prototype.slice.call(arguments);
+    var later = function() {
       clearTimeout(timeout);
-      func(...args);
+      func.apply(null, args);
     };
     clearTimeout(timeout);
     timeout = setTimeout(later, wait);
@@ -59,14 +63,14 @@ function debounce(func, wait = 300) {
  */
 function copyToClipboard(text) {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText(text).then(function() {
       showSuccess('Copied to clipboard!');
-    }).catch(() => {
+    }).catch(function() {
       showError('Failed to copy');
     });
   } else {
     // Fallback for older browsers
-    const textarea = document.createElement('textarea');
+    var textarea = document.createElement('textarea');
     textarea.value = text;
     document.body.appendChild(textarea);
     textarea.select();
@@ -80,7 +84,7 @@ function copyToClipboard(text) {
  * Get status badge HTML
  */
 function getStatusBadge(status) {
-  const statusMap = {
+  var statusMap = {
     // Order statuses
     'pending': { color: 'warning', icon: 'clock', text: 'Pending' },
     'published': { color: 'info', icon: 'cloud', text: 'Published' },
@@ -100,7 +104,7 @@ function getStatusBadge(status) {
     'unpaid': { color: 'warning', icon: 'exclamation', text: 'Unpaid' }
   };
 
-  const config = statusMap[status] || { color: 'secondary', icon: 'question', text: status };
+  var config = statusMap[status] || { color: 'secondary', icon: 'question', text: status };
 
   return `<span class="badge bg-${config.color}">
     <i class="fa-solid fa-${config.icon} me-1"></i> ${config.text}
@@ -121,16 +125,17 @@ function confirmDialog(title, message, callback) {
 /**
  * Loading overlay
  */
-const loadingOverlay = {
-  show: function(message = 'Loading...') {
-    const overlay = document.getElementById('loading-overlay');
+var loadingOverlay = {
+  show: function(message) {
+    message = message || 'Loading...';
+    var overlay = document.getElementById('loading-overlay');
     if (overlay) {
       overlay.querySelector('.loading-text').textContent = message;
       overlay.classList.remove('d-none');
     }
   },
   hide: function() {
-    const overlay = document.getElementById('loading-overlay');
+    var overlay = document.getElementById('loading-overlay');
     if (overlay) {
       overlay.classList.add('d-none');
     }
@@ -140,9 +145,10 @@ const loadingOverlay = {
 /**
  * Auto-refresh for real-time dashboards
  */
-let refreshInterval = null;
+var refreshInterval = null;
 
-function startAutoRefresh(callback, interval = 30000) {
+function startAutoRefresh(callback, interval) {
+  interval = interval || 30000;
   stopAutoRefresh();
   refreshInterval = setInterval(callback, interval);
 }
@@ -164,7 +170,8 @@ function isMobile() {
 /**
  * Scroll to top
  */
-function scrollToTop(smooth = true) {
+function scrollToTop(smooth) {
+  smooth = smooth !== false;
   window.scrollTo({
     top: 0,
     behavior: smooth ? 'smooth' : 'auto'
@@ -175,10 +182,10 @@ function scrollToTop(smooth = true) {
  * Print element
  */
 function printElement(elementId) {
-  const element = document.getElementById(elementId);
+  var element = document.getElementById(elementId);
   if (!element) return;
 
-  const printWindow = window.open('', '', 'height=600,width=800');
+  var printWindow = window.open('', '', 'height=600,width=800');
   printWindow.document.write('<html><head><title>Print</title>');
   printWindow.document.write('<link rel="stylesheet" href="/static/webpages/css/brandkit.css">');
   printWindow.document.write('</head><body>');
@@ -191,26 +198,27 @@ function printElement(elementId) {
 /**
  * Export table to CSV
  */
-function exportToCSV(tableId, filename = 'export.csv') {
-  const table = document.getElementById(tableId);
+function exportToCSV(tableId, filename) {
+  filename = filename || 'export.csv';
+  var table = document.getElementById(tableId);
   if (!table) return;
 
-  let csv = [];
-  const rows = table.querySelectorAll('tr');
+  var csv = [];
+  var rows = table.querySelectorAll('tr');
 
-  rows.forEach(row => {
-    const cols = row.querySelectorAll('td, th');
-    const rowData = [];
-    cols.forEach(col => {
+  rows.forEach(function(row) {
+    var cols = row.querySelectorAll('td, th');
+    var rowData = [];
+    cols.forEach(function(col) {
       rowData.push('"' + col.textContent.trim().replace(/"/g, '""') + '"');
     });
     csv.push(rowData.join(','));
   });
 
-  const csvContent = csv.join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv' });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  var csvContent = csv.join('\n');
+  var blob = new Blob([csvContent], { type: 'text/csv' });
+  var url = window.URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
@@ -222,17 +230,19 @@ function exportToCSV(tableId, filename = 'export.csv') {
  * Get CSRF Token
  */
 function getCSRFToken() {
-  return document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-         document.querySelector('meta[name=csrf-token]')?.content ||
-         getCookie('csrftoken');
+  var el = document.querySelector('[name=csrfmiddlewaretoken]');
+  if (el) return el.value;
+  var meta = document.querySelector('meta[name=csrf-token]');
+  if (meta) return meta.getAttribute('content');
+  return getCookie('csrftoken');
 }
 
 function getCookie(name) {
-  let cookieValue = null;
+  var cookieValue = null;
   if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+      var cookie = cookies[i].trim();
       if (cookie.substring(0, name.length + 1) === (name + '=')) {
         cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
         break;
@@ -245,8 +255,9 @@ function getCookie(name) {
 /**
  * AJAX helper with CSRF
  */
-function ajaxRequest(url, options = {}) {
-  const defaultOptions = {
+function ajaxRequest(url, options) {
+  options = options || {};
+  var defaultOptions = {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -254,8 +265,10 @@ function ajaxRequest(url, options = {}) {
     }
   };
 
-  return fetch(url, { ...defaultOptions, ...options })
-    .then(response => {
+  var finalOptions = Object.assign({}, defaultOptions, options);
+
+  return fetch(url, finalOptions)
+    .then(function(response) {
       if (!response.ok) throw new Error('Network response was not ok');
       return response.json();
     });

@@ -4,8 +4,10 @@
  */
 
 // Toast notification wrapper
-function showToast(message, type = 'success', duration = 3000) {
-  const colors = {
+function showToast(message, type, duration) {
+  type = type || 'success';
+  duration = duration || 3000;
+  var colors = {
     success: '#10B981',
     error: '#EF4444',
     warning: '#F59E0B',
@@ -13,7 +15,7 @@ function showToast(message, type = 'success', duration = 3000) {
     primary: '#f7c000'
   };
 
-  const icons = {
+  var icons = {
     success: '✓',
     error: '✕',
     warning: '⚠',
@@ -46,35 +48,39 @@ function showToast(message, type = 'success', duration = 3000) {
 }
 
 // Success toast
-function showSuccess(message, duration = 3000) {
+function showSuccess(message, duration) {
+  duration = duration || 3000;
   showToast(message, 'success', duration);
 }
 
 // Error toast
-function showError(message, duration = 5000) {
+function showError(message, duration) {
+  duration = duration || 5000;
   showToast(message, 'error', duration);
 }
 
 // Warning toast
-function showWarning(message, duration = 4000) {
+function showWarning(message, duration) {
+  duration = duration || 4000;
   showToast(message, 'warning', duration);
 }
 
 // Info toast
-function showInfo(message, duration = 3000) {
+function showInfo(message, duration) {
+  duration = duration || 3000;
   showToast(message, 'info', duration);
 }
 
 // Convert Django messages to toasts
 document.addEventListener('DOMContentLoaded', function() {
-  const djangoMessages = document.querySelectorAll('.django-message');
+  var djangoMessages = document.querySelectorAll('.django-message');
 
   djangoMessages.forEach(function(msg) {
-    const text = msg.textContent.trim();
-    const messageType = msg.dataset.messageType || 'info';
+    var text = msg.textContent.trim();
+    var messageType = msg.dataset.messageType || 'info';
 
     // Map Django message types to toast types
-    const typeMap = {
+    var typeMap = {
       'success': 'success',
       'error': 'error',
       'warning': 'warning',
@@ -92,8 +98,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // HTMX response toasts
 document.body.addEventListener('htmx:afterSwap', function(evt) {
   // Check for toast data in response
-  const toast = evt.detail.xhr.getResponseHeader('X-Toast-Message');
-  const toastType = evt.detail.xhr.getResponseHeader('X-Toast-Type');
+    var toast = evt.detail.xhr.getResponseHeader('X-Toast-Message');
+    var toastType = evt.detail.xhr.getResponseHeader('X-Toast-Type');
 
   if (toast) {
     showToast(toast, toastType || 'success');
@@ -107,7 +113,7 @@ function showValidationError(message) {
 
 // Confirm action with toast
 function confirmAction(message, callback) {
-  const confirmed = confirm(message);
+    var confirmed = confirm(message);
   if (confirmed) {
     callback();
     showInfo('Action in progress...');

@@ -420,6 +420,22 @@ class DriverTransaction(models.Model):
     pending_earnings_after = models.DecimalField(
         max_digits=10, decimal_places=2, default=0.00
     )
+    # COD in hand breakdown by payment method
+    cod_cash_after = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00
+    )
+    cod_pos_after = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00
+    )
+    cod_fawran_after = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00
+    )
+    cod_bank_after = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00
+    )
+    cod_atm_after = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00
+    )
 
     # COD Submission Verification (for cod_driver_settle / cod_deposit transactions)
     is_received = models.BooleanField(

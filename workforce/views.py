@@ -1000,7 +1000,7 @@ def orders_by_seller(request):
 
     businesses = businesses.order_by('-total_orders', 'business_name')
 
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'Orders by Seller',
@@ -7156,7 +7156,7 @@ def business_verification_list(request):
     businesses = businesses.order_by('-profile__verification_applied_at', '-business_id')
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'Business Verification',
@@ -7205,7 +7205,7 @@ def driver_verification_list(request):
 
     drivers = drivers.order_by('-profile__verification_applied_at', '-driver_id')
 
-    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+    page_obj = paginate_queryset(request, drivers, items_per_page=25)
 
     context = {
         'page_title': 'Driver Verification',
@@ -7467,7 +7467,7 @@ def orders_reported(request):
         order_status='reported'
     ).order_by('-created_at')
 
-    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
+    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=25)
 
     context = {
         'orders': orders_with_pagination,
@@ -7588,7 +7588,7 @@ def tasks_reported(request):
         dl_task_status__in=['rejected', 'cancelled'],
     ).order_by('-created_at')
 
-    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
+    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=25)
 
     context = {
         'dl_tasks': tasks_with_pagination,
@@ -7937,7 +7937,7 @@ def fleet_cod_in_hand(request):
     if 'per_page' in filter_params:
         del filter_params['per_page']
 
-    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
+    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=25)
 
     context = {
         'drivers': drivers_with_pagination,
@@ -7949,7 +7949,7 @@ def fleet_cod_in_hand(request):
         'cod_ranges': cod_ranges,
         'total_drivers': total_drivers,
         'filter_params': filter_params.urlencode(),
-        'per_page': get_per_page(request, default=20),
+        'per_page': get_per_page(request, default=25),
         'date_preset': date_preset,
         'date_from': date_from or '',
         'date_to': date_to or '',
@@ -8008,7 +8008,7 @@ def fleet_drivers_earnings(request):
         total_deliveries=Sum('deliveries_after_settlement'),
     )
 
-    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
+    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=25)
 
     context = {
         'drivers': drivers_with_pagination,
@@ -8227,7 +8227,7 @@ def earnings_verification_action(request):
 @staff_required
 def cod_settlement_report(request):
     """COD Settlement Report - Select drivers, settle COD, export PDF"""
-    from django.db.models import Sum, F
+    from django.db.models import Sum, F, Q
     from delivery import models as delivery_models
     from datetime import timedelta
 
@@ -8259,16 +8259,38 @@ def cod_settlement_report(request):
     if date_to:
         unsettled_tasks = unsettled_tasks.filter(completed_at__date__lte=date_to)
 
+    # Get pending driver transaction requests
+    pending_requests = fleet_models.DriverTransaction.objects.filter(
+        Q(
+            transaction_type='cod_driver_settle',
+            is_verified=False
+        ) |
+        Q(
+            transaction_type='cod_deposit',
+            is_verified=False
+        ) |
+        Q(
+            transaction_type='settlement',
+            is_verified=False
+        )
+    ).select_related('driver', 'driver__user').order_by('-created_at')[:50]
+
     # Calculate totals
-    total_unsettled = drivers.aggregate(total=Sum('cod_in_hand'))['total'] or 0
+    # Total COD in hand with fleet (drivers) pending to be settled to admin
+    total_unsettled = unsettled_tasks.aggregate(total=Sum('cod_collected_amount'))['total'] or 0
     drivers_with_cod = drivers.count()
+    pending_count = pending_requests.count()
+    pending_total = pending_requests.aggregate(total=Sum('amount'))['total'] or 0
 
     context = {
         'drivers': drivers,
         'unsettled_tasks': unsettled_tasks[:100],
+        'pending_requests': pending_requests,
         'page_title': 'COD Settlement Report',
         'total_unsettled': total_unsettled,
         'drivers_with_cod': drivers_with_cod,
+        'pending_count': pending_count,
+        'pending_total': pending_total,
         'date_from': date_from,
         'date_to': date_to,
     }
@@ -8452,11 +8474,45 @@ def cod_settlement_pdf(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+@require_http_methods(["GET", "POST"])
 def fleet_transactions(request):
     """View for fleet transactions with filtering and sorting"""
     from django.db.models import Sum
     from decimal import Decimal
     from datetime import timedelta
+
+    # Handle POST requests for approve/reject actions
+    if request.method == 'POST':
+        import json
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+            txn_id = data.get('txn_id')
+
+            if not txn_id:
+                return JsonResponse({'success': False, 'error': 'Missing transaction ID'})
+
+            txn = fleet_models.DriverTransaction.objects.get(id=txn_id)
+
+            if action == 'approve_cod':
+                txn.is_verified = True
+                txn.save(update_fields=['is_verified'])
+                return JsonResponse({'success': True, 'message': 'COD submission approved'})
+
+            elif action == 'reject_cod':
+                reason = data.get('reason', 'No reason provided')
+                # Mark as not verified and potentially add a note
+                txn.is_verified = False
+                txn.save(update_fields=['is_verified'])
+                logger.info(f"COD submission {txn.id} rejected by {request.user}. Reason: {reason}")
+                return JsonResponse({'success': True, 'message': 'COD submission rejected'})
+
+            return JsonResponse({'success': False, 'error': 'Invalid action'})
+        except fleet_models.DriverTransaction.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Transaction not found'})
+        except Exception as e:
+            logger.error(f"Error processing COD action: {str(e)}")
+            return JsonResponse({'success': False, 'error': str(e)})
 
     # Get all approved drivers for filter dropdown
     all_drivers = fleet_models.Driver.objects.filter(
@@ -8473,7 +8529,7 @@ def fleet_transactions(request):
             selected_driver = fleet_models.Driver.objects.select_related('user').get(driver_id=driver_id)
             transactions = fleet_models.DriverTransaction.objects.filter(
                 driver=selected_driver
-            ).select_related('delivery_task', 'settlement')
+            ).select_related('delivery_task', 'delivery_task__cod_submission_txn', 'settlement')
         except fleet_models.Driver.DoesNotExist:
             selected_driver = None
 
@@ -8503,8 +8559,8 @@ def fleet_transactions(request):
         date_to = today.isoformat()
     # For 'custom', use the date_from and date_to from request
 
-    # Default to cod_driver_settle (COD submissions) if no type filter specified
-    txn_type = request.GET.get('type', 'cod_driver_settle') if 'type' not in request.GET else request.GET.get('type')
+    # Get transaction type filter (empty string = all types)
+    txn_type = request.GET.get('type', '')
     status = request.GET.get('status', '')
     min_amount = request.GET.get('min_amount', '')
     max_amount = request.GET.get('max_amount', '')
@@ -8517,6 +8573,9 @@ def fleet_transactions(request):
         if txn_type == 'cod_driver_settle':
             # Include legacy cod_deposit too
             transactions = transactions.filter(transaction_type__in=['cod_driver_settle', 'cod_deposit'])
+        elif txn_type == 'cod_collection':
+            # Show only COD collection transactions
+            transactions = transactions.filter(transaction_type='cod_collection')
         elif txn_type:
             transactions = transactions.filter(transaction_type=txn_type)
         if status == 'settled':
@@ -8538,9 +8597,6 @@ def fleet_transactions(request):
         'type_asc': 'transaction_type',
         'type_desc': '-transaction_type',
     }
-    if selected_driver:
-        transactions = transactions.order_by(sort_options.get(sort_by, '-created_at'))
-
     # Transaction type choices for filter dropdown
     transaction_types = fleet_models.DriverTransaction.TRANSACTION_TYPES
 
@@ -8549,7 +8605,11 @@ def fleet_transactions(request):
     total_earnings = Decimal('0.00')
     cod_unsettled = Decimal('0.00')
     earnings_unsettled = Decimal('0.00')
+    cod_unsettled_breakdown = []
+    cod_in_hand_breakdown = []
+    current_cod_by_method = {}
     deposited_refs = set()
+    view_type = 'cod'
 
     if selected_driver:
         from delivery import models as delivery_models
@@ -8559,9 +8619,46 @@ def fleet_transactions(request):
         total_cod = dl_tasks.filter(
             cod_collected=True
         ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
-        cod_unsettled = dl_tasks.filter(
+        cod_unsettled_qs = dl_tasks.filter(
             cod_collected=True, cod_settled=False
-        ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+        )
+
+        # Current COD in hand breakdown (all unsettled, no date filter)
+        cod_in_hand_breakdown = (
+            cod_unsettled_qs
+            .values('payment_method')
+            .annotate(total=Sum('cod_collected_amount'))
+            .order_by('-total')
+        )
+
+        # Convert to dict for template access with defaults for all methods
+        current_cod_by_method = {
+            'cash': Decimal('0'),
+            'pos': Decimal('0'),
+            'fawran': Decimal('0'),
+            'bank': Decimal('0'),
+            'atm': Decimal('0'),
+            'unknown': Decimal('0'),
+        }
+        for row in cod_in_hand_breakdown:
+            method = row['payment_method'] or 'unknown'
+            current_cod_by_method[method] = row['total']
+
+        # Apply date filters to COD breakdown queryset for filtered view
+        if date_from:
+            cod_unsettled_qs = cod_unsettled_qs.filter(completed_at__date__gte=date_from)
+        if date_to:
+            cod_unsettled_qs = cod_unsettled_qs.filter(completed_at__date__lte=date_to)
+
+        cod_unsettled = cod_unsettled_qs.aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+
+        # Breakdown of unsettled COD by payment method (filtered by date)
+        cod_unsettled_breakdown = (
+            cod_unsettled_qs
+            .values('payment_method')
+            .annotate(total=Sum('cod_collected_amount'))
+            .order_by('-total')
+        )
 
         # Get all transactions for earnings totals and deposit refs
         all_txns = fleet_models.DriverTransaction.objects.filter(driver=selected_driver)
@@ -8578,14 +8675,66 @@ def fleet_transactions(request):
                 if not txn.settlement_id:
                     earnings_unsettled += txn.amount
 
+        # Recalculate COD balances once per day per driver (first page load triggers it)
+        from django.core.cache import cache
+        from fleet.wallet_service import WalletService
+        cache_key = f"cod_bal_recalc_{driver_id}_{timezone.now().date()}"
+        if not cache.get(cache_key):
+            WalletService.recalculate_cod_balances(selected_driver)
+            cache.set(cache_key, True, timeout=86400)  # 24 hours
+
+        # Get tab view type (cod, cod_submit, earnings, or settled)
+        view_type = request.GET.get('view', 'cod')
+
+        # Filter transactions based on selected view
+        if view_type == 'earnings':
+            transactions = all_txns.filter(transaction_type__in=['earning', 'settlement'])
+        elif view_type == 'cod_submit':
+            transactions = all_txns.filter(transaction_type='cod_driver_settle')
+        else:
+            transactions = all_txns.filter(transaction_type__in=['cod_collection', 'cod_driver_settle', 'cod_deposit'])
+            view_type = 'cod'
+
+        # Apply sort after view_type filter
+        transactions = transactions.order_by(sort_options.get(sort_by, '-created_at'))
+    else:
+        view_type = 'cod'
+
     # Build filter params for pagination (exclude page and per_page as they're handled separately)
     filter_params = request.GET.copy()
     if 'page' in filter_params:
         del filter_params['page']
     if 'per_page' in filter_params:
         del filter_params['per_page']
+    if 'view' in filter_params:
+        del filter_params['view']
 
-    transactions_paginated = paginate_queryset(request, transactions, items_per_page=20)
+    transactions_paginated = paginate_queryset(request, transactions, items_per_page=25)
+
+    # Calculate payment method breakdown for each settlement transaction
+    if selected_driver and transactions_paginated:
+        for txn in transactions_paginated:
+            if txn.transaction_type in ['cod_deposit', 'cod_driver_settle']:
+                # Get all delivery tasks settled by this transaction
+                settled_tasks = delivery_models.DeliveryTask.objects.filter(
+                    cod_submission_txn=txn,
+                    cod_collected=True
+                )
+
+                # Calculate breakdown by payment method
+                txn.settlement_split = {
+                    'cash': settled_tasks.filter(payment_method='cash').aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0'),
+                    'pos': settled_tasks.filter(payment_method='pos').aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0'),
+                    'fawran': settled_tasks.filter(payment_method='fawran').aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0'),
+                }
+
+    # Payment method breakdown for filtered transactions
+    payment_method_breakdown = (
+        transactions
+        .values('payment_method')
+        .annotate(total=Sum('amount'))
+        .order_by('-total')
+    ) if selected_driver else []
 
     context = {
         'page_title': 'Fleet Transactions',
@@ -8596,9 +8745,12 @@ def fleet_transactions(request):
         'total_earnings': total_earnings,
         'cod_unsettled': cod_unsettled,
         'earnings_unsettled': earnings_unsettled,
+        'cod_unsettled_breakdown': cod_unsettled_breakdown,
+        'cod_in_hand_breakdown': cod_in_hand_breakdown,
+        'current_cod_by_method': current_cod_by_method,
         'deposited_refs': deposited_refs,
         'filter_params': filter_params.urlencode(),
-        'per_page': get_per_page(request, default=20),
+        'per_page': get_per_page(request, default=25),
         # Filter values for form
         'date_preset': date_preset,
         'date_from': date_from or '',
@@ -8609,8 +8761,139 @@ def fleet_transactions(request):
         'max_amount': max_amount or '',
         'sort_by': sort_by,
         'transaction_types': transaction_types,
+        'payment_method_breakdown': payment_method_breakdown,
+        'view_type': view_type,
     }
     return render(request, 'workforce/fleet_transactions.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def seller_transactions(request):
+    """View for seller COD transactions tracking and settlement"""
+    from django.db.models import Sum, Q
+    from decimal import Decimal
+    from datetime import timedelta
+
+    # Get all active sellers/businesses
+    all_sellers = business_models.Business.objects.filter(
+        business_status='active'
+    ).select_related('user').order_by('business_name')
+
+    # Get selected seller
+    seller_id = request.GET.get('seller_id')
+    selected_seller = None
+    orders = Order.objects.none()
+
+    if seller_id:
+        try:
+            selected_seller = business_models.Business.objects.select_related('user').get(business_id=seller_id)
+            orders = Order.objects.filter(business=selected_seller).select_related('business')
+        except business_models.Business.DoesNotExist:
+            selected_seller = None
+
+    # Date filters
+    date_preset = request.GET.get('date_preset', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    today = timezone.now().date()
+
+    # Calculate dates based on preset
+    if date_preset == 'today':
+        date_from = today.isoformat()
+        date_to = today.isoformat()
+    elif date_preset == 'yesterday':
+        yesterday = today - timedelta(days=1)
+        date_from = yesterday.isoformat()
+        date_to = yesterday.isoformat()
+    elif date_preset == '3days':
+        date_from = (today - timedelta(days=3)).isoformat()
+        date_to = today.isoformat()
+    elif date_preset == '1week':
+        date_from = (today - timedelta(days=7)).isoformat()
+        date_to = today.isoformat()
+    elif date_preset == '1month':
+        date_from = (today - timedelta(days=30)).isoformat()
+        date_to = today.isoformat()
+
+    # Filter status
+    status = request.GET.get('status', '')
+    min_amount = request.GET.get('min_amount', '')
+    max_amount = request.GET.get('max_amount', '')
+
+    total_cod = Decimal('0.00')
+    cod_unsettled = Decimal('0.00')
+
+    if selected_seller:
+        # Get COD orders from selected seller
+        if status == 'settled':
+            orders = orders.filter(Q(cod_status_by_staff='cod_settled_with_business') | Q(fulfilled_at__isnull=False))
+        elif status == 'pending':
+            orders = orders.filter(cod_status_by_staff__in=['not_collected', 'partially_collected', 'fully_paid', 'cod_with_driver', 'cod_with_ezzy'])
+
+        # Date filters
+        if date_from:
+            orders = orders.filter(order_date__gte=date_from)
+        if date_to:
+            orders = orders.filter(order_date__lte=date_to)
+
+        # Amount filters
+        if min_amount:
+            orders = orders.filter(cod_amount__gte=min_amount)
+        if max_amount:
+            orders = orders.filter(cod_amount__lte=max_amount)
+
+        # Calculate totals
+        total_cod = orders.filter(
+            cod_amount__gt=0
+        ).aggregate(total=Sum('cod_amount'))['total'] or Decimal('0.00')
+
+        cod_unsettled = orders.filter(
+            cod_amount__gt=0,
+            cod_status_by_staff__in=['pending', 'to_review', 'accepted']
+        ).aggregate(total=Sum('cod_amount'))['total'] or Decimal('0.00')
+
+    # Sorting
+    sort_by = request.GET.get('sort', 'date_desc')
+    sort_options = {
+        'date_asc': 'order_date',
+        'date_desc': '-order_date',
+        'amount_asc': 'cod_amount',
+        'amount_desc': '-cod_amount',
+        'status_asc': 'cod_status_by_staff',
+        'status_desc': '-cod_status_by_staff',
+    }
+    orders = orders.order_by(sort_options.get(sort_by, '-order_date'))
+
+    # Build filter params for pagination
+    filter_params = request.GET.copy()
+    if 'page' in filter_params:
+        del filter_params['page']
+    if 'per_page' in filter_params:
+        del filter_params['per_page']
+
+    orders_paginated = paginate_queryset(request, orders, items_per_page=25)
+
+    context = {
+        'page_title': 'Seller Transactions',
+        'all_sellers': all_sellers,
+        'selected_seller': selected_seller,
+        'orders': orders_paginated,
+        'total_cod': total_cod,
+        'cod_unsettled': cod_unsettled,
+        'filter_params': filter_params.urlencode(),
+        'per_page': get_per_page(request, default=25),
+        # Filter values for form
+        'date_preset': date_preset,
+        'date_from': date_from or '',
+        'date_to': date_to or '',
+        'status': status or '',
+        'min_amount': min_amount or '',
+        'max_amount': max_amount or '',
+        'sort_by': sort_by,
+    }
+    return render(request, 'workforce/seller_transactions.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -8696,7 +8979,15 @@ def fleet_transaction_update_status(request, txn_id):
     if field not in ('is_received', 'is_verified'):
         return JsonResponse({'error': 'Invalid field'}, status=400)
 
-    new_value = not getattr(txn, field)
+    # If explicit value passed use it, otherwise toggle
+    explicit = request.POST.get('value')
+    if explicit == 'true':
+        new_value = True
+    elif explicit == 'false':
+        new_value = False
+    else:
+        new_value = not getattr(txn, field)
+
     setattr(txn, field, new_value)
     txn.save(update_fields=[field])
 
@@ -8716,6 +9007,14 @@ def bulk_settle_transactions(request):
 
     driver_id = request.POST.get('driver_id')
     transaction_ids_json = request.POST.get('transaction_ids', '[]')
+    settlement_date_str = request.POST.get('settlement_date', '')
+
+    # Parse settlement date or fall back to today
+    from datetime import date as date_type, datetime as datetime_type
+    try:
+        settlement_date = date_type.fromisoformat(settlement_date_str) if settlement_date_str else timezone.now().date()
+    except ValueError:
+        settlement_date = timezone.now().date()
 
     try:
         transaction_ids = json.loads(transaction_ids_json)
@@ -8754,71 +9053,135 @@ def bulk_settle_transactions(request):
     from django.db.models import F
     from django.db.models.functions import Greatest
 
-    # Pre-calculate amounts before entering atomic block (transactions queryset will be re-evaluated)
-    transaction_list = list(transactions)
+    # Pre-calculate amounts before entering atomic block
+    transaction_list = list(transactions.select_related('delivery_task'))
     earnings_settled = sum(
         (txn.amount for txn in transaction_list if txn.transaction_type == 'earning'),
         Decimal('0.00')
     )
-    cod_settled = sum(
-        (abs(txn.amount) for txn in transaction_list if txn.transaction_type == 'cod_collection'),
-        Decimal('0.00')
-    )
+    cod_txns = [txn for txn in transaction_list if txn.transaction_type == 'cod_collection']
+    cod_settled = sum((abs(txn.amount) for txn in cod_txns), Decimal('0.00'))
+
+    # Get delivery task IDs and dominant payment method from COD transactions
+    cod_delivery_ids = [txn.delivery_task_id for txn in cod_txns if txn.delivery_task_id]
+    cod_payment_method = 'cash'
+    if cod_txns:
+        method_totals = {}
+        for txn in cod_txns:
+            m = txn.payment_method or 'cash'
+            method_totals[m] = method_totals.get(m, Decimal('0')) + abs(txn.amount)
+        cod_payment_method = max(method_totals, key=method_totals.get)
 
     with db_transaction.atomic():
-        # Create a settlement record
-        settlement_code = f"STL-{timezone.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
-
-        # Check if transactions still exist (might have been settled by another request)
         first_txn = transactions.order_by('created_at').first()
         if not first_txn:
             messages.warning(request, 'Transactions were already settled by another request')
             return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
 
+        settlement_code = f"STL-{timezone.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
+
         settlement = fleet_models.DriverSettlement.objects.create(
             driver=driver,
             settlement_code=settlement_code,
             period_start=first_txn.created_at.date(),
-            period_end=timezone.now().date(),
-            total_deliveries=transactions.filter(transaction_type='earning').count(),
+            period_end=settlement_date,
+            total_deliveries=len([t for t in transaction_list if t.transaction_type == 'earning']),
             gross_earnings=total_amount,
             net_amount=total_amount,
             created_by=request.user,
             status='paid',
-            paid_at=timezone.now(),
+            paid_at=timezone.make_aware(datetime_type(settlement_date.year, settlement_date.month, settlement_date.day)),
         )
 
-        # Link transactions to settlement
+        # Link original transactions to settlement record
         transactions.update(settlement=settlement)
 
-        # Update driver balances atomically using F() to prevent race conditions
+        # Create a CODD transaction for the COD portion (visible in transactions list)
+        if cod_settled > 0:
+            from django.db.models import Max
+            payment_method_display = {'cash': 'Cash', 'bank': 'Bank Transfer', 'atm': 'ATM', 'fawran': 'Fawran', 'pos': 'POS'}.get(cod_payment_method, 'Cash')
+
+            # Generate transaction code using settlement_date (not today)
+            date_str = settlement_date.strftime('%Y%m%d')
+            code_pattern = f"CODD-{date_str}-"
+            last_code = fleet_models.DriverTransaction.objects.filter(
+                transaction_code__startswith=code_pattern
+            ).aggregate(max_code=Max('transaction_code'))['max_code']
+            seq = 1
+            if last_code:
+                try:
+                    seq = int(last_code.split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            codd_code = f"{code_pattern}{seq:04d}"
+
+            codd_txn = fleet_models.DriverTransaction.objects.create(
+                driver=driver,
+                transaction_type='cod_deposit',
+                transaction_code=codd_code,
+                amount=cod_settled,
+                description=f"COD deposit to admin - {cod_settled} QR via {payment_method_display}",
+                payment_method=cod_payment_method,
+                reference_number=settlement_code,
+                created_by=request.user,
+            )
+            # Set created_at to the chosen settlement date (auto_now_add prevents direct assignment)
+            settlement_datetime = timezone.make_aware(datetime_type(settlement_date.year, settlement_date.month, settlement_date.day))
+            fleet_models.DriverTransaction.objects.filter(pk=codd_txn.pk).update(created_at=settlement_datetime)
+
+            # Update driver wallet_balance (cod_deposit: wallet += amount)
+            fleet_models.Driver.objects.filter(driver_id=driver_id).update(
+                wallet_balance=F('wallet_balance') + cod_settled,
+                cod_in_hand=Greatest(F('cod_in_hand') - cod_settled, Decimal('0.00'))
+            )
+
+            # Mark delivery tasks as cod_settled
+            if cod_delivery_ids:
+                from delivery.models import DeliveryTask
+                DeliveryTask.objects.filter(id__in=cod_delivery_ids).update(
+                    cod_settled=True,
+                    cod_settled_at=settlement_datetime,
+                    cod_submission_txn=codd_txn,
+                )
+
+        # Update earnings balance and last_settlement_date
         if earnings_settled > 0:
-            # Use Greatest to ensure we don't go below zero
             fleet_models.Driver.objects.filter(driver_id=driver_id).update(
                 pending_earnings=Greatest(
                     F('pending_earnings') - earnings_settled,
                     Decimal('0.00')
                 )
             )
-        if cod_settled > 0:
-            fleet_models.Driver.objects.filter(driver_id=driver_id).update(
-                cod_in_hand=Greatest(
-                    F('cod_in_hand') - cod_settled,
-                    Decimal('0.00')
-                )
-            )
-
-        # Update last_settlement_date
         fleet_models.Driver.objects.filter(driver_id=driver_id).update(
             last_settlement_date=timezone.now()
         )
 
     messages.success(
         request,
-        f'Successfully settled {transactions.count()} transactions for QAR {total_amount:.2f}. '
+        f'Successfully settled {len(transaction_list)} transactions for QAR {total_amount:.2f}. '
         f'Settlement code: {settlement_code}'
     )
     return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def recalculate_cod_balances(request):
+    from fleet.wallet_service import WalletService
+    from django.core.cache import cache
+    try:
+        data = json.loads(request.body)
+        driver_id = data.get('driver_id')
+        driver = fleet_models.Driver.objects.get(driver_id=driver_id)
+        updated = WalletService.recalculate_cod_balances(driver)
+        # Clear cache so next page load doesn't skip recalc
+        cache.delete(f"cod_bal_recalc_{driver_id}_{timezone.now().date()}")
+        return JsonResponse({'success': True, 'updated': updated})
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 
 # ==========================================
@@ -9237,7 +9600,7 @@ def driver_documents_list(request):
     documents = documents.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, documents, items_per_page=20)
+    page_obj = paginate_queryset(request, documents, items_per_page=25)
 
     context = {
         'page_title': 'Driver ID Documents',
@@ -9336,7 +9699,7 @@ def vehicle_documents_list(request):
     vehicles = vehicles.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, vehicles, items_per_page=20)
+    page_obj = paginate_queryset(request, vehicles, items_per_page=25)
 
     context = {
         'page_title': 'Vehicle Documents',
@@ -9415,7 +9778,7 @@ def store_documents_list(request):
     businesses = businesses.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'Store Documents',
@@ -9533,7 +9896,7 @@ def business_licenses_list(request):
     businesses = businesses.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'Business Licenses',
@@ -10283,7 +10646,7 @@ def sellers_list(request):
     inactive_sellers = stats['inactive']
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'All Sellers',
@@ -10324,7 +10687,7 @@ def sellers_pending(request):
         )
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'Pending Sellers',
@@ -10363,7 +10726,7 @@ def sellers_active(request):
         )
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'Active Sellers',
@@ -10398,7 +10761,7 @@ def sellers_inactive(request):
         )
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+    page_obj = paginate_queryset(request, businesses, items_per_page=25)
 
     context = {
         'page_title': 'Inactive Sellers',
@@ -10969,7 +11332,7 @@ def drivers_list(request):
         drivers = drivers.filter(driver_status=status_filter)
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+    page_obj = paginate_queryset(request, drivers, items_per_page=25)
 
     # Get counts for stats
     total_count = fleet_models.Driver.objects.count()
@@ -11017,7 +11380,7 @@ def drivers_pending(request):
         )
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+    page_obj = paginate_queryset(request, drivers, items_per_page=25)
 
     context = {
         'page_title': 'Pending Drivers',
@@ -11055,7 +11418,7 @@ def drivers_active(request):
         )
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+    page_obj = paginate_queryset(request, drivers, items_per_page=25)
 
     context = {
         'page_title': 'Active Drivers',
@@ -11093,7 +11456,7 @@ def drivers_inactive(request):
         )
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+    page_obj = paginate_queryset(request, drivers, items_per_page=25)
 
     context = {
         'page_title': 'Inactive Drivers',
@@ -12700,7 +13063,7 @@ def pricing_inquiries_list(request):
         Q(is_required_fulfillment_service_for_make_hub_in_doha=True)
     ).count()
 
-    page_obj = paginate_queryset(request, inquiries, items_per_page=20)
+    page_obj = paginate_queryset(request, inquiries, items_per_page=25)
 
     context = {
         'page_title': 'Pricing Inquiries',
@@ -12732,7 +13095,7 @@ def whatsapp_inquiries_list(request):
         )
 
     total_count = webpages_models.WhatsAppInquiry.objects.count()
-    page_obj = paginate_queryset(request, inquiries, items_per_page=20)
+    page_obj = paginate_queryset(request, inquiries, items_per_page=25)
 
     context = {
         'page_title': 'WhatsApp Inquiries',
@@ -16300,6 +16663,170 @@ def whatsapp_instances_list(request):
         'instances': instances,
     })
 
+
+@login_required(login_url='/accounts/login/')
+def whatsapp_last_message(request):
+    """Fetch the last message from a WhatsApp number via Evolution API."""
+    import json
+    import requests
+    from django.http import JsonResponse
+    from django.conf import settings
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST only'})
+
+    try:
+        data = json.loads(request.body)
+        phone_number = data.get('phone_number', '').strip()
+
+        if not phone_number:
+            return JsonResponse({'success': False, 'error': 'Phone number required'})
+
+        # Get Evolution API config
+        evolution_url = getattr(settings, 'EVALUATION_URL', '')
+        evolution_api_key = getattr(settings, 'EVALUATION_API_KEY', '')
+        evolution_instance = getattr(settings, 'EVALUATION_INSTANCE', '')
+
+        if not all([evolution_url, evolution_api_key, evolution_instance]):
+            return JsonResponse({'success': False, 'error': 'Evolution API not configured'})
+
+        # Clean phone number
+        clean_phone = phone_number.replace('+', '').replace(' ', '').replace('-', '')
+
+        # Call Evolution API to fetch messages
+        api_endpoint = f"{evolution_url}/chat/findMessages/{evolution_instance}"
+        headers = {
+            'apikey': evolution_api_key,
+            'Content-Type': 'application/json'
+        }
+        payload = {'number': clean_phone}
+
+        response = requests.post(api_endpoint, headers=headers, json=payload, timeout=10)
+
+        if response.status_code == 200:
+            chat_data = response.json()
+            messages = chat_data.get('messages', {}).get('records', [])
+
+            if messages:
+                # Get the most recent message (first in the list)
+                last_msg = messages[0]
+                msg_text = last_msg.get('message', {}).get('conversation', '[Media]')
+                timestamp = last_msg.get('messageTimestamp', 0)
+                from_me = last_msg.get('key', {}).get('fromMe', False)
+
+                # Convert timestamp
+                from datetime import datetime
+                msg_date = datetime.fromtimestamp(timestamp).strftime('%d %b, %H:%M')
+
+                return JsonResponse({
+                    'success': True,
+                    'message': msg_text[:100] + ('...' if len(msg_text) > 100 else ''),
+                    'full_message': msg_text,
+                    'timestamp': msg_date,
+                    'from_me': from_me,
+                    'sender': 'Ezzy' if from_me else 'Customer'
+                })
+            else:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'No messages found',
+                    'timestamp': '',
+                    'sender': 'N/A'
+                })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'API returned {response.status_code}'
+            })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@login_required(login_url='/accounts/login/')
+def whatsapp_get_instances(request):
+    """Get available WhatsApp instances."""
+    from django.http import JsonResponse
+
+    try:
+        instances = core_models.WhatsAppInstance.objects.filter(is_active=True).values_list('instance_name', 'label', 'phone_number')
+        instance_list = [
+            {'name': inst[0], 'label': inst[1], 'phone': inst[2]}
+            for inst in instances
+        ]
+        return JsonResponse({
+            'success': True,
+            'instances': instance_list
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@login_required(login_url='/accounts/login/')
+def whatsapp_send_message(request):
+    """Send a WhatsApp message via Evolution API."""
+    import json
+    import requests
+    from django.http import JsonResponse
+    from django.conf import settings
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST only'})
+
+    try:
+        data = json.loads(request.body)
+        phone_number = data.get('phone_number', '').strip()
+        message = data.get('message', '').strip()
+        instance_name = data.get('instance_name', '').strip()
+
+        if not all([phone_number, message, instance_name]):
+            return JsonResponse({'success': False, 'error': 'Phone, message, and instance required'})
+
+        # Get Evolution API config
+        evolution_url = getattr(settings, 'EVALUATION_URL', '')
+        evolution_api_key = getattr(settings, 'EVALUATION_API_KEY', '')
+
+        if not all([evolution_url, evolution_api_key]):
+            return JsonResponse({'success': False, 'error': 'Evolution API not configured'})
+
+        # Clean phone number
+        clean_phone = phone_number.replace('+', '').replace(' ', '').replace('-', '')
+
+        # Call Evolution API to send message
+        api_endpoint = f"{evolution_url}/message/sendText/{instance_name}"
+        headers = {
+            'apikey': evolution_api_key,
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            'number': clean_phone,
+            'text': message
+        }
+
+        response = requests.post(api_endpoint, headers=headers, json=payload, timeout=10)
+
+        if response.status_code in [200, 201]:
+            return JsonResponse({
+                'success': True,
+                'message': 'Message sent successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'API returned {response.status_code}: {response.text[:100]}'
+            })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 # =============================================================================
 # WEBHOOK IMPORTS

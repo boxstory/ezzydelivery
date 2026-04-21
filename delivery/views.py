@@ -532,6 +532,96 @@ def start_ride(request):
 
 
 @login_required(login_url='account_login')
+@transaction.atomic
+def retry_delivery_task(request, task_id):
+    """Retry a failed delivery task - reset status from failed to accepted"""
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST request required"})
+
+    try:
+        # Verify user is staff or admin (IDOR check)
+        if not (request.user.is_staff or request.user.is_superuser):
+            logger.warning(f"Non-staff user {request.user.id} attempted task retry")
+            error_msg = "Permission denied"
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({"success": False, "error": error_msg})
+            messages.error(request, error_msg)
+            return redirect(request.META.get('HTTP_REFERER', '/workforce/'))
+
+        task = DeliveryTask.objects.select_for_update().get(id=task_id)
+
+        # Check task is in failed status
+        if task.dl_task_status != 'failed':
+            error_msg = f"Task is not in failed status (current: {task.dl_task_status})"
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({"success": False, "error": error_msg})
+            messages.error(request, error_msg)
+            return redirect(request.META.get('HTTP_REFERER', '/workforce/'))
+
+        # Check retry limit (max 3 attempts)
+        if task.failed_attempt_count >= 3:
+            error_msg = f"Max retries reached (attempted {task.failed_attempt_count} times)"
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({"success": False, "error": error_msg})
+            messages.error(request, error_msg)
+            return redirect(request.META.get('HTTP_REFERER', '/workforce/'))
+
+        # Verify task has an assigned driver
+        if not task.driver:
+            error_msg = "Task has no assigned driver"
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({"success": False, "error": error_msg})
+            messages.error(request, error_msg)
+            return redirect(request.META.get('HTTP_REFERER', '/workforce/'))
+
+        # Reset task to accepted status (same driver, same task)
+        task.dl_task_status = 'accepted'
+        task.completed_at = None
+        task.failure_reason = ''
+        task.failure_notes = ''
+        task.reschedule_date = None
+        task._status_actor = 'staff'  # state machine: failed → accepted allowed for staff
+        task._status_changed_by = request.user
+        task.save(update_fields=[
+            'dl_task_status', 'completed_at', 'failure_reason',
+            'failure_notes', 'reschedule_date'
+        ])
+        logger.info(f"Task {task_id} retried by staff {request.user.id}. "
+                   f"Attempt count: {task.failed_attempt_count + 1}/3")
+
+        # Calculate retries remaining
+        retries_left = 3 - task.failed_attempt_count
+        success_msg = f"Task {task.dl_task_number} retried successfully. {retries_left} attempts remaining."
+
+        # Return JSON for AJAX requests, redirect for form submissions
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                "success": True,
+                "new_status": 'accepted',
+                "attempts_left": retries_left,
+                "message": success_msg
+            })
+
+        messages.success(request, success_msg)
+        return redirect(request.META.get('HTTP_REFERER', '/workforce/'))
+
+    except DeliveryTask.DoesNotExist:
+        error_msg = "Task not found"
+        logger.warning(f"Task {task_id} not found for retry")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({"success": False, "error": error_msg})
+        messages.error(request, error_msg)
+        return redirect(request.META.get('HTTP_REFERER', '/workforce/'))
+    except Exception as e:
+        error_msg = "Error retrying task"
+        logger.error(f"Error retrying task {task_id}: {e}", exc_info=True)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({"success": False, "error": str(e)})
+        messages.error(request, error_msg)
+        return redirect(request.META.get('HTTP_REFERER', '/workforce/'))
+
+
+@login_required(login_url='account_login')
 def task_navigation(request, task_id):
     """Show navigation map for delivery task"""
     try:

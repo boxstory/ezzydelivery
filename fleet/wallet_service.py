@@ -85,6 +85,40 @@ class WalletService:
 
                 driver.save()
 
+            # Calculate COD breakdown by payment method (running balance up to this point)
+            cod_cash_after = Decimal('0')
+            cod_pos_after = Decimal('0')
+            cod_fawran_after = Decimal('0')
+            cod_bank_after = Decimal('0')
+            cod_atm_after = Decimal('0')
+
+            if driver and transaction_type in ('cod_collection', 'cod_deposit', 'cod_driver_settle'):
+                # Get all COD collected up to now (delivered but not yet settled)
+                settled_task_ids = DriverTransaction.objects.filter(
+                    driver=driver,
+                    transaction_type__in=['cod_driver_settle', 'cod_deposit'],
+                    delivery_task_id__isnull=False,
+                    created_at__lte=timezone.now()
+                ).values_list('delivery_task_id', flat=True)
+
+                cod_collected = DeliveryTask.objects.filter(
+                    driver=driver,
+                    cod_collected=True,
+                    dl_task_status='delivered',
+                    completed_at__isnull=False
+                ).exclude(id__in=settled_task_ids)
+
+                cod_cash_after = cod_collected.filter(payment_method='cash').aggregate(
+                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
+                cod_pos_after = cod_collected.filter(payment_method='pos').aggregate(
+                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
+                cod_fawran_after = cod_collected.filter(payment_method='fawran').aggregate(
+                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
+                cod_bank_after = cod_collected.filter(payment_method='bank').aggregate(
+                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
+                cod_atm_after = cod_collected.filter(payment_method='atm').aggregate(
+                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
+
             # Create transaction record
             trans = DriverTransaction.objects.create(
                 driver=driver,
@@ -98,6 +132,11 @@ class WalletService:
                 wallet_balance_after=driver.wallet_balance if driver else Decimal('0'),
                 cod_in_hand_after=driver.cod_in_hand if driver else Decimal('0'),
                 pending_earnings_after=driver.pending_earnings if driver else Decimal('0'),
+                cod_cash_after=cod_cash_after,
+                cod_pos_after=cod_pos_after,
+                cod_fawran_after=cod_fawran_after,
+                cod_bank_after=cod_bank_after,
+                cod_atm_after=cod_atm_after,
                 created_by=created_by,
                 notes=notes,
                 payment_method=payment_method
@@ -264,6 +303,69 @@ class WalletService:
                 )
 
         return trans
+
+    @staticmethod
+    def recalculate_cod_balances(driver):
+        """
+        Recalculate cod_cash_after, cod_fawran_after, cod_pos_after for all COD
+        transactions in chronological order. Saves any changed values back to DB.
+        Called on each fleet_transactions page load to keep balances accurate.
+        """
+        txns = list(
+            DriverTransaction.objects.filter(
+                driver=driver,
+                transaction_type__in=['cod_collection', 'cod_deposit', 'cod_driver_settle']
+            ).select_related('delivery_task').order_by('created_at')
+        )
+
+        running_cash = Decimal('0')
+        running_fawran = Decimal('0')
+        running_pos = Decimal('0')
+        to_update = []
+
+        for t in txns:
+            if t.transaction_type in ['cod_deposit', 'cod_driver_settle']:
+                running_cash = Decimal('0')
+                running_fawran = Decimal('0')
+                running_pos = Decimal('0')
+                # After a deposit the running balance should be 0
+                if t.cod_cash_after != 0 or t.cod_fawran_after != 0 or t.cod_pos_after != 0:
+                    t.cod_cash_after = Decimal('0')
+                    t.cod_fawran_after = Decimal('0')
+                    t.cod_pos_after = Decimal('0')
+                    to_update.append(t)
+                continue
+
+            method = (
+                (t.delivery_task.payment_method if t.delivery_task else None)
+                or t.payment_method
+                or 'cash'
+            )
+            amt = abs(t.amount)
+
+            if method == 'cash':
+                running_cash += amt
+            elif method == 'fawran':
+                running_fawran += amt
+            elif method in ['pos', 'card']:
+                running_pos += amt
+            else:
+                running_cash += amt
+
+            if (t.cod_cash_after != running_cash
+                    or t.cod_fawran_after != running_fawran
+                    or t.cod_pos_after != running_pos):
+                t.cod_cash_after = running_cash
+                t.cod_fawran_after = running_fawran
+                t.cod_pos_after = running_pos
+                to_update.append(t)
+
+        if to_update:
+            DriverTransaction.objects.bulk_update(
+                to_update, ['cod_cash_after', 'cod_fawran_after', 'cod_pos_after']
+            )
+
+        return len(to_update)
 
     @staticmethod
     def settle_cod_with_client(business, amount, delivery_task_ids=None,

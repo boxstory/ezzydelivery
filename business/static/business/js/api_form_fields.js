@@ -1,7 +1,7 @@
 // Show/hide API form fields based on selected platform type
 (function () {
     // Fields grouped by platform with auto-fill URLs
-    const FIELD_CONFIG = {
+    var FIELD_CONFIG = {
         google_sheet: {
             show: ['site_api_url'],
             labels: { site_api_url: 'Google Sheet URL' },
@@ -68,12 +68,12 @@
         },
     };
 
-    const ALL_FIELDS = ['api_key', 'api_secret', 'api_access_token', 'api_version',
+    var ALL_FIELDS = ['api_key', 'api_secret', 'api_access_token', 'api_version',
                         'site_api_url', 'order_api_endpoint', 'product_api_endpoint',
                         'site_contry', 'tiktok_shop_id', 'tiktok_shop_cipher', 'tiktok_refresh_token'];
 
     // Default labels from the form
-    const DEFAULT_LABELS = {
+    var DEFAULT_LABELS = {
         site_api_url: 'Site URL (with https://)',
     };
 
@@ -82,23 +82,23 @@
     }
 
     function getLabelEl(fieldName) {
-        const wrapper = getWrapper(fieldName);
+        var wrapper = getWrapper(fieldName);
         return wrapper ? wrapper.querySelector('label') : null;
     }
 
     function applyFieldVisibility(apiType) {
-        const config = FIELD_CONFIG[apiType] || FIELD_CONFIG['custom'];
-        const showFields = config.show || [];
-        const labelOverrides = config.labels || {};
-        const autofillValues = config.autofill || {};
+        var config = FIELD_CONFIG[apiType] || FIELD_CONFIG['custom'];
+        var showFields = config.show || [];
+        var labelOverrides = config.labels || {};
+        var autofillValues = config.autofill || {};
 
         ALL_FIELDS.forEach(function (field) {
-            const wrapper = getWrapper(field);
+            var wrapper = getWrapper(field);
             if (!wrapper) return;
-            if (showFields.includes(field)) {
+            if (showFields.indexOf(field) !== -1) {
                 wrapper.style.display = '';
                 // Restore/override label
-                const label = getLabelEl(field);
+                var label = getLabelEl(field);
                 if (label) {
                     label.textContent = labelOverrides[field] || DEFAULT_LABELS[field] || label.dataset.defaultLabel || label.textContent;
                     if (!label.dataset.defaultLabel) {
@@ -106,7 +106,7 @@
                     }
                 }
                 // Auto-fill known endpoints (only if empty)
-                const input = wrapper.querySelector('input');
+                var input = wrapper.querySelector('input');
                 if (input && autofillValues[field] && !input.value) {
                     input.value = autofillValues[field];
                 }
@@ -117,12 +117,12 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        const select = document.getElementById('api_type_select');
+        var select = document.getElementById('api_type_select');
         if (!select) return;
 
         // Store default labels
         ALL_FIELDS.forEach(function (field) {
-            const label = getLabelEl(field);
+            var label = getLabelEl(field);
             if (label && !label.dataset.defaultLabel) {
                 label.dataset.defaultLabel = label.textContent;
             }

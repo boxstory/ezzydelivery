@@ -4,6 +4,21 @@
 {% load custom_filters %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<style>
+.dl-table__action-btn--retry {
+    background-color: #fbbf24;
+    color: #78350f;
+    border: 1px solid #f59e0b;
+}
+.dl-table__action-btn--retry:hover {
+    background-color: #f59e0b;
+    color: #fff;
+}
+.dl-table__action-btn--retry:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
 {% endblock extra_css %}
 {% block content %}
 <!-- Page Header -->
@@ -269,6 +284,14 @@
                                 <a href="/workforce/delivery-task/{{ dl.id }}/" class="dl-table__action-btn dl-table__action-btn--view" title="View">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
+                                {% if dl.dl_task_status == 'failed' and dl.failed_attempt_count < 3 %}
+                                <button type="button" class="dl-table__action-btn dl-table__action-btn--retry wf-retry-btn"
+                                        data-task-id="{{ dl.id }}"
+                                        data-task-number="{{ dl.dl_task_number }}"
+                                        title="Retry delivery task">
+                                    <i class="fa-solid fa-rotate-right"></i>
+                                </button>
+                                {% endif %}
                                 <a href="https://wa.me/{{ dl.order.customer_phone|whatsapp_number }}?text=Hi%20{{ dl.order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ dl.order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ dl.order.order_number|urlencode }}%26key={{ dl.order|verify_key }}" target="_blank" class="dl-table__action-btn dl-table__action-btn--whatsapp" title="WhatsApp">
                                     <i class="fa-brands fa-whatsapp"></i>
                                 </a>
@@ -319,3 +342,70 @@
 <script src="{% static 'orders/js/orders_main.js' %}"></script>
 {% include "workforce/parts/components/_tasks_view_scripts.html" %}
 {% endblock content %}
+
+<!-- Retry handler - outside HTMX content block -->
+<script>
+console.log('✅ Retry handler loaded (outside HTMX block)');
+
+// CSRF helper
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Retry failed task handlers - event delegation
+(function() {
+    document.addEventListener('click', function(e) {
+        var retryBtn = e.target.closest('.wf-retry-btn');
+        if (!retryBtn) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        var taskId = retryBtn.dataset.taskId;
+        var taskNumber = retryBtn.dataset.taskNumber;
+
+        if (!confirm('Retry delivery task #' + taskNumber + '?')) return;
+
+        retryBtn.disabled = true;
+        var originalHTML = retryBtn.innerHTML;
+        retryBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var csrfInput = document.querySelector('[name="csrfmiddlewaretoken"]');
+        var csrfToken = (csrfInput && csrfInput.value) || (csrfMeta && csrfMeta.content) || getCookie('csrftoken');
+
+        fetch('/delivery/task/' + taskId + '/retry/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken || ''
+            }
+        }).then(function(r) {
+            return r.json();
+        }).then(function(data) {
+            if (data.success) {
+                alert('Task #' + taskNumber + ' retry successful!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+                retryBtn.disabled = false;
+                retryBtn.innerHTML = originalHTML;
+            }
+        }).catch(function(err) {
+            alert('Request failed');
+            retryBtn.disabled = false;
+            retryBtn.innerHTML = originalHTML;
+        });
+    });
+})();
+</script>

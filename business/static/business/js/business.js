@@ -4,11 +4,11 @@
    ============================================ */
 
 /* ==================== BUSINESS MAIN ==================== */
-window.addEventListener('DOMContentLoaded', event => {
+window.addEventListener('DOMContentLoaded', function(event) {
 
     // Navbar shrink function
     var navbarShrink = function () {
-        const navbarCollapsible = document.body.querySelector('#mainNav');
+        var navbarCollapsible = document.body.querySelector('#mainNav');
         if (!navbarCollapsible) {
             return;
         }
@@ -20,28 +20,28 @@ window.addEventListener('DOMContentLoaded', event => {
 
     };
 
-    // Shrink the navbar 
+    // Shrink the navbar
     navbarShrink();
 
     // Shrink the navbar when page is scrolled
     document.addEventListener('scroll', navbarShrink);
 
     // Activate Bootstrap scrollspy on the main nav element
-    const mainNav = document.body.querySelector('#mainNav');
+    var mainNav = document.body.querySelector('#mainNav');
     if (mainNav) {
         new bootstrap.ScrollSpy(document.body, {
             target: '#mainNav',
             rootMargin: '0px 0px -40%',
         });
-    };
+    }
 
     // Collapse responsive navbar when toggler is visible
-    const navbarToggler = document.body.querySelector('.navbar-toggler');
-    const responsiveNavItems = [].slice.call(
+    var navbarToggler = document.body.querySelector('.navbar-toggler');
+    var responsiveNavItems = [].slice.call(
         document.querySelectorAll('#navbarResponsive .nav-link')
     );
     responsiveNavItems.map(function (responsiveNavItem) {
-        responsiveNavItem.addEventListener('click', () => {
+        responsiveNavItem.addEventListener('click', function() {
             if (window.getComputedStyle(navbarToggler).display !== 'none') {
                 navbarToggler.click();
             }
@@ -58,11 +58,11 @@ window.addEventListener('DOMContentLoaded', event => {
 
 document.addEventListener('DOMContentLoaded', function() {
     // Get form elements
-    const phoneInput = document.querySelector('input[name="business_phone"]');
-    const whatsappInput = document.querySelector('input[name="business_whatsapp"]');
-    const facebookInput = document.querySelector('input[name="business_facebook_page"]');
-    const instagramInput = document.querySelector('input[name="business_instagram"]');
-    const form = document.querySelector('#core_business_register_form_main');
+    var phoneInput = document.querySelector('input[name="business_phone"]');
+    var whatsappInput = document.querySelector('input[name="business_whatsapp"]');
+    var facebookInput = document.querySelector('input[name="business_facebook_page"]');
+    var instagramInput = document.querySelector('input[name="business_instagram"]');
+    var form = document.querySelector('#core_business_register_form_main');
 
     /**
      * Validate phone/WhatsApp numbers - only digits allowed
@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function validatePhoneNumber(input) {
         if (!input) return;
 
-        const value = input.value.trim();
-        const errorDiv = getOrCreateErrorDiv(input);
+    var value = input.value.trim();
+    var errorDiv = getOrCreateErrorDiv(input);
 
         if (value === '') {
             clearError(input, errorDiv);
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Remove common separators for checking
-        const cleanedValue = value.replace(/[\s\-\(\)\+]/g, '');
+    var cleanedValue = value.replace(/[\s\-\(\)\+]/g, '');
 
         if (!/^\d+$/.test(cleanedValue)) {
             showError(input, errorDiv, 'Only numbers are allowed (0-9)');
@@ -96,8 +96,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateSocialMedia(input) {
         if (!input) return;
 
-        const value = input.value.trim();
-        const errorDiv = getOrCreateErrorDiv(input);
+    var value = input.value.trim();
+    var errorDiv = getOrCreateErrorDiv(input);
 
         if (value === '') {
             clearError(input, errorDiv);
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Get or create error div for input field
      */
     function getOrCreateErrorDiv(input) {
-        let errorDiv = input.parentElement.querySelector('.validation-feedback');
+        var errorDiv = input.parentElement.querySelector('.validation-feedback');
         if (!errorDiv) {
             errorDiv = document.createElement('div');
             errorDiv.className = 'validation-feedback';
@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form submit validation
     if (form) {
         form.addEventListener('submit', function(e) {
-            let isValid = true;
+            var isValid = true;
 
             // Validate all fields before submit
             if (phoneInput && !validatePhoneNumber(phoneInput)) {
@@ -233,16 +233,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
 
                 // Show error message at the top
-                const existingAlert = document.querySelector('.validation-alert');
+                var existingAlert = document.querySelector('.validation-alert');
                 if (existingAlert) {
                     existingAlert.remove();
                 }
 
-                const alertDiv = document.createElement('div');
+                var alertDiv = document.createElement('div');
                 alertDiv.className = 'validation-alert alert alert-danger';
                 alertDiv.style.marginBottom = '1rem';
                 // Use DOM methods instead of innerHTML for XSS safety
-                const icon = document.createElement('i');
+                var icon = document.createElement('i');
                 icon.className = 'fa-solid fa-exclamation-circle me-2';
                 icon.setAttribute('aria-hidden', 'true');
                 alertDiv.appendChild(icon);
@@ -251,13 +251,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 form.insertBefore(alertDiv, form.firstChild);
 
                 // Scroll to first error
-                const firstError = form.querySelector('.is-invalid');
+                var firstError = form.querySelector('.is-invalid');
                 if (firstError) {
                     firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
 
                 // Remove alert after 5 seconds
-                setTimeout(() => {
+                setTimeout(function() {
                     alertDiv.remove();
                 }, 5000);
             }

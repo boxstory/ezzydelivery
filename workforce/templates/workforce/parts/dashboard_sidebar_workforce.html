@@ -19,9 +19,9 @@
         <div id="workforce_sidebar_link_import" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-import" data-title="Import">
           <i class="fa-solid fa-file-import me-2"></i>
           <span>Import</span>
-          {% if temp_orders_sync_errors %}<span class="badge ms-1" style="background:#dc3545;color:#fff;padding:.2rem .4rem;font-size:0.55rem;"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
-          {% if temp_orders_count %}<span class="badge ms-1" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;">{{ temp_orders_count }}</span>{% endif %}
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
+          {% if temp_orders_sync_errors %}<span class="badge ms-auto me-2" style="background:#dc3545;color:#fff;padding:.25rem .4rem;font-size:0.55rem;line-height:1.2;" title="Sync errors: {{ temp_orders_sync_errors|length }} source(s) failed" data-badge="sync_errors_parent"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
+          <span class="badge ms-auto me-2" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders_parent">{{ temp_orders_count|default:"0" }}</span>
+          <i class="fa-solid fa-chevron-down"></i>
         </div>
         <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}show{% endif %}" id="submenu-import">
           <ul class="nav flex-column">
@@ -30,8 +30,8 @@
                  href="{% url 'workforce:temp_orders' %}">
                 <i class="fa-solid fa-inbox me-2"></i>
                 <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Temp Orders</span>
-                {% if temp_orders_sync_errors %}<span class="badge" style="flex:0 0 auto;background:#dc3545;color:#fff;padding:.2rem .4rem;font-size:0.55rem;line-height:1.2;" title="Sync errors: {{ temp_orders_sync_errors|length }} source(s) failed" data-badge="sync_errors"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
-                {% if temp_orders_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders">{{ temp_orders_count }}</span>{% endif %}
+                {% if temp_orders_sync_errors %}<span class="badge" style="flex:0 0 auto;background:#dc3545;color:#fff;padding:.25rem .4rem;font-size:0.55rem;line-height:1.2;" title="Sync errors: {{ temp_orders_sync_errors|length }} source(s) failed" data-badge="sync_errors"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
+                <span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders">{{ temp_orders_count|default:"0" }}</span>
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'temp_orders_by_date' %}active{% endif %}">
@@ -106,7 +106,8 @@
         <div id="workforce_sidebar_link_orders" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-orders" data-title="Orders">
           <i class="fa-solid fa-box me-2"></i>
           <span>Orders</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
+          <span class="badge ms-auto me-2" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="pending_publish_parent">{{ pending_publish_count|default:"0" }}</span>
+          <i class="fa-solid fa-chevron-down"></i>
         </div>
         <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,order_detail,order_edit,orders_pending_verification' %}show{% endif %}" id="submenu-orders">
           <ul class="nav flex-column">
@@ -326,8 +327,15 @@
             <li class="nav-item {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}">
               <a id="workforce_sidebar_link_finance_transactions" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}"
                  href="{% url 'workforce:fleet_transactions' %}">
-                <i class="fa-solid fa-clock-rotate-left me-2"></i>
-                Recent Transactions
+                <i class="fa-solid fa-motorcycle me-2"></i>
+                Driver Transactions
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'seller_transactions' %}active{% endif %}">
+              <a id="workforce_sidebar_link_seller_transactions" class="nav-link btn {% if request.resolver_match.url_name == 'seller_transactions' %}active{% endif %}"
+                 href="{% url 'workforce:seller_transactions' %}">
+                <i class="fa-solid fa-store me-2"></i>
+                Seller Transactions
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'cod_settlement_report' %}active{% endif %}">
@@ -886,6 +894,8 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/sellers\/\d+/,                      menu: 'submenu-sellers',      link: 'workforce_sidebar_link_all_sellers'},
         {re: /^\/workforce\/sellers\//,                         menu: 'submenu-sellers',      link: null},
         {re: /^\/workforce\/finance\//,                         menu: 'submenu-finance',      link: 'workforce_sidebar_link_finance_overview'},
+        {re: /^\/workforce\/seller-transactions\//,             menu: 'submenu-finance',      link: 'workforce_sidebar_link_seller_transactions'},
+        {re: /^\/workforce\/fleet\/transactions\//,             menu: 'submenu-finance',      link: 'workforce_sidebar_link_finance_transactions'},
         {re: /^\/workforce\/suppliers\//,                       menu: 'submenu-fulfillment',  link: 'workforce_sidebar_link_suppliers'},
         {re: /^\/workforce\/purchase-orders\//,                 menu: 'submenu-fulfillment',  link: 'workforce_sidebar_link_purchase_orders'},
         {re: /^\/workforce\/warehouses\//,                      menu: 'submenu-fulfillment',  link: 'workforce_sidebar_link_warehouses_list'},

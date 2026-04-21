@@ -514,6 +514,14 @@ def cod_collection(request):
         cod_in_hand_total = cod_in_hand_list.aggregate(total=Sum('cod_collected_amount'))['total'] or 0
         cod_in_hand_count = cod_in_hand_list.count()
 
+        # Breakdown of unsettled COD in hand by payment method
+        payment_method_breakdown = (
+            cod_in_hand_qs
+            .values('payment_method')
+            .annotate(total=Sum('cod_collected_amount'))
+            .order_by('-total')
+        )
+
         # All-time unsettled COD total (unaffected by date filter) for hero card
         all_time_cod_total = delivery_models.DeliveryTask.objects.filter(
             driver=driver, cod_collected=True, cod_settled=False, dl_task_status='delivered'
@@ -544,6 +552,7 @@ def cod_collection(request):
             'cod_orders': cod_orders,
             'total_cod_in_hand': all_time_cod_total,
             'total_orders': cod_in_hand_count,
+            'payment_method_breakdown': payment_method_breakdown,
             'filter_days': filter_days,
             'days_range': filter_days if filter_days != 'all' else 'All',
             'sort_by': sort_by,

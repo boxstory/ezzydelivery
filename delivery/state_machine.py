@@ -129,6 +129,10 @@ def can_transition(old_status, new_status, actor='driver'):
     if old_status == new_status:
         return True, ''
 
+    # Special case: allow failed → accepted for staff/admin (task retry)
+    if old_status == 'failed' and new_status == 'accepted' and actor in ('staff', 'admin'):
+        return True, ''
+
     if actor == 'admin':
         transitions = ADMIN_TRANSITIONS
     elif actor == 'staff':

@@ -3,6 +3,29 @@
 {% load static %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<style>
+.dl-table__action-btn--retry {
+    background-color: #fbbf24;
+    color: #78350f;
+    border: 1px solid #f59e0b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    transition: all 0.15s;
+}
+.dl-table__action-btn--retry:hover {
+    background-color: #f59e0b;
+    color: #fff;
+}
+.dl-table__action-btn--retry:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
 {% endblock extra_css %}
 {% block content %}
 <!-- Page Header -->
@@ -173,6 +196,7 @@
 <script src="{% static 'orders/js/orders_main.js' %}"></script>
 {% include "workforce/parts/components/_tasks_view_scripts.html" %}
 {% include "workforce/parts/components/_tasks_ai_scripts.html" %}
+<!-- Retry handler moved to main_dashboard_scripts.html to avoid duplicates and HTMX issues -->
 
 <script>
 // ---- PGF Filter Panel ----
@@ -230,7 +254,7 @@
         if (Object.keys(vals).length) {
             var collapse = document.getElementById('pgfCollapse');
             var bar = document.getElementById('pgfBarToggle');
-            if (collapse && !collapse.classList.contains('show')) {
+            if (collapse && !collapse.classList.contains('show') && typeof bootstrap !== 'undefined') {
                 var bsCollapse = new bootstrap.Collapse(collapse, {toggle: false});
                 bsCollapse.show();
                 if (bar) bar.setAttribute('aria-expanded', 'true');
@@ -264,9 +288,13 @@
     window.pgfClearAll = function() {
         window.location.href = '{{ request.path }}?per_page={{ per_page }}';
     };
-    document.getElementById('clearFilter')?.addEventListener('click', window.pgfClearAll);
-    document.getElementById('pgfClearBtn')?.addEventListener('click', window.pgfClearAll);
-    document.getElementById('clearFilterEmpty')?.addEventListener('click', window.pgfClearAll);
+    var el;
+    el = document.getElementById('clearFilter');
+    if (el) el.addEventListener('click', window.pgfClearAll);
+    el = document.getElementById('pgfClearBtn');
+    if (el) el.addEventListener('click', window.pgfClearAll);
+    el = document.getElementById('clearFilterEmpty');
+    if (el) el.addEventListener('click', window.pgfClearAll);
 
     // Chevron rotation via Bootstrap collapse events
     var pgfCollapse = document.getElementById('pgfCollapse');
@@ -284,4 +312,6 @@
     maybeOpenPanel();
 })();
 </script>
+
 {% endblock content %}
+

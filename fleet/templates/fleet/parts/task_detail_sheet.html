@@ -210,6 +210,25 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             <input type="file" id="tdProofInput" accept="image/*" capture="environment" style="display:none;" onchange="previewProof(this)">
         </div>
 
+        <!-- Payment Mode — always visible -->
+        <div class="td-form-group">
+            <label class="td-form-label"><i class="fa-solid fa-credit-card me-1"></i>Payment Mode</label>
+            <div class="td-payment-methods">
+                <label class="td-payment-radio">
+                    <input type="radio" name="tdPaymentMethod" value="cash" checked>
+                    <span class="td-payment-radio__label"><i class="fa-solid fa-money-bill"></i> Cash</span>
+                </label>
+                <label class="td-payment-radio">
+                    <input type="radio" name="tdPaymentMethod" value="pos">
+                    <span class="td-payment-radio__label"><i class="fa-solid fa-credit-card"></i> POS</span>
+                </label>
+                <label class="td-payment-radio">
+                    <input type="radio" name="tdPaymentMethod" value="fawran">
+                    <span class="td-payment-radio__label"><i class="fa-solid fa-mobile-screen"></i> Fawran</span>
+                </label>
+            </div>
+        </div>
+
         <!-- COD Toggle -->
         <div id="tdCodSection" class="td-form-group" style="display:none;">
             <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>COD Collection</label>
@@ -223,20 +242,26 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             <div id="tdCodAmountRow" style="display:none; margin-top:8px;">
                 <label class="td-form-label">Amount Collected (QR)</label>
                 <input type="number" id="tdCodAmount" class="td-form-input" placeholder="0.00" step="0.01" min="0">
-                <label class="td-form-label" style="margin-top:10px;">Payment Method</label>
-                <div class="td-payment-methods">
-                    <label class="td-payment-radio">
-                        <input type="radio" name="tdPaymentMethod" value="cash" checked>
-                        <span class="td-payment-radio__label"><i class="fa-solid fa-money-bill"></i> Cash</span>
-                    </label>
-                    <label class="td-payment-radio">
-                        <input type="radio" name="tdPaymentMethod" value="pos">
-                        <span class="td-payment-radio__label"><i class="fa-solid fa-credit-card"></i> POS</span>
-                    </label>
-                    <label class="td-payment-radio">
-                        <input type="radio" name="tdPaymentMethod" value="fawran">
-                        <span class="td-payment-radio__label"><i class="fa-solid fa-mobile-screen"></i> Fawran</span>
-                    </label>
+                <label class="td-form-label" style="margin-top:10px;">Payment Breakdown</label>
+                <div class="td-payment-split" style="display:flex;flex-direction:column;gap:8px;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <i class="fa-solid fa-money-bill" style="color:#059669;width:24px;"></i>
+                        <label style="flex:1;display:flex;align-items:center;gap:6px;">Cash</label>
+                        <input type="number" id="tdSplitCash" class="td-form-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()" style="width:80px;padding:4px 8px;height:auto;">
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <i class="fa-solid fa-credit-card" style="color:#2563eb;width:24px;"></i>
+                        <label style="flex:1;display:flex;align-items:center;gap:6px;">POS</label>
+                        <input type="number" id="tdSplitPos" class="td-form-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()" style="width:80px;padding:4px 8px;height:auto;">
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <i class="fa-solid fa-mobile-screen" style="color:#7c3aed;width:24px;"></i>
+                        <label style="flex:1;display:flex;align-items:center;gap:6px;">Fawran</label>
+                        <input type="number" id="tdSplitFawran" class="td-form-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()" style="width:80px;padding:4px 8px;height:auto;">
+                    </div>
+                    <div style="padding:6px 8px;background:var(--fleet-grey-50);border-radius:4px;font-size:0.8rem;border:1px solid var(--fleet-grey-200);">
+                        <strong>Remaining:</strong> <span id="tdRemaining" style="color:var(--fleet-primary);">0.00</span> QR
+                    </div>
                 </div>
             </div>
         </div>
@@ -822,6 +847,15 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         document.getElementById('tdCodAmountRow').style.display = 'none';
         document.getElementById('tdFailReason').value = '';
         document.querySelectorAll('.td-reason-btn').forEach(b => b.classList.remove('selected'));
+        // Pre-select payment method from task data
+        const pm = card.dataset.paymentMethod || 'cash';
+        const pmRadio = document.querySelector(`input[name="tdPaymentMethod"][value="${pm}"]`);
+        if (pmRadio) pmRadio.checked = true;
+        // Reset split payment inputs
+        document.getElementById('tdSplitCash').value = '';
+        document.getElementById('tdSplitPos').value = '';
+        document.getElementById('tdSplitFawran').value = '';
+        updateRemaining();
         // Set min date for postpone (tomorrow)
         const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
         document.getElementById('tdPostponeDate').min = tomorrow.toISOString().split('T')[0];
@@ -877,6 +911,30 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
 
     window.toggleCodAmount = function(chk) {
         document.getElementById('tdCodAmountRow').style.display = chk.checked ? '' : 'none';
+        if (chk.checked) {
+            // Pre-fill cash with full COD amount
+            const codAmt = parseFloat(document.getElementById('tdCodAmount').value) || 0;
+            document.getElementById('tdSplitCash').value = codAmt > 0 ? codAmt.toFixed(2) : '';
+            document.getElementById('tdSplitPos').value = '';
+            document.getElementById('tdSplitFawran').value = '';
+            updateRemaining();
+        }
+    };
+
+    window.updateRemaining = function() {
+        const codAmt = parseFloat(document.getElementById('tdCodAmount').value) || 0;
+        const cash = parseFloat(document.getElementById('tdSplitCash').value) || 0;
+        const pos = parseFloat(document.getElementById('tdSplitPos').value) || 0;
+        const fawran = parseFloat(document.getElementById('tdSplitFawran').value) || 0;
+        const remaining = codAmt - (cash + pos + fawran);
+        document.getElementById('tdRemaining').textContent = remaining.toFixed(2);
+        if (remaining < 0) {
+            document.getElementById('tdRemaining').style.color = 'var(--fleet-danger)';
+        } else if (remaining > 0.01) {
+            document.getElementById('tdRemaining').style.color = 'var(--fleet-warning)';
+        } else {
+            document.getElementById('tdRemaining').style.color = 'var(--fleet-success)';
+        }
     };
 
     window.submitDelivered = function() {
@@ -896,6 +954,19 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             return;
         }
 
+        // If COD collected, validate split payment totals match COD amount
+        if (codCollected) {
+            const codAmt = parseFloat(document.getElementById('tdCodAmount').value) || 0;
+            const cash = parseFloat(document.getElementById('tdSplitCash').value) || 0;
+            const pos = parseFloat(document.getElementById('tdSplitPos').value) || 0;
+            const fawran = parseFloat(document.getElementById('tdSplitFawran').value) || 0;
+            const total = cash + pos + fawran;
+            if (Math.abs(total - codAmt) > 0.01) {
+                showToast(`⚠️ Split payments (${total.toFixed(2)} QR) must equal COD amount (${codAmt.toFixed(2)} QR)`, 'error');
+                return;
+            }
+        }
+
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -907,9 +978,17 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         if (codCollected) {
             const amt = document.getElementById('tdCodAmount').value;
             if (amt) fd.append('cod_amount_collected', amt);
-            const payMethod = document.querySelector('input[name="tdPaymentMethod"]:checked');
-            if (payMethod) fd.append('payment_method', payMethod.value);
+            // Always send split payments if COD collected
+            const cash = parseFloat(document.getElementById('tdSplitCash').value) || 0;
+            const pos = parseFloat(document.getElementById('tdSplitPos').value) || 0;
+            const fawran = parseFloat(document.getElementById('tdSplitFawran').value) || 0;
+            if (cash > 0) fd.append('payment_split_cash', cash.toFixed(2));
+            if (pos > 0) fd.append('payment_split_pos', pos.toFixed(2));
+            if (fawran > 0) fd.append('payment_split_fawran', fawran.toFixed(2));
         }
+        // Always send payment mode (even for non-COD)
+        const payMethod = document.querySelector('input[name="tdPaymentMethod"]:checked');
+        if (payMethod) fd.append('payment_method', payMethod.value);
         fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf },

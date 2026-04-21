@@ -47,6 +47,10 @@ urlpatterns = [
     path("delivery_task/start_ride/",
          delivery_views.start_ride, name="start_ride"),
 
+    # Retry failed task
+    path("task/<int:task_id>/retry/",
+         delivery_views.retry_delivery_task, name="retry_task"),
+
     # Task navigation map
     path("task/<int:task_id>/navigation/",
          delivery_views.task_navigation, name="task_navigation"),

@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 {# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=202603281">
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=202604215">
 {% endblock extra_css %}
 
 {% block content %}
@@ -272,10 +272,14 @@
                     {% if task.order.order_items.exists %}
                     <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.65rem;">Product Items ({{ task.order.order_items.count }})</div>
                     {% for item in task.order.order_items.all %}
-                    <div class="d-flex align-items-start gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}">
-                        <span class="badge bg-light text-dark flex-shrink-0 mt-1">{{ item.quantity }}</span>
+                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}">
                         <span class="flex-grow-1" style="overflow-wrap:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35;">{{ item.display_name }}</span>
-                        {% if item.unit_price %}<span class="ms-auto text-muted small flex-shrink-0">{{ item.unit_price }} QR</span>{% endif %}
+                        <span class="badge bg-light text-dark flex-shrink-0">{{ item.quantity }}</span>
+                        {% if item.stock_status == 'in_stock' %}
+                            <span class="badge bg-success flex-shrink-0">In Stock</span>
+                        {% else %}
+                            <span class="badge bg-danger flex-shrink-0">Out of Stock</span>
+                        {% endif %}
                     </div>
                     {% endfor %}
                     {% endif %}
@@ -564,162 +568,65 @@
                 </div>
             </div>
 
-            <!-- Delivery Map -->
-            <div class="dtd__card">
+            <!-- WhatsApp Messaging -->
+            <div class="dtd__card dtd__whatsapp">
                 <div class="dtd__card__head">
-                    <div class="dtd__card__head-left">
-                        <i class="fa-solid fa-map-location-dot"></i>
-                        Delivery Location
-                    </div>
-                    <button type="button" class="btn btn-xs btn-outline-primary" style="font-size:0.65rem;padding:0.2rem 0.55rem;" data-bs-toggle="modal" data-bs-target="#locUpdateModal" title="Update Location">
-                        <i class="fa-solid fa-location-crosshairs me-1"></i>Update Location
-                    </button>
-                </div>
-                <div class="dtd__map">
-                    <div id="taskMap" class="dtd__map__inner"></div>
-                    <div id="mapLoading" class="dtd__map__loading">
-                        <span><i class="fa-solid fa-spinner fa-spin me-1"></i>Loading map...</span>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-brands fa-whatsapp dtd__whatsapp__icon"></i>
+                            <span class="dtd__whatsapp__title">WhatsApp</span>
+                        </div>
                     </div>
                 </div>
-                <div class="dtd__map__footer">
-                    <i class="fa-solid fa-location-dot text-danger"></i>
-                    {% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}
-                    {% if task.order.customer_address %}<span class="ms-1" style="color:var(--brand-grey-400);">{{ task.order.customer_address|truncatechars:50 }}</span>{% endif %}
-                    {% if task.pickup_location %}
-                    <br><i class="fa-solid fa-store text-primary"></i> Pickup: {{ task.pickup_location.pickup_location_title|default:"Seller Location" }}
-                    {% endif %}
-                </div>
-            </div>
 
-            <!-- Location Update Modal -->
-            <div class="modal fade" id="locUpdateModal" tabindex="-1" aria-labelledby="locUpdateModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-lg">
-                    <div class="modal-content lum__modal">
-
-                        <!-- Header -->
-                        <div class="lum__hdr">
-                            <div class="lum__hdr__icon">
-                                <i class="fa-solid fa-location-crosshairs"></i>
-                            </div>
-                            <div class="lum__hdr__info">
-                                <h6 class="lum__hdr__title" id="locUpdateModalLabel">Update Delivery Location</h6>
-                                <div class="lum__hdr__meta">
-                                    <code class="lum__hdr__code">{{ task.order.order_number }}</code>
-                                    <span class="lum__hdr__dot"></span>
-                                    {{ task.order.business.business_name }}
-                                </div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <!-- Row 1: From + To (Compact) -->
+                <div class="dtd__whatsapp__body">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;">
+                        <label class="dtd__whatsapp__compact-label" style="margin-bottom: 0; white-space: nowrap;">From</label>
+                        <div class="dtd__whatsapp__compact-value" id="whatsappInstanceDisplay" style="flex: 1;">6003432</div>
+                        <button type="button" class="dtd__whatsapp__edit-btn" onclick="toggleInstanceEdit()">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button type="button" class="dtd__whatsapp__pin-btn" id="whatsappPinBtn" onclick="submitInstanceSelection()" title="Submit instance selection">
+                            <i class="fa-solid fa-location-pin"></i>
+                        </button>
+                        <select id="whatsappInstanceSelect" class="dtd__whatsapp__compact-select" style="display:none;">
+                            <option value="">Select Instance</option>
+                            <option value="EzzyWhatspp">66451589</option>
+                            <option value="Ezzy-COS-60003432" selected>6003432</option>
+                        </select>
+                    </div>
+                    <div class="dtd__whatsapp__compact-row" style="margin-top: 0.5rem;">
+                        <div class="dtd__whatsapp__compact-col">
+                            <label class="dtd__whatsapp__compact-label">To</label>
+                            <div class="dtd__whatsapp__compact-value">{{ task.order.customer_phone }}</div>
                         </div>
+                    </div>
 
-                        <!-- Body -->
-                        <div class="modal-body lum__body">
-
-                            <!-- Address -->
-                            <div class="mb-3">
-                                <label class="lum__label" for="locModalAddress">
-                                    <i class="fa-solid fa-location-dot"></i> Address
-                                </label>
-                                <input type="text" class="form-control form-control-sm" id="locModalAddress"
-                                    value="{{ task.order.customer_address|default:'' }}"
-                                    placeholder="Customer delivery address">
-                            </div>
-
-                            <!-- Zone / Street / Building -->
-                            <div class="lum__qna-row mb-3">
-                                <div class="lum__qna-cell">
-                                    <label class="lum__label" for="locModalZone">
-                                        <i class="fa-solid fa-draw-polygon"></i> Zone
-                                    </label>
-                                    <input type="number" class="form-control form-control-sm lum__digit-input" id="locModalZone"
-                                        value="{{ task.order.dl_zone|default:'' }}" placeholder="e.g. 46">
-                                </div>
-                                <div class="lum__qna-cell">
-                                    <label class="lum__label" for="locModalStreet">
-                                        <i class="fa-solid fa-road"></i> Street
-                                    </label>
-                                    <input type="number" class="form-control form-control-sm lum__digit-input" id="locModalStreet"
-                                        value="{{ task.order.dl_street|default:'' }}" placeholder="e.g. 9">
-                                </div>
-                                <div class="lum__qna-cell">
-                                    <label class="lum__label" for="locModalBuilding">
-                                        <i class="fa-solid fa-building"></i> Building
-                                    </label>
-                                    <input type="number" class="form-control form-control-sm lum__digit-input" id="locModalBuilding"
-                                        value="{{ task.order.dl_building|default:'' }}" placeholder="e.g. 18">
-                                </div>
-                            </div>
-
-                            <!-- Map -->
-                            <div class="lum__map-wrap mb-3">
-                                <div class="lum__map-toolbar">
-                                    <span class="lum__map-toolbar__hint">
-                                        <i class="fa-solid fa-circle-info"></i>
-                                        Drag pin or click map to reposition
-                                    </span>
-                                    <button type="button" class="lum__gps-btn" onclick="locModalGeolocate()">
-                                        <i class="fa-solid fa-crosshairs"></i> My Location
-                                    </button>
-                                </div>
-                                <div id="locModalMap" class="lum__map"></div>
-                            </div>
-
-                            <!-- Coords + Accuracy -->
-                            <div class="lum__coords-row mb-3">
-                                <div class="lum__coord-field">
-                                    <label class="lum__label">
-                                        <i class="fa-solid fa-arrow-up-down"></i> Latitude
-                                    </label>
-                                    <input type="text" class="form-control form-control-sm lum__coord-input"
-                                        id="locModalLat" readonly placeholder="—">
-                                </div>
-                                <div class="lum__coord-field">
-                                    <label class="lum__label">
-                                        <i class="fa-solid fa-arrow-left-right"></i> Longitude
-                                    </label>
-                                    <input type="text" class="form-control form-control-sm lum__coord-input"
-                                        id="locModalLng" readonly placeholder="—">
-                                </div>
-                                <div class="lum__coord-field lum__coord-field--accuracy">
-                                    <label class="lum__label" for="locModalAccuracy">
-                                        <i class="fa-solid fa-satellite-dish"></i> Accuracy
-                                    </label>
-                                    <select class="form-select form-select-sm" id="locModalAccuracy">
-                                        <option value="exact">Exact</option>
-                                        <option value="street">Street</option>
-                                        <option value="landmark">Landmark</option>
-                                        <option value="zone_center">Zone Center</option>
-                                        <option value="ai_estimate">AI Estimate</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Paste Link / Plus Code -->
-                            <div class="lum__link-section">
-                                <label class="lum__label">
-                                    <i class="fa-solid fa-link"></i> Paste Google Maps URL or Plus Code
-                                </label>
-                                <div class="lum__link-wrap">
-                                    <i class="fa-solid fa-map-location-dot lum__link-ico"></i>
-                                    <input type="text" class="form-control form-control-sm lum__link-input"
-                                        id="locModalUrlInput" placeholder="maps.app.goo.gl/… or 8FM8+MJ Doha">
-                                </div>
-                                <div id="locModalUrlPreview" class="lum__link-preview"></div>
-                            </div>
-
-                        </div>
-
-                        <!-- Footer -->
-                        <div class="modal-footer lum__footer">
-                            <span id="locModalMsg" class="lum__footer__msg me-auto"></span>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
-                                Cancel
-                            </button>
-                            <button type="button" class="btn btn-sm lum__save-btn" id="locModalSaveBtn" onclick="saveLocationUpdate()">
-                                <i class="fa-solid fa-check me-1"></i> Save Location
+                    <!-- Row 2: Last Message -->
+                    <div class="dtd__whatsapp__row dtd__whatsapp__row--message">
+                        <div class="dtd__whatsapp__msg-header">
+                            <label class="dtd__whatsapp__label">Last Message</label>
+                            <button type="button" class="dtd__whatsapp__refresh-btn" onclick="loadLastWhatsAppMessage('{{ task.order.customer_phone|escapejs }}')" title="Refresh">
+                                <i class="fa-solid fa-arrows-rotate"></i>
                             </button>
                         </div>
+                        <div id="lastMessageContainer" class="dtd__whatsapp__message-display">
+                            <div id="lastMessageLoading" class="dtd__whatsapp__message-loading">Loading...</div>
+                            <div id="lastMessageContent" style="display:none;">
+                                <div class="dtd__whatsapp__message-text" id="lastMessageText"></div>
+                                <div class="dtd__whatsapp__message-meta" id="lastMessageMeta"></div>
+                            </div>
+                            <div id="lastMessageError" style="display:none;" class="dtd__whatsapp__message-error"></div>
+                        </div>
+                    </div>
 
+                    <!-- Row 3: Message Input + Send -->
+                    <div class="dtd__whatsapp__row dtd__whatsapp__row--input">
+                        <input type="text" id="whatsappMessageInput" class="dtd__whatsapp__input" placeholder="Type a message...">
+                        <button type="button" id="whatsappSendBtn" class="dtd__whatsapp__send-btn" onclick="sendWhatsAppMessage('{{ task.order.customer_phone|escapejs }}')">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1002,6 +909,64 @@
         return null;
     }
     const csrftoken = getCSRFToken();
+
+    function toggleInstanceEdit() {
+        const display = document.getElementById('whatsappInstanceDisplay');
+        const select = document.getElementById('whatsappInstanceSelect');
+        const isEditing = select.style.display !== 'none';
+
+        if (isEditing) {
+            const selectedOption = select.options[select.selectedIndex];
+            display.textContent = selectedOption.text;
+            select.style.display = 'none';
+            display.parentElement.style.display = 'flex';
+        } else {
+            select.style.display = 'block';
+            display.parentElement.style.display = 'none';
+        }
+    }
+
+    function submitInstanceSelection() {
+        const select = document.getElementById('whatsappInstanceSelect');
+        const pinBtn = document.getElementById('whatsappPinBtn');
+        const selectedValue = select.value;
+
+        if (!selectedValue) {
+            alert('Please select an instance first');
+            return;
+        }
+
+        pinBtn.disabled = true;
+        pinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        fetch(`/workforce/delivery-task/{{ task.id }}/update-whatsapp-instance/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ instance: selectedValue })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pinBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i>';
+                pinBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                setTimeout(() => {
+                    pinBtn.innerHTML = '<i class="fa-solid fa-location-pin"></i>';
+                    pinBtn.style.background = '';
+                    pinBtn.disabled = false;
+                }, 2000);
+            } else {
+                pinBtn.disabled = false;
+                pinBtn.innerHTML = '<i class="fa-solid fa-location-pin"></i>';
+                alert('Error: ' + (data.error || 'Failed to update instance'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            pinBtn.disabled = false;
+            pinBtn.innerHTML = '<i class="fa-solid fa-location-pin"></i>';
+            alert('Request failed: ' + error);
+        });
+    }
 
     function publishToFleets(taskId) {
         if (confirm('Publish this task to Fleet drivers?')) {
@@ -1328,220 +1293,6 @@
     }
 
     setTimeout(function() { map.invalidateSize(); }, 300);
-})();
-</script>
-
-<!-- Location Update Modal JS -->
-<script>
-(function() {
-    var locMap = null, locMarker = null;
-    var orderId = {{ task.order.id }};
-    var initLat = {% if task.order.latitude %}{{ task.order.latitude }}{% elif task.dl_address_update.dl_latitude %}{{ task.dl_address_update.dl_latitude }}{% else %}25.2854{% endif %};
-    var initLng = {% if task.order.longitude %}{{ task.order.longitude }}{% elif task.dl_address_update.dl_longitude %}{{ task.dl_address_update.dl_longitude }}{% else %}51.5310{% endif %};
-    var hasCoords = {% if task.order.latitude or task.dl_address_update.dl_latitude %}true{% else %}false{% endif %};
-
-    var pinIcon = L.divIcon({
-        className: '',
-        html: '<div style="background:#dc2626;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);cursor:grab;"><i class="fa-solid fa-location-dot"></i></div>',
-        iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32]
-    });
-
-    function updateCoordsDisplay(lat, lng) {
-        document.getElementById('locModalLat').value = lat.toFixed(6);
-        document.getElementById('locModalLng').value = lng.toFixed(6);
-    }
-
-    function initLocModal() {
-        if (locMap) { locMap.invalidateSize(); return; }
-
-        locMap = L.map('locModalMap', { zoomControl: true, attributionControl: false }).setView([initLat, initLng], hasCoords ? 16 : 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(locMap);
-
-        locMarker = L.marker([initLat, initLng], { icon: pinIcon, draggable: true }).addTo(locMap);
-
-        if (hasCoords) {
-            updateCoordsDisplay(initLat, initLng);
-        }
-
-        locMarker.on('dragend', function(e) {
-            var ll = e.target.getLatLng();
-            updateCoordsDisplay(ll.lat, ll.lng);
-        });
-
-        locMap.on('click', function(e) {
-            locMarker.setLatLng(e.latlng);
-            updateCoordsDisplay(e.latlng.lat, e.latlng.lng);
-        });
-    }
-
-    var modalEl = document.getElementById('locUpdateModal');
-    if (modalEl) {
-        modalEl.addEventListener('shown.bs.modal', function() {
-            initLocModal();
-            setTimeout(function() { if (locMap) locMap.invalidateSize(); }, 200);
-            initUrlInput();
-        });
-    }
-
-    // URL / Plus Code resolution
-    var urlPatterns = [
-        /[?&]q=([-\d.]+),([-\d.]+)/,
-        /@([-\d.]+),([-\d.]+)/,
-        /\/search\/([-\d.]+),([-\d.]+)/,
-        /[?&]ll=([-\d.]+),([-\d.]+)/,
-        /(2[4-6]\.\d{3,8})\s*[,\s]\s*(5[0-2]\.\d{3,8})/
-    ];
-    var needsServer = /maps\.app\.goo\.gl|goo\.gl\/maps|^[A-Z0-9]{4,8}\+[A-Z0-9]/i;
-    var urlTimer = null;
-
-    function extractLocalCoords(text) {
-        for (var i = 0; i < urlPatterns.length; i++) {
-            var m = text.match(urlPatterns[i]);
-            if (m) {
-                var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
-                if (lat >= 24 && lat <= 27 && lng >= 50 && lng <= 52.5) return { lat: lat, lng: lng };
-            }
-        }
-        return null;
-    }
-
-    function applyCoords(lat, lng) {
-        updateCoordsDisplay(lat, lng);
-        if (locMarker && locMap) {
-            locMarker.setLatLng([lat, lng]);
-            locMap.setView([lat, lng], 17);
-        }
-    }
-
-    function setUrlPreview(html, color) {
-        var el = document.getElementById('locModalUrlPreview');
-        if (el) { el.innerHTML = html; el.style.color = color || '#64748b'; }
-    }
-
-    function resolveUrlServer(text) {
-        setUrlPreview('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Resolving...', '#64748b');
-        fetch('/workforce/api/resolve-location/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
-            body: JSON.stringify({ text: text })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.lat && data.lng) {
-                applyCoords(data.lat, data.lng);
-                setUrlPreview('<i class="fa-solid fa-circle-check me-1"></i>' + data.lat.toFixed(6) + ', ' + data.lng.toFixed(6), '#16a34a');
-            } else {
-                setUrlPreview('<i class="fa-solid fa-triangle-exclamation me-1"></i>Could not extract coordinates', '#dc2626');
-            }
-        })
-        .catch(function() { setUrlPreview('<i class="fa-solid fa-triangle-exclamation me-1"></i>Network error', '#dc2626'); });
-    }
-
-    function handleUrlInput() {
-        var text = document.getElementById('locModalUrlInput').value.trim();
-        if (!text) { setUrlPreview(''); return; }
-        var coords = extractLocalCoords(text);
-        if (coords) {
-            applyCoords(coords.lat, coords.lng);
-            setUrlPreview('<i class="fa-solid fa-circle-check me-1"></i>' + coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6), '#16a34a');
-            return;
-        }
-        if (needsServer.test(text)) {
-            clearTimeout(urlTimer);
-            urlTimer = setTimeout(function() { resolveUrlServer(text); }, 350);
-        } else {
-            setUrlPreview('');
-        }
-    }
-
-    function initUrlInput() {
-        var inp = document.getElementById('locModalUrlInput');
-        if (!inp || inp._locInited) return;
-        inp._locInited = true;
-        inp.addEventListener('input', handleUrlInput);
-        inp.addEventListener('paste', function() { setTimeout(handleUrlInput, 150); });
-    }
-
-    window.locModalGeolocate = function() {
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            var lat = pos.coords.latitude, lng = pos.coords.longitude;
-            if (locMap && locMarker) {
-                locMarker.setLatLng([lat, lng]);
-                locMap.setView([lat, lng], 17);
-                updateCoordsDisplay(lat, lng);
-            }
-        });
-    };
-
-    window.saveLocationUpdate = function() {
-        var zone = document.getElementById('locModalZone').value.trim();
-        var street = document.getElementById('locModalStreet').value.trim();
-        var building = document.getElementById('locModalBuilding').value.trim();
-        var latVal = document.getElementById('locModalLat').value.trim();
-        var lngVal = document.getElementById('locModalLng').value.trim();
-        var accuracy = document.getElementById('locModalAccuracy').value;
-        var msgEl = document.getElementById('locModalMsg');
-        var saveBtn = document.getElementById('locModalSaveBtn');
-
-        if (!zone) {
-            msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Zone is required.</span>';
-            return;
-        }
-
-        var payload = { zone_number: parseInt(zone) };
-        if (street) payload.street_number = parseInt(street);
-        if (building) payload.building_number = parseInt(building);
-        if (latVal && lngVal) {
-            payload.latitude = parseFloat(latVal);
-            payload.longitude = parseFloat(lngVal);
-            payload.coords_accuracy = accuracy;
-        }
-
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...';
-        msgEl.innerHTML = '';
-
-        fetch('/workforce/order/' + orderId + '/update-zone/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || getCookie('csrftoken')
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Location';
-            if (data.success) {
-                msgEl.innerHTML = '<span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>' + (data.message || 'Location updated!') + '</span>';
-                // Update the read-only lat/lon inputs in the main page
-                var latInputs = document.querySelectorAll('.dtd__latlon-input');
-                if (latVal && lngVal && latInputs.length >= 2) {
-                    latInputs[0].value = parseFloat(latVal).toFixed(6);
-                    latInputs[1].value = parseFloat(lngVal).toFixed(6);
-                }
-                setTimeout(function() {
-                    var bsModal = bootstrap.Modal.getInstance(document.getElementById('locUpdateModal'));
-                    if (bsModal) bsModal.hide();
-                    location.reload();
-                }, 1200);
-            } else {
-                msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>' + (data.error || 'Failed to update.') + '</span>';
-            }
-        })
-        .catch(function() {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Location';
-            msgEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Network error. Please try again.</span>';
-        });
-    };
-
-    function getCookie(name) {
-        var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        return match ? decodeURIComponent(match[2]) : '';
-    }
 })();
 </script>
 {% endblock extra_js %}

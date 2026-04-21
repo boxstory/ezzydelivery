@@ -8,8 +8,9 @@
     <!-- Hero Header -->
     {% include "workforce/parts/components/_page_header.html" with title="Fleet Transactions" icon="fa-money-bill-transfer" subtitle="View and manage driver financial transactions" %}
 
-    <!-- Driver Selector -->
-    <div class="ftr__card">
+    <!-- Driver Selector - Hidden when driver selected -->
+    {% if not selected_driver %}
+    <div class="ftr__card ftr__card--driver">
         <div class="ftr__card-header">
             <i class="fa-solid fa-user ftr__card-icon"></i>
             <span class="ftr__card-title">SELECT DRIVER</span>
@@ -20,16 +21,16 @@
                     <select id="driverFilter" class="ftr__filter-select" onchange="window.location.href='?driver_id=' + this.value">
                         <option value="">-- Select a Driver --</option>
                         {% for driver in all_drivers %}
-                        <option value="{{ driver.driver_id }}" {% if selected_driver and selected_driver.driver_id == driver.driver_id %}selected{% endif %}>
+                        <option value="{{ driver.driver_id }}">
                             {{ driver.user.first_name }} {{ driver.user.last_name }} (ID: {{ driver.driver_id }})
                         </option>
                         {% endfor %}
                     </select>
                 </div>
-                {% comment %}Demo transaction generator removed{% endcomment %}
             </div>
         </div>
     </div>
+    {% endif %}
 
     {% if selected_driver %}
     <!-- Driver Profile Card -->
@@ -38,7 +39,12 @@
             {{ selected_driver.user.first_name|first|upper }}{{ selected_driver.user.last_name|first|upper }}
         </div>
         <div class="ftr__profile-info">
-            <h2 class="ftr__profile-name">{{ selected_driver.user.first_name }} {{ selected_driver.user.last_name }}</h2>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <h2 class="ftr__profile-name">{{ selected_driver.user.first_name }} {{ selected_driver.user.last_name }}</h2>
+                <button type="button" class="ftr__profile-edit-btn" data-bs-toggle="modal" data-bs-target="#driverChangeModal" title="Change Driver">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
             <p class="ftr__profile-meta">Driver ID: {{ selected_driver.driver_id }} | Phone: {{ selected_driver.driver_phone }}</p>
             <div class="ftr__profile-balances">
                 <span class="ftr__balance ftr__balance--green">COD Unsettled: <strong>QAR {{ cod_unsettled|floatformat:2|default:"0.00" }}</strong></span>
@@ -48,28 +54,26 @@
         </div>
     </div>
 
-    <!-- Summary Stats -->
-    <div class="ftr__stats">
-        <div class="ftr__stat ftr__stat--green">
-            <span class="ftr__stat-label">FLEET COD COLLECTION</span>
-            <span class="ftr__stat-value">QAR {{ total_cod|default:"0.00" }}</span>
-        </div>
-        <div class="ftr__stat ftr__stat--blue">
-            <span class="ftr__stat-label">TOTAL EARNINGS</span>
-            <span class="ftr__stat-value">QAR {{ total_earnings|default:"0.00" }}</span>
-        </div>
-        <div class="ftr__stat ftr__stat--red">
-            <span class="ftr__stat-label">COD UNSETTLED</span>
-            <span class="ftr__stat-value">QAR {{ cod_unsettled|default:"0.00" }}</span>
-        </div>
-        <div class="ftr__stat ftr__stat--amber">
-            <span class="ftr__stat-label">EARNINGS UNSETTLED</span>
-            <span class="ftr__stat-value">QAR {{ earnings_unsettled|default:"0.00" }}</span>
+    <!-- View Tabs Navigation -->
+    {% if selected_driver %}
+    <div class="ftr__card ftr__card--tabs" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; border-bottom: 2px solid #e5e7eb;">
+            <a href="?driver_id={{ selected_driver.driver_id }}&view=cod" style="padding: 1rem 1.5rem; border-bottom: 3px solid {% if view_type == 'cod' %}#059669{% else %}transparent{% endif %}; color: {% if view_type == 'cod' %}#059669{% else %}#6b7280{% endif %}; text-decoration: none; font-weight: {% if view_type == 'cod' %}600{% else %}500{% endif %}; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-money-bill-wave"></i> COD with Fleet
+            </a>
+            <a href="?driver_id={{ selected_driver.driver_id }}&view=cod_submit" style="padding: 1rem 1.5rem; border-bottom: 3px solid {% if view_type == 'cod_submit' %}#f59e0b{% else %}transparent{% endif %}; color: {% if view_type == 'cod_submit' %}#f59e0b{% else %}#6b7280{% endif %}; text-decoration: none; font-weight: {% if view_type == 'cod_submit' %}600{% else %}500{% endif %}; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-check-circle"></i> Submit COD to Admin
+            </a>
+            <a href="?driver_id={{ selected_driver.driver_id }}&view=earnings" style="padding: 1rem 1.5rem; border-bottom: 3px solid {% if view_type == 'earnings' %}#2563eb{% else %}transparent{% endif %}; color: {% if view_type == 'earnings' %}#2563eb{% else %}#6b7280{% endif %}; text-decoration: none; font-weight: {% if view_type == 'earnings' %}600{% else %}500{% endif %}; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-briefcase"></i> Earnings
+            </a>
         </div>
     </div>
+    {% endif %}
+
 
     <!-- Filter Panel -->
-    <div class="ftr__card">
+    <div class="ftr__card ftr__card--filter">
         <div class="ftr__card-header">
             <i class="fa-solid fa-filter ftr__card-icon"></i>
             <span class="ftr__card-title">FILTERS</span>
@@ -149,6 +153,9 @@
         <button type="button" class="ftr__btn ftr__btn--primary" onclick="exportToCSV()">
             <i class="fa-solid fa-file-export"></i> Export CSV
         </button>
+        <button type="button" class="ftr__btn ftr__btn--outline" id="recalcBtn" onclick="recalculateBalances()">
+            <i class="fa-solid fa-rotate"></i> Recalculate Balances
+        </button>
         <span class="ftr__toolbar-count">{{ transactions.paginator.count }} transaction{{ transactions.paginator.count|pluralize }}</span>
     </div>
 
@@ -182,8 +189,8 @@
                             {% elif sort_by == 'amount_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
                             {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
                         </th>
-                        <th>Reference</th>
                         <th>Balance After</th>
+                        <th>Reference</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
@@ -199,6 +206,7 @@
                                    data-description="{{ txn.description }}"
                                    data-date="{{ txn.created_at|date:'d M Y' }}"
                                    data-txn-code="{{ txn.transaction_code }}"
+                                   data-payment-method="{{ txn.payment_method|default:'' }}"
                                    onchange="updateBulkSelection()"
                                    {% if txn.settlement or txn.transaction_type == 'settlement' or txn.transaction_type == 'cod_deposit' or txn.reference_number in deposited_refs %}disabled{% endif %}>
                         </td>
@@ -210,17 +218,77 @@
                             </span>
                         </td>
                         <td>{{ txn.description }}</td>
-                        <td>
+                        <td style="font-size: 0.8rem;">
                             {% if txn.transaction_type == 'cod_collection' and txn.delivery_task and txn.delivery_task.cod_collected_amount != txn.amount %}
                                 <span class="ftr__cod-changed">
-                                    <del class="ftr__cod-old">QAR {{ txn.amount }}</del>
-                                    <span class="ftr__cod-new">QAR {{ txn.delivery_task.cod_collected_amount }}</span>
+                                    <del class="ftr__cod-old">{{ txn.amount }}</del>
+                                    <span class="ftr__cod-new">{{ txn.delivery_task.cod_collected_amount }}</span>
                                     <span class="ftr__cod-flag" title="COD amount was updated after collection"><i class="fa-solid fa-triangle-exclamation"></i> Changed</span>
                                 </span>
                             {% else %}
+                                {% if txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
+                                <div style="font-size: 0.75rem; line-height: 1.6;">
+                                    {% if txn.settlement_split %}
+                                    <div><i class="fa-solid fa-money-bill" style="color: #059669;"></i> -{{ txn.settlement_split.cash|floatformat:0 }}</div>
+                                    <div><i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i> -{{ txn.settlement_split.fawran|floatformat:0 }}</div>
+                                    <div><i class="fa-solid fa-credit-card" style="color: #2563eb;"></i> -{{ txn.settlement_split.pos|floatformat:0 }}</div>
+                                    <div style="border-top: 1px solid #e5e7eb; padding-top: 4px; margin-top: 4px; font-weight: 600;">-{{ txn.settlement_split.cash|add:txn.settlement_split.fawran|add:txn.settlement_split.pos|floatformat:0 }}</div>
+                                    {% else %}
+                                    <div><i class="fa-solid fa-money-bill" style="color: #059669;"></i> {% if txn.payment_method == 'cash' %}-{{ txn.amount|floatformat:0 }}{% else %}0{% endif %}</div>
+                                    <div><i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i> {% if txn.payment_method == 'fawran' %}-{{ txn.amount|floatformat:0 }}{% else %}0{% endif %}</div>
+                                    <div><i class="fa-solid fa-credit-card" style="color: #2563eb;"></i> {% if txn.payment_method == 'pos' %}-{{ txn.amount|floatformat:0 }}{% else %}0{% endif %}</div>
+                                    <div style="border-top: 1px solid #e5e7eb; padding-top: 4px; margin-top: 4px; font-weight: 600;">-{{ txn.amount|floatformat:0 }}</div>
+                                    {% endif %}
+                                </div>
+                                {% else %}
                                 <span class="{% if txn.amount >= 0 %}ftr__amount--credit{% else %}ftr__amount--debit{% endif %}">
-                                    {% if txn.amount >= 0 %}+{% endif %}QAR {{ txn.amount }}
+                                    {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount }}
                                 </span>
+                                {% endif %}
+                            {% endif %}
+                            {% if txn.delivery_task and txn.delivery_task.payment_split %}
+                            <div style="margin-top: 4px; line-height: 1.4;">
+                                {% if txn.delivery_task.payment_split.cash %}
+                                <div><i class="fa-solid fa-money-bill" style="color: #059669;"></i> {{ txn.delivery_task.payment_split.cash }}</div>
+                                {% endif %}
+                                {% if txn.delivery_task.payment_split.pos %}
+                                <div><i class="fa-solid fa-credit-card" style="color: #2563eb;"></i> {{ txn.delivery_task.payment_split.pos }}</div>
+                                {% endif %}
+                                {% if txn.delivery_task.payment_split.fawran %}
+                                <div><i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i> {{ txn.delivery_task.payment_split.fawran }}</div>
+                                {% endif %}
+                                {% if txn.delivery_task.payment_split.bank %}
+                                <div><i class="fa-solid fa-building-columns" style="color: #8b5cf6;"></i> {{ txn.delivery_task.payment_split.bank }}</div>
+                                {% endif %}
+                            </div>
+                            {% elif txn.transaction_type == 'cod_collection' and txn.delivery_task and txn.delivery_task.payment_method %}
+                            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                                {% if txn.delivery_task.payment_method == 'cash' %}<i class="fa-solid fa-money-bill" style="color: #059669;"></i> Cash{% endif %}
+                                {% if txn.delivery_task.payment_method == 'pos' %}<i class="fa-solid fa-credit-card" style="color: #2563eb;"></i> POS{% endif %}
+                                {% if txn.delivery_task.payment_method == 'fawran' %}<i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i> Fawran{% endif %}
+                            </div>
+                            {% elif txn.payment_method %}
+                            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                                {% if txn.payment_method == 'cash' %}<i class="fa-solid fa-money-bill" style="color: #059669;"></i> Cash{% endif %}
+                                {% if txn.payment_method == 'pos' %}<i class="fa-solid fa-credit-card" style="color: #2563eb;"></i> POS{% endif %}
+                                {% if txn.payment_method == 'fawran' %}<i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i> Fawran{% endif %}
+                                {% if txn.payment_method == 'bank' %}<i class="fa-solid fa-building-columns" style="color: #8b5cf6;"></i> Bank{% endif %}
+                                {% if txn.payment_method == 'atm' %}<i class="fa-solid fa-credit-card" style="color: #06b6d4;"></i> ATM{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="font-size: 0.75rem; line-height: 1.7;">
+                            {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
+                                <div>
+                                    <div><i class="fa-solid fa-money-bill" style="color: #059669;"></i> {{ txn.cod_cash_after|floatformat:0 }}</div>
+                                    <div><i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i> {{ txn.cod_fawran_after|floatformat:0 }}</div>
+                                    <div><i class="fa-solid fa-credit-card" style="color: #2563eb;"></i> {{ txn.cod_pos_after|floatformat:0 }}</div>
+                                    <div style="border-top: 1px solid #e5e7eb; padding-top: 4px; margin-top: 4px; font-weight: 600;">Total: {{ txn.cod_cash_after|add:txn.cod_fawran_after|add:txn.cod_pos_after|floatformat:0 }}</div>
+                                </div>
+                            {% elif txn.transaction_type == 'earning' or txn.transaction_type == 'settlement' %}
+                            <div style="white-space: nowrap;"><i class="fa-solid fa-wallet" style="color: #2563eb;"></i>&nbsp;{{ txn.pending_earnings_after }}</div>
+                            {% else %}
+                            <div style="white-space: nowrap;"><i class="fa-solid fa-piggy-bank" style="color: #7c3aed;"></i>&nbsp;{{ txn.wallet_balance_after }}</div>
                             {% endif %}
                         </td>
                         <td>
@@ -235,38 +303,56 @@
                             {% endif %}
                         </td>
                         <td>
-                            <div class="ftr__balance-after">
-                                {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
-                                COD: QAR {{ txn.cod_in_hand_after }}
-                                {% elif txn.transaction_type == 'earning' or txn.transaction_type == 'settlement' %}
-                                Earnings: QAR {{ txn.pending_earnings_after }}
-                                {% else %}
-                                Wallet: QAR {{ txn.wallet_balance_after }}
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td>
                             {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}
-                            <div class="ftr__sub-status">
-                                <span class="ftr__txn-type {% if txn.is_received %}ftr__txn-type--received{% else %}ftr__txn-type--not-received{% endif %}">
-                                    <i class="fa-solid {% if txn.is_received %}fa-circle-check{% else %}fa-circle-xmark{% endif %} me-1"></i>{% if txn.is_received %}Received{% else %}Not Received{% endif %}
-                                </span>
-                                <span class="ftr__txn-type {% if txn.is_verified %}ftr__txn-type--verified{% else %}ftr__txn-type--not-verified{% endif %}">
-                                    <i class="fa-solid {% if txn.is_verified %}fa-shield-check{% else %}fa-shield{% endif %} me-1"></i>{% if txn.is_verified %}Verified{% else %}Not Verified{% endif %}
-                                </span>
-                            </div>
-                            {% elif txn.settlement %}
-                            <span class="ftr__txn-type ftr__txn-type--settlement">Settled</span>
+                                {% if txn.is_received and txn.is_verified %}
+                                <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
+                                {% else %}
+                                <div class="ftr__sub-status">
+                                    <span class="ftr__txn-type {% if txn.is_received %}ftr__txn-type--received{% else %}ftr__txn-type--not-received{% endif %}">
+                                        <i class="fa-solid {% if txn.is_received %}fa-circle-check{% else %}fa-circle-xmark{% endif %} me-1"></i>{% if txn.is_received %}Received{% else %}Not Received{% endif %}
+                                    </span>
+                                    <span class="ftr__txn-type {% if txn.is_verified %}ftr__txn-type--verified{% else %}ftr__txn-type--not-verified{% endif %}">
+                                        <i class="fa-solid {% if txn.is_verified %}fa-shield-check{% else %}fa-shield{% endif %} me-1"></i>{% if txn.is_verified %}Verified{% else %}Not Verified{% endif %}
+                                    </span>
+                                </div>
+                                {% endif %}
+                            {% elif txn.transaction_type == 'cod_collection' %}
+                                {% if txn.delivery_task and txn.delivery_task.cod_submission_txn and txn.delivery_task.cod_submission_txn.is_received and txn.delivery_task.cod_submission_txn.is_verified %}
+                                <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
+                                {% elif txn.reference_number in deposited_refs %}
+                                <span class="ftr__txn-type ftr__txn-type--cod_deposit">Deposited</span>
+                                {% else %}
+                                <span class="ftr__txn-type ftr__txn-type--pending">Pending</span>
+                                {% endif %}
                             {% elif txn.transaction_type == 'settlement' %}
                             <span class="ftr__txn-type ftr__txn-type--settlement">Paid</span>
-                            {% elif txn.transaction_type == 'cod_collection' and txn.reference_number in deposited_refs %}
-                            <span class="ftr__txn-type ftr__txn-type--cod_deposit">Deposited</span>
+                            {% elif txn.settlement %}
+                            <span class="ftr__txn-type ftr__txn-type--settlement">Settled</span>
                             {% else %}
                             <span class="ftr__txn-type ftr__txn-type--pending">Pending</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_collection' %}
+                            {% if view_type == 'cod_submit' and txn.transaction_type in 'cod_driver_settle,cod_deposit' %}
+                            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                                {% if not txn.is_verified %}
+                                <button type="button" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#059669;color:#fff;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.2s;"
+                                        onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'"
+                                        onclick="approveCodSubmission({{ txn.id }}, '{{ txn.transaction_code|default:txn.id }}')">
+                                    <i class="fa-solid fa-check"></i> Approve
+                                </button>
+                                <button type="button" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.2s;"
+                                        onmouseover="this.style.background='#991b1b'" onmouseout="this.style.background='#dc2626'"
+                                        onclick="rejectCodSubmission({{ txn.id }}, '{{ txn.transaction_code|default:txn.id }}')">
+                                    <i class="fa-solid fa-times"></i> Reject
+                                </button>
+                                {% else %}
+                                <span style="padding:6px 12px;background:#dcfce7;color:#166534;border-radius:6px;font-size:0.72rem;font-weight:600;display:flex;align-items:center;gap:4px;">
+                                    <i class="fa-solid fa-check-circle"></i> Approved
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% elif txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_collection' %}
                             <button type="button" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#001f3f;color:#fff;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;"
                                     onclick="openCodDrawer({{ txn.id }}, '{{ txn.transaction_code|default:txn.id }}', {{ txn.is_received|yesno:'true,false' }}, {{ txn.is_verified|yesno:'true,false' }})">
                                 <i class="fa-solid fa-eye"></i> View
@@ -313,11 +399,9 @@
     <div class="ftr__drawer-meta" id="drawerMeta"></div>
     <div class="ftr__drawer-status-row">
         <span class="ftr__drawer-status-label">Admin Status:</span>
-        <button type="button" id="btnReceived" class="ftr__status-toggle ftr__status-toggle--received" onclick="toggleCodStatus('is_received')">
-            <i class="fa-solid fa-circle-check me-1"></i><span id="lblReceived">Mark Received</span>
-        </button>
-        <button type="button" id="btnVerified" class="ftr__status-toggle ftr__status-toggle--verified" onclick="toggleCodStatus('is_verified')">
-            <i class="fa-solid fa-shield-check me-1"></i><span id="lblVerified">Mark Verified</span>
+        <div id="drawerStatusBadges" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;"></div>
+        <button type="button" id="btnConfirmBoth" class="ftr__status-toggle ftr__status-toggle--received" onclick="confirmReceivedAndVerified()">
+            <i class="fa-solid fa-circle-check me-1"></i><span id="lblConfirmBoth">Confirm Received & Verified</span>
         </button>
     </div>
     <div class="ftr__drawer-body">
@@ -389,16 +473,65 @@
             </div>
         </div>
         <div class="ftr__modal-actions">
-            <button type="button" class="ftr__btn ftr__btn--outline" onclick="closeReceiptModal()">Close</button>
-            <button type="button" class="ftr__btn ftr__btn--primary" onclick="printReceipt()">
-                <i class="fa-solid fa-print me-1"></i>Print Receipt
-            </button>
+            <div class="ftr__settlement-date-row">
+                <label class="ftr__settlement-date-label"><i class="fa-solid fa-calendar-check me-1"></i>Settlement Date</label>
+                <input type="date" id="settlementDateInput" class="ftr__filter-input" style="width:auto;">
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <button type="button" class="ftr__btn ftr__btn--outline" onclick="closeReceiptModal()">Close</button>
+                <button type="button" class="ftr__btn ftr__btn--primary" id="submitSettlementBtn" onclick="submitSettlement()">
+                    <i class="fa-solid fa-check me-1"></i>Confirm & Settle
+                </button>
+                <button type="button" class="ftr__btn ftr__btn--outline" id="printReceiptBtn" onclick="printReceipt()" style="display:none;">
+                    <i class="fa-solid fa-print me-1"></i>Print Receipt
+                </button>
+            </div>
         </div>
     </div>
+
 </div>
 {% endblock content %}
 
 {% block extra_js %}
+<script>
+// Initialize driver change modal with driver list
+function initializeDriverModal() {
+    if (typeof bootstrap === 'undefined') {
+        setTimeout(initializeDriverModal, 100);
+        return;
+    }
+
+    // Populate driver select options
+    var driverSelect = document.getElementById('driverChangeSelect');
+    if (driverSelect && driverSelect.children.length === 1) { // Only has placeholder option
+        {% for driver in all_drivers %}
+            var option = document.createElement('option');
+            option.value = '{{ driver.driver_id }}';
+            option.text = '{{ driver.user.first_name }} {{ driver.user.last_name }} (ID: {{ driver.driver_id }})';
+            {% if selected_driver and selected_driver.driver_id == driver.driver_id %}
+            option.selected = true;
+            {% endif %}
+            driverSelect.appendChild(option);
+        {% endfor %}
+    }
+
+    if (driverSelect) {
+        driverSelect.addEventListener('change', function() {
+            if (this.value) {
+                var modalElement = document.getElementById('driverChangeModal');
+                if (modalElement) {
+                    var modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) modal.hide();
+                }
+                setTimeout(() => window.location.href = '?driver_id=' + this.value, 300);
+            }
+        });
+    }
+}
+document.addEventListener('DOMContentLoaded', initializeDriverModal);
+
+// Page functions
+</script>
 <script>
 function updateSort(value) {
     document.getElementById('sortInput').value = value;
@@ -446,12 +579,30 @@ function settleSelected() {
     var checkedBoxes = document.querySelectorAll('.ftr__checkbox--row:checked');
     if (checkedBoxes.length === 0) { alert('Please select transactions to settle.'); return; }
     var transactionIds = [], items = [], totalAmount = 0;
+    var paymentMethods = { cash: 0, fawran: 0, pos: 0, bank: 0, atm: 0, other: 0 };
+
     checkedBoxes.forEach(function(cb) {
         transactionIds.push(cb.value);
         var amount = parseFloat(cb.dataset.amount) || 0;
+        var method = (cb.dataset.paymentMethod || 'other').toLowerCase();
         totalAmount += amount;
-        items.push({ txnCode: cb.dataset.txnCode || '-', description: cb.dataset.description, date: cb.dataset.date, amount: amount });
+
+        // Track payment method breakdown
+        if (paymentMethods.hasOwnProperty(method)) {
+            paymentMethods[method] += amount;
+        } else {
+            paymentMethods.other += amount;
+        }
+
+        items.push({
+            txnCode: cb.dataset.txnCode || '-',
+            description: cb.dataset.description,
+            date: cb.dataset.date,
+            amount: amount,
+            method: method
+        });
     });
+
     var receiptNo = 'STL-' + Date.now().toString(36).toUpperCase();
     var today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     document.getElementById('receiptNumber').textContent = receiptNo;
@@ -459,6 +610,28 @@ function settleSelected() {
     document.getElementById('receiptDriver').textContent = '{{ selected_driver.user.first_name }} {{ selected_driver.user.last_name }}';
     document.getElementById('receiptDriverId').textContent = '{{ selected_driver.driver_id }}';
     document.getElementById('receiptTotal').textContent = 'QAR ' + totalAmount.toFixed(2);
+
+    // Build payment method breakdown
+    var breakdownHtml = '<div style="background:#f8f9fa;padding:1rem;border-radius:6px;margin-bottom:1rem;border-left:4px solid #f7c000;">';
+    breakdownHtml += '<div style="font-size:0.9rem;font-weight:600;margin-bottom:0.75rem;color:#001f3f;">Payment Method Breakdown</div>';
+    if (paymentMethods.cash > 0) {
+        breakdownHtml += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #e5e7eb;"><span><i class="fa-solid fa-money-bill" style="color:#059669;margin-right:0.5rem;"></i>Cash</span><span style="font-weight:600;">QAR ' + paymentMethods.cash.toFixed(2) + '</span></div>';
+    }
+    if (paymentMethods.fawran > 0) {
+        breakdownHtml += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #e5e7eb;"><span><i class="fa-solid fa-mobile-screen" style="color:#7c3aed;margin-right:0.5rem;"></i>Fawran</span><span style="font-weight:600;">QAR ' + paymentMethods.fawran.toFixed(2) + '</span></div>';
+    }
+    if (paymentMethods.pos > 0) {
+        breakdownHtml += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #e5e7eb;"><span><i class="fa-solid fa-credit-card" style="color:#2563eb;margin-right:0.5rem;"></i>POS</span><span style="font-weight:600;">QAR ' + paymentMethods.pos.toFixed(2) + '</span></div>';
+    }
+    if (paymentMethods.bank > 0) {
+        breakdownHtml += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #e5e7eb;"><span><i class="fa-solid fa-building-columns" style="color:#8b5cf6;margin-right:0.5rem;"></i>Bank</span><span style="font-weight:600;">QAR ' + paymentMethods.bank.toFixed(2) + '</span></div>';
+    }
+    if (paymentMethods.atm > 0) {
+        breakdownHtml += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #e5e7eb;"><span><i class="fa-solid fa-credit-card" style="color:#06b6d4;margin-right:0.5rem;"></i>ATM</span><span style="font-weight:600;">QAR ' + paymentMethods.atm.toFixed(2) + '</span></div>';
+    }
+    breakdownHtml += '<div style="display:flex;justify-content:space-between;padding:0.6rem 0;margin-top:0.5rem;border-top:2px solid #001f3f;font-weight:700;font-size:1rem;"><span>Total Settlement</span><span style="color:#f7c000;">QAR ' + totalAmount.toFixed(2) + '</span></div>';
+    breakdownHtml += '</div>';
+
     var tbody = document.getElementById('receiptItemsBody');
     tbody.innerHTML = '';
     items.forEach(function(item) {
@@ -470,33 +643,105 @@ function settleSelected() {
         tr.appendChild(tdCode); tr.appendChild(tdDesc); tr.appendChild(tdDate); tr.appendChild(tdAmount);
         tbody.appendChild(tr);
     });
+
+    // Insert breakdown before the receipt items
+    var receiptItems = document.querySelector('.ftr__receipt-items');
+    if (receiptItems && !document.getElementById('paymentBreakdown')) {
+        var breakdownDiv = document.createElement('div');
+        breakdownDiv.id = 'paymentBreakdown';
+        breakdownDiv.innerHTML = breakdownHtml;
+        receiptItems.parentNode.insertBefore(breakdownDiv, receiptItems);
+    } else if (!document.getElementById('paymentBreakdown')) {
+        var breakdownDiv = document.createElement('div');
+        breakdownDiv.id = 'paymentBreakdown';
+        breakdownDiv.innerHTML = breakdownHtml;
+        document.querySelector('.ftr__modal-body').insertBefore(breakdownDiv, document.querySelector('.ftr__receipt'));
+    } else {
+        document.getElementById('paymentBreakdown').innerHTML = breakdownHtml;
+    }
+
+    // Set today as default settlement date
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('settlementDateInput').value = today;
+
     document.getElementById('receiptModal').classList.add('ftr__modal--show');
     document.getElementById('receiptModal').dataset.transactionIds = JSON.stringify(transactionIds);
 }
 function closeReceiptModal() {
     document.getElementById('receiptModal').classList.remove('ftr__modal--show');
 }
-function printReceipt() {
+
+function submitSettlement() {
     var modal = document.getElementById('receiptModal');
     var transactionIds = JSON.parse(modal.dataset.transactionIds || '[]');
-    if (transactionIds.length > 0) {
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{% url "workforce:bulk_settle_transactions" %}';
-        var csrfInput = document.createElement('input'); csrfInput.type = 'hidden'; csrfInput.name = 'csrfmiddlewaretoken'; csrfInput.value = '{{ csrf_token }}'; form.appendChild(csrfInput);
-        var driverInput = document.createElement('input'); driverInput.type = 'hidden'; driverInput.name = 'driver_id'; driverInput.value = '{{ selected_driver.driver_id }}'; form.appendChild(driverInput);
-        var idsInput = document.createElement('input'); idsInput.type = 'hidden'; idsInput.name = 'transaction_ids'; idsInput.value = JSON.stringify(transactionIds); form.appendChild(idsInput);
-        document.body.appendChild(form);
-        window.print();
-        setTimeout(function() { form.submit(); }, 500);
-    } else {
-        window.print();
+    var submitBtn = document.getElementById('submitSettlementBtn');
+
+    if (transactionIds.length === 0) {
+        alert('No transactions to settle');
+        return;
     }
+
+    var settlementDate = document.getElementById('settlementDateInput').value;
+    if (!settlementDate) { alert('Please select a settlement date.'); return; }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Processing...';
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{% url "workforce:bulk_settle_transactions" %}';
+    var csrfInput = document.createElement('input'); csrfInput.type = 'hidden'; csrfInput.name = 'csrfmiddlewaretoken'; csrfInput.value = '{{ csrf_token }}'; form.appendChild(csrfInput);
+    var driverInput = document.createElement('input'); driverInput.type = 'hidden'; driverInput.name = 'driver_id'; driverInput.value = '{{ selected_driver.driver_id }}'; form.appendChild(driverInput);
+    var idsInput = document.createElement('input'); idsInput.type = 'hidden'; idsInput.name = 'transaction_ids'; idsInput.value = JSON.stringify(transactionIds); form.appendChild(idsInput);
+    var dateInput = document.createElement('input'); dateInput.type = 'hidden'; dateInput.name = 'settlement_date'; dateInput.value = settlementDate; form.appendChild(dateInput);
+
+    // Submit via fetch to handle response without page reload
+    fetch('{% url "workforce:bulk_settle_transactions" %}', {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.text())
+    .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Settled!';
+        submitBtn.classList.add('ftr__btn--success');
+        submitBtn.onclick = null;
+
+        // Show print button after successful settlement
+        document.getElementById('printReceiptBtn').style.display = 'inline-block';
+
+        // Refresh the transactions table after 2 seconds
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    })
+    .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle me-1"></i>Error - Try Again';
+        submitBtn.classList.add('ftr__btn--error');
+        console.error('Settlement error:', error);
+        alert('Error settling transactions. Please try again.');
+    });
+}
+
+function printReceipt() {
+    var printArea = document.getElementById('receiptPrintArea');
+    var printWindow = window.open('', '', 'height=600,width=800');
+    printWindow.document.write('<html><head><title>Settlement Receipt</title>');
+    printWindow.document.write('<style>body { font-family: Arial, sans-serif; margin: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; } .text-end { text-align: right; } .receipt-total { font-weight: bold; font-size: 18px; margin-top: 20px; }</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printArea.innerHTML);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.print();
 }
 document.getElementById('receiptModal').addEventListener('click', function(e) { if (e.target === this) closeReceiptModal(); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeReceiptModal(); });
 function exportToCSV() {
-    var csvData = [['TXN Code', 'Date & Time', 'Type', 'Description', 'Amount', 'Reference', 'Balance After', 'Status']];
+    var csvData = [['TXN Code', 'Date & Time', 'Type', 'Description', 'Amount', 'Balance After', 'Reference', 'Status']];
     document.querySelectorAll('#transactionsTable tbody tr:not([style*="display: none"])').forEach(function(row) {
         var cells = row.querySelectorAll('td');
         csvData.push([cells[1].textContent.trim(), cells[2].textContent.trim(), cells[3].textContent.trim(), cells[4].textContent.trim(), cells[5].textContent.replace('QAR','').trim(), cells[6].textContent.trim(), cells[7].textContent.trim(), cells[8].textContent.trim()]);
@@ -596,45 +841,82 @@ function closeCodDrawer() {
 }
 
 function updateDrawerStatusButtons() {
-    var btnR = document.getElementById('btnReceived');
-    var lblR = document.getElementById('lblReceived');
-    if (_currentIsReceived) {
-        btnR.classList.add('active');
-        lblR.textContent = 'Received';
+    var btn = document.getElementById('btnConfirmBoth');
+    var lbl = document.getElementById('lblConfirmBoth');
+    var badges = document.getElementById('drawerStatusBadges');
+
+    var bothDone = _currentIsReceived && _currentIsVerified;
+
+    // Show current status badges
+    badges.innerHTML =
+        '<span class="ftr__txn-type ' + (_currentIsReceived ? 'ftr__txn-type--received' : 'ftr__txn-type--not-received') + '">' +
+            '<i class="fa-solid ' + (_currentIsReceived ? 'fa-circle-check' : 'fa-circle-xmark') + ' me-1"></i>' +
+            (_currentIsReceived ? 'Received' : 'Not Received') +
+        '</span>' +
+        '<span class="ftr__txn-type ' + (_currentIsVerified ? 'ftr__txn-type--verified' : 'ftr__txn-type--not-verified') + '">' +
+            '<i class="fa-solid ' + (_currentIsVerified ? 'fa-shield-check' : 'fa-shield') + ' me-1"></i>' +
+            (_currentIsVerified ? 'Verified' : 'Not Verified') +
+        '</span>';
+
+    if (bothDone) {
+        btn.classList.add('active');
+        btn.style.background = '#059669';
+        btn.style.color = '#fff';
+        lbl.textContent = 'Confirmed & Verified ✓';
+        btn.disabled = true;
     } else {
-        btnR.classList.remove('active');
-        lblR.textContent = 'Mark Received';
-    }
-    var btnV = document.getElementById('btnVerified');
-    var lblV = document.getElementById('lblVerified');
-    if (_currentIsVerified) {
-        btnV.classList.add('active');
-        lblV.textContent = 'Verified';
-    } else {
-        btnV.classList.remove('active');
-        lblV.textContent = 'Mark Verified';
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.color = '';
+        lbl.textContent = 'Confirm Received & Verified';
+        btn.disabled = false;
     }
 }
 
-function toggleCodStatus(field) {
+function confirmReceivedAndVerified() {
     if (!_currentTxnId) return;
-    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '{{ csrf_token }}';
-    var body = new URLSearchParams({ field: field, csrfmiddlewaretoken: csrfToken });
-    fetch('{% url "workforce:fleet_transaction_update_status" 0 %}'.replace('/0/', '/' + _currentTxnId + '/'), {
+    var btn = document.getElementById('btnConfirmBoth');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...';
+
+    var csrfToken = '{{ csrf_token }}';
+    var url = '{% url "workforce:fleet_transaction_update_status" 0 %}'.replace('/0/', '/' + _currentTxnId + '/');
+
+    // Set both is_received and is_verified to true
+    fetch(url, {
         method: 'POST',
-        body: body,
+        body: new URLSearchParams({ field: 'is_received', value: 'true', csrfmiddlewaretoken: csrfToken }),
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(r => r.json())
+    .then(() => fetch(url, {
+        method: 'POST',
+        body: new URLSearchParams({ field: 'is_verified', value: 'true', csrfmiddlewaretoken: csrfToken }),
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }))
+    .then(r => r.json())
+    .then(data => {
         if (data.success) {
-            if (field === 'is_received') _currentIsReceived = data.value;
-            if (field === 'is_verified') _currentIsVerified = data.value;
+            _currentIsReceived = true;
+            _currentIsVerified = true;
             updateDrawerStatusButtons();
-            // Update the row in the table
+            // Update table row status to Settled
             var row = document.querySelector('tr[data-txn-id="' + _currentTxnId + '"]');
-            if (row) updateRowStatusBadges(row, _currentIsReceived, _currentIsVerified, _currentTxnId);
+            if (row) {
+                var statusTd = row.querySelector('td:nth-child(9)');
+                if (statusTd) {
+                    statusTd.innerHTML =
+                        '<div class="ftr__sub-status">' +
+                        '<span class="ftr__txn-type ftr__txn-type--received"><i class="fa-solid fa-circle-check me-1"></i>Received</span>' +
+                        '<span class="ftr__txn-type ftr__txn-type--verified"><i class="fa-solid fa-shield-check me-1"></i>Verified</span>' +
+                        '</div>';
+                }
+            }
         }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i><span>Confirm Received & Verified</span>';
     });
 }
 
@@ -658,5 +940,131 @@ function updateRowStatusBadges(row, isReceived, isVerified, txnId) {
         }
     }
 }
+
+function approveCodSubmission(txnId, txnCode) {
+    if (!confirm('Approve COD submission ' + txnCode + '?')) return;
+
+    fetch('{% url "workforce:fleet_transactions" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            action: 'approve_cod',
+            txn_id: txnId
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            var row = document.querySelector('tr[data-txn-id="' + txnId + '"]');
+            if (row) {
+                var actionTd = row.querySelector('td:last-child');
+                actionTd.innerHTML = '<span style="padding:6px 12px;background:#dcfce7;color:#166534;border-radius:6px;font-size:0.72rem;font-weight:600;display:flex;align-items:center;gap:4px;"><i class="fa-solid fa-check-circle"></i> Approved</span>';
+            }
+            alert('COD submission approved successfully!');
+        } else {
+            alert('Error: ' + (data.error || 'Failed to approve'));
+        }
+    })
+    .catch(e => alert('Error: ' + e));
+}
+
+function rejectCodSubmission(txnId, txnCode) {
+    var reason = prompt('Reject COD submission ' + txnCode + '?\n\nReason for rejection:');
+    if (!reason) return;
+
+    fetch('{% url "workforce:fleet_transactions" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            action: 'reject_cod',
+            txn_id: txnId,
+            reason: reason
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            var row = document.querySelector('tr[data-txn-id="' + txnId + '"]');
+            if (row) row.style.opacity = '0.6';
+            alert('COD submission rejected!');
+        } else {
+            alert('Error: ' + (data.error || 'Failed to reject'));
+        }
+    })
+    .catch(e => alert('Error: ' + e));
+}
+
+function recalculateBalances() {
+    var btn = document.getElementById('recalcBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Recalculating...';
+    fetch('{% url "workforce:recalculate_cod_balances" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driver_id: '{{ selected_driver.driver_id }}' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        if (data.success) {
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Done (' + data.updated + ' updated)';
+            btn.classList.add('ftr__btn--success');
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Recalculate Balances';
+                btn.classList.remove('ftr__btn--success');
+                window.location.reload();
+            }, 1500);
+        } else {
+            btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Recalculate Balances';
+            alert('Error: ' + (data.error || 'Failed'));
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Recalculate Balances';
+    });
+}
+
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Driver change modal handlers
+document.addEventListener('DOMContentLoaded', function() {
+    var driverSelect = document.getElementById('driverChangeSelect');
+    if (driverSelect) {
+        driverSelect.addEventListener('change', function() {
+            if (this.value) {
+                window.location.href = '?driver_id=' + this.value;
+            }
+        });
+    }
+
+    var modal = document.getElementById('driverChangeModal');
+    if (modal) {
+        window.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closeDriverChangeModal();
+            }
+        });
+    }
+});
 </script>
 {% endblock extra_js %}

@@ -1,7 +1,11 @@
-{% extends "workforce/wf_base_dashboard.html" %}
+{% extends "wf_dashboard_base.html" %}
 {% load static %}
 
 {% block title %}COD Settlement Report{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/cod_settlement_report.css' %}?v=20260420s" type="text/css" />
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-3">
@@ -39,7 +43,7 @@
 
   <!-- Summary Cards -->
   <div class="row mb-4 g-3">
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="csr__stat-card">
         <div class="csr__stat-icon csr__stat-icon--danger">
           <i class="fa-solid fa-exclamation-circle"></i>
@@ -48,7 +52,7 @@
         <div class="csr__stat-label">Total Unsettled COD</div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="csr__stat-card">
         <div class="csr__stat-icon csr__stat-icon--primary">
           <i class="fa-solid fa-users"></i>
@@ -57,13 +61,22 @@
         <div class="csr__stat-label">Drivers with COD</div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="csr__stat-card">
         <div class="csr__stat-icon csr__stat-icon--success">
           <i class="fa-solid fa-check-circle"></i>
         </div>
         <div class="csr__stat-value csr__stat-value--success" id="selected-total">0.00 QR</div>
         <div class="csr__stat-label">Selected Amount</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="csr__stat-card">
+        <div class="csr__stat-icon" style="background: #fef3c7; color: #92400e;">
+          <i class="fa-solid fa-hourglass-half"></i>
+        </div>
+        <div class="csr__stat-value" style="color: #92400e;">{{ pending_count }}</div>
+        <div class="csr__stat-label">Pending Requests</div>
       </div>
     </div>
   </div>
@@ -80,30 +93,28 @@
       </div>
     </div>
 
-    <div id="drivers-list">
+    <div id="drivers-list" class="csr__drivers-grid">
       {% for driver in drivers %}
-      <div class="csr__driver-row">
-        <div class="form-check me-3">
+      <div class="csr__driver-card">
+        <div class="csr__driver-card-checkbox">
           <input class="form-check-input driver-checkbox" type="checkbox"
                  value="{{ driver.driver_id }}"
                  data-amount="{{ driver.cod_in_hand }}"
-                 data-name="{{ driver.driver_name }}"
+                 data-name="{{ driver.user.first_name }} {{ driver.user.last_name }}"
                  id="driver{{ driver.driver_id }}">
         </div>
-        <div class="flex-grow-1">
-          <div class="csr__driver-name">{{ driver.driver_name }}</div>
-          <div class="csr__driver-meta">
-            ID: {{ driver.driver_id }} |
-            Phone: {{ driver.driver_mobile|default:"-" }} |
-            Last Settlement: {{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}
-          </div>
+        <div class="csr__driver-card-content">
+          <div class="csr__driver-card-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</div>
+          <div class="csr__driver-card-id">ID: {{ driver.driver_id }}</div>
+          <div class="csr__driver-card-phone">{{ driver.user.profile.phone|default:"-" }}</div>
         </div>
-        <div class="csr__cod-amount">
-          {{ driver.cod_in_hand|floatformat:2 }} QR
+        <div class="csr__driver-card-amount">
+          {{ driver.cod_in_hand|floatformat:2 }}
+          <span>QR</span>
         </div>
       </div>
       {% empty %}
-      <div class="csr__empty">
+      <div class="csr__empty" style="grid-column: 1 / -1;">
         <i class="fa-solid fa-check-circle"></i>
         <p>No unsettled COD found</p>
       </div>
@@ -111,11 +122,71 @@
     </div>
   </div>
 
+  <!-- Pending Driver Requests -->
+  <div class="csr__card" style="margin-bottom: 1.5rem;">
+    <div class="csr__card-header">
+      <h5 class="csr__card-title">
+        <i class="fa-solid fa-hourglass-half csr__section-icon"></i>PENDING DRIVER REQUESTS
+      </h5>
+      {% if pending_count > 0 %}
+      <span style="font-size: 0.75rem; background: #fef3c7; color: #92400e; padding: 0.25rem 0.75rem; border-radius: 999px; font-weight: 600;">
+        {{ pending_count }} pending
+      </span>
+      {% else %}
+      <span style="font-size: 0.75rem; color: var(--brand-grey-500);">No pending requests</span>
+      {% endif %}
+    </div>
+
+    <div id="pending-requests-list" style="max-height: 500px; overflow-y: auto;">
+      {% for txn in pending_requests %}
+      <div class="csr__request-row">
+        <div class="csr__request-icon" style="background: {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}#dcfce7{% elif txn.transaction_type == 'settlement' %}#eff6ff{% else %}#fef3c7{% endif %}; color: {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}#15803d{% elif txn.transaction_type == 'settlement' %}#2563eb{% else %}#92400e{% endif %};">
+          <i class="fa-solid {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}fa-money-bill-wave{% elif txn.transaction_type == 'settlement' %}fa-briefcase{% else %}fa-hand-holding-dollar{% endif %}"></i>
+        </div>
+        <div class="csr__request-info" style="flex: 1;">
+          <div class="csr__request-type">
+            {{ txn.get_transaction_type_display }}
+          </div>
+          <div class="csr__request-meta">
+            Driver: <strong>{{ txn.driver.user.first_name }} {{ txn.driver.user.last_name }}</strong> (ID: {{ txn.driver.driver_id }}) • {{ txn.created_at|date:"d M Y, h:i A" }}
+          </div>
+        </div>
+        <div class="csr__request-amount">
+          {{ txn.amount|floatformat:2 }} QR
+        </div>
+        <div class="csr__request-status">
+          {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}
+            {% if txn.is_received %}
+              <span style="font-size: 0.7rem; background: #dcfce7; color: #15803d; padding: 0.25rem 0.5rem; border-radius: var(--brand-radius-sm); display: inline-flex; align-items: center; gap: 0.25rem;">
+                <i class="fa-solid fa-check-circle"></i> Received
+              </span>
+            {% else %}
+              <span style="font-size: 0.7rem; background: #fee2e2; color: #991b1b; padding: 0.25rem 0.5rem; border-radius: var(--brand-radius-sm); display: inline-flex; align-items: center; gap: 0.25rem;">
+                <i class="fa-solid fa-circle-xmark"></i> Pending
+              </span>
+            {% endif %}
+          {% else %}
+            <span style="font-size: 0.7rem; background: #fef3c7; color: #92400e; padding: 0.25rem 0.5rem; border-radius: var(--brand-radius-sm); display: inline-flex; align-items: center; gap: 0.25rem;">
+              <i class="fa-solid fa-hourglass-end"></i> Pending
+            </span>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="csr__empty" style="padding: 2rem 1.5rem;">
+        <i class="fa-solid fa-check-double" style="font-size: 2.5rem; color: #15803d; display: block; margin-bottom: 0.75rem;"></i>
+        <p style="margin: 0; color: #15803d; font-weight: 600;">All caught up!</p>
+        <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--brand-grey-500);">No pending driver requests</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
   <!-- Action Buttons -->
   <div class="csr__action-bar">
-    <div class="row align-items-center">
-      <div class="col-md-4">
-        <label class="csr__filter-label">Payment Method</label>
+    <div class="row align-items-end g-3">
+      <div class="col-md-3">
+        <label class="csr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Payment Method</label>
         <select class="form-select" id="payment-method">
           <option value="cash" selected>Cash</option>
           <option value="bank">Bank Transfer</option>
@@ -123,42 +194,52 @@
           <option value="fawran">Fawran</option>
         </select>
       </div>
-      <div class="col-md-4">
-        <label class="csr__filter-label">Reference (Optional)</label>
+      <div class="col-md-3">
+        <label class="csr__filter-label"><i class="fa-solid fa-receipt me-1"></i>Reference (Optional)</label>
         <input type="text" class="form-control" id="payment-reference" placeholder="Transaction ID / Receipt No.">
       </div>
-      <div class="col-md-4 text-end">
-        <button type="button" class="csr__btn csr__btn--outline me-2" id="btn-export-pdf" disabled>
-          <i class="fa-solid fa-file-pdf"></i> Export PDF
-        </button>
-        <button type="button" class="csr__btn csr__btn--success" id="btn-settle" disabled>
-          <i class="fa-solid fa-check"></i> Settle Selected (<span id="settle-count">0</span>)
-        </button>
+      <div class="col-md-3">
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+          <button type="button" class="csr__btn csr__btn--outline" id="btn-export-pdf" disabled title="Export selected drivers to PDF">
+            <i class="fa-solid fa-file-pdf"></i> <span class="d-none d-sm-inline">Export PDF</span>
+          </button>
+          <button type="button" class="csr__btn csr__btn--success" id="btn-settle" disabled title="Settle COD for selected drivers">
+            <i class="fa-solid fa-check-circle"></i> <span class="d-none d-sm-inline">Settle</span> (<span id="settle-count">0</span>)
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Settlement Confirmation Modal -->
-<div class="modal fade" id="confirmModal" tabindex="-1">
-  <div class="modal-dialog">
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="fa-solid fa-check-circle text-success me-2"></i>Confirm Settlement</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title" id="confirmModalLabel">
+          <i class="fa-solid fa-check-circle me-2" style="color: #15803d;"></i>Confirm COD Settlement
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <p>You are about to settle COD for <strong id="confirm-count">0</strong> driver(s).</p>
-        <p class="fs-4 text-center my-3">
-          <span class="badge badge-success fs-5">Total: <span id="confirm-amount">0.00</span> QR</span>
-        </p>
-        <p><strong>Payment Method:</strong> <span id="confirm-method">Cash</span></p>
-        <div id="confirm-drivers-list" class="small text-muted"></div>
+        <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border: 1px solid #a7f3d0; border-radius: var(--brand-radius-sm); padding: 1rem; text-align: center; margin: 1rem 0;">
+          <div style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #15803d; margin-bottom: 0.25rem;">Total Amount</div>
+          <div style="font-size: 1.375rem; font-weight: 700; color: #15803d;"><span id="confirm-amount">0.00</span> QR</div>
+        </div>
+        <p style="margin-bottom: 0.75rem;"><strong style="color: var(--brand-grey-800);">Payment Method:</strong><br><span id="confirm-method" style="color: var(--brand-grey-600); font-size: 0.875rem;">Cash</span></p>
+        <details style="margin-top: 1rem;">
+          <summary style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--brand-grey-500); cursor: pointer; user-select: none;">View drivers (<span id="confirm-count-detail">0</span>)</summary>
+          <div id="confirm-drivers-list" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--brand-grey-200); font-size: 0.75rem; color: var(--brand-grey-600); max-height: 200px; overflow-y: auto;"></div>
+        </details>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="fa-solid fa-times me-1"></i>Cancel
+        </button>
         <button type="button" class="btn btn-success" id="btn-confirm-settle">
-          <i class="fa-solid fa-check me-1"></i>Confirm Settlement
+          <i class="fa-solid fa-check-circle me-1"></i>Confirm Settlement
         </button>
       </div>
     </div>
@@ -213,10 +294,11 @@ $(document).ready(function() {
   // Show settlement confirmation
   $('#btn-settle').on('click', function() {
     $('#confirm-count').text(selectedDrivers.length);
+    $('#confirm-count-detail').text(selectedDrivers.length);
     $('#confirm-amount').text(selectedTotal.toFixed(2));
     $('#confirm-method').text($('#payment-method option:selected').text());
 
-    var driversList = selectedDrivers.map(d => d.name + ' (' + d.amount.toFixed(2) + ' QR)').join('<br>');
+    var driversList = selectedDrivers.map(d => '<div style="padding: 0.25rem 0;">' + d.name + ' — <strong>' + d.amount.toFixed(2) + ' QR</strong></div>').join('');
     $('#confirm-drivers-list').html(driversList);
 
     var modal = new bootstrap.Modal(document.getElementById('confirmModal'));

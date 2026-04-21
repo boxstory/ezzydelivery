@@ -4,7 +4,7 @@
  */
 
 // Global chart configuration
-const CHART_DEFAULTS = {
+var CHART_DEFAULTS = {
   fontFamily: 'Inter, Poppins, sans-serif',
   colors: ['#f7c000', '#001f3f', '#10B981', '#EF4444', '#3B82F6', '#F59E0B'],
   theme: {
@@ -73,24 +73,21 @@ const CHART_DEFAULTS = {
 /**
  * Create Line Chart
  */
-function createLineChart(elementId, data, options = {}) {
-  const chartOptions = {
-    ...CHART_DEFAULTS,
+function createLineChart(elementId, data, options) {
+  options = options || {};
+  var chartOptions = Object.assign({}, CHART_DEFAULTS, {
     series: data.series,
-    chart: {
-      ...CHART_DEFAULTS.chart,
+    chart: Object.assign({}, CHART_DEFAULTS.chart, {
       type: 'line',
       height: options.height || 350,
       zoom: { enabled: false }
-    },
-    xaxis: {
-      ...CHART_DEFAULTS.xaxis,
+    }),
+    xaxis: Object.assign({}, CHART_DEFAULTS.xaxis, {
       categories: data.categories
-    },
-    ...options
-  };
+    })
+  }, options);
 
-  const chart = new ApexCharts(document.querySelector(`#${elementId}`), chartOptions);
+  var chart = new ApexCharts(document.querySelector('#' + elementId), chartOptions);
   chart.render();
   return chart;
 }
@@ -98,19 +95,17 @@ function createLineChart(elementId, data, options = {}) {
 /**
  * Create Area Chart
  */
-function createAreaChart(elementId, data, options = {}) {
-  const chartOptions = {
-    ...CHART_DEFAULTS,
+function createAreaChart(elementId, data, options) {
+  options = options || {};
+  var chartOptions = Object.assign({}, CHART_DEFAULTS, {
     series: data.series,
-    chart: {
-      ...CHART_DEFAULTS.chart,
+    chart: Object.assign({}, CHART_DEFAULTS.chart, {
       type: 'area',
       height: options.height || 350
-    },
-    xaxis: {
-      ...CHART_DEFAULTS.xaxis,
+    }),
+    xaxis: Object.assign({}, CHART_DEFAULTS.xaxis, {
       categories: data.categories
-    },
+    }),
     fill: {
       type: 'gradient',
       gradient: {
@@ -119,11 +114,10 @@ function createAreaChart(elementId, data, options = {}) {
         opacityTo: 0.3,
         stops: [0, 90, 100]
       }
-    },
-    ...options
-  };
+    }
+  }, options);
 
-  const chart = new ApexCharts(document.querySelector(`#${elementId}`), chartOptions);
+  var chart = new ApexCharts(document.querySelector('#' + elementId), chartOptions);
   chart.render();
   return chart;
 }
@@ -131,15 +125,14 @@ function createAreaChart(elementId, data, options = {}) {
 /**
  * Create Bar Chart
  */
-function createBarChart(elementId, data, options = {}) {
-  const chartOptions = {
-    ...CHART_DEFAULTS,
+function createBarChart(elementId, data, options) {
+  options = options || {};
+  var chartOptions = Object.assign({}, CHART_DEFAULTS, {
     series: data.series,
-    chart: {
-      ...CHART_DEFAULTS.chart,
+    chart: Object.assign({}, CHART_DEFAULTS.chart, {
       type: 'bar',
       height: options.height || 350
-    },
+    }),
     plotOptions: {
       bar: {
         horizontal: options.horizontal || false,
@@ -149,14 +142,12 @@ function createBarChart(elementId, data, options = {}) {
         }
       }
     },
-    xaxis: {
-      ...CHART_DEFAULTS.xaxis,
+    xaxis: Object.assign({}, CHART_DEFAULTS.xaxis, {
       categories: data.categories
-    },
-    ...options
-  };
+    })
+  }, options);
 
-  const chart = new ApexCharts(document.querySelector(`#${elementId}`), chartOptions);
+  var chart = new ApexCharts(document.querySelector('#' + elementId), chartOptions);
   chart.render();
   return chart;
 }
@@ -164,15 +155,14 @@ function createBarChart(elementId, data, options = {}) {
 /**
  * Create Donut Chart
  */
-function createDonutChart(elementId, data, options = {}) {
-  const chartOptions = {
-    ...CHART_DEFAULTS,
+function createDonutChart(elementId, data, options) {
+  options = options || {};
+  var chartOptions = Object.assign({}, CHART_DEFAULTS, {
     series: data.series,
-    chart: {
-      ...CHART_DEFAULTS.chart,
+    chart: Object.assign({}, CHART_DEFAULTS.chart, {
       type: 'donut',
       height: options.height || 350
-    },
+    }),
     labels: data.labels,
     plotOptions: {
       pie: {
@@ -198,11 +188,10 @@ function createDonutChart(elementId, data, options = {}) {
     },
     legend: {
       position: 'bottom'
-    },
-    ...options
-  };
+    }
+  }, options);
 
-  const chart = new ApexCharts(document.querySelector(`#${elementId}`), chartOptions);
+  var chart = new ApexCharts(document.querySelector('#' + elementId), chartOptions);
   chart.render();
   return chart;
 }
@@ -210,15 +199,14 @@ function createDonutChart(elementId, data, options = {}) {
 /**
  * Create Radial Bar Chart (Progress/Gauge)
  */
-function createRadialChart(elementId, data, options = {}) {
-  const chartOptions = {
-    ...CHART_DEFAULTS,
+function createRadialChart(elementId, data, options) {
+  options = options || {};
+  var chartOptions = Object.assign({}, CHART_DEFAULTS, {
     series: data.series,
-    chart: {
-      ...CHART_DEFAULTS.chart,
+    chart: Object.assign({}, CHART_DEFAULTS.chart, {
       type: 'radialBar',
       height: options.height || 300
-    },
+    }),
     plotOptions: {
       radialBar: {
         hollow: {
@@ -238,11 +226,10 @@ function createRadialChart(elementId, data, options = {}) {
         }
       }
     },
-    labels: data.labels || ['Progress'],
-    ...options
-  };
+    labels: data.labels || ['Progress']
+  }, options);
 
-  const chart = new ApexCharts(document.querySelector(`#${elementId}`), chartOptions);
+  var chart = new ApexCharts(document.querySelector('#' + elementId), chartOptions);
   chart.render();
   return chart;
 }
@@ -251,7 +238,7 @@ function createRadialChart(elementId, data, options = {}) {
  * Example Usage - Revenue Trend Chart
  */
 function initRevenueTrendChart() {
-  const revenueData = {
+    var revenueData = {
     series: [{
       name: 'Revenue (QAR)',
       data: [12000, 19000, 15000, 25000, 22000, 30000, 28000]
@@ -274,7 +261,7 @@ function initRevenueTrendChart() {
  * Example Usage - Order Status Breakdown
  */
 function initOrderStatusChart() {
-  const statusData = {
+    var statusData = {
     series: [35, 25, 20, 15, 5],
     labels: ['Delivered', 'In Transit', 'Pending', 'Assigned', 'Failed']
   };
@@ -291,7 +278,7 @@ function initOrderStatusChart() {
  * Example Usage - Driver Performance
  */
 function initDriverPerformanceChart() {
-  const performanceData = {
+    var performanceData = {
     series: [85],
     labels: ['Completion Rate']
   };

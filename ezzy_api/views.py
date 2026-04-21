@@ -855,9 +855,25 @@ def driver_complete_task(request, task_id):
             if cod_amount_collected:
                 task.cod_collected_amount = cod_amount_collected
 
-            # Save payment method from driver
+            # Save payment method and split payment from driver
             payment_method = request.data.get('payment_method', '') if hasattr(request.data, 'get') else request.POST.get('payment_method', '')
-            if payment_method in ('cash', 'pos', 'fawran'):
+
+            # Parse split payment (cash, pos, fawran per-method amounts)
+            split = {}
+            for m in ('cash', 'pos', 'fawran'):
+                val = request.data.get(f'payment_split_{m}') if hasattr(request.data, 'get') else request.POST.get(f'payment_split_{m}')
+                if val:
+                    try:
+                        amount = float(val)
+                        if amount > 0:
+                            split[m] = round(amount, 2)
+                    except (ValueError, TypeError):
+                        pass
+
+            if split:
+                task.payment_split = split
+                task.payment_method = max(split, key=split.get)
+            elif payment_method in ('cash', 'pos', 'fawran'):
                 task.payment_method = payment_method
 
             task.save()

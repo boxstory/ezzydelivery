@@ -1,4 +1,10 @@
 {% load static %}
+<!-- jQuery - Required for DataTables, Select2, and Bootstrap (NO defer - must load first) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Bootstrap Bundle JS (includes Popper.js) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+
 <script
   src="https://unpkg.com/htmx.org@2.0.3"
   integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"
@@ -58,8 +64,8 @@
     }
   });
 
-  document.body.addEventListener("htmx:configRequest", (event) => {
-    event.detail.headers["X-CSRFToken"] = "{{ csrf_token }}"; //insert csrf token when performing AJAX request
+  document.body.addEventListener("htmx:configRequest", function(event) {
+    event.detail.headers["X-CSRFToken"] = "{{ csrf_token }}";
   });
 
   // Handle HTMX history cache errors gracefully
@@ -85,7 +91,7 @@
   document.body.addEventListener("htmx:beforeHistorySave", function(evt) {
     try {
       // Check if we're getting close to quota
-      const historyCache = localStorage.getItem('htmx-history-cache');
+      var historyCache = localStorage.getItem('htmx-history-cache');
       if (historyCache && historyCache.length > 500000) { // ~500KB
         console.warn("HTMX history cache getting large, clearing...");
         localStorage.removeItem('htmx-history-cache');
@@ -101,7 +107,7 @@
     // Check if jQuery and Select2 are available
     if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
       // Find all select elements that should use Select2
-      const selectElements = evt.detail.target.querySelectorAll('select[id^="id_pickup_location"], select[id^="id_product"], select.select2-enable');
+      var selectElements = evt.detail.target.querySelectorAll('select[id^="id_pickup_location"], select[id^="id_product"], select.select2-enable');
 
       selectElements.forEach(function(selectEl) {
         // Destroy existing Select2 instance if it exists
@@ -153,22 +159,22 @@
 <!-- <script src="{% static 'volte/js/volte.js' %}"></script> -->
 
 <script>
-  const dropdowns = document.querySelectorAll(".status-dropdown");
-  dropdowns.forEach((dropdown) => {
-    dropdown.addEventListener("change", () => {
-      const selectedOption = dropdown.options[dropdown.selectedIndex].value;
-      const selectedRow = dropdown.closest("tr");
-      const order_id = selectedRow.dataset.orderId;
+  var dropdowns = document.querySelectorAll(".status-dropdown");
+  dropdowns.forEach(function(dropdown) {
+    dropdown.addEventListener("change", function() {
+      var selectedOption = dropdown.options[dropdown.selectedIndex].value;
+      var selectedRow = dropdown.closest("tr");
+      var order_id = selectedRow.dataset.orderId;
 
       // get with the csrf
-      const csrftoken = getCookie("csrftoken");
+      var csrftoken = getCookie("csrftoken");
 
       // Show loading state on dropdown
       dropdown.disabled = true;
-      const originalValue = dropdown.value;
+      var originalValue = dropdown.value;
 
       // Send a POST request to the server using AJAX
-      const xhr = new XMLHttpRequest();
+      var xhr = new XMLHttpRequest();
       xhr.open("POST", "/orders/update_order_status/", true);
       xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
       xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
@@ -177,15 +183,15 @@
       // Set timeout for the request
       xhr.timeout = 10000; // 10 seconds
 
-      xhr.onload = () => {
+      xhr.onload = function() {
         dropdown.disabled = false;
         if (xhr.status === 200) {
           try {
-            const response = JSON.parse(xhr.responseText);
+            var response = JSON.parse(xhr.responseText);
             if (response.status === "success") {
               // Visual feedback for success
               selectedRow.classList.add('status-updated');
-              setTimeout(() => selectedRow.classList.remove('status-updated'), 1500);
+              setTimeout(function() { selectedRow.classList.remove('status-updated'); }, 1500);
             } else {
               // Revert on error and show user feedback
               dropdown.value = originalValue;
@@ -202,20 +208,20 @@
         }
       };
 
-      xhr.onerror = () => {
+      xhr.onerror = function() {
         dropdown.disabled = false;
         dropdown.value = originalValue;
         showStatusMessage(selectedRow, 'Network error. Please check your connection.', 'error');
       };
 
-      xhr.ontimeout = () => {
+      xhr.ontimeout = function() {
         dropdown.disabled = false;
         dropdown.value = originalValue;
         showStatusMessage(selectedRow, 'Request timed out. Please try again.', 'error');
       };
 
       // Send the request with the selected option and object ID
-      const data = `status=${selectedOption}&order_id=${order_id}`;
+      var data = 'status=' + selectedOption + '&order_id=' + order_id;
       xhr.send(data);
     });
   });
@@ -223,26 +229,26 @@
   // Show temporary status message near the row
   function showStatusMessage(row, message, type) {
     // Remove any existing message
-    const existingMsg = row.querySelector('.status-message');
+    var existingMsg = row.querySelector('.status-message');
     if (existingMsg) existingMsg.remove();
 
-    const msgEl = document.createElement('span');
+    var msgEl = document.createElement('span');
     msgEl.className = 'status-message';
     msgEl.textContent = message;
     msgEl.style.cssText = type === 'error'
       ? 'color: #dc3545; font-size: 0.85rem; margin-left: 0.5rem;'
       : 'color: #28a745; font-size: 0.85rem; margin-left: 0.5rem;';
 
-    const dropdown = row.querySelector('.status-dropdown');
+    var dropdown = row.querySelector('.status-dropdown');
     if (dropdown && dropdown.parentNode) {
       dropdown.parentNode.appendChild(msgEl);
-      setTimeout(() => msgEl.remove(), 5000);
+      setTimeout(function() { msgEl.remove(); }, 5000);
     }
   }
 
   // Helper function to get the CSRF token value from the cookie
   function getCookie(name) {
-    const cookieValue = document.cookie.match(
+    var cookieValue = document.cookie.match(
       "(^|;)\\s*" + name + "\\s*=\\s*([^;]+)"
     );
     return cookieValue ? cookieValue.pop() : "";
@@ -259,15 +265,15 @@
     // Now open ONLY the submenu that contains an active sublink
     // Check if any submenu contains an active nav-link (sublink)
     $(".dashboard-sidebar .multi-level, .dashboard-sidebar .submenu").each(function() {
-      const submenu = $(this);
-      const hasActiveSublink = submenu.find(".nav-link.active, .nav-item.active").length > 0;
+      var submenu = $(this);
+      var hasActiveSublink = submenu.find(".nav-link.active, .nav-item.active").length > 0;
 
       if (hasActiveSublink) {
         // Open this submenu
         submenu.addClass("show");
 
         // Update the parent toggle
-        const toggleBtn = $('[data-bs-target="#' + submenu.attr('id') + '"]');
+        var toggleBtn = $('[data-bs-target="#' + submenu.attr('id') + '"]');
         if (toggleBtn.length) {
           toggleBtn.attr("aria-expanded", "true");
           toggleBtn.find(".fa-caret-down").css("transform", "rotate(180deg)");
@@ -281,34 +287,34 @@
   // Sidebar accordion behavior - close other dropdowns when one is opened
   document.addEventListener('DOMContentLoaded', function() {
     // Target ALL sidebar containers (desktop and mobile)
-    const sidebarContainers = document.querySelectorAll('.dashboard-sidebar');
+    var sidebarContainers = document.querySelectorAll('.dashboard-sidebar');
     if (!sidebarContainers.length) return;
 
     sidebarContainers.forEach(function(sidebarContainer) {
       // Get all collapse toggle elements in this sidebar
-      const collapseToggles = sidebarContainer.querySelectorAll('[data-bs-toggle="collapse"]');
+      var collapseToggles = sidebarContainer.querySelectorAll('[data-bs-toggle="collapse"]');
 
       collapseToggles.forEach(function(toggle) {
         toggle.addEventListener('click', function(e) {
-          const targetId = this.getAttribute('data-bs-target');
-          const targetElement = document.querySelector(targetId);
+          var targetId = this.getAttribute('data-bs-target');
+          var targetElement = document.querySelector(targetId);
 
           // If this dropdown is currently closed, close all other open dropdowns
           if (targetElement && !targetElement.classList.contains('show')) {
             // Find all open dropdowns in THIS sidebar only
-            const openDropdowns = sidebarContainer.querySelectorAll('.multi-level.show');
+            var openDropdowns = sidebarContainer.querySelectorAll('.multi-level.show');
 
             openDropdowns.forEach(function(openDropdown) {
               // Don't close the one we're about to open
               if (openDropdown.id !== targetId.replace('#', '')) {
                 // Use Bootstrap's collapse API to close
-                const bsCollapse = bootstrap.Collapse.getInstance(openDropdown);
+                var bsCollapse = bootstrap.Collapse.getInstance(openDropdown);
                 if (bsCollapse) {
                   bsCollapse.hide();
                 } else {
                   // Fallback: manually remove show class and update aria
                   openDropdown.classList.remove('show');
-                  const parentToggle = sidebarContainer.querySelector('[data-bs-target="#' + openDropdown.id + '"]');
+                  var parentToggle = sidebarContainer.querySelector('[data-bs-target="#' + openDropdown.id + '"]');
                   if (parentToggle) {
                     parentToggle.setAttribute('aria-expanded', 'false');
                     parentToggle.classList.remove('active');
@@ -321,14 +327,14 @@
       });
 
       // Also handle the collapse events to update toggle states
-      const allCollapses = sidebarContainer.querySelectorAll('.multi-level');
+      var allCollapses = sidebarContainer.querySelectorAll('.multi-level');
       allCollapses.forEach(function(collapseEl) {
         collapseEl.addEventListener('show.bs.collapse', function() {
-          const toggleBtn = sidebarContainer.querySelector('[data-bs-target="#' + this.id + '"]');
+          var toggleBtn = sidebarContainer.querySelector('[data-bs-target="#' + this.id + '"]');
           if (toggleBtn) {
             toggleBtn.classList.add('active');
             // Rotate caret icon
-            const caret = toggleBtn.querySelector('.fa-caret-down');
+            var caret = toggleBtn.querySelector('.fa-caret-down');
             if (caret) {
               caret.style.transform = 'rotate(180deg)';
               caret.style.transition = 'transform 0.3s ease';
@@ -337,11 +343,11 @@
         });
 
         collapseEl.addEventListener('hide.bs.collapse', function() {
-          const toggleBtn = sidebarContainer.querySelector('[data-bs-target="#' + this.id + '"]');
+          var toggleBtn = sidebarContainer.querySelector('[data-bs-target="#' + this.id + '"]');
           if (toggleBtn) {
             toggleBtn.classList.remove('active');
             // Reset caret icon
-            const caret = toggleBtn.querySelector('.fa-caret-down');
+            var caret = toggleBtn.querySelector('.fa-caret-down');
             if (caret) {
               caret.style.transform = 'rotate(0deg)';
             }
@@ -358,38 +364,38 @@
     // Small delay to ensure DOM is fully updated after redirect
     setTimeout(function() {
       // Get current path - this is the FINAL destination URL
-      const currentPath = window.location.pathname;
+      var currentPath = window.location.pathname;
 
       // STEP 1: Aggressively remove ALL active states from everything
       // Handle both business (.multi-level) and workforce (.submenu, .collapse) dropdowns
-      const allDropdowns = document.querySelectorAll('.dashboard-sidebar .multi-level, .dashboard-sidebar .submenu, .dashboard-sidebar .collapse');
+      var allDropdowns = document.querySelectorAll('.dashboard-sidebar .multi-level, .dashboard-sidebar .submenu, .dashboard-sidebar .collapse');
       allDropdowns.forEach(function(dropdown) {
         dropdown.classList.remove('show');
       });
 
-      const allToggles = document.querySelectorAll('.dashboard-sidebar [data-bs-toggle="collapse"]');
+      var allToggles = document.querySelectorAll('.dashboard-sidebar [data-bs-toggle="collapse"]');
       allToggles.forEach(function(toggle) {
         toggle.setAttribute('aria-expanded', 'false');
         toggle.classList.remove('active');
-        const caret = toggle.querySelector('.fa-caret-down, .fa-chevron-down');
+        var caret = toggle.querySelector('.fa-caret-down, .fa-chevron-down');
         if (caret) {
           caret.style.transform = 'rotate(0deg)';
         }
       });
 
-      const allNavItems = document.querySelectorAll('.dashboard-sidebar .nav-item');
+      var allNavItems = document.querySelectorAll('.dashboard-sidebar .nav-item');
       allNavItems.forEach(function(item) {
         item.classList.remove('active');
       });
 
-      const allNavLinks = document.querySelectorAll('.dashboard-sidebar .nav-link, .dashboard-sidebar .submenu-link');
+      var allNavLinks = document.querySelectorAll('.dashboard-sidebar .nav-link, .dashboard-sidebar .submenu-link');
       allNavLinks.forEach(function(link) {
         link.classList.remove('active');
       });
 
       // STEP 2: Determine which dropdown should be open based on URL
       // Priority order: check most specific patterns first
-      let targetDropdownId = null;
+      var targetDropdownId = null;
 
       // ========== WORKFORCE DASHBOARD DROPDOWNS ==========
       // Zone & QNAS URLs
@@ -473,36 +479,36 @@
 
       // STEP 3: Open ONLY the correct dropdown
       if (targetDropdownId) {
-        const targetDropdown = document.getElementById(targetDropdownId);
+        var targetDropdown = document.getElementById(targetDropdownId);
         if (targetDropdown) {
           targetDropdown.classList.add('show');
 
-          const toggle = document.querySelector('[data-bs-target="#' + targetDropdownId + '"]');
+          var toggle = document.querySelector('[data-bs-target="#' + targetDropdownId + '"]');
           if (toggle) {
             toggle.setAttribute('aria-expanded', 'true');
             toggle.classList.add('active');
 
-            const parentNavItem = toggle.closest('.nav-item');
+            var parentNavItem = toggle.closest('.nav-item');
             if (parentNavItem) {
               parentNavItem.classList.add('active');
             }
 
-            const caret = toggle.querySelector('.fa-caret-down, .fa-chevron-down');
+            var caret = toggle.querySelector('.fa-caret-down, .fa-chevron-down');
             if (caret) {
               caret.style.transform = 'rotate(180deg)';
             }
           }
 
           // STEP 4: Highlight the specific active link within the dropdown
-          const linksInDropdown = targetDropdown.querySelectorAll('.nav-link, .submenu-link');
+          var linksInDropdown = targetDropdown.querySelectorAll('.nav-link, .submenu-link');
           linksInDropdown.forEach(function(link) {
-            const href = link.getAttribute('href');
+            var href = link.getAttribute('href');
             // Check if the link's href matches the current path (exact or starts with)
             if (href) {
-              const hrefPath = href.split('?')[0];
+              var hrefPath = href.split('?')[0];
               if (currentPath === hrefPath || currentPath.startsWith(hrefPath + '/')) {
                 link.classList.add('active');
-                const linkParentItem = link.closest('.nav-item');
+                var linkParentItem = link.closest('.nav-item');
                 if (linkParentItem) {
                   linkParentItem.classList.add('active');
                 }
@@ -514,14 +520,14 @@
 
       // STEP 5: If no dropdown matched, try to find and highlight single nav links
       if (!targetDropdownId) {
-        const allSingleLinks = document.querySelectorAll('.dashboard-sidebar .nav-link-single, .dashboard-sidebar a.nav-link:not(.nav-link-collapse)');
+        var allSingleLinks = document.querySelectorAll('.dashboard-sidebar .nav-link-single, .dashboard-sidebar a.nav-link:not(.nav-link-collapse)');
         allSingleLinks.forEach(function(link) {
-          const href = link.getAttribute('href');
+          var href = link.getAttribute('href');
           if (href) {
-            const hrefPath = href.split('?')[0];
+            var hrefPath = href.split('?')[0];
             if (currentPath === hrefPath) {
               link.classList.add('active');
-              const parentNavItem = link.closest('.nav-item');
+              var parentNavItem = link.closest('.nav-item');
               if (parentNavItem) {
                 parentNavItem.classList.add('active');
               }
@@ -556,9 +562,9 @@
 <script>
   // Mobile sidebar toggle icon rotation
   document.addEventListener('DOMContentLoaded', function() {
-    const sidebarToggleBtn = document.querySelector('[data-bs-target="#navbarNav2"]');
-    const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
-    const sidebarCollapse = document.getElementById('navbarNav2');
+    var sidebarToggleBtn = document.querySelector('[data-bs-target="#navbarNav2"]');
+    var sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
+    var sidebarCollapse = document.getElementById('navbarNav2');
 
     if (sidebarCollapse && sidebarToggleIcon) {
       sidebarCollapse.addEventListener('show.bs.collapse', function() {
@@ -572,4 +578,22 @@
       });
     }
   });
+
+  // Retry handler removed - now uses simple form-based POST to Django backend
+
+  // Helper function to get CSRF cookie
+  function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      var cookies = document.cookie.split(';');
+      for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
 </script>

@@ -144,6 +144,7 @@
     data-lng="{{ card.order.longitude|default:'' }}{% if not card.order.longitude and addr %}{{ addr.dl_longitude|default:'' }}{% endif %}"
     data-coords-accuracy="{{ card.order.coords_accuracy|default:'' }}"
     data-order-id="{{ card.order.id }}"
+    data-payment-method="{{ card.payment_method|default:'' }}"
     data-verify-url="{% with av=card.order.address_verifications.first %}{% with phone=addr.mobile_no|default:card.order.customer_phone|default:'' %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url 'verify_location_short' phone av.verification_token %}{% endif %}{% endwith %}{% endwith %}"
 >
 <script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{{ item.display_name|escapejs }}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}

@@ -1,0 +1,300 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Seller Transactions - Ezzy Delivery{% endblock title %}
+
+{% block content %}
+<div class="ftr">
+    <!-- Hero Header -->
+    {% include "workforce/parts/components/_page_header.html" with title="Seller Transactions" icon="fa-store" subtitle="Track and manage seller COD collections and settlements" %}
+
+    <!-- Seller Selector - Hidden when seller selected -->
+    {% if not selected_seller %}
+    <div class="ftr__card ftr__card--driver">
+        <div class="ftr__card-header">
+            <i class="fa-solid fa-store ftr__card-icon"></i>
+            <span class="ftr__card-title">SELECT SELLER</span>
+        </div>
+        <div class="ftr__card-body">
+            <div class="ftr__select-row">
+                <div class="ftr__select-group">
+                    <select id="sellerFilter" class="ftr__filter-select" onchange="window.location.href='?seller_id=' + this.value">
+                        <option value="">-- Select a Seller --</option>
+                        {% for seller in all_sellers %}
+                        <option value="{{ seller.business_id }}">
+                            {{ seller.business_name }} (ID: {{ seller.business_id }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if selected_seller %}
+    <!-- Seller Profile Card -->
+    <div class="ftr__profile">
+        <div class="ftr__profile-avatar">
+            {{ selected_seller.user.first_name|first|upper }}{{ selected_seller.user.last_name|first|upper }}
+        </div>
+        <div class="ftr__profile-info">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <h2 class="ftr__profile-name">{{ selected_seller.business_name }}</h2>
+                <button type="button" class="ftr__profile-edit-btn" data-bs-toggle="modal" data-bs-target="#sellerChangeModal" title="Change Seller">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+            <p class="ftr__profile-meta">Business ID: {{ selected_seller.id }} | Contact: {{ selected_seller.user.email }}</p>
+            <div class="ftr__profile-balances">
+                <span class="ftr__balance ftr__balance--green">Total COD: <strong>QAR {{ total_cod|floatformat:2|default:"0.00" }}</strong></span>
+                <span class="ftr__balance ftr__balance--blue">Unsettled: <strong>QAR {{ cod_unsettled|floatformat:2|default:"0.00" }}</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Panel -->
+    <div class="ftr__card ftr__card--filter">
+        <div class="ftr__card-header">
+            <i class="fa-solid fa-filter ftr__card-icon"></i>
+            <span class="ftr__card-title">FILTERS</span>
+        </div>
+        <div class="ftr__card-body">
+            <form method="get" id="filterForm">
+                <input type="hidden" name="seller_id" value="{{ selected_seller.business_id }}">
+                <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
+                <div class="ftr__filter-row">
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-calendar me-1"></i>Date Range</label>
+                        <select name="date_preset" id="datePresetSelect" class="ftr__filter-select" onchange="toggleCustomDate(this.value)">
+                            <option value="">All Time</option>
+                            <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
+                            <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                            <option value="3days" {% if date_preset == '3days' %}selected{% endif %}>Last 3 Days</option>
+                            <option value="1week" {% if date_preset == '1week' %}selected{% endif %}>Last 1 Week</option>
+                            <option value="1month" {% if date_preset == '1month' %}selected{% endif %}>Last 1 Month</option>
+                            <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom Date</option>
+                        </select>
+                    </div>
+                    <div class="ftr__filter-group ftr__filter-group--custom {% if date_preset != 'custom' %}ftr__hidden{% endif %}" id="customDateFrom">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-calendar-day me-1"></i>From</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="ftr__filter-input" id="dateFromInput">
+                    </div>
+                    <div class="ftr__filter-group ftr__filter-group--custom {% if date_preset != 'custom' %}ftr__hidden{% endif %}" id="customDateTo">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-calendar-day me-1"></i>To</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="ftr__filter-input" id="dateToInput">
+                    </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-circle-check me-1"></i>Status</label>
+                        <select name="status" class="ftr__filter-select">
+                            <option value="">All Status</option>
+                            <option value="settled" {% if status == 'settled' %}selected{% endif %}>Settled</option>
+                            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                        </select>
+                    </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Min Amount (QAR)</label>
+                        <input type="number" step="0.01" name="min_amount" value="{{ min_amount }}" class="ftr__filter-input" placeholder="0">
+                    </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Max Amount (QAR)</label>
+                        <input type="number" step="0.01" name="max_amount" value="{{ max_amount }}" class="ftr__filter-input" placeholder="9999">
+                    </div>
+                    <div class="ftr__filter-actions">
+                        <button type="submit" class="ftr__btn ftr__btn--primary">
+                            <i class="fa-solid fa-filter me-1"></i>Apply
+                        </button>
+                        <a href="{% url 'workforce:seller_transactions' %}?seller_id={{ selected_seller.business_id }}" class="ftr__btn ftr__btn--outline">
+                            <i class="fa-solid fa-times me-1"></i>Clear
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="ftr__toolbar">
+        <button type="button" class="ftr__btn ftr__btn--outline" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> Print Report
+        </button>
+        <button type="button" class="ftr__btn ftr__btn--primary" onclick="exportToCSV()">
+            <i class="fa-solid fa-file-export"></i> Export CSV
+        </button>
+        <span class="ftr__toolbar-count">{{ orders.paginator.count }} order{{ orders.paginator.count|pluralize }}</span>
+    </div>
+
+    <!-- Orders Table -->
+    {% if orders %}
+    <div class="ftr__card">
+        <div class="ftr__table-wrap">
+            <table class="ftr__table" id="transactionsTable">
+                <thead>
+                    <tr>
+                        <th>Order Code</th>
+                        <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'date_asc' %}date_desc{% else %}date_asc{% endif %}')">
+                            Order Date
+                            {% if sort_by == 'date_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                            {% elif sort_by == 'date_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                            {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
+                        </th>
+                        <th>Customer</th>
+                        <th>Delivery Address</th>
+                        <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'amount_asc' %}amount_desc{% else %}amount_asc{% endif %}')">
+                            COD Amount
+                            {% if sort_by == 'amount_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                            {% elif sort_by == 'amount_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                            {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
+                        </th>
+                        <th>Status</th>
+                        <th>Order Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><code class="ftr__code">{{ order.client_order_code|default:"-" }}</code></td>
+                        <td>{{ order.order_date|date:"d M Y" }}</td>
+                        <td>{{ order.customer_name|default:"-" }}</td>
+                        <td>{{ order.customer_address|default:"-" }}</td>
+                        <td style="font-weight: 600; color: #059669;">
+                            QAR {{ order.cod_amount|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td>
+                            {% if order.cod_status_by_staff == 'cod_settled_with_business' %}
+                            <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
+                            {% elif order.cod_status_by_staff == 'fully_paid' %}
+                            <span class="ftr__txn-type ftr__txn-type--received"><i class="fa-solid fa-check me-1"></i>Collected</span>
+                            {% elif order.cod_status_by_staff == 'cod_with_ezzy' %}
+                            <span class="ftr__txn-type ftr__txn-type--not-verified"><i class="fa-solid fa-hourglass-start me-1"></i>With Ezzy</span>
+                            {% elif order.cod_status_by_staff == 'cod_with_driver' %}
+                            <span class="ftr__txn-type ftr__txn-type--not-verified"><i class="fa-solid fa-motorcycle me-1"></i>With Driver</span>
+                            {% else %}
+                            <span class="ftr__txn-type ftr__txn-type--pending"><i class="fa-solid fa-clock me-1"></i>Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.order_status == 'completed' %}
+                            <span class="badge bg-success"><i class="fa-solid fa-circle-check"></i> Delivered</span>
+                            {% elif order.order_status == 'in_progress' %}
+                            <span class="badge bg-info"><i class="fa-solid fa-spinner"></i> In Progress</span>
+                            {% elif order.order_status == 'cancelled' %}
+                            <span class="badge bg-danger"><i class="fa-solid fa-circle-xmark"></i> Cancelled</span>
+                            {% else %}
+                            <span class="badge bg-warning"><i class="fa-solid fa-hourglass"></i> {{ order.order_status|title }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}
+
+    {% else %}
+    <div class="ftr__empty">
+        <i class="fa-solid fa-inbox"></i>
+        <h3>No Orders Found</h3>
+        <p>This seller has no COD orders in the selected date range.</p>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="ftr__empty">
+        <i class="fa-solid fa-store"></i>
+        <h3>Select a Seller</h3>
+        <p>Please select a seller from the dropdown above to view their COD transactions.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Seller Change Modal -->
+<div class="modal fade" id="sellerChangeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Seller</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <select id="driverChangeSelect" class="form-select">
+                    <option value="">-- Select a Seller --</option>
+                    {% for seller in all_sellers %}
+                    <option value="{{ seller.business_id }}">{{ seller.business_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+function initializeSellerModal() {
+    if (typeof bootstrap === 'undefined') {
+        setTimeout(initializeSellerModal, 100);
+        return;
+    }
+
+    var sellerSelect = document.getElementById('driverChangeSelect');
+    if (sellerSelect) {
+        sellerSelect.addEventListener('change', function() {
+            if (this.value) {
+                var modalElement = document.getElementById('sellerChangeModal');
+                if (modalElement) {
+                    var modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) modal.hide();
+                }
+                setTimeout(() => window.location.href = '?seller_id=' + this.value, 300);
+            }
+        });
+    }
+}
+document.addEventListener('DOMContentLoaded', initializeSellerModal);
+
+function updateSort(value) {
+    document.getElementById('sortInput').value = value;
+    document.getElementById('filterForm').submit();
+}
+
+function toggleCustomDate(value) {
+    var from = document.getElementById('customDateFrom');
+    var to = document.getElementById('customDateTo');
+    if (value === 'custom') {
+        from.style.display = ''; from.classList.remove('ftr__hidden');
+        to.style.display = ''; to.classList.remove('ftr__hidden');
+    } else {
+        from.style.display = 'none'; from.classList.add('ftr__hidden');
+        to.style.display = 'none'; to.classList.add('ftr__hidden');
+    }
+}
+
+function exportToCSV() {
+    var csvData = [['Order Code', 'Order Date', 'Customer', 'Address', 'COD Amount', 'Status']];
+    document.querySelectorAll('#transactionsTable tbody tr:not([style*="display: none"])').forEach(function(row) {
+        var cells = row.querySelectorAll('td');
+        csvData.push([
+            cells[0].textContent.trim(),
+            cells[1].textContent.trim(),
+            cells[2].textContent.trim(),
+            cells[3].textContent.trim(),
+            cells[4].textContent.replace('QAR','').trim(),
+            cells[5].textContent.trim()
+        ]);
+    });
+    var csvContent = csvData.map(function(row) { return row.map(function(c) { return '"' + c + '"'; }).join(','); }).join('\n');
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var sellerId = new URLSearchParams(window.location.search).get('seller_id') || 'all';
+    a.download = 'seller_cod_transactions_' + sellerId + '_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
+{% endblock extra_js %}

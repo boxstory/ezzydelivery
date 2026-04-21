@@ -46,9 +46,20 @@ def workforce_sidebar_counts(request):
     # Check for sync errors from last auto-sync
     sync_errors = cache.get('temp_orders_sync_errors', [])
 
+    from django.db.models import Q
+
     counts = {
-        # New (unimported) temp orders count for sidebar badge
-        'temp_orders_count': TempOrder.objects.filter(status='new').count(),
+        # New (unimported) temp orders count for sidebar badge (only from enabled businesses)
+        'temp_orders_count': TempOrder.objects.filter(
+            status='new',
+            business__temp_order_enabled=True
+        ).exclude(
+            # Exclude orphaned records with no source FK
+            Q(source_type='onedrive', onedrive_source__isnull=True) |
+            Q(source_type='google_sheet', api_settings__isnull=True) |
+            Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True) |
+            Q(source_type='public_link', public_link_source__isnull=True)
+        ).count(),
 
         # Sync errors from last auto-sync (mapping mismatch, etc.)
         'temp_orders_sync_errors': sync_errors,
@@ -61,6 +72,7 @@ def workforce_sidebar_counts(request):
 
         # Tasks created but not yet published to fleet drivers
         'unpublished_tasks_count': DeliveryTask.objects.filter(
+            order__business__business_status='active',
             dl_task_publish=False
         ).exclude(
             dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']

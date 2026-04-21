@@ -3,9 +3,7 @@
  * EzzyDelivery Qatar
  */
 
-// Common DataTable configuration presets
-const TABLE_PRESETS = {
-  // Standard table with search, pagination
+var TABLE_PRESETS = {
   standard: {
     responsive: true,
     pageLength: 25,
@@ -18,7 +16,6 @@ const TABLE_PRESETS = {
     }
   },
 
-  // Table with export buttons
   export: {
     responsive: true,
     pageLength: 25,
@@ -51,13 +48,12 @@ const TABLE_PRESETS = {
     ]
   },
 
-  // Compact table for mobile
   compact: {
     responsive: {
       details: {
         display: $.fn.dataTable.Responsive.display.modal({
           header: function(row) {
-            const data = row.data();
+            var data = row.data();
             return 'Details: ' + data[0];
           }
         }),
@@ -74,15 +70,13 @@ const TABLE_PRESETS = {
     }
   },
 
-  // Server-side processing for large datasets
   serverSide: {
     processing: true,
     serverSide: true,
     ajax: {
-      url: '', // Set dynamically
+      url: '',
       type: 'GET',
       data: function(d) {
-        // Add custom filters
         d.status = $('#statusFilter').val();
         d.date_from = $('#dateFrom').val();
         d.date_to = $('#dateTo').val();
@@ -93,14 +87,10 @@ const TABLE_PRESETS = {
   }
 };
 
-/**
- * Initialize Orders Table
- */
 function initOrdersTable() {
   if ($('#ordersTable').length && !$.fn.DataTable.isDataTable('#ordersTable')) {
-    $('#ordersTable').DataTable({
-      ...TABLE_PRESETS.export,
-      order: [[0, 'desc']], // Sort by order ID descending
+    var config = jQuery.extend({}, TABLE_PRESETS.export, {
+      order: [[0, 'desc']],
       columnDefs: [
         {
           targets: 'no-sort',
@@ -112,97 +102,83 @@ function initOrdersTable() {
         }
       ],
       drawCallback: function() {
-        // Reinitialize tooltips after redraw
         $('[data-bs-toggle="tooltip"]').tooltip();
       }
     });
+    $('#ordersTable').DataTable(config);
   }
 }
 
-/**
- * Initialize Drivers Table
- */
 function initDriversTable() {
   if ($('#driversTable').length && !$.fn.DataTable.isDataTable('#driversTable')) {
-    $('#driversTable').DataTable({
-      ...TABLE_PRESETS.standard,
-      order: [[1, 'asc']], // Sort by driver name
+    var config = jQuery.extend({}, TABLE_PRESETS.standard, {
+      order: [[1, 'asc']],
       columnDefs: [
         {
           targets: 0,
           render: function(data, type, row) {
-            // Custom rendering for status badges
-            const statusColors = {
+            var statusColors = {
               'Approved': 'success',
               'Pending': 'warning',
               'Suspended': 'danger'
             };
-            return `<span class="badge bg-${statusColors[data] || 'secondary'}">${data}</span>`;
+            var color = statusColors[data] || 'secondary';
+            return '<span class="badge bg-' + color + '">' + data + '</span>';
           }
         }
       ]
     });
+    $('#driversTable').DataTable(config);
   }
 }
 
-/**
- * Initialize Tasks Table
- */
 function initTasksTable() {
   if ($('#tasksTable').length && !$.fn.DataTable.isDataTable('#tasksTable')) {
-    $('#tasksTable').DataTable({
-      ...TABLE_PRESETS.export,
-      order: [[2, 'desc']], // Sort by created date
+    var config = jQuery.extend({}, TABLE_PRESETS.export, {
+      order: [[2, 'desc']],
       columnDefs: [
         {
           targets: 'status-column',
           render: function(data, type, row) {
-            const statusIcons = {
+            var statusIcons = {
               'delivered': '<i class="fa-solid fa-check-circle text-success"></i>',
               'in_transit': '<i class="fa-solid fa-truck text-primary"></i>',
               'pending': '<i class="fa-solid fa-clock text-warning"></i>',
               'failed': '<i class="fa-solid fa-times-circle text-danger"></i>'
             };
-            return `${statusIcons[data] || ''} ${data}`;
+            var icon = statusIcons[data] || '';
+            return icon + ' ' + data;
           }
         }
       ]
     });
+    $('#tasksTable').DataTable(config);
   }
 }
 
-/**
- * Initialize COD Transactions Table
- */
 function initCODTable() {
   if ($('#codTable').length && !$.fn.DataTable.isDataTable('#codTable')) {
-    $('#codTable').DataTable({
-      ...TABLE_PRESETS.export,
+    var config = jQuery.extend({}, TABLE_PRESETS.export, {
       order: [[0, 'desc']],
       footerCallback: function() {
-        const api = this.api();
-
-        // Calculate total COD amount
-        const total = api
-          .column(3, {page: 'current'})
-          .data()
-          .reduce((a, b) => parseFloat(a) + parseFloat(b), 0);
-
-        // Update footer
+        var api = this.api();
+        var total = 0;
+        var data = api.column(3, {page: 'current'}).data();
+        for (var i = 0; i < data.length; i++) {
+          total += parseFloat(data[i]) || 0;
+        }
         $(api.column(3).footer()).html(
-          `<strong>Total: QAR ${total.toFixed(2)}</strong>`
+          '<strong>Total: QAR ' + total.toFixed(2) + '</strong>'
         );
       }
     });
+    $('#codTable').DataTable(config);
   }
 }
 
-/**
- * Add custom search to specific column
- */
 function addColumnSearch(table, columnIndex, placeholder) {
   table.column(columnIndex).every(function() {
-    const column = this;
+    var column = this;
     $('<input type="text" class="form-control form-control-sm" placeholder="' + placeholder + '" />')
       .appendTo($(column.footer()).empty())
       .on('keyup change clear', function() {
@@ -213,11 +189,8 @@ function addColumnSearch(table, columnIndex, placeholder) {
   });
 }
 
-/**
- * Export table data with custom formatting
- */
 function exportTableData(tableId, format) {
-  const table = $(`#${tableId}`).DataTable();
+  var table = $('#' + tableId).DataTable();
 
   if (format === 'excel') {
     table.button('.buttons-excel').trigger();
@@ -228,11 +201,8 @@ function exportTableData(tableId, format) {
   }
 }
 
-/**
- * Refresh table data via AJAX
- */
 function refreshTableData(tableId, url) {
-  const table = $(`#${tableId}`).DataTable();
+  var table = $('#' + tableId).DataTable();
 
   $.ajax({
     url: url,
@@ -249,7 +219,6 @@ function refreshTableData(tableId, url) {
   });
 }
 
-// Auto-initialize tables on DOM ready
 document.addEventListener('DOMContentLoaded', function() {
   if (typeof $.fn.DataTable !== 'undefined') {
     initOrdersTable();
@@ -259,7 +228,6 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// Reinitialize after HTMX swap
 document.body.addEventListener('htmx:afterSwap', function(evt) {
   setTimeout(function() {
     initOrdersTable();

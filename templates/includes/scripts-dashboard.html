@@ -28,8 +28,7 @@
 <script src="{% static 'webpages/js/dashboard-utils.js' %}" defer></script>
 
 <script>
-  // Global Dashboard Configuration
-  const DASHBOARD_CONFIG = {
+  var DASHBOARD_CONFIG = {
     brandPrimary: '#f7c000',
     brandNavy: '#001f3f',
     brandGrey: '#6c757d',
@@ -39,30 +38,21 @@
     fontFamily: 'Inter, Poppins, sans-serif'
   };
 
-  // Initialize Dashboard Components
   document.addEventListener('DOMContentLoaded', function() {
-    // Initialize all DataTables
     initDataTables();
-
-    // Initialize all Flatpickr date pickers
     initDatePickers();
-
-    // Initialize tooltips
     initTooltips();
-
-    // Setup HTMX event listeners
     setupHTMXListeners();
   });
 
-  // DataTables Initialization
   function initDataTables() {
-    if ($.fn.DataTable) {
+    if (typeof $.fn !== 'undefined' && $.fn.DataTable) {
       $('.data-table').each(function() {
-        const $table = $(this);
+        var $table = $(this);
         if ($.fn.DataTable.isDataTable($table)) return;
-        const exportButtons = $table.data('export') !== false;
+        var exportButtons = $table.data('export') !== false;
 
-        $table.DataTable({
+        var config = {
           responsive: true,
           pageLength: 25,
           lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
@@ -100,15 +90,14 @@
               orderable: false
             }
           ]
-        });
+        };
+        $table.DataTable(config);
       });
     }
   }
 
-  // Flatpickr Date Picker Initialization
   function initDatePickers() {
     if (typeof flatpickr !== 'undefined') {
-      // Single date picker
       flatpickr('.date-picker', {
         dateFormat: 'Y-m-d',
         altInput: true,
@@ -116,7 +105,6 @@
         allowInput: true
       });
 
-      // Date range picker
       flatpickr('.date-range-picker', {
         mode: 'range',
         dateFormat: 'Y-m-d',
@@ -125,7 +113,6 @@
         allowInput: true
       });
 
-      // Datetime picker
       flatpickr('.datetime-picker', {
         enableTime: true,
         dateFormat: 'Y-m-d H:i',
@@ -136,45 +123,42 @@
     }
   }
 
-  // Bootstrap Tooltips
   function initTooltips() {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+      if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+      }
     });
   }
 
-  // HTMX Integration
   function setupHTMXListeners() {
-    // Show loading spinner on HTMX requests
     document.body.addEventListener('htmx:beforeRequest', function(evt) {
       showLoadingSpinner();
     });
 
-    // Hide loading spinner after HTMX response
     document.body.addEventListener('htmx:afterSwap', function(evt) {
       hideLoadingSpinner();
-      // Reinitialize components after HTMX swap
       initDataTables();
       initDatePickers();
       initTooltips();
     });
 
-    // Handle HTMX errors
     document.body.addEventListener('htmx:responseError', function(evt) {
       hideLoadingSpinner();
-      showToast('An error occurred. Please try again.', 'error');
+      if (typeof showToast === 'function') {
+        showToast('An error occurred. Please try again.', 'error');
+      }
     });
   }
 
-  // Loading Spinner
   function showLoadingSpinner() {
-    const spinner = document.getElementById('loading-spinner');
+    var spinner = document.getElementById('loading-spinner');
     if (spinner) spinner.classList.remove('d-none');
   }
 
   function hideLoadingSpinner() {
-    const spinner = document.getElementById('loading-spinner');
+    var spinner = document.getElementById('loading-spinner');
     if (spinner) spinner.classList.add('d-none');
   }
 </script>

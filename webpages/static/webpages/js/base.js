@@ -1,7 +1,7 @@
 // Auto-refresh on focus disabled to prevent form data loss
 // Users can manually refresh if needed
 
-// let userIsViewingPage = true;
+// var userIsViewingPage = true;
 
 // setInterval(focusChecker, 500);
 

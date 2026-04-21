@@ -9,52 +9,50 @@ This provides the JavaScript for switching between list, grid, and table views.
 <script>
 // Tasks View Toggle
 function setTasksView(view) {
-    const cardsContainer = document.getElementById('tasksContainer');
-    const tableContainer = document.getElementById('tasksTableContainer');
-    const listBtn = document.getElementById('listViewBtn');
-    const gridBtn = document.getElementById('gridViewBtn');
-    const tableBtn = document.getElementById('tableViewBtn');
+    var cardsContainer = document.getElementById('tasksContainer');
+    var tableContainer = document.getElementById('tasksTableContainer');
+    var listBtn = document.getElementById('listViewBtn');
+    var gridBtn = document.getElementById('gridViewBtn');
+    var tableBtn = document.getElementById('tableViewBtn');
 
     if (!cardsContainer || !tableContainer) return;
 
     // Reset all buttons
-    listBtn.classList.remove('active');
-    gridBtn.classList.remove('active');
-    tableBtn.classList.remove('active');
+    if (listBtn) listBtn.classList.remove('active');
+    if (gridBtn) gridBtn.classList.remove('active');
+    if (tableBtn) tableBtn.classList.remove('active');
 
     if (view === 'list') {
         cardsContainer.style.display = '';
         tableContainer.style.display = 'none';
         cardsContainer.classList.remove('tsk-card--grid');
         cardsContainer.classList.add('tsk-card--list');
-        listBtn.classList.add('active');
+        if (listBtn) listBtn.classList.add('active');
     } else if (view === 'grid') {
         cardsContainer.style.display = '';
         tableContainer.style.display = 'none';
         cardsContainer.classList.remove('tsk-card--list');
         cardsContainer.classList.add('tsk-card--grid');
-        gridBtn.classList.add('active');
+        if (gridBtn) gridBtn.classList.add('active');
     } else {
-        // Default: table view
         cardsContainer.style.display = 'none';
         tableContainer.style.display = 'block';
-        tableBtn.classList.add('active');
+        if (tableBtn) tableBtn.classList.add('active');
     }
 
-    // Save preference to localStorage
     localStorage.setItem('tasksViewPreference', view);
 }
 
 // Initialize view on page load
 document.addEventListener('DOMContentLoaded', function() {
-    const savedView = localStorage.getItem('tasksViewPreference') || 'table';
+    var savedView = localStorage.getItem('tasksViewPreference') || 'table';
     setTasksView(savedView);
 });
 
 // Re-initialize after HTMX swaps
 document.body.addEventListener('htmx:afterSwap', function(event) {
     if (document.getElementById('tasksContainer')) {
-        const savedView = localStorage.getItem('tasksViewPreference') || 'table';
+        var savedView = localStorage.getItem('tasksViewPreference') || 'table';
         setTasksView(savedView);
     }
 });
@@ -65,22 +63,22 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
 
 // Toggle select all checkboxes
 function toggleSelectAll(checkbox) {
-    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
-    taskCheckboxes.forEach(cb => {
-        cb.checked = checkbox.checked;
-    });
+    var taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    for (var i = 0; i < taskCheckboxes.length; i++) {
+        taskCheckboxes[i].checked = checkbox.checked;
+    }
     updateBulkSelection();
 }
 
 // Update bulk selection count and show/hide bulk actions bar + AI toolbar
 function updateBulkSelection() {
-    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
-    const selectedCheckboxes = document.querySelectorAll('.task-checkbox:checked');
-    const bulkActionsBar = document.getElementById('bulkActionsBar');
-    const selectedCount = document.getElementById('selectedCount');
-    const selectAllCheckbox = document.getElementById('selectAllTasks');
-    const aiToolbar = document.getElementById('aiActionsToolbar');
-    const aiCount = document.getElementById('selectedTaskCountAI');
+    var taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    var selectedCheckboxes = document.querySelectorAll('.task-checkbox:checked');
+    var bulkActionsBar = document.getElementById('bulkActionsBar');
+    var selectedCount = document.getElementById('selectedCount');
+    var selectAllCheckbox = document.getElementById('selectAllTasks');
+    var aiToolbar = document.getElementById('aiActionsToolbar');
+    var aiCount = document.getElementById('selectedTaskCountAI');
 
     if (selectedCount) {
         selectedCount.textContent = selectedCheckboxes.length;
@@ -89,7 +87,7 @@ function updateBulkSelection() {
         aiCount.textContent = selectedCheckboxes.length;
     }
 
-    const hasSelection = selectedCheckboxes.length > 0;
+    var hasSelection = selectedCheckboxes.length > 0;
 
     if (bulkActionsBar) {
         bulkActionsBar.style.display = hasSelection ? 'block' : 'none';
@@ -98,7 +96,6 @@ function updateBulkSelection() {
         aiToolbar.style.display = hasSelection ? 'flex' : 'none';
     }
 
-    // Update select all checkbox state
     if (selectAllCheckbox) {
         if (selectedCheckboxes.length === 0) {
             selectAllCheckbox.checked = false;
@@ -115,12 +112,12 @@ function updateBulkSelection() {
 
 // Clear all selections
 function clearAllSelections() {
-    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
-    const selectAllCheckbox = document.getElementById('selectAllTasks');
+    var taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    var selectAllCheckbox = document.getElementById('selectAllTasks');
 
-    taskCheckboxes.forEach(cb => {
-        cb.checked = false;
-    });
+    for (var i = 0; i < taskCheckboxes.length; i++) {
+        taskCheckboxes[i].checked = false;
+    }
 
     if (selectAllCheckbox) {
         selectAllCheckbox.checked = false;
@@ -132,13 +129,17 @@ function clearAllSelections() {
 
 // Get selected task IDs
 function getSelectedTaskIds() {
-    const selectedCheckboxes = document.querySelectorAll('.task-checkbox:checked');
-    return Array.from(selectedCheckboxes).map(cb => cb.value);
+    var selectedCheckboxes = document.querySelectorAll('.task-checkbox:checked');
+    var result = [];
+    for (var i = 0; i < selectedCheckboxes.length; i++) {
+        result.push(selectedCheckboxes[i].value);
+    }
+    return result;
 }
 
 // Bulk action handler
 function bulkAction(action) {
-    const selectedIds = getSelectedTaskIds();
+    var selectedIds = getSelectedTaskIds();
 
     if (selectedIds.length === 0) {
         showToast('Please select at least one task', 'warning');
@@ -168,7 +169,7 @@ function bulkAction(action) {
         case 'status_failed':
         case 'status_rejected':
         case 'status_cancelled':
-            const status = action.replace('status_', '');
+            var status = action.replace('status_', '');
             bulkUpdateStatus(selectedIds, status);
             break;
         default:
@@ -178,8 +179,15 @@ function bulkAction(action) {
 
 // Bulk print selected tasks
 function bulkPrint(taskIds) {
-    const printUrl = '/workforce/tasks/bulk-print/?ids=' + taskIds.join(',');
+    var printUrl = '/workforce/tasks/bulk-print/?ids=' + taskIds.join(',');
     window.open(printUrl, '_blank');
+}
+
+// Get CSRF token helper
+function getCsrfToken() {
+    var el1 = document.querySelector('meta[name="csrf-token"]');
+    var el2 = document.querySelector('[name=csrfmiddlewaretoken]');
+    return (el1 && el1.content) || (el2 && el2.value) || getCookie('csrftoken');
 }
 
 // Bulk publish to Fleets
@@ -189,12 +197,12 @@ function bulkPublishFleets(taskIds) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': getCsrfToken()
             },
             body: JSON.stringify({ task_ids: taskIds })
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success) {
                 showToast('Tasks published to Fleets successfully', 'success');
                 location.reload();
@@ -202,7 +210,7 @@ function bulkPublishFleets(taskIds) {
                 showToast(data.error || data.message || 'Error publishing tasks', 'error');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showToast('Error publishing tasks', 'error');
             console.error('Error:', error);
         });
@@ -216,12 +224,12 @@ function bulkPublishApp(taskIds) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': getCsrfToken()
             },
             body: JSON.stringify({ task_ids: taskIds })
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success) {
                 showToast('Tasks published to App successfully', 'success');
                 location.reload();
@@ -229,7 +237,7 @@ function bulkPublishApp(taskIds) {
                 showToast(data.error || data.message || 'Error publishing tasks', 'error');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showToast('Error publishing tasks', 'error');
             console.error('Error:', error);
         });
@@ -243,12 +251,12 @@ function bulkUpdateStatus(taskIds, status) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': getCsrfToken()
             },
             body: JSON.stringify({ task_ids: taskIds, status: status })
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success) {
                 showToast('Status updated successfully', 'success');
                 location.reload();
@@ -256,7 +264,7 @@ function bulkUpdateStatus(taskIds, status) {
                 showToast(data.error || data.message || 'Error updating status', 'error');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showToast('Error updating status', 'error');
             console.error('Error:', error);
         });
@@ -265,31 +273,28 @@ function bulkUpdateStatus(taskIds, status) {
 
 // Bulk export
 function bulkExport(taskIds) {
-    const exportUrl = '/workforce/tasks/bulk-export/?ids=' + taskIds.join(',');
+    var exportUrl = '/workforce/tasks/bulk-export/?ids=' + taskIds.join(',');
     window.location.href = exportUrl;
 }
 
 // Bulk assign driver
 function bulkAssignDriver(taskIds) {
-    // Show modal with driver selection
-    const modal = document.getElementById('bulkDriverModal') || createBulkDriverModal();
+    var modal = document.getElementById('bulkDriverModal') || createBulkDriverModal();
 
-    // Store task IDs for later use
     window.selectedTaskIdsForDriver = taskIds;
 
-    // Fetch available drivers
     fetch('/workforce/api/get-active-drivers/')
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success) {
                 populateDriverList(data.drivers, taskIds.length);
-                const bsModal = new bootstrap.Modal(modal);
+                var bsModal = new bootstrap.Modal(modal);
                 bsModal.show();
             } else {
                 showToast('Error loading drivers', 'error');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showToast('Error loading drivers', 'error');
             console.error('Error:', error);
         });
@@ -297,39 +302,10 @@ function bulkAssignDriver(taskIds) {
 
 // Create bulk driver assignment modal
 function createBulkDriverModal() {
-    const modal = document.createElement('div');
+    var modal = document.createElement('div');
     modal.id = 'bulkDriverModal';
     modal.className = 'modal fade';
-    modal.innerHTML = `
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="fa-solid fa-user-plus me-2"></i>Assign Driver to Tasks
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted mb-3">
-                        <i class="fa-solid fa-info-circle me-1"></i>
-                        Assigning driver to <strong id="taskCountDisplay">0</strong> task(s)
-                    </p>
-                    <div class="mb-3">
-                        <label for="bulkDriverSelect" class="form-label">Select Driver</label>
-                        <select class="form-select" id="bulkDriverSelect" style="width: 100%;">
-                            <option value="">Loading drivers...</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="confirmBulkDriverAssign()">
-                        <i class="fa-solid fa-check me-1"></i>Assign Driver
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
+    modal.innerHTML = '<div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title"><i class="fa-solid fa-user-plus me-2"></i>Assign Driver to Tasks</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-muted mb-3"><i class="fa-solid fa-info-circle me-1"></i>Assigning driver to <strong id="taskCountDisplay">0</strong> task(s)</p><div class="mb-3"><label for="bulkDriverSelect" class="form-label">Select Driver</label><select class="form-select" id="bulkDriverSelect" style="width: 100%;"><option value="">Loading drivers...</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="confirmBulkDriverAssign()"><i class="fa-solid fa-check me-1"></i>Assign Driver</button></div></div></div>';
     document.body.appendChild(modal);
     return modal;
 }
@@ -337,9 +313,8 @@ function createBulkDriverModal() {
 // Populate driver list
 function populateDriverList(drivers, taskCount) {
     document.getElementById('taskCountDisplay').textContent = taskCount;
-    const selectElement = $('#bulkDriverSelect');
+    var selectElement = $('#bulkDriverSelect');
 
-    // Clear existing options
     selectElement.empty();
 
     if (drivers.length === 0) {
@@ -347,17 +322,15 @@ function populateDriverList(drivers, taskCount) {
         return;
     }
 
-    // Add placeholder
     selectElement.append(new Option('Select a driver...', '', false, false));
 
-    // Add driver options
-    drivers.forEach(driver => {
-        const displayText = `${driver.name}${driver.driver_code ? ' (' + driver.driver_code + ')' : ''} - ${driver.phone || 'No phone'}`;
-        const option = new Option(displayText, driver.driver_id, false, false);
+    for (var i = 0; i < drivers.length; i++) {
+        var driver = drivers[i];
+        var displayText = driver.name + (driver.driver_code ? ' (' + driver.driver_code + ')' : '') + ' - ' + (driver.phone || 'No phone');
+        var option = new Option(displayText, driver.driver_id, false, false);
         selectElement.append(option);
-    });
+    }
 
-    // Initialize or refresh Select2
     selectElement.select2({
         placeholder: 'Select a driver...',
         allowClear: true,
@@ -368,9 +341,9 @@ function populateDriverList(drivers, taskCount) {
 
 // Confirm and perform bulk driver assignment
 function confirmBulkDriverAssign() {
-    const driverId = $('#bulkDriverSelect').val();
-    const driverName = $('#bulkDriverSelect option:selected').text();
-    const taskIds = window.selectedTaskIdsForDriver;
+    var driverId = $('#bulkDriverSelect').val();
+    var driverName = $('#bulkDriverSelect option:selected').text();
+    var taskIds = window.selectedTaskIdsForDriver;
 
     if (!driverId) {
         showToast('Please select a driver', 'warning');
@@ -386,27 +359,25 @@ function confirmBulkDriverAssign() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+            'X-CSRFToken': getCsrfToken()
         },
         body: JSON.stringify({
             task_ids: taskIds,
             driver_id: driverId
         })
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
         if (data.success) {
-            showToast(`Successfully assigned ${data.assigned || taskIds.length} task(s) to driver`, 'success');
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('bulkDriverModal'));
+            showToast('Successfully assigned ' + (data.assigned || taskIds.length) + ' task(s) to driver', 'success');
+            var modal = bootstrap.Modal.getInstance(document.getElementById('bulkDriverModal'));
             if (modal) modal.hide();
-            // Reload page
-            setTimeout(() => location.reload(), 1000);
+            setTimeout(function() { location.reload(); }, 1000);
         } else {
             showToast(data.message || 'Error assigning tasks', 'error');
         }
     })
-    .catch(error => {
+    .catch(function(error) {
         showToast('Error assigning tasks', 'error');
         console.error('Error:', error);
     });
@@ -416,10 +387,9 @@ function confirmBulkDriverAssign() {
 // TABLE SORTING FUNCTIONS
 // ============================================
 
-let currentSort = { field: null, direction: 'asc' };
+var currentSort = { field: null, direction: 'asc' };
 
 function sortTable(field) {
-    // Toggle direction if same field, else reset to asc
     if (currentSort.field === field) {
         currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
     } else {
@@ -427,12 +397,10 @@ function sortTable(field) {
         currentSort.direction = 'asc';
     }
 
-    // Update URL with sort params and reload
-    const url = new URL(window.location.href);
+    var url = new URL(window.location.href);
     url.searchParams.set('sort', field);
     url.searchParams.set('order', currentSort.direction);
 
-    // Use HTMX if available, else regular navigation
     if (typeof htmx !== 'undefined') {
         htmx.ajax('GET', url.toString(), {
             target: '#main-content',
@@ -443,28 +411,26 @@ function sortTable(field) {
         window.location.href = url.toString();
     }
 
-    // Update sort icons
     updateSortIcons(field, currentSort.direction);
 }
 
 function updateSortIcons(activeField, direction) {
-    // Reset all sort icons
-    document.querySelectorAll('.sortable .sort-icon').forEach(icon => {
-        icon.className = 'fa-solid fa-sort sort-icon';
-    });
+    var icons = document.querySelectorAll('.sortable .sort-icon');
+    for (var i = 0; i < icons.length; i++) {
+        icons[i].className = 'fa-solid fa-sort sort-icon';
+    }
 
-    // Update active column icon
-    const activeHeader = document.querySelector(`.sortable[data-sort="${activeField}"] .sort-icon`);
+    var activeHeader = document.querySelector('.sortable[data-sort="' + activeField + '"] .sort-icon');
     if (activeHeader) {
-        activeHeader.className = `fa-solid fa-sort-${direction === 'asc' ? 'up' : 'down'} sort-icon text-primary`;
+        var iconClass = direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+        activeHeader.className = 'fa-solid ' + iconClass + ' sort-icon text-primary';
     }
 }
 
-// Initialize sort icons based on URL params
 document.addEventListener('DOMContentLoaded', function() {
-    const url = new URL(window.location.href);
-    const sortField = url.searchParams.get('sort');
-    const sortOrder = url.searchParams.get('order') || 'asc';
+    var url = new URL(window.location.href);
+    var sortField = url.searchParams.get('sort');
+    var sortOrder = url.searchParams.get('order') || 'asc';
 
     if (sortField) {
         currentSort = { field: sortField, direction: sortOrder };
@@ -476,9 +442,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // TASK ACTION FUNCTIONS
 // ============================================
 
-// View task detail
 function viewTaskDetail(taskId) {
-    const url = '/workforce/delivery-task/' + taskId + '/';
+    var url = '/workforce/delivery-task/' + taskId + '/';
     if (typeof htmx !== 'undefined') {
         htmx.ajax('GET', url, {
             target: '#main-content',
@@ -491,9 +456,8 @@ function viewTaskDetail(taskId) {
     }
 }
 
-// Edit task
 function editTask(taskId) {
-    const url = '/workforce/delivery-task/' + taskId + '/edit/';
+    var url = '/workforce/delivery-task/' + taskId + '/edit/';
     if (typeof htmx !== 'undefined') {
         htmx.ajax('GET', url, {
             target: '#main-content',
@@ -506,18 +470,17 @@ function editTask(taskId) {
     }
 }
 
-// Publish single task to Fleets
 function publishToFleets(taskId) {
     if (confirm('Publish this task to Fleet drivers?')) {
         fetch('/workforce/delivery-task/' + taskId + '/publish-fleets/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': getCsrfToken()
             }
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success) {
                 showToast('Task published to Fleets successfully', 'success');
                 location.reload();
@@ -525,25 +488,24 @@ function publishToFleets(taskId) {
                 showToast(data.error || data.message || 'Error publishing task', 'error');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showToast('Error publishing task', 'error');
             console.error('Error:', error);
         });
     }
 }
 
-// Unpublish single task from Fleets
 function unpublishFromFleets(taskId) {
     if (confirm('Unpublish this task? It will no longer show to Fleet drivers.')) {
         fetch('/workforce/delivery-task/' + taskId + '/unpublish-fleets/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': getCsrfToken()
             }
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success) {
                 showToast('Task unpublished from Fleets', 'success');
                 location.reload();
@@ -551,34 +513,31 @@ function unpublishFromFleets(taskId) {
                 showToast(data.error || 'Error unpublishing task', 'error');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showToast('Error unpublishing task', 'error');
             console.error('Error:', error);
         });
     }
 }
 
-// Set task info for status modal (overrides workforce.js version — this one populates dropdown)
-window.setStatusModalTask = function setStatusModalTask(button) {
-    const taskId = button.getAttribute('data-task-id');
-    const taskNumber = button.getAttribute('data-task-number');
-    const statusType = button.getAttribute('data-status-type') || 'task';
-    const currentStatus = button.getAttribute('data-current-status') || '';
-    const currentDms = button.getAttribute('data-current-dms') || '';
-    const driverId = button.getAttribute('data-driver-id') || '';
-    const driverName = button.getAttribute('data-driver-name') || '';
-    const customerName = button.getAttribute('data-customer-name') || '';
-    const failureReason = button.getAttribute('data-failure-reason') || '';
-    const failureNotes = button.getAttribute('data-failure-notes') || '';
-    const taskNotes = button.getAttribute('data-task-notes') || '';
+window.setStatusModalTask = function(button) {
+    var taskId = button.getAttribute('data-task-id');
+    var taskNumber = button.getAttribute('data-task-number');
+    var statusType = button.getAttribute('data-status-type') || 'task';
+    var currentStatus = button.getAttribute('data-current-status') || '';
+    var currentDms = button.getAttribute('data-current-dms') || '';
+    var driverId = button.getAttribute('data-driver-id') || '';
+    var driverName = button.getAttribute('data-driver-name') || '';
+    var customerName = button.getAttribute('data-customer-name') || '';
+    var failureReason = button.getAttribute('data-failure-reason') || '';
+    var failureNotes = button.getAttribute('data-failure-notes') || '';
+    var taskNotes = button.getAttribute('data-task-notes') || '';
 
-    // Set task ID, type and number
     document.getElementById('statusModalTaskId').value = taskId;
     document.getElementById('statusModalStatusType').value = statusType;
     document.getElementById('statusModalTaskNumber').textContent = taskNumber;
 
-    // Update modal title based on status type
-    const modalTitle = document.getElementById('statusModalLabel');
+    var modalTitle = document.getElementById('statusModalLabel');
     if (modalTitle) {
         if (statusType === 'dms') {
             modalTitle.innerHTML = '<i class="fa-solid fa-satellite-dish me-2"></i>Update DMS Task Status';
@@ -587,14 +546,12 @@ window.setStatusModalTask = function setStatusModalTask(button) {
         }
     }
 
-    // Set customer name
-    const custEl = document.getElementById('statusModalCustomer');
+    var custEl = document.getElementById('statusModalCustomer');
     if (custEl) custEl.textContent = customerName || '—';
 
-    // Set current status badge
-    const badgeEl = document.getElementById('statusModalCurrentBadge');
+    var badgeEl = document.getElementById('statusModalCurrentBadge');
     if (badgeEl) {
-        let display = '';
+        var display = '';
         if (statusType === 'dms') {
             display = getDmsStatusDisplay(currentDms);
             badgeEl.className = 'dl-badge dl-badge--dms-' + (currentDms || 'default');
@@ -605,58 +562,48 @@ window.setStatusModalTask = function setStatusModalTask(button) {
         badgeEl.textContent = display;
     }
 
-    // Populate status dropdown based on type
-    const statusSelect = document.getElementById('statusSelect');
+    var statusSelect = document.getElementById('statusSelect');
     if (statusSelect) {
         if (statusType === 'dms') {
-            // DMS status options - build with selected attribute
-            const dmsOptions = ['0', '1', '2', '3', '4', '6', '7', '8', '9', '10'];
-            const dmsLabels = {
+            var dmsOptions = ['0', '1', '2', '3', '4', '6', '7', '8', '9', '10'];
+            var dmsLabels = {
                 '0': 'Assigned', '1': 'Started', '2': 'Successful', '3': 'Failed',
                 '4': 'InProgress/Arrived', '6': 'Unassigned', '7': 'Accepted/Acknowledged',
                 '8': 'Decline', '9': 'Cancel', '10': 'Deleted'
             };
-
-            let optionsHtml = '<option value="">-- Select DMS Status --</option>';
-            dmsOptions.forEach(val => {
-                const selected = (val === currentDms) ? ' selected' : '';
-                optionsHtml += `<option value="${val}"${selected}>${val} - ${dmsLabels[val]}</option>`;
-            });
+            var optionsHtml = '<option value="">-- Select DMS Status --</option>';
+            for (var i = 0; i < dmsOptions.length; i++) {
+                var val = dmsOptions[i];
+                var selected = (val === currentDms) ? ' selected' : '';
+                optionsHtml += '<option value="' + val + '"' + selected + '>' + val + ' - ' + dmsLabels[val] + '</option>';
+            }
             statusSelect.innerHTML = optionsHtml;
-            console.log('DMS Status - currentDms:', currentDms, 'Type:', typeof currentDms);
         } else {
-            // Task status options - loaded from model choices via context processor
-            const taskStatuses = window.TASK_STATUS_CHOICES || [];
-
-            let optionsHtml = '<option value="">-- Select Status --</option>';
-            taskStatuses.forEach(status => {
-                const selected = (status.value === currentStatus) ? ' selected' : '';
-                optionsHtml += `<option value="${status.value}"${selected}>${status.label}</option>`;
-            });
+            var taskStatuses = window.TASK_STATUS_CHOICES || [];
+            var optionsHtml = '<option value="">-- Select Status --</option>';
+            for (var i = 0; i < taskStatuses.length; i++) {
+                var status = taskStatuses[i];
+                var selected = (status.value === currentStatus) ? ' selected' : '';
+                optionsHtml += '<option value="' + status.value + '"' + selected + '>' + status.label + '</option>';
+            }
             statusSelect.innerHTML = optionsHtml;
-            console.log('Task Status - currentStatus:', currentStatus, 'Type:', typeof currentStatus);
         }
-        // Log final selected value
-        console.log('Status select value after setting:', statusSelect.value, 'Options count:', statusSelect.options.length);
     }
 
-    // Set current time
-    const timeEl = document.getElementById('statusModalTime');
+    var timeEl = document.getElementById('statusModalTime');
     if (timeEl) {
-        const now = new Date();
-        const offset = now.getTimezoneOffset();
-        const local = new Date(now.getTime() - offset * 60000);
+        var now = new Date();
+        var offset = now.getTimezoneOffset();
+        var local = new Date(now.getTime() - offset * 60000);
         timeEl.value = local.toISOString().slice(0, 16);
     }
 
-    // Pre-fill notes from task description
-    const notesEl = document.getElementById('statusModalNotes');
+    var notesEl = document.getElementById('statusModalNotes');
     if (notesEl) notesEl.value = taskNotes || '';
 
-    // Failure info — read-only, from latest failed status history entry (driver-set)
-    const failureSection = document.getElementById('statusModalFailureSection');
-    const failureReasonEl = document.getElementById('statusModalFailureReason');
-    const failureNotesEl = document.getElementById('statusModalFailureNotes');
+    var failureSection = document.getElementById('statusModalFailureSection');
+    var failureReasonEl = document.getElementById('statusModalFailureReason');
+    var failureNotesEl = document.getElementById('statusModalFailureNotes');
     if (failureSection) {
         if (failureReason || failureNotes) {
             if (failureReasonEl) failureReasonEl.textContent = failureReason || '';
@@ -670,9 +617,8 @@ window.setStatusModalTask = function setStatusModalTask(button) {
         }
     }
 
-    // Show driver info if assigned
-    const driverInfoEl = document.getElementById('statusModalDriverInfo');
-    const driverNameEl = document.getElementById('statusModalDriverName');
+    var driverInfoEl = document.getElementById('statusModalDriverInfo');
+    var driverNameEl = document.getElementById('statusModalDriverName');
     if (driverId && driverName) {
         if (driverInfoEl) driverInfoEl.style.display = 'block';
         if (driverNameEl) driverNameEl.textContent = driverName;
@@ -680,13 +626,11 @@ window.setStatusModalTask = function setStatusModalTask(button) {
         if (driverInfoEl) driverInfoEl.style.display = 'none';
     }
 
-    // Load drivers list and pre-select current driver
     loadDriversList(driverId);
 }
 
-// Get DMS status display text
 function getDmsStatusDisplay(dmsStatus) {
-    const dmsLabels = {
+    var dmsLabels = {
         '0': 'Assigned',
         '1': 'Started',
         '2': 'Successful',
@@ -701,35 +645,34 @@ function getDmsStatusDisplay(dmsStatus) {
     return dmsLabels[dmsStatus] || dmsStatus || '—';
 }
 
-// Load drivers list for dropdown
 function loadDriversList(currentDriverId) {
-    const driverSelect = document.getElementById('statusModalDriver');
+    var driverSelect = document.getElementById('statusModalDriver');
     if (!driverSelect) return;
 
-    // Set loading state
     driverSelect.innerHTML = '<option value="">Loading drivers...</option>';
     driverSelect.disabled = true;
 
     fetch('/workforce/api/drivers-list/', {
         headers: { 'Accept': 'application/json' }
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         driverSelect.innerHTML = '<option value="">-- No Driver --</option>';
         if (data.drivers && data.drivers.length) {
-            data.drivers.forEach(d => {
-                const opt = document.createElement('option');
+            for (var i = 0; i < data.drivers.length; i++) {
+                var d = data.drivers[i];
+                var opt = document.createElement('option');
                 opt.value = d.id;
                 opt.textContent = d.name;
                 if (String(d.id) === String(currentDriverId)) {
                     opt.selected = true;
                 }
                 driverSelect.appendChild(opt);
-            });
+            }
         }
         driverSelect.disabled = false;
     })
-    .catch(() => {
+    .catch(function() {
         driverSelect.innerHTML = '<option value="">-- No Driver --</option>';
         driverSelect.disabled = false;
     });
@@ -739,13 +682,12 @@ function loadDriversList(currentDriverId) {
 // UTILITY FUNCTIONS
 // ============================================
 
-// Get CSRF cookie
 function getCookie(name) {
-    let cookieValue = null;
+    var cookieValue = null;
     if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
             if (cookie.substring(0, name.length + 1) === (name + '=')) {
                 cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                 break;
@@ -755,7 +697,6 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Show toast notification (uses existing toast system if available)
 function showToast(message, type) {
     if (typeof window.showToastNotification === 'function') {
         window.showToastNotification(message, type);
@@ -764,13 +705,11 @@ function showToast(message, type) {
     }
 }
 
-// Initialize modal event listener (script is at bottom of page, DOM is ready)
 (function() {
-    const statusModal = document.getElementById('statusModal');
+    var statusModal = document.getElementById('statusModal');
     if (statusModal) {
         statusModal.addEventListener('show.bs.modal', function(event) {
-            // Get the button that triggered the modal
-            const button = event.relatedTarget;
+            var button = event.relatedTarget;
             if (button && button.classList.contains('status-modal-trigger')) {
                 window.setStatusModalTask(button);
             }

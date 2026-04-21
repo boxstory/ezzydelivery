@@ -27,14 +27,15 @@
                     <thead class="table-light">
                         <tr>
                             <th style="width:3%">#</th>
-                            <th style="width:14%">Flow Name</th>
-                            <th style="width:14%">Trigger</th>
-                            <th style="width:7%">Category</th>
-                            <th style="width:14%">Action Type</th>
-                            <th style="width:8%">Config</th>
-                            <th style="width:7%">Status</th>
+                            <th style="width:8%">Code</th>
+                            <th style="width:12%">Flow Name</th>
+                            <th style="width:12%">Trigger</th>
+                            <th style="width:6%">Category</th>
+                            <th style="width:12%">Action Type</th>
+                            <th style="width:7%">Config</th>
+                            <th style="width:6%">Status</th>
                             <th style="width:5%" class="text-center">On/Off</th>
-                            <th style="width:14%" class="text-center">Test</th>
+                            <th style="width:11%" class="text-center">Test</th>
                             <th style="width:5%" class="text-center">Edit</th>
                             <th style="width:5%" class="text-center">Logs</th>
                             <th style="width:5%" class="text-center">Delete</th>
@@ -44,6 +45,7 @@
                         {% for flow in flows %}
                         <tr id="flow-row-{{ flow.id }}">
                             <td>{{ forloop.counter }}</td>
+                            <td><code class="text-muted small user-select-all">FLW-{{ flow.id|stringformat:"04d" }}</code></td>
                             <td><strong>{{ flow.name }}</strong></td>
                             <td>
                                 <i class="fa-solid {% if flow.trigger.category == 'whatsapp' %}fa-brands fa-whatsapp text-success{% elif flow.trigger.category == 'webhook' %}fa-globe text-primary{% else %}fa-gears text-warning{% endif %} me-1"></i>

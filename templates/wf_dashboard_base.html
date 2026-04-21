@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}?v=20260328c" type="text/css" />
   <!-- Fleet CSS - Preloaded for HTMX navigation -->
   <link rel="stylesheet" href="{% static 'workforce/css/fleet_cod_in_hand.css' %}?v=20260224a" type="text/css" />
-  <link rel="stylesheet" href="{% static 'workforce/css/fleet_transactions.css' %}?v=20260408a" type="text/css" />
+  <link rel="stylesheet" href="{% static 'workforce/css/fleet_transactions.css' %}?v=20260420i" type="text/css" />
   <link rel="stylesheet" href="{% static 'workforce/css/fleet_drivers_earnings.css' %}?v=20260224a" type="text/css" />
   <link rel="stylesheet" href="{% static 'workforce/css/earnings_verification.css' %}?v=20260224a" type="text/css" />
   <!-- Workforce Dashboard CSS -->
@@ -86,7 +86,25 @@
       </div>
     </div>
   </main>
-  
+
+  <!-- Global Modals (outside main content for proper z-index/overflow handling) -->
+  <div class="modal fade" id="driverChangeModal" tabindex="-1" role="dialog" aria-labelledby="driverChangeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="driverChangeModalLabel"><i class="fa-solid fa-user-circle"></i> Change Driver</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="driverChangeSelect"><i class="fa-solid fa-users"></i> Select a Driver</label>
+          <select id="driverChangeSelect" class="form-select">
+            <option value="">-- Select a Driver --</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- extra js -->
   {% include "includes/scripts.html" %}
   <!-- dashboard js -->

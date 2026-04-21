@@ -8,11 +8,11 @@
  * @param {number} orderId - Order ID to update
  * @param {string} status - 'verified', 'not_found', or 'error'
  */
-async function _saveQnasStatus(orderId, status) {
+function _saveQnasStatus(orderId, status) {
     if (!orderId) return;
     try {
-        const csrfToken = _getCsrfToken();
-        await fetch(`${window.location.origin}/workforce/orders/${orderId}/update-coords/`, {
+        var csrfToken = _getCsrfToken();
+        fetch(window.location.origin + '/workforce/orders/' + orderId + '/update-coords/', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
@@ -29,29 +29,29 @@ async function _saveQnasStatus(orderId, status) {
  * Update all QNAS status badges on the page for a given order
  */
 function _updateQnasStatusBadges(orderId, status) {
-    const badges = document.querySelectorAll(`[data-qnas-badge="${orderId}"]`);
-    const config = {
+    var badges = document.querySelectorAll('[data-qnas-badge="' + orderId + '"]');
+    var config = {
         verified:  { cls: 'qnas-verify__status--verified',   icon: 'fa-check-circle',        label: 'Verified' },
         not_found: { cls: 'qnas-verify__status--not_found',  icon: 'fa-exclamation-triangle', label: 'Not Found' },
         error:     { cls: 'qnas-verify__status--error',      icon: 'fa-times-circle',         label: 'Error' },
     };
-    const c = config[status];
+    var c = config[status];
     if (!c) return;
-    badges.forEach(badge => {
+    badges.forEach(function(badge) {
         badge.className = 'qnas-verify__status ' + c.cls;
-        badge.innerHTML = `<i class="fa-solid ${c.icon} me-1"></i>${c.label}`;
+        badge.innerHTML = '<i class="fa-solid ' + c.icon + ' me-1"></i>' + c.label;
         badge.style.display = '';
     });
 }
 
-async function verifyQNAS(zone, street, building, recordId, orderId) {
-    const btnId = `qnasVerifyBtn${recordId}`;
-    const resultId = `qnasResult${recordId}`;
-    const coordsId = `qnasCoords${recordId}`;
+function verifyQNAS(zone, street, building, recordId, orderId) {
+    var btnId = 'qnasVerifyBtn' + recordId;
+    var resultId = 'qnasResult' + recordId;
+    var coordsId = 'qnasCoords' + recordId;
 
-    const btn = document.getElementById(btnId);
-    const resultSpan = document.getElementById(resultId);
-    const coordsSpan = document.getElementById(coordsId);
+    var btn = document.getElementById(btnId);
+    var resultSpan = document.getElementById(resultId);
+    var coordsSpan = document.getElementById(coordsId);
 
     if (!btn) return;
 
@@ -63,21 +63,21 @@ async function verifyQNAS(zone, street, building, recordId, orderId) {
 
     try {
         // Use current domain for API calls to avoid CORS issues
-        const domain = window.location.origin;
-        let url = `${domain}/api/qnas/location/${zone}/${street}/`;
+        var domain = window.location.origin;
+        var url = domain + '/api/qnas/location/' + zone + '/' + street + '/';
         if (building) {
-            url += `${building}/`;
+            url += building + '/';
         }
 
         console.log('[QNAS Verify] Calling:', url);
 
         // Use GET endpoint with path parameters
-        const response = await fetch(url, {
+        fetch(url, {
             method: 'GET',
             credentials: 'include'
-        });
-
-        const data = await response.json();
+        }).then(function(response) {
+            return response.json();
+        }).then(function(data) {
         console.log('[QNAS Verify] Response:', data);
 
         if (!response.ok || !data.success) {
@@ -91,9 +91,9 @@ async function verifyQNAS(zone, street, building, recordId, orderId) {
             return;
         }
 
-        const lat = data.latitude;
-        const lng = data.longitude;
-        const isExactMatch = data.match_type === 'exact';
+        var lat = data.latitude;
+        var lng = data.longitude;
+        var isExactMatch = data.match_type === 'exact';
 
         if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
             btn.innerHTML = '<i class="fa-solid fa-exclamation-triangle me-1"></i>No Coords';
@@ -111,27 +111,29 @@ async function verifyQNAS(zone, street, building, recordId, orderId) {
         btn.disabled = false;
 
         if (resultSpan) {
-            const matchBadge = isExactMatch
+            var matchBadge = isExactMatch
                 ? '<span class="badge bg-success"><i class="fa-solid fa-check-double me-1"></i>Exact Match</span>'
                 : '<span class="badge bg-info"><i class="fa-solid fa-location-dot me-1"></i>Street Level</span>';
             resultSpan.innerHTML = matchBadge;
         }
 
         if (coordsSpan) {
-            coordsSpan.innerHTML = `
-                <a href="https://www.google.com/maps?q=${lat},${lng}"
-                   target="_blank"
-                   class="text-success text-decoration-none d-inline-flex align-items-center gap-1"
-                   title="View on Google Maps">
-                    <i class="fa-solid fa-map-pin"></i>
-                    <span>${lat.toFixed(6)}, ${lng.toFixed(6)}</span>
-                </a>
-            `;
+            coordsSpan.innerHTML = '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" class="text-success text-decoration-none d-inline-flex align-items-center gap-1" title="View on Google Maps"><i class="fa-solid fa-map-pin"></i><span>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</span></a>';
         }
 
         _saveQnasStatus(orderId, 'verified');
-        console.log('[QNAS Verify] Success:', { zone, street, building, lat, lng, isExactMatch, totalBuildings: data.total_buildings });
+        console.log('[QNAS Verify] Success:', { zone: zone, street: street, building: building, lat: lat, lng: lng, isExactMatch: isExactMatch, totalBuildings: data.total_buildings });
+        }).catch(function(error) {
+        console.error('[QNAS Verify] Error:', error);
+        btn.innerHTML = '<i class="fa-solid fa-exclamation-circle me-1"></i>Error';
+        btn.className = 'btn btn-sm btn-outline-danger';
+        btn.disabled = false;
 
+        if (resultSpan) {
+            resultSpan.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Check Failed</span>';
+        }
+        _saveQnasStatus(orderId, 'error');
+        });
     } catch (error) {
         console.error('[QNAS Verify] Error:', error);
         btn.innerHTML = '<i class="fa-solid fa-exclamation-circle me-1"></i>Error';
@@ -148,45 +150,50 @@ async function verifyQNAS(zone, street, building, recordId, orderId) {
 /**
  * Verify QNAS and save coordinates to order
  */
-async function verifyAndUpdateCoords(zone, street, building, orderId) {
-    const container = document.getElementById(`orderLatLng${orderId}`);
+function verifyAndUpdateCoords(zone, street, building, orderId) {
+    var container = document.getElementById('orderLatLng' + orderId);
     if (!container) return;
 
     container.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Verifying...';
 
     try {
-        const domain = window.location.origin;
-        let url = `${domain}/api/qnas/location/${zone}/${street}/`;
-        if (building) url += `${building}/`;
+        var domain = window.location.origin;
+        var url = domain + '/api/qnas/location/' + zone + '/' + street + '/';
+        if (building) url += building + '/';
 
-        const resp = await fetch(url, { method: 'GET', credentials: 'include' });
-        const data = await resp.json();
+        fetch(url, { method: 'GET', credentials: 'include' }).then(function(resp) {
+            return resp.json();
+        }).then(function(data) {
 
-        if (!resp.ok || !data.success || !data.latitude || !data.longitude) {
-            container.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Not found in QNAS</span>';
-            _saveQnasStatus(orderId, 'not_found');
-            return;
-        }
+            if (!data.success || !data.latitude || !data.longitude) {
+                container.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Not found in QNAS</span>';
+                _saveQnasStatus(orderId, 'not_found');
+                return;
+            }
 
-        // Save to order - get CSRF token
-        const csrfToken = _getCsrfToken();
-        const saveResp = await fetch(`${domain}/workforce/orders/${orderId}/update-coords/`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({ latitude: data.latitude, longitude: data.longitude, qnas_status: 'verified' })
+            // Save to order - get CSRF token
+            var csrfToken = _getCsrfToken();
+            fetch(domain + '/workforce/orders/' + orderId + '/update-coords/', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ latitude: data.latitude, longitude: data.longitude, qnas_status: 'verified' })
+            }).then(function(saveResp) {
+                return saveResp.json();
+            }).then(function(saveData) {
+                if (saveData.success) {
+                    var lat = saveData.latitude.toFixed(6);
+                    var lng = saveData.longitude.toFixed(6);
+                    container.innerHTML = '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" class="text-decoration-none"><i class="fa-solid fa-map-pin me-1 text-success"></i>' + lat + ', ' + lng + '</a> <span class="badge bg-success ms-1"><i class="fa-solid fa-check me-1"></i>Saved</span>';
+                } else {
+                    container.innerHTML = '<span class="text-danger"><i class="fa-solid fa-map-pin me-1"></i>' + data.latitude.toFixed(6) + ', ' + data.longitude.toFixed(6) + '</span> <span class="badge bg-warning text-dark">Save failed</span>';
+                }
+            }).catch(function(err) {
+                console.error('[QNAS] Save error:', err);
+            });
+        }).catch(function(err) {
+            console.error('[QNAS] Fetch error:', err);
         });
-        const saveData = await saveResp.json();
-
-        if (saveData.success) {
-            const lat = saveData.latitude.toFixed(6);
-            const lng = saveData.longitude.toFixed(6);
-            container.innerHTML = `<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="text-decoration-none">
-                <i class="fa-solid fa-map-pin me-1 text-success"></i>${lat}, ${lng}
-            </a> <span class="badge bg-success ms-1"><i class="fa-solid fa-check me-1"></i>Saved</span>`;
-        } else {
-            container.innerHTML = `<span class="text-danger"><i class="fa-solid fa-map-pin me-1"></i>${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}</span> <span class="badge bg-warning text-dark">Save failed</span>`;
-        }
     } catch (error) {
         console.error('[QNAS] verifyAndUpdateCoords error:', error);
         container.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Error</span>';
@@ -201,14 +208,17 @@ async function verifyAndUpdateCoords(zone, street, building, orderId) {
  * @param {object} opts - { zoneId, streetId, buildingId, latId, lngId, resultId, btnId }
  *   All are element IDs. Zone/street are read from inputs, lat/lng are filled on success.
  */
-async function qnasValidateAndFill(opts) {
-    const zone = document.getElementById(opts.zoneId)?.value;
-    const street = document.getElementById(opts.streetId)?.value;
-    const building = document.getElementById(opts.buildingId)?.value || '';
-    const latInput = document.getElementById(opts.latId);
-    const lngInput = document.getElementById(opts.lngId);
-    const resultDiv = document.getElementById(opts.resultId);
-    const btn = document.getElementById(opts.btnId);
+function qnasValidateAndFill(opts) {
+    var zoneEl = document.getElementById(opts.zoneId);
+    var streetEl = document.getElementById(opts.streetId);
+    var zone = zoneEl ? zoneEl.value : null;
+    var street = streetEl ? streetEl.value : null;
+    var buildingEl = document.getElementById(opts.buildingId);
+    var building = buildingEl ? buildingEl.value : '';
+    var latInput = document.getElementById(opts.latId);
+    var lngInput = document.getElementById(opts.lngId);
+    var resultDiv = document.getElementById(opts.resultId);
+    var btn = document.getElementById(opts.btnId);
 
     if (!zone || !street) {
         if (resultDiv) resultDiv.innerHTML = '<span class="text-danger small">Enter Zone and Street first</span>';
@@ -219,54 +229,53 @@ async function qnasValidateAndFill(opts) {
     if (resultDiv) resultDiv.innerHTML = '';
 
     try {
-        let url = `${window.location.origin}/api/qnas/location/${zone}/${street}/`;
-        if (building) url += `${building}/`;
+        var url = window.location.origin + '/api/qnas/location/' + zone + '/' + street + '/';
+        if (building) url += building + '/';
 
-        const resp = await fetch(url, { method: 'GET', credentials: 'include' });
-        const data = await resp.json();
-
-        const mapLink = opts.mapId ? document.getElementById(opts.mapId) : null;
-        const accuracyInput = opts.accuracyId ? document.getElementById(opts.accuracyId) : null;
-        const accuracyBadge = opts.accuracyBadgeId ? document.getElementById(opts.accuracyBadgeId) : null;
-        if (data.success && data.latitude && data.longitude) {
-            if (latInput) latInput.value = data.latitude;
-            if (lngInput) lngInput.value = data.longitude;
-            const lat = data.latitude.toFixed(6);
-            const lng = data.longitude.toFixed(6);
-            const isExact = data.match_type === 'exact';
-            const accuracy = isExact ? 'exact' : 'street';
-            const zoneName = data.zone_name || '';
-            if (accuracyInput) accuracyInput.value = accuracy;
-            // Fill zone name display field if provided
-            const zoneNameId = opts.zoneNameId;
-            if (zoneNameId && zoneName) {
-                const znEl = document.getElementById(zoneNameId);
-                if (znEl) znEl.value = zoneName;
+        fetch(url, { method: 'GET', credentials: 'include' }).then(function(resp) {
+            return resp.json();
+        }).then(function(data) {
+            var mapLink = opts.mapId ? document.getElementById(opts.mapId) : null;
+            var accuracyInput = opts.accuracyId ? document.getElementById(opts.accuracyId) : null;
+            var accuracyBadge = opts.accuracyBadgeId ? document.getElementById(opts.accuracyBadgeId) : null;
+            if (data.success && data.latitude && data.longitude) {
+                if (latInput) latInput.value = data.latitude;
+                if (lngInput) lngInput.value = data.longitude;
+                var lat = data.latitude.toFixed(6);
+                var lng = data.longitude.toFixed(6);
+                var isExact = data.match_type === 'exact';
+                var accuracy = isExact ? 'exact' : 'street';
+                var zoneName = data.zone_name || '';
+                if (accuracyInput) accuracyInput.value = accuracy;
+                // Fill zone name display field if provided
+                var zoneNameId = opts.zoneNameId;
+                if (zoneNameId && zoneName) {
+                    var znEl = document.getElementById(zoneNameId);
+                    if (znEl) znEl.value = zoneName;
+                }
+                if (mapLink) {
+                    mapLink.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+                    mapLink.classList.remove('disabled', 'btn-outline-secondary', 'btn-success', 'btn-warning');
+                    mapLink.classList.add(isExact ? 'btn-success' : 'btn-warning');
+                }
+                if (accuracyBadge) {
+                    accuracyBadge.innerHTML = isExact
+                        ? '<span class="badge bg-success" style="font-size:.7rem">Exact</span>'
+                        : '<span class="badge bg-warning text-dark" style="font-size:.7rem">Street</span>';
+                }
+                if (resultDiv) {
+                    var zoneNameHtml = zoneName ? '<span class="text-muted small ms-1">' + zoneName + '</span>' : '';
+                    resultDiv.innerHTML = '<div class="d-flex align-items-center gap-2 flex-wrap"><span class="badge ' + (isExact ? 'bg-success' : 'bg-warning text-dark') + '"><i class="fa-solid fa-check me-1"></i>' + (isExact ? 'Exact Match' : 'Street Level') + '</span><span class="text-muted small">(' + data.total_buildings + ' buildings)</span>' + zoneNameHtml + '</div>';
+                }
+                if (btn) { btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Verified'; btn.className = btn.className.replace('btn-outline-warning', 'btn-success'); }
+            } else {
+                if (accuracyInput) accuracyInput.value = '';
+                if (accuracyBadge) accuracyBadge.innerHTML = '';
+                if (mapLink) { mapLink.href = '#'; mapLink.classList.add('disabled', 'btn-outline-secondary'); mapLink.classList.remove('btn-success', 'btn-warning'); }
+                if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Not found in QNAS</span>';
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-satellite-dish me-1"></i>Validate'; }
             }
-            if (mapLink) {
-                mapLink.href = `https://www.google.com/maps?q=${lat},${lng}`;
-                mapLink.classList.remove('disabled', 'btn-outline-secondary', 'btn-success', 'btn-warning');
-                mapLink.classList.add(isExact ? 'btn-success' : 'btn-warning');
-            }
-            if (accuracyBadge) {
-                accuracyBadge.innerHTML = isExact
-                    ? '<span class="badge bg-success" style="font-size:.7rem">Exact</span>'
-                    : '<span class="badge bg-warning text-dark" style="font-size:.7rem">Street</span>';
-            }
-            if (resultDiv) {
-                const zoneNameHtml = zoneName ? `<span class="text-muted small ms-1">${zoneName}</span>` : '';
-                resultDiv.innerHTML = `<div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="badge ${isExact ? 'bg-success' : 'bg-warning text-dark'}"><i class="fa-solid fa-check me-1"></i>${isExact ? 'Exact Match' : 'Street Level'}</span>
-                    <span class="text-muted small">(${data.total_buildings} buildings)</span>${zoneNameHtml}</div>`;
-            }
-            if (btn) { btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Verified'; btn.className = btn.className.replace('btn-outline-warning', 'btn-success'); }
-        } else {
-            if (accuracyInput) accuracyInput.value = '';
-            if (accuracyBadge) accuracyBadge.innerHTML = '';
-            if (mapLink) { mapLink.href = '#'; mapLink.classList.add('disabled', 'btn-outline-secondary'); mapLink.classList.remove('btn-success', 'btn-warning'); }
-            if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Not found in QNAS</span>';
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-satellite-dish me-1"></i>Validate'; }
-        }
+        });
     } catch (error) {
         console.error('[QNAS] qnasValidateAndFill error:', error);
         if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Connection error</span>';
@@ -288,7 +297,7 @@ function _getCsrfToken() {
     var cookies = document.cookie.split(';');
     for (var i = 0; i < cookies.length; i++) {
         var c = cookies[i].trim();
-        if (c.startsWith('csrftoken=')) return c.substring('csrftoken='.length);
+        if (c.indexOf('csrftoken=') === 0) return c.substring('csrftoken='.length);
     }
     // Meta tag
     var meta = document.querySelector('meta[name="csrf-token"]');
@@ -308,7 +317,7 @@ function _setProgress(btn, resultDiv, step, message) {
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>' + pct + '%';
-        btn.className = btn.className.replace(/btn-outline-info|btn-success|btn-outline-danger/g, 'btn-outline-info');
+        btn.className = 'btn-outline-info';
         btn.style.color = '#8b1a3a';
         btn.style.borderColor = '#8b1a3a';
     }
@@ -325,20 +334,27 @@ function _setProgress(btn, resultDiv, step, message) {
  */
 function _getAccuracyInfo(geocodeSource, confidence) {
     var pct = Math.round((confidence || 0) * 100);
+    var result;
     switch (geocodeSource) {
         case 'qnas_exact':
-            return { badgeClass: 'bg-success', badgeStyle: '', label: 'Exact', accuracy: 'exact', mapBtnClass: 'btn-success' };
+            result = { badgeClass: 'bg-success', badgeStyle: '', label: 'Exact', accuracy: 'exact', mapBtnClass: 'btn-success' };
+            break;
         case 'qnas_street':
-            return { badgeClass: 'bg-warning text-dark', badgeStyle: '', label: 'Street', accuracy: 'street', mapBtnClass: 'btn-warning' };
+            result = { badgeClass: 'bg-warning text-dark', badgeStyle: '', label: 'Street', accuracy: 'street', mapBtnClass: 'btn-warning' };
+            break;
         case 'landmark':
-            return { badgeClass: 'text-white', badgeStyle: 'background:#8b1a3a', label: 'Area ' + pct + '%', accuracy: 'landmark', mapBtnClass: 'btn-outline-danger' };
+            result = { badgeClass: 'text-white', badgeStyle: 'background:#8b1a3a', label: 'Area ' + pct + '%', accuracy: 'landmark', mapBtnClass: 'btn-outline-danger' };
+            break;
         case 'zone_center':
-            return { badgeClass: 'text-white', badgeStyle: 'background:#8b1a3a', label: 'Zone ~' + pct + '%', accuracy: 'zone_center', mapBtnClass: 'btn-outline-danger' };
+            result = { badgeClass: 'text-white', badgeStyle: 'background:#8b1a3a', label: 'Zone ~' + pct + '%', accuracy: 'zone_center', mapBtnClass: 'btn-outline-danger' };
+            break;
         case 'ai_estimate':
-            return { badgeClass: 'text-white', badgeStyle: 'background:#8b1a3a', label: 'AI ' + pct + '%', accuracy: 'ai_estimate', mapBtnClass: 'btn-outline-danger' };
+            result = { badgeClass: 'text-white', badgeStyle: 'background:#8b1a3a', label: 'AI ' + pct + '%', accuracy: 'ai_estimate', mapBtnClass: 'btn-outline-danger' };
+            break;
         default:
-            return { badgeClass: 'bg-secondary', badgeStyle: '', label: pct + '%', accuracy: '', mapBtnClass: 'btn-outline-secondary' };
+            result = { badgeClass: 'bg-secondary', badgeStyle: '', label: pct + '%', accuracy: '', mapBtnClass: 'btn-outline-secondary' };
     }
+    return result;
 }
 
 /** Show done state on AI parse button */
@@ -348,7 +364,7 @@ function _setDone(btn, label) {
     btn.style.color = '';
     btn.style.borderColor = '';
     btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>' + label;
-    btn.className = btn.className.replace(/btn-outline-info|btn-outline-danger/g, 'btn-success');
+    btn.className = 'btn-success';
 }
 
 /** Show error state */
@@ -359,21 +375,22 @@ function _setError(btn, resultDiv, message) {
         btn.style.color = '';
         btn.style.borderColor = '';
         btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Parse';
-        btn.className = btn.className.replace(/btn-success/g, 'btn-outline-info');
+        btn.className = 'btn-outline-info';
     }
 }
 
 /** Reset AI parse button to initial state after delay */
 function _resetBtnAfterDelay(btn, ms) {
+    ms = ms || 4000;
     setTimeout(function() {
         if (btn) {
             btn.disabled = false;
             btn.style.color = '';
             btn.style.borderColor = '';
             btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Parse';
-            btn.className = btn.className.replace(/btn-success|btn-outline-danger/g, 'btn-outline-info');
+            btn.className = 'btn-outline-info';
         }
-    }, ms || 4000);
+    }, ms);
 }
 
 /**
@@ -421,7 +438,7 @@ function _applyCoords(opts, lat, lng, info) {
  * @param {string} resultId   - ID of the result container
  * @param {object} extra      - { qnasOpts: opts to pass to qnasValidateAndFill }
  */
-async function aiParseAddress(addressId, zoneId, streetId, buildingId, btnId, resultId, extra) {
+function aiParseAddress(addressId, zoneId, streetId, buildingId, btnId, resultId, extra) {
     var addressInput = document.getElementById(addressId);
     var btn = document.getElementById(btnId);
     var resultDiv = document.getElementById(resultId);
@@ -436,114 +453,117 @@ async function aiParseAddress(addressId, zoneId, streetId, buildingId, btnId, re
     _setProgress(btn, resultDiv, 1, 'Extracting address...');
 
     var csrfToken = _getCsrfToken();
-    var d;
     try {
-        var resp = await fetch(window.location.origin + '/api/ai-agent/tools/parse-address/', {
+        fetch(window.location.origin + '/api/ai-agent/tools/parse-address/', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
             body: JSON.stringify({ address: address })
+        }).then(function(resp) {
+            return resp.json();
+        }).then(function(data) {
+            var d = data.data || data;
+
+            var zone = d.zone_number;
+            var street = d.street_number;
+            var building = d.building_number;
+            var areaName = d.zone_name || d.area_name || '';
+            var confidence = d.confidence || 0;
+            var aiLat = d.coordinates ? d.coordinates.latitude : null;
+            var aiLng = d.coordinates ? d.coordinates.longitude : null;
+            var geocodeSource = d.geocode_source || null;
+
+            /* ── Step 2: Fill form fields ── */
+            _setProgress(btn, resultDiv, 2, 'Filling fields...');
+
+            var filled = [];
+            if (zone) { document.getElementById(zoneId).value = zone; filled.push('Zone ' + zone); }
+            if (street) { document.getElementById(streetId).value = street; filled.push('St ' + street); }
+            if (building) { document.getElementById(buildingId).value = building; filled.push('Bldg ' + building); }
+
+            var parsedStreet = parseInt(street);
+            var hasValidStreet = street && !isNaN(parsedStreet) && parsedStreet > 0;
+            var qOpts = extra ? extra.qnasOpts : null;
+
+            /* ── Step 3: Zone + Street + Building → QNAS exact (green) ── */
+            if (zone && hasValidStreet && building) {
+                _setProgress(btn, resultDiv, 3, 'QNAS verifying building...');
+                if (qOpts) {
+                    // Call QNAS to finish filling coords
+                    _qnasAndFinish(qOpts, btn, resultDiv, filled, areaName, geocodeSource, confidence);
+                } else {
+                    _showFilledResult(btn, resultDiv, filled, areaName);
+                }
+                _resetBtnAfterDelay(btn, 4000);
+                return;
+            }
+
+            /* ── Step 4: Zone + Street (no building) → QNAS street-level (yellow) ── */
+            if (zone && hasValidStreet) {
+                _setProgress(btn, resultDiv, 4, 'QNAS verifying street...');
+                if (qOpts) {
+                    _qnasAndFinish(qOpts, btn, resultDiv, filled, areaName, geocodeSource, confidence);
+                } else {
+                    _showFilledResult(btn, resultDiv, filled, areaName);
+                }
+                _resetBtnAfterDelay(btn, 4000);
+                return;
+            }
+
+            /* ── Step 5: Zone only (or no zone) with coords → maroon badge ── */
+            if (aiLat && aiLng) {
+                var stepMsg = zone ? 'Geocoding area...' : 'Locating address...';
+                _setProgress(btn, resultDiv, 5, stepMsg);
+
+                var info = _getAccuracyInfo(geocodeSource, confidence);
+                if (qOpts) {
+                    _applyCoords(qOpts, aiLat, aiLng, info);
+                }
+
+                // Build result HTML
+                var html = '';
+                if (filled.length > 0) {
+                    html += '<span class="badge bg-info"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>' + filled.join(', ') + '</span> ';
+                }
+                if (areaName) {
+                    html += '<span class="text-muted small">' + areaName + '</span> ';
+                }
+                // Maroon confidence badge
+                var pct = Math.round(confidence * 100);
+                html += '<span class="badge text-white" style="font-size:.72rem;background:#8b1a3a">' + info.label + '</span>';
+
+                if (resultDiv) resultDiv.innerHTML = html;
+                _setDone(btn, filled.length > 0 ? 'Parsed' : 'Located');
+                _resetBtnAfterDelay(btn, 4000);
+                return;
+            }
+
+            /* ── Step 5b: Fields filled but no coords ── */
+            if (filled.length > 0) {
+                _showFilledResult(btn, resultDiv, filled, areaName);
+                _resetBtnAfterDelay(btn, 4000);
+                return;
+            }
+
+            /* ── Fallback: Nothing found ── */
+            _setError(btn, resultDiv, 'Could not parse address');
+        }).catch(function(error) {
+            console.error('[AI Parse] Error:', error);
+            _setError(btn, resultDiv, 'Parse failed');
         });
-        var data = await resp.json();
-        d = data.data || data;
     } catch (error) {
         console.error('[AI Parse] Error:', error);
         _setError(btn, resultDiv, 'Parse failed');
-        return;
     }
-
-    var zone = d.zone_number;
-    var street = d.street_number;
-    var building = d.building_number;
-    var areaName = d.zone_name || d.area_name || '';
-    var confidence = d.confidence || 0;
-    var aiLat = d.coordinates ? d.coordinates.latitude : null;
-    var aiLng = d.coordinates ? d.coordinates.longitude : null;
-    var geocodeSource = d.geocode_source || null;
-
-    /* ── Step 2: Fill form fields ── */
-    _setProgress(btn, resultDiv, 2, 'Filling fields...');
-
-    var filled = [];
-    if (zone) { document.getElementById(zoneId).value = zone; filled.push('Zone ' + zone); }
-    if (street) { document.getElementById(streetId).value = street; filled.push('St ' + street); }
-    if (building) { document.getElementById(buildingId).value = building; filled.push('Bldg ' + building); }
-
-    var parsedStreet = parseInt(street);
-    var hasValidStreet = street && !isNaN(parsedStreet) && parsedStreet > 0;
-    var qOpts = extra ? extra.qnasOpts : null;
-
-    /* ── Step 3: Zone + Street + Building → QNAS exact (green) ── */
-    if (zone && hasValidStreet && building) {
-        _setProgress(btn, resultDiv, 3, 'QNAS verifying building...');
-        if (qOpts) {
-            // Wait for QNAS to finish filling coords
-            await _qnasAndFinish(qOpts, btn, resultDiv, filled, areaName, geocodeSource, confidence);
-        } else {
-            _showFilledResult(btn, resultDiv, filled, areaName);
-        }
-        _resetBtnAfterDelay(btn, 4000);
-        return;
-    }
-
-    /* ── Step 4: Zone + Street (no building) → QNAS street-level (yellow) ── */
-    if (zone && hasValidStreet) {
-        _setProgress(btn, resultDiv, 4, 'QNAS verifying street...');
-        if (qOpts) {
-            await _qnasAndFinish(qOpts, btn, resultDiv, filled, areaName, geocodeSource, confidence);
-        } else {
-            _showFilledResult(btn, resultDiv, filled, areaName);
-        }
-        _resetBtnAfterDelay(btn, 4000);
-        return;
-    }
-
-    /* ── Step 5: Zone only (or no zone) with coords → maroon badge ── */
-    if (aiLat && aiLng) {
-        var stepMsg = zone ? 'Geocoding area...' : 'Locating address...';
-        _setProgress(btn, resultDiv, 5, stepMsg);
-
-        var info = _getAccuracyInfo(geocodeSource, confidence);
-        if (qOpts) {
-            _applyCoords(qOpts, aiLat, aiLng, info);
-        }
-
-        // Build result HTML
-        var html = '';
-        if (filled.length > 0) {
-            html += '<span class="badge bg-info"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>' + filled.join(', ') + '</span> ';
-        }
-        if (areaName) {
-            html += '<span class="text-muted small">' + areaName + '</span> ';
-        }
-        // Maroon confidence badge
-        var pct = Math.round(confidence * 100);
-        html += '<span class="badge text-white" style="font-size:.72rem;background:#8b1a3a">' + info.label + '</span>';
-
-        if (resultDiv) resultDiv.innerHTML = html;
-        _setDone(btn, filled.length > 0 ? 'Parsed' : 'Located');
-        _resetBtnAfterDelay(btn, 4000);
-        return;
-    }
-
-    /* ── Step 5b: Fields filled but no coords ── */
-    if (filled.length > 0) {
-        _showFilledResult(btn, resultDiv, filled, areaName);
-        _resetBtnAfterDelay(btn, 4000);
-        return;
-    }
-
-    /* ── Fallback: Nothing found ── */
-    _setError(btn, resultDiv, 'Could not parse address');
 }
 
 /**
  * Run qnasValidateAndFill then show final result
- * (wraps the async QNAS call so aiParseAddress can await it)
+ * (wraps the QNAS call so aiParseAddress can call it)
  */
-async function _qnasAndFinish(qOpts, btn, resultDiv, filled, areaName, geocodeSource, confidence) {
+function _qnasAndFinish(qOpts, btn, resultDiv, filled, areaName, geocodeSource, confidence) {
     try {
-        await qnasValidateAndFill(qOpts);
+        qnasValidateAndFill(qOpts);
         // After QNAS finishes, check if it actually set coords
         var latInput = qOpts.latId ? document.getElementById(qOpts.latId) : null;
         var latVal = latInput ? parseFloat(latInput.value) : 0;
@@ -578,13 +598,13 @@ function _showFilledResult(btn, resultDiv, filled, areaName) {
 
 // Auto-verify on page load if data-auto-verify attribute is present
 document.addEventListener('DOMContentLoaded', function() {
-    const autoVerifyButtons = document.querySelectorAll('[data-auto-verify="true"]');
-    autoVerifyButtons.forEach(btn => {
-        const zone = btn.dataset.zone;
-        const street = btn.dataset.street;
-        const building = btn.dataset.building || '';
-        const recordId = btn.dataset.recordId;
-        const orderId = btn.dataset.orderId || '';
+    var autoVerifyButtons = document.querySelectorAll('[data-auto-verify="true"]');
+    autoVerifyButtons.forEach(function(btn) {
+        var zone = btn.dataset.zone;
+        var street = btn.dataset.street;
+        var building = btn.dataset.building || '';
+        var recordId = btn.dataset.recordId;
+        var orderId = btn.dataset.orderId || '';
 
         if (zone && street && recordId) {
             verifyQNAS(zone, street, building, recordId, orderId);

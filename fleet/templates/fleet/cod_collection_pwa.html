@@ -44,6 +44,26 @@
     </div>
 </div>
 
+<!-- Payment Method Breakdown -->
+{% if payment_method_breakdown %}
+<div class="fleet-card fleet-slide-up" style="animation-delay: 0.05s; margin-bottom: 0;">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; padding: var(--spacing-md);">
+        {% for row in payment_method_breakdown %}
+        {% if row.total %}
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; background: var(--fleet-grey-50); border: 1px solid var(--fleet-grey-200); font-size: 0.8rem;">
+            {% if row.payment_method == 'cash' %}<i class="fa-solid fa-money-bill" style="color: #059669;"></i>{% endif %}
+            {% if row.payment_method == 'pos' %}<i class="fa-solid fa-credit-card" style="color: #2563eb;"></i>{% endif %}
+            {% if row.payment_method == 'fawran' %}<i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i>{% endif %}
+            {% if not row.payment_method %}<i class="fa-solid fa-circle-question" style="color: #9ca3af;"></i>{% endif %}
+            <span>{{ row.payment_method|default:"Unknown"|title }}</span>
+            <strong>{{ row.total|floatformat:2 }} QR</strong>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Filter Tabs -->
 <div class="fleet-tabs fleet-slide-up" style="animation-delay: 0.1s;">
     <button type="button" class="fleet-tab {% if not filter_days or filter_days == '7' %}active{% endif %}" onclick="filterByDays(7)">

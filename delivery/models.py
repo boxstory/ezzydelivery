@@ -329,6 +329,10 @@ class DeliveryTask(models.Model):
         choices=PAYMENT_METHOD_CHOICES,
         help_text="Customer preferred payment method"
     )
+    payment_split = models.JSONField(
+        null=True, blank=True,
+        help_text="Split COD payment by method: {cash: 100, fawran: 50}"
+    )
 
     # Earnings Verification Fields (for staff approval)
     EARNINGS_VERIFICATION_STATUS = [

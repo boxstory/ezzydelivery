@@ -159,7 +159,9 @@ urlpatterns = [
     path('fleet/earnings-verification/', workforce_views.earnings_verification, name='earnings_verification'),
     path('fleet/earnings-verification/action/', workforce_views.earnings_verification_action, name='earnings_verification_action'),
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
+    path('seller-transactions/', workforce_views.seller_transactions, name='seller_transactions'),
     path('fleet/bulk-settle-transactions/', workforce_views.bulk_settle_transactions, name='bulk_settle_transactions'),
+    path('fleet/recalculate-cod-balances/', workforce_views.recalculate_cod_balances, name='recalculate_cod_balances'),
     path('fleet/transactions/<int:txn_id>/cod-details/', workforce_views.fleet_transaction_cod_details, name='fleet_transaction_cod_details'),
     path('fleet/transactions/<int:txn_id>/update-status/', workforce_views.fleet_transaction_update_status, name='fleet_transaction_update_status'),
 
@@ -317,5 +319,8 @@ urlpatterns = [
 
     # WhatsApp Instances
     path('auto-triggers/whatsapp-instances/', workforce_views.whatsapp_instances_list, name='whatsapp_instances_list'),
+    path('whatsapp/get-instances/', workforce_views.whatsapp_get_instances, name='whatsapp_get_instances'),
+    path('whatsapp/last-message/', workforce_views.whatsapp_last_message, name='whatsapp_last_message'),
+    path('whatsapp/send-message/', workforce_views.whatsapp_send_message, name='whatsapp_send_message'),
 
 ]
