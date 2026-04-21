@@ -6706,6 +6706,25 @@ def delivery_task_detail(request, task_id):
                 'product', 'location', 'order_item'
             ).order_by('location__code')
 
+    # Calculate actual payment split from DriverTransaction records (not static stored values)
+    from django.db.models import Sum, DecimalField, Case, When, Value
+    payment_split_calc = {}
+    if task.cod_collected:
+        try:
+            from fleet.models import DriverTransaction
+            txns = DriverTransaction.objects.filter(
+                delivery_task=task,
+                transaction_type='cod_collection'
+            ).values('payment_method').annotate(
+                total=Sum('amount', output_field=DecimalField(max_digits=10, decimal_places=2))
+            )
+            for txn in txns:
+                method = txn['payment_method'] or 'cash'
+                amount = txn['total'] or 0
+                payment_split_calc[method] = float(amount)
+        except Exception:
+            pass
+
     context = {
         'page_title': f'Delivery Task #{task.dl_task_number}',
         'task': task,
@@ -6719,6 +6738,7 @@ def delivery_task_detail(request, task_id):
         'status_point_map': status_point_map,
         'pick_list': pick_list,
         'pick_list_items': pick_list_items,
+        'payment_split_calc': payment_split_calc,  # Calculated from actual transactions
     }
 
     return render(request, 'workforce/parts/delivery_task_detail.html', context)

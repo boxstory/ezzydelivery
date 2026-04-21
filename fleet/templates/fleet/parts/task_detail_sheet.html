@@ -851,10 +851,20 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const pm = card.dataset.paymentMethod || 'cash';
         const pmRadio = document.querySelector(`input[name="tdPaymentMethod"][value="${pm}"]`);
         if (pmRadio) pmRadio.checked = true;
-        // Reset split payment inputs
-        document.getElementById('tdSplitCash').value = '';
-        document.getElementById('tdSplitPos').value = '';
-        document.getElementById('tdSplitFawran').value = '';
+        // Pre-fill split payment inputs from task data
+        const splitCash = card.dataset.paymentSplitCash || '';
+        const splitPos = card.dataset.paymentSplitPos || '';
+        const splitFawran = card.dataset.paymentSplitFawran || '';
+        document.getElementById('tdSplitCash').value = splitCash || '';
+        document.getElementById('tdSplitPos').value = splitPos || '';
+        document.getElementById('tdSplitFawran').value = splitFawran || '';
+        // Pre-fill COD amount if available
+        const codCollected = card.dataset.codCollectedAmount;
+        if (codCollected) {
+            document.getElementById('tdCodAmount').value = codCollected;
+            document.getElementById('tdCodCollected').checked = true;
+            document.getElementById('tdCodAmountRow').style.display = 'block';
+        }
         updateRemaining();
         // Set min date for postpone (tomorrow)
         const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);

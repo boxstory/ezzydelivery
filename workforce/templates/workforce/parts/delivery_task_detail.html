@@ -96,13 +96,6 @@
                                     <span class="dtd__cod__amount">{{ task.order.cod_amount|default:0 }}</span>
                                     <span class="dtd__cod__currency">QAR</span>
                                 </div>
-                                {% if task.cod_collected and task.cod_collected_amount and task.driver %}
-                                <div class="mt-2">
-                                    <button type="button" class="btn btn-sm btn-outline-danger" id="dtd_btn_cod_return" data-task-id="{{ task.id }}">
-                                        <i class="fa-solid fa-rotate-left me-1"></i> Process COD Return
-                                    </button>
-                                </div>
-                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -783,6 +776,92 @@
                 </div>
             </div>
 
+            <!-- Payment Method Card -->
+            {% if task.payment_method or task.cod_collected %}
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-credit-card"></i>
+                        Payment Method
+                    </div>
+                </div>
+                <div class="dtd__card__body">
+                    <div class="dtd__fields">
+                        {% if task.payment_method %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-wallet"></i> Method</span>
+                            <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.25rem;">
+                                {% if task.payment_method == 'cash' %}
+                                <i class="fa-solid fa-money-bill" style="color:#10b981;"></i>
+                                <span class="dtd__field__value">Cash</span>
+                                {% elif task.payment_method == 'card' %}
+                                <i class="fa-solid fa-credit-card" style="color:#3b82f6;"></i>
+                                <span class="dtd__field__value">Card</span>
+                                {% elif task.payment_method == 'pos' %}
+                                <i class="fa-solid fa-square-terminal" style="color:#8b5cf6;"></i>
+                                <span class="dtd__field__value">POS</span>
+                                {% elif task.payment_method == 'fawran' %}
+                                <i class="fa-solid fa-mobile-screen" style="color:#f59e0b;"></i>
+                                <span class="dtd__field__value">Fawran</span>
+                                {% else %}
+                                <span class="dtd__field__value text-muted">{{ task.get_payment_method_display|default:'—' }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if task.cod_collected %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-check-circle"></i> COD Status</span>
+                            <span class="dtd__field__value" style="color:#10b981; font-weight:600;">✓ Collected</span>
+                            {% if task.cod_collected_at %}
+                            <div style="font-size:0.75rem; color:#6b7280; margin-top:0.25rem;">
+                                <i class="fa-regular fa-clock me-1"></i>{{ task.cod_collected_at|date:"M d, Y H:i" }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {% if task.cod_collected_amount %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-money-bill-wave"></i> Amount Collected</span>
+                            <span class="dtd__field__value fw-semibold">{{ task.cod_collected_amount }} QAR</span>
+                        </div>
+                        {% endif %}
+                        {% if payment_split_calc %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-chart-pie"></i> Payment Split (Calculated)</span>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.25rem;">
+                                {% if payment_split_calc.cash %}
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#f0fdf4; border-radius:0.375rem; border-left:3px solid #10b981;">
+                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-money-bill me-1" style="color:#10b981;"></i> Cash</span>
+                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.cash|floatformat:2 }} QAR</strong>
+                                </div>
+                                {% endif %}
+                                {% if payment_split_calc.pos %}
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#eff6ff; border-radius:0.375rem; border-left:3px solid #3b82f6;">
+                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-square-terminal me-1" style="color:#3b82f6;"></i> POS</span>
+                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.pos|floatformat:2 }} QAR</strong>
+                                </div>
+                                {% endif %}
+                                {% if payment_split_calc.fawran %}
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#fffbeb; border-radius:0.375rem; border-left:3px solid #f59e0b;">
+                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-mobile-screen me-1" style="color:#f59e0b;"></i> Fawran</span>
+                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.fawran|floatformat:2 }} QAR</strong>
+                                </div>
+                                {% endif %}
+                                {% if payment_split_calc.card %}
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#eff6ff; border-radius:0.375rem; border-left:3px solid #3b82f6;">
+                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-credit-card me-1" style="color:#3b82f6;"></i> Card</span>
+                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.card|floatformat:2 }} QAR</strong>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
         </div>
     </div>
 
@@ -1123,45 +1202,6 @@
 
     // Auto-refresh every hour
     setInterval(function() { location.reload(); }, 3600000);
-
-    // COD Return button handler
-    (function() {
-        var codReturnBtn = document.getElementById('dtd_btn_cod_return');
-        if (!codReturnBtn) return;
-
-        codReturnBtn.addEventListener('click', function() {
-            var taskId = this.dataset.taskId;
-            var notes = prompt('Enter notes for COD return (optional):');
-            if (notes === null) return; // cancelled
-
-            if (!confirm('Are you sure you want to process a COD return for this task?')) return;
-
-            codReturnBtn.disabled = true;
-            codReturnBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing...';
-
-            fetch('/workforce/delivery-task/' + taskId + '/cod-return/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-                body: JSON.stringify({ notes: notes })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown error'));
-                    codReturnBtn.disabled = false;
-                    codReturnBtn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i> Process COD Return';
-                }
-            })
-            .catch(function(err) {
-                alert('Request failed: ' + err);
-                codReturnBtn.disabled = false;
-                codReturnBtn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i> Process COD Return';
-            });
-        });
-    })();
 
 </script>
 

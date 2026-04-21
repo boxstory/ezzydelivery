@@ -148,6 +148,62 @@ Usage:
             {% endfor %}
             {% endif %}
 
+            <!-- Payment Method (if COD collected) -->
+            {% if delivery_task.cod_collected and delivery_task.cod_collected_at %}
+            <div class="odp__tl-item">
+                <div class="odp__tl-track">
+                    <div class="odp__tl-icon odp__tl-icon--cod"><i class="fa-solid fa-credit-card"></i></div>
+                </div>
+                <div class="odp__tl-body">
+                    <div class="odp__tl-card-inner">
+                        <div class="odp__tl-row">
+                            <span class="odp__tl-title">COD Collected</span>
+                            <span class="odp__tl-timestamp"><i class="fa-regular fa-clock me-1"></i>{{ delivery_task.cod_collected_at|date:"d M Y, H:i" }}</span>
+                        </div>
+                        <div class="odp__tl-detail">
+                            {% if delivery_task.payment_method == 'cash' %}
+                            <span class="odp__tl-pill" style="background:#f0fdf4; color:#166534; border:1px solid #86efac;"><i class="fa-solid fa-money-bill me-1"></i> Cash</span>
+                            {% elif delivery_task.payment_method == 'pos' %}
+                            <span class="odp__tl-pill" style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe;"><i class="fa-solid fa-square-terminal me-1"></i> POS</span>
+                            {% elif delivery_task.payment_method == 'fawran' %}
+                            <span class="odp__tl-pill" style="background:#fffbeb; color:#92400e; border:1px solid #fcd34d;"><i class="fa-solid fa-mobile-screen me-1"></i> Fawran</span>
+                            {% elif delivery_task.payment_method == 'card' %}
+                            <span class="odp__tl-pill" style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe;"><i class="fa-solid fa-credit-card me-1"></i> Card</span>
+                            {% else %}
+                            <span class="odp__tl-pill odp__tl-pill--muted">Payment Method: {{ delivery_task.get_payment_method_display|default:'Not specified' }}</span>
+                            {% endif %}
+                            <span class="odp__tl-pill odp__tl-pill--muted">{{ delivery_task.cod_collected_amount|default:delivery_task.order.cod_amount|default:0 }} QAR</span>
+                        </div>
+                        {% if payment_split_calc %}
+                        <div class="odp__tl-detail" style="margin-top:0.75rem; font-size:0.875rem;">
+                            <strong style="display:block; margin-bottom:0.5rem;">Payment Split (from transactions):</strong>
+                            {% if payment_split_calc.cash %}
+                            <div style="padding:0.35rem 0.5rem; background:#f0fdf4; border-radius:0.25rem; margin-bottom:0.25rem;">
+                                <i class="fa-solid fa-money-bill" style="color:#10b981;"></i> Cash: <strong>{{ payment_split_calc.cash|floatformat:2 }} QAR</strong>
+                            </div>
+                            {% endif %}
+                            {% if payment_split_calc.pos %}
+                            <div style="padding:0.35rem 0.5rem; background:#eff6ff; border-radius:0.25rem; margin-bottom:0.25rem;">
+                                <i class="fa-solid fa-square-terminal" style="color:#3b82f6;"></i> POS: <strong>{{ payment_split_calc.pos|floatformat:2 }} QAR</strong>
+                            </div>
+                            {% endif %}
+                            {% if payment_split_calc.fawran %}
+                            <div style="padding:0.35rem 0.5rem; background:#fffbeb; border-radius:0.25rem; margin-bottom:0.25rem;">
+                                <i class="fa-solid fa-mobile-screen" style="color:#f59e0b;"></i> Fawran: <strong>{{ payment_split_calc.fawran|floatformat:2 }} QAR</strong>
+                            </div>
+                            {% endif %}
+                            {% if payment_split_calc.card %}
+                            <div style="padding:0.35rem 0.5rem; background:#eff6ff; border-radius:0.25rem;">
+                                <i class="fa-solid fa-credit-card" style="color:#3b82f6;"></i> Card: <strong>{{ payment_split_calc.card|floatformat:2 }} QAR</strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Delivered / Fulfilled timestamps -->
             {% if order.delivered_at %}
             <div class="odp__tl-item">
