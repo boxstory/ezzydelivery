@@ -1,0 +1,220 @@
+/* ==========================================================================
+   Bulk Print Labels - Print Template Styles
+   ========================================================================== */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #ccc;
+  font-size: 12px;
+  color: #000;
+}
+
+/* ── Screen controls bar ── */
+.ctrl-bar {
+  background: #1e293b;
+  color: #fff;
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.ctrl-bar h1 { font-size: 0.95rem; font-weight: 600; flex: 1; }
+.ctrl-bar .cnt { font-size: 0.8rem; opacity: 0.65; }
+.ctrl-btn {
+  padding: 0.35rem 0.9rem;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.ctrl-btn--print { background: #2563eb; color: #fff; }
+.ctrl-btn--close  { background: #64748b; color: #fff; }
+
+/* ── Page wrapper — 4×6 inch label ── */
+.label-wrap {
+  width: 4in;
+  height: 6in;
+  margin: 6mm auto;
+  background: #fff;
+  border: 1px solid #aaa;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+}
+.label-wrap:last-child { page-break-after: auto; break-after: auto; }
+
+/* ── Label top: number + title + logo ── */
+.lbl-top {
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid #000;
+  padding: 4px 6px;
+  gap: 6px;
+}
+.lbl-top__num {
+  font-size: 14px;
+  font-weight: 800;
+  min-width: 22px;
+  text-align: center;
+  border-right: 1px solid #000;
+  padding-right: 6px;
+  margin-right: 2px;
+}
+.lbl-top__title {
+  font-size: 12px;
+  font-weight: 700;
+  flex: 1;
+}
+.lbl-top__logo {
+  width: 48px;
+  height: 48px;
+  border: 1.5px solid #000;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.lbl-top__logo img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+/* ── Info table rows ── */
+.lbl-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.lbl-table td {
+  padding: 3px 6px;
+  vertical-align: top;
+  border-bottom: 1px solid #ddd;
+  font-size: 11px;
+}
+.lbl-table .td-key {
+  width: 80px;
+  color: #333;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.lbl-table .td-val {
+  font-weight: 400;
+  color: #000;
+}
+/* Highlighted row — Task No */
+.row-taskno td {
+  background: #f0f0f0;
+  font-weight: 700;
+  border-top: 1px solid #aaa;
+  border-bottom: 1px solid #aaa;
+}
+/* Customer row */
+.row-customer .td-val {
+  font-weight: 700;
+  font-size: 12px;
+  color: #1a237e;
+}
+/* COD row */
+.row-cod .td-val {
+  font-weight: 700;
+  color: #b71c1c;
+}
+
+/* ── SKU section ── */
+.lbl-sku {
+  padding: 4px 6px;
+  border-bottom: 1px solid #ddd;
+  font-size: 11px;
+}
+.lbl-sku__title {
+  font-weight: 700;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+.lbl-sku__line {
+  padding: 1px 0;
+  color: #222;
+}
+
+/* ── Locality / address row ── */
+.lbl-locality {
+  display: flex;
+  padding: 4px 6px;
+  border-bottom: 1px solid #ddd;
+  gap: 6px;
+  font-size: 11px;
+}
+.lbl-locality__key { width: 80px; color: #333; flex-shrink: 0; }
+.lbl-locality__val { font-weight: 700; font-size: 12px; }
+
+/* ── QR + body side-by-side ── */
+.lbl-body {
+  display: flex;
+}
+.lbl-body__main { flex: 1; }
+.lbl-body__qr {
+  width: 80px;
+  flex-shrink: 0;
+  border-left: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 6px 4px;
+  gap: 3px;
+}
+.lbl-body__qr img {
+  width: 68px;
+  height: 68px;
+  display: block;
+}
+.lbl-body__qr-num {
+  font-size: 7px;
+  text-align: center;
+  color: #555;
+  word-break: break-all;
+}
+.lbl-body__qr-placeholder {
+  width: 68px;
+  height: 68px;
+  border: 1px dashed #bbb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: #aaa;
+  text-align: center;
+}
+
+/* ── Empty state ── */
+.lbl-empty {
+  width: 4in;
+  margin: 3rem auto;
+  background: #fff;
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  border-radius: 4px;
+}
+
+/* ── PRINT ── */
+@page {
+  size: 4in 6in;
+  margin: 0;
+}
+@media print {
+  body { background: #fff; }
+  .ctrl-bar { display: none !important; }
+  .label-wrap {
+    width: 4in;
+    height: 6in;
+    margin: 0;
+    border: none;
+    overflow: hidden;
+  }
+}

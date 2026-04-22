@@ -381,6 +381,51 @@
 </div>{% endwith %}
 {% endfor %}
 
+<!-- Pagination Controls -->
+{% if paginator.num_pages > 1 %}
+<div class="fleet-pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page=1&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
+       class="fleet-pagination__btn fleet-pagination__btn--first" title="First page">
+        <i class="fa-solid fa-angles-left"></i>
+    </a>
+    <a href="?page={{ page_obj.previous_page_number }}&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
+       class="fleet-pagination__btn fleet-pagination__btn--prev" title="Previous page">
+        <i class="fa-solid fa-angle-left"></i>
+    </a>
+    {% else %}
+    <button class="fleet-pagination__btn fleet-pagination__btn--first" disabled>
+        <i class="fa-solid fa-angles-left"></i>
+    </button>
+    <button class="fleet-pagination__btn fleet-pagination__btn--prev" disabled>
+        <i class="fa-solid fa-angle-left"></i>
+    </button>
+    {% endif %}
+
+    <div class="fleet-pagination__info">
+        <span class="fleet-pagination__current">{{ page_obj.number }} / {{ paginator.num_pages }}</span>
+    </div>
+
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
+       class="fleet-pagination__btn fleet-pagination__btn--next" title="Next page">
+        <i class="fa-solid fa-angle-right"></i>
+    </a>
+    <a href="?page={{ paginator.num_pages }}&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
+       class="fleet-pagination__btn fleet-pagination__btn--last" title="Last page">
+        <i class="fa-solid fa-angles-right"></i>
+    </a>
+    {% else %}
+    <button class="fleet-pagination__btn fleet-pagination__btn--next" disabled>
+        <i class="fa-solid fa-angle-right"></i>
+    </button>
+    <button class="fleet-pagination__btn fleet-pagination__btn--last" disabled>
+        <i class="fa-solid fa-angles-right"></i>
+    </button>
+    {% endif %}
+</div>
+{% endif %}
+
 {% else %}
 <!-- Empty State -->
 <div class="fleet-empty fleet-fade-in">

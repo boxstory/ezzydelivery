@@ -79,8 +79,7 @@
                     </div>
                     <!-- Progress bar -->
                     <div class="progress mb-2" style="height: 10px; border-radius: 10px; overflow: hidden; background-color: #e9ecef;">
-                        <div class="progress-bar {% if profile.get_profile_completion_percentage == 100 %}bg-success{% elif profile.get_profile_completion_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
-                             style="width: {{ profile.get_profile_completion_percentage }}% !important; min-width: 2%; transition: width 0.3s ease;"></div>
+                        <div style="width: {{ profile.get_profile_completion_percentage }}% !important; height: 100%; background-color: {% if profile.get_profile_completion_percentage == 100 %}#198754{% elif profile.get_profile_completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %}; transition: width 0.3s ease; border-radius: 10px;"></div>
                     </div>
                     <!-- Status -->
                     <small class="mt-2 d-block">
@@ -157,9 +156,8 @@
                         </span>
                     </div>
                     <!-- Progress bar -->
-                    <div class="progress mb-2" style="height: 10px; border-radius: 10px; overflow: hidden;">
-                        <div class="progress-bar {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
-                             style="width: {{ completion_percentage }}%; transition: width 0.3s ease; border-radius: 10px;"></div>
+                    <div class="progress mb-2" style="height: 10px; border-radius: 10px; overflow: hidden; background-color: #e9ecef;">
+                        <div style="width: {{ completion_percentage }}% !important; height: 100%; background-color: {% if completion_percentage == 100 %}#198754{% elif completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %}; transition: width 0.3s ease; border-radius: 10px;"></div>
                     </div>
                     <!-- Status -->
                     <small class="mt-2 d-block">
@@ -182,6 +180,7 @@
             <div class="col-12">
                 <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-building me-2"></i>Business Details</h6>
             </div>
+            <!-- Row 1 -->
             <div class="col-md-6">
                 <div class="mb-3">
                     <label class="form-label text-muted small">Business Code</label>
@@ -252,6 +251,71 @@
                             <i class="fa-solid fa-check text-success ms-2"></i>
                         {% else %}
                             <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <!-- Row 2 -->
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business Bio</label>
+                    <div class="form-control form-control-plaintext" style="min-height: 80px; white-space: pre-wrap;">
+                        {% if business.business_bio %}
+                            {{ business.business_bio }}
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business Since</label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_since %}
+                            {{ business.business_since|date:"M d, Y" }}
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Languages</label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_languages %}
+                            {{ business.business_languages }}
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Facebook Page</label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_facebook_page %}
+                            {{ business.business_facebook_page }}
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Instagram</label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_instagram %}
+                            {{ business.business_instagram }}
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Created At</label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.created_at %}
+                            {{ business.created_at|date:"M d, Y - g:i A" }}
+                        {% else %}
+                            <em class="text-muted">Not available</em>
                         {% endif %}
                     </div>
                 </div>

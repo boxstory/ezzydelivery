@@ -19,7 +19,7 @@
 
     <!-- PWA Modern CSS -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260408a">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260421g">
     <!-- Fleet Component CSS - fth__ ffs__ fpm__ BEM blocks -->
     <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260317k">
 
@@ -40,18 +40,6 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; touch-action: pan-y; }
         html, body { overflow-x: hidden; position: relative; height: 100%; }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-        /* GPS status dot on map icon */
-        .fleet-gps-dot {
-            position: absolute; top: 2px; right: 2px;
-            width: 10px; height: 10px;
-            border-radius: 50%;
-            border: 2px solid var(--brand-primary, #001f3f);
-        }
-        .fleet-gps-dot--green { background: #10b981; animation: gps-pulse 2s infinite; }
-        .fleet-gps-dot--red { background: #ef4444; }
-        .fleet-gps-dot--yellow { background: #f59e0b; }
-        .fleet-gps-dot--grey { background: #9ca3af; }
-        @keyframes gps-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
 </head>
 <body>
@@ -66,7 +54,7 @@
                 <h1 class="fleet-pwa__title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="fleet-pwa__header-actions">
                     {% block header_actions %}
-                    <a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon" title="Tasks Map" style="text-decoration:none; position:relative;">
+                    <a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon fleet-pwa__header-link" title="Tasks Map">
                         <i class="fa-solid fa-map-location-dot"></i>
                         <span id="fleet_gps_status_dot" class="fleet-gps-dot fleet-gps-dot--grey" title="GPS: checking…"></span>
                     </a>

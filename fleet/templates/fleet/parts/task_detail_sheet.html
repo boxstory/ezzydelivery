@@ -6,14 +6,6 @@ Requires: openTaskDetail(event, cardEl) to be called from a .task-card onclick.
 The card element must have data-* attributes as defined in driver_tasks_pwa.html.
 {% endcomment %}
 
-<!-- COD warning shake animation -->
-<style>
-@keyframes td-cod-shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-  20%, 40%, 60%, 80% { transform: translateX(4px); }
-}
-</style>
 
 <!-- ── Task Detail Bottom Sheet ───────────────────────── -->
 <div id="taskDetailOverlay" class="td-overlay" onclick="closeTaskDetail()"></div>
@@ -243,23 +235,23 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                 <label class="td-form-label">Amount Collected (QR)</label>
                 <input type="number" id="tdCodAmount" class="td-form-input" placeholder="0.00" step="0.01" min="0">
                 <label class="td-form-label" style="margin-top:10px;">Payment Breakdown</label>
-                <div class="td-payment-split" style="display:flex;flex-direction:column;gap:8px;">
-                    <div style="display:flex;gap:8px;align-items:center;">
+                <div class="td-payment-split td-split-row" style="flex-direction:column;">
+                    <div class="td-split-row">
                         <i class="fa-solid fa-money-bill" style="color:#059669;width:24px;"></i>
-                        <label style="flex:1;display:flex;align-items:center;gap:6px;">Cash</label>
-                        <input type="number" id="tdSplitCash" class="td-form-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()" style="width:80px;padding:4px 8px;height:auto;">
+                        <label class="td-split-label">Cash</label>
+                        <input type="number" id="tdSplitCash" class="td-form-input td-split-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()">
                     </div>
-                    <div style="display:flex;gap:8px;align-items:center;">
+                    <div class="td-split-row">
                         <i class="fa-solid fa-credit-card" style="color:#2563eb;width:24px;"></i>
-                        <label style="flex:1;display:flex;align-items:center;gap:6px;">POS</label>
-                        <input type="number" id="tdSplitPos" class="td-form-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()" style="width:80px;padding:4px 8px;height:auto;">
+                        <label class="td-split-label">POS</label>
+                        <input type="number" id="tdSplitPos" class="td-form-input td-split-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()">
                     </div>
-                    <div style="display:flex;gap:8px;align-items:center;">
+                    <div class="td-split-row">
                         <i class="fa-solid fa-mobile-screen" style="color:#7c3aed;width:24px;"></i>
-                        <label style="flex:1;display:flex;align-items:center;gap:6px;">Fawran</label>
-                        <input type="number" id="tdSplitFawran" class="td-form-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()" style="width:80px;padding:4px 8px;height:auto;">
+                        <label class="td-split-label">Fawran</label>
+                        <input type="number" id="tdSplitFawran" class="td-form-input td-split-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()">
                     </div>
-                    <div style="padding:6px 8px;background:var(--fleet-grey-50);border-radius:4px;font-size:0.8rem;border:1px solid var(--fleet-grey-200);">
+                    <div class="td-remaining-box">
                         <strong>Remaining:</strong> <span id="tdRemaining" style="color:var(--fleet-primary);">0.00</span> QR
                     </div>
                 </div>

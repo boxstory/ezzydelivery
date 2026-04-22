@@ -1,0 +1,256 @@
+/* ── BLT: Business Live Tracking ── */
+
+.blt__wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.blt__map {
+  width: 100%;
+  height: calc(100vh - 160px);
+  min-height: 400px;
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* Leaflet z-index fixes */
+.blt__map .leaflet-pane { z-index: 2 !important; }
+.blt__map .leaflet-top,
+.blt__map .leaflet-bottom { z-index: 3 !important; }
+
+/* Summary chip floating on map */
+.blt__summary {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  background: var(--brand-primary, #001f3f);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.blt__summary-count {
+  background: var(--brand-warning, #f59e0b);
+  color: var(--brand-primary, #001f3f);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.blt__refresh-label {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+/* Recenter button */
+.blt__recenter {
+  position: absolute;
+  bottom: 20px;
+  right: 16px;
+  z-index: 400;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--brand-primary, #001f3f);
+  cursor: pointer;
+}
+
+.blt__recenter:active { background: #f3f4f6; }
+
+/* Delivery pin (red teardrop) */
+.blt__pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 2px solid #fff;
+}
+
+.blt__pin-inner {
+  transform: rotate(45deg);
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.blt__pin--delivery   { background: #ef4444; }
+.blt__pin--start_ride { background: #10b981; }
+.blt__pin--in_transit  { background: #f59e0b; }
+.blt__pin--out_for_delivery { background: #3b82f6; }
+
+/* Driver pin (blue pulsing dot) */
+.blt__driver-dot {
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+}
+
+.blt__driver-pulse {
+  width: 20px;
+  height: 20px;
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 50%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: blt-pulse 2s ease-out infinite;
+}
+
+@keyframes blt-pulse {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* Popup styling */
+.blt__popup {
+  min-width: 220px;
+  font-family: inherit;
+}
+
+.blt__popup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.blt__popup-task {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--brand-primary, #001f3f);
+}
+
+.blt__popup-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.blt__popup-badge--start_ride       { background: #d1fae5; color: #065f46; }
+.blt__popup-badge--in_transit        { background: #fef3c7; color: #92400e; }
+.blt__popup-badge--out_for_delivery  { background: #dbeafe; color: #1e40af; }
+
+.blt__popup-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.blt__popup-row i {
+  width: 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.blt__popup-row a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* Empty state */
+.blt__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  padding: 48px 24px;
+  color: #6b7280;
+}
+
+.blt__empty-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  opacity: 0.35;
+  color: var(--brand-primary, #001f3f);
+}
+
+.blt__empty h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.blt__empty p {
+  font-size: 14px;
+  margin-bottom: 20px;
+  max-width: 360px;
+}
+
+/* Page header */
+.blt__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 12px;
+}
+
+.blt__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.blt__title i {
+  color: var(--brand-primary, #001f3f);
+}
+
+@media (max-width: 767.98px) {
+  .blt__map {
+    height: calc(100vh - 130px);
+    border-radius: 0;
+  }
+
+  .blt__header {
+    padding: 12px 16px 8px;
+  }
+}

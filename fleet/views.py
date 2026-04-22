@@ -529,12 +529,24 @@ def cod_collection(request):
         all_time_cod_total = all_time_cod_qs.aggregate(total=Sum('cod_collected_amount'))['total'] or 0
 
         # All-time payment method breakdown for hero card
-        all_time_payment_breakdown = (
+        # Ensure all payment methods show (even with 0)
+        breakdown_dict = {}
+        for pm in ['cash', 'fawran', 'pos']:
+            breakdown_dict[pm] = 0
+
+        breakdown_qs = (
             all_time_cod_qs
             .values('payment_method')
             .annotate(total=Sum('cod_collected_amount'))
-            .order_by('-total')
         )
+        for row in breakdown_qs:
+            if row['payment_method'] in breakdown_dict:
+                breakdown_dict[row['payment_method']] = row['total']
+
+        all_time_payment_breakdown = [
+            {'payment_method': pm, 'total': breakdown_dict[pm]}
+            for pm in ['cash', 'fawran', 'pos']
+        ]
 
         # Get recent settled COD deliveries
         cod_in_hand_ids = list(cod_in_hand_list.values_list('id', flat=True))
@@ -550,6 +562,9 @@ def cod_collection(request):
             id__in=cod_in_hand_list.values_list('order_id', flat=True)
         ).select_related('business', 'pickup_location').order_by('-created_at')
 
+        # All-time orders count (non-filtered)
+        all_time_orders_count = all_time_cod_qs.count()
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
@@ -560,7 +575,7 @@ def cod_collection(request):
             'cod_in_hand_count': cod_in_hand_count,
             'cod_orders': cod_orders,
             'total_cod_in_hand': all_time_cod_total,
-            'total_orders': cod_in_hand_count,
+            'total_orders': all_time_orders_count,
             'payment_method_breakdown': payment_method_breakdown,
             'all_time_payment_breakdown': all_time_payment_breakdown,
             'filter_days': filter_days,
@@ -2353,6 +2368,7 @@ def driver_tasks(request):
     URL: /fleet/tasks/
     """
     from django.db.models import Prefetch
+    from django.core.paginator import Paginator
     from delivery import models as delivery_models
 
     try:
@@ -2368,6 +2384,7 @@ def driver_tasks(request):
     status_filter = request.GET.get('status', 'all')
     sort_by = request.GET.get('sort', 'date')
     zone_filter = request.GET.get('zone', '')
+    page = request.GET.get('page', 1)
 
     base_qs = delivery_models.DeliveryTask.objects.select_related(
         'order', 'order__business', 'order__pickup_location', 'driver', 'dl_to_address',
@@ -2472,13 +2489,19 @@ def driver_tasks(request):
     history_count = history_tasks.count()
 
     if tab == 'all':
-        cards = all_tasks[:50]
+        task_list = all_tasks
     elif tab == 'assigned':
-        cards = assigned_tasks[:50]
+        task_list = assigned_tasks
     elif tab == 'accepted':
-        cards = accepted_tasks[:50]
+        task_list = accepted_tasks
     else:
-        cards = history_tasks[:50]
+        task_list = history_tasks
+
+    paginator = Paginator(task_list, 20)
+    try:
+        cards = paginator.page(int(page))
+    except (paginator.PageNotAnInteger, paginator.EmptyPage):
+        cards = paginator.page(1)
 
     # Available zones dropdown
     zone_numbers = delivery_models.DeliveryTask.objects.filter(
@@ -2519,6 +2542,8 @@ def driver_tasks(request):
     context = {
         'driver': driver,
         'cards': cards,
+        'page_obj': cards,
+        'paginator': paginator,
         'all_count': all_count,
         'assigned_count': assigned_count,
         'accepted_count': accepted_count,
