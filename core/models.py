@@ -163,6 +163,34 @@ class Profile(models.Model):
 
         return int((completed / len(required_fields)) * 100)
 
+    def get_business_profile_completion_percentage(self):
+        """Calculate business profile completion percentage"""
+        if not self.is_business:
+            return 0
+        try:
+            from business.models import Business
+            business = Business.objects.get(profile=self)
+            required_fields = ['business_name', 'business_phone', 'business_whatsapp',
+                             'business_email', 'business_product_category', 'business_qid']
+            completed = sum(1 for field in required_fields if getattr(business, field, None))
+            return int((completed / len(required_fields)) * 100)
+        except:
+            return 0
+
+    def get_driver_profile_completion_percentage(self):
+        """Calculate driver profile completion percentage"""
+        if not self.is_driver:
+            return 0
+        try:
+            from fleet.models import Driver
+            driver = Driver.objects.get(profile=self)
+            required_fields = ['driver_phone', 'driver_whatsapp', 'driver_languages',
+                             'driver_license_number', 'driver_bio']
+            completed = sum(1 for field in required_fields if getattr(driver, field, None))
+            return int((completed / len(required_fields)) * 100)
+        except:
+            return 0
+
     def can_apply_for_verification(self):
         """Check if user can apply for verification"""
         if self.is_business:

@@ -54,6 +54,14 @@
                 <i class="fa-solid fa-user-check me-2"></i>Application Details
             </h5>
             <div class="cve__profile-detail">
+                <strong>Request Number:</strong>
+                <span>{{ profile.user_number }}</span>
+            </div>
+            <div class="cve__profile-detail">
+                <strong>Username:</strong>
+                <span>{{ profile.username }}</span>
+            </div>
+            <div class="cve__profile-detail">
                 <strong>Name:</strong>
                 <span>{{ profile.first_name }} {{ profile.last_name }}</span>
             </div>
@@ -80,6 +88,42 @@
                         Recently
                     {% endif %}
                 </span>
+            </div>
+        </div>
+
+        <!-- Completion Bars (Full Width) -->
+        <div class="cve__completion-boxes">
+            <!-- User Profile Completion -->
+            <div class="cve__completion-box cve__completion-box--full">
+                <div class="cve__completion-header">
+                    <span class="cve__completion-title"><i class="fa-solid fa-user-check me-2"></i>User Profile</span>
+                    <span class="cve__completion-percent cve__completion-percent--success">{{ profile.get_profile_completion_percentage }}%</span>
+                </div>
+                <div class="cve__completion-bar">
+                    <div class="cve__completion-fill {% if profile.get_profile_completion_percentage == 100 %}cve__completion-fill--success{% elif profile.get_profile_completion_percentage >= 50 %}cve__completion-fill--warning{% else %}cve__completion-fill--danger{% endif %}"
+                         style="width: {{ profile.get_profile_completion_percentage }}%"></div>
+                </div>
+                <div class="cve__completion-status">
+                    {% if profile.is_profile_completed %}<i class="fa-solid fa-check text-success me-1"></i>Complete{% else %}<i class="fa-solid fa-xmark text-danger me-1"></i>Incomplete{% endif %}
+                </div>
+            </div>
+            <!-- Role Profile Completion -->
+            <div class="cve__completion-box">
+                <div class="cve__completion-header">
+                    <span class="cve__completion-title">
+                        {% if profile.is_business %}<i class="fa-solid fa-building me-2"></i>Business Profile{% elif profile.is_driver %}<i class="fa-solid fa-car me-2"></i>Driver Profile{% else %}<i class="fa-solid fa-user me-2"></i>Role Profile{% endif %}
+                    </span>
+                    <span class="cve__completion-percent {% if profile.is_business and profile.is_business_profile_completed or profile.is_driver and profile.is_driver_profile_completed %}cve__completion-percent--success{% else %}cve__completion-percent--danger{% endif %}">
+                        {% if profile.is_business and profile.is_business_profile_completed or profile.is_driver and profile.is_driver_profile_completed %}100{% else %}0{% endif %}%
+                    </span>
+                </div>
+                <div class="cve__completion-bar">
+                    <div class="cve__completion-fill {% if profile.is_business and profile.is_business_profile_completed or profile.is_driver and profile.is_driver_profile_completed %}cve__completion-fill--success{% else %}cve__completion-fill--danger{% endif %}"
+                         style="width: {% if profile.is_business and profile.is_business_profile_completed or profile.is_driver and profile.is_driver_profile_completed %}100{% else %}0{% endif %}%"></div>
+                </div>
+                <div class="cve__completion-status">
+                    {% if profile.is_business and profile.is_business_profile_completed or profile.is_driver and profile.is_driver_profile_completed %}<i class="fa-solid fa-check text-success me-1"></i>Complete{% else %}<i class="fa-solid fa-xmark text-danger me-1"></i>Incomplete{% endif %}
+                </div>
             </div>
         </div>
 

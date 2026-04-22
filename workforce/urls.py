@@ -140,6 +140,8 @@ urlpatterns = [
     path('verification/teams/', workforce_views.team_verification_list, name='team_verification_list'),
     path('verification/<int:profile_id>/update-status/', workforce_views.update_verification_status, name='update_verification_status'),
     path('verification/team/<int:team_id>/update-status/', workforce_views.update_team_status, name='update_team_status'),
+    path('verification/<int:profile_id>/driver-profile/', workforce_views.view_user_driver_profile, name='view_user_driver_profile'),
+    path('verification/<int:profile_id>/business-profile/', workforce_views.view_user_business_profile, name='view_user_business_profile'),
 
     # Additional Orders URLs
     path('orders/reported/', workforce_views.orders_reported, name='wf_orders_reported'),

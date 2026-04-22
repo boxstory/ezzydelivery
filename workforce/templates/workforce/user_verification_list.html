@@ -154,17 +154,51 @@
             {% endif %}
         </div>
 
-        <!-- Profile Completion Bar -->
-        <div class="uvl__progress-wrap">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="uvl__section-head"><i class="fa-solid fa-chart-pie"></i> Profile Completion</span>
-                <span class="uvl__progress-pct {% if data.profile.get_profile_completion_percentage == 100 %}uvl__progress-pct--ok{% elif data.profile.get_profile_completion_percentage >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
-                    {{ data.profile.get_profile_completion_percentage }}%
-                </span>
+        <!-- Completion Bars (2 Columns) -->
+        <div class="row g-3">
+            <!-- User Profile Completion -->
+            <div class="col-sm-6">
+                <div class="uvl__progress-wrap">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="uvl__section-head"><i class="fa-solid fa-user-check"></i> User Profile</span>
+                        <span class="uvl__progress-pct {% if data.profile.get_profile_completion_percentage == 100 %}uvl__progress-pct--ok{% elif data.profile.get_profile_completion_percentage >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
+                            {{ data.profile.get_profile_completion_percentage }}%
+                        </span>
+                    </div>
+                    <div class="uvl__progress-bar">
+                        <div class="uvl__progress-fill {% if data.profile.get_profile_completion_percentage == 100 %}uvl__progress-fill--ok{% elif data.profile.get_profile_completion_percentage >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
+                             style="width: {{ data.profile.get_profile_completion_percentage }}%"></div>
+                    </div>
+                    <div class="small text-muted mt-1">
+                        {% if data.profile.is_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                    </div>
+                </div>
             </div>
-            <div class="uvl__progress-bar">
-                <div class="uvl__progress-fill {% if data.profile.get_profile_completion_percentage == 100 %}uvl__progress-fill--ok{% elif data.profile.get_profile_completion_percentage >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
-                     style="width: {{ data.profile.get_profile_completion_percentage }}%"></div>
+            <!-- Business/Driver Profile Completion -->
+            <div class="col-sm-6">
+                <div class="uvl__progress-wrap">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="uvl__section-head">
+                            {% if data.profile.is_business %}<i class="fa-solid fa-building"></i> Business Profile{% elif data.profile.is_driver %}<i class="fa-solid fa-car"></i> Driver Profile{% else %}<i class="fa-solid fa-user"></i> Role Profile{% endif %}
+                        </span>
+                        {% with role_completion=data.profile.get_business_profile_completion_percentage|add:data.profile.get_driver_profile_completion_percentage %}
+                        <span class="uvl__progress-pct {% if role_completion == 100 %}uvl__progress-pct--ok{% elif role_completion >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
+                            {{ role_completion }}%
+                        </span>
+                        {% endwith %}
+                    </div>
+                    <div class="uvl__progress-bar">
+                        {% with role_completion=data.profile.get_business_profile_completion_percentage|add:data.profile.get_driver_profile_completion_percentage %}
+                        <div class="uvl__progress-fill {% if role_completion == 100 %}uvl__progress-fill--ok{% elif role_completion >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
+                             style="width: {{ role_completion }}%"></div>
+                        {% endwith %}
+                    </div>
+                    <div class="small text-muted mt-1">
+                        {% with role_completion=data.profile.get_business_profile_completion_percentage|add:data.profile.get_driver_profile_completion_percentage %}
+                        {% if role_completion == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -342,11 +376,17 @@
         <!-- Action Buttons -->
         {% if data.profile.verification_status != 'verified' %}
         <div class="uvl__actions">
-            {% if data.business %}
+            {% if data.profile.is_business and data.business %}
+            <a href="{% url 'workforce:view_user_business_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-chart-line"></i> View Progress
+            </a>
             <a href="{% url 'workforce:seller_detail' data.business.business_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>
-            {% elif data.driver %}
+            {% elif data.profile.is_driver and data.driver %}
+            <a href="{% url 'workforce:view_user_driver_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-chart-line"></i> View Progress
+            </a>
             <a href="{% url 'workforce:driver_detail' data.driver.driver_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>
@@ -377,11 +417,17 @@
         </div>
         {% else %}
         <div class="uvl__actions">
-            {% if data.business %}
+            {% if data.profile.is_business and data.business %}
+            <a href="{% url 'workforce:view_user_business_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-chart-line"></i> View Progress
+            </a>
             <a href="{% url 'workforce:seller_detail' data.business.business_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>
-            {% elif data.driver %}
+            {% elif data.profile.is_driver and data.driver %}
+            <a href="{% url 'workforce:view_user_driver_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-chart-line"></i> View Progress
+            </a>
             <a href="{% url 'workforce:driver_detail' data.driver.driver_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>

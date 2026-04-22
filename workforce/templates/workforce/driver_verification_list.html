@@ -170,21 +170,43 @@
             </div>
         </div>
 
-        <!-- Profile Completion Bar -->
-        <div class="uvl__progress-wrap">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="uvl__section-head"><i class="fa-solid fa-chart-pie"></i> Profile Completion</span>
-                <span class="uvl__progress-pct {% if driver.profile.get_profile_completion_percentage == 100 %}uvl__progress-pct--ok{% elif driver.profile.get_profile_completion_percentage >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
-                    {{ driver.profile.get_profile_completion_percentage }}%
-                </span>
+        <!-- Completion Bars (2 Columns) -->
+        <div class="row g-3">
+            <!-- Profile Completion -->
+            <div class="col-sm-6">
+                <div class="uvl__progress-wrap">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="uvl__section-head"><i class="fa-solid fa-user-check"></i> User Profile</span>
+                        <span class="uvl__progress-pct {% if driver.profile.get_profile_completion_percentage == 100 %}uvl__progress-pct--ok{% elif driver.profile.get_profile_completion_percentage >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
+                            {{ driver.profile.get_profile_completion_percentage }}%
+                        </span>
+                    </div>
+                    <div class="uvl__progress-bar">
+                        <div class="uvl__progress-fill {% if driver.profile.get_profile_completion_percentage == 100 %}uvl__progress-fill--ok{% elif driver.profile.get_profile_completion_percentage >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
+                             style="width: {{ driver.profile.get_profile_completion_percentage }}%"></div>
+                    </div>
+                    <div class="small text-muted mt-1">
+                        {% if driver.profile.is_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                    </div>
+                </div>
             </div>
-            <div class="uvl__progress-bar">
-                <div class="uvl__progress-fill {% if driver.profile.get_profile_completion_percentage == 100 %}uvl__progress-fill--ok{% elif driver.profile.get_profile_completion_percentage >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
-                     style="width: {{ driver.profile.get_profile_completion_percentage }}%"></div>
-            </div>
-            <div class="d-flex gap-3 mt-1 small text-muted">
-                <span>Profile: {% if driver.profile.is_profile_completed %}<i class="fa-solid fa-check text-success"></i>{% else %}<i class="fa-solid fa-xmark text-danger"></i>{% endif %}</span>
-                <span>Driver Profile: {% if driver.profile.is_driver_profile_completed %}<i class="fa-solid fa-check text-success"></i>{% else %}<i class="fa-solid fa-xmark text-danger"></i>{% endif %}</span>
+            <!-- Driver Profile Completion -->
+            <div class="col-sm-6">
+                <div class="uvl__progress-wrap">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="uvl__section-head"><i class="fa-solid fa-car"></i> Driver Profile</span>
+                        <span class="uvl__progress-pct {% if driver.profile.is_driver_profile_completed %}uvl__progress-pct--ok{% else %}uvl__progress-pct--low{% endif %}">
+                            {% if driver.profile.is_driver_profile_completed %}100{% else %}0{% endif %}%
+                        </span>
+                    </div>
+                    <div class="uvl__progress-bar">
+                        <div class="uvl__progress-fill {% if driver.profile.is_driver_profile_completed %}uvl__progress-fill--ok{% else %}uvl__progress-fill--low{% endif %}"
+                             style="width: {% if driver.profile.is_driver_profile_completed %}100{% else %}0{% endif %}%"></div>
+                    </div>
+                    <div class="small text-muted mt-1">
+                        {% if driver.profile.is_driver_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -251,6 +273,9 @@
 
         <!-- Action Buttons -->
         <div class="uvl__actions">
+            <a href="{% url 'workforce:view_user_driver_profile' driver.profile.id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-chart-line"></i> View Progress
+            </a>
             <a href="{% url 'workforce:driver_detail' driver.driver_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> Full Profile
             </a>

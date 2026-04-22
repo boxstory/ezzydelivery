@@ -1,0 +1,295 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}View Business Profile - Staff Dashboard{% endblock title %}
+
+{% block content %}
+<div class="col-12">
+
+<!-- Header with Progress Circle -->
+<div class="wfd__hero">
+    <div class="wfd__hero-content d-flex align-items-center gap-4">
+        <!-- Circular Progress -->
+        <div style="flex-shrink: 0;">
+            <svg width="120" height="120" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                <!-- Background circle -->
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="8"/>
+                <!-- Progress circle -->
+                <circle cx="60" cy="60" r="50" fill="none"
+                        stroke="{% if completion_percentage == 100 %}#198754{% elif completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %}"
+                        stroke-width="8"
+                        stroke-dasharray="314.159"
+                        stroke-linecap="round"
+                        style="stroke-dashoffset: calc(314.159 - (314.159 * {{ completion_percentage }} / 100)); transition: all 0.3s ease;"/>
+            </svg>
+            <!-- Progress text overlay -->
+            <div style="position: absolute; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; margin-top: -120px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: {% if completion_percentage == 100 %}#198754{% elif completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %};">{{ completion_percentage }}%</div>
+                    <small style="color: #6c757d; font-size: 12px;">complete</small>
+                </div>
+            </div>
+        </div>
+        <!-- Title and Subtitle -->
+        <div>
+            <h1 class="wfd__hero-title mb-2"><i class="fa-solid fa-building me-2"></i>Business Profile</h1>
+            <p class="wfd__hero-subtitle mb-0">{{ profile.user.get_full_name }}</p>
+            <small class="text-muted d-block mt-2">
+                {% if completion_percentage == 100 %}
+                    <i class="fa-solid fa-check-circle text-success me-1"></i>Profile Complete
+                {% elif completion_percentage >= 75 %}
+                    <i class="fa-solid fa-exclamation-circle text-warning me-1"></i>{{ completion_percentage }}% Complete
+                {% elif completion_percentage >= 50 %}
+                    <i class="fa-solid fa-exclamation-circle text-warning me-1"></i>Half way there ({{ completion_percentage }}%)
+                {% else %}
+                    <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>Incomplete ({{ completion_percentage }}%)
+                {% endif %}
+            </small>
+        </div>
+    </div>
+</div>
+
+<!-- Back Link -->
+<a href="javascript:history.back()" class="btn btn-outline-secondary mb-3">
+    <i class="fa-solid fa-arrow-left me-2"></i>Back
+</a>
+
+<!-- Card -->
+<div class="card border-0 shadow-sm" style="border-radius: var(--brand-radius-lg);">
+    <div class="card-body p-4">
+
+        <!-- User Profile Completion (at top) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, {% if profile.get_profile_completion_percentage == 100 %}#d4edda{% elif profile.get_profile_completion_percentage >= 50 %}#fff3cd{% else %}#f8d7da{% endif %} 0%, rgba(255,255,255,0) 100%);">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-1"><i class="fa-solid fa-user-check me-2"></i>User Profile</h6>
+                            <small class="text-muted">
+                                {% if profile.get_profile_completion_percentage == 100 %}
+                                    All fields completed
+                                {% else %}
+                                    {{ profile.get_profile_completion_percentage }}% filled
+                                {% endif %}
+                            </small>
+                        </div>
+                        <span class="badge {% if profile.get_profile_completion_percentage == 100 %}bg-success{% elif profile.get_profile_completion_percentage >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %} p-2 fs-6">
+                            {{ profile.get_profile_completion_percentage }}%
+                        </span>
+                    </div>
+                    <!-- Progress bar -->
+                    <div class="progress mb-2" style="height: 10px; border-radius: 10px; overflow: hidden; background-color: #e9ecef;">
+                        <div class="progress-bar {% if profile.get_profile_completion_percentage == 100 %}bg-success{% elif profile.get_profile_completion_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+                             style="width: {{ profile.get_profile_completion_percentage }}% !important; min-width: 2%; transition: width 0.3s ease;"></div>
+                    </div>
+                    <!-- Status -->
+                    <small class="mt-2 d-block">
+                        {% if profile.get_profile_completion_percentage == 100 %}
+                            <i class="fa-solid fa-check-circle text-success me-1"></i><span class="text-success fw-bold">Complete</span>
+                        {% elif profile.get_profile_completion_percentage >= 50 %}
+                            <i class="fa-solid fa-exclamation-circle text-warning me-1"></i><span class="text-warning fw-bold">In Progress</span>
+                        {% else %}
+                            <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i><span class="text-danger fw-bold">Incomplete</span>
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Information -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-user me-2"></i>User Information</h6>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Name</label>
+                    <div class="form-control form-control-plaintext">{{ profile.user.get_full_name }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Email</label>
+                    <div class="form-control form-control-plaintext">{{ profile.user.email }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">User Number</label>
+                    <div class="form-control form-control-plaintext">{{ profile.user_number }}</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-info-circle me-2"></i>Profile Status</h6>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Verification Status</label>
+                    <div>
+                        <span class="badge bg-{% if profile.verification_status == 'verified' %}success{% elif profile.verification_status == 'under_review' %}info{% elif profile.verification_status == 'rejected' %}danger{% else %}warning{% endif %}">
+                            {{ profile.get_verification_status_display }}
+                        </span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Applied At</label>
+                    <div class="form-control form-control-plaintext">
+                        {% if profile.verification_applied_at %}
+                            {{ profile.verification_applied_at|date:"M d, Y - g:i A" }}
+                        {% else %}
+                            <em class="text-muted">Not yet applied</em>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Business Profile Completion (after user info) -->
+        <hr>
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, {% if completion_percentage == 100 %}#d4edda{% elif completion_percentage >= 50 %}#fff3cd{% else %}#f8d7da{% endif %} 0%, rgba(255,255,255,0) 100%);">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-1"><i class="fa-solid fa-building me-2"></i>Business Profile</h6>
+                            <small class="text-muted">
+                                {% if completion_percentage == 100 %}
+                                    All fields completed
+                                {% else %}
+                                    {{ completion_percentage }}% filled
+                                {% endif %}
+                            </small>
+                        </div>
+                        <span class="badge {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %} p-2 fs-6">
+                            {{ completion_percentage }}%
+                        </span>
+                    </div>
+                    <!-- Progress bar -->
+                    <div class="progress mb-2" style="height: 10px; border-radius: 10px; overflow: hidden;">
+                        <div class="progress-bar {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+                             style="width: {{ completion_percentage }}%; transition: width 0.3s ease; border-radius: 10px;"></div>
+                    </div>
+                    <!-- Status -->
+                    <small class="mt-2 d-block">
+                        {% if completion_percentage == 100 %}
+                            <i class="fa-solid fa-check-circle text-success me-1"></i><span class="text-success fw-bold">Complete</span>
+                        {% elif completion_percentage >= 50 %}
+                            <i class="fa-solid fa-exclamation-circle text-warning me-1"></i><span class="text-warning fw-bold">In Progress</span>
+                        {% else %}
+                            <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i><span class="text-danger fw-bold">Incomplete</span>
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        {% if business %}
+        <!-- Business Details -->
+        <hr>
+        <div class="row mb-4">
+            <div class="col-12">
+                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-building me-2"></i>Business Details</h6>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business Code</label>
+                    <div class="form-control form-control-plaintext fw-bold">{{ business.business_code }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business Name <span class="text-danger">*</span></label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_name %}
+                            {{ business.business_name }}
+                            <i class="fa-solid fa-check text-success ms-2"></i>
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business Phone <span class="text-danger">*</span></label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_phone %}
+                            {{ business.business_phone }}
+                            <i class="fa-solid fa-check text-success ms-2"></i>
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business WhatsApp <span class="text-danger">*</span></label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_whatsapp %}
+                            {{ business.business_whatsapp }}
+                            <i class="fa-solid fa-check text-success ms-2"></i>
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business Email <span class="text-danger">*</span></label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_email %}
+                            {{ business.business_email }}
+                            <i class="fa-solid fa-check text-success ms-2"></i>
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Product Category <span class="text-danger">*</span></label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_product_category %}
+                            {{ business.business_product_category }}
+                            <i class="fa-solid fa-check text-success ms-2"></i>
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">QID / License <span class="text-danger">*</span></label>
+                    <div class="form-control form-control-plaintext">
+                        {% if business.business_qid %}
+                            {{ business.business_qid }}
+                            <i class="fa-solid fa-check text-success ms-2"></i>
+                        {% else %}
+                            <em class="text-muted">Not provided</em>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Business Status -->
+        <hr>
+        <div class="row">
+            <div class="col-12">
+                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-sliders me-2"></i>Business Account Status</h6>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Business Status</label>
+                    <div>
+                        <span class="badge {% if business.business_status == 'active' %}bg-success{% elif business.business_status == 'pending' %}bg-warning{% elif business.business_status == 'suspended' %}bg-danger{% else %}bg-secondary{% endif %}">
+                            {{ business.get_business_status_display }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fa-solid fa-info-circle me-2"></i>
+            No business profile found for this user.
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <hr>
+        <div class="text-center text-muted small">
+            <i class="fa-solid fa-lock me-1"></i>This is a read-only view for staff members to verify user registration details.
+        </div>
+
+    </div>
+</div>
+
+</div>
+{% endblock content %}

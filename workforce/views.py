@@ -17950,3 +17950,53 @@ def staff_cod_submission_approve_redirect(request, txn_code):
         return redirect('wf_dashboard')
     from fleet import views as fleet_views
     return fleet_views.staff_cod_submission_approve(request, txn_code)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def view_user_driver_profile(request, profile_id):
+    """Staff view to see user's driver profile information"""
+    from core import models as core_models
+    from fleet import models as fleet_models
+
+    profile = get_object_or_404(core_models.Profile, id=profile_id)
+
+    try:
+        driver = fleet_models.Driver.objects.get(profile=profile)
+    except fleet_models.Driver.DoesNotExist:
+        driver = None
+
+    completion_percentage = profile.get_driver_profile_completion_percentage()
+
+    context = {
+        'profile': profile,
+        'driver': driver,
+        'completion_percentage': completion_percentage,
+    }
+
+    return render(request, 'workforce/view_driver_profile.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def view_user_business_profile(request, profile_id):
+    """Staff view to see user's business profile information"""
+    from core import models as core_models
+    from business import models as business_models
+
+    profile = get_object_or_404(core_models.Profile, id=profile_id)
+
+    try:
+        business = business_models.Business.objects.get(profile=profile)
+    except business_models.Business.DoesNotExist:
+        business = None
+
+    completion_percentage = profile.get_business_profile_completion_percentage()
+
+    context = {
+        'profile': profile,
+        'business': business,
+        'completion_percentage': completion_percentage,
+    }
+
+    return render(request, 'workforce/view_business_profile.html', context)
