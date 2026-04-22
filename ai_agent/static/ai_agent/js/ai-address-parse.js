@@ -739,6 +739,7 @@
         }
 
         var title = opts.title || ('Address Parse' + (opts.orderNumber ? ' - ' + opts.orderNumber : ''));
+        console.log('[EzzyAIParse] Starting parse with hasStructured:', hasStructured, 'hasAddress:', hasAddress, 'zone:', zone, 'street:', street);
 
         // Build steps based on what data we have
         var steps = [];
@@ -746,6 +747,7 @@
 
         if (hasStructured) {
             steps.push({ title: 'QNAS Lookup', activeText: 'Looking up Zone ' + zone + ', Street ' + street + (building ? ', Building ' + building : '') + '...' });
+            steps.push({ title: 'Street-level QNAS Check', activeText: 'Checking Zone ' + zone + ', Street ' + street + ' (if full lookup fails)...' });
         }
 
         if (hasAddress) {
@@ -763,6 +765,7 @@
 
         steps.push({ title: 'Generate Results', activeText: 'Finalizing...' });
 
+        console.log('[EzzyAIParse] Steps array (length=' + steps.length + '):', steps.map(function(s) { return s.title; }));
         _process.init(steps);
         _openModal(title);
         _setFooter('<button class="btn btn-secondary" onclick="EzzyAIParse.close()">Close</button>');
@@ -775,6 +778,7 @@
         try {
             // ── Step: Collect Page Data ──
             _process.updateStep(stepIdx, 'active');
+            _process.addLog('🚀 TEST MESSAGE - Steps: ' + steps.length + ' items');
             _process.addLog('Collecting existing data from page...');
             _process.render();
             await _delay(250);
@@ -808,6 +812,29 @@
                     console.error('[Parse] QNAS error:', err);
                     _process.addLog('✗ QNAS lookup failed: ' + err.message, 'error');
                     qnasCoords = null;
+                }
+
+                _process.updateStep(stepIdx, 'completed');
+                stepIdx++;
+
+                // ── Step: Street-level QNAS Check (if full lookup failed) ──
+                try {
+                    if (!qnasCoords) {
+                        _process.addLog('[STREET-LEVEL] Attempting street-level lookup for Zone ' + zone + ', Street ' + street);
+                        _process.render();
+
+                        qnasCoords = await _lookupQNASCoords(zone, street, null);
+
+                        if (qnasCoords) {
+                            _process.addLog('✓ Street-level QNAS FOUND: Lat ' + qnasCoords.latitude.toFixed(6) + ', Long ' + qnasCoords.longitude.toFixed(6));
+                        } else {
+                            _process.addLog('⚠ Street-level QNAS also returned no results');
+                        }
+                        _process.render();
+                    }
+                } catch (streetLevelErr) {
+                    _process.addLog('ERROR in street-level check: ' + streetLevelErr.message);
+                    _process.render();
                 }
 
                 _process.updateStep(stepIdx, 'completed');
