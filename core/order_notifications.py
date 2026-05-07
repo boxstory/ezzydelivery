@@ -217,7 +217,10 @@ def _build_message(event, order, task):
 # ---------------------------------------------------------------------------
 
 def _send_whatsapp(phone, message, event, order):
-    """Send the message via n8n webhook. Logs but never raises."""
+    """Send the message via n8n webhook (or WAHA when enabled). Logs but never raises."""
+    if getattr(settings, 'WAHA_ENABLED', False):
+        return _send_whatsapp_via_waha(phone, message, event, order)
+
     n8n_url = getattr(settings, 'N8N_WHATSAPP_WEBHOOK_URL', None)
     if not n8n_url:
         logger.debug(f"WhatsApp notification skipped ({event}): N8N_WHATSAPP_WEBHOOK_URL not configured")
@@ -248,3 +251,81 @@ def _send_whatsapp(phone, message, event, order):
             logger.warning(f"WhatsApp notification HTTP {response.status_code}: event={event} order={order.order_number}")
     except requests.exceptions.RequestException as e:
         logger.warning(f"WhatsApp notification failed (network): event={event} order={order.order_number}: {e}")
+
+
+def _send_whatsapp_via_waha(phone, message, event, order):
+    """
+    Send via the self-hosted WAHA bridge instead of n8n.
+
+    Talks directly to WAHA (no internal HTTP self-call) and writes an
+    outbound row into whatsapp.WhatsAppMessage so the agent inbox shows
+    the conversation history.
+
+    Why direct (not through /api/integrations/waha/send/): self-HTTP from
+    a signal handler can deadlock if all gunicorn workers are already
+    busy. The DB row + audit trail is preserved either way.
+    """
+    base_url = getattr(settings, 'WAHA_BASE_URL', '') or ''
+    api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
+    session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
+    if not base_url or not api_key:
+        logger.debug(f"WAHA notification skipped ({event}): WAHA_BASE_URL or WAHA_API_KEY not configured")
+        return
+
+    digits = ''.join(ch for ch in str(phone) if ch.isdigit())
+    if not digits:
+        logger.debug(f"WAHA notification skipped ({event}): no digits in phone")
+        return
+    chat_id = f"{digits}@c.us"
+
+    waha_url = f"{base_url.rstrip('/')}/api/sendText"
+    payload = {'chatId': chat_id, 'text': str(message).strip(), 'session': session}
+    headers = {'X-Api-Key': api_key, 'Content-Type': 'application/json'}
+
+    waha_status = 0
+    waha_resp_id = ''
+    err_kind = ''
+    try:
+        response = requests.post(waha_url, json=payload, headers=headers, timeout=10)
+        waha_status = response.status_code
+        if 200 <= waha_status < 300:
+            try:
+                body = response.json() or {}
+                waha_resp_id = (body.get('id') or
+                                (body.get('_data') or {}).get('id') or '')
+            except ValueError:
+                waha_resp_id = ''
+            logger.info(f"WAHA notification sent: event={event} order={order.order_number} phone={phone[:6]}*** status={waha_status}")
+        else:
+            err_kind = 'waha_send_error'
+            logger.warning(f"WAHA notification HTTP {waha_status}: event={event} order={order.order_number}")
+    except requests.exceptions.Timeout:
+        err_kind = 'waha_timeout'
+        logger.warning(f"WAHA notification timeout: event={event} order={order.order_number}")
+    except requests.exceptions.RequestException as e:
+        err_kind = 'waha_send_error'
+        logger.warning(f"WAHA notification failed (network): event={event} order={order.order_number}: {e}")
+
+    try:
+        from whatsapp.models import WhatsAppMessage
+        from uuid import uuid4
+        wid = waha_resp_id or (
+            f"out-fail-{uuid4().hex}" if err_kind else f"out-{uuid4().hex}"
+        )
+        WhatsAppMessage.objects.create(
+            waha_message_id=wid,
+            session=session,
+            direction='outbound',
+            from_number=getattr(settings, 'WAHA_DEFAULT_FROM', '') or '',
+            to_number=digits,
+            body=str(message).strip(),
+            message_type='text',
+            status='failed' if err_kind else 'processed',
+            error_kind=err_kind,
+            order=order if order else None,
+            raw_payload={'event': event, 'order_id': getattr(order, 'id', None)},
+            received_at=timezone.now(),
+            processed_at=timezone.now(),
+        )
+    except Exception as e:
+        logger.warning(f"WAHA outbound row write failed (non-fatal): {e}")

@@ -109,6 +109,11 @@ urlpatterns = [
     # AI Operations Agent
     path('api/ai-agent/', include('ai_agent.urls', namespace='ai_agent')),
 
+    # WAHA WhatsApp bridge
+    path('api/integrations/waha/', include('whatsapp.urls')),         # webhook + agent API (HMAC + Bearer)
+    path('waha/wa-dashboard/',     include('whatsapp.dashboard_urls')),  # ops UI: session health + QR (htpasswd)
+    path('waha/wa-chats/',         include('whatsapp.chats_urls')),      # ops UI: agent inbox        (htpasswd)
+
     # Public Customer Tracking Page
     path('track/<str:token>/', orders_views.customer_tracking, name='customer_tracking'),
     path('track/<str:token>/data/', orders_views.customer_tracking_data, name='customer_tracking_data'),

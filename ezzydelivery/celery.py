@@ -68,6 +68,21 @@ app.conf.beat_schedule = {
         'task': 'orders.tasks.sync_all_temp_orders',
         'schedule': crontab(hour='6,8,9,10,11,12,13,14,15,16,17,18,19', minute=0),
     },
+
+    # WAHA daily WhatsApp backfill — 01:30 Asia/Qatar (CELERY_TIMEZONE).
+    # Skips today so live messages stay webhook-driven.
+    'whatsapp-daily-backfill': {
+        'task': 'whatsapp.tasks.run_backfill',
+        'schedule': crontab(hour=1, minute=30),
+        'kwargs': {
+            'skip_today': True,
+            'days': 120,
+            'limit_per_chat': 100,
+            'max_chats': 200,
+            'min_sleep': 3,
+            'max_sleep': 8,
+        },
+    },
 }
 
 # Task routing

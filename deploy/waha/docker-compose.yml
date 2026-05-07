@@ -1,0 +1,30 @@
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: ezzy-waha
+    restart: unless-stopped
+    # Bind to loopback only — public exposure goes through nginx with auth.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - waha_sessions:/app/.sessions
+      - waha_files:/app/.media
+    environment:
+      # API key required in X-Api-Key on every request (nginx injects it).
+      WHATSAPP_API_KEY: "${WAHA_API_KEY}"
+      # Webhook target — HMAC-signed by WAHA, verified in whatsapp/auth.py.
+      WHATSAPP_HOOK_URL: "https://ezzydelivery.qa/api/integrations/waha/webhook/"
+      WHATSAPP_HOOK_EVENTS: "message,message.any,session.status"
+      # HMAC-SHA512 over raw webhook body, sent in X-Webhook-Hmac header.
+      WHATSAPP_HOOK_HMAC: "${WAHA_WEBHOOK_HMAC_SECRET}"
+      WHATSAPP_HOOK_HMAC_ALGORITHM: "sha512"
+      # NOWEB engine — Core edition, single session.
+      WAHA_LOG_FORMAT: "JSON"
+      WAHA_LOG_LEVEL: "info"
+      WAHA_PRINT_QR: "false"
+
+volumes:
+  waha_sessions:
+    name: ezzy_waha_sessions
+  waha_files:
+    name: ezzy_waha_files

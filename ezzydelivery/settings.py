@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     'warehouse',
     'dispatch',
     'ai_agent',
+    'whatsapp',
 
 ]
 
@@ -816,5 +817,25 @@ EVALUATION_INSTANCE = config('EVALUATION_INSTANCE', default='')
 
 # ==========================================
 # END AI AGENT CONFIGURATION
+# ==========================================
+
+
+# ==========================================
+# WAHA (self-hosted WhatsApp HTTP API)
+# ==========================================
+# Feature flag — when True, core/order_notifications.py routes outbound
+# WhatsApp through WAHA instead of the legacy n8n webhook.
+WAHA_ENABLED = config('WAHA_ENABLED', default=False, cast=bool)
+
+# WAHA container endpoints + credentials
+WAHA_BASE_URL = config('WAHA_BASE_URL', default='http://127.0.0.1:3000')
+WAHA_API_KEY = config('WAHA_API_KEY', default='')
+WAHA_WEBHOOK_HMAC_SECRET = config('WAHA_WEBHOOK_HMAC_SECRET', default='')
+WAHA_DEFAULT_SESSION = config('WAHA_DEFAULT_SESSION', default='default')
+WAHA_DEFAULT_FROM = config('WAHA_DEFAULT_FROM', default='EzzyDelivery')
+
+# Bearer token used by internal callers of /api/integrations/waha/messages/
+# and /api/integrations/waha/send/ (agent API + send proxy).
+WAHA_AGENT_TOKEN = config('WAHA_AGENT_TOKEN', default='')
 # ==========================================
 
