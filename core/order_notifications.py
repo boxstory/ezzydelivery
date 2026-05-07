@@ -112,6 +112,16 @@ def notify_order_event(event, task=None, order=None):
 
         _send_whatsapp(phone, message, event, _order)
 
+        # Also notify the business-configured extra phone for this trigger.
+        # Falls back to the business's own WhatsApp number if no per-trigger override is set.
+        extra_phone = ''
+        if trigger_status and _order.business_id:
+            extra_phone = (getattr(trigger, 'notification_phone', '') or '').strip()
+            if not extra_phone:
+                extra_phone = (getattr(_order.business, 'business_whatsapp', '') or '').strip()
+        if extra_phone and extra_phone != phone:
+            _send_whatsapp(extra_phone, message, event, _order)
+
     except Exception as e:
         logger.exception(f"notify_order_event({event}) failed unexpectedly: {e}")
 
