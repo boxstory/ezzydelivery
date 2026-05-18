@@ -333,6 +333,27 @@ def services(request):
     return render(request, 'webpages/services.html', data)
 
 
+def llm_knowledge_panel(request):
+    """AI-search company knowledge panel (/llm/).
+
+    Renders a structured company profile with Organization + FAQPage
+    JSON-LD, optimized for LLM crawlers (GPTBot, Claude-Web, PerplexityBot)
+    and Google rich results.
+    """
+    meta = SEOMetadata.get_page_meta(
+        title="EzzyDelivery Qatar | Company Knowledge Panel",
+        description=(
+            "EzzyDelivery is Qatar's B2B delivery and logistics platform: "
+            "same-day delivery, COD, 3PL fulfillment and e-commerce integrations across Qatar."
+        ),
+        url="https://ezzydelivery.qa/llm/",
+    )
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/llm_knowledge_panel.html', data)
+
+
 def terms(request):
     meta = SEOMetadata.get_terms_meta()
     data = {

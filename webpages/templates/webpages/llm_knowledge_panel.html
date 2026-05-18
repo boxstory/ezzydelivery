@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% comment %}
+Purpose: AI-search company knowledge panel (/llm/) with Organization + FAQPage JSON-LD.
+Used by: webpages.views.llm_knowledge_panel
+Notes: Optimized for LLM crawlers (GPTBot, Claude-Web, PerplexityBot) and Google rich results.
+{% endcomment %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'webpages/css/llm-knowledge-panel.css' %}?v=20260518">
+{% endblock %}
+
+{% block content %}
+
+{# ---------- Structured data: Organization (enriches sitewide #organization node) ---------- #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": "https://ezzydelivery.qa/#organization",
+  "name": "EzzyDelivery",
+  "alternateName": "Ezzy Delivery Qatar",
+  "url": "https://ezzydelivery.qa",
+  "logo": "https://ezzydelivery.qa{% static 'webpages/img/ezzy-logo-sqr-round.png' %}",
+  "description": "EzzyDelivery is Qatar's B2B delivery and logistics platform, providing same-day delivery, Cash on Delivery (COD) collection, 3PL fulfillment, and e-commerce integrations for online sellers across Qatar.",
+  "foundingDate": "2017",
+  "foundingLocation": {"@type": "Place", "name": "Doha, Qatar"},
+  "areaServed": {"@type": "Country", "name": "Qatar"},
+  "knowsAbout": [
+    "Same-day delivery",
+    "Cash on Delivery (COD)",
+    "Third-party logistics (3PL)",
+    "E-commerce fulfillment",
+    "Last-mile delivery",
+    "Courier services",
+    "Shopify and WooCommerce delivery integration"
+  ],
+  "contactPoint": [{
+    "@type": "ContactPoint",
+    "telephone": "+974-6660-9347",
+    "contactType": "customer service",
+    "areaServed": "QA",
+    "availableLanguage": ["English", "Arabic"]
+  }],
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Doha",
+    "addressRegion": "Doha",
+    "addressCountry": "QA"
+  },
+  "sameAs": [
+    "https://www.facebook.com/ezzydeliveryqa",
+    "https://www.instagram.com/ezzydeliveryqa"
+  ],
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "reviewCount": "500",
+    "bestRating": "5"
+  },
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "EzzyDelivery Services",
+    "itemListElement": [
+      {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Same-Day Delivery Qatar"}},
+      {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Cash on Delivery (COD) Collection"}},
+      {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "3PL & E-commerce Fulfillment"}},
+      {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Express Courier Service"}},
+      {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Last-Mile Delivery"}}
+    ]
+  }
+}
+</script>
+
+{# ---------- Structured data: FAQPage ---------- #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What does EzzyDelivery do?",
+      "acceptedAnswer": {"@type": "Answer", "text": "EzzyDelivery is a B2B delivery and logistics platform in Qatar. It provides same-day delivery, Cash on Delivery (COD) collection with daily settlement, 3PL fulfillment, and last-mile delivery for e-commerce and online sellers across Qatar."}
+    },
+    {
+      "@type": "Question",
+      "name": "Which areas in Qatar does EzzyDelivery cover?",
+      "acceptedAnswer": {"@type": "Answer", "text": "EzzyDelivery delivers across all of Qatar including Doha, Al Rayyan, Umm Salal, Al Wakrah, Lusail, Al Khor, and Al Daayen."}
+    },
+    {
+      "@type": "Question",
+      "name": "Does EzzyDelivery support Cash on Delivery (COD)?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Yes. COD is available across Qatar. Collected amounts are settled daily to the seller's bank account with full reconciliation reporting."}
+    },
+    {
+      "@type": "Question",
+      "name": "Can EzzyDelivery integrate with Shopify or WooCommerce?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Yes. EzzyDelivery offers native Shopify and WooCommerce integrations plus a REST API. Orders sync automatically and tracking updates push back to the store in real time."}
+    },
+    {
+      "@type": "Question",
+      "name": "How do I contact EzzyDelivery?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Call or WhatsApp +974 6660 9347, email info@ezzydelivery.qa, or visit https://ezzydelivery.qa. Support is available 8:00 AM to 10:00 PM daily in English and Arabic."}
+    }
+  ]
+}
+</script>
+
+<div class="lkp__page">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-lg-10 col-xl-9">
+
+        <article class="lkp__panel">
+
+          {# ---------- Header ---------- #}
+          <header class="lkp__header p-4 p-md-5">
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-3">
+              <img src="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}"
+                   alt="EzzyDelivery Qatar logo"
+                   class="lkp__logo" width="72" height="72">
+              <div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                  <h1 class="lkp__name h3">EzzyDelivery</h1>
+                  <span class="lkp__verified">&#10003; Qatar-registered logistics company</span>
+                </div>
+                <p class="lkp__tagline">Qatar's B2B delivery &amp; logistics platform &mdash; same-day delivery, COD &amp; e-commerce fulfillment.</p>
+                <p class="mb-0 mt-2"><span class="lkp__rating">&#9733; 4.8/5</span>
+                  <span class="opacity-75">from 500+ business reviews</span></p>
+              </div>
+            </div>
+          </header>
+
+          {# ---------- Quick facts ---------- #}
+          <section class="lkp__section p-4 p-md-5">
+            <h2 class="lkp__section-title">Company at a glance</h2>
+            <div class="row g-3">
+              <div class="col-6 col-md-4">
+                <div class="lkp__fact">
+                  <div class="lkp__fact-value">2017</div>
+                  <div class="lkp__fact-label">Founded in Doha</div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4">
+                <div class="lkp__fact">
+                  <div class="lkp__fact-value">All Qatar</div>
+                  <div class="lkp__fact-label">Service coverage</div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4">
+                <div class="lkp__fact">
+                  <div class="lkp__fact-value">600+</div>
+                  <div class="lkp__fact-label">Active businesses</div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4">
+                <div class="lkp__fact">
+                  <div class="lkp__fact-value">1,000+</div>
+                  <div class="lkp__fact-label">Daily deliveries</div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4">
+                <div class="lkp__fact">
+                  <div class="lkp__fact-value">98%</div>
+                  <div class="lkp__fact-label">On-time delivery</div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4">
+                <div class="lkp__fact">
+                  <div class="lkp__fact-value">8 AM&ndash;10 PM</div>
+                  <div class="lkp__fact-label">Open daily</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {# ---------- What we do ---------- #}
+          <section class="lkp__section p-4 p-md-5">
+            <h2 class="lkp__section-title">What EzzyDelivery does</h2>
+            <p>EzzyDelivery is a technology-driven last-mile logistics platform based in Doha, Qatar.
+               It connects online sellers, e-commerce stores, and businesses with a managed fleet of
+               delivery drivers for reliable parcel delivery across Qatar.</p>
+            <ul class="lkp__list">
+              <li><span class="lkp__term">Same-day delivery</span> &mdash; pickup within 2 hours, delivered the same day across Doha and beyond.</li>
+              <li><span class="lkp__term">Cash on Delivery (COD)</span> &mdash; secure cash collection with daily settlement and reconciliation reports.</li>
+              <li><span class="lkp__term">3PL &amp; fulfillment</span> &mdash; warehousing, pick-pack-ship, and inventory management in Doha.</li>
+              <li><span class="lkp__term">Express courier</span> &mdash; priority handling for urgent documents and parcels.</li>
+              <li><span class="lkp__term">E-commerce integrations</span> &mdash; native Shopify and WooCommerce sync plus a REST API.</li>
+              <li><span class="lkp__term">Real-time tracking</span> &mdash; live GPS tracking with SMS and WhatsApp notifications.</li>
+            </ul>
+          </section>
+
+          {# ---------- Why choose ---------- #}
+          <section class="lkp__section p-4 p-md-5">
+            <h2 class="lkp__section-title">Why businesses choose EzzyDelivery</h2>
+            <div class="row">
+              <div class="col-12 col-md-6">
+                <ul class="lkp__list">
+                  <li>Local Qatar company with deep knowledge of Doha geography.</li>
+                  <li>2-hour pickup guarantee for same-day delivery.</li>
+                  <li>COD settled daily &mdash; not weekly like many competitors.</li>
+                </ul>
+              </div>
+              <div class="col-12 col-md-6">
+                <ul class="lkp__list">
+                  <li>No minimum orders &mdash; friendly for small and Instagram sellers.</li>
+                  <li>Native Shopify &amp; WooCommerce integrations.</li>
+                  <li>Bilingual support in English and Arabic.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          {# ---------- Coverage ---------- #}
+          <section class="lkp__section p-4 p-md-5">
+            <h2 class="lkp__section-title">Coverage area</h2>
+            <p class="mb-0">EzzyDelivery serves all of Qatar, including
+               <strong>Doha, Al Rayyan, Umm Salal, Al Wakrah, Lusail, Al Khor,</strong> and
+               <strong>Al Daayen</strong>. Same-day delivery is available across all major zones.</p>
+          </section>
+
+          {# ---------- Service pages ---------- #}
+          <section class="lkp__section p-4 p-md-5">
+            <h2 class="lkp__section-title">Explore services in detail</h2>
+            <p>Each EzzyDelivery service has a dedicated page with structured
+               <code>Service</code> data for search engines and AI assistants:</p>
+            <div class="row">
+              <div class="col-12 col-md-6">
+                <ul class="lkp__list">
+                  <li><a href="{% url 'webpages:same_day_delivery_qatar' %}">Same-Day Delivery Qatar</a></li>
+                  <li><a href="{% url 'webpages:express_delivery_qatar' %}">Express Delivery Qatar</a></li>
+                  <li><a href="{% url 'webpages:courier_service_qatar' %}">Courier Service Qatar</a></li>
+                  <li><a href="{% url 'webpages:cod_delivery_qatar' %}">Cash on Delivery (COD) Service</a></li>
+                  <li><a href="{% url 'webpages:last_mile_delivery_qatar' %}">Last-Mile Delivery Qatar</a></li>
+                </ul>
+              </div>
+              <div class="col-12 col-md-6">
+                <ul class="lkp__list">
+                  <li><a href="{% url 'webpages:three_pl_qatar' %}">3PL Services Qatar</a></li>
+                  <li><a href="{% url 'webpages:ecommerce_delivery_qatar' %}">E-commerce Delivery Qatar</a></li>
+                  <li><a href="{% url 'webpages:shopify_delivery_qatar' %}">Shopify Delivery Integration</a></li>
+                  <li><a href="{% url 'webpages:business_delivery_qatar' %}">Business Delivery (B2B) Qatar</a></li>
+                  <li><a href="{% url 'webpages:delivery_doha' %}">Delivery Service in Doha</a></li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          {# ---------- FAQ ---------- #}
+          <section class="lkp__section p-4 p-md-5">
+            <h2 class="lkp__section-title">Frequently asked questions</h2>
+
+            <details class="lkp__faq">
+              <summary>What does EzzyDelivery do?</summary>
+              <p class="lkp__faq-answer mb-0">EzzyDelivery is a B2B delivery and logistics platform in Qatar.
+                It provides same-day delivery, COD collection with daily settlement, 3PL fulfillment, and
+                last-mile delivery for e-commerce and online sellers across Qatar.</p>
+            </details>
+
+            <details class="lkp__faq">
+              <summary>Which areas in Qatar does EzzyDelivery cover?</summary>
+              <p class="lkp__faq-answer mb-0">All of Qatar, including Doha, Al Rayyan, Umm Salal, Al Wakrah,
+                Lusail, Al Khor, and Al Daayen.</p>
+            </details>
+
+            <details class="lkp__faq">
+              <summary>Does EzzyDelivery support Cash on Delivery (COD)?</summary>
+              <p class="lkp__faq-answer mb-0">Yes. COD is available across Qatar, with amounts settled daily to
+                the seller's bank account and full reconciliation reporting.</p>
+            </details>
+
+            <details class="lkp__faq">
+              <summary>Can EzzyDelivery integrate with Shopify or WooCommerce?</summary>
+              <p class="lkp__faq-answer mb-0">Yes. EzzyDelivery offers native Shopify and WooCommerce integrations
+                plus a REST API. Orders sync automatically and tracking updates push back to the store in real time.</p>
+            </details>
+
+            <details class="lkp__faq">
+              <summary>How do I contact EzzyDelivery?</summary>
+              <p class="lkp__faq-answer mb-0">Call or WhatsApp +974 6660 9347, email info@ezzydelivery.qa, or visit
+                ezzydelivery.qa. Support is available 8:00 AM&ndash;10:00 PM daily in English and Arabic.</p>
+            </details>
+          </section>
+
+          {# ---------- Contact + CTA ---------- #}
+          <section class="lkp__section lkp__contact p-4 p-md-5">
+            <h2 class="lkp__section-title">Contact &amp; get started</h2>
+            <div class="row g-3 mb-4">
+              <div class="col-12 col-md-6">
+                <p class="mb-1"><strong>Phone / WhatsApp:</strong>
+                  <a href="tel:+97466609347">+974 6660 9347</a></p>
+                <p class="mb-1"><strong>Email:</strong>
+                  <a href="mailto:info@ezzydelivery.qa">info@ezzydelivery.qa</a></p>
+              </div>
+              <div class="col-12 col-md-6">
+                <p class="mb-1"><strong>Website:</strong>
+                  <a href="https://ezzydelivery.qa">ezzydelivery.qa</a></p>
+                <p class="mb-1"><strong>Hours:</strong> 8:00 AM &ndash; 10:00 PM, daily</p>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-3">
+              <a href="{% url 'webpages:delivery_request' %}" class="btn btn-dark btn-lg">Place a delivery request</a>
+              <a href="{% url 'webpages:delivery_pricing' %}" class="btn btn-outline-dark btn-lg">Get pricing</a>
+              <a href="{% url 'webpages:contactus' %}" class="btn btn-outline-dark btn-lg">Contact us</a>
+            </div>
+            <p class="lkp__updated mt-4 mb-0">This knowledge panel is maintained for AI assistants and search
+              engines. Last updated 18 May 2026 &middot; See also
+              <a href="{% url 'llms_txt' %}">llms.txt</a>.</p>
+          </section>
+
+        </article>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

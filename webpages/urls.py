@@ -12,6 +12,7 @@ urlpatterns = [
     path('', webpages_views.index, name='index'),
     path('about/', webpages_views.about, name='about'),
     path('contactus/', webpages_views.contactus, name='contactus'),
+    path('llm/', webpages_views.llm_knowledge_panel, name='llm_knowledge_panel'),
     path('services/', webpages_views.services, name='services'),
     path('join_driver/', core_views.join_driver, name='join_driver'),
     path('privacy/', webpages_views.privacy, name='privacy'),

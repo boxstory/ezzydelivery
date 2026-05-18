@@ -30,6 +30,7 @@ class StaticViewSitemap(Sitemap):
             'webpages:contactus',
             'webpages:delivery_pricing',
             'webpages:services',
+            'webpages:llm_knowledge_panel',
             'webpages:careers',
             'webpages:fulfillment',
             'webpages:qcommerce',
