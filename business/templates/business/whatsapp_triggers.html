@@ -22,87 +22,104 @@
     <i class="fa-solid fa-circle-info mt-1"></i>
     <div>
       <strong>How it works:</strong> When a delivery status changes, we automatically send a WhatsApp message to the customer.
-      Toggle on the statuses you want to notify customers about. You can also set a custom message per status using placeholders:
+      Toggle on the statuses you want to notify. An <strong>extra notification number</strong> also receives the same alert —
+      if left blank it defaults to your business WhatsApp{% if default_whatsapp %} (<strong>{{ default_whatsapp }}</strong>){% else %} (not yet set — <a href="{% url 'business:business_profile' %}">add it to your business profile</a>){% endif %}.
+      Customise messages using placeholders:
       <code>{customer_name}</code>, <code>{order_number}</code>, <code>{driver_name}</code>, <code>{driver_phone}</code>.
     </div>
   </div>
 
-  <!-- Trigger Cards -->
-  <div class="row g-3">
-    {% for status_key, trigger in triggers.items %}
-    <div class="col-12 col-md-6 col-xl-4">
-      <div class="card bwt__card" id="business_whatsapp_trigger_card_{{ status_key }}">
-        <div class="card-body">
-          <!-- Header row with toggle -->
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="d-flex align-items-center gap-2">
-              <span class="bwt__status-icon bwt__status-icon--{{ status_key }}">
-                {% if status_key == 'assigned' %}
-                  <i class="fa-solid fa-user-check"></i>
-                {% elif status_key == 'picked_up' %}
-                  <i class="fa-solid fa-box"></i>
-                {% elif status_key == 'start_ride' %}
-                  <i class="fa-solid fa-motorcycle"></i>
-                {% elif status_key == 'out_for_delivery' %}
-                  <i class="fa-solid fa-truck-fast"></i>
-                {% elif status_key == 'delivered' %}
-                  <i class="fa-solid fa-circle-check"></i>
-                {% elif status_key == 'failed' %}
-                  <i class="fa-solid fa-circle-exclamation"></i>
-                {% endif %}
-              </span>
-              <h6 class="bwt__card-title mb-0">{{ trigger.label }}</h6>
-            </div>
-            <div class="form-check form-switch">
-              <input class="form-check-input bwt__toggle"
-                     type="checkbox"
-                     role="switch"
-                     id="bwt_toggle_{{ status_key }}"
+  <!-- Trigger Table -->
+  <div class="card bwt__table-card">
+    <div class="table-responsive">
+      <table class="table bwt__table align-middle mb-0" id="business_whatsapp_triggers_table">
+        <thead>
+          <tr>
+            <th scope="col">Trigger Event</th>
+            <th scope="col" class="text-center">Active</th>
+            <th scope="col" class="bwt__th-phone">Notification Phone</th>
+            <th scope="col">Custom Message</th>
+            <th scope="col" class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for status_key, trigger in triggers.items %}
+          <tr id="business_whatsapp_trigger_row_{{ status_key }}">
+            <!-- Trigger Event -->
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="bwt__status-icon bwt__status-icon--{{ status_key }}">
+                  {% if status_key == 'assigned' %}
+                    <i class="fa-solid fa-user-check"></i>
+                  {% elif status_key == 'picked_up' %}
+                    <i class="fa-solid fa-box"></i>
+                  {% elif status_key == 'start_ride' %}
+                    <i class="fa-solid fa-motorcycle"></i>
+                  {% elif status_key == 'out_for_delivery' %}
+                    <i class="fa-solid fa-truck-fast"></i>
+                  {% elif status_key == 'delivered' %}
+                    <i class="fa-solid fa-circle-check"></i>
+                  {% elif status_key == 'failed' %}
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                  {% endif %}
+                </span>
+                <span class="bwt__row-title">{{ trigger.label }}</span>
+              </div>
+            </td>
+
+            <!-- Active Toggle -->
+            <td class="text-center">
+              <div class="form-check form-switch d-inline-flex m-0">
+                <input class="form-check-input bwt__toggle"
+                       type="checkbox"
+                       role="switch"
+                       id="bwt_toggle_{{ status_key }}"
+                       data-status="{{ status_key }}"
+                       {% if trigger.is_active %}checked{% endif %}>
+              </div>
+            </td>
+
+            <!-- Notification Phone -->
+            <td class="bwt__td-phone">
+              <input type="tel"
+                     class="form-control form-control-sm bwt__phone-input"
+                     id="bwt_phone_{{ status_key }}"
                      data-status="{{ status_key }}"
-                     {% if trigger.is_active %}checked{% endif %}>
-            </div>
-          </div>
+                     value="{{ trigger.notification_phone }}"
+                     placeholder="{% if default_whatsapp %}{{ default_whatsapp }}{% else %}+974 5xxx xxxx{% endif %}"
+                     aria-label="Notification phone number for {{ trigger.label }}">
+            </td>
 
-          <!-- Custom Message (collapsible) -->
-          <div class="mt-3">
-            <button class="btn btn-sm btn-outline-secondary bwt__msg-toggle"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#bwt_msg_{{ status_key }}"
-                    aria-expanded="false">
-              <i class="fa-solid fa-pen-to-square me-1"></i> Custom Message
-            </button>
-            <div class="collapse {% if trigger.custom_message %}show{% endif %} mt-2" id="bwt_msg_{{ status_key }}">
-              <textarea class="form-control bwt__textarea"
+            <!-- Custom Message -->
+            <td>
+              <textarea class="form-control form-control-sm bwt__textarea"
                         id="bwt_message_{{ status_key }}"
-                        rows="3"
-                        placeholder="Leave blank to use default message. Use {customer_name}, {order_number}, {driver_name}, {driver_phone}."
+                        rows="2"
+                        placeholder="Leave blank for default. Use {customer_name}, {order_number}, {driver_name}, {driver_phone}."
                         data-status="{{ status_key }}">{{ trigger.custom_message }}</textarea>
-            </div>
-          </div>
+            </td>
 
-          <!-- Save button -->
-          <div class="mt-3 d-flex justify-content-end">
-            <button class="btn btn-sm btn-primary bwt__save-btn"
-                    data-status="{{ status_key }}"
-                    id="bwt_save_{{ status_key }}">
-              <i class="fa-solid fa-floppy-disk me-1"></i> Save
-            </button>
-          </div>
-
-          <!-- Status indicator -->
-          <div class="bwt__save-status d-none" id="bwt_status_{{ status_key }}"></div>
-        </div>
-      </div>
+            <!-- Save -->
+            <td class="text-end">
+              <button class="btn btn-sm btn-primary bwt__save-btn"
+                      data-status="{{ status_key }}"
+                      id="bwt_save_{{ status_key }}">
+                <i class="fa-solid fa-floppy-disk me-1"></i> Save
+              </button>
+              <div class="bwt__save-status d-none mt-1" id="bwt_status_{{ status_key }}"></div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    {% endfor %}
   </div>
 
 </div>
 {% endblock content %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-whatsapp.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-whatsapp.css' %}?v=20260423-2">
 {% endblock extra_css %}
 
 {% block extra_js %}
@@ -117,10 +134,12 @@ document.addEventListener('DOMContentLoaded', function() {
       const status = this.dataset.status;
       const toggle = document.getElementById('bwt_toggle_' + status);
       const textarea = document.getElementById('bwt_message_' + status);
+      const phoneInput = document.getElementById('bwt_phone_' + status);
       const statusEl = document.getElementById('bwt_status_' + status);
 
       const isActive = toggle.checked;
       const customMessage = textarea ? textarea.value : '';
+      const notificationPhone = phoneInput ? phoneInput.value : '';
 
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving...';
@@ -129,6 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
       formData.append('trigger_status', status);
       formData.append('is_active', isActive ? 'true' : 'false');
       formData.append('custom_message', customMessage);
+      formData.append('notification_phone', notificationPhone);
 
       fetch('{% url "business:whatsapp_trigger_toggle" %}', {
         method: 'POST',
@@ -139,13 +159,13 @@ document.addEventListener('DOMContentLoaded', function() {
       .then(function(data) {
         statusEl.classList.remove('d-none', 'bwt__save-status--error');
         statusEl.classList.add('bwt__save-status--success');
-        statusEl.textContent = 'Saved successfully';
+        statusEl.textContent = 'Saved';
         setTimeout(function() { statusEl.classList.add('d-none'); }, 2500);
       })
       .catch(function(err) {
         statusEl.classList.remove('d-none', 'bwt__save-status--success');
         statusEl.classList.add('bwt__save-status--error');
-        statusEl.textContent = 'Error saving. Please try again.';
+        statusEl.textContent = 'Error saving.';
       })
       .finally(function() {
         btn.disabled = false;

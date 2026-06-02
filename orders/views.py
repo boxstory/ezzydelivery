@@ -55,7 +55,7 @@ import logging
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Q
 from datetime import datetime, timedelta, timezone
@@ -245,9 +245,10 @@ def orders_all_list(request):
         else:
             items = items.order_by(f'-{order_field}')
     else:
-        sort_by = 'client_order_code'
+        # Default: newest by import time so freshly imported orders surface first.
+        sort_by = 'id'
         sort_dir = 'desc'
-        items = items.order_by('-client_order_code')
+        items = items.order_by('-id')
 
     logger.debug(f"Fetching orders for business {business.business_id}")
 
@@ -273,11 +274,36 @@ def orders_all_list(request):
         orders = paginator.page(paginator.num_pages)
         logger.debug(f"Empty page, displaying last page {paginator.num_pages}")
 
+    # Build fallback failure-reason map for legacy failed tasks that never saved
+    # DeliveryTask.failure_reason — read the latest OrderStatusHistory note for the
+    # dl_task_status → failed transition on each order on the current page.
+    page_order_ids = [o.id for o in orders.object_list]
+    fallback_failure_notes = {}
+    if page_order_ids:
+        failed_history_qs = orders_models.OrderStatusHistory.objects.filter(
+            order_id__in=page_order_ids,
+            field_name='dl_task_status',
+            new_value='failed',
+        ).order_by('order_id', '-created_at').values('order_id', 'notes')
+        seen = set()
+        for row in failed_history_qs:
+            oid = row['order_id']
+            if oid in seen:
+                continue
+            seen.add(oid)
+            note = (row['notes'] or '').strip()
+            if note:
+                fallback_failure_notes[oid] = note
+
     context = {
         'orders': orders,
         'business': business,
+        'fallback_failure_notes': fallback_failure_notes,
         'len': paginator.count,  # Use paginator.count (cached) instead of items.count()
         'per_page': str(per_page),  # String for template comparison
+        'has_ecom_api': business_models.BusinessApiSettings.objects.filter(
+            business=business, api_type__in=['shopify', 'woocommerce']
+        ).exists(),
         # Permission checks for template buttons
         'can_create_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE),
         'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
@@ -733,6 +759,20 @@ def bulk_order_entry(request):
 
 
 # order creation ----------------------------------------------------------------
+
+@login_required(login_url='account_login')
+def mobile_product_row_partial(request):
+    """HTMX endpoint: returns a single mobile product row with the next index."""
+    try:
+        row_index = int(request.GET.get('index', 0))
+    except (TypeError, ValueError):
+        row_index = 0
+    if row_index < 0:
+        row_index = 0
+    return render(request, 'orders/parts/_mobile_product_row.html', {
+        'row_index': row_index,
+    })
+
 
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_CREATE)
@@ -1429,12 +1469,40 @@ def order_details(request, order_id):
         if delivery_task:
             delivery_proofs = delivery_task.delivery_proofs.all()
 
+        # Reconfirm events — every publish→ready_to_pickup transition (client/staff
+        # clicking Reconfirm on a failed delivery). Paired with the matching
+        # "Reconfirmed by …" comment (same second) for the free-text note.
+        reconfirm_history = orders_models.OrderStatusHistory.objects.filter(
+            order=order,
+            field_name='order_status',
+            old_value='publish',
+            new_value='ready_to_pickup',
+        ).select_related('changed_by').order_by('created_at')
+        reconfirm_comments = list(
+            order.order_comments.filter(name__istartswith='Reconfirmed by').order_by('created_at')
+        )
+        reconfirm_events = []
+        for hist in reconfirm_history:
+            # find the closest reconfirm comment after this history entry (within 5s)
+            body = ''
+            for c in reconfirm_comments:
+                delta = (c.created_at - hist.created_at).total_seconds()
+                if -2 <= delta <= 10:
+                    body = c.body
+                    break
+            reconfirm_events.append({
+                'created_at': hist.created_at,
+                'by': (hist.changed_by.get_full_name() if hist.changed_by else '') or (hist.changed_by.username if hist.changed_by else ''),
+                'note': body,
+            })
+
         data = {
             'order': order,
             'delivery_task': delivery_task,
             'order_items': order_items,
             'fail_notes': fail_notes,
             'delivery_proofs': delivery_proofs,
+            'reconfirm_events': reconfirm_events,
             'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
             'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
         }
@@ -1629,6 +1697,7 @@ def order_product_list(request, order_id):
 def update_order_status(request, order_id=None):
     """Update order status - supports both form POST and JSON body"""
     try:
+        comment = ''
         # Get order_id from URL or request body
         if order_id is None:
             # Try JSON body first
@@ -1637,18 +1706,22 @@ def update_order_status(request, order_id=None):
                 data = json.loads(request.body)
                 order_id = data.get('order_id')
                 status = data.get('status')
+                comment = (data.get('comment') or '').strip()
             else:
                 # Fall back to form POST
                 order_id = request.POST.get('order_id')
                 status = request.POST.get('status')
+                comment = (request.POST.get('comment') or '').strip()
         else:
             # order_id from URL, status from body
             if request.content_type == 'application/json':
                 import json
                 data = json.loads(request.body)
                 status = data.get('status')
+                comment = (data.get('comment') or '').strip()
             else:
                 status = request.POST.get('status')
+                comment = (request.POST.get('comment') or '').strip()
 
         if not order_id or not status:
             return JsonResponse({'success': False, 'error': 'Missing order_id or status'}, status=400)
@@ -1661,12 +1734,21 @@ def update_order_status(request, order_id=None):
             if not user_business or user_business.business_id != order.business_id:
                 return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
-        # Published orders: only staff can revert to to_review
+        # Published orders — restricted transitions:
+        #   - publish → ready_to_pickup: allowed for staff and owning business, ONLY when
+        #     the latest delivery task is 'failed' (client reconfirm-for-redispatch).
+        #   - publish → to_review: staff only (manual rollback).
+        #   - anything else: rejected.
         if order.order_status == 'publish':
-            if not request.user.is_staff:
-                return JsonResponse({'success': False, 'error': 'Published orders cannot be changed. Contact staff.'}, status=403)
-            if status != 'to_review':
-                return JsonResponse({'success': False, 'error': 'Published orders can only be reverted to Hold for Review.'}, status=400)
+            if status == 'ready_to_pickup':
+                latest_task = order.delivery_task.order_by('-id').first()
+                if not latest_task or latest_task.dl_task_status != 'failed':
+                    return JsonResponse({'success': False, 'error': 'Only published orders with a failed delivery can be reconfirmed.'}, status=400)
+            elif status == 'to_review':
+                if not request.user.is_staff:
+                    return JsonResponse({'success': False, 'error': 'Only staff can revert a published order to Hold for Review.'}, status=403)
+            else:
+                return JsonResponse({'success': False, 'error': 'Published orders can only be reverted to Hold for Review or reconfirmed after a failed delivery.'}, status=400)
 
         # Delivered/cancelled orders cannot be changed by business users
         if order.order_status in ('delivered', 'cancelled') and not request.user.is_staff:
@@ -1674,7 +1756,36 @@ def update_order_status(request, order_id=None):
 
         old_status = order.order_status
         order.order_status = status
+        # Attach the acting user so the post-save signal records it on OrderStatusHistory
+        order._status_changed_by = request.user
         order.save()
+
+        # Save user-provided comment (e.g. reconfirmation note) as an OrderComment
+        # and ALSO attach it to the OrderStatusHistory entry the signal just created,
+        # so the workforce Status Timeline surfaces the note inline.
+        if comment:
+            try:
+                commenter = request.user.get_full_name() or request.user.username
+                orders_models.OrderComments.objects.create(
+                    order=order,
+                    name=f"Reconfirmed by {commenter}"[:255] if status == 'ready_to_pickup' else commenter[:255],
+                    body=comment,
+                )
+            except Exception as e:
+                logger.warning(f'Failed to save comment for order {order_id}: {e}')
+
+            try:
+                hist = orders_models.OrderStatusHistory.objects.filter(
+                    order=order,
+                    field_name='order_status',
+                    old_value=old_status or '',
+                    new_value=status,
+                ).order_by('-created_at').first()
+                if hist and not hist.notes:
+                    hist.notes = comment[:255]
+                    hist.save(update_fields=['notes'])
+            except Exception as e:
+                logger.warning(f'Failed to attach note to status history for order {order_id}: {e}')
 
         # Reverse sync: cancel active delivery tasks when order is cancelled
         if status == 'cancelled' and old_status != 'cancelled':
@@ -2085,6 +2196,301 @@ def import_shopify_orders(request):
         'skipped': skipped,
         'errors': errors,
     })
+
+
+# -----------------------------------------------------------------------------
+# In-page "New Orders to Import" panel for the All Orders page.
+# - orders_api_pending_list: HTMX fragment, fetches latest 10 from Shopify/Woo,
+#   marks ones already in local Orders so the form skips them.
+# - orders_api_pending_import: POST endpoint, reads selected rows from the form
+#   and creates Order + OrderItem records directly (no TempOrder staging).
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+def orders_api_pending_list(request):
+    """HTMX endpoint: render the latest 10 e-commerce orders for quick import."""
+    import signal
+
+    business = get_cached_business(request)
+    if not business:
+        return HttpResponse('', status=204)
+
+    api = business_models.BusinessApiSettings.objects.filter(
+        business=business, api_type__in=['shopify', 'woocommerce']
+    ).first()
+
+    import_result = getattr(request, '_orders_api_import_result', None)
+    ctx_base = {'business': business, 'import_result': import_result}
+
+    if not api:
+        return render(request, 'orders/parts/api_pending_orders_fragment.html', dict(ctx_base, **{
+            'api_orders': [], 'api_orders_error': '', 'api_orders_platform': '',
+            'imported_codes': set(), 'resolved_handle': '',
+        }))
+
+    api_orders = []
+    api_orders_error = ''
+    resolved_handle = ''
+
+    class ApiTimeout(Exception):
+        pass
+
+    def timeout_handler(signum, frame):
+        raise ApiTimeout('API request timed out after 12s')
+
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(12)
+
+    try:
+        if api.api_type == 'shopify':
+            from workforce.views import resolve_shopify_shop_handle
+            import shopify
+            shop_name, was_resolved = resolve_shopify_shop_handle(api)
+            if not shop_name:
+                raise ValueError(
+                    f'Could not resolve Shopify handle from "{api.site_api_url}".'
+                )
+            if was_resolved:
+                resolved_handle = f'{shop_name}.myshopify.com'
+            session = shopify.Session(shop_name, api.api_version or '2023-10', api.api_access_token)
+            shopify.ShopifyResource.activate_session(session)
+            try:
+                fetched = shopify.Order.find(limit=10, status='any', order='created_at desc')
+                for o in fetched:
+                    customer_name = ''
+                    customer_phone = ''
+                    customer = getattr(o, 'customer', None)
+                    if customer:
+                        first = getattr(customer, 'first_name', '') or ''
+                        last = getattr(customer, 'last_name', '') or ''
+                        customer_name = (first + ' ' + last).strip()
+                        customer_phone = getattr(customer, 'phone', '') or ''
+                    addr_parts = []
+                    shipping = getattr(o, 'shipping_address', None)
+                    if shipping:
+                        if not customer_name:
+                            customer_name = getattr(shipping, 'name', '') or ''
+                        if not customer_phone:
+                            customer_phone = getattr(shipping, 'phone', '') or ''
+                        for f in ('address1', 'address2', 'city', 'province', 'country'):
+                            v = getattr(shipping, f, '') or ''
+                            if v:
+                                addr_parts.append(v)
+                    if not customer_name:
+                        customer_name = getattr(o, 'email', '') or ''
+
+                    items = []
+                    for li in (getattr(o, 'line_items', None) or []):
+                        items.append({
+                            'name': getattr(li, 'name', '') or getattr(li, 'title', '') or '',
+                            'qty': int(getattr(li, 'quantity', 1) or 1),
+                            'price': str(getattr(li, 'price', '0') or '0'),
+                            'sku': getattr(li, 'sku', '') or '',
+                        })
+
+                    api_orders.append({
+                        'platform_id': str(o.id),
+                        'name': getattr(o, 'name', '') or '',
+                        'created_at': getattr(o, 'created_at', '') or '',
+                        'financial_status': getattr(o, 'financial_status', '') or '',
+                        'fulfillment_status': getattr(o, 'fulfillment_status', '') or 'unfulfilled',
+                        'total_price': str(getattr(o, 'total_price', '0') or '0'),
+                        'currency': getattr(o, 'currency', '') or '',
+                        'customer_name': customer_name,
+                        'customer_phone': customer_phone,
+                        'customer_address': ', '.join(addr_parts),
+                        'item_count': len(items),
+                        'line_items_json': json.dumps(items),
+                    })
+            finally:
+                shopify.ShopifyResource.clear_session()
+
+        else:  # woocommerce
+            from woocommerce import API as WooAPI
+            wcapi = WooAPI(
+                url=api.site_api_url or '',
+                consumer_key=api.api_key or '',
+                consumer_secret=api.api_secret or '',
+                version='wc/v3', timeout=10,
+            )
+            r = wcapi.get('orders', params={'per_page': 10, 'orderby': 'date', 'order': 'desc'})
+            if r.status_code != 200:
+                api_orders_error = f'WooCommerce API error {r.status_code}'
+            else:
+                for o in r.json():
+                    billing = o.get('billing') or {}
+                    shipping = o.get('shipping') or {}
+                    name = (
+                        ((billing.get('first_name') or '') + ' ' + (billing.get('last_name') or '')).strip()
+                        or ((shipping.get('first_name') or '') + ' ' + (shipping.get('last_name') or '')).strip()
+                        or billing.get('email') or ''
+                    )
+                    addr_parts = []
+                    src = shipping if shipping.get('address_1') else billing
+                    for f in ('address_1', 'address_2', 'city', 'state', 'country'):
+                        v = src.get(f) or ''
+                        if v:
+                            addr_parts.append(v)
+                    items = []
+                    for li in (o.get('line_items') or []):
+                        items.append({
+                            'name': li.get('name', ''),
+                            'qty': int(li.get('quantity', 1) or 1),
+                            'price': str(li.get('price', '0') or '0'),
+                            'sku': li.get('sku', '') or '',
+                        })
+                    api_orders.append({
+                        'platform_id': str(o.get('id')),
+                        'name': f"#{o.get('number') or o.get('id')}",
+                        'created_at': o.get('date_created') or '',
+                        'financial_status': o.get('status') or '',
+                        'fulfillment_status': '',
+                        'total_price': str(o.get('total') or '0'),
+                        'currency': o.get('currency') or '',
+                        'customer_name': name,
+                        'customer_phone': billing.get('phone') or '',
+                        'customer_address': ', '.join(addr_parts),
+                        'item_count': len(items),
+                        'line_items_json': json.dumps(items),
+                    })
+    except ApiTimeout:
+        api_orders_error = 'API request timed out. Try again.'
+    except Exception as e:
+        logger.exception('orders_api_pending_list failed')
+        api_orders_error = str(e)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+    # Mark ones already imported (by client_order_code matching the platform name)
+    incoming_codes = [(o['name'] or '').lstrip('#').strip() for o in api_orders]
+    incoming_codes = [c for c in incoming_codes if c]
+    imported_codes = set(orders_models.Order.objects.filter(
+        business=business, client_order_code__in=incoming_codes
+    ).values_list('client_order_code', flat=True))
+
+    return render(request, 'orders/parts/api_pending_orders_fragment.html', dict(ctx_base, **{
+        'api_orders': api_orders,
+        'api_orders_error': api_orders_error,
+        'api_orders_platform': api.api_type,
+        'imported_codes': imported_codes,
+        'resolved_handle': resolved_handle,
+    }))
+
+
+@login_required(login_url='account_login')
+@require_POST
+def orders_api_pending_import(request):
+    """Create Order + OrderItem records from selected rows of the pending fragment."""
+    import uuid as _uuid
+
+    business = get_cached_business(request)
+    if not business:
+        return HttpResponse('', status=403)
+
+    indices = request.POST.getlist('selected')
+    saved = 0
+    skipped_dup = 0
+    skipped_invalid = 0
+    errors = []
+
+    for raw_idx in indices:
+        try:
+            i = int(raw_idx)
+        except (TypeError, ValueError):
+            continue
+
+        platform_id = (request.POST.get(f'o_{i}_platform_id') or '').strip()
+        order_name = (request.POST.get(f'o_{i}_name') or '').strip()
+        customer_name = (request.POST.get(f'o_{i}_customer_name') or '').strip()
+        customer_phone = (request.POST.get(f'o_{i}_customer_phone') or '').strip()
+        customer_address = (request.POST.get(f'o_{i}_customer_address') or '').strip()
+        total_price = (request.POST.get(f'o_{i}_total_price') or '0').strip()
+        financial_status = (request.POST.get(f'o_{i}_financial_status') or '').strip().lower()
+        line_items_json = request.POST.get(f'o_{i}_line_items_json') or '[]'
+        try:
+            line_items = json.loads(line_items_json)
+            if not isinstance(line_items, list):
+                line_items = []
+        except (ValueError, json.JSONDecodeError):
+            line_items = []
+
+        if not customer_name and not customer_phone:
+            skipped_invalid += 1
+            errors.append(f"{order_name or platform_id}: missing customer name and phone")
+            continue
+
+        client_order_code = order_name.lstrip('#').strip() or f"SH-{_uuid.uuid4().hex[:8].upper()}"
+        client_order_code = client_order_code[:64]
+        if orders_models.Order.objects.filter(business=business, client_order_code=client_order_code).exists():
+            skipped_dup += 1
+            continue
+
+        def _safe_int(val):
+            try:
+                return int(float(str(val).replace(',', '').strip())) if val else 0
+            except (ValueError, TypeError):
+                return 0
+
+        if financial_status == 'paid':
+            cod_amount = 0
+            cod_status = 'online_paid'
+        elif financial_status == 'partially_paid':
+            cod_amount = _safe_int(total_price)
+            cod_status = 'partial_paid'
+        else:
+            cod_amount = _safe_int(total_price)
+            cod_status = 'unpaid'
+
+        pkg_desc = ', '.join(f"{li.get('name', '')} x{li.get('qty', 1)}" for li in line_items)[:255]
+        pkg_qty = max(sum(int(li.get('qty', 1) or 1) for li in line_items), 1)
+
+        try:
+            order = orders_models.Order(
+                business=business,
+                client_order_code=client_order_code,
+                customer_name=customer_name[:100],
+                customer_phone=customer_phone[:100],
+                customer_whatsapp=customer_phone[:100],
+                customer_address=customer_address[:255],
+                cod_amount=cod_amount,
+                cod_status_by_client=cod_status,
+                package_description=pkg_desc,
+                package_qty=pkg_qty,
+                order_status='to_review',
+                verification_status='pending',
+                original_order_data={
+                    'source': 'shopify_quick_import',
+                    'platform_id': platform_id,
+                    'financial_status': financial_status,
+                    'line_items': line_items,
+                },
+            )
+            order.save()
+
+            for li in line_items:
+                try:
+                    orders_models.OrderItem.objects.create(
+                        order=order,
+                        product=None,
+                        quantity=int(li.get('qty', 1) or 1),
+                        unit_price=float(li.get('price', 0) or 0),
+                        notes=li.get('name', '')[:200] if li.get('name') else '',
+                    )
+                except Exception as item_exc:
+                    logger.warning('OrderItem create failed for %s: %s', client_order_code, item_exc)
+
+            saved += 1
+        except Exception as exc:
+            logger.exception('orders_api_pending_import failed for %s', platform_id)
+            errors.append(f"{order_name or platform_id}: {str(exc)}")
+
+    request._orders_api_import_result = {
+        'saved': saved,
+        'skipped_duplicate': skipped_dup,
+        'skipped_invalid': skipped_invalid,
+        'errors': errors[:5],
+    }
+    return orders_api_pending_list(request)
 
 
 @login_required(login_url='account_login')

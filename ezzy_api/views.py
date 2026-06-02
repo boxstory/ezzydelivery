@@ -841,6 +841,20 @@ def driver_complete_task(request, task_id):
             if status_value in ('delivered', 'failed', 'cancelled'):
                 task.completed_at = timezone.now()
 
+            # Persist failure reason & driver notes on the task when marking failed
+            if status_value == 'failed':
+                valid_reason_keys = {k for k, _ in delivery_models.DeliveryTask.FAILURE_REASON_CHOICES}
+                failure_reason = serializer.validated_data.get('failure_reason', '') or ''
+                failure_notes = serializer.validated_data.get('failure_notes', '') or ''
+                if failure_reason and failure_reason in valid_reason_keys:
+                    task.failure_reason = failure_reason
+                elif failure_reason:
+                    task.failure_reason = 'other'
+                if failure_notes:
+                    task.failure_notes = failure_notes
+                elif notes and not task.failure_notes:
+                    task.failure_notes = notes
+
             # Save proof-of-delivery GPS coordinates
             comp_lat = serializer.validated_data.get('completion_latitude')
             comp_lng = serializer.validated_data.get('completion_longitude')
@@ -923,7 +937,7 @@ def driver_complete_task(request, task_id):
                     notes=cod_notes,
                     delivery_task=task,
                     created_by=request.user,
-                    payment_method=payment_method if payment_method in ('cash', 'pos', 'fawran') else None,
+                    payment_method=task.payment_method or None,
                 )
 
             # Fix 14: Allow additional COD collection on partially collected orders

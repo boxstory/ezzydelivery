@@ -13,7 +13,15 @@
         <h2><i class="fa-solid {{ page_icon|default:'fa-paper-plane' }} me-1" aria-hidden="true"></i>{{ page_title|default:"Unpublished Tasks" }}</h2>
         <span class="oli__hero__subtitle">| {{ page_subtitle|default:"Ready to publish to fleet" }}</span>
     </div>
-    <div class="oli__hero__right">
+    <div class="oli__hero__right d-flex align-items-center gap-3">
+        {% if publish_to_task_count is not None %}
+        <a href="{% url 'workforce:wf_orders_to_publish' %}" class="btn btn-outline-dark btn-sm position-relative">
+            <i class="fa-solid fa-paper-plane me-1"></i>Publish to Task
+            {% if publish_to_task_count %}
+            <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle">{{ publish_to_task_count }}</span>
+            {% endif %}
+        </a>
+        {% endif %}
         <div class="oli__hero__count" aria-label="Task count">
             <span class="oli__hero__count-value" id="pageOrderCount">{{ dl_tasks.paginator.count|default:"0" }}</span>
             <span class="oli__hero__count-label">tasks</span>

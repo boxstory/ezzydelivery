@@ -76,11 +76,13 @@ function verifyQNAS(zone, street, building, recordId, orderId) {
             method: 'GET',
             credentials: 'include'
         }).then(function(response) {
-            return response.json();
-        }).then(function(data) {
+            var ok = response.ok;
+            return response.json().then(function(data) { return { ok: ok, data: data }; });
+        }).then(function(payload) {
+        var data = payload.data;
         console.log('[QNAS Verify] Response:', data);
 
-        if (!response.ok || !data.success) {
+        if (!payload.ok || !data.success) {
             // Not found in QNAS
             btn.innerHTML = '<i class="fa-solid fa-xmark-circle me-1"></i>Not in QNAS';
             btn.className = 'btn btn-sm btn-outline-danger';
@@ -121,7 +123,20 @@ function verifyQNAS(zone, street, building, recordId, orderId) {
             coordsSpan.innerHTML = '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" class="text-success text-decoration-none d-inline-flex align-items-center gap-1" title="View on Google Maps"><i class="fa-solid fa-map-pin"></i><span>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</span></a>';
         }
 
-        _saveQnasStatus(orderId, 'verified');
+        // Persist coords + status to the Order
+        try {
+            var csrfToken = _getCsrfToken();
+            fetch(window.location.origin + '/workforce/orders/' + orderId + '/update-coords/', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ latitude: lat, longitude: lng, qnas_status: 'verified' })
+            });
+            _updateQnasStatusBadges(orderId, 'verified');
+        } catch (e) {
+            console.error('[QNAS] Failed to save coords:', e);
+            _saveQnasStatus(orderId, 'verified');
+        }
         console.log('[QNAS Verify] Success:', { zone: zone, street: street, building: building, lat: lat, lng: lng, isExactMatch: isExactMatch, totalBuildings: data.total_buildings });
         }).catch(function(error) {
         console.error('[QNAS Verify] Error:', error);

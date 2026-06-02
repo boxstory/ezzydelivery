@@ -15,8 +15,26 @@
         <th class="oal__table-th oal__table-th--check">
           <input type="checkbox" id="orders_bulk_select_all" class="oal__table-checkbox" title="Select all">
         </th>
-        <th class="oal__table-th sortable-header" data-sort="order_number">
-          Order # <i class="fa-solid fa-sort oal__table-sort-icon"></i>
+        <th class="oal__table-th">
+          <div class="d-flex align-items-center gap-2">
+            <span class="sortable-header" data-sort="order_number" role="button">
+              Order #
+              {% if sort_by == 'order_number' %}
+                <i class="fa-solid fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %} oal__table-sort-icon"></i>
+              {% else %}
+                <i class="fa-solid fa-sort oal__table-sort-icon"></i>
+              {% endif %}
+            </span>
+            <span class="text-muted">|</span>
+            <span class="sortable-header" data-sort="order_date" role="button">
+              Date
+              {% if sort_by == 'order_date' %}
+                <i class="fa-solid fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %} oal__table-sort-icon"></i>
+              {% else %}
+                <i class="fa-solid fa-sort oal__table-sort-icon"></i>
+              {% endif %}
+            </span>
+          </div>
         </th>
         <th class="oal__table-th sortable-header" data-sort="client_order_code">
           Client # <i class="fa-solid fa-sort oal__table-sort-icon"></i>
@@ -120,6 +138,15 @@
               <i class="fa-solid {% if delivery and delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery and delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery and delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery and delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% elif order.task_created %}fa-clipboard-check{% elif order.order_status == 'publish' %}fa-paper-plane{% else %}fa-minus{% endif %}"></i>
               {% if delivery and delivery.dl_task_status == 'delivered' %}Delivered{% elif delivery and delivery.dl_task_status == 'assigned' %}Assigned{% elif delivery and delivery.dl_task_status == 'accepted' %}Accepted{% elif delivery and delivery.dl_task_status == 'picked_up' %}Picked Up{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}In Transit{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}Failed{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}Cancelled{% elif order.task_created %}Task Created{% elif order.order_status == 'publish' %}In DL Task{% else %}No Task{% endif %}
             </span>
+            {% if delivery and delivery.failure_reason %}
+            <span class="oal__fail-reason" title="{% if delivery.failure_notes %}{{ delivery.failure_notes }}{% else %}{{ delivery.get_failure_reason_display }}{% endif %}">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ delivery.get_failure_reason_display }}{% if delivery.dl_task_status != 'failed' %} <span class="oal__fail-reason-prev">(prev)</span>{% endif %}
+            </span>
+            {% elif delivery and fallback_failure_notes|get_item:order.id %}
+            <span class="oal__fail-reason" title="{{ fallback_failure_notes|get_item:order.id }}">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ fallback_failure_notes|get_item:order.id|truncatechars:40 }}{% if delivery.dl_task_status != 'failed' %} <span class="oal__fail-reason-prev">(prev)</span>{% endif %}
+            </span>
+            {% endif %}
             {% endwith %}
           </div>
           {% if order.order_status != 'delivered' and order.order_status != 'cancelled' %}
@@ -137,13 +164,37 @@
         <!-- Actions -->
         <td class="oal__table-td oal__table-td--actions">
           <div class="oal__table-actions">
-            {% if order.order_status == 'publish' or order.order_status == 'delivered' or order.order_status == 'cancelled' %}
+            {% with action_delivery=order.delivery_task.first %}
+            {% if order.order_status == 'delivered' or order.order_status == 'cancelled' %}
+            <span class="oal__action-btn oal__action-btn--disabled" title="Cannot reconfirm {{ order.get_order_status_display }} orders"><i class="fa-solid fa-check-double"></i></span>
+            <span class="oal__action-btn oal__action-btn--disabled" title="Cannot edit {{ order.get_order_status_display }} orders"><i class="fa-solid fa-pen"></i></span>
+            <span class="oal__action-btn oal__action-btn--disabled" title="Cannot delete {{ order.get_order_status_display }} orders"><i class="fa-solid fa-trash"></i></span>
+            {% elif order.order_status == 'publish' %}
+              {% if action_delivery and action_delivery.dl_task_status == 'failed' %}
+              <button type="button"
+                      class="oal__action-btn oal__action-btn--reconfirm"
+                      data-order-id="{{ order.id }}"
+                      data-order-number="{{ order.order_number }}"
+                      title="Reconfirm Failed Order">
+                <i class="fa-solid fa-check-double"></i>
+              </button>
+              {% else %}
+              <span class="oal__action-btn oal__action-btn--disabled" title="Cannot reconfirm {{ order.get_order_status_display }} orders"><i class="fa-solid fa-check-double"></i></span>
+              {% endif %}
             <span class="oal__action-btn oal__action-btn--disabled" title="Cannot edit {{ order.get_order_status_display }} orders"><i class="fa-solid fa-pen"></i></span>
             <span class="oal__action-btn oal__action-btn--disabled" title="Cannot delete {{ order.get_order_status_display }} orders"><i class="fa-solid fa-trash"></i></span>
             {% else %}
+            <button type="button"
+                    class="oal__action-btn oal__action-btn--reconfirm"
+                    data-order-id="{{ order.id }}"
+                    data-order-number="{{ order.order_number }}"
+                    title="Reconfirm Order">
+              <i class="fa-solid fa-check-double"></i>
+            </button>
             <a href="{% url 'orders:order_update' order.id %}" class="oal__action-btn" title="Edit Order"><i class="fa-solid fa-pen"></i></a>
             <a href="{% url 'orders:delete_order' order.id %}" class="oal__action-btn oal__action-btn--danger" title="Delete Order"><i class="fa-solid fa-trash"></i></a>
             {% endif %}
+            {% endwith %}
           </div>
         </td>
       </tr>

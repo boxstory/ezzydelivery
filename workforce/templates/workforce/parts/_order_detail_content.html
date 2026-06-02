@@ -212,6 +212,7 @@ Parameters:
                     <th>Qty</th>
                     <th>Unit Price</th>
                     <th>Total</th>
+                    <th>Stock</th>
                 </tr>
             </thead>
             <tbody>
@@ -221,6 +222,19 @@ Parameters:
                     <td>{{ item.quantity }}</td>
                     <td>{{ item.unit_price|default:"0.00" }} QAR</td>
                     <td class="odp__table__amount">{{ item.total_price|default:"0.00" }} QAR</td>
+                    <td>
+                        {% with si=item.stock_info %}
+                        {% if si.status == 'in_stock' %}
+                            <span class="badge bg-success">In Stock{% if si.available is not None %} · {{ si.available }}{% endif %}</span>
+                        {% elif si.status == 'low_stock' %}
+                            <span class="badge bg-warning text-dark">Low · {{ si.available }}</span>
+                        {% elif si.status == 'out_of_stock' %}
+                            <span class="badge bg-danger">Out{% if si.available is not None %} · {{ si.available }}{% endif %}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">—</span>
+                        {% endif %}
+                        {% endwith %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -1162,3 +1162,43 @@ def seller_warehouse_link_post_delete(sender, instance, **kwargs):
         logger.exception(
             f"Error deactivating PickupLocation on SellerWarehouseLink delete: {e}"
         )
+
+
+# =============================================================================
+# Mirror StockLevel.quantity_on_hand → ProductInventory.item_quantity
+# =============================================================================
+# StockLevel (warehouse app) is the source of truth for fulfillment-enabled
+# businesses. ProductInventory (product app) is a single per-product counter
+# used by inventory reports / product list. We keep ProductInventory in sync by
+# summing all StockLevel rows for the product across every warehouse/location.
+# This way reports stay correct without callers needing to update both systems.
+def _sync_product_inventory_from_stock(product):
+    """Recompute ProductInventory.item_quantity = sum(StockLevel.quantity_on_hand) for product."""
+    from warehouse.models import StockLevel
+    from product.models import ProductInventory
+    from django.db.models import Sum
+
+    if product is None:
+        return
+    total = StockLevel.objects.filter(product=product).aggregate(
+        total=Sum('quantity_on_hand')
+    )['total'] or 0
+    ProductInventory.objects.update_or_create(
+        item_sku=product, defaults={'item_quantity': int(total)}
+    )
+
+
+@receiver(post_save, sender='warehouse.StockLevel', dispatch_uid='warehouse.stocklevel_mirror_to_productinventory')
+def stocklevel_mirror_to_productinventory_on_save(sender, instance, **kwargs):
+    try:
+        _sync_product_inventory_from_stock(instance.product)
+    except Exception:
+        logger.exception('Failed to mirror StockLevel → ProductInventory on save')
+
+
+@receiver(post_delete, sender='warehouse.StockLevel', dispatch_uid='warehouse.stocklevel_mirror_to_productinventory_delete')
+def stocklevel_mirror_to_productinventory_on_delete(sender, instance, **kwargs):
+    try:
+        _sync_product_inventory_from_stock(instance.product)
+    except Exception:
+        logger.exception('Failed to mirror StockLevel → ProductInventory on delete')

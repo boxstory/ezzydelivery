@@ -39,7 +39,6 @@ View Categories:
 
     Reports:
         - staff_reports: Staff activity reports
-        - staff_contacts: Contact management
 
 Integrations:
     - ShipDay API: For DMS order publishing
@@ -112,6 +111,55 @@ def _parse_date_param(value):
         return dateutil_parser.parse(value).strftime('%Y-%m-%d')
     except (ValueError, TypeError):
         return ''
+
+
+def resolve_shopify_shop_handle(api_settings, persist=True):
+    """
+    Return the canonical .myshopify.com shop handle for a BusinessApiSettings row.
+
+    If `site_api_url` is already a .myshopify.com URL, returns the handle directly.
+    If it's a custom domain (e.g. pearlluxurysmile.com), fetches the storefront HTML
+    and extracts the canonical handle from `Shopify.shop = "<handle>.myshopify.com"`.
+
+    On a successful resolve from a custom domain, replaces site_api_url with the
+    canonical https://<handle>.myshopify.com so subsequent API calls (cron tasks,
+    product sync, etc.) hit the right host without re-resolving.
+
+    Returns: (handle: str|None, was_resolved_from_custom_domain: bool)
+    """
+    import re as _re
+    import requests as _requests
+
+    raw = (api_settings.site_api_url or '').strip()
+    if not raw:
+        return None, False
+
+    no_scheme = _re.sub(r'^https?://', '', raw).rstrip('/').strip()
+    if no_scheme.endswith('.myshopify.com'):
+        return no_scheme[:-len('.myshopify.com')], False
+
+    fetch_url = raw if raw.startswith(('http://', 'https://')) else f'https://{raw}'
+    try:
+        r = _requests.get(
+            fetch_url.rstrip('/') + '/',
+            timeout=8, allow_redirects=True,
+            headers={'User-Agent': 'EzzyDelivery/1.0 (+shop-handle-resolver)'},
+        )
+    except _requests.RequestException:
+        return None, False
+    if r.status_code != 200:
+        return None, False
+
+    m = _re.search(r'Shopify\.shop\s*=\s*"([^"]+)\.myshopify\.com"', r.text)
+    if not m:
+        return None, False
+
+    handle = m.group(1)
+    canonical = f'https://{handle}.myshopify.com'
+    if persist and api_settings.site_api_url != canonical:
+        api_settings.site_api_url = canonical
+        api_settings.save(update_fields=['site_api_url'])
+    return handle, True
 
 
 # Import shared utilities from core
@@ -635,6 +683,8 @@ def all_orders(request):
 
     filter_params = '&'.join(filter_params_list)
 
+    wa_data = _fetch_whatsapp_instances()
+
     data = {
         'orders': orders,
         'all_businesses': all_businesses,
@@ -651,6 +701,8 @@ def all_orders(request):
         'filter_params': filter_params,
         'sort': sort,
         'per_page': request.GET.get('per_page', '25'),
+        'wa_instances': wa_data['instances'],
+        'wa_instances_error': wa_data['error'],
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
@@ -1023,8 +1075,16 @@ def orders_to_publish(request):
     ).prefetch_related('order_comments', 'delivery_task').filter(task_created=False).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
+    tasks_to_fleet_count = delivery_models.DeliveryTask.objects.filter(
+        order__business__business_status='active',
+        dl_task_publish=False,
+    ).exclude(
+        dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
+    ).count()
+
     data = {
         'orders': orders,
+        'tasks_to_fleet_count': tasks_to_fleet_count,
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
@@ -1752,17 +1812,11 @@ def preview_api_import(request):
                     return j
             return None
 
-        def col_idx_auto(*keys):
-            for k in keys:
-                for j, h in enumerate(headers):
-                    if h.strip().lower() == k.lower():
-                        return j
-            return None
-
-        def get_idx(field_name, *auto_keys):
+        def get_idx(field_name, *_ignored_auto_keys):
+            # Mapping-config is authoritative — no auto-detection fallback.
             if field_name in saved_mapping:
                 return col_idx_by_header(saved_mapping[field_name])
-            return col_idx_auto(*auto_keys)
+            return None
 
         idx_name = get_idx('customer_name', 'name', 'customer name', 'customer', 'client name')
         idx_phone = get_idx('customer_phone', 'phone', 'mobile', 'phone number', 'contact')
@@ -2366,7 +2420,7 @@ def import_api_orders(request):
             headers = all_values[0] if all_values else []
             data_rows = all_values[1:] if all_values else []
 
-            # Use saved column mapping if available
+            # Use saved column mapping — authoritative; no auto-detection.
             saved_mapping = api.column_mapping or {}
 
             def col_idx_by_header(header_name):
@@ -2375,17 +2429,11 @@ def import_api_orders(request):
                         return j
                 return None
 
-            def col_idx_auto(*keys):
-                for k in keys:
-                    for j, h in enumerate(headers):
-                        if h.strip().lower() == k.lower():
-                            return j
-                return None
-
-            def get_idx(field_name, *auto_keys):
+            def get_idx(field_name, *_ignored_auto_keys):
+                # Mapping-config is authoritative — no auto-detection fallback.
                 if field_name in saved_mapping:
                     return col_idx_by_header(saved_mapping[field_name])
-                return col_idx_auto(*auto_keys)
+                return None
 
             idx_name = get_idx('customer_name', 'name', 'customer name', 'customer', 'client name', 'client', 'first name')
             idx_phone = get_idx('customer_phone', 'phone', 'mobile', 'phone number', 'contact')
@@ -2719,87 +2767,204 @@ def mapping_manager(request):
     })
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def wf_sheet_headers(request):
-    """GET: Return the column headers from a business's Google Sheet config."""
-    business_id = request.GET.get('business_id', '').strip()
-    if not business_id:
-        return JsonResponse({'success': False, 'error': 'Missing business_id'}, status=400)
-
-    try:
-        api = business_models.BusinessApiSettings.objects.get(
-            business__business_id=business_id, api_type='google_sheet', is_verify_api=True
-        )
-    except business_models.BusinessApiSettings.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'No approved Google Sheet config'}, status=404)
-
-    import re as _re, json as _json, gspread
+def _gspread_client_or_error():
+    """Return (gc, error_string). Shared bootstrap for Google Sheets endpoints."""
+    import json as _json, gspread
     from google.oauth2.credentials import Credentials as _GCreds
     from google.auth.transport.requests import Request as _GReq
     from django.conf import settings as django_settings
     from pathlib import Path as _Path
 
-    sheet_url = api.google_sheet_url or api.site_api_url or ''
     token_path = _Path(django_settings.BASE_DIR) / getattr(
         django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
     )
     if not token_path.exists():
-        return JsonResponse({'success': False, 'error': 'Google Sheets not authorized.'}, status=400)
+        return None, 'Google Sheets not authorized.'
+    _td = _json.loads(token_path.read_text())
+    creds = _GCreds(
+        token=_td.get('access_token'),
+        refresh_token=_td.get('refresh_token'),
+        token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+        client_id=_td.get('client_id'),
+        client_secret=_td.get('client_secret'),
+        scopes=_td.get('scope', '').split(),
+    )
+    if creds.expired and creds.refresh_token:
+        creds.refresh(_GReq())
+        _td['access_token'] = creds.token
+        token_path.write_text(_json.dumps(_td, indent=2))
+    return gspread.authorize(creds), None
+
+
+def _resolve_gsheet_api(business_id, source_id):
+    """Return BusinessApiSettings row for the selected (or default) Google Sheet source."""
+    qs = business_models.BusinessApiSettings.objects.filter(
+        business__business_id=business_id, api_type='google_sheet', is_verify_api=True
+    )
+    if source_id:
+        try:
+            return qs.get(pk=int(source_id))
+        except (ValueError, business_models.BusinessApiSettings.DoesNotExist):
+            return None
+    return qs.order_by('-is_default', 'id').first()
+
+
+def _select_gsheet_worksheet(spreadsheet, api):
+    """
+    Pick the worksheet to use, in priority order:
+      1) saved api.google_sheet_gid
+      2) gid in the URL (?gid=N or #gid=N)
+      3) first sheet
+    """
+    import re as _re
+    if api and api.google_sheet_gid is not None:
+        for ws in spreadsheet.worksheets():
+            if ws.id == int(api.google_sheet_gid):
+                return ws
+    sheet_url = (api.google_sheet_url or api.site_api_url or '') if api else ''
+    gid_match = _re.search(r'gid=(\d+)', sheet_url)
+    if gid_match:
+        gid = int(gid_match.group(1))
+        for ws in spreadsheet.worksheets():
+            if ws.id == gid:
+                return ws
+    return spreadsheet.sheet1
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_sheet_worksheets(request):
+    """GET: list all worksheets (tabs) inside the selected Google Sheet."""
+    business_id = request.GET.get('business_id', '').strip()
+    source_id = request.GET.get('source_id', '').strip()
+    if not business_id:
+        return JsonResponse({'success': False, 'error': 'Missing business_id'}, status=400)
+
+    api = _resolve_gsheet_api(business_id, source_id)
+    if not api:
+        return JsonResponse({'success': False, 'error': 'No approved Google Sheet config'}, status=404)
+
+    sheet_url = api.google_sheet_url or api.site_api_url or ''
+    if not sheet_url:
+        return JsonResponse({'success': False, 'error': 'Google Sheet URL not set on this source'}, status=400)
+
+    gc, err = _gspread_client_or_error()
+    if err:
+        return JsonResponse({'success': False, 'error': err}, status=400)
+
+    import re as _re
+    match = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+    if not match:
+        return JsonResponse({'success': False, 'error': 'Invalid Sheet URL'}, status=400)
+    try:
+        spreadsheet = gc.open_by_key(match.group(1))
+        worksheets = []
+        for ws in spreadsheet.worksheets():
+            worksheets.append({
+                'gid': ws.id,
+                'title': ws.title,
+                'rows': getattr(ws, 'row_count', None),
+                'cols': getattr(ws, 'col_count', None),
+            })
+        current_ws = _select_gsheet_worksheet(spreadsheet, api)
+        return JsonResponse({
+            'success': True,
+            'worksheets': worksheets,
+            'current_gid': current_ws.id if current_ws else None,
+            'current_title': current_ws.title if current_ws else '',
+            'spreadsheet_title': spreadsheet.title,
+        })
+    except Exception as e:
+        logger.exception('wf_sheet_worksheets failed')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def wf_sheet_save_tab(request):
+    """POST: save the selected worksheet (gid + title) on the BusinessApiSettings row."""
+    business_id = (request.POST.get('business_id') or '').strip()
+    source_id = (request.POST.get('source_id') or '').strip()
+    gid_raw = (request.POST.get('gid') or '').strip()
+    title = (request.POST.get('title') or '').strip()[:255]
+
+    if not business_id or not gid_raw:
+        return JsonResponse({'success': False, 'error': 'Missing business_id or gid'}, status=400)
+    try:
+        gid = int(gid_raw)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Invalid gid'}, status=400)
+
+    api = _resolve_gsheet_api(business_id, source_id)
+    if not api:
+        return JsonResponse({'success': False, 'error': 'No matching Google Sheet config'}, status=404)
+
+    api.google_sheet_gid = gid
+    api.google_sheet_tab_name = title
+    api.save(update_fields=['google_sheet_gid', 'google_sheet_tab_name'])
+    return JsonResponse({'success': True, 'gid': gid, 'title': title})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_sheet_headers(request):
+    """GET: Return the column headers from a business's Google Sheet config."""
+    business_id = request.GET.get('business_id', '').strip()
+    source_id = request.GET.get('source_id', '').strip()
+    if not business_id:
+        return JsonResponse({'success': False, 'error': 'Missing business_id'}, status=400)
+
+    api = _resolve_gsheet_api(business_id, source_id)
+    if not api:
+        return JsonResponse({'success': False, 'error': 'No approved Google Sheet config'}, status=404)
+
+    import re as _re
+
+    sheet_url = api.google_sheet_url or api.site_api_url or ''
+    if not sheet_url:
+        return JsonResponse({'success': False, 'error': 'Google Sheet URL not set on this source'}, status=400)
+
+    gc, err = _gspread_client_or_error()
+    if err:
+        return JsonResponse({'success': False, 'error': err}, status=400)
 
     try:
-        _td = _json.loads(token_path.read_text())
-        creds = _GCreds(
-            token=_td.get('access_token'),
-            refresh_token=_td.get('refresh_token'),
-            token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
-            client_id=_td.get('client_id'),
-            client_secret=_td.get('client_secret'),
-            scopes=_td.get('scope', '').split(),
-        )
-        if creds.expired and creds.refresh_token:
-            creds.refresh(_GReq())
-            _td['access_token'] = creds.token
-            token_path.write_text(_json.dumps(_td, indent=2))
-
-        gc = gspread.authorize(creds)
         match = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
         if not match:
             return JsonResponse({'success': False, 'error': 'Invalid Sheet URL'}, status=400)
 
         spreadsheet = gc.open_by_key(match.group(1))
-        gid_match = _re.search(r'gid=(\d+)', sheet_url)
-        gid = int(gid_match.group(1)) if gid_match else 0
+        worksheet = _select_gsheet_worksheet(spreadsheet, api)
 
-        worksheet = None
-        for ws in spreadsheet.worksheets():
-            if ws.id == gid:
-                worksheet = ws
-                break
-        if worksheet is None:
-            worksheet = spreadsheet.sheet1
+        # Cache the chosen tab title back on the row for display
+        if worksheet and api.google_sheet_tab_name != worksheet.title:
+            api.google_sheet_tab_name = worksheet.title[:255]
+            update_fields = ['google_sheet_tab_name']
+            if api.google_sheet_gid is None:
+                api.google_sheet_gid = worksheet.id
+                update_fields.append('google_sheet_gid')
+            api.save(update_fields=update_fields)
 
         all_values = worksheet.get_all_values()
-        if len(all_values) <= 1:
-            for ws in spreadsheet.worksheets():
-                if ws.id == (worksheet.id if worksheet else -1):
-                    continue
-                candidate = ws.get_all_values()
-                if len(candidate) > 1:
-                    all_values = candidate
-                    break
-
         headers = all_values[0] if all_values else []
-        # Also return sample data (first data row) for preview
         sample = all_values[1] if len(all_values) > 1 else []
+
+        # Persist headers so preview/transfer can resolve raw_row positions to db fields
+        if headers and list(api.last_headers or []) != list(headers):
+            api.last_headers = list(headers)
+            api.save(update_fields=['last_headers'])
 
         return JsonResponse({
             'success': True,
             'headers': headers,
             'sample': sample,
             'saved_mapping': api.column_mapping or {},
+            'current_gid': worksheet.id if worksheet else None,
+            'current_title': worksheet.title if worksheet else '',
         })
     except Exception as e:
+        logger.exception('wf_sheet_headers failed')
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
@@ -4681,6 +4846,97 @@ def wf_mapping_manager_test(request):
                 'source': 'woocommerce',
             }
 
+        elif platform == 'google_sheet':
+            import re as _re
+            import gspread
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            from django.conf import settings as django_settings
+            from pathlib import Path
+            import json as _json
+
+            sheet_url = api_cfg.google_sheet_url or ''
+            if not sheet_url:
+                return JsonResponse({'success': False, 'error': 'Google Sheet URL is not set on this source.'})
+
+            token_path = Path(django_settings.BASE_DIR) / getattr(
+                django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
+            )
+            if not token_path.exists():
+                return JsonResponse({'success': False, 'error': 'Google Sheets not authorized. Run: python google_sheets_auth.py'})
+
+            _td = _json.loads(token_path.read_text())
+            creds = Credentials(
+                token=_td.get('access_token'),
+                refresh_token=_td.get('refresh_token'),
+                token_uri=_td.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                client_id=_td.get('client_id'),
+                client_secret=_td.get('client_secret'),
+                scopes=_td.get('scope', '').split(),
+            )
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                _td['access_token'] = creds.token
+                token_path.write_text(_json.dumps(_td, indent=2))
+
+            gc = gspread.authorize(creds)
+            m = _re.search(r'/spreadsheets/d/([^/]+)', sheet_url)
+            if not m:
+                return JsonResponse({'success': False, 'error': 'Invalid Google Sheet URL.'})
+            sheet_id = m.group(1)
+            gid_match = _re.search(r'gid=(\d+)', sheet_url)
+            url_gid = int(gid_match.group(1)) if gid_match else 0
+
+            spreadsheet = gc.open_by_key(sheet_id)
+            saved_gid = getattr(api_cfg, 'google_sheet_gid', None)
+            worksheet = None
+            if saved_gid is not None:
+                for ws in spreadsheet.worksheets():
+                    if ws.id == int(saved_gid):
+                        worksheet = ws
+                        break
+            if worksheet is None:
+                for ws in spreadsheet.worksheets():
+                    if ws.id == url_gid:
+                        worksheet = ws
+                        break
+            if worksheet is None:
+                worksheet = spreadsheet.sheet1
+
+            all_values = worksheet.get_all_values()
+            if not all_values or len(all_values) <= 1:
+                return JsonResponse({'success': False, 'error': 'No data rows in this sheet.'})
+
+            headers = all_values[0]
+            # Latest row = last non-empty row from the bottom
+            latest_row = None
+            latest_row_num = None
+            for i in range(len(all_values) - 1, 0, -1):
+                row = all_values[i]
+                if any((c or '').strip() for c in row):
+                    latest_row = row
+                    latest_row_num = i + 1  # 1-based sheet row
+                    break
+            if latest_row is None:
+                return JsonResponse({'success': False, 'error': 'No data rows in this sheet.'})
+
+            col_values = {}
+            for j, h in enumerate(headers):
+                key = (h or '').strip()
+                if not key:
+                    continue
+                col_values[key] = (latest_row[j] if j < len(latest_row) else '') or ''
+            raw_order = dict(col_values)
+            raw_order['_row_number'] = latest_row_num
+            raw_order['_sheet_tab'] = worksheet.title
+
+            order_info = {
+                'id':   col_values.get(platform_mapping.get('client_order_code', ''), '') if platform_mapping else '',
+                'name': col_values.get(platform_mapping.get('customer_name', ''), '') if platform_mapping else '',
+                'date': col_values.get(platform_mapping.get('order_date', ''), '') if platform_mapping else '',
+                'source': 'google_sheet',
+            }
+
         else:
             return JsonResponse({'success': False, 'error': f'Test not supported for platform: {platform}'})
 
@@ -4901,7 +5157,7 @@ def wf_api_orders(request):
                 data_rows = all_values[1:]
                 live_total = len(data_rows)
 
-                # Use saved column mapping if available, else auto-detect
+                # Mapping config is authoritative — no auto-detection fallback.
                 saved_mapping = selected_api.column_mapping or {}
 
                 def col_idx_by_header(header_name):
@@ -4911,29 +5167,20 @@ def wf_api_orders(request):
                             return j
                     return None
 
-                def col_idx_auto(*keys):
-                    """Auto-detect column index by common name variants."""
-                    for k in keys:
-                        for j, h in enumerate(headers):
-                            if h.strip().lower() == k.lower():
-                                return j
-                    return None
-
-                def get_idx(field_name, *auto_keys):
-                    """Get column index: saved mapping first, then auto-detect."""
+                def get_idx(field_name, *_ignored_auto_keys):
                     if field_name in saved_mapping:
                         return col_idx_by_header(saved_mapping[field_name])
-                    return col_idx_auto(*auto_keys)
+                    return None
 
-                idx_name = get_idx('customer_name', 'name', 'customer name', 'customer', 'client name', 'client', 'first name')
-                idx_phone = get_idx('customer_phone', 'phone', 'mobile', 'phone number', 'contact')
-                idx_address = get_idx('customer_address', 'address', 'delivery address', 'location', 'area', 'city')
-                idx_cod = get_idx('cod_amount', 'cod', 'amount', 'cod amount', 'price', 'total')
-                idx_status = col_idx_auto('status', 'order status', 'state')
-                idx_date = get_idx('order_date', 'date', 'order date', 'created', 'created at')
-                idx_country = col_idx_auto('country', 'country code')
-                idx_order = get_idx('client_order_code', 'order', 'order number', 'order #', 'order id', 'ref', 'reference')
-                idx_product = get_idx('package_desc', 'product', 'product name', 'item', 'items', 'package desc')
+                idx_name = get_idx('customer_name')
+                idx_phone = get_idx('customer_phone')
+                idx_address = get_idx('customer_address')
+                idx_cod = get_idx('cod_amount')
+                idx_status = get_idx('cod_status_by_client')
+                idx_date = get_idx('order_date')
+                idx_country = get_idx('country')
+                idx_order = get_idx('client_order_code')
+                idx_product = get_idx('package_desc')
 
                 def cell(row, idx):
                     if idx is not None and idx < len(row):
@@ -5220,7 +5467,7 @@ def dl_list_all(request):
         Prefetch('order__status_history', queryset=failure_history_qs, to_attr='failure_history'),
     ).filter(
         order__business__business_status='active',
-    ).order_by('-created_at')
+    ).order_by('-updated_at')
 
     # Get filter parameters
     dl_code = request.GET.get('dlCode', '')
@@ -5262,10 +5509,12 @@ def dl_list_all(request):
     sort_order = request.GET.get('order', 'asc')
     SORT_MAP = {
         'task_number': 'dl_task_number',
+        'order': 'order__client_order_code',
         'date': 'created_at',
+        'updated': 'updated_at',
         'business': 'order__business__business_name',
         'customer': 'order__customer_name',
-        'cod': 'order__order_cod_amount',
+        'cod': 'order__cod_amount',
         'status': 'dl_task_status',
         'driver': 'driver__user__first_name',
     }
@@ -5313,6 +5562,9 @@ def dl_list_all(request):
         'page_icon': 'fa-tasks',
         'list_type': 'all',
         'show_filters': True,
+        'show_updated_at': True,
+        'default_sort': 'updated',
+        'default_order': 'desc',
         'filter_params': filter_params,
         'per_page': request.GET.get('per_page', '25'),
         'filters': {
@@ -5543,6 +5795,22 @@ def dl_list_incompleted_details(request):
 
     dl_tasks = paginate_queryset(request, dl_tasks)
 
+    # Attach the most recent "dl_task_status → failed" history entry per order
+    # (driver's free-text reason lives in OrderStatusHistory.notes, not on the task)
+    order_ids = [t.order_id for t in dl_tasks.object_list if t.order_id]
+    latest_failed_by_order = {}
+    if order_ids:
+        failed_history = orders_models.OrderStatusHistory.objects.filter(
+            order_id__in=order_ids,
+            field_name='dl_task_status',
+            new_value='failed',
+        ).order_by('order_id', '-created_at')
+        for entry in failed_history:
+            if entry.order_id not in latest_failed_by_order:
+                latest_failed_by_order[entry.order_id] = entry
+    for t in dl_tasks.object_list:
+        t.latest_failed_history = latest_failed_by_order.get(t.order_id)
+
     data = {
         'dl_tasks': dl_tasks,
         'businesses': businesses,
@@ -5552,6 +5820,7 @@ def dl_list_incompleted_details(request):
         'page_icon': 'fa-clock-rotate-left',
         'list_type': 'incompleted',
         'show_filters': True,
+        'show_failure_reason': True,
         'filters': {
             'dlCode': dl_code, 'cCode': c_code, 'mobile': mobile,
             'driverName': driver_name, 'cStatus': c_status, 'dmsStatus': dms_status,
@@ -5600,11 +5869,14 @@ def dl_list_ready_to_published_to_dms(request):
     ).order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
 
+    publish_to_task_count = orders_models.Order.objects.filter(task_created=False).count()
+
     data = {
         'dl_tasks': dl_tasks,
         'page_title': 'Unpublished Tasks',
         'page_subtitle': 'Ready to publish to fleet',
         'page_icon': 'fa-paper-plane',
+        'publish_to_task_count': publish_to_task_count,
     }
     return render(request, 'workforce/parts/lists/dl_list_unpublished.html', data)
 
@@ -5820,6 +6092,25 @@ def order_detail(request, order_id):
         order=order
     ).select_related('changed_by').order_by('created_at')
 
+    from core.templatetags.custom_filters import whatsapp_number
+    wa_data = _fetch_whatsapp_instances()
+    wa_default_to = whatsapp_number(order.customer_whatsapp or order.customer_phone)
+    wa_default_message = _build_order_whatsapp_message(order)
+
+    # Latest address-verification job for this order (for the detail panel).
+    address_verify_job = None
+    try:
+        from whatsapp.models import AddressVerificationJob
+        address_verify_job = (
+            AddressVerificationJob.objects
+            .filter(order=order)
+            .select_related('received_message')
+            .order_by('-created_at')
+            .first()
+        )
+    except Exception:
+        address_verify_job = None
+
     context = {
         'order': order,
         'order_items': order_items,
@@ -5828,6 +6119,12 @@ def order_detail(request, order_id):
         'delivery_task': delivery_task,
         'status_history': status_history,
         'timeline_count': status_history.count(),
+        'wa_instances': wa_data['instances'],
+        'wa_default_instance': wa_data['default'],
+        'wa_instances_error': wa_data['error'],
+        'wa_default_to': wa_default_to,
+        'wa_default_message': wa_default_message,
+        'address_verify_job': address_verify_job,
     }
 
     # Check if this is being loaded in a panel (via HTMX)
@@ -5841,6 +6138,215 @@ def order_detail(request, order_id):
     template = 'workforce/order_detail_panel.html' if use_panel else 'workforce/order_detail.html'
 
     return render(request, template, context)
+
+
+def _build_delivery_recovery_whatsapp_message(order, driver_failure_note=''):
+    """Recovery message sent 10 min after a driver marks a delivery failed.
+
+    Includes the driver's structured failure reason (and any notes) so the
+    customer knows exactly what went wrong, plus the same verify-link the
+    auto-import flow uses so they can re-pin their location to retry.
+    """
+    from core.templatetags.custom_filters import generate_order_verify_key
+
+    verify_key = generate_order_verify_key(order.order_number, order.customer_phone)
+    note_line = ''
+    if driver_failure_note:
+        note_line = f"Reason: {driver_failure_note}\n"
+    return (
+        f"Hi {order.customer_name}, sorry — we couldn't complete delivery of "
+        f"your order {order.order_number}.\n\n"
+        f"{note_line}"
+        f"We'd like to deliver again. Please confirm your location so the driver "
+        f"can find you:\n"
+        f"📌 https://ezzydelivery.qa/orders/verify/?order={order.order_number}&key={verify_key}\n\n"
+        f"Or reply with your live WhatsApp location pin."
+    )
+
+
+def _build_order_whatsapp_message(order):
+    """Default WhatsApp verification message including up to 2 product names."""
+    from core.templatetags.custom_filters import generate_order_verify_key
+
+    items = list(
+        orders_models.OrderItem.objects
+        .filter(order=order)
+        .select_related('product')[:3]
+    )
+    names = []
+    for it in items[:2]:
+        name = it.product.item_name if it.product and it.product.item_name else None
+        if not name and it.notes:
+            parts = it.notes.split('__')
+            name = (parts[1] if len(parts) >= 2 else it.notes).strip()
+        if name:
+            names.append(name)
+
+    items_line = ''
+    if names:
+        joined = ' & '.join(names)
+        more = len(items) - len(names)
+        suffix = f' (+{more} more)' if more > 0 else ''
+        items_line = f"🛒 Items: {joined}{suffix}\n"
+
+    verify_key = generate_order_verify_key(order.order_number, order.customer_phone)
+    return (
+        f"Hi {order.customer_name}, this is regarding your order {order.order_number}. "
+        f"Please confirm your delivery details and availability.\n\n"
+        f"{items_line}"
+        f"📌 Verify your location: https://ezzydelivery.qa/orders/verify/"
+        f"?order={order.order_number}&key={verify_key}"
+    )
+
+
+def _fetch_whatsapp_instances():
+    """Fetch Evolution API instances. Cached for 60s to avoid per-render hits."""
+    import requests
+    from django.conf import settings as dj_settings
+    from django.core.cache import cache
+
+    cached = cache.get('wsmw_evolution_instances')
+    if cached is not None:
+        return cached
+
+    api_url = getattr(dj_settings, 'EVALUATION_URL', '')
+    api_key = getattr(dj_settings, 'EVALUATION_API_KEY', '')
+    default_instance = getattr(dj_settings, 'EVALUATION_INSTANCE', '')
+
+    result = {'instances': [], 'default': default_instance, 'error': None}
+
+    if not api_url or not api_key:
+        result['error'] = 'Evolution API not configured'
+        return result
+
+    try:
+        resp = requests.get(
+            f"{api_url.rstrip('/')}/instance/fetchInstances",
+            headers={'apikey': api_key, 'Accept': 'application/json'},
+            timeout=8,
+        )
+        raw = resp.json() if resp.text else []
+    except Exception as e:
+        result['error'] = str(e)
+        return result
+
+    items = raw if isinstance(raw, list) else raw.get('instances', []) or []
+    instances = []
+    for it in items:
+        inst = it.get('instance', it) if isinstance(it, dict) else {}
+        name = inst.get('instanceName') or inst.get('name') or it.get('name')
+        if not name:
+            continue
+        owner = inst.get('owner') or inst.get('ownerJid') or it.get('ownerJid') or ''
+        number = owner.split('@')[0] if owner else ''
+        status = (
+            inst.get('status')
+            or inst.get('connectionStatus')
+            or it.get('connectionStatus')
+            or ''
+        )
+        instances.append({
+            'name': name,
+            'number': number,
+            'status': status,
+            'is_default': name == default_instance,
+            'connected': bool(status) and status.lower() in ('open', 'connected'),
+        })
+
+    instances.sort(key=lambda x: (not x['is_default'], x['name'].lower()))
+    result['instances'] = instances
+    cache.set('wsmw_evolution_instances', result, 60)
+    return result
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def order_whatsapp_defaults(request, order_id):
+    """Return the default WhatsApp `to` and `message` for an order (used by list-page modal)."""
+    from core.templatetags.custom_filters import whatsapp_number
+    order = get_object_or_404(orders_models.Order, id=order_id)
+    return JsonResponse({
+        'success': True,
+        'order_number': order.order_number,
+        'customer_name': order.customer_name,
+        'to': whatsapp_number(order.customer_whatsapp or order.customer_phone),
+        'message': _build_order_whatsapp_message(order),
+    })
+
+
+def _send_order_whatsapp_internal(order, message=None, instance=None, to=None):
+    """Send an order WhatsApp via Evolution API. Returns (ok: bool, info: dict).
+
+    Reusable from the manual button view and the auto-import pipeline.
+    Falls back to the order's customer_whatsapp/phone and the default verify
+    message template when arguments are omitted.
+    """
+    import requests
+    from django.conf import settings as dj_settings
+    from core.templatetags.custom_filters import whatsapp_number
+
+    instance = (instance or '').strip() or getattr(dj_settings, 'EVALUATION_INSTANCE', '')
+    to_raw = (to or '').strip() or order.customer_whatsapp or order.customer_phone
+    phone = whatsapp_number(to_raw)
+    if not phone:
+        return False, {'error': 'No WhatsApp number on order'}
+
+    msg = (message or '').strip() or _build_order_whatsapp_message(order)
+
+    api_url = getattr(dj_settings, 'EVALUATION_URL', '')
+    api_key = getattr(dj_settings, 'EVALUATION_API_KEY', '')
+    if not api_url or not api_key or not instance:
+        return False, {'error': 'Evolution API not configured (missing url/key/instance)'}
+
+    try:
+        resp = requests.post(
+            f"{api_url.rstrip('/')}/message/sendText/{instance}",
+            json={'number': phone, 'text': msg},
+            headers={'Content-Type': 'application/json', 'apikey': api_key},
+            timeout=10,
+        )
+        ok = resp.status_code in (200, 201)
+        data = resp.json() if resp.text else {}
+    except requests.exceptions.RequestException as e:
+        return False, {'error': f'Send failed: {e}'}
+
+    if ok:
+        return True, {'phone': phone, 'instance': instance}
+    return False, {
+        'error': data.get('message') or f'HTTP {resp.status_code}',
+        'detail': data,
+    }
+
+
+@require_POST
+@login_required(login_url='/accounts/login/')
+@staff_required
+def send_order_whatsapp(request, order_id):
+    """Send a WhatsApp message for an order via Evolution API.
+
+    Accepts JSON body with optional `instance`, `to`, and `message` overrides.
+    Falls back to the order's customer WhatsApp + the default verification
+    template when fields are omitted.
+    """
+    import json as _json
+
+    order = get_object_or_404(orders_models.Order, id=order_id)
+
+    try:
+        body = _json.loads(request.body or b'{}')
+    except ValueError:
+        body = {}
+
+    ok, info = _send_order_whatsapp_internal(
+        order,
+        message=body.get('message'),
+        instance=body.get('instance'),
+        to=body.get('to'),
+    )
+    if ok:
+        return JsonResponse({'success': True, **info})
+    status = 400 if info.get('error', '').startswith(('No WhatsApp', 'Evolution API not')) else 502
+    return JsonResponse({'success': False, **info}, status=status)
 
 
 @require_http_methods(["POST"])
@@ -7245,7 +7751,7 @@ def user_verification_list(request):
     """Staff view to see all users pending verification"""
     from core import models as core_models
     from business import models as business_models
-    from django.db.models import Count
+    from django.db.models import Count, Q
 
     # Get status counts for filter tabs
     status_counts = dict(
@@ -7258,8 +7764,12 @@ def user_verification_list(request):
     ).count()
     total_count = sum(v for k, v in status_counts.items() if k != 'not_applied')
 
-    # Get all profiles based on filter
+    # Read filters from query string
     verification_filter = request.GET.get('status', 'all')
+    search_query = (request.GET.get('q') or '').strip()
+    role_filter = request.GET.get('role', 'all')
+    date_from = (request.GET.get('date_from') or '').strip()
+    date_to = (request.GET.get('date_to') or '').strip()
 
     profiles = core_models.Profile.objects.select_related('user')
     if verification_filter == 'not_applied':
@@ -7267,11 +7777,46 @@ def user_verification_list(request):
     elif verification_filter in ('pending', 'under_review', 'verified', 'rejected', 'incomplete'):
         profiles = profiles.filter(verification_status=verification_filter)
 
+    # Role filter
+    if role_filter == 'business':
+        profiles = profiles.filter(is_business=True)
+    elif role_filter == 'driver':
+        profiles = profiles.filter(is_driver=True)
+    elif role_filter == 'user':
+        profiles = profiles.filter(is_business=False, is_driver=False)
+
+    # Date range filter (by application date, falls back to created_at when not applied)
+    if date_from:
+        profiles = profiles.filter(
+            Q(verification_applied_at__date__gte=date_from)
+            | Q(verification_applied_at__isnull=True, created_at__date__gte=date_from)
+        )
+    if date_to:
+        profiles = profiles.filter(
+            Q(verification_applied_at__date__lte=date_to)
+            | Q(verification_applied_at__isnull=True, created_at__date__lte=date_to)
+        )
+
+    # Search: name, email, phone, whatsapp, user_number, username
+    if search_query:
+        profiles = profiles.filter(
+            Q(user__first_name__icontains=search_query)
+            | Q(user__last_name__icontains=search_query)
+            | Q(user__email__icontains=search_query)
+            | Q(user__username__icontains=search_query)
+            | Q(username__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(phone__icontains=search_query)
+            | Q(whatsapp__icontains=search_query)
+            | Q(user_number__icontains=search_query)
+        )
+
     # Order by application date (most recent first)
     profiles = profiles.order_by('-verification_applied_at', '-created_at')
 
-    # Prefetch related Business and Driver data to avoid N+1 queries
-    profile_list = list(profiles)
+    # Paginate
+    page_obj = paginate_queryset(request, profiles, items_per_page=25)
+    profile_list = list(page_obj.object_list)
     user_ids = [p.user_id for p in profile_list]
 
     # Bulk fetch businesses and drivers
@@ -7311,11 +7856,39 @@ def user_verification_list(request):
         }
         verification_data.append(data)
 
+    # Build filter_params strings.
+    # - pills_params: preserves q/role/date but NOT status (so pills can swap status)
+    # - filter_params: full set including status (used by pagination)
+    from urllib.parse import quote_plus
+    pills_parts = []
+    if search_query:
+        pills_parts.append(f'q={quote_plus(search_query)}')
+    if role_filter and role_filter != 'all':
+        pills_parts.append(f'role={role_filter}')
+    if date_from:
+        pills_parts.append(f'date_from={date_from}')
+    if date_to:
+        pills_parts.append(f'date_to={date_to}')
+    pills_params = '&'.join(pills_parts)
+
+    full_parts = list(pills_parts)
+    if verification_filter and verification_filter != 'all':
+        full_parts.append(f'status={verification_filter}')
+    filter_params = '&'.join(full_parts)
+
     context = {
         'verification_data': verification_data,
         'current_filter': verification_filter,
         'total_count': total_count,
         'status_counts': status_counts,
+        'page_obj': page_obj,
+        'filter_params': filter_params,
+        'pills_params': pills_params,
+        'search_query': search_query,
+        'role_filter': role_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'per_page': request.GET.get('per_page', '25'),
     }
 
     return render(request, 'workforce/user_verification_list.html', context)
@@ -7343,12 +7916,9 @@ def update_verification_status(request, profile_id):
                 'error': 'Status is required'
             }, status=400)
 
-        # Block approval if user has never applied
+        # If staff verifies a user who skipped self-service, back-fill the applied timestamp
         if new_status == 'verified' and not profile.verification_applied_at:
-            return JsonResponse({
-                'success': False,
-                'error': 'Cannot verify — user has not yet applied for verification.'
-            }, status=400)
+            profile.verification_applied_at = timezone.now()
 
         # Update verification status
         profile.verification_status = new_status
@@ -8584,6 +9154,9 @@ def fleet_transactions(request):
     status = request.GET.get('status', '')
     min_amount = request.GET.get('min_amount', '')
     max_amount = request.GET.get('max_amount', '')
+    business_filter = request.GET.get('business', '')
+    payment_method_filter = request.GET.get('payment_method', '')
+    task_search = request.GET.get('task_search', '').strip()
 
     if selected_driver:
         if date_from:
@@ -8606,6 +9179,22 @@ def fleet_transactions(request):
             transactions = transactions.filter(amount__gte=min_amount)
         if max_amount:
             transactions = transactions.filter(amount__lte=max_amount)
+        if business_filter:
+            transactions = transactions.filter(
+                Q(business_id=business_filter) |
+                Q(delivery_task__business_id=business_filter) |
+                Q(delivery_task__order__business_id=business_filter)
+            )
+        if payment_method_filter:
+            transactions = transactions.filter(
+                Q(payment_method=payment_method_filter) |
+                Q(delivery_task__payment_method=payment_method_filter)
+            )
+        if task_search:
+            transactions = transactions.filter(
+                Q(delivery_task__dl_task_number__icontains=task_search) |
+                Q(reference_number__icontains=task_search)
+            )
 
     # Sorting
     sort_by = request.GET.get('sort', 'date_desc')
@@ -8715,6 +9304,24 @@ def fleet_transactions(request):
             transactions = all_txns.filter(transaction_type__in=['cod_collection', 'cod_driver_settle', 'cod_deposit'])
             view_type = 'cod'
 
+        # Re-apply business and payment method filters after view_type reassignment
+        if business_filter:
+            transactions = transactions.filter(
+                Q(business_id=business_filter) |
+                Q(delivery_task__business_id=business_filter) |
+                Q(delivery_task__order__business_id=business_filter)
+            )
+        if payment_method_filter:
+            transactions = transactions.filter(
+                Q(payment_method=payment_method_filter) |
+                Q(delivery_task__payment_method=payment_method_filter)
+            )
+        if task_search:
+            transactions = transactions.filter(
+                Q(delivery_task__dl_task_number__icontains=task_search) |
+                Q(reference_number__icontains=task_search)
+            )
+
         # Apply sort after view_type filter
         transactions = transactions.order_by(sort_options.get(sort_by, '-created_at'))
     else:
@@ -8728,6 +9335,45 @@ def fleet_transactions(request):
         del filter_params['per_page']
     if 'view' in filter_params:
         del filter_params['view']
+
+    # CSV export — stream the full filtered queryset (not paginated)
+    if request.GET.get('export') == 'csv':
+        import csv
+        from django.http import StreamingHttpResponse
+
+        class _Echo:
+            def write(self, value):
+                return value
+
+        writer = csv.writer(_Echo())
+        header = [
+            'TXN Code', 'Date & Time', 'Type', 'Description',
+            'Amount', 'Payment Method', 'Balance After', 'COD In Hand After',
+            'Reference', 'Status',
+        ]
+
+        def _rows():
+            yield writer.writerow(header)
+            for t in transactions.iterator():
+                status_label = 'Settled' if t.settlement_id else 'Pending'
+                yield writer.writerow([
+                    t.transaction_code or '',
+                    t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else '',
+                    t.get_transaction_type_display(),
+                    t.description or '',
+                    f"{t.amount}",
+                    t.payment_method or '',
+                    f"{t.wallet_balance_after}" if t.wallet_balance_after is not None else '',
+                    f"{t.cod_in_hand_after}" if t.cod_in_hand_after is not None else '',
+                    t.reference_number or '',
+                    status_label,
+                ])
+
+        driver_tag = selected_driver.driver_id if selected_driver else 'all'
+        filename = f"driver_transactions_{driver_tag}_{view_type}_{timezone.now().date().isoformat()}.csv"
+        resp = StreamingHttpResponse(_rows(), content_type='text/csv')
+        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return resp
 
     transactions_paginated = paginate_queryset(request, transactions, items_per_page=25)
 
@@ -8756,6 +9402,44 @@ def fleet_transactions(request):
         .order_by('-total')
     ) if selected_driver else []
 
+    # Businesses associated with this driver's transactions (for filter dropdown)
+    driver_businesses = []
+    if selected_driver:
+        driver_businesses = business_models.Business.objects.filter(
+            Q(transactions__driver=selected_driver) |
+            Q(deliverytask__driver=selected_driver)
+        ).distinct().order_by('business_name')
+
+    # Payment method choices for filter dropdown
+    payment_method_choices = [
+        ('cash', 'Cash'),
+        ('fawran', 'Fawran'),
+        ('pos', 'POS'),
+        ('bank', 'Bank'),
+        ('atm', 'ATM'),
+    ]
+
+    # When task_search is active, surface delivery tasks that match but have
+    # no transaction in the current view (e.g. delivered without COD, or no
+    # earning entry yet). These are tasks the user is hunting for that don't
+    # show up in the transactions table because no DriverTransaction exists.
+    unmatched_tasks = []
+    if task_search and selected_driver:
+        from delivery import models as delivery_models
+        matched_task_ids = set(
+            transactions.exclude(delivery_task__isnull=True)
+            .values_list('delivery_task_id', flat=True)
+        )
+        unmatched_tasks = (
+            delivery_models.DeliveryTask.objects.filter(
+                driver=selected_driver,
+                dl_task_number__icontains=task_search,
+            )
+            .exclude(id__in=matched_task_ids)
+            .select_related('order', 'business')
+            .order_by('-completed_at', '-id')[:50]
+        )
+
     context = {
         'page_title': 'Fleet Transactions',
         'transactions': transactions_paginated,
@@ -8779,10 +9463,16 @@ def fleet_transactions(request):
         'status': status or '',
         'min_amount': min_amount or '',
         'max_amount': max_amount or '',
+        'business_filter': business_filter or '',
+        'payment_method_filter': payment_method_filter or '',
+        'task_search': task_search or '',
         'sort_by': sort_by,
         'transaction_types': transaction_types,
         'payment_method_breakdown': payment_method_breakdown,
         'view_type': view_type,
+        'driver_businesses': driver_businesses,
+        'payment_method_choices': payment_method_choices,
+        'unmatched_tasks': unmatched_tasks,
     }
     return render(request, 'workforce/fleet_transactions.html', context)
 
@@ -9012,6 +9702,150 @@ def fleet_transaction_update_status(request, txn_id):
     txn.save(update_fields=[field])
 
     return JsonResponse({'success': True, 'field': field, 'value': new_value})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def fleet_task_cod_correct(request, task_id):
+    """Staff COD correction for a delivery task.
+
+    Updates DeliveryTask.cod_collected / cod_collected_amount / payment_method
+    and creates or updates the linked cod_collection DriverTransaction so the
+    driver wallet stays consistent. Refused if the task's COD is already
+    settled (submitted to admin) — that requires reversing the deposit first.
+    """
+    from decimal import Decimal, InvalidOperation
+    from django.db import transaction as db_transaction
+    from delivery import models as delivery_models
+    from fleet.wallet_service import WalletService
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'driver', 'order', 'business'
+        ).get(id=task_id)
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return JsonResponse({'error': 'Delivery task not found'}, status=404)
+
+    if not task.driver:
+        return JsonResponse({'error': 'Task has no driver assigned'}, status=400)
+
+    if task.cod_settled:
+        return JsonResponse({
+            'error': 'COD for this task is already settled with admin. '
+                     'Reverse the COD deposit before correcting.'
+        }, status=400)
+
+    try:
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        data = {}
+
+    cod_collected_raw = str(data.get('cod_collected', '')).lower()
+    cod_collected = cod_collected_raw in ('true', '1', 'yes', 'on')
+    payment_method = (data.get('payment_method') or '').strip().lower() or None
+    reason = (data.get('reason') or '').strip()[:255]
+
+    valid_methods = {'cash', 'pos', 'fawran', 'bank', 'atm'}
+    if cod_collected and payment_method not in valid_methods:
+        return JsonResponse({'error': 'Valid payment method required when COD is collected'}, status=400)
+
+    try:
+        amount = Decimal(str(data.get('amount') or '0'))
+    except (InvalidOperation, ValueError):
+        return JsonResponse({'error': 'Invalid amount'}, status=400)
+
+    if amount < 0:
+        return JsonResponse({'error': 'Amount cannot be negative'}, status=400)
+    if cod_collected and amount <= 0:
+        return JsonResponse({'error': 'Amount must be greater than 0 when COD is collected'}, status=400)
+
+    old_collected = bool(task.cod_collected)
+    old_amount = Decimal(task.cod_collected_amount or 0)
+    old_method = task.payment_method or ''
+
+    try:
+        with db_transaction.atomic():
+            # Update task
+            task.cod_collected = cod_collected
+            task.cod_collected_amount = amount if cod_collected else Decimal('0')
+            task.payment_method = payment_method if cod_collected else None
+            if cod_collected and not task.cod_collected_at:
+                task.cod_collected_at = timezone.now()
+            if not cod_collected:
+                task.cod_collected_at = None
+            task.save(update_fields=[
+                'cod_collected', 'cod_collected_amount', 'payment_method',
+                'cod_collected_at',
+            ])
+
+            # Sync the cod_collection DriverTransaction
+            existing_txn = fleet_models.DriverTransaction.objects.filter(
+                delivery_task=task, transaction_type='cod_collection'
+            ).first()
+
+            audit_suffix = (
+                f" — corrected by {request.user.username}: "
+                f"{old_amount} {old_method or '-'} → {amount} {payment_method or '-'}"
+                f"{' (' + reason + ')' if reason else ''}"
+            )
+
+            if cod_collected:
+                if existing_txn:
+                    existing_txn.amount = amount
+                    existing_txn.payment_method = payment_method
+                    existing_txn.description = (
+                        f"COD collected for task {task.dl_task_number}{audit_suffix}"
+                    )[:255]
+                    existing_txn.save(update_fields=[
+                        'amount', 'payment_method', 'description'
+                    ])
+                else:
+                    WalletService.record_transaction(
+                        driver=task.driver,
+                        transaction_type='cod_collection',
+                        amount=amount,
+                        description=(
+                            f"COD collected for task {task.dl_task_number}{audit_suffix}"
+                        )[:255],
+                        delivery_task=task,
+                        created_by=request.user,
+                        reference_number=task.dl_task_number,
+                        payment_method=payment_method,
+                    )
+            else:
+                # Marking as not collected: delete the linked cod_collection txn
+                # so balances don't include it.
+                if existing_txn:
+                    existing_txn.delete()
+
+            # Recalculate driver balances after the change
+            WalletService.recalculate_cod_balances(task.driver)
+
+            logger.info(
+                "COD correction by %s on task %s (id=%s): collected=%s amount %s→%s method %s→%s",
+                request.user, task.dl_task_number, task.id,
+                cod_collected, old_amount, amount, old_method, payment_method,
+            )
+    except Exception as e:
+        logger.exception("COD correction failed for task %s", task_id)
+        return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({
+        'success': True,
+        'task_id': task.id,
+        'task_number': task.dl_task_number,
+        'cod_collected': task.cod_collected,
+        'cod_collected_amount': float(task.cod_collected_amount or 0),
+        'payment_method': task.payment_method or '',
+        'old': {
+            'cod_collected': old_collected,
+            'amount': float(old_amount),
+            'payment_method': old_method,
+        },
+    })
 
 
 @login_required(login_url='/accounts/login/')
@@ -9558,35 +10392,6 @@ def staff_reports(request):
         'active_drivers': driver_stats['active'],
     }
     return render(request, 'workforce/staff_reports.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def staff_contacts(request):
-    """View for staff contacts directory"""
-    from core import models as core_models
-    from django.db.models import Count, Q
-
-    # Get all staff members
-    staff_profiles = core_models.Profile.objects.select_related('user').filter(
-        is_staff=True
-    ).order_by('first_name')
-
-    # Get business and driver counts in a single query
-    profile_counts = core_models.Profile.objects.aggregate(
-        business_count=Count('id', filter=Q(is_business=True, verification_status='verified')),
-        driver_count=Count('id', filter=Q(is_driver=True, verification_status='verified')),
-    )
-
-    staff_with_pagination = paginate_queryset(request, staff_profiles, items_per_page=50)
-
-    context = {
-        'page_title': 'Contacts Directory',
-        'staff_profiles': staff_with_pagination,
-        'business_count': profile_counts['business_count'],
-        'driver_count': profile_counts['driver_count'],
-    }
-    return render(request, 'workforce/staff_contacts.html', context)
 
 
 
@@ -10260,6 +11065,117 @@ def wf_approve_api_config(request, api_id):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def wf_get_api_config(request, api_id):
+    """Return JSON of a BusinessApiSettings record (for the staff edit modal)."""
+    try:
+        api = business_models.BusinessApiSettings.objects.select_related('business').get(pk=api_id)
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
+    return JsonResponse({
+        'success': True,
+        'api': {
+            'id': api.id,
+            'api_type': api.api_type,
+            'api_key': api.api_key or '',
+            'api_secret': api.api_secret or '',
+            'api_access_token': api.api_access_token or '',
+            'api_version': api.api_version or '',
+            'site_api_url': api.site_api_url or '',
+            'site_contry': api.site_contry or '',
+            'order_api_endpoint': api.order_api_endpoint or '',
+            'product_api_endpoint': api.product_api_endpoint or '',
+            'google_sheet_url': api.google_sheet_url or '',
+            'tiktok_shop_id': api.tiktok_shop_id or '',
+            'tiktok_shop_cipher': api.tiktok_shop_cipher or '',
+            'tiktok_refresh_token': api.tiktok_refresh_token or '',
+            'is_verify_api': api.is_verify_api,
+            'is_default': api.is_default,
+        },
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_update_api_config(request, api_id):
+    """
+    Staff action: update editable fields on a BusinessApiSettings record.
+    POST only. Resets is_verify_api when credentials change.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    try:
+        api = business_models.BusinessApiSettings.objects.select_related('business').get(pk=api_id)
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
+
+    editable = [
+        'api_type', 'api_key', 'api_secret', 'api_access_token', 'api_version',
+        'site_api_url', 'site_contry', 'order_api_endpoint', 'product_api_endpoint',
+        'google_sheet_url', 'tiktok_shop_id', 'tiktok_shop_cipher', 'tiktok_refresh_token',
+    ]
+    cred_fields = {'api_key', 'api_secret', 'api_access_token', 'site_api_url', 'google_sheet_url'}
+
+    changed = []
+    creds_changed = False
+    try:
+        for f in editable:
+            if f in request.POST:
+                new_val = (request.POST.get(f) or '').strip() or None
+                if getattr(api, f) != new_val:
+                    setattr(api, f, new_val)
+                    changed.append(f)
+                    if f in cred_fields:
+                        creds_changed = True
+
+        if 'is_default' in request.POST:
+            new_default = request.POST.get('is_default') in ('1', 'true', 'on', 'yes')
+            if api.is_default != new_default:
+                api.is_default = new_default
+                changed.append('is_default')
+                if new_default:
+                    business_models.BusinessApiSettings.objects.filter(
+                        business=api.business
+                    ).exclude(pk=api.pk).update(is_default=False)
+
+        if creds_changed and api.is_verify_api:
+            api.is_verify_api = False
+            changed.append('is_verify_api')
+
+        if changed:
+            changed.append('updated_at')
+            api.save(update_fields=list(set(changed)))
+
+        return JsonResponse({
+            'success': True,
+            'changed': changed,
+            'api_id': api.id,
+            'is_verify_api': api.is_verify_api,
+            'is_default': api.is_default,
+        })
+    except Exception as e:
+        logger.exception('wf_update_api_config error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_delete_api_config(request, api_id):
+    """Staff action: delete a BusinessApiSettings record. POST only."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    try:
+        api = business_models.BusinessApiSettings.objects.get(pk=api_id)
+        api.delete()
+        return JsonResponse({'success': True})
+    except business_models.BusinessApiSettings.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
+    except Exception as e:
+        logger.exception('wf_delete_api_config error: %s', e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def wf_save_google_sheet(request):
     """
     POST: Save a Google Sheet URL for a business as a BusinessApiSettings record
@@ -10419,7 +11335,14 @@ def wf_test_api_config_result(request, api_id):
     try:
         if api.api_type == 'shopify':
             import shopify
-            shop_name = (api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
+            shop_name, resolved_from_custom = resolve_shopify_shop_handle(api)
+            if not shop_name:
+                raise ValueError(
+                    f'Could not resolve Shopify shop handle from "{api.site_api_url}". '
+                    'Enter the .myshopify.com handle or a Shopify-hosted custom domain.'
+                )
+            if resolved_from_custom:
+                api_stats['resolved_handle'] = f'{shop_name}.myshopify.com'
             session = shopify.Session(shop_name, api.api_version or '2023-10', api.api_access_token)
             shopify.ShopifyResource.activate_session(session)
 
@@ -11069,11 +11992,20 @@ def seller_api_products(request, business_id):
     api_products = []
     api_products_error = ''
     api_products_platform = ''
+    imported_skus = set(
+        s for s in product_models.Product.objects
+        .filter(business=business)
+        .exclude(item_sku='')
+        .values_list('item_sku', flat=True)
+        if s
+    )
+    import_result = getattr(request, '_seller_api_import_result', None)
 
     if not first_api or first_api.api_type not in ('shopify', 'woocommerce'):
         return render(request, 'workforce/parts/seller_api_products_fragment.html', {
             'api_products': [], 'api_products_error': 'No API configured',
             'api_products_platform': '', 'business': business,
+            'imported_skus': imported_skus, 'import_result': import_result,
         })
 
     api_products_platform = first_api.api_type
@@ -11088,10 +12020,17 @@ def seller_api_products(request, business_id):
     old_handler = signal.signal(signal.SIGALRM, timeout_handler)
     signal.alarm(10)  # 10 second hard timeout
 
+    resolved_handle = ''
     try:
         if first_api.api_type == 'shopify':
             import shopify
-            shop_name = (first_api.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip().rstrip('/')
+            shop_name, resolved_from_custom = resolve_shopify_shop_handle(first_api)
+            if not shop_name:
+                raise ValueError(
+                    f'Could not resolve Shopify shop handle from "{first_api.site_api_url}".'
+                )
+            if resolved_from_custom:
+                resolved_handle = f'{shop_name}.myshopify.com'
             session = shopify.Session(shop_name, first_api.api_version or '2023-10', first_api.api_access_token)
             shopify.ShopifyResource.activate_session(session)
             try:
@@ -11241,7 +12180,245 @@ def seller_api_products(request, business_id):
         'api_products_error': api_products_error,
         'api_products_platform': api_products_platform,
         'business': business,
+        'imported_skus': imported_skus,
+        'import_result': import_result,
+        'resolved_handle': resolved_handle,
     })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_http_methods(["POST"])
+def seller_api_products_import(request, business_id):
+    """
+    Import selected API products into the local Product catalog for this seller.
+    Reads `selected[]` indices and `p_<i>_<field>` hidden inputs from the POSTed
+    fragment form, creates Product rows, then re-renders the fragment with a
+    result banner.
+    """
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+
+    indices = request.POST.getlist('selected')
+    imported = 0
+    skipped_dup = 0
+    skipped_invalid = 0
+
+    existing_skus = set(
+        s for s in product_models.Product.objects
+        .filter(business=business)
+        .exclude(item_sku='')
+        .values_list('item_sku', flat=True)
+        if s
+    )
+
+    for raw_idx in indices:
+        try:
+            i = int(raw_idx)
+        except (TypeError, ValueError):
+            continue
+        title = (request.POST.get(f'p_{i}_title') or '').strip()
+        variant_title = (request.POST.get(f'p_{i}_variant_title') or '').strip()
+        sku = (request.POST.get(f'p_{i}_sku') or '').strip()
+        barcode = (request.POST.get(f'p_{i}_barcode') or '').strip()
+        price_raw = (request.POST.get(f'p_{i}_price') or '').strip()
+        option1 = (request.POST.get(f'p_{i}_option1') or '').strip()
+        vendor = (request.POST.get(f'p_{i}_vendor') or '').strip()
+        product_type = (request.POST.get(f'p_{i}_product_type') or '').strip()
+        platform_id = (request.POST.get(f'p_{i}_platform_id') or '').strip()
+        variant_id = (request.POST.get(f'p_{i}_variant_id') or '').strip()
+
+        if not title:
+            skipped_invalid += 1
+            continue
+        # Auto-generate SKU when the merchant didn't set one. Prefer the platform's
+        # variant id (stable across re-imports), fall back to product id, then to a
+        # per-business counter as last resort.
+        if not sku:
+            ext_id = variant_id or platform_id
+            if ext_id:
+                sku = f'EZ-{ext_id}'
+            else:
+                n = product_models.Product.objects.filter(
+                    business=business, item_sku__startswith=f'EZ-{business_id}-'
+                ).count() + imported + 1
+                sku = f'EZ-{business_id}-{n:05d}'
+        if sku in existing_skus:
+            skipped_dup += 1
+            continue
+
+        if variant_title and variant_title.lower() not in ('default title', 'default'):
+            item_name = f'{title} - {variant_title}'
+        else:
+            item_name = title
+
+        try:
+            price_val = int(round(float(price_raw))) if price_raw else 0
+            if price_val < 0:
+                price_val = 0
+        except (TypeError, ValueError):
+            price_val = 0
+
+        product_models.Product.objects.create(
+            business=business,
+            item_name=item_name[:100],
+            brand_name=vendor[:100],
+            item_sku=sku[:100],
+            barcode=barcode[:100] if barcode else None,
+            item_price=price_val,
+            size=option1[:100] if option1 else None,
+            item_discription=product_type[:100] if product_type else None,
+        )
+        if sku:
+            existing_skus.add(sku)
+        imported += 1
+
+    request._seller_api_import_result = {
+        'imported': imported,
+        'skipped_duplicate': skipped_dup,
+        'skipped_invalid': skipped_invalid,
+    }
+    return seller_api_products(request, business_id)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def seller_api_orders(request, business_id):
+    """HTMX endpoint: fetch the most recent N orders from Shopify/WooCommerce."""
+    import signal
+
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+    api_settings = business_models.BusinessApiSettings.objects.filter(business=business)
+    first_api = api_settings.first() if api_settings else None
+
+    ALLOWED_LIMITS = (10, 25, 50)
+    try:
+        limit = int(request.GET.get('limit', '10'))
+    except (TypeError, ValueError):
+        limit = 10
+    if limit not in ALLOWED_LIMITS:
+        limit = 10
+
+    api_orders = []
+    api_orders_error = ''
+    api_orders_platform = ''
+    resolved_handle = ''
+
+    ctx_base = {
+        'business': business, 'limit': limit, 'allowed_limits': ALLOWED_LIMITS,
+    }
+
+    if not first_api or first_api.api_type not in ('shopify', 'woocommerce'):
+        return render(request, 'workforce/parts/seller_api_orders_fragment.html', dict(ctx_base, **{
+            'api_orders': [], 'api_orders_error': 'No Shopify or WooCommerce API configured',
+            'api_orders_platform': '', 'resolved_handle': '',
+        }))
+
+    api_orders_platform = first_api.api_type
+
+    class ApiTimeout(Exception):
+        pass
+
+    def timeout_handler(signum, frame):
+        raise ApiTimeout(f'API request timed out after 15 seconds')
+
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(15)
+
+    try:
+        if first_api.api_type == 'shopify':
+            import shopify
+            shop_name, resolved_from_custom = resolve_shopify_shop_handle(first_api)
+            if not shop_name:
+                raise ValueError(
+                    f'Could not resolve Shopify shop handle from "{first_api.site_api_url}".'
+                )
+            if resolved_from_custom:
+                resolved_handle = f'{shop_name}.myshopify.com'
+
+            session = shopify.Session(shop_name, first_api.api_version or '2023-10', first_api.api_access_token)
+            shopify.ShopifyResource.activate_session(session)
+            try:
+                orders = shopify.Order.find(limit=limit, status='any', order='created_at desc')
+                for o in orders:
+                    customer_name = ''
+                    customer_phone = ''
+                    customer = getattr(o, 'customer', None)
+                    if customer:
+                        first = getattr(customer, 'first_name', '') or ''
+                        last = getattr(customer, 'last_name', '') or ''
+                        customer_name = (first + ' ' + last).strip()
+                        customer_phone = getattr(customer, 'phone', '') or ''
+                    shipping = getattr(o, 'shipping_address', None)
+                    if shipping:
+                        if not customer_name:
+                            customer_name = getattr(shipping, 'name', '') or ''
+                        if not customer_phone:
+                            customer_phone = getattr(shipping, 'phone', '') or ''
+                    if not customer_name:
+                        customer_name = getattr(o, 'email', '') or ''
+
+                    line_items = getattr(o, 'line_items', None) or []
+                    api_orders.append({
+                        'id': o.id,
+                        'name': getattr(o, 'name', '') or '',
+                        'created_at': getattr(o, 'created_at', '') or '',
+                        'financial_status': getattr(o, 'financial_status', '') or '',
+                        'fulfillment_status': getattr(o, 'fulfillment_status', '') or 'unfulfilled',
+                        'total_price': getattr(o, 'total_price', '') or '',
+                        'currency': getattr(o, 'currency', '') or '',
+                        'customer_name': customer_name,
+                        'customer_phone': customer_phone,
+                        'item_count': len(line_items),
+                    })
+            finally:
+                shopify.ShopifyResource.clear_session()
+
+        elif first_api.api_type == 'woocommerce':
+            from woocommerce import API as WooAPI
+            wcapi = WooAPI(
+                url=first_api.site_api_url or '',
+                consumer_key=first_api.api_key or '',
+                consumer_secret=first_api.api_secret or '',
+                version='wc/v3', timeout=12,
+            )
+            r = wcapi.get('orders', params={'per_page': limit, 'orderby': 'date', 'order': 'desc'})
+            if r.status_code != 200:
+                api_orders_error = f'WooCommerce API error {r.status_code}'
+            else:
+                for o in r.json():
+                    billing = o.get('billing') or {}
+                    shipping = o.get('shipping') or {}
+                    name = (
+                        ((billing.get('first_name') or '') + ' ' + (billing.get('last_name') or '')).strip()
+                        or ((shipping.get('first_name') or '') + ' ' + (shipping.get('last_name') or '')).strip()
+                        or billing.get('email') or ''
+                    )
+                    api_orders.append({
+                        'id': o.get('id'),
+                        'name': f"#{o.get('number') or o.get('id')}",
+                        'created_at': o.get('date_created') or '',
+                        'financial_status': o.get('status') or '',
+                        'fulfillment_status': '',
+                        'total_price': o.get('total') or '',
+                        'currency': o.get('currency') or '',
+                        'customer_name': name,
+                        'customer_phone': billing.get('phone') or '',
+                        'item_count': len(o.get('line_items') or []),
+                    })
+    except ApiTimeout:
+        api_orders_error = f'API request timed out (>{15}s). Try a smaller batch.'
+    except Exception as e:
+        api_orders_error = str(e)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+    return render(request, 'workforce/parts/seller_api_orders_fragment.html', dict(ctx_base, **{
+        'api_orders': api_orders,
+        'api_orders_error': api_orders_error,
+        'api_orders_platform': api_orders_platform,
+        'resolved_handle': resolved_handle,
+    }))
 
 
 @login_required(login_url='/accounts/login/')
@@ -11604,6 +12781,11 @@ def driver_detail(request, driver_id):
             if credit_limit:
                 from decimal import Decimal
                 driver.credit_limit = Decimal(credit_limit)
+            # Notify opt-in + preferred zones live on the "Zones & Notify" tab.
+            # Only update when that form's marker is posted, otherwise the
+            # Settings-tab save would clear them on every submit.
+            if request.POST.get('zones_form'):
+                driver.to_be_notified = bool(request.POST.get('to_be_notified'))
 
             # Status change — superadmin only
             new_status = request.POST.get('driver_status')
@@ -11618,6 +12800,15 @@ def driver_detail(request, driver_id):
                     }, status=403)
 
             driver.save()
+
+            # Apply preferred zone groups M2M if the zones form was submitted.
+            if request.POST.get('zones_form'):
+                zone_ids = request.POST.getlist('preferred_zone_groups')
+                try:
+                    int_ids = [int(z) for z in zone_ids if z]
+                except (TypeError, ValueError):
+                    int_ids = []
+                driver.preferred_zone_groups.set(int_ids)
 
             # Fire auto flows for driver status changes
             if new_status and new_status != old_driver_status:
@@ -11642,11 +12833,17 @@ def driver_detail(request, driver_id):
                 'error': 'An error occurred while updating driver'
             }, status=400)
 
+    from delivery.models import ZoneGroup
+    all_zone_groups = ZoneGroup.objects.filter(is_active=True).order_by('display_order', 'name')
+    preferred_zone_ids = set(driver.preferred_zone_groups.values_list('id', flat=True))
+
     context = {
         'page_title': f'Driver: {driver.user.first_name} {driver.user.last_name}',
         'driver': driver,
         'vehicles': vehicles,
         'documents': documents,
+        'all_zone_groups': all_zone_groups,
+        'preferred_zone_ids': preferred_zone_ids,
         'delivery_stats': delivery_stats,
         'success_rate': success_rate,
         'recent_tasks_count': recent_tasks_count,
@@ -13691,10 +14888,24 @@ def tasks_live_map(request):
         approved_driver_ids.add(d.driver_id)
     all_relevant_driver_ids = active_driver_ids | gps_driver_ids | approved_driver_ids
 
+    # Build per-driver active tasks list (excludes terminal statuses) for popup display
+    driver_active_tasks_map = {}
+    terminal_statuses = {'delivered', 'cancelled', 'rejected'}
+    for t in tasks:
+        if not t.driver_id or t.dl_task_status in terminal_statuses:
+            continue
+        driver_active_tasks_map.setdefault(t.driver_id, []).append({
+            'id': t.id,
+            'task_number': t.dl_task_number or str(t.id),
+            'status': t.dl_task_status,
+            'status_display': t.get_dl_task_status_display(),
+            'customer_name': t.order.customer_name or '',
+        })
+
     for loc in latest_locs:
         drivers_with_gps.add(loc.driver_id)
         driver = driver_map.get(loc.driver_id)
-        task_count = sum(1 for t in tasks if t.driver_id == loc.driver_id)
+        active_tasks = driver_active_tasks_map.get(loc.driver_id, [])
         driver_locations.append({
             'driver_id': loc.driver_id,
             'driver_name': str(driver) if driver else f'Driver #{loc.driver_id}',
@@ -13705,7 +14916,8 @@ def tasks_live_map(request):
             'updated': loc.created_at.strftime('%H:%M'),
             'minutes_ago': int((timezone.now() - loc.created_at).total_seconds() / 60),
             'has_gps': True,
-            'task_count': task_count,
+            'task_count': len(active_tasks),
+            'active_tasks': active_tasks,
         })
 
     # For drivers with active tasks but no GPS pings, show at task location
@@ -13713,17 +14925,15 @@ def tasks_live_map(request):
     for driver_id in (active_driver_ids | approved_driver_ids) - drivers_with_gps:
         driver = driver_map.get(driver_id)
         fallback_lat = fallback_lng = None
-        task_count = 0
         for t in tasks:
-            if t.driver_id == driver_id:
-                task_count += 1
-                if fallback_lat is None:
-                    if t.order.latitude and t.order.longitude:
-                        fallback_lat = float(t.order.latitude)
-                        fallback_lng = float(t.order.longitude)
-                    elif t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
-                        fallback_lat = float(t.dl_to_address.dl_latitude)
-                        fallback_lng = float(t.dl_to_address.dl_longitude)
+            if t.driver_id == driver_id and fallback_lat is None:
+                if t.order.latitude and t.order.longitude:
+                    fallback_lat = float(t.order.latitude)
+                    fallback_lng = float(t.order.longitude)
+                elif t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
+                    fallback_lat = float(t.dl_to_address.dl_latitude)
+                    fallback_lng = float(t.dl_to_address.dl_longitude)
+        active_tasks = driver_active_tasks_map.get(driver_id, [])
         driver_locations.append({
             'driver_id': driver_id,
             'driver_name': str(driver) if driver else f'Driver #{driver_id}',
@@ -13734,7 +14944,8 @@ def tasks_live_map(request):
             'updated': None,
             'minutes_ago': -1,
             'has_gps': False,
-            'task_count': task_count,
+            'task_count': len(active_tasks),
+            'active_tasks': active_tasks,
         })
 
     # Static mode: show each driver at their latest task's delivery location
@@ -13746,10 +14957,8 @@ def tasks_live_map(request):
         for driver_id in active_driver_ids:
             driver = driver_map.get(driver_id)
             latest_task = None
-            task_count = 0
             for t in tasks:
                 if t.driver_id == driver_id:
-                    task_count += 1
                     if latest_task is None or t.updated_at > latest_task.updated_at:
                         latest_task = t
             if latest_task:
@@ -13761,6 +14970,7 @@ def tasks_live_map(request):
                     lat = float(latest_task.dl_to_address.dl_latitude)
                     lng = float(latest_task.dl_to_address.dl_longitude)
                 minutes_ago = int((timezone.now() - latest_task.updated_at).total_seconds() / 60)
+                active_tasks = driver_active_tasks_map.get(driver_id, [])
                 static_locations.append({
                     'driver_id': driver_id,
                     'driver_name': str(driver) if driver else f'Driver #{driver_id}',
@@ -13771,7 +14981,8 @@ def tasks_live_map(request):
                     'updated': latest_task.updated_at.strftime('%H:%M'),
                     'minutes_ago': minutes_ago,
                     'has_gps': False,
-                    'task_count': task_count,
+                    'task_count': len(active_tasks),
+                    'active_tasks': active_tasks,
                     'last_status': latest_task.get_dl_task_status_display(),
                     'last_task_number': latest_task.dl_task_number or str(latest_task.id),
                 })
@@ -13865,25 +15076,13 @@ def temp_orders(request):
         Q(source_type='public_link', public_link_source__isnull=True)
     )
 
-    # Build default source filter per business (from import_mapping._default)
-    enabled_businesses = business_models.Business.objects.filter(temp_order_enabled=True)
+    # Per-business default source filter dropped intentionally: it used to hide
+    # rows whose source_type didn't match the business's import_mapping._default,
+    # but that diverged from the sidebar badge / "New Orders" tile (which count
+    # all enabled-business sources) and surfaced as "tile says N, table empty".
+    # Users who want to narrow to one source can still pick it from the source
+    # filter dropdown. ``default_filter = Q()`` keeps biz_count_qs unchanged.
     default_filter = Q()
-    platform_to_source = {
-        'public_link': 'public_link', 'onedrive': 'onedrive',
-        'google_sheet': 'google_sheet', 'shopify': 'shopify',
-        'woocommerce': 'woocommerce', 'csv': 'onedrive',
-    }
-    for biz in enabled_businesses:
-        biz_default = (biz.import_mapping or {}).get('_default', '')
-        if biz_default and biz_default in platform_to_source:
-            default_filter |= Q(business_id=biz.business_id, source_type=platform_to_source[biz_default])
-        else:
-            # No default set — show all sources for this business
-            default_filter |= Q(business_id=biz.business_id)
-
-    # Apply default source filter (skip if user explicitly filters by source_type)
-    if not source_type_filter:
-        qs = qs.filter(default_filter)
 
     if business_id:
         qs = qs.filter(business_id=business_id)
@@ -13894,14 +15093,19 @@ def temp_orders(request):
 
     # Sort options
     SORT_OPTIONS = {
-        'date_desc': '-order_date',
-        'date_asc': 'order_date',
+        'date_desc': ('-order_date', '-row_num'),
+        'date_asc': ('order_date', 'row_num'),
         'business_asc': 'business__business_name',
         'business_desc': '-business__business_name',
         'status_asc': 'status',
         'status_desc': '-status',
+        'row_desc': ('-row_num', '-order_date'),
+        'row_asc': ('row_num', '-order_date'),
     }
-    order_by = SORT_OPTIONS.get(sort, '-order_date')
+    # Default: order_date desc, with row_num desc as tie-breaker for same-date
+    # rows. Date-primary makes the list robust against bad row_num values from
+    # historical sync glitches (e.g. row_num=100247 mixed with row_num=2..300).
+    order_by = SORT_OPTIONS.get(sort, ('-order_date', '-row_num'))
     if isinstance(order_by, str):
         order_by = (order_by,)
 
@@ -13950,38 +15154,20 @@ def temp_orders(request):
         for b in biz_qs
     ]
 
-    # Count of temp orders with status='new' that don't exist in main orders
-    # Match by client_order_code OR (customer_name + customer_phone) per business
-    from datetime import timedelta
-    thirty_days_ago = (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-    existing_codes = set(
-        orders_models.Order.objects.filter(
-            client_order_code__gt=''
-        ).values_list('business_id', 'client_order_code')
-    )
-    existing_customers = set(
-        orders_models.Order.objects.filter(
-            customer_name__gt='', customer_phone__gt=''
-        ).values_list('business_id', 'customer_name', 'customer_phone')
-    )
-    temp_count_qs = orders_models.TempOrder.objects.filter(
-        status='new', order_date__gte=thirty_days_ago,
-        business__temp_order_enabled=True
-    )
-    if default_filter:
-        temp_count_qs = temp_count_qs.filter(default_filter)
-    temp_qs = temp_count_qs.values_list(
-        'business_id', 'client_order_code', 'customer_name', 'customer_phone'
-    )
-    new_count = 0
-    for biz_id, code, name, phone in temp_qs:
-        matched = False
-        if code and (biz_id, code) in existing_codes:
-            matched = True
-        elif name and phone and (biz_id, name, phone) in existing_customers:
-            matched = True
-        if not matched:
-            new_count += 1
+    # New temp orders count — mirrors the sidebar badge query so the
+    # "New Orders / all caught up" tile and the sidebar agree. Only excludes
+    # orphaned-source rows (where the source FK is gone). No 30-day cutoff
+    # (an invalid order_date like '0' would otherwise break the string
+    # comparison) and no name/phone dedup against existing Orders.
+    new_count = orders_models.TempOrder.objects.filter(
+        status='new',
+        business__temp_order_enabled=True,
+    ).exclude(
+        Q(source_type='onedrive', onedrive_source__isnull=True)
+        | Q(source_type='google_sheet', api_settings__isnull=True)
+        | Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True)
+        | Q(source_type='public_link', public_link_source__isnull=True)
+    ).count()
 
     # Status counts (only enabled businesses, default source only)
     enabled_temps = orders_models.TempOrder.objects.filter(business__temp_order_enabled=True)
@@ -14172,6 +15358,571 @@ def temp_orders_sync(request):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+def temp_orders_delete(request):
+    """Delete selected TempOrder rows.
+
+    Accepts JSON body: { "ids": [1, 2, 3] }
+    Imported rows (status='imported') are skipped to preserve the link
+    to the real Order they produced; the user can still delete them by
+    clearing the imported Order first.
+    """
+    import json as json_lib
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    ids = body.get('ids', [])
+    if not ids:
+        return JsonResponse({'success': False, 'error': 'No IDs provided'}, status=400)
+
+    try:
+        ids = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'IDs must be integers'}, status=400)
+
+    qs = orders_models.TempOrder.objects.filter(id__in=ids)
+    skipped_imported = qs.filter(status='imported').count()
+    deletable = qs.exclude(status='imported')
+    deleted = deletable.count()
+    deletable.delete()
+
+    return JsonResponse({
+        'success': True,
+        'deleted': deleted,
+        'skipped_imported': skipped_imported,
+        'message': f'{deleted} deleted' + (f', {skipped_imported} skipped (already imported)' if skipped_imported else ''),
+    })
+
+
+def _resolve_temp_order_mapping(temp_order):
+    """Return (headers, biz_mapping) for a TempOrder using its source's saved
+    headers + the current column mapping. ``biz_mapping`` is normalized to
+    {db_field: header_name}. Returns (None, None) if not resolvable.
+    """
+    business = temp_order.business
+    raw_biz_full = (business.import_mapping if business else None) or {}
+    is_nested = any(
+        k in raw_biz_full
+        for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link')
+    )
+
+    headers = []
+    raw_source = {}
+
+    if temp_order.source_type == 'onedrive' and temp_order.onedrive_source_id:
+        src = temp_order.onedrive_source
+        headers = src.last_headers or []
+        raw_source = src.last_column_mapping or {}
+        raw_biz = raw_biz_full.get('onedrive', {}) if is_nested else raw_biz_full
+    elif temp_order.source_type == 'public_link' and temp_order.public_link_source_id:
+        src = temp_order.public_link_source
+        headers = getattr(src, 'last_headers', []) or []
+        raw_source = src.last_column_mapping or {}
+        raw_biz = raw_biz_full.get('public_link', {}) if is_nested else raw_biz_full
+    elif temp_order.source_type == 'google_sheet' and temp_order.api_settings_id:
+        api = temp_order.api_settings
+        raw_source = api.column_mapping or {}
+        raw_biz = raw_biz_full.get('google_sheet', {}) if is_nested else raw_biz_full
+    else:
+        return None, None
+
+    biz_mapping = {}
+    if raw_biz:
+        if all(str(k).isdigit() for k in raw_biz):
+            for col_idx_str, db_field in raw_biz.items():
+                if db_field:
+                    idx = int(col_idx_str)
+                    if idx < len(headers) and headers[idx]:
+                        biz_mapping[db_field] = headers[idx]
+        else:
+            biz_mapping = dict(raw_biz)
+    elif raw_source:
+        for col_idx_str, db_field in raw_source.items():
+            if db_field:
+                try:
+                    idx = int(col_idx_str)
+                except (TypeError, ValueError):
+                    continue
+                if idx < len(headers) and headers[idx]:
+                    biz_mapping[db_field] = headers[idx]
+
+    if not biz_mapping or not headers:
+        return None, None
+    return headers, biz_mapping
+
+
+def _remap_sheet_temp_order(to):
+    """Re-apply current column mapping to a sheet-based TempOrder's stored raw_row.
+
+    Returns (changed, before_dict, after_dict, error_or_None).
+    Used as a final pass after a sheet-source full sync, so denormalized fields
+    reflect the latest mapping even if the sync didn't trip per-field change
+    detection.
+    """
+    from orders.tasks import _convert_excel_date
+
+    DENORM_FIELDS = [
+        'client_order_code', 'customer_name', 'customer_phone',
+        'customer_address', 'dl_zone', 'dl_street', 'dl_building',
+        'cod_amount', 'package_desc',
+    ]
+
+    headers, biz_mapping = _resolve_temp_order_mapping(to)
+    if not biz_mapping:
+        return False, {}, {}, 'No mapping/headers available for source'
+
+    header_idx = {str(h).strip().lower(): j for j, h in enumerate(headers)}
+    field_map = {}
+    for db_field, hname in biz_mapping.items():
+        j = header_idx.get(str(hname).strip().lower())
+        if j is not None:
+            field_map[db_field] = j
+
+    raw = to.raw_row or []
+
+    def cell(field_name):
+        j = field_map.get(field_name)
+        if j is None or j >= len(raw):
+            return ''
+        v = raw[j]
+        return str(v).strip() if v is not None else ''
+
+    new_values = {f: cell(f) for f in DENORM_FIELDS}
+    new_values['order_date'] = _convert_excel_date(cell('order_date')) if 'order_date' in field_map else to.order_date
+
+    changed = False
+    before = {}
+    after = {}
+    for k, v in new_values.items():
+        old = getattr(to, k)
+        if old != v:
+            before[k] = old
+            after[k] = v
+            setattr(to, k, v)
+            changed = True
+
+    if changed:
+        to.save(update_fields=list(new_values.keys()) + ['synced_at'])
+        to.append_change_log('resync-mapping', before, after)
+    return changed, before, after, None
+
+
+def _apply_api_row_to_temp_order(to, row):
+    """Update a Shopify/Woo TempOrder from a freshly fetched row dict.
+
+    Mirrors the upsert logic in orders.tasks._sync_api_source so a per-row
+    refresh produces the same denormalized state a full sync would. Imported
+    rows keep their status. Returns (changed, before, after).
+    """
+    from orders.tasks import _convert_excel_date
+
+    new_values = {
+        'client_order_code': row.get('order_id', '') or row.get('platform_id', ''),
+        'customer_name': row.get('customer', '') or row.get('name', ''),
+        'customer_phone': row.get('phone', ''),
+        'customer_address': row.get('address', ''),
+        'cod_amount': str(row.get('cod', '')) if row.get('cod') else '',
+        'order_date': _convert_excel_date(row.get('date', '')),
+        'package_desc': row.get('package_desc', ''),
+        'financial_status': row.get('financial_status', ''),
+        'raw_row': row,
+    }
+
+    changed = False
+    before = {}
+    after = {}
+    for k, v in new_values.items():
+        old = getattr(to, k)
+        if old != v:
+            before[k] = old if k != 'raw_row' else '(raw_row changed)'
+            after[k] = v if k != 'raw_row' else '(raw_row refreshed)'
+            setattr(to, k, v)
+            changed = True
+
+    if changed:
+        to.save(update_fields=list(new_values.keys()) + ['synced_at'])
+        to.append_change_log('resync-api', before, after)
+    return changed, before, after
+
+
+def _refetch_temp_orders_by_ids(ids):
+    """Shared refetch path for the Resync button and the Auto-Import pre-fetch step.
+
+    For Shopify/Woo rows: fetch by platform_id and upsert via
+    _apply_api_row_to_temp_order. For sheet sources (OneDrive / Google Sheet /
+    Public Link): run sync_all_temp_orders once per unique source, then
+    _remap_sheet_temp_order per selected row. Returns
+    ``{'updated', 'skipped', 'errors', 'results'}`` with the same per-row
+    shape as the Resync JSON response.
+    """
+    from orders.tasks import (
+        _fetch_single_shopify_order, _fetch_single_woo_order, sync_all_temp_orders,
+    )
+
+    qs = orders_models.TempOrder.objects.filter(id__in=ids).select_related(
+        'business', 'onedrive_source', 'public_link_source', 'api_settings',
+    )
+
+    updated = 0
+    skipped = 0
+    errors = []
+    results = []
+
+    api_rows = []
+    sheet_rows_by_source = {}
+
+    def _stub(to):
+        return {
+            'id': to.id, 'changed': False,
+            'customer_name': to.customer_name,
+            'customer_address': to.customer_address,
+            'client_order_code': to.client_order_code,
+            'dl_zone': to.dl_zone,
+        }
+
+    for to in qs:
+        if to.source_type in ('shopify', 'woocommerce'):
+            if not to.api_settings_id or not to.platform_id:
+                skipped += 1
+                errors.append({'id': to.id, 'error': f'{to.source_type} row is missing api_settings or platform_id'})
+                results.append(_stub(to))
+                continue
+            api_rows.append(to)
+        elif to.source_type in ('onedrive', 'google_sheet', 'public_link'):
+            if to.source_type == 'onedrive':
+                src_id = to.onedrive_source_id
+            elif to.source_type == 'public_link':
+                src_id = to.public_link_source_id
+            else:
+                src_id = to.api_settings_id
+            if not src_id:
+                skipped += 1
+                errors.append({'id': to.id, 'error': f'{to.source_type} row has no source FK'})
+                results.append(_stub(to))
+                continue
+            sheet_rows_by_source.setdefault((to.source_type, src_id), []).append(to)
+        else:
+            skipped += 1
+            errors.append({'id': to.id, 'error': f'source_type {to.source_type!r} is not refreshable'})
+            results.append(_stub(to))
+
+    for to in api_rows:
+        try:
+            if to.source_type == 'shopify':
+                row = _fetch_single_shopify_order(to.api_settings, to.platform_id)
+            else:
+                row = _fetch_single_woo_order(to.api_settings, to.platform_id)
+        except Exception as e:
+            logger.exception("Resync fetch failed for TempOrder %s", to.id)
+            errors.append({'id': to.id, 'error': f'Fetch error: {e}'})
+            results.append(_stub(to))
+            continue
+        if row is None:
+            errors.append({'id': to.id, 'error': f'Order {to.platform_id} not found in {to.source_type}'})
+            results.append(_stub(to))
+            continue
+        changed, before, after = _apply_api_row_to_temp_order(to, row)
+        if changed:
+            updated += 1
+        else:
+            to.log_audit_event(f'refetch-{to.source_type}', 'no-diff')
+        results.append({
+            'id': to.id, 'changed': changed,
+            'before': before if changed else {},
+            'after': after if changed else {},
+            'customer_name': to.customer_name,
+            'customer_address': to.customer_address,
+            'client_order_code': to.client_order_code,
+            'dl_zone': to.dl_zone,
+        })
+
+    pre_hist_len = {t.id: len(t.change_history or []) for t in qs if t.source_type in ('onedrive', 'google_sheet', 'public_link')}
+
+    for (source_type, source_id), temp_orders in sheet_rows_by_source.items():
+        try:
+            sync_all_temp_orders(source_type=source_type, source_id=source_id)
+        except Exception as e:
+            logger.exception("Resync source sync failed for %s:%s", source_type, source_id)
+            for to in temp_orders:
+                errors.append({'id': to.id, 'error': f'Source sync error: {e}'})
+                results.append(_stub(to))
+            continue
+        refreshed = orders_models.TempOrder.objects.filter(
+            id__in=[t.id for t in temp_orders]
+        ).select_related('business', 'onedrive_source', 'public_link_source', 'api_settings')
+        for to in refreshed:
+            changed, before, after, err = _remap_sheet_temp_order(to)
+            if err:
+                errors.append({'id': to.id, 'error': err})
+            if changed:
+                updated += 1
+            # If neither the source sync nor the remap added any change_history
+            # entry, drop in an audit entry so ops see the refetch fired.
+            if not changed:
+                to.refresh_from_db(fields=['change_history'])
+                if len(to.change_history or []) == pre_hist_len.get(to.id, 0):
+                    to.log_audit_event(f'refetch-{source_type}', 'no-diff')
+            results.append({
+                'id': to.id, 'changed': changed,
+                'before': before if changed else {},
+                'after': after if changed else {},
+                'customer_name': to.customer_name,
+                'customer_address': to.customer_address,
+                'client_order_code': to.client_order_code,
+                'dl_zone': to.dl_zone,
+            })
+
+    return {'updated': updated, 'skipped': skipped, 'errors': errors, 'results': results}
+
+
+@login_required(login_url='/accounts/login/')
+def order_autoflow_status(request, order_id):
+    """Return recent AutoFlowLog entries for an Order.
+
+    Used by the Auto-Import modal: after Auto-Import returns, the JS polls this
+    per Order ~5 s later to surface customer-notify and driver-notify outcomes
+    that happen via post-save signals.
+    """
+    from core.models import AutoFlowLog
+    try:
+        order = orders_models.Order.objects.get(id=order_id)
+    except orders_models.Order.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Order not found'}, status=404)
+
+    # Match logs by either order_id (preferred — added recently) or task_id
+    # via the order's delivery_tasks for older logs that only stored task info.
+    from delivery import models as delivery_models
+    task_ids = list(delivery_models.DeliveryTask.objects.filter(order=order).values_list('id', flat=True))
+
+    logs = AutoFlowLog.objects.filter(
+        Q(trigger_data__order_id=order.id)
+        | (Q(trigger_data__task_id__in=task_ids) if task_ids else Q(pk__in=[]))
+    ).select_related('flow', 'flow__trigger').order_by('-executed_at')[:10]
+
+    entries = []
+    for log in logs:
+        entries.append({
+            'flow_name': log.flow.name,
+            'trigger_key': log.flow.trigger.trigger_key,
+            'status': log.status,
+            'duration_ms': log.duration_ms,
+            'executed_at': log.executed_at.isoformat(),
+            'result_short': (log.result or '')[:200],
+            'error': log.error or '',
+        })
+
+    return JsonResponse({
+        'success': True,
+        'order_id': order.id,
+        'order_number': order.order_number,
+        'logs': entries,
+    })
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+def temp_orders_resync(request):
+    """Refresh selected TempOrder rows from their upstream source.
+
+    For each selected row:
+      - Shopify / WooCommerce: fetch the single order by platform_id (works
+        for orders beyond the recent-N window) and update raw_row +
+        denormalized fields the same way ``_sync_api_source`` would.
+      - OneDrive / Google Sheet / Public Link: run the existing per-source
+        sync once for every unique source key. The sync upserts every row
+        in that source by natural key, then we re-apply the current column
+        mapping to the selected rows so the displayed denormalized fields
+        match the live data.
+
+    Body: either
+      - {"ids": [1, 2, 3]}                       — explicit row selection
+      - {"filters": {"business": "<bizid>", "status": "...",
+                     "source_type": "...", "q": "..."}}  — bulk by filter
+                                                          (capped at 500)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    BULK_CAP = 500
+
+    ids = body.get('ids') or []
+    filters = body.get('filters') or {}
+
+    if not ids and not filters:
+        return JsonResponse({'success': False, 'error': 'No IDs or filters provided'}, status=400)
+
+    if ids:
+        try:
+            ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'IDs must be integers'}, status=400)
+    else:
+        # Resolve filters → ids server-side. Business is required to prevent
+        # an unbounded sweep across all tenants.
+        from django.db.models import Q
+        business_id = (filters.get('business') or '').strip()
+        if not business_id:
+            return JsonResponse({'success': False, 'error': 'filters.business is required'}, status=400)
+        try:
+            business = business_models.Business.objects.get(business_id=business_id)
+        except business_models.Business.DoesNotExist:
+            return JsonResponse({'success': False, 'error': f'Unknown business {business_id}'}, status=400)
+
+        fqs = orders_models.TempOrder.objects.filter(business=business)
+        if filters.get('status'):
+            fqs = fqs.filter(status=filters['status'])
+        if filters.get('source_type'):
+            fqs = fqs.filter(source_type=filters['source_type'])
+        q_search = (filters.get('q') or '').strip()
+        if q_search:
+            fqs = fqs.filter(
+                Q(client_order_code__icontains=q_search) |
+                Q(customer_name__icontains=q_search) |
+                Q(customer_phone__icontains=q_search) |
+                Q(customer_address__icontains=q_search) |
+                Q(platform_id__icontains=q_search)
+            )
+
+        ids = list(fqs.order_by('-id').values_list('id', flat=True)[:BULK_CAP])
+        if not ids:
+            return JsonResponse({
+                'success': True, 'updated': 0, 'unchanged': 0, 'skipped': 0,
+                'errors': [], 'rows': [], 'total_matched': 0, 'bulk_cap': BULK_CAP,
+            })
+
+    summary = _refetch_temp_orders_by_ids(ids)
+    return JsonResponse({
+        'success': True,
+        'updated': summary['updated'],
+        'unchanged': len(summary['results']) - summary['updated'],
+        'skipped': summary['skipped'],
+        'errors': summary['errors'],
+        'rows': summary['results'],
+        'total_processed': len(ids),
+        'bulk_cap': BULK_CAP,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+def temp_orders_browse(request):
+    """Full paginated list of TempOrders, scoped by business filter.
+
+    Unlike the main temp_orders page (per-business 10-row groups), this
+    shows every TempOrder for the selected business in a single table,
+    paginated 50 per page. Useful for reviewing the historical 1000-row
+    cap data per source.
+    """
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+
+    business_id = request.GET.get('business', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    source_type_filter = request.GET.get('source_type', '').strip()
+    q_search = request.GET.get('q', '').strip()
+    page_num = request.GET.get('page', '1').strip()
+    try:
+        per_page = int(request.GET.get('per_page', '50'))
+    except (TypeError, ValueError):
+        per_page = 50
+    if per_page not in (10, 25, 50, 100):
+        per_page = 50
+
+    all_businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    rows_page = None
+    selected_business = None
+    total_count = 0
+    status_counts = {}
+    source_counts = {}
+
+    if business_id:
+        try:
+            selected_business = all_businesses.get(business_id=business_id)
+        except business_models.Business.DoesNotExist:
+            selected_business = None
+
+    if selected_business:
+        qs = orders_models.TempOrder.objects.select_related(
+            'business', 'onedrive_source', 'api_settings',
+            'public_link_source', 'imported_order',
+        ).filter(business=selected_business)
+
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if source_type_filter:
+            qs = qs.filter(source_type=source_type_filter)
+        if q_search:
+            qs = qs.filter(
+                Q(client_order_code__icontains=q_search) |
+                Q(customer_name__icontains=q_search) |
+                Q(customer_phone__icontains=q_search) |
+                Q(customer_address__icontains=q_search) |
+                Q(platform_id__icontains=q_search)
+            )
+
+        from django.db.models import Count
+        biz_qs_unfiltered = orders_models.TempOrder.objects.filter(business=selected_business)
+        total_count = biz_qs_unfiltered.count()
+        status_counts = dict(
+            biz_qs_unfiltered.values_list('status').annotate(Count('id')).order_by()
+        )
+        source_counts = dict(
+            biz_qs_unfiltered.values_list('source_type').annotate(Count('id')).order_by()
+        )
+
+        qs = qs.order_by('-id')
+        paginator = Paginator(qs, per_page)
+        try:
+            rows_page = paginator.page(page_num)
+        except Exception:
+            rows_page = paginator.page(1)
+
+    from urllib.parse import urlencode
+    filter_pairs = []
+    if business_id:
+        filter_pairs.append(('business', business_id))
+    if status_filter:
+        filter_pairs.append(('status', status_filter))
+    if source_type_filter:
+        filter_pairs.append(('source_type', source_type_filter))
+    if q_search:
+        filter_pairs.append(('q', q_search))
+    filter_params = urlencode(filter_pairs)
+
+    context = {
+        'all_businesses': all_businesses,
+        'selected_business': selected_business,
+        'rows_page': rows_page,
+        'total_count': total_count,
+        'status_counts': status_counts,
+        'source_counts': source_counts,
+        'per_page': str(per_page),
+        'filter_params': filter_params,
+        'filters': {
+            'business': business_id,
+            'status': status_filter,
+            'source_type': source_type_filter,
+            'q': q_search,
+        },
+    }
+    return render(request, 'workforce/temp_orders_browse.html', context)
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
 def temp_orders_preview(request):
     """Return JSON detail for selected TempOrder IDs for the preview modal."""
     if request.method != 'POST':
@@ -14187,9 +15938,13 @@ def temp_orders_preview(request):
     if not ids:
         return JsonResponse({'success': False, 'error': 'No rows selected'}, status=400)
 
+    # Order rows by source row_num ASC (then order_date ASC for API sources without
+    # row_num) so the transfer step creates Order records top-to-bottom matching the
+    # sheet/table. Combined with default `-id DESC` on the orders list, the bottom-
+    # most source row surfaces first — matching the visual order in the source sheet.
     rows = orders_models.TempOrder.objects.filter(
         id__in=ids
-    ).select_related('business', 'onedrive_source', 'api_settings', 'public_link_source').order_by('-order_date')
+    ).select_related('business', 'onedrive_source', 'api_settings', 'public_link_source').order_by('row_num', 'order_date', 'id')
 
     # Check for businesses without any mapping configured
     unmapped_biz = {}
@@ -14251,6 +16006,9 @@ def temp_orders_preview(request):
             'platform_id': r.platform_id,
             'status': r.status,
             'raw_row': r.raw_row,
+            'change_history': r.change_history or [],
+            'imported_order_id': r.imported_order_id,
+            'imported_order_number': r.imported_order.order_number if r.imported_order_id and r.imported_order else '',
         }
 
         # Set direct fields
@@ -14263,6 +16021,8 @@ def temp_orders_preview(request):
             raw_headers = r.onedrive_source.last_headers
         elif r.public_link_source and getattr(r.public_link_source, 'last_headers', None):
             raw_headers = r.public_link_source.last_headers
+        elif r.api_settings and getattr(r.api_settings, 'last_headers', None):
+            raw_headers = r.api_settings.last_headers
 
         # Extract extra fields from raw_row — prefer shared business mapping, fall back to per-source
         # Map source_type to the nested platform key used in business.import_mapping
@@ -14338,6 +16098,26 @@ def temp_orders_preview(request):
         row_data['raw_headers'] = raw_headers
         row_data['col_mapping'] = col_mapping
 
+        # {raw_cell_key: db_field} so the popup timeline can resolve
+        # raw header names back to friendly DB-field labels.
+        change_log_keymap = {}
+        if is_new_format:
+            for db_field, header_name in col_mapping.items():
+                if db_field and header_name:
+                    change_log_keymap[str(header_name)] = db_field
+        else:
+            for col_idx_str, db_field in (col_mapping or {}).items():
+                if not db_field:
+                    continue
+                try:
+                    idx = int(col_idx_str)
+                except (ValueError, TypeError):
+                    continue
+                if 0 <= idx < len(raw_headers) and raw_headers[idx]:
+                    change_log_keymap[raw_headers[idx]] = db_field
+                change_log_keymap[f'raw[{idx}]'] = db_field
+        row_data['change_log_keymap'] = change_log_keymap
+
         data.append(row_data)
 
     return JsonResponse({'success': True, 'rows': data})
@@ -14362,6 +16142,7 @@ def _parse_coded_product_name(raw_name):
 
 def _match_product_by_name(pname, business):
     """Match a product by name, parsing coded format if needed."""
+    import re
     from product.models import Product as ProductModel
     clean_name, sku = _parse_coded_product_name(pname)
 
@@ -14406,6 +16187,29 @@ def _match_product_by_name(pname, business):
         if matched:
             return matched
 
+    # Substring fallback: handles single-underscore coded formats like
+    # '01_MTFLOW_METAL FLOWER WITH JEWERLLY_Red_LongBox_' where the product's
+    # item_name appears verbatim inside the raw cell value, or its SKU keyword
+    # token appears between underscores.
+    raw_lower = raw_stripped.lower()
+    candidates = list(ProductModel.objects.filter(business=business))
+    name_hit = None
+    for product in candidates:
+        nm = (product.item_name or '').strip().lower()
+        if nm and nm in raw_lower:
+            if name_hit is None or len(nm) > len((name_hit.item_name or '')):
+                name_hit = product
+    if name_hit:
+        return name_hit
+    raw_tokens = {t.strip().lower() for t in re.split(r'[_\s\-]+', raw_stripped) if t.strip()}
+    for product in candidates:
+        sku = (product.item_sku or '').strip()
+        if not sku:
+            continue
+        sku_tokens = {t.strip().lower() for t in re.split(r'[_\s\-]+', sku) if t.strip()}
+        if sku_tokens & raw_tokens:
+            return product
+
     return None
 
 
@@ -14417,6 +16221,8 @@ def _extract_products_from_raw_row(temp_order):
         raw_headers = temp_order.onedrive_source.last_headers
     elif temp_order.public_link_source and getattr(temp_order.public_link_source, 'last_headers', None):
         raw_headers = temp_order.public_link_source.last_headers
+    elif temp_order.api_settings and getattr(temp_order.api_settings, 'last_headers', None):
+        raw_headers = temp_order.api_settings.last_headers
 
     # --- Resolve col_mapping, handling nested business.import_mapping ---
     _src_to_platform = {
@@ -14563,13 +16369,14 @@ def temp_orders_transfer(request):
         if not client_order_code:
             client_order_code = f"OD-{uuid.uuid4().hex[:8].upper()}"
 
-        # Check duplicate
-        if orders_models.Order.objects.filter(client_order_code=client_order_code).exists():
-            errors.append(f"Row {temp_id}: Duplicate order code '{client_order_code}'")
+        # Check duplicate (uniqueness is per-business, matching the DB constraint
+        # ord_unique_client_code_per_business). Same code can legitimately exist
+        # under different businesses.
+        if orders_models.Order.objects.filter(business=business, client_order_code=client_order_code).exists():
+            errors.append(f"Row {temp_id}: Order code '{client_order_code}' already exists for {business.business_name} — edit the code and retry")
             skipped += 1
-            # Mark as imported since it already exists
-            temp_order.status = 'imported'
-            temp_order.save(update_fields=['status'])
+            # Do NOT auto-mark as imported — user may want to retry with a
+            # different code from the verify step.
             continue
 
         # Clean phone
@@ -14590,8 +16397,12 @@ def temp_orders_transfer(request):
         dl_street = safe_int_or_none(row_data.get('dl_street', temp_order.dl_street))
         dl_building = safe_int_or_none(row_data.get('dl_building', temp_order.dl_building))
         raw_row = temp_order.raw_row if isinstance(temp_order.raw_row, dict) else {}
-        package_desc = row_data.get('package_desc', '') or temp_order.package_desc or raw_row.get('package_desc', '')
-        package_desc = package_desc.strip() if package_desc else ''
+        # If the user submitted package_desc (even blank), respect that. Only fall back
+        # to stored/raw values when the key is missing entirely.
+        if 'package_desc' in row_data:
+            package_desc = (row_data.get('package_desc') or '').strip()
+        else:
+            package_desc = (temp_order.package_desc or raw_row.get('package_desc', '') or '').strip()
         package_qty = safe_int(row_data.get('package_qty', '')) or safe_int(raw_row.get('package_qty', '')) or 1
         deadline_date = row_data.get('deadline_date', '').strip()
         seller_notes = row_data.get('seller_notes', '').strip()
@@ -14629,11 +16440,15 @@ def temp_orders_transfer(request):
 
         # Build product list: prefer row_data (preview modal), fallback to raw_row product_N, then line_items
         products = []
-        for i in range(1, 6):
+        for i in range(1, 11):
             pname = (row_data.get(f'product_{i}', '') or raw_row.get(f'product_{i}', '')).strip()
             pcount = safe_int(row_data.get(f'count_{i}', '') or raw_row.get(f'count_{i}', '')) or 1
             if pname:
                 products.append({'name': pname, 'qty': pcount})
+
+        # Positional raw_row (Google Sheet / OneDrive list format) — extract via column mapping
+        if not products and isinstance(temp_order.raw_row, list):
+            products = _extract_products_from_raw_row(temp_order)
 
         # If still no products, fall back to raw line_items (Shopify API orders)
         if not products:
@@ -14719,6 +16534,16 @@ def temp_orders_transfer(request):
             temp_order.imported_order = order
             temp_order.save(update_fields=['status', 'imported_order'])
 
+            # Cascade: mark sibling TempOrders with the same client_order_code
+            # (e.g. duplicates from a different sheet/tab) as imported so they
+            # don't linger in the temp orders list as phantom duplicates.
+            if client_order_code:
+                orders_models.TempOrder.objects.filter(
+                    business=business,
+                    client_order_code=client_order_code,
+                    status='new',
+                ).exclude(id=temp_order.id).update(status='imported')
+
             saved += 1
 
         except Exception as e:
@@ -14775,6 +16600,32 @@ def temp_orders_auto_import(request):
     ids = body.get('ids', [])
     if not ids:
         return JsonResponse({'success': False, 'error': 'No IDs provided'}, status=400)
+    try:
+        ids = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'IDs must be integers'}, status=400)
+
+    # Refetch each row from its upstream source first, so the import uses the
+    # latest seller-edited values rather than the snapshot from the last cron.
+    # change_history gets a per-cell diff entry whenever anything changed.
+    refetch_summary = _refetch_temp_orders_by_ids(ids)
+
+    # Stage override from caller: None = use each business's saved defaults
+    # (Business.import_mapping['_auto_stages']); a dict = apply uniformly to all rows.
+    # Missing keys default to True so behavior is backwards-compatible.
+    stage_override = body.get('stages')
+    if stage_override is not None and not isinstance(stage_override, dict):
+        stage_override = None
+    DEFAULT_STAGES = {
+        'ai_parse': True, 'match_products': True, 'auto_pickup': True,
+        'geocode': True, 'set_publish': True, 'send_whatsapp': True, 'publish': True,
+    }
+
+    def resolve_stages(biz):
+        if stage_override is not None:
+            return {k: bool(stage_override.get(k, DEFAULT_STAGES[k])) for k in DEFAULT_STAGES}
+        biz_cfg = ((biz.import_mapping or {}).get('_auto_stages') or {}) if biz else {}
+        return {k: bool(biz_cfg.get(k, DEFAULT_STAGES[k])) for k in DEFAULT_STAGES}
 
     def safe_int(val):
         if not val:
@@ -14806,9 +16657,35 @@ def temp_orders_auto_import(request):
     failed = 0
     row_results = []
 
+    # Per-business ImportLog tracking so this batch surfaces on /workforce/import-history/
+    import_logs_by_biz = {}
+    per_log_counters = {}
+    per_log_errors = {}
+
+    # Quick lookup so each row can report whether the refetch step picked
+    # something up (or hit an error) without re-walking the summary.
+    refetch_row_outcome = {r['id']: r for r in refetch_summary.get('results', [])}
+    refetch_row_errors = {e.get('id'): e.get('error', '') for e in refetch_summary.get('errors', []) if e.get('id')}
+
     for temp_id in ids:
-        result_entry = {'id': temp_id, 'status': None, 'warnings': [], 'order_number': None}
+        result_entry = {
+            'id': temp_id, 'status': None, 'warnings': [], 'order_number': None,
+            'stages': {},
+        }
+        stage_outcomes = result_entry['stages']
         row_warnings = result_entry['warnings']
+
+        # Refetch outcome (from the pre-fetch step that ran for every id).
+        if temp_id in refetch_row_errors:
+            stage_outcomes['refetch'] = f"failed: {refetch_row_errors[temp_id]}"
+        else:
+            r = refetch_row_outcome.get(temp_id)
+            if r is None:
+                stage_outcomes['refetch'] = 'skipped'
+            elif r.get('changed'):
+                stage_outcomes['refetch'] = f"updated:{len(r.get('after') or {})}"
+            else:
+                stage_outcomes['refetch'] = 'no-diff'
 
         # --- Fetch TempOrder ---
         try:
@@ -14821,6 +16698,41 @@ def temp_orders_auto_import(request):
             continue
 
         business = temp_order.business
+        stages = resolve_stages(business)
+        # Note: result_entry['stages'] is the per-stage outcome dict (already
+        # initialized + referenced via stage_outcomes); the config flags live
+        # in `stages` and `result_entry['stage_flags']` for transparency.
+        result_entry['stage_flags'] = stages
+
+        # --- Lazy ImportLog per business (created once per batch+business) ---
+        log = import_logs_by_biz.get(business.pk)
+        if log is None:
+            log = orders_models.ImportLog.objects.create(
+                business=business,
+                source='temp_order',
+                status='processing',
+                initiated_by=request.user,
+                total_rows=0,
+                source_meta={'temp_order_ids': [], 'source_types': []},
+            )
+            import_logs_by_biz[business.pk] = log
+            per_log_counters[business.pk] = {
+                'total': 0, 'created': 0, 'failed': 0,
+                'raw': [], 'source_types': set(), 'temp_ids': [],
+            }
+            per_log_errors[business.pk] = []
+        counters = per_log_counters[business.pk]
+        errs = per_log_errors[business.pk]
+        counters['total'] += 1
+        counters['temp_ids'].append(temp_order.id)
+        counters['source_types'].add(temp_order.source_type)
+        counters['raw'].append({
+            'temp_order_id': temp_order.id,
+            'source_type': temp_order.source_type,
+            'row_num': temp_order.row_num,
+            'platform_id': temp_order.platform_id,
+            'raw_row': temp_order.raw_row,
+        })
 
         # --- Field extraction ---
         client_order_code = (temp_order.client_order_code or '').strip()
@@ -14832,18 +16744,22 @@ def temp_orders_auto_import(request):
             result_entry['status'] = 'failed'
             result_entry['error'] = 'Missing customer name and phone'
             failed += 1
+            counters['failed'] += 1
+            errs.append(f"TempOrder {temp_id}: Missing customer name and phone")
             row_results.append(result_entry)
             continue
 
         if not client_order_code:
             client_order_code = f"OD-{uuid.uuid4().hex[:8].upper()}"
 
-        if orders_models.Order.objects.filter(client_order_code=client_order_code).exists():
+        if orders_models.Order.objects.filter(business=business, client_order_code=client_order_code).exists():
             temp_order.status = 'imported'
             temp_order.save(update_fields=['status'])
             result_entry['status'] = 'failed'
-            result_entry['error'] = f"Duplicate order code '{client_order_code}'"
+            result_entry['error'] = f"Duplicate order code '{client_order_code}' for {business.business_name}"
             failed += 1
+            counters['failed'] += 1
+            errs.append(f"TempOrder {temp_id}: Duplicate order code '{client_order_code}' for {business.business_name}")
             row_results.append(result_entry)
             continue
 
@@ -14886,73 +16802,155 @@ def temp_orders_auto_import(request):
         fin_status = (temp_order.financial_status or '').lower()
         cod_status_by_client = 'online_paid' if fin_status == 'paid' else None
 
-        # --- Product extraction (mirrors transfer flow exactly) ---
-        # 1. Direct product_N/count_N keys from dict raw_row (Shopify, WooCommerce, CSV)
+        # --- AI address parse (when zone/street missing but free-text address exists) ---
+        # Mirrors the manual verify_address flow: ParseAddressTool extracts
+        # zone/street/building from free text and runs 2-stage QNAS internally,
+        # returning coords + a tier we map to Order.coords_accuracy.
+        parsed_accuracy = None
+        parsed_qnas_status = None
+        parse_confidence = None
+        ai_parse_applicable = (
+            (dl_zone is None or dl_street is None)
+            and customer_address
+            and len(customer_address.strip()) >= 3
+        )
+        needs_ai_parse = stages['ai_parse'] and ai_parse_applicable
+        if not ai_parse_applicable:
+            stage_outcomes['ai_parse'] = 'not-applicable'
+        elif not stages['ai_parse']:
+            stage_outcomes['ai_parse'] = 'disabled'
+            row_warnings.append('AI address parse skipped (disabled)')
+        if needs_ai_parse:
+            try:
+                from ai_agent.tools.address_tools import ParseAddressTool
+                parse_result = ParseAddressTool().execute(customer_address)
+
+                if parse_result.get('zone_number') and dl_zone is None:
+                    dl_zone = parse_result['zone_number']
+                if parse_result.get('street_number') and dl_street is None:
+                    dl_street = parse_result['street_number']
+                if parse_result.get('building_number') and dl_building is None:
+                    dl_building = parse_result['building_number']
+
+                coords = parse_result.get('coordinates') or {}
+                if coords.get('latitude') and dl_latitude is None:
+                    dl_latitude = float(coords['latitude'])
+                if coords.get('longitude') and dl_longitude is None:
+                    dl_longitude = float(coords['longitude'])
+
+                source_to_accuracy = {
+                    'google_maps': 'exact',
+                    'qnas_exact':  'exact',
+                    'qnas_street': 'street',
+                    'landmark':    'landmark',
+                    'zone_center': 'zone_center',
+                    'ai_estimate': 'ai_estimate',
+                }
+                gs = parse_result.get('geocode_source')
+                if gs:
+                    parsed_accuracy = source_to_accuracy.get(gs)
+                    if gs in ('qnas_exact', 'qnas_street'):
+                        parsed_qnas_status = 'verified'
+
+                parse_confidence = round(float(parse_result.get('confidence') or 0), 2)
+                if parse_result.get('zone_number'):
+                    parts = [f"Zone {parse_result['zone_number']}"]
+                    if parse_result.get('street_number'):
+                        parts.append(f"Street {parse_result['street_number']}")
+                    if parse_result.get('building_number'):
+                        parts.append(f"Bldg {parse_result['building_number']}")
+                    row_warnings.append(f"AI parsed: {', '.join(parts)} (conf {parse_confidence})")
+                if parse_confidence < 0.5:
+                    row_warnings.append('AI parse low confidence — review address')
+                stage_outcomes['ai_parse'] = f'ok:conf={parse_confidence}'
+            except Exception as e:
+                logger.exception('AI address parse failed for temp_order %s', temp_id)
+                row_warnings.append(f'AI address parse skipped: {str(e)[:80]}')
+                stage_outcomes['ai_parse'] = f'failed: {str(e)[:60]}'
+
+        # --- Product extraction & matching (gated by stage) ---
         products = []
-        for i in range(1, 6):
-            pname = (raw_row.get(f'product_{i}', '') or '').strip()
-            pcount = safe_int(raw_row.get(f'count_{i}', '')) or 1
-            if pname:
-                products.append({'name': pname, 'qty': pcount})
-
-        # 2. List-type raw_row via column mapping (OneDrive, Google Sheet, Public Link)
-        if not products:
-            products = _extract_products_from_raw_row(temp_order)
-
-        # 3. parse_products_from_desc fallback (e.g. "Item x2, Other x1")
-        if not products and package_desc:
-            products = parse_products_from_desc(package_desc)
-
-        # 4. line_items fallback (Shopify API orders)
-        if not products:
-            for li in raw_row.get('line_items', []):
-                li_name = li.get('name', '')
-                li_qty = li.get('qty', 1)
-                if li_name:
-                    products.append({'name': li_name, 'qty': li_qty})
-
-        # --- Parse clean names and match to Product records ---
         unmatched_names = []
         clean_product_names = []
         all_items = []  # [{product, qty, pname, unit_price}] — all products, matched or not
-        li_price_map = {li.get('name', ''): li.get('price', 0) for li in raw_row.get('line_items', [])}
-        for p in products:
-            pname = p['name']
-            pqty = p['qty']
-            matched = _match_product_by_name(pname, business)
-            clean_name, _ = _parse_coded_product_name(pname)
-            clean_product_names.append({'name': clean_name, 'qty': pqty})
-            unit_price = float(li_price_map.get(pname, 0) or 0) or (matched.item_price or 0 if matched else 0)
-            all_items.append({'product': matched, 'qty': pqty, 'pname': pname, 'unit_price': unit_price})
-            if not matched:
-                unmatched_names.append(f"{clean_name} x{pqty}")
+        if stages['match_products']:
+            # 1. Direct product_N/count_N keys from dict raw_row (Shopify, WooCommerce, CSV)
+            for i in range(1, 6):
+                pname = (raw_row.get(f'product_{i}', '') or '').strip()
+                pcount = safe_int(raw_row.get(f'count_{i}', '')) or 1
+                if pname:
+                    products.append({'name': pname, 'qty': pcount})
 
-        # Build package_desc from clean product names if not already set
-        if not package_desc and clean_product_names:
-            package_desc = ', '.join(f"{p['name']} x{p['qty']}" for p in clean_product_names)
-        if not package_qty or package_qty == 1:
-            package_qty = sum(p['qty'] for p in clean_product_names) or 1
+            # 2. List-type raw_row via column mapping (OneDrive, Google Sheet, Public Link)
+            if not products:
+                products = _extract_products_from_raw_row(temp_order)
 
-        if unmatched_names:
-            row_warnings.append(f"Unmatched products: {', '.join(unmatched_names)}")
+            # 3. parse_products_from_desc fallback (e.g. "Item x2, Other x1")
+            if not products and package_desc:
+                products = parse_products_from_desc(package_desc)
 
-        # --- Pickup location auto-assignment ---
+            # 4. line_items fallback (Shopify API orders)
+            if not products:
+                for li in raw_row.get('line_items', []):
+                    li_name = li.get('name', '')
+                    li_qty = li.get('qty', 1)
+                    if li_name:
+                        products.append({'name': li_name, 'qty': li_qty})
+
+            # --- Parse clean names and match to Product records ---
+            li_price_map = {li.get('name', ''): li.get('price', 0) for li in raw_row.get('line_items', [])}
+            for p in products:
+                pname = p['name']
+                pqty = p['qty']
+                matched = _match_product_by_name(pname, business)
+                clean_name, _ = _parse_coded_product_name(pname)
+                clean_product_names.append({'name': clean_name, 'qty': pqty})
+                unit_price = float(li_price_map.get(pname, 0) or 0) or (matched.item_price or 0 if matched else 0)
+                all_items.append({'product': matched, 'qty': pqty, 'pname': pname, 'unit_price': unit_price})
+                if not matched:
+                    unmatched_names.append(f"{clean_name} x{pqty}")
+
+            # Build package_desc from clean product names if not already set
+            if not package_desc and clean_product_names:
+                package_desc = ', '.join(f"{p['name']} x{p['qty']}" for p in clean_product_names)
+            if not package_qty or package_qty == 1:
+                package_qty = sum(p['qty'] for p in clean_product_names) or 1
+
+            if unmatched_names:
+                row_warnings.append(f"Unmatched products: {', '.join(unmatched_names)}")
+                stage_outcomes['match_products'] = f'partial:{len(unmatched_names)}-unmatched'
+            elif all_items:
+                stage_outcomes['match_products'] = f'ok:{len(all_items)}-matched'
+            else:
+                stage_outcomes['match_products'] = 'no-products'
+        else:
+            stage_outcomes['match_products'] = 'disabled'
+            row_warnings.append('Product matching skipped (disabled) — order created without OrderItems')
+
+        # --- Pickup location auto-assignment (gated by stage) ---
         pickup_location = None
-        if business.fulfillment_service_enabled and business.fulfillment_service_status == 'active':
-            pickup_location = PickupLocation.objects.filter(
-                business=business, pickup_status='active', is_fulfilment_center=True
-            ).first()
-        if not pickup_location:
-            pickup_location = PickupLocation.objects.filter(
-                business=business, pickup_status='active', is_default=True
-            ).first()
-        if not pickup_location:
-            active_locs = PickupLocation.objects.filter(business=business, pickup_status='active')
-            if active_locs.count() == 1:
-                pickup_location = active_locs.first()
+        if stages['auto_pickup']:
+            if business.fulfillment_service_enabled and business.fulfillment_service_status == 'active':
+                pickup_location = PickupLocation.objects.filter(
+                    business=business, pickup_status='active', is_fulfilment_center=True
+                ).first()
+            if not pickup_location:
+                pickup_location = PickupLocation.objects.filter(
+                    business=business, pickup_status='active', is_default=True
+                ).first()
+            if not pickup_location:
+                active_locs = PickupLocation.objects.filter(business=business, pickup_status='active')
+                if active_locs.count() == 1:
+                    pickup_location = active_locs.first()
 
-        if not pickup_location:
-            row_warnings.append('No default pickup location found — manual assignment required')
+            if pickup_location:
+                stage_outcomes['auto_pickup'] = f'ok:{pickup_location.location_name}' if hasattr(pickup_location, 'location_name') else 'ok'
+            else:
+                stage_outcomes['auto_pickup'] = 'no-default-found'
+                row_warnings.append('No default pickup location found — manual assignment required')
+        else:
+            stage_outcomes['auto_pickup'] = 'disabled'
+            row_warnings.append('Pickup auto-assign skipped (disabled)')
 
         # --- Build order_notes (mirrors transfer: seller/internal notes + unmatched) ---
         notes_parts = []
@@ -14990,6 +16988,8 @@ def temp_orders_auto_import(request):
                     order_notes=auto_notes[:100] if auto_notes else '',
                     order_status='to_review',
                     verification_status='pending',
+                    coords_accuracy=parsed_accuracy,
+                    qnas_status=parsed_qnas_status or 'not_checked',
                     package_description=package_desc[:255] if package_desc else '',
                     package_qty=package_qty,
                     original_order_data={
@@ -15017,26 +17017,50 @@ def temp_orders_auto_import(request):
                     )
 
                 # Mark temp order imported
+                prev_status = temp_order.status
+                prev_imported_id = temp_order.imported_order_id
                 temp_order.status = 'imported'
                 temp_order.imported_order = order
                 temp_order.save(update_fields=['status', 'imported_order'])
+
+                temp_order.append_change_log(
+                    'auto-import',
+                    {'status': prev_status, 'imported_order_id': prev_imported_id},
+                    {'status': 'imported', 'imported_order_id': order.id},
+                )
 
         except Exception as e:
             logger.exception('Auto-import order creation error for temp_order %s', temp_id)
             result_entry['status'] = 'failed'
             result_entry['error'] = str(e)
             failed += 1
+            counters['failed'] += 1
+            errs.append(f"TempOrder {temp_id}: {str(e)}")
             row_results.append(result_entry)
             continue
 
         result_entry['order_number'] = order.order_number
+        if parsed_accuracy:
+            result_entry['accuracy'] = parsed_accuracy
+        if parse_confidence is not None:
+            result_entry['confidence'] = parse_confidence
+        log.orders.add(order)
+        counters['created'] += 1
 
-        # --- QNAS geocoding & address verification ---
+        # --- QNAS geocoding & address verification (gated by stage) ---
+        # Publish when we either have zone+street (signal will run QNAS) OR coords
+        # already in hand (from raw_row or AI parse — signal skips QNAS, just builds
+        # the DeliveryTask).
         address_verified = False
+        has_geocode_data = (dl_zone and dl_street) or (dl_latitude and dl_longitude)
 
-        if getattr(settings, 'DISPATCH_BATCHING_ENABLED', False):
+        if not stages['geocode']:
+            stage_outcomes['geocode'] = 'disabled'
+            row_warnings.append('QNAS geocode skipped (disabled)')
+        elif getattr(settings, 'DISPATCH_BATCHING_ENABLED', False):
+            stage_outcomes['geocode'] = 'deferred-to-queue'
             row_warnings.append('Batch dispatch mode — address geocoding deferred to queue')
-        elif dl_zone and dl_street:
+        elif has_geocode_data:
             try:
                 # Trigger signal: _create_delivery_task_from_order → QNAS geocode → DeliveryTask
                 order.order_status = 'publish'
@@ -15055,18 +17079,91 @@ def temp_orders_auto_import(request):
                         address_verified = True
                         order.verification_status = 'address_verified'
                         order.save(update_fields=['verification_status'])
+                        if order.coords_accuracy and 'accuracy' not in result_entry:
+                            result_entry['accuracy'] = order.coords_accuracy
+                        stage_outcomes['geocode'] = f'ok:{order.coords_accuracy or "verified"}'
                     else:
+                        stage_outcomes['geocode'] = 'no-coords'
                         row_warnings.append('QNAS returned no coordinates — manual address review needed')
                 except delivery_models.DlAddressUpdate.DoesNotExist:
+                    stage_outcomes['geocode'] = 'no-record'
                     row_warnings.append('Address update record not created — manual review needed')
             except Exception as e:
                 logger.exception('Auto-import geocode error for order %s', order.order_number)
+                stage_outcomes['geocode'] = f'failed: {str(e)[:60]}'
                 row_warnings.append(f'Geocoding error: {str(e)}')
         else:
-            row_warnings.append('Zone or street number missing — manual address review needed')
+            stage_outcomes['geocode'] = 'missing-address-data'
+            row_warnings.append('Zone/street/coords missing — manual address review needed')
 
-        # --- Auto-publish to fleet if all checks pass ---
-        if pickup_location and address_verified:
+        # --- Set Order Status → Publish (runs AFTER QNAS, gated independently) ---
+        # The QNAS stage above sets order_status='publish' as a side effect (it's
+        # how the signal fires). This stage decides whether to KEEP that status
+        # after QNAS finished. When disabled, the order reverts to 'to_review'
+        # so staff manually approve it. The DeliveryTask + QNAS results created
+        # by the signal are preserved either way.
+        if not stages['set_publish']:
+            if order.order_status == 'publish':
+                order.order_status = 'to_review'
+                order.save(update_fields=['order_status'])
+            stage_outcomes['set_publish'] = 'disabled-kept-to_review'
+            row_warnings.append('Order kept at to_review (publish-status stage disabled)')
+        elif order.order_status != 'publish':
+            order.order_status = 'publish'
+            order.save(update_fields=['order_status'])
+            stage_outcomes['set_publish'] = 'ok'
+        else:
+            stage_outcomes['set_publish'] = 'already-publish'
+
+        # --- Send WhatsApp address-verify link (runs AFTER set_publish, before fleet) ---
+        # Decoupled from the import pipeline: creates an AddressVerificationJob
+        # row that a rate-limited Celery drain task picks up later. This avoids
+        # WhatsApp bulk-send bans during big imports. When the customer replies
+        # with a location pin, the WAHA webhook applies the coords back to this
+        # order (auto if within 24h of send, manual_review otherwise).
+        if stages['send_whatsapp']:
+            try:
+                from whatsapp.models import AddressVerificationJob
+                from core.templatetags.custom_filters import whatsapp_number
+                from core.auto_flow_executor import is_valid_phone
+                raw_phone = order.customer_whatsapp or order.customer_phone
+                phone_norm = whatsapp_number(raw_phone)
+                if not phone_norm:
+                    stage_outcomes['send_whatsapp'] = 'no-phone'
+                    row_warnings.append('WhatsApp queue skipped — order has no phone')
+                elif not is_valid_phone(phone_norm):
+                    stage_outcomes['send_whatsapp'] = f'skipped:invalid_phone({raw_phone})'
+                    row_warnings.append(f'WhatsApp queue skipped — invalid phone "{raw_phone}"')
+                    try:
+                        temp_order.log_audit_event(
+                            'auto-import',
+                            f'invalid-phone:{raw_phone}',
+                        )
+                    except Exception:
+                        pass
+                else:
+                    AddressVerificationJob.objects.create(
+                        order=order,
+                        phone=phone_norm,
+                        status='queued',
+                    )
+                    stage_outcomes['send_whatsapp'] = 'queued'
+                    row_warnings.append('Queued for WhatsApp address verification')
+            except Exception as e:
+                logger.exception('Auto-import enqueue verification job failed for order %s', order.order_number)
+                stage_outcomes['send_whatsapp'] = f'failed: {str(e)[:60]}'
+                row_warnings.append(f'WhatsApp queue error: {str(e)[:80]}')
+        else:
+            stage_outcomes['send_whatsapp'] = 'disabled'
+            row_warnings.append('WhatsApp send skipped (disabled)')
+
+        # --- Auto-publish to fleet (gated by stage; needs pickup + verified address) ---
+        if not stages['publish']:
+            stage_outcomes['publish'] = 'disabled'
+            row_warnings.append('Fleet publish skipped (disabled)')
+            result_entry['status'] = 'needs_review'
+            needs_review += 1
+        elif pickup_location and address_verified:
             try:
                 task = delivery_models.DeliveryTask.objects.filter(order=order).first()
                 if task:
@@ -15083,22 +17180,50 @@ def temp_orders_auto_import(request):
                         new_display='Published to Fleet (Auto-Import)',
                         changed_by=request.user,
                     )
+                    stage_outcomes['publish'] = 'ok'
                     result_entry['status'] = 'fully_automated'
                     fully_automated += 1
                 else:
+                    stage_outcomes['publish'] = 'no-task'
                     row_warnings.append('DeliveryTask not created — cannot auto-publish')
                     result_entry['status'] = 'needs_review'
                     needs_review += 1
             except Exception as e:
                 logger.exception('Auto-import publish error for order %s', order.order_number)
+                stage_outcomes['publish'] = f'failed: {str(e)[:60]}'
                 row_warnings.append(f'Publish error: {str(e)}')
                 result_entry['status'] = 'needs_review'
                 needs_review += 1
         else:
+            missing = []
+            if not pickup_location: missing.append('pickup')
+            if not address_verified: missing.append('verified-address')
+            stage_outcomes['publish'] = f'blocked:missing-{",".join(missing)}'
             result_entry['status'] = 'needs_review'
             needs_review += 1
 
         row_results.append(result_entry)
+
+    # Finalize ImportLog rows so they surface on /workforce/import-history/
+    for biz_id, log in import_logs_by_biz.items():
+        c = per_log_counters[biz_id]
+        log.total_rows = c['total']
+        log.orders_created = c['created']
+        log.orders_failed = c['failed']
+        log.raw_data = c['raw']
+        log.errors = per_log_errors[biz_id]
+        meta = log.source_meta or {}
+        meta['temp_order_ids'] = sorted(c['temp_ids'])
+        meta['source_types'] = sorted(c['source_types'])
+        log.source_meta = meta
+        log.save(update_fields=[
+            'total_rows', 'orders_created', 'orders_failed',
+            'raw_data', 'errors', 'source_meta',
+        ])
+        if c['failed'] and not c['created']:
+            log.mark_failed()
+        else:
+            log.mark_completed()
 
     return JsonResponse({
         'success': True,
@@ -15108,6 +17233,477 @@ def temp_orders_auto_import(request):
         'total': len(ids),
         'message': f'{fully_automated} fully automated, {needs_review} need review, {failed} failed',
         'rows': row_results,
+        'refetch': {
+            'updated': refetch_summary['updated'],
+            'skipped': refetch_summary['skipped'],
+            'errors': refetch_summary['errors'],
+        },
+    })
+
+
+# =============================================================================
+# AUTO-IMPORT STAGE MANAGER
+# Per-business configuration of which stages run during temp-order auto-import.
+# Stages are stored under Business.import_mapping['_auto_stages'] as a dict of
+# bool flags. Missing keys default to True so existing businesses keep the
+# original "all stages on" behavior.
+# =============================================================================
+
+AUTO_STAGE_KEYS = ['ai_parse', 'match_products', 'auto_pickup', 'geocode', 'set_publish', 'send_whatsapp', 'publish']
+AUTO_STAGE_LABELS = {
+    'ai_parse':       'AI Address Parse',
+    'match_products': 'Match Products',
+    'auto_pickup':    'Auto-Assign Pickup',
+    'geocode':        'QNAS Geocode',
+    'set_publish':    'Set Order Status → Publish',
+    'send_whatsapp':  'Send WhatsApp Verify Link',
+    'publish':        'Publish to Fleet',
+}
+
+
+def _read_auto_stages(business):
+    """Return the 5 stage flags for a business, defaulting missing keys to True."""
+    cfg = ((business.import_mapping or {}).get('_auto_stages') or {})
+    return {k: bool(cfg.get(k, True)) for k in AUTO_STAGE_KEYS}
+
+
+def _write_auto_stages(business, stages):
+    """Persist stage flags back into Business.import_mapping['_auto_stages']."""
+    mapping = business.import_mapping or {}
+    cleaned = {k: bool(stages.get(k, True)) for k in AUTO_STAGE_KEYS}
+    mapping['_auto_stages'] = cleaned
+    business.import_mapping = mapping
+    business.save(update_fields=['import_mapping'])
+    return cleaned
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_auto_stages(request):
+    """Table page: pick which auto-import stages run for each business."""
+    businesses = business_models.Business.objects.filter(
+        temp_order_enabled=True
+    ).order_by('business_name').only('business_id', 'business_name', 'import_mapping')
+
+    rows = [{
+        'business_id': b.business_id,
+        'business_name': b.business_name,
+        'stages': _read_auto_stages(b),
+    } for b in businesses]
+
+    context = {
+        'rows': rows,
+        'stage_keys': AUTO_STAGE_KEYS,
+        'stage_labels': AUTO_STAGE_LABELS,
+    }
+    return render(request, 'workforce/temp_auto_stages.html', context)
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_auto_stages_save(request):
+    """Save stage config. Two modes:
+        Single  : {business_id, stages: {ai_parse: bool, ...}}
+        Bulk    : {bulk: true, stage: 'ai_parse', value: bool}  (applies to all)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    # Bulk: flip one stage across every temp_order_enabled business
+    if body.get('bulk'):
+        stage = body.get('stage')
+        if stage not in AUTO_STAGE_KEYS:
+            return JsonResponse({'success': False, 'error': f'Invalid stage: {stage}'}, status=400)
+        value = bool(body.get('value'))
+        updated = 0
+        for b in business_models.Business.objects.filter(temp_order_enabled=True).only(
+            'business_id', 'import_mapping'
+        ):
+            current = _read_auto_stages(b)
+            if current[stage] == value:
+                continue
+            current[stage] = value
+            _write_auto_stages(b, current)
+            updated += 1
+        return JsonResponse({'success': True, 'updated': updated})
+
+    # Single business
+    business_id = body.get('business_id')
+    stages_in = body.get('stages')
+    if not business_id or not isinstance(stages_in, dict):
+        return JsonResponse({'success': False, 'error': 'business_id and stages required'}, status=400)
+    try:
+        biz = business_models.Business.objects.get(business_id=business_id)
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+    saved = _write_auto_stages(biz, stages_in)
+    return JsonResponse({'success': True, 'business_id': business_id, 'stages': saved})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_auto_stages_get(request):
+    """Return saved stages for a list of business IDs.
+    GET ?ids=1,2,3 → {results: {1: {...}, 2: {...}}}
+    Used by the auto-import modal to pre-fill the pre-step checkboxes.
+    """
+    ids_str = request.GET.get('ids', '').strip()
+    if not ids_str:
+        return JsonResponse({'success': False, 'error': 'ids required'}, status=400)
+    try:
+        ids = [int(x) for x in ids_str.split(',') if x.strip()]
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Invalid ids'}, status=400)
+    results = {}
+    for b in business_models.Business.objects.filter(business_id__in=ids).only(
+        'business_id', 'business_name', 'import_mapping'
+    ):
+        results[str(b.business_id)] = {
+            'business_name': b.business_name,
+            'stages': _read_auto_stages(b),
+        }
+    return JsonResponse({'success': True, 'results': results})
+
+
+# =============================================================================
+# ADDRESS VERIFICATION QUEUE
+# Phase 2 UI for the auto-import → WhatsApp verify-link → customer location
+# flow. Lists AddressVerificationJob rows with manual action endpoints.
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_verify_queue(request):
+    """List address-verification jobs with filters + per-row actions."""
+    from whatsapp.models import AddressVerificationJob
+
+    qs = (
+        AddressVerificationJob.objects
+        .select_related('order', 'order__business', 'sent_message', 'received_message')
+        .order_by('-created_at')
+    )
+
+    # Filters
+    status_filter = request.GET.get('status', '').strip()
+    kind_filter = request.GET.get('kind', '').strip()
+    business_id = request.GET.get('business', '').strip()
+    search = request.GET.get('q', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if kind_filter:
+        qs = qs.filter(kind=kind_filter)
+    if business_id:
+        qs = qs.filter(order__business_id=business_id)
+    if search:
+        from django.db.models import Q
+        qs = qs.filter(
+            Q(phone__icontains=search)
+            | Q(order__order_number__icontains=search)
+            | Q(order__customer_name__icontains=search)
+        )
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    # Status counts (unfiltered by status so the chips stay informative)
+    from django.db.models import Count
+    base_count_qs = AddressVerificationJob.objects.all()
+    if business_id:
+        base_count_qs = base_count_qs.filter(order__business_id=business_id)
+    if search:
+        from django.db.models import Q
+        base_count_qs = base_count_qs.filter(
+            Q(phone__icontains=search)
+            | Q(order__order_number__icontains=search)
+            | Q(order__customer_name__icontains=search)
+        )
+    status_counts = dict(
+        base_count_qs.values_list('status').annotate(Count('id')).order_by()
+    )
+    total_count = sum(status_counts.values())
+
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    # Status badge classes (Bootstrap)
+    status_badge = {
+        'queued':        'bg-secondary',
+        'sent':          'bg-info text-dark',
+        'verified':      'bg-success',
+        'manual_review': 'bg-warning text-dark',
+        'failed':        'bg-danger',
+        'cancelled':     'bg-light text-dark border',
+    }
+
+    # All businesses with at least one job (for the filter dropdown)
+    biz_ids = qs.values_list('order__business_id', flat=True).distinct()
+    biz_list = business_models.Business.objects.filter(
+        business_id__in=list(biz_ids)
+    ).order_by('business_name')
+
+    # WAHA session status (cached 30s) so ops can see at a glance whether the
+    # outbound channel is connected and which phone is currently linked.
+    from whatsapp.waha_views import fetch_waha_session_status
+    from whatsapp.models import WahaConfig
+    waha_status = fetch_waha_session_status()
+    # Runtime kill-switch (DB-backed). True = drain worker is allowed to send.
+    waha_status['messaging_enabled'] = WahaConfig.get_solo().verify_messaging_enabled
+
+    context = {
+        'jobs': page_obj,
+        'paginator': paginator,
+        'status_counts': status_counts,
+        'total_count': total_count,
+        'status_badge': status_badge,
+        'all_businesses': biz_list,
+        'filters': {
+            'status': status_filter, 'kind': kind_filter, 'business': business_id,
+            'q': search, 'date_from': date_from, 'date_to': date_to,
+        },
+        'status_choices': AddressVerificationJob.STATUS_CHOICES,
+        'kind_choices': AddressVerificationJob.KIND_CHOICES,
+        'waha_status': waha_status,
+    }
+    return render(request, 'workforce/temp_verify_queue.html', context)
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_verify_queue_action(request, job_id):
+    """Single endpoint for queue row actions. Body: {action: 'send_now'|...}."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body or b'{}')
+    except (json_lib.JSONDecodeError, ValueError):
+        body = {}
+    action = (body.get('action') or '').strip()
+
+    from whatsapp.models import AddressVerificationJob
+    try:
+        job = AddressVerificationJob.objects.select_related('order', 'received_message').get(id=job_id)
+    except AddressVerificationJob.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Job not found'}, status=404)
+
+    if action == 'send_now':
+        return _verify_action_send_now(job)
+    if action == 'resend':
+        return _verify_action_resend(job)
+    if action == 'cancel':
+        return _verify_action_cancel(job)
+    if action == 'apply_to_order':
+        return _verify_action_apply(job, body.get('order_id'))
+    if action == 'mark_verified':
+        return _verify_action_mark_verified(job)
+
+    return JsonResponse({'success': False, 'error': f'Unknown action: {action}'}, status=400)
+
+
+def _verify_action_send_now(job):
+    """Force-send a job immediately, bypassing the rate-limit window."""
+    if job.status not in ('queued', 'failed'):
+        return JsonResponse({
+            'success': False,
+            'error': f'Cannot send_now from status={job.status}',
+        }, status=400)
+    from whatsapp.waha_views import send_waha_text
+    from whatsapp.models import WahaConfig
+    from django.conf import settings
+    if not WahaConfig.get_solo().verify_messaging_enabled:
+        return JsonResponse({
+            'success': False,
+            'error': 'Messaging is paused (runtime toggle off). Turn it on first.',
+        }, status=409)
+    text = _build_order_whatsapp_message(job.order)
+    sent_msg = None
+    ok, info = (False, {'error': 'no sender'})
+    use_waha = bool(
+        getattr(settings, 'WAHA_VERIFY_USE_WAHA', False)
+        or getattr(settings, 'WAHA_ENABLED', False)
+    )
+    if use_waha:
+        ok, info = send_waha_text(job.phone, text)
+        if ok:
+            sent_msg = info.get('message_obj')
+    if not ok:
+        ok, info = _send_order_whatsapp_internal(job.order, message=text)
+
+    job.send_attempts = (job.send_attempts or 0) + 1
+    if ok:
+        job.status = 'sent'
+        job.sent_at = timezone.now()
+        if sent_msg is not None:
+            job.sent_message = sent_msg
+        job.last_error = ''
+        job.save(update_fields=['status', 'sent_at', 'sent_message', 'send_attempts', 'last_error'])
+        return JsonResponse({'success': True, 'job_id': job.id, 'status': job.status})
+    job.last_error = str(info.get('error', ''))[:250]
+    job.status = 'failed'
+    job.save(update_fields=['status', 'send_attempts', 'last_error'])
+    return JsonResponse({'success': False, 'error': info.get('error', 'send failed'), 'status': job.status}, status=502)
+
+
+def _verify_action_resend(job):
+    """Re-queue a job (already-sent, failed, etc.) so the drain task picks it up
+    again on the next tick. Also resets send_attempts for failed jobs so they
+    don't immediately re-trip the max-attempts ceiling."""
+    if job.status in ('cancelled',):
+        return JsonResponse({
+            'success': False,
+            'error': f'Cannot resend from status={job.status}',
+        }, status=400)
+    job.status = 'queued'
+    job.last_error = ''
+    # Failed jobs hit the attempt cap; resetting lets the drain worker try
+    # again without immediately re-failing.
+    if (job.send_attempts or 0) >= 1:
+        job.send_attempts = 0
+    job.save(update_fields=['status', 'last_error', 'send_attempts'])
+    return JsonResponse({'success': True, 'job_id': job.id, 'status': job.status})
+
+
+def _verify_action_cancel(job):
+    if job.status in ('verified', 'cancelled'):
+        return JsonResponse({
+            'success': False,
+            'error': f'Cannot cancel from status={job.status}',
+        }, status=400)
+    job.status = 'cancelled'
+    job.completed_at = timezone.now()
+    job.save(update_fields=['status', 'completed_at'])
+    return JsonResponse({'success': True, 'job_id': job.id, 'status': job.status})
+
+
+def _verify_action_apply(job, target_order_id):
+    """Apply the inbound location pin (on received_message) to a target order.
+
+    If `target_order_id` is None, applies to this job's own order. Otherwise
+    re-targets the pin to a different order. Useful for manual_review rows
+    where the auto-match window expired or matched the wrong order.
+    """
+    msg = job.received_message
+    if not msg or msg.latitude is None or msg.longitude is None:
+        return JsonResponse({'success': False, 'error': 'No location pin attached to this job'}, status=400)
+
+    target_order = job.order
+    if target_order_id:
+        try:
+            target_order = orders_models.Order.objects.get(id=int(target_order_id))
+        except (orders_models.Order.DoesNotExist, ValueError, TypeError):
+            return JsonResponse({'success': False, 'error': 'Target order not found'}, status=404)
+
+    from decimal import Decimal
+    from django.db import transaction
+    from delivery.models import DlAddressUpdate
+    lat = Decimal(str(msg.latitude))
+    lng = Decimal(str(msg.longitude))
+
+    with transaction.atomic():
+        target_order.latitude = lat
+        target_order.longitude = lng
+        target_order.coords_accuracy = 'exact'
+        target_order.verification_status = 'address_verified'
+        target_order.save(update_fields=['latitude', 'longitude', 'coords_accuracy', 'verification_status'])
+
+        addr, _ = DlAddressUpdate.objects.get_or_create(
+            order=target_order,
+            defaults={
+                'full_name': target_order.customer_name or '',
+                'dl_task_number': target_order.order_number,
+                'mobile_no': target_order.customer_phone or '',
+                'dl_zone': target_order.dl_zone,
+                'dl_street': target_order.dl_street,
+                'dl_building': target_order.dl_building,
+                'dl_latitude': lat,
+                'dl_longitude': lng,
+                'dl_unit': '0',
+                'area_name': target_order.customer_address or '',
+            },
+        )
+        if addr.dl_latitude != lat or addr.dl_longitude != lng:
+            addr.dl_latitude = lat
+            addr.dl_longitude = lng
+            addr.save(update_fields=['dl_latitude', 'dl_longitude'])
+
+        orders_models.OrderStatusHistory.objects.create(
+            order=target_order,
+            field_name='latitude/longitude',
+            old_value='',
+            new_value=f'{lat},{lng}',
+            old_display='No coords',
+            new_display=f'Manually applied from WhatsApp pin (job #{job.id})',
+        )
+
+        # If re-targeted to a different order, retarget the job too.
+        if target_order.id != job.order_id:
+            job.order = target_order
+        job.status = 'verified'
+        job.applied_latitude = lat
+        job.applied_longitude = lng
+        job.completed_at = timezone.now()
+        job.save(update_fields=['order', 'status', 'applied_latitude', 'applied_longitude', 'completed_at'])
+
+    return JsonResponse({
+        'success': True, 'job_id': job.id, 'status': job.status,
+        'target_order_number': target_order.order_number,
+    })
+
+
+def _verify_action_mark_verified(job):
+    """Manual override: mark verified without applying any coordinates."""
+    job.status = 'verified'
+    job.completed_at = timezone.now()
+    job.save(update_fields=['status', 'completed_at'])
+    return JsonResponse({'success': True, 'job_id': job.id, 'status': job.status})
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+@staff_required
+def temp_verify_queue_toggle_messaging(request):
+    """Flip the WahaConfig.verify_messaging_enabled kill switch.
+
+    Body: {} (no params — just inverts current state) OR {value: bool} (set
+    explicitly). Returns the new state. The drain worker and the manual
+    send-now action both honor this flag — when off, no WhatsApp goes out
+    regardless of WAHA_VERIFY_USE_WAHA. Jobs stay queued until re-enabled.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    try:
+        body = json_lib.loads(request.body or b'{}')
+    except (json_lib.JSONDecodeError, ValueError):
+        body = {}
+
+    from whatsapp.models import WahaConfig
+    cfg = WahaConfig.get_solo()
+    if 'value' in body:
+        cfg.verify_messaging_enabled = bool(body['value'])
+    else:
+        cfg.verify_messaging_enabled = not cfg.verify_messaging_enabled
+    cfg.last_toggled_by = request.user if request.user.is_authenticated else None
+    cfg.last_toggled_at = timezone.now()
+    cfg.save(update_fields=['verify_messaging_enabled', 'last_toggled_by', 'last_toggled_at'])
+    return JsonResponse({
+        'success': True,
+        'verify_messaging_enabled': cfg.verify_messaging_enabled,
     })
 
 
@@ -15265,6 +17861,126 @@ def public_link_save_mapping(request, source_id):
 
 
 # =============================================================================
+# GOOGLE SHEET IMPORT SOURCES (UI mirrors OneDrive; data on BusinessApiSettings)
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def google_sheet_sources(request):
+    """List and manage Google Sheet import sources.
+
+    Sources are stored on BusinessApiSettings(api_type='google_sheet') —
+    this view provides a dedicated management page styled like OneDrive.
+    """
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add':
+            business_id = request.POST.get('business_id', '').strip()
+            sheet_url = request.POST.get('sheet_url', '').strip()
+            gid_raw = request.POST.get('gid', '').strip()
+            if not business_id or not sheet_url:
+                return JsonResponse({'success': False, 'error': 'Business and Sheet URL are required'}, status=400)
+            try:
+                business = business_models.Business.objects.get(business_id=business_id)
+            except business_models.Business.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Business not found'}, status=400)
+            try:
+                gid_val = int(gid_raw) if gid_raw else None
+            except (ValueError, TypeError):
+                gid_val = None
+            business_models.BusinessApiSettings.objects.create(
+                business=business,
+                api_type='google_sheet',
+                google_sheet_url=sheet_url,
+                google_sheet_gid=gid_val,
+                is_verify_api=True,
+            )
+            return JsonResponse({'success': True, 'message': 'Source added'})
+
+        if action == 'edit':
+            api_id = request.POST.get('api_id')
+            sheet_url = request.POST.get('sheet_url', '').strip()
+            gid_raw = request.POST.get('gid', '').strip()
+            if not api_id or not sheet_url:
+                return JsonResponse({'success': False, 'error': 'Sheet URL is required'}, status=400)
+            try:
+                api = business_models.BusinessApiSettings.objects.get(id=api_id, api_type='google_sheet')
+            except business_models.BusinessApiSettings.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Source not found'}, status=404)
+            api.google_sheet_url = sheet_url
+            try:
+                api.google_sheet_gid = int(gid_raw) if gid_raw else None
+            except (ValueError, TypeError):
+                pass
+            api.save(update_fields=['google_sheet_url', 'google_sheet_gid'])
+            return JsonResponse({'success': True, 'message': 'Source updated'})
+
+        if action == 'delete':
+            api_id = request.POST.get('api_id')
+            business_models.BusinessApiSettings.objects.filter(id=api_id, api_type='google_sheet').delete()
+            return JsonResponse({'success': True, 'message': 'Source deleted'})
+
+        if action == 'toggle':
+            api_id = request.POST.get('api_id')
+            try:
+                api = business_models.BusinessApiSettings.objects.get(id=api_id, api_type='google_sheet')
+            except business_models.BusinessApiSettings.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Source not found'}, status=404)
+            api.is_verify_api = not api.is_verify_api
+            api.save(update_fields=['is_verify_api'])
+            return JsonResponse({'success': True, 'is_active': api.is_verify_api})
+
+        if action == 'sync':
+            api_id = request.POST.get('api_id')
+            try:
+                api = business_models.BusinessApiSettings.objects.get(id=api_id, api_type='google_sheet')
+            except business_models.BusinessApiSettings.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Source not found'}, status=404)
+            from orders.tasks import _sync_google_sheet_source
+            try:
+                created, updated = _sync_google_sheet_source(api)
+                return JsonResponse({'success': True, 'created': created, 'updated': updated})
+            except Exception as e:
+                logger.exception('google_sheet_sources sync failed')
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    sources = business_models.BusinessApiSettings.objects.filter(
+        api_type='google_sheet'
+    ).select_related('business').order_by('business__business_name', '-id')
+
+    # Last sync timestamp + count from TempOrder (no field on api_settings)
+    from django.db.models import Max, Count
+    sync_stats = {
+        row['api_settings_id']: row
+        for row in orders_models.TempOrder.objects.filter(
+            source_type='google_sheet', api_settings__in=sources,
+        ).values('api_settings_id').annotate(last=Max('created_at'), total=Count('id'))
+    }
+
+    rows = []
+    for s in sources:
+        stats = sync_stats.get(s.id, {})
+        rows.append({
+            'api': s,
+            'headers_count': len(s.last_headers or []),
+            'mapping_count': len(s.column_mapping or {}),
+            'last_sync': stats.get('last'),
+            'temp_order_count': stats.get('total', 0),
+        })
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    return render(request, 'workforce/google_sheet_sources.html', {
+        'page_title': 'Google Sheet Import Sources',
+        'rows': rows,
+        'businesses': businesses,
+    })
+
+
+# =============================================================================
 # ONEDRIVE IMPORT SOURCES
 # =============================================================================
 
@@ -15345,42 +18061,66 @@ def onedrive_sources(request):
 
 
 def _onedrive_download_file(source):
-    """Download Excel file from OneDrive source. Returns (bytes, error_msg)."""
+    """Download Excel file from OneDrive source. Returns (bytes, error_msg).
+
+    On a transient SharePoint 5xx or read timeout, retries once after 3 s.
+    """
     import requests as http_requests
+    import time
 
     link = source.share_link.strip()
+    no_cache_headers = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'If-None-Match': '*',
+    }
 
-    try:
-        # Strategy: Follow the share link without redirects to get the intermediate URL,
-        # then append &download=1 to force file download instead of web view.
-        resp1 = http_requests.get(link, timeout=30, allow_redirects=False)
+    def _bust(url):
+        bust = f'_t={int(time.time() * 1000)}'
+        sep = '&' if '?' in url else '?'
+        return f'{url}{sep}{bust}'
 
-        if resp1.status_code in (301, 302, 307, 308):
-            redirect_url = resp1.headers.get('Location', '')
-            if redirect_url:
-                # Append download=1 to the redirect URL
-                sep = '&' if '?' in redirect_url else '?'
-                download_url = redirect_url + sep + 'download=1'
-                resp = http_requests.get(download_url, timeout=60, allow_redirects=True)
-                content_type = resp.headers.get('Content-Type', '')
+    def _attempt():
+        try:
+            resp1 = http_requests.get(_bust(link), timeout=30, allow_redirects=False, headers=no_cache_headers)
+            if resp1.status_code >= 500:
+                return None, f'OneDrive 5xx on redirect probe: {resp1.status_code}', True
 
-                if resp.status_code == 200 and 'text/html' not in content_type:
-                    return resp.content, None
+            if resp1.status_code in (301, 302, 307, 308):
+                redirect_url = resp1.headers.get('Location', '')
+                if redirect_url:
+                    sep = '&' if '?' in redirect_url else '?'
+                    bust = f'_t={int(time.time() * 1000)}'
+                    download_url = redirect_url + sep + 'download=1&' + bust
+                    resp = http_requests.get(download_url, timeout=60, allow_redirects=True, headers=no_cache_headers)
+                    content_type = resp.headers.get('Content-Type', '')
+                    if resp.status_code == 200 and 'text/html' not in content_type:
+                        return resp.content, None, False
+                    if resp.status_code >= 500:
+                        return None, f'OneDrive 5xx on download: {resp.status_code}', True
 
-        # Fallback: try the model's get_download_url() method
-        download_url = source.get_download_url()
-        resp = http_requests.get(download_url, timeout=30, allow_redirects=True)
-        content_type = resp.headers.get('Content-Type', '')
+            download_url = _bust(source.get_download_url())
+            resp = http_requests.get(download_url, timeout=30, allow_redirects=True, headers=no_cache_headers)
+            content_type = resp.headers.get('Content-Type', '')
+            if resp.status_code == 200 and 'text/html' not in content_type:
+                return resp.content, None, False
+            if resp.status_code >= 500:
+                return None, f'OneDrive 5xx on fallback download: {resp.status_code}', True
 
-        if resp.status_code == 200 and 'text/html' not in content_type:
-            return resp.content, None
+            return None, 'Could not download the file. Make sure it is shared with "Anyone with the link" in OneDrive.', False
+        except http_requests.exceptions.Timeout:
+            return None, 'Download timed out. The file may be too large or OneDrive is slow.', True
+        except http_requests.exceptions.ConnectionError as e:
+            return None, f'OneDrive connection error: {e}', True
+        except Exception as e:
+            return None, f'Download error: {str(e)}', False
 
-        return None, 'Could not download the file. Make sure it is shared with "Anyone with the link" in OneDrive.'
-
-    except http_requests.exceptions.Timeout:
-        return None, 'Download timed out. The file may be too large or OneDrive is slow.'
-    except Exception as e:
-        return None, f'Download error: {str(e)}'
+    content, err, transient = _attempt()
+    if err and transient:
+        logger.warning(f'OneDrive download transient failure for source {source.id}: {err} — retrying once in 3s')
+        time.sleep(3)
+        content, err, _ = _attempt()
+    return content, err
 
 
 def _safe_load_workbook(file_bytes):
@@ -15761,9 +18501,9 @@ def onedrive_import_trigger(request, source_id):
             if not client_order_code:
                 client_order_code = f"OD-{uuid.uuid4().hex[:8].upper()}"
 
-            if orders_models.Order.objects.filter(client_order_code=client_order_code).exists():
+            if orders_models.Order.objects.filter(business=business, client_order_code=client_order_code).exists():
                 skipped += 1
-                errors.append(f"Row {row_num}: Duplicate '{client_order_code}'")
+                errors.append(f"Row {row_num}: Duplicate '{client_order_code}' for {business.business_name}")
                 continue
 
             try:
@@ -17768,10 +20508,20 @@ def temp_order_config(request):
             messages.success(request, f'Temp order config updated — {len(enabled_ids)} businesses enabled.')
             return redirect('workforce:temp_order_config')
 
-    businesses = business_models.Business.objects.all().order_by('business_name')
+    from django.db.models import Count, Case, When, IntegerField, Value
+    status_order = Case(
+        When(business_status='active', then=Value(0)),
+        When(business_status='pending', then=Value(1)),
+        When(business_status='suspended', then=Value(2)),
+        When(business_status='inactive', then=Value(3)),
+        default=Value(4),
+        output_field=IntegerField(),
+    )
+    businesses = business_models.Business.objects.annotate(
+        _status_rank=status_order,
+    ).order_by('_status_rank', 'business_name')
 
     # Count temp orders per business
-    from django.db.models import Count
     temp_counts = dict(
         orders_models.TempOrder.objects.values_list('business_id').annotate(Count('id'))
     )
@@ -17786,14 +20536,42 @@ def temp_order_config(request):
         orders_models.PublicLinkSource.objects.filter(is_active=True).values_list('business_id').annotate(Count('id'))
     )
 
+    # Default mapping per business (explicit defaults only)
+    od_default_labels = dict(
+        orders_models.OneDriveSource.objects.filter(
+            is_active=True, is_default_mapping=True,
+        ).values_list('business_id', 'label')
+    )
+    api_default_types = dict(
+        business_models.BusinessApiSettings.objects.filter(
+            is_default=True, is_verify_api=True,
+        ).values_list('business_id', 'api_type')
+    )
+
     biz_list = []
     for biz in businesses:
+        od_default = od_default_labels.get(biz.business_id)
+        api_default = api_default_types.get(biz.business_id)
+
+        # Derive a single primary default for quick-glance: OneDrive > API > Public Link
+        if od_default:
+            primary_default = {'type': 'OneDrive', 'label': od_default, 'css': 'bg-info text-dark'}
+        elif api_default:
+            primary_default = {'type': 'API', 'label': api_default, 'css': 'bg-warning text-dark'}
+        elif public_link_counts.get(biz.business_id, 0):
+            primary_default = {'type': 'Public Link', 'label': '', 'css': 'bg-secondary'}
+        else:
+            primary_default = None
+
         biz_list.append({
             'business': biz,
             'temp_count': temp_counts.get(biz.business_id, 0),
             'onedrive_count': onedrive_counts.get(biz.business_id, 0),
             'api_count': api_counts.get(biz.business_id, 0),
             'public_link_count': public_link_counts.get(biz.business_id, 0),
+            'od_default': od_default,
+            'api_default': api_default,
+            'primary_default': primary_default,
         })
 
     enabled_count = sum(1 for b in biz_list if b['business'].temp_order_enabled)

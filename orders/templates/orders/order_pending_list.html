@@ -75,8 +75,8 @@
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--review" data-status="to_review" title="Hold for Review">
               <i class="fas fa-clock"></i>
             </button>
-            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--confirmed" data-status="ready_to_pickup" title="Confirmed">
-              <i class="fas fa-clipboard-check"></i>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--reconfirmed" data-status="ready_to_pickup" data-needs-comment="true" title="Reconfirmed">
+              <i class="fas fa-check-double"></i>
             </button>
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--publish" data-status="publish" title="Publish">
               <i class="fas fa-rocket"></i>
@@ -98,6 +98,8 @@
         </div>
       {% endif %}
     </div>
+
+    {% include "orders/parts/_reconfirm_modal.html" %}
 
     {% if orders %}
     <div class="pwa-mobile-pagination">
@@ -410,30 +412,21 @@
       if (btn) btn.classList.add('pwa-card-actions__btn--active');
     });
 
-    document.addEventListener('click', function(e) {
-      var btn = e.target.closest('.pwa-card-actions__btn');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-
+    function submitStatusUpdate(btn, orderId, newStatus, comment) {
       var card = btn.closest('.pwa-order-card-full');
-      var orderId = card.getAttribute('data-order-id');
-      var newStatus = btn.getAttribute('data-status');
-      var currentStatus = card.getAttribute('data-current-status');
-
-      if (newStatus === currentStatus) return;
-      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) return;
-
       card.querySelectorAll('.pwa-card-actions__btn').forEach(function(b) { b.disabled = true; });
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-      fetch('{% url "orders:update_order_status" %}', {
+      var payload = { order_id: parseInt(orderId), status: newStatus };
+      if (comment) payload.comment = comment;
+
+      return fetch('{% url "orders:update_order_status" %}', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': '{{ csrf_token }}'
         },
-        body: JSON.stringify({ order_id: parseInt(orderId), status: newStatus })
+        body: JSON.stringify(payload)
       })
       .then(function(resp) { return resp.json(); })
       .then(function(data) {
@@ -449,6 +442,30 @@
         alert('Network error: ' + err);
         window.location.reload();
       });
+    }
+
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.pwa-card-actions__btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      var card = btn.closest('.pwa-order-card-full');
+      var orderId = card.getAttribute('data-order-id');
+      var newStatus = btn.getAttribute('data-status');
+      var currentStatus = card.getAttribute('data-current-status');
+
+      if (newStatus === currentStatus) return;
+      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) return;
+
+      if (btn.getAttribute('data-needs-comment') === 'true' && typeof window.openReconfirmModal === 'function') {
+        window.openReconfirmModal(function(comment) {
+          return submitStatusUpdate(btn, orderId, newStatus, comment);
+        });
+        return;
+      }
+
+      submitStatusUpdate(btn, orderId, newStatus, '');
     });
   })();
   </script>

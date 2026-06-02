@@ -3,7 +3,7 @@
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}?v=20260218a">
+<link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}?v=20260423a">
 <!-- Dashboard styles now in business-dashboard-pro.css for HTMX compatibility -->
 {% endblock extra_css %}
 
@@ -343,36 +343,26 @@
 
     <!-- Stats -->
     <div class="bdb__stats">
-      <div class="bdb__stat">
+      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}">
         <div class="bdb__stat-icon bdb__stat-icon--primary"><i class="fa-solid fa-box"></i></div>
         <p class="bdb__stat-value">{{ total_orders|default:0 }}</p>
         <p class="bdb__stat-label">Total Orders</p>
-      </div>
-      <div class="bdb__stat">
+      </a>
+      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}?cStatus=delivered">
         <div class="bdb__stat-icon bdb__stat-icon--success"><i class="fa-solid fa-check"></i></div>
         <p class="bdb__stat-value">{{ delivered_count|default:0 }}</p>
         <p class="bdb__stat-label">Delivered</p>
-      </div>
-      <div class="bdb__stat">
-        <div class="bdb__stat-icon bdb__stat-icon--info"><i class="fa-solid fa-money-bill"></i></div>
-        <p class="bdb__stat-value">{{ cod_amount_total|default:0 }} QAR</p>
-        <p class="bdb__stat-label">COD Amount</p>
-      </div>
-      <div class="bdb__stat">
-        <div class="bdb__stat-icon bdb__stat-icon--success"><i class="fa-solid fa-hand-holding-dollar"></i></div>
-        <p class="bdb__stat-value">{{ cod_collected|default:0 }} QAR</p>
-        <p class="bdb__stat-label">COD Collected</p>
-      </div>
-      <div class="bdb__stat">
+      </a>
+      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}?cStatus=pending">
         <div class="bdb__stat-icon bdb__stat-icon--warning"><i class="fa-solid fa-clock"></i></div>
         <p class="bdb__stat-value">{{ pending_count|default:0 }}</p>
         <p class="bdb__stat-label">Pending</p>
-      </div>
-      <div class="bdb__stat">
+      </a>
+      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}?dlStatus=failed">
         <div class="bdb__stat-icon bdb__stat-icon--danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
         <p class="bdb__stat-value">{{ followup_count|default:0 }}</p>
         <p class="bdb__stat-label">Follow Up</p>
-      </div>
+      </a>
     </div>
 
     <!-- AI Assistant Chat -->

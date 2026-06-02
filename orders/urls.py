@@ -9,11 +9,14 @@ urlpatterns = [
     path('partial/successfull/', orders_views.orders_successfull_list, name='orders_successfull_list'),
     path('partial/unsuccess/', orders_views.orders_unsuccessfull_list, name='orders_unsuccessfull_list'),
     path('partial/all/', orders_views.orders_all_list, name='orders_all_list'),
+    path('partial/api-pending/', orders_views.orders_api_pending_list, name='orders_api_pending_list'),
+    path('partial/api-pending/import/', orders_views.orders_api_pending_import, name='orders_api_pending_import'),
     #path('partial/all', orders_views.orders_list_review, name='orders_list'),
 
 
     # ORDERS
     path('add_order/', orders_views.add_order, name='add_order'),
+    path('partials/mobile_product_row/', orders_views.mobile_product_row_partial, name='mobile_product_row_partial'),
     path('add_order_bulk/', orders_views.add_order_bulk, name='add_order_bulk'),
     path('add_order_with_product/', orders_views.add_order_with_product, name='add_order_with_product'),
     path('add_order/<int:pickup_id>/', orders_views.deliver_to_here, name='deliver_to_here'),

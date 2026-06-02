@@ -437,6 +437,108 @@ def stock_card(request, product_id):
 
 @login_required(login_url='account_login')
 @user_passes_test(has_warehouse_access, login_url='account_login')
+def staff_product_edit(request, product_id):
+    """Staff-only product edit page reachable from the warehouse inventory.
+
+    Unlike `product:product_single_update`, this view is not scoped to the
+    requesting user's business — staff/warehouse users can edit any
+    product. Non-staff with warehouse access can only edit products
+    belonging to a business linked to one of their warehouses.
+    """
+    from product import forms as product_forms
+
+    business, is_staff = get_business_filter(request)
+
+    if is_staff:
+        product = get_object_or_404(
+            product_models.Product.objects.select_related(
+                'color', 'unit', 'business', 'product_category'
+            ),
+            pk=product_id,
+        )
+    else:
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('warehouse:inventory_list')
+        # Non-staff with warehouse access: allow editing products from any
+        # business linked to a warehouse they're connected to (so a 3PL ops
+        # user can edit on behalf of their seller clients).
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        allowed_business_ids = set(
+            warehouse_models.SellerWarehouseLink.objects.filter(
+                warehouse_id__in=linked_warehouse_ids, is_active=True
+            ).values_list('business_id', flat=True)
+        )
+        allowed_business_ids.add(business.pk)
+        product = get_object_or_404(
+            product_models.Product.objects.select_related(
+                'color', 'unit', 'business', 'product_category'
+            ),
+            pk=product_id,
+            business_id__in=allowed_business_ids,
+        )
+
+    if request.method == 'POST':
+        form = product_forms.AddItemsForm(request.POST, request.FILES, instance=product)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                f"Product '{product.item_name}' updated."
+            )
+            next_url = request.POST.get('next') or request.GET.get('next')
+            if next_url:
+                return redirect(next_url)
+            return redirect('warehouse:inventory_list')
+        messages.error(request, "Please correct the errors below.")
+    else:
+        form = product_forms.AddItemsForm(instance=product)
+
+    context = {
+        'form': form,
+        'product': product,
+        'is_staff': is_staff,
+        'next_url': request.GET.get('next', ''),
+    }
+    return render(request, 'warehouse/staff_product_edit.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def stock_level_detail_modal(request, stock_id):
+    """Return partial HTML for the inventory detail modal — full product +
+    stock info + recent transactions for one StockLevel row.
+    """
+    business, is_staff = get_business_filter(request)
+
+    qs = warehouse_models.StockLevel.objects.select_related(
+        'product', 'product__business', 'product__product_category',
+        'product__color', 'product__unit', 'warehouse', 'location',
+    )
+    if not is_staff:
+        if not business:
+            return render(request, 'warehouse/parts/inventory_detail_modal.html', {
+                'error': 'No business associated with your account',
+            }, status=403)
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        qs = qs.filter(warehouse_id__in=linked_warehouse_ids, product__business=business)
+
+    stock = get_object_or_404(qs, pk=stock_id)
+
+    context = {
+        'stock': stock,
+        'product': stock.product,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/parts/inventory_detail_modal.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
 def transaction_list(request):
     """List all inventory transactions"""
     business, is_staff = get_business_filter(request)

@@ -9,6 +9,8 @@ urlpatterns = [
 
     # Inventory
     path('inventory/', warehouse_views.inventory_list, name='inventory_list'),
+    path('inventory/<int:stock_id>/detail/', warehouse_views.stock_level_detail_modal, name='stock_level_detail_modal'),
+    path('products/<int:product_id>/edit/', warehouse_views.staff_product_edit, name='staff_product_edit'),
     path('inventory/<int:product_id>/', warehouse_views.stock_card, name='stock_card'),
     path('transactions/', warehouse_views.transaction_list, name='transaction_list'),
 

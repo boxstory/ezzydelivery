@@ -2874,6 +2874,8 @@ def whatsapp_triggers_list(request):
     """Settings page for WhatsApp notification triggers."""
     from business.models import WhatsAppNotificationTrigger
 
+    default_whatsapp = (request.current_business.business_whatsapp or '').strip()
+
     triggers = {}
     for status, label in WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES:
         trigger = WhatsAppNotificationTrigger.objects.filter(
@@ -2883,12 +2885,14 @@ def whatsapp_triggers_list(request):
             'label': label,
             'is_active': trigger.is_active if trigger else False,
             'custom_message': trigger.custom_message if trigger else '',
+            'notification_phone': (trigger.notification_phone if trigger else '') or '',
         }
 
     return render(request, 'business/whatsapp_triggers.html', {
         'triggers': triggers,
         'user_business': request.current_business,
         'is_business_owner': request.access_type == 'owner',
+        'default_whatsapp': default_whatsapp,
     })
 
 
@@ -2904,6 +2908,7 @@ def whatsapp_trigger_toggle(request):
     status = request.POST.get('trigger_status')
     is_active = request.POST.get('is_active') == 'true'
     custom_message = request.POST.get('custom_message', '')
+    notification_phone = request.POST.get('notification_phone', '').strip()
 
     valid_statuses = [s[0] for s in WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES]
     if status not in valid_statuses:
@@ -2912,7 +2917,11 @@ def whatsapp_trigger_toggle(request):
     trigger, created = WhatsAppNotificationTrigger.objects.update_or_create(
         business=request.current_business,
         trigger_status=status,
-        defaults={'is_active': is_active, 'custom_message': custom_message}
+        defaults={
+            'is_active': is_active,
+            'custom_message': custom_message,
+            'notification_phone': notification_phone,
+        }
     )
 
     return JsonResponse({'success': True, 'is_active': trigger.is_active})

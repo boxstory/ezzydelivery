@@ -434,6 +434,36 @@
             No orders yet
         </div>
         {% endif %}
+
+        {% if api_products_platform %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-4 mb-2">
+            <span class="text-muted small me-1">
+                <i class="fa-solid fa-cloud-arrow-down me-1"></i>
+                Show {{ api_products_platform|title }} Orders:
+            </span>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Fetch order count">
+                <button type="button" class="btn btn-outline-primary"
+                        hx-get="{% url 'workforce:seller_api_orders' business.business_id %}?limit=10"
+                        hx-target="#seller-api-orders-container"
+                        hx-swap="innerHTML"
+                        hx-indicator="#seller-api-orders-spinner">10</button>
+                <button type="button" class="btn btn-outline-primary"
+                        hx-get="{% url 'workforce:seller_api_orders' business.business_id %}?limit=25"
+                        hx-target="#seller-api-orders-container"
+                        hx-swap="innerHTML"
+                        hx-indicator="#seller-api-orders-spinner">25</button>
+                <button type="button" class="btn btn-outline-primary"
+                        hx-get="{% url 'workforce:seller_api_orders' business.business_id %}?limit=50"
+                        hx-target="#seller-api-orders-container"
+                        hx-swap="innerHTML"
+                        hx-indicator="#seller-api-orders-spinner">50</button>
+            </div>
+            <span id="seller-api-orders-spinner" class="htmx-indicator text-muted small ms-2">
+                <i class="fa-solid fa-spinner fa-spin me-1"></i> Loading...
+            </span>
+        </div>
+        <div id="seller-api-orders-container"></div>
+        {% endif %}
     </div>
 
     <!-- Tab: Details -->
@@ -751,32 +781,73 @@
         </h3>
         {% if api_settings %}
         <div class="sld__table-wrap">
-            <table class="sld__table">
+            <table class="sld__table sld__api-table">
                 <thead>
                     <tr>
                         <th>Platform</th>
                         <th>API URL</th>
+                        <th>Key</th>
                         <th>Status</th>
                         <th>Default</th>
                         <th>Created</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for api in api_settings %}
-                    <tr>
-                        <td><span class="sld__badge sld__badge--muted">{{ api.api_type|title }}</span></td>
-                        <td class="sld__api-url">{{ api.site_api_url|default:"N/A"|truncatechars:40 }}</td>
+                    <tr id="sld-api-row-{{ api.id }}" data-api-id="{{ api.id }}">
                         <td>
-                            {% if api.is_verify_api %}
-                            <span class="sld__badge sld__badge--success">Verified</span>
+                            {% if api.api_type == 'shopify' %}
+                                <span class="badge bg-success"><i class="fa-brands fa-shopify me-1"></i>Shopify</span>
+                            {% elif api.api_type == 'woocommerce' %}
+                                <span class="badge bg-primary"><i class="fa-brands fa-wordpress me-1"></i>WooCommerce</span>
+                            {% elif api.api_type == 'tiktokshop' %}
+                                <span class="badge bg-dark"><i class="fa-brands fa-tiktok me-1"></i>TikTok Shop</span>
+                            {% elif api.api_type == 'google_sheet' %}
+                                <span class="badge bg-danger"><i class="fa-brands fa-google me-1"></i>Google Sheet</span>
                             {% else %}
-                            <span class="sld__badge sld__badge--warning">Pending</span>
+                                <span class="badge bg-secondary"><i class="fa-solid fa-plug me-1"></i>{{ api.api_type|title }}</span>
                             {% endif %}
                         </td>
+                        <td class="sld__api-url">
+                            {% if api.api_type == 'google_sheet' and api.google_sheet_url %}
+                                <a href="{{ api.google_sheet_url }}" target="_blank" rel="noopener" class="text-break">{{ api.google_sheet_url|truncatechars:40 }}</a>
+                            {% else %}
+                                {{ api.site_api_url|default:"N/A"|truncatechars:40 }}
+                            {% endif %}
+                        </td>
+                        <td><code class="small">{{ api.api_key|default:"—"|slice:":14" }}{% if api.api_key and api.api_key|length > 14 %}…{% endif %}</code></td>
                         <td>
-                            {% if api.is_default %}<i class="fa-solid fa-check sld__check-icon"></i>{% else %}-{% endif %}
+                            <span class="sld__badge sld__api-status-badge {% if api.is_verify_api %}sld__badge--success{% else %}sld__badge--warning{% endif %}" id="sld-api-status-{{ api.id }}">
+                                {% if api.is_verify_api %}Verified{% else %}Pending{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="sld__api-default-cell" id="sld-api-default-{{ api.id }}">
+                                {% if api.is_default %}<i class="fa-solid fa-check sld__check-icon"></i>{% else %}-{% endif %}
+                            </span>
                         </td>
                         <td class="sld__date-cell">{{ api.created_at|date:"d M Y" }}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-info sld-api-test-btn"
+                                        data-api-id="{{ api.id }}" title="Test connection">
+                                    <i class="fa-solid fa-vial"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-primary sld-api-edit-btn"
+                                        data-api-id="{{ api.id }}" title="Edit">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button type="button" class="btn {% if api.is_verify_api %}btn-outline-warning{% else %}btn-outline-success{% endif %} sld-api-approve-btn"
+                                        data-api-id="{{ api.id }}" title="{% if api.is_verify_api %}Revoke{% else %}Approve{% endif %}">
+                                    <i class="fa-solid {% if api.is_verify_api %}fa-ban{% else %}fa-circle-check{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger sld-api-delete-btn"
+                                        data-api-id="{{ api.id }}" title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -788,6 +859,132 @@
             No API integrations
         </div>
         {% endif %}
+    </div>
+
+    <!-- API Edit Modal -->
+    <div class="sld__modal-overlay sld__modal-overlay--wide" id="sldApiEditModal" aria-hidden="true">
+        <div class="sld__modal sld__modal--api-edit">
+            <div class="sld__modal-header">
+                <h4 class="sld__modal-title"><i class="fa-solid fa-pen-to-square me-2"></i>Edit API Integration</h4>
+                <button type="button" class="sld__modal-close" id="sldApiEditClose" aria-label="Close">&times;</button>
+            </div>
+            <form id="sldApiEditForm" autocomplete="off">
+                <input type="hidden" id="sldApiEditId" name="api_id">
+                    <div class="sld__modal-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold">Platform</label>
+                                <select class="form-select form-select-sm" name="api_type" id="sldApiEditType">
+                                    <option value="shopify">Shopify</option>
+                                    <option value="woocommerce">WooCommerce</option>
+                                    <option value="tiktokshop">TikTok Shop</option>
+                                    <option value="magento">Magento</option>
+                                    <option value="opencart">OpenCart</option>
+                                    <option value="prestashop">PrestaShop</option>
+                                    <option value="bigcommerce">BigCommerce</option>
+                                    <option value="google_sheet">Google Sheet</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold">Country</label>
+                                <input type="text" class="form-control form-control-sm" name="site_contry" id="sldApiEditCountry" placeholder="Qatar">
+                            </div>
+
+                            <div class="col-12 sld__api-field-group" data-show-for="shopify,woocommerce,magento,opencart,prestashop,bigcommerce,custom,tiktokshop">
+                                <label class="form-label small fw-semibold">Site / Store URL</label>
+                                <input type="url" class="form-control form-control-sm" name="site_api_url" id="sldApiEditUrl" placeholder="https://example.myshopify.com">
+                            </div>
+
+                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,woocommerce,tiktokshop,magento,opencart,prestashop,bigcommerce,custom">
+                                <label class="form-label small fw-semibold">API Key / Consumer Key</label>
+                                <input type="text" class="form-control form-control-sm" name="api_key" id="sldApiEditKey">
+                            </div>
+                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,woocommerce,tiktokshop,magento,opencart,prestashop,bigcommerce,custom">
+                                <label class="form-label small fw-semibold">API Secret / Consumer Secret</label>
+                                <input type="text" class="form-control form-control-sm" name="api_secret" id="sldApiEditSecret">
+                            </div>
+                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,tiktokshop,custom">
+                                <label class="form-label small fw-semibold">Access Token</label>
+                                <input type="text" class="form-control form-control-sm" name="api_access_token" id="sldApiEditToken">
+                            </div>
+                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,tiktokshop,custom">
+                                <label class="form-label small fw-semibold">API Version</label>
+                                <input type="text" class="form-control form-control-sm" name="api_version" id="sldApiEditVersion" placeholder="e.g. 2023-10">
+                            </div>
+
+                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="custom,woocommerce">
+                                <label class="form-label small fw-semibold">Order API Endpoint</label>
+                                <input type="text" class="form-control form-control-sm" name="order_api_endpoint" id="sldApiEditOrderEp">
+                            </div>
+                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="custom,woocommerce">
+                                <label class="form-label small fw-semibold">Product API Endpoint</label>
+                                <input type="text" class="form-control form-control-sm" name="product_api_endpoint" id="sldApiEditProdEp">
+                            </div>
+
+                            <div class="col-12 sld__api-field-group" data-show-for="google_sheet">
+                                <label class="form-label small fw-semibold">Google Sheet URL</label>
+                                <input type="url" class="form-control form-control-sm" name="google_sheet_url" id="sldApiEditSheet" placeholder="https://docs.google.com/spreadsheets/d/...">
+                            </div>
+
+                            <div class="col-12 col-md-4 sld__api-field-group" data-show-for="tiktokshop">
+                                <label class="form-label small fw-semibold">TikTok Shop ID</label>
+                                <input type="text" class="form-control form-control-sm" name="tiktok_shop_id" id="sldApiEditTtShop">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-show-for="tiktokshop">
+                                <label class="form-label small fw-semibold">TikTok Shop Cipher</label>
+                                <input type="text" class="form-control form-control-sm" name="tiktok_shop_cipher" id="sldApiEditTtCipher">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-show-for="tiktokshop">
+                                <label class="form-label small fw-semibold">TikTok Refresh Token</label>
+                                <input type="text" class="form-control form-control-sm" name="tiktok_refresh_token" id="sldApiEditTtRefresh">
+                            </div>
+
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="is_default" value="1" id="sldApiEditDefault">
+                                    <label class="form-check-label small" for="sldApiEditDefault">
+                                        Use as default integration for this business
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sld__form-note small text-muted mt-3">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            Changing API credentials will reset verification status to <strong>Pending</strong>.
+                        </div>
+                        <div id="sldApiEditMsg" class="mt-2 small"></div>
+                    </div>
+                <div class="sld__modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-info me-auto" id="sldApiEditTestBtn">
+                        <i class="fa-solid fa-vial me-1"></i>Test Connection
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light" id="sldApiEditCancel">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary" id="sldApiEditSave">
+                        <i class="fa-solid fa-save me-1"></i>Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- API Test Result Modal -->
+    <div class="sld__modal-overlay sld__modal-overlay--wide" id="sldApiTestModal" aria-hidden="true">
+        <div class="sld__modal sld__modal--api-test">
+            <div class="sld__modal-header">
+                <h4 class="sld__modal-title"><i class="fa-solid fa-vial me-2"></i>API Connection Test</h4>
+                <button type="button" class="sld__modal-close" id="sldApiTestClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="sld__modal-body" id="sldApiTestBody">
+                <div class="text-center py-4 text-muted">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x mb-2"></i>
+                    <div>Testing connection…</div>
+                </div>
+            </div>
+            <div class="sld__modal-footer">
+                <button type="button" class="btn btn-sm btn-light" id="sldApiTestCloseBtn">Close</button>
+            </div>
+        </div>
     </div>
 
     <!-- Tab: Products -->
@@ -1260,5 +1457,200 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
     });
 });
+
+// ===== API Integrations: edit / test / approve / delete =====
+(function() {
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    var editModal      = document.getElementById('sldApiEditModal');
+    var editForm       = document.getElementById('sldApiEditForm');
+    var editId         = document.getElementById('sldApiEditId');
+    var editTypeSel    = document.getElementById('sldApiEditType');
+    var editMsg        = document.getElementById('sldApiEditMsg');
+    var editSaveBtn    = document.getElementById('sldApiEditSave');
+    var editTestBtn    = document.getElementById('sldApiEditTestBtn');
+    var fields = {
+        site_contry: document.getElementById('sldApiEditCountry'),
+        site_api_url: document.getElementById('sldApiEditUrl'),
+        api_key: document.getElementById('sldApiEditKey'),
+        api_secret: document.getElementById('sldApiEditSecret'),
+        api_access_token: document.getElementById('sldApiEditToken'),
+        api_version: document.getElementById('sldApiEditVersion'),
+        order_api_endpoint: document.getElementById('sldApiEditOrderEp'),
+        product_api_endpoint: document.getElementById('sldApiEditProdEp'),
+        google_sheet_url: document.getElementById('sldApiEditSheet'),
+        tiktok_shop_id: document.getElementById('sldApiEditTtShop'),
+        tiktok_shop_cipher: document.getElementById('sldApiEditTtCipher'),
+        tiktok_refresh_token: document.getElementById('sldApiEditTtRefresh'),
+    };
+    var defaultChk = document.getElementById('sldApiEditDefault');
+
+    var testModal     = document.getElementById('sldApiTestModal');
+    var testBody      = document.getElementById('sldApiTestBody');
+
+    function openModal(m) { m.classList.add('show'); document.body.style.overflow = 'hidden'; }
+    function closeModal(m) { m.classList.remove('show'); document.body.style.overflow = ''; }
+
+    function applyTypeVisibility() {
+        var t = editTypeSel.value;
+        document.querySelectorAll('#sldApiEditModal .sld__api-field-group').forEach(function(grp) {
+            var allowed = (grp.dataset.showFor || '').split(',').map(function(s) { return s.trim(); });
+            grp.style.display = allowed.indexOf(t) === -1 ? 'none' : '';
+        });
+    }
+    editTypeSel.addEventListener('change', applyTypeVisibility);
+
+    document.querySelectorAll('.sld-api-edit-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var apiId = this.dataset.apiId;
+            editMsg.textContent = '';
+            editId.value = apiId;
+            fetch('/workforce/sellers/api-configs/' + apiId + '/get/', { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) { alert(data.error || 'Failed to load'); return; }
+                    var a = data.api;
+                    editTypeSel.value = a.api_type || 'custom';
+                    Object.keys(fields).forEach(function(k) {
+                        if (fields[k]) fields[k].value = a[k] || '';
+                    });
+                    defaultChk.checked = !!a.is_default;
+                    applyTypeVisibility();
+                    openModal(editModal);
+                })
+                .catch(function() { alert('Network error loading API config'); });
+        });
+    });
+
+    document.getElementById('sldApiEditClose').addEventListener('click', function() { closeModal(editModal); });
+    document.getElementById('sldApiEditCancel').addEventListener('click', function() { closeModal(editModal); });
+    editModal.addEventListener('click', function(e) { if (e.target === editModal) closeModal(editModal); });
+
+    editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var apiId = editId.value;
+        var fd = new FormData(editForm);
+        if (!defaultChk.checked) fd.set('is_default', '0');
+        editSaveBtn.disabled = true;
+        editSaveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving';
+        editMsg.textContent = '';
+        fetch('/workforce/sellers/api-configs/' + apiId + '/update/', {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-CSRFToken': csrf },
+            credentials: 'same-origin'
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                editMsg.innerHTML = '<span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>Saved</span>';
+                setTimeout(function() { location.reload(); }, 700);
+            } else {
+                editMsg.innerHTML = '<span class="text-danger">' + (data.error || 'Save failed') + '</span>';
+                editSaveBtn.disabled = false;
+                editSaveBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save';
+            }
+        })
+        .catch(function() {
+            editMsg.innerHTML = '<span class="text-danger">Network error</span>';
+            editSaveBtn.disabled = false;
+            editSaveBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save';
+        });
+    });
+
+    function runTest(apiId) {
+        testBody.innerHTML = '<div class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin fa-2x mb-2"></i><div>Testing connection…</div></div>';
+        openModal(testModal);
+        fetch('/workforce/sellers/api-configs/' + apiId + '/test/result/', {
+            credentials: 'same-origin',
+            headers: { 'HX-Request': 'true' }
+        })
+        .then(function(r) { return r.text(); })
+        .then(function(html) { testBody.innerHTML = html; })
+        .catch(function() {
+            testBody.innerHTML = '<div class="alert alert-danger mb-0"><i class="fa-solid fa-circle-exclamation me-1"></i>Failed to run test.</div>';
+        });
+    }
+
+    document.querySelectorAll('.sld-api-test-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { runTest(this.dataset.apiId); });
+    });
+    editTestBtn.addEventListener('click', function() {
+        var apiId = editId.value;
+        if (apiId) runTest(apiId);
+    });
+
+    document.getElementById('sldApiTestClose').addEventListener('click', function() { closeModal(testModal); });
+    document.getElementById('sldApiTestCloseBtn').addEventListener('click', function() { closeModal(testModal); });
+    testModal.addEventListener('click', function(e) { if (e.target === testModal) closeModal(testModal); });
+
+    document.querySelectorAll('.sld-api-approve-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var apiId = this.dataset.apiId;
+            var el = this;
+            el.disabled = true;
+            var orig = el.innerHTML;
+            el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            fetch('/workforce/sellers/api-configs/' + apiId + '/approve/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'csrfmiddlewaretoken=' + encodeURIComponent(csrf),
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var approved = data.is_approved;
+                    var badge = document.getElementById('sld-api-status-' + apiId);
+                    if (badge) {
+                        badge.className = 'sld__badge sld__api-status-badge ' + (approved ? 'sld__badge--success' : 'sld__badge--warning');
+                        badge.textContent = approved ? 'Verified' : 'Pending';
+                    }
+                    el.className = 'btn btn-sm sld-api-approve-btn ' + (approved ? 'btn-outline-warning' : 'btn-outline-success');
+                    el.innerHTML = '<i class="fa-solid ' + (approved ? 'fa-ban' : 'fa-circle-check') + '"></i>';
+                    el.title = approved ? 'Revoke' : 'Approve';
+                } else {
+                    el.innerHTML = orig;
+                    alert(data.error || 'Failed');
+                }
+            })
+            .catch(function() { el.innerHTML = orig; alert('Network error'); })
+            .finally(function() { el.disabled = false; });
+        });
+    });
+
+    document.querySelectorAll('.sld-api-delete-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var apiId = this.dataset.apiId;
+            if (!confirm('Delete this API integration? This cannot be undone.')) return;
+            var el = this;
+            el.disabled = true;
+            fetch('/workforce/sellers/api-configs/' + apiId + '/delete/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'csrfmiddlewaretoken=' + encodeURIComponent(csrf),
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var row = document.getElementById('sld-api-row-' + apiId);
+                    if (row) row.remove();
+                } else {
+                    alert(data.error || 'Failed');
+                    el.disabled = false;
+                }
+            })
+            .catch(function() { alert('Network error'); el.disabled = false; });
+        });
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            if (editModal.classList.contains('show')) closeModal(editModal);
+            if (testModal.classList.contains('show')) closeModal(testModal);
+        }
+    });
+})();
 </script>
 {% endblock extra_js %}

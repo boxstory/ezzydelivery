@@ -2,7 +2,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260423c">
 {% endblock extra_css %}
 
 {% block content %}
@@ -155,33 +155,17 @@
         <i class="fas fa-boxes-stacked me-1"></i> Products <span class="badge bg-secondary fw-normal ms-1" id="mobile_product_badge">Optional</span>
       </div>
       <div id="mobile_product_rows" class="mt-2">
-        <div class="oap__inline-row oap__inline-row--mobile" data-row-index="0">
-          <div class="oap__inline-row-header">
-            <span class="oap__inline-row-num">Product #1</span>
-            <button type="button" class="oap__inline-remove mobile-product-remove" title="Remove"><i class="fas fa-times"></i></button>
-          </div>
-          <select name="inline_product_id[]" class="pwa-form-group__input mobile-product-sel mb-2">
-            <option value="">Search products…</option>
-          </select>
-          <div class="d-flex gap-2 mb-1">
-            <div class="flex-fill">
-              <label class="form-label form-label-sm mb-1">Qty</label>
-              <input type="number" name="inline_quantity[]" class="form-control form-control-sm mobile-product-qty" value="1" min="1">
-            </div>
-            <div class="flex-fill">
-              <label class="form-label form-label-sm mb-1">Price <span class="text-muted fw-normal">QAR</span></label>
-              <input type="number" name="inline_unit_price[]" class="form-control form-control-sm mobile-product-price" step="0.01" min="0" placeholder="Auto">
-            </div>
-            <div style="width:72px;">
-              <label class="form-label form-label-sm mb-1">Total</label>
-              <div class="oap__inline-line-total mobile-product-line-total">0.00</div>
-            </div>
-          </div>
-          <input type="hidden" name="inline_notes[]" value="">
-        </div>
+        {% include "orders/parts/_mobile_product_row.html" with row_index=0 %}
       </div>
       <div class="oap__inline-add-area mt-1">
-        <button type="button" class="oap__inline-add-btn w-100 justify-content-center" id="mobile_add_product_row">
+        <button type="button"
+                class="oap__inline-add-btn w-100 justify-content-center"
+                id="mobile_add_product_row"
+                hx-get="{% url 'orders:mobile_product_row_partial' %}"
+                hx-trigger="click"
+                hx-target="#mobile_product_rows"
+                hx-swap="beforeend"
+                hx-vals="js:{index: document.querySelectorAll('#mobile_product_rows .oap__inline-row--mobile').length}">
           <i class="fas fa-plus"></i> Add Product
         </button>
       </div>
@@ -1390,37 +1374,6 @@ $(document).ready(function () {
   const mobileTotalDisplay = document.getElementById('mobile_product_total_display');
   let mobileRowCount = 0;
 
-  function buildMobileRow(idx) {
-    const div = document.createElement('div');
-    div.className = 'oap__inline-row oap__inline-row--mobile';
-    div.dataset.rowIndex = idx;
-    div.innerHTML = `
-      <div class="oap__inline-row-header">
-        <span class="oap__inline-row-num">Product #${idx + 1}</span>
-        <button type="button" class="oap__inline-remove mobile-product-remove" title="Remove"><i class="fas fa-times"></i></button>
-      </div>
-      <select name="inline_product_id[]" class="pwa-form-group__input mobile-product-sel mb-2">
-        <option value="">Search products…</option>
-      </select>
-      <div class="d-flex gap-2 mb-1">
-        <div class="flex-fill">
-          <label class="form-label form-label-sm mb-1">Qty</label>
-          <input type="number" name="inline_quantity[]" class="form-control form-control-sm mobile-product-qty" value="1" min="1">
-        </div>
-        <div class="flex-fill">
-          <label class="form-label form-label-sm mb-1">Price <span class="text-muted fw-normal">QAR</span></label>
-          <input type="number" name="inline_unit_price[]" class="form-control form-control-sm mobile-product-price" step="0.01" min="0" placeholder="Auto">
-        </div>
-        <div style="width:72px;">
-          <label class="form-label form-label-sm mb-1">Total</label>
-          <div class="oap__inline-line-total mobile-product-line-total">0.00</div>
-        </div>
-      </div>
-      <input type="hidden" name="inline_notes[]" value="">
-    `;
-    return div;
-  }
-
   function recalcMobileRow(row) {
     const qty = parseFloat(row.querySelector('.mobile-product-qty').value) || 0;
     const price = parseFloat(row.querySelector('.mobile-product-price').value) || 0;
@@ -1497,15 +1450,23 @@ $(document).ready(function () {
     });
   }
 
-  function addMobileRow() {
-    const row = buildMobileRow(mobileRowCount++);
-    mobileContainer.appendChild(row);
-    initMobileSelect2(row.querySelector('.mobile-product-sel'));
-    updateMobileBadge();
+  // Rows are now added via HTMX. Initialise Select2 on any newly-swapped row
+  // and keep the badge in sync.
+  if (mobileContainer) {
+    mobileContainer.addEventListener('htmx:afterSwap', function(evt) {
+      const newRow = evt.detail.elt && evt.detail.elt.id === 'mobile_product_rows'
+        ? mobileContainer.querySelector('.oap__inline-row--mobile:last-child')
+        : null;
+      if (newRow) {
+        const sel = newRow.querySelector('.mobile-product-sel');
+        if (sel && !sel.classList.contains('select2-hidden-accessible')) {
+          initMobileSelect2(sel);
+        }
+        mobileRowCount++;
+      }
+      updateMobileBadge();
+    });
   }
-
-  const mobileAddBtn = document.getElementById('mobile_add_product_row');
-  if (mobileAddBtn) mobileAddBtn.addEventListener('click', addMobileRow);
 
   // Init Select2 on server-rendered mobile row(s)
   if (mobileContainer) {

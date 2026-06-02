@@ -401,7 +401,17 @@ function sortTable(field) {
     url.searchParams.set('sort', field);
     url.searchParams.set('order', currentSort.direction);
 
-    if (typeof htmx !== 'undefined') {
+    // Reset to page 1 so the sort applies across the full dataset, not the
+    // current page slice — otherwise the user sees the same rows reshuffled.
+    url.searchParams.delete('page');
+
+    // Push the new URL so refreshSortIconsFromUrl() can re-read it after swap,
+    // and so back/forward navigation keeps the sort.
+    if (typeof history !== 'undefined' && history.pushState) {
+        history.pushState({}, '', url.toString());
+    }
+
+    if (typeof htmx !== 'undefined' && document.getElementById('main-content')) {
         htmx.ajax('GET', url.toString(), {
             target: '#main-content',
             select: '#main-content',
@@ -409,6 +419,7 @@ function sortTable(field) {
         });
     } else {
         window.location.href = url.toString();
+        return;
     }
 
     updateSortIcons(field, currentSort.direction);
@@ -427,16 +438,28 @@ function updateSortIcons(activeField, direction) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function refreshSortIconsFromUrl() {
     var url = new URL(window.location.href);
     var sortField = url.searchParams.get('sort');
-    var sortOrder = url.searchParams.get('order') || 'asc';
-
-    if (sortField) {
-        currentSort = { field: sortField, direction: sortOrder };
-        updateSortIcons(sortField, sortOrder);
+    var sortOrder = url.searchParams.get('order');
+    if (!sortField) {
+        // Fall back to the page's declared default sort (e.g. dl_list_all
+        // defaults to updated desc) so the indicator matches the data.
+        var wrapper = document.getElementById('tasksTableContainer');
+        if (wrapper && wrapper.dataset.defaultSort) {
+            sortField = wrapper.dataset.defaultSort;
+            sortOrder = wrapper.dataset.defaultOrder || 'asc';
+        }
     }
-});
+    if (sortField) {
+        currentSort = { field: sortField, direction: sortOrder || 'asc' };
+        updateSortIcons(sortField, currentSort.direction);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', refreshSortIconsFromUrl);
+// htmx swaps the table without firing DOMContentLoaded, so re-apply icons after each swap
+document.body.addEventListener('htmx:afterSwap', refreshSortIconsFromUrl);
 
 // ============================================
 // TASK ACTION FUNCTIONS

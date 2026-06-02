@@ -4,7 +4,7 @@
 {% block title %}Mapping Manager — Import Wizard{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/mapping_manager.css' %}?v=20260331a">
+<link rel="stylesheet" href="{% static 'workforce/css/mapping_manager.css' %}?v=20260429a">
 {% endblock %}
 
 {% block content %}
@@ -90,6 +90,16 @@
             <span class="mmap__stat-value mmap__stat-value--accent" id="mmap_stat_req">0/0 req</span>
         </div>
         <div class="mmap__stat-actions">
+            <!-- Google Sheet tab picker (only visible on the google_sheet platform) -->
+            <span id="mmap_sheet_tab_wrap" class="d-none align-items-center gap-2">
+                <label class="text-muted small mb-0" for="mmap_sheet_tab_select">
+                    <i class="fa-solid fa-table fa-sm"></i> Sheet:
+                </label>
+                <select id="mmap_sheet_tab_select" class="form-select form-select-sm mmap__sheet-tab-select"
+                        onchange="onSheetTabChange()">
+                    <option value="">— loading… —</option>
+                </select>
+            </span>
             <!-- Header source buttons (OneDrive / Google Sheet / CSV) -->
             <span id="mmap_header_actions" class="d-none d-inline-flex gap-2">
                 <button class="mmap__btn mmap__btn--outline" id="mmap_fetch_btn" onclick="fetchSourceHeaders()" title="Fetch headers from connected source">
@@ -329,6 +339,14 @@ function switchPlatform(key) {
     // Hide fetch btn for csv (no connected source)
     const fetchBtn = document.getElementById('mmap_fetch_btn');
     if (fetchBtn) fetchBtn.style.display = key === 'csv' ? 'none' : '';
+    // Sheet-tab picker is Google Sheet only
+    const tabWrap = document.getElementById('mmap_sheet_tab_wrap');
+    if (tabWrap) {
+        const isGS = (key === 'google_sheet');
+        tabWrap.classList.toggle('d-none', !isGS);
+        tabWrap.classList.toggle('d-inline-flex', isGS);
+        if (isGS) loadGoogleSheetWorksheets();
+    }
     // Headers are pre-loaded from server — "Fetch Headers" is manual only
 }
 
@@ -593,6 +611,67 @@ function autoDetectAll() {
     }
 }
 
+// ── Google Sheet: load worksheet list + handle tab change ────
+function loadGoogleSheetWorksheets() {
+    const sel = document.getElementById('mmap_sheet_tab_select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— loading… —</option>';
+    sel.disabled = true;
+    let url = '{% url "workforce:wf_sheet_worksheets" %}?business_id=' + encodeURIComponent(BIZ_ID);
+    const srcId = selectedSources.google_sheet;
+    if (srcId) url += '&source_id=' + encodeURIComponent(srcId);
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            sel.disabled = false;
+            if (!data.success) {
+                sel.innerHTML = '<option value="">— ' + escHtml(data.error || 'failed to load') + ' —</option>';
+                return;
+            }
+            const ws = data.worksheets || [];
+            const cur = data.current_gid;
+            sel.innerHTML = ws.map(w =>
+                `<option value="${w.gid}" data-title="${escAttr(w.title)}" ${w.gid == cur ? 'selected' : ''}>${escHtml(w.title)}${w.rows ? ` (${w.rows} rows)` : ''}</option>`
+            ).join('') || '<option value="">— no tabs found —</option>';
+        })
+        .catch(e => {
+            sel.disabled = false;
+            sel.innerHTML = '<option value="">— ' + escHtml(e.message) + ' —</option>';
+        });
+}
+
+function onSheetTabChange() {
+    const sel = document.getElementById('mmap_sheet_tab_select');
+    if (!sel || !sel.value) return;
+    const gid = sel.value;
+    const opt = sel.options[sel.selectedIndex];
+    const title = opt ? (opt.dataset.title || opt.text) : '';
+    showToast('Saving sheet selection…', 'info');
+    const fd = new FormData();
+    fd.append('business_id', BIZ_ID);
+    fd.append('gid', gid);
+    fd.append('title', title);
+    const srcId = selectedSources.google_sheet;
+    if (srcId) fd.append('source_id', srcId);
+    fetch('{% url "workforce:wf_sheet_save_tab" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        body: fd,
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                showToast('Save failed: ' + (data.error || 'Unknown'), 'error');
+                return;
+            }
+            showToast('Sheet "' + title + '" selected — refreshing headers…', 'info');
+            // Drop existing platform mapping (different sheet => different columns)
+            allMappings.google_sheet = {};
+            fetchSourceHeaders();
+        })
+        .catch(e => showToast('Save error: ' + e.message, 'error'));
+}
+
 // ── Fetch Headers from connected source ──────────────────
 function fetchSourceHeaders() {
     const platform = PLATFORMS.find(p => p.key === activePlatform);
@@ -676,6 +755,8 @@ function switchSource(platformKey, sourceId) {
     // Fetch headers for the new source and reload panel
     const platform = PLATFORMS.find(p => p.key === platformKey);
     if (!platform) return;
+    // Different Google Sheet => different worksheet list
+    if (platformKey === 'google_sheet') loadGoogleSheetWorksheets();
     showToast('Loading headers for selected source...', 'info');
     let url = '{% url "workforce:wf_source_headers" %}?business_id=' + encodeURIComponent(BIZ_ID) + '&platform=' + encodeURIComponent(platformKey) + '&source_id=' + encodeURIComponent(sourceId);
     fetch(url)

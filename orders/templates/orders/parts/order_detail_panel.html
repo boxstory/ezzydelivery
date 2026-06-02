@@ -200,13 +200,24 @@
     <div class="small text-muted fw-semibold text-uppercase mb-1" style="letter-spacing:0.04em;font-size:0.6rem;">Product Items ({{ order_items|length }})</div>
     <div class="odp__items">
       {% for item in order_items %}
+      {% with stock=item.stock_info %}
       <div class="odp__item">
         <div class="odp__item-info">
           <span class="odp__item-name">{{ item.product|default:item.notes|truncatechars:40 }}</span>
           <span class="odp__item-qty">x{{ item.quantity }}</span>
+          {% if stock.status == 'out_of_stock' %}
+          <span class="oal__stock-badge oal__stock-badge--oos" title="Out of stock — 0 available">
+            <i class="fa-solid fa-triangle-exclamation"></i> Out of Stock · {{ stock.available }}
+          </span>
+          {% elif stock.status == 'low_stock' %}
+          <span class="oal__stock-badge oal__stock-badge--low" title="Only {{ stock.available }} available, ordered {{ item.quantity }}">
+            <i class="fa-solid fa-box-open"></i> Low Stock · {{ stock.available }}
+          </span>
+          {% endif %}
         </div>
         <span class="odp__item-price">{{ item.total_price|default:"0.00" }} QR</span>
       </div>
+      {% endwith %}
       {% endfor %}
     </div>
     {% endif %}
@@ -218,43 +229,41 @@
   <div class="odp__section">
     <div class="odp__section-head">
       <i class="fa-solid fa-truck-fast"></i>
-      <span>Delivery</span>
+      <span>Delivery Task</span>
     </div>
     <div class="odp__delivery">
-      <div class="odp__dl-status-row">
-        <span class="ob__ ob__--dl-{{ delivery_task.dl_task_status }}">
-          <i class="fa-solid {% if delivery_task.dl_task_status == 'delivered' %}fa-check{% elif delivery_task.dl_task_status == 'assigned' %}fa-user{% elif delivery_task.dl_task_status == 'accepted' %}fa-user-check{% elif delivery_task.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery_task.dl_task_status == 'out_for_delivery' or delivery_task.dl_task_status == 'in_transit' or delivery_task.dl_task_status == 'start_ride' %}fa-truck{% elif delivery_task.dl_task_status == 'failed' or delivery_task.dl_task_status == 'non_reachable' %}fa-times{% elif delivery_task.dl_task_status == 'cancelled' or delivery_task.dl_task_status == 'rejected' %}fa-ban{% else %}fa-clock{% endif %}"></i>
-          {{ delivery_task.get_dl_task_status_display }}
-        </span>
+      <!-- Line 1: task code -->
+      <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
         {% if delivery_task.dl_task_number %}
-        <span class="odp__dl-task-num">{{ delivery_task.dl_task_number }}</span>
+        <span class="odp__dl-task-num"><i class="fa-solid fa-hashtag"></i> {{ delivery_task.dl_task_number }}</span>
         {% endif %}
       </div>
-      {% if delivery_task.driver %}
-      <div class="odp__dl-driver">
-        <div class="odp__dl-driver-avatar">
-          <i class="fa-solid fa-user-helmet-safety"></i>
-        </div>
-        <div class="odp__dl-driver-info">
-          <span class="odp__dl-driver-name">{{ delivery_task.driver }}</span>
-          {% if delivery_task.driver.driver_phone %}
-          <a href="tel:{{ delivery_task.driver.driver_phone }}" class="odp__dl-driver-phone">
-            <i class="fa-solid fa-phone"></i> {{ delivery_task.driver.driver_phone }}
-          </a>
-          {% endif %}
-        </div>
+      <!-- Line 2: status + date/time as two separate items -->
+      <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+        <span class="odp__dl-completed odp__dl-completed--{{ delivery_task.dl_task_status }}">
+          <i class="fa-regular {% if delivery_task.dl_task_status == 'delivered' %}fa-circle-check{% elif delivery_task.dl_task_status == 'failed' or delivery_task.dl_task_status == 'rejected' %}fa-circle-xmark{% elif delivery_task.dl_task_status == 'cancelled' %}fa-ban{% else %}fa-clock{% endif %}"></i>
+          {{ delivery_task.get_dl_task_status_display }}
+        </span>
+        {% if delivery_task.completed_at %}
+        <span class="odp__dl-time"><i class="fa-regular fa-clock"></i> {{ delivery_task.completed_at|date:"d M Y, H:i" }}</span>
+        {% endif %}
+      </div>
+      <!-- Line 3: failure reason -->
+      {% if delivery_task.failure_reason or delivery_task.failure_notes or fail_notes %}
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <span class="odp__dl-reason"><i class="fa-solid fa-circle-exclamation"></i>
+          {% if delivery_task.failure_reason %}{{ delivery_task.get_failure_reason_display }}{% if delivery_task.failure_notes %} — {{ delivery_task.failure_notes }}{% endif %}
+          {% elif delivery_task.failure_notes %}{{ delivery_task.failure_notes }}
+          {% else %}{{ fail_notes }}{% endif %}
+        </span>
       </div>
       {% endif %}
-      {% if delivery_task.completed_at %}
-      <div class="odp__dl-completed">
-        <i class="fa-regular fa-circle-check"></i>
-        Delivered {{ delivery_task.completed_at|date:"d M Y, H:i" }}
-      </div>
-      {% endif %}
-      {% if delivery_task.dl_task_description %}
-      <div class="odp__dl-notes">
-        <i class="fa-solid fa-note-sticky"></i>
-        {{ delivery_task.dl_task_description }}
+      <!-- Line 4: Reconfirm action (after reason) -->
+      {% if can_edit_order and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+      <div class="d-flex align-items-center flex-wrap gap-2 mt-2">
+        <button type="button" class="odp__reconfirm-btn" data-reconfirm-order-id="{{ order.id }}">
+          <i class="fas fa-check-double"></i> Reconfirm
+        </button>
       </div>
       {% endif %}
     </div>
@@ -282,6 +291,11 @@
     <div class="odp__notes">{{ order.verification_notes }}</div>
   </div>
   {% endif %}
+
+  <!-- Timeline -->
+  <div class="odp__section odp__section--timeline">
+    {% include "orders/parts/order_timeline.html" %}
+  </div>
 
   <!-- Action Buttons -->
   <div class="odp__actions">

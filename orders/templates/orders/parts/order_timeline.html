@@ -93,11 +93,6 @@
           </div>
           <div class="odt__timeline__desc">
             Assigned to: <strong>{{ delivery_task.driver.user.get_full_name|default:delivery_task.driver.driver_code }}</strong>
-            {% if delivery_task.driver.driver_phone %}
-            <span class="odt__timeline__phone">
-              <i class="fa-solid fa-phone"></i> {{ delivery_task.driver.driver_phone }}
-            </span>
-            {% endif %}
           </div>
         </div>
       </div>
@@ -158,6 +153,62 @@
         </div>
       </div>
       {% endif %}
+
+      <!-- Delivery Failed -->
+      {% if delivery_task and delivery_task.dl_task_status == 'failed' or delivery_task.failure_reason or fail_notes %}
+      <div class="odt__timeline__item odt__timeline__item--danger">
+        <div class="odt__timeline__dot odt__timeline__dot--danger">
+          <i class="fa-solid fa-circle-exclamation"></i>
+        </div>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Delivery Failed</span>
+            {% if delivery_task.completed_at %}
+            <span class="odt__timeline__time">{{ delivery_task.completed_at|date:"d M Y, H:i" }}</span>
+            {% endif %}
+          </div>
+          <div class="odt__timeline__desc">
+            {% if delivery_task.failure_reason %}
+            <strong>Reason:</strong> {{ delivery_task.get_failure_reason_display }}
+            {% elif fail_notes %}
+            <strong>Reason:</strong> {{ fail_notes }}
+            {% endif %}
+            {% if delivery_task.failure_notes %}
+            <div class="odt__timeline__note">{{ delivery_task.failure_notes }}</div>
+            {% elif delivery_task.failure_reason and fail_notes %}
+            <div class="odt__timeline__note">{{ fail_notes }}</div>
+            {% endif %}
+            {% if delivery_task.failed_attempt_count %}
+            <div class="odt__timeline__note">Attempt #{{ delivery_task.failed_attempt_count }}</div>
+            {% endif %}
+            {% if delivery_task.reschedule_date %}
+            <div class="odt__timeline__note">
+              <i class="fa-solid fa-calendar-days"></i> Rescheduled for {{ delivery_task.reschedule_date|date:"d M Y" }}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Reconfirmed (after a failed delivery) -->
+      {% for ev in reconfirm_events %}
+      <div class="odt__timeline__item odt__timeline__item--done">
+        <div class="odt__timeline__dot">
+          <i class="fa-solid fa-check-double"></i>
+        </div>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Reconfirmed</span>
+            <span class="odt__timeline__time">{{ ev.created_at|date:"d M Y, H:i" }}</span>
+          </div>
+          <div class="odt__timeline__desc">
+            Order reconfirmed{% if ev.by %} by <strong>{{ ev.by }}</strong>{% endif %} — moved back to Ready to Pickup for re-dispatch.
+            {% if ev.note %}<div class="odt__timeline__note">{{ ev.note }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
 
       <!-- Cancelled -->
       {% if order.order_status == 'cancelled' %}

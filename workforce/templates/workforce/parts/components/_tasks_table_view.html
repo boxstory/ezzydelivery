@@ -9,7 +9,7 @@ Each task should have select_related: order, driver, business, pickup_location, 
 {% endcomment %}
 
 {% load custom_filters %}
-<div class="dl-table-wrapper" id="tasksTableContainer">
+<div class="dl-table-wrapper" id="tasksTableContainer" data-default-sort="{{ default_sort|default:'' }}" data-default-order="{{ default_order|default:'asc' }}">
     <!-- Bulk Actions Bar -->
     <div class="dl-bulk-bar" id="bulkActionsBar" style="display: none;">
         <div class="dl-bulk-bar__inner">
@@ -78,15 +78,35 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <th class="dl-table__th-check">
                         <input type="checkbox" class="form-check-input" id="selectAllTasks" onchange="toggleSelectAll(this)">
                     </th>
-                    <th class="dl-table__th-id sortable" data-sort="task_number" onclick="sortTable('task_number')">
-                        Task / Order <i class="fa-solid fa-sort sort-icon"></i>
+                    <th class="dl-table__th-id">
+                        <div class="dl-table__th-dual">
+                            <span class="dl-table__th-dual-item sortable" data-sort="business" onclick="sortTable('business')">
+                                Seller <i class="fa-solid fa-sort sort-icon"></i>
+                            </span>
+                            <span class="dl-table__th-dual-item sortable" data-sort="task_number" onclick="sortTable('task_number')">
+                                Task <i class="fa-solid fa-sort sort-icon"></i>
+                            </span>
+                            <span class="dl-table__th-dual-item sortable" data-sort="order" onclick="sortTable('order')">
+                                Order <i class="fa-solid fa-sort sort-icon"></i>
+                            </span>
+                        </div>
                     </th>
+                    {% if show_updated_at %}
+                    <th class="dl-table__th-date">
+                        <div class="dl-table__th-dual">
+                            <span class="dl-table__th-dual-item sortable" data-sort="date" onclick="sortTable('date')">
+                                Date <i class="fa-solid fa-sort sort-icon"></i>
+                            </span>
+                            <span class="dl-table__th-dual-item sortable" data-sort="updated" onclick="sortTable('updated')">
+                                Updated <i class="fa-solid fa-sort sort-icon"></i>
+                            </span>
+                        </div>
+                    </th>
+                    {% else %}
                     <th class="dl-table__th-date sortable" data-sort="date" onclick="sortTable('date')">
                         Date <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
-                    <th class="dl-table__th-seller sortable" data-sort="business" onclick="sortTable('business')">
-                        Seller <i class="fa-solid fa-sort sort-icon"></i>
-                    </th>
+                    {% endif %}
                     <th class="dl-table__th-customer sortable" data-sort="customer" onclick="sortTable('customer')">
                         Customer <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
@@ -97,6 +117,9 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <th class="dl-table__th-status sortable" data-sort="status" onclick="sortTable('status')">
                         DL Status <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
+                    {% if show_failure_reason %}
+                    <th class="dl-table__th-fail-reason">Fail Reason</th>
+                    {% endif %}
                     <th class="dl-table__th-driver sortable" data-sort="driver" onclick="sortTable('driver')">
                         Driver <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
@@ -109,20 +132,27 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <td class="dl-table__td-check" onclick="event.stopPropagation();">
                         <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
                     </td>
-                    <!-- Task # + Order # stacked -->
+                    <!-- Seller + Task # + Order # stacked -->
                     <td class="dl-table__td-id">
                         <div class="dl-table__id-stack">
+                            <span class="dl-table__seller-name" title="{{ dl.order.business.business_name }}">{{ dl.order.business.business_name|default:"—"|truncatechars:18 }}</span>
                             <span class="dl-table__task-num">{{ dl.dl_task_number|default:"—" }}</span>
                             <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"—"|truncatechars:14 }}</span>
                         </div>
                     </td>
-                    <!-- Date -->
+                    <!-- Date / Updated -->
                     <td class="dl-table__td-date">
-                        {{ dl.dl_task_date|date:"d M"|default:"—" }}
-                    </td>
-                    <!-- Seller -->
-                    <td class="dl-table__td-seller" title="{{ dl.order.business.business_name }}">
-                        {{ dl.order.business.business_name|default:"—"|truncatechars:16 }}
+                        <div class="dl-table__date-stack">
+                            <span class="dl-table__date-main">{{ dl.dl_task_date|date:"d M"|default:"—" }}</span>
+                            {% if show_updated_at %}
+                            <span class="dl-table__date-updated" title="Last updated: {{ dl.updated_at|date:'d M Y, H:i' }}">
+                                <i class="fa-regular fa-clock me-1"></i>{{ dl.updated_at|date:"d M, H:i" }}
+                            </span>
+                            <span class="dl-table__date-ago" title="{{ dl.updated_at|date:'d M Y, H:i' }}">
+                                {{ dl.updated_at|short_timesince }} ago
+                            </span>
+                            {% endif %}
+                        </div>
                     </td>
                     <!-- Customer (name + phone stacked) -->
                     <td class="dl-table__td-customer">
@@ -224,6 +254,47 @@ Each task should have select_related: order, driver, business, pickup_location, 
                             </div>
                         </div>
                     </td>
+                    {% if show_failure_reason %}
+                    <!-- Fail Reason -->
+                    <td class="dl-table__td-fail-reason">
+                        {% if dl.latest_failed_history.notes or dl.failure_reason %}
+                        <div class="dl-table__fail-stack d-flex flex-column">
+                            <div class="dl-table__fail-main d-flex flex-wrap align-items-center gap-1">
+                                {% if dl.failure_reason %}
+                                <span class="dl-badge dl-badge--failed" title="{{ dl.failure_notes|default:'' }}">
+                                    {{ dl.get_failure_reason_display }}
+                                </span>
+                                {% endif %}
+                                {% if dl.latest_failed_history.notes %}
+                                <span class="dl-table__fail-notes" title="{{ dl.latest_failed_history.notes }}">
+                                    {{ dl.latest_failed_history.notes|truncatechars:60 }}
+                                </span>
+                                {% elif dl.failure_notes %}
+                                <span class="dl-table__fail-notes" title="{{ dl.failure_notes }}">
+                                    {{ dl.failure_notes|truncatechars:60 }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% if dl.latest_failed_history.created_at or dl.failed_attempt_count %}
+                            <div class="dl-table__fail-meta d-flex flex-wrap gap-2 text-muted small mt-1">
+                                {% if dl.latest_failed_history.created_at %}
+                                <span class="dl-table__fail-date">
+                                    <i class="fa-regular fa-clock me-1"></i>{{ dl.latest_failed_history.created_at|date:"d M, H:i" }}
+                                </span>
+                                {% endif %}
+                                {% if dl.failed_attempt_count %}
+                                <span class="dl-table__fail-attempts">
+                                    <i class="fa-solid fa-rotate-right me-1"></i>Attempts: {{ dl.failed_attempt_count }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <span class="dl-table__driver-none">—</span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
                     <!-- Driver -->
                     <td class="dl-table__td-driver">
                         {% if dl.driver %}
@@ -258,7 +329,7 @@ Each task should have select_related: order, driver, business, pickup_location, 
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="10" class="dl-table__empty">
+                    <td colspan="{% if show_failure_reason %}10{% else %}9{% endif %}" class="dl-table__empty">
                         <i class="fa-solid fa-inbox me-2"></i>No tasks to display
                     </td>
                 </tr>

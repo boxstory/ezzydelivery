@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/live-map.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/live-map.css' %}?v=20260503-2" rel="stylesheet" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -214,7 +214,7 @@
             h += '</div>';
             // Full address — full width, wraps, last line
             h += '<div class="wf-popup__row wf-popup__row--wrap" style="margin-top:4px;padding-top:4px;border-top:1px solid #f3f4f6;"><i class="fa-solid fa-location-dot"></i><span>' + (escHtml(p.address) || addrLine(p)) + '</span></div>';
-            h += '<a href="/workforce/delivery-task/' + p.id + '/" class="wf-popup__link"><i class="fa-solid fa-eye me-1"></i>View Task</a>';
+            h += '<a href="/workforce/delivery-task/' + p.id + '/" target="_blank" rel="noopener" class="wf-popup__link"><i class="fa-solid fa-eye me-1"></i>View Task</a>';
             h += '</div>';
             return h;
         }
@@ -251,6 +251,24 @@
             if (chipEl) chipEl.textContent = filtered.length;
         }
 
+        function activeTasksList(d) {
+            var tasks = d.active_tasks || [];
+            if (!tasks.length) return '';
+            var h = '<div class="wf-dpopup__tasks">';
+            h += '<div class="wf-dpopup__tasks-title"><i class="fa-solid fa-list-check me-1"></i>' + tasks.length + ' active task' + (tasks.length > 1 ? 's' : '') + '</div>';
+            tasks.forEach(function(t) {
+                h += '<a href="/workforce/delivery-task/' + t.id + '/" target="_blank" rel="noopener" class="wf-dpopup__task">';
+                h += '<span class="wf-dpopup__task-num">#' + escHtml(t.task_number) + '</span>';
+                h += '<span class="wf-dpopup__task-badge wf-dpopup__task-badge--' + t.status + '">' + escHtml(t.status_display) + '</span>';
+                if (t.customer_name) {
+                    h += '<span class="wf-dpopup__task-cust">' + escHtml(t.customer_name) + '</span>';
+                }
+                h += '</a>';
+            });
+            h += '</div>';
+            return h;
+        }
+
         function driverPopup(d) {
             var noGps = !d.has_gps;
             var stale = d.has_gps && d.minutes_ago > 10;
@@ -259,9 +277,6 @@
             if (noGps) {
                 h += '<div class="wf-dpopup__meta wf-dpopup__meta--stale"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS pings received' + (d.updated ? ' — ' + d.updated : '') + '</div>';
                 h += '<div class="wf-dpopup__meta" style="color:#9ca3af;font-size:11px;"><i class="fa-solid fa-location-dot me-1"></i>Shown at task location (fallback)</div>';
-                if (d.last_status) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-circle-info me-1"></i>' + escHtml(d.last_status) + '</div>';
-                if (d.last_task_number) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-hashtag me-1"></i>Task #' + escHtml(d.last_task_number) + '</div>';
-                if (d.task_count) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-list-check me-1"></i>' + d.task_count + ' active task' + (d.task_count > 1 ? 's' : '') + '</div>';
                 if (d.updated) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-clock me-1"></i>Updated ' + d.updated + '</div>';
             } else {
                 h += '<div class="wf-dpopup__meta' + (stale ? ' wf-dpopup__meta--stale' : '') + '">';
@@ -270,14 +285,14 @@
                 else if (d.minutes_ago < 60) h += 'GPS: ' + d.minutes_ago + ' min ago';
                 else h += 'GPS: ' + Math.floor(d.minutes_ago / 60) + 'h ' + (d.minutes_ago % 60) + 'm ago';
                 h += '</div>';
-                if (d.task_count > 0) {
-                    h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-list-check me-1"></i>' + d.task_count + ' active task' + (d.task_count > 1 ? 's' : '') + '</div>';
-                } else {
-                    h += '<div class="wf-dpopup__meta" style="color:#10b981;"><i class="fa-solid fa-wifi me-1"></i>Online — no tasks</div>';
-                }
                 if (d.speed !== null && d.speed > 0) {
                     h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-gauge me-1"></i>' + Math.round(d.speed * 3.6) + ' km/h</div>';
                 }
+            }
+            if (d.active_tasks && d.active_tasks.length) {
+                h += activeTasksList(d);
+            } else {
+                h += '<div class="wf-dpopup__meta" style="color:#10b981;margin-top:4px;"><i class="fa-solid fa-wifi me-1"></i>No active tasks</div>';
             }
             h += '</div>';
             return h;
@@ -457,7 +472,7 @@
                     popupAnchor: [0, -14]
                 });
                 L.marker([d.lat, d.lng], { icon: icon, zIndexOffset: 1000 })
-                    .bindPopup(driverPopup(d), { maxWidth: 220 })
+                    .bindPopup(driverPopup(d), { maxWidth: 280 })
                     .addTo(driverLayerGroup);
                 bounds.extend([d.lat, d.lng]);
             });

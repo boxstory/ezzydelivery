@@ -184,11 +184,7 @@ def business_required(view_func=None, redirect_url=None):
                 messages.error(request, "Profile not found.")
                 return redirect(redirect_url or 'core:main_dashboard')
 
-            # Check if business owner
-            if profile.is_business:
-                return view_func(request, *args, **kwargs)
-
-            # Check if team member using business.decorators helper
+            # Resolve business access (owner or team member)
             from business.decorators import get_user_business_access
             business, access_type, team_profile = get_user_business_access(request.user, request)
 

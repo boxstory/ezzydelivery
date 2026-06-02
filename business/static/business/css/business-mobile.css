@@ -1195,6 +1195,25 @@ body.business-mobile {
   line-height: 1.3;
 }
 
+/* Failure reason pill */
+.pwa-order-card-full__fail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(220, 53, 69, 0.08);
+  color: #b02a37;
+  border: 1px solid rgba(220, 53, 69, 0.22);
+  margin: 0 0 6px auto;
+  width: fit-content;
+  max-width: 100%;
+  word-break: break-word;
+}
+
 /* Meta row: compact info items */
 .pwa-order-card-full__meta {
   display: flex;
@@ -1353,11 +1372,117 @@ body.business-mobile {
   background: #fef9c3;
 }
 
-.pwa-card-actions__btn--confirmed {
+.pwa-card-actions__btn--reconfirmed {
   color: #0d9488;
 }
-.pwa-card-actions__btn--confirmed:active {
+.pwa-card-actions__btn--reconfirmed:active {
   background: #f0fdfa;
+}
+
+/* Reconfirm comment modal */
+.reconfirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10500;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+.reconfirm-modal.is-open {
+  display: flex;
+}
+.reconfirm-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  animation: reconfirm-fade-in 0.18s ease;
+}
+.reconfirm-modal__sheet {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.15);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  animation: reconfirm-slide-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.reconfirm-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #f1f3f5;
+}
+.reconfirm-modal__title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--pwa-navy, #001f3f);
+}
+.reconfirm-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1rem;
+  color: #6c757d;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.reconfirm-modal__close:active {
+  background: #f1f3f5;
+}
+.reconfirm-modal__body {
+  padding: 0.9rem 1rem 0.5rem;
+}
+.reconfirm-modal__subtitle {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin: 0 0 0.5rem;
+}
+.reconfirm-modal__textarea {
+  border-radius: 10px;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+.reconfirm-modal__footer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+}
+.reconfirm-modal__btn {
+  flex: 1;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+}
+.reconfirm-modal__btn--submit {
+  background: #0d9488;
+  border-color: #0d9488;
+}
+.reconfirm-modal__btn--submit:hover,
+.reconfirm-modal__btn--submit:focus {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+@keyframes reconfirm-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes reconfirm-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (min-width: 576px) {
+  .reconfirm-modal {
+    align-items: center;
+  }
+  .reconfirm-modal__sheet {
+    border-radius: 16px;
+    margin: 1rem;
+  }
 }
 
 .pwa-card-actions__btn--publish {

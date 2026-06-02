@@ -35,6 +35,7 @@
                     <th class="text-center">OneDrive</th>
                     <th class="text-center">API</th>
                     <th class="text-center">Public Link</th>
+                    <th class="text-start">Default Mapping</th>
                     <th class="text-center">Temp Sync</th>
                 </tr>
             </thead>
@@ -81,6 +82,25 @@
                         {% else %}
                         <span class="text-muted">-</span>
                         {% endif %}
+                    </td>
+                    <td class="text-start">
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            {% if item.primary_default %}
+                            <span class="badge {{ item.primary_default.css }}" title="{{ item.primary_default.label }}">
+                                {{ item.primary_default.type }}{% if item.primary_default.label %}: {{ item.primary_default.label }}{% endif %}
+                            </span>
+                            {% if item.od_default and item.api_default %}
+                            <span class="badge bg-warning text-dark" title="API: {{ item.api_default }}">API: {{ item.api_default }}</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                            <a href="{% url 'workforce:wf_mapping_manager' %}?business={{ item.business.business_id }}"
+                               class="btn btn-outline-secondary btn-sm ms-1 py-0 px-1 small"
+                               title="Edit mapping for {{ item.business.business_name }}">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </a>
+                        </div>
                     </td>
                     <td class="text-center">
                         <div class="form-check form-switch d-flex justify-content-center mb-0">

@@ -355,13 +355,14 @@ def _geocode_address_from_qnas(zone, street, building, area_name=None):
     """
     Look up lat/lng for a Qatar address using QNAS API.
 
-    Geocoding priority:
-    1. zone + street + building -> exact building coordinates from QNAS
-    2. zone + street (no building) -> first available building on street from QNAS
-    3. zone only (no street) -> zone center from ZoneName model
-    4. area_name only -> resolve zone from ZoneName/ZoneArea, then use zone center
+    Geocoding priority (returned tier in parentheses):
+    1. zone + street + building -> exact building coordinates from QNAS ('exact')
+    2. zone + street (no building) -> first available building on street ('street')
+    3. zone only (no street) -> zone center from ZoneName model ('zone_center')
+    4. area_name only -> resolve zone, then use zone center ('zone_center')
 
-    Returns (latitude, longitude) as Decimals, or (None, None) on failure.
+    Returns (latitude, longitude, tier) — tier is one of the Order.COORDS_ACCURACY
+    keys ('exact', 'street', 'zone_center'), or (None, None, None) on failure.
     """
     import requests
     from decimal import Decimal
@@ -401,8 +402,8 @@ def _geocode_address_from_qnas(zone, street, building, area_name=None):
                                 if str(b.get("building_number", "")) == building_str:
                                     lat = Decimal(str(b["x"]))
                                     lng = Decimal(str(b["y"]))
-                                    logger.info(f"QNAS geocoded zone={zone_number}, street={street}, building={building} -> ({lat}, {lng})")
-                                    return lat, lng
+                                    logger.info(f"QNAS geocoded zone={zone_number}, street={street}, building={building} -> ({lat}, {lng}) [exact]")
+                                    return lat, lng, 'exact'
 
                         # Building missing or not found: use first available building on street
                         first = buildings_data[0]
@@ -410,8 +411,8 @@ def _geocode_address_from_qnas(zone, street, building, area_name=None):
                             lat = Decimal(str(first["x"]))
                             lng = Decimal(str(first["y"]))
                             src = "first building on street" if not building else f"building {building} not found, using nearest"
-                            logger.info(f"QNAS geocoded zone={zone_number}, street={street} ({src}) -> ({lat}, {lng})")
-                            return lat, lng
+                            logger.info(f"QNAS geocoded zone={zone_number}, street={street} ({src}) -> ({lat}, {lng}) [street]")
+                            return lat, lng, 'street'
                     else:
                         logger.info(f"QNAS returned no buildings for zone={zone_number}, street={street}")
                 else:
@@ -427,12 +428,12 @@ def _geocode_address_from_qnas(zone, street, building, area_name=None):
             if zone_obj.latitude and zone_obj.longitude:
                 lat = Decimal(str(zone_obj.latitude))
                 lng = Decimal(str(zone_obj.longitude))
-                logger.info(f"Geocoded from ZoneName center: zone={zone_number} -> ({lat}, {lng})")
-                return lat, lng
+                logger.info(f"Geocoded from ZoneName center: zone={zone_number} -> ({lat}, {lng}) [zone_center]")
+                return lat, lng, 'zone_center'
         except delivery_models.ZoneName.DoesNotExist:
             logger.info(f"Zone {zone_number} not found in ZoneName model")
 
-    return None, None
+    return None, None, None
 
 
 def _create_delivery_task_from_order(order):
@@ -534,7 +535,7 @@ def _create_delivery_task_from_order(order):
         # Auto-geocode via QNAS if no coords yet
         if not address_update.dl_latitude or address_update.dl_latitude == Decimal('0'):
             if order.dl_zone or order.dl_street or address_update.area_name:
-                lat, lng = _geocode_address_from_qnas(
+                lat, lng, tier = _geocode_address_from_qnas(
                     order.dl_zone, order.dl_street, order.dl_building,
                     area_name=address_update.area_name
                 )
@@ -542,6 +543,18 @@ def _create_delivery_task_from_order(order):
                     address_update.dl_latitude = lat
                     address_update.dl_longitude = lng
                     address_update.save(update_fields=['dl_latitude', 'dl_longitude'])
+                    order_dirty_fields = []
+                    if not order.latitude or order.latitude == Decimal('0'):
+                        order.latitude = lat
+                        order_dirty_fields.append('latitude')
+                    if not order.longitude or order.longitude == Decimal('0'):
+                        order.longitude = lng
+                        order_dirty_fields.append('longitude')
+                    if tier and order.coords_accuracy != tier:
+                        order.coords_accuracy = tier
+                        order_dirty_fields.append('coords_accuracy')
+                    if order_dirty_fields:
+                        order.save(update_fields=order_dirty_fields)
 
         # Map order_type → dl_speed
         order_type_to_speed = {
@@ -552,11 +565,16 @@ def _create_delivery_task_from_order(order):
         if order.scheduled_delivery:
             dl_speed = 'Same Day'
 
-        # Map coords_accuracy → address_accuracy
+        # Map Order.coords_accuracy → DeliveryTask.address_accuracy
+        # Keys must match Order.COORDS_ACCURACY choices (orders/models.py)
         coords_to_accuracy = {
-            'high': 'by_customer',
-            'medium': 'geocoded',
-            'low': 'geocoded',
+            'by_customer': 'by_customer',
+            'by_driver':   'by_driver',
+            'exact':       'geocoded',
+            'street':      'geocoded',
+            'landmark':    'geocoded',
+            'zone_center': 'geocoded',
+            'ai_estimate': 'geocoded',
         }
         address_accuracy = coords_to_accuracy.get(order.coords_accuracy or '', 'unverified')
 

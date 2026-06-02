@@ -5,7 +5,7 @@
 {% load custom_filters %}
 {% block head_title %}Order #{{ order.order_number }}{% endblock %}
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}?v=20260215c"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260423y"
         rel="stylesheet"
         type="text/css" />
   <link href="{% static 'orders/css/orders-wizard.css' %}"
@@ -206,41 +206,41 @@
     <div class="pwa-detail-section">
       <div class="pwa-detail-section__header">
         <i class="fas fa-truck"></i>
-        <span>Delivery</span>
+        <span>Delivery Task</span>
       </div>
       <div class="pwa-detail-section__body">
-        <div class="pwa-detail-row">
-          <span class="pwa-detail-row__label">Task #</span>
-          <span class="pwa-detail-row__value">{{ delivery_task.dl_task_number|default:"-" }}</span>
+        <!-- Line 1: task code -->
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+          {% if delivery_task.dl_task_number %}
+          <span class="odp__dl-task-num"><i class="fa-solid fa-hashtag"></i> {{ delivery_task.dl_task_number }}</span>
+          {% endif %}
         </div>
-        {% if delivery_task.driver %}
-        <div class="pwa-detail-row">
-          <span class="pwa-detail-row__label">Driver</span>
-          <span class="pwa-detail-row__value">{{ delivery_task.driver.user.get_full_name|default:delivery_task.driver.driver_code }}</span>
+        <!-- Line 2: status + date/time -->
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+          <span class="odp__dl-completed odp__dl-completed--{{ delivery_task.dl_task_status }}">
+            <i class="fa-regular {% if delivery_task.dl_task_status == 'delivered' %}fa-circle-check{% elif delivery_task.dl_task_status == 'failed' or delivery_task.dl_task_status == 'rejected' %}fa-circle-xmark{% elif delivery_task.dl_task_status == 'cancelled' %}fa-ban{% else %}fa-clock{% endif %}"></i>
+            {{ delivery_task.get_dl_task_status_display }}
+          </span>
+          {% if delivery_task.completed_at %}
+          <span class="odp__dl-time"><i class="fa-regular fa-clock"></i> {{ delivery_task.completed_at|date:"d M Y, H:i" }}</span>
+          {% endif %}
         </div>
-        {% if delivery_task.driver.driver_phone %}
-        <div class="pwa-detail-row">
-          <span class="pwa-detail-row__label">Driver Phone</span>
-          <a href="tel:{{ delivery_task.driver.driver_phone }}" class="pwa-detail-row__value pwa-detail-row__value--link" hx-boost="false">{{ delivery_task.driver.driver_phone }}</a>
-        </div>
-        {% endif %}
-        {% endif %}
-        <div class="pwa-detail-row">
-          <span class="pwa-detail-row__label">Speed</span>
-          <span class="pwa-detail-row__value">{{ delivery_task.dl_speed|default:"Normal" }}</span>
-        </div>
-        {% if delivery_task.cod_collected %}
-        <div class="pwa-detail-row">
-          <span class="pwa-detail-row__label">COD Collected</span>
-          <span class="pwa-detail-row__value pwa-detail-row__value--success">
-            <i class="fas fa-check-circle"></i> QAR {{ delivery_task.cod_collected_amount }}
+        <!-- Line 3: failure reason -->
+        {% if delivery_task.failure_reason or delivery_task.failure_notes or fail_notes %}
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <span class="odp__dl-reason"><i class="fa-solid fa-circle-exclamation"></i>
+            {% if delivery_task.failure_reason %}{{ delivery_task.get_failure_reason_display }}{% if delivery_task.failure_notes %} — {{ delivery_task.failure_notes }}{% endif %}
+            {% elif delivery_task.failure_notes %}{{ delivery_task.failure_notes }}
+            {% else %}{{ fail_notes }}{% endif %}
           </span>
         </div>
         {% endif %}
-        {% if delivery_task.completed_at %}
-        <div class="pwa-detail-row">
-          <span class="pwa-detail-row__label">Completed</span>
-          <span class="pwa-detail-row__value">{{ delivery_task.completed_at|date:"d M Y H:i" }}</span>
+        <!-- Line 4: Reconfirm action (after reason) -->
+        {% if can_edit_order and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+        <div class="d-flex align-items-center flex-wrap gap-2 mt-2">
+          <button type="button" class="odp__reconfirm-btn" data-reconfirm-order-id="{{ order.id }}">
+            <i class="fas fa-check-double"></i> Reconfirm
+          </button>
         </div>
         {% endif %}
       </div>
@@ -327,6 +327,11 @@
       </div>
     </div>
     {% endif %}
+
+    <!-- Timeline section -->
+    <div class="pwa-detail-section pwa-detail-section--timeline">
+      {% include "orders/parts/order_timeline.html" %}
+    </div>
 
     <!-- Bottom spacer for bottom nav -->
     <div class="pb-3"></div>
@@ -647,11 +652,24 @@
                   <span class="odt__items__head-price">Price</span>
                 </div>
                 {% for item in order_items %}
+                {% with stock=item.stock_info %}
                 <div class="odt__items__row">
-                  <span class="odt__items__name">{{ item.product|default:item.notes|default:"Item"|truncatechars:50 }}</span>
+                  <span class="odt__items__name">
+                    {{ item.product|default:item.notes|default:"Item"|truncatechars:50 }}
+                    {% if stock.status == 'out_of_stock' %}
+                    <span class="oal__stock-badge oal__stock-badge--oos ms-1" title="Out of stock — 0 available">
+                      <i class="fa-solid fa-triangle-exclamation"></i> Out of Stock · {{ stock.available }}
+                    </span>
+                    {% elif stock.status == 'low_stock' %}
+                    <span class="oal__stock-badge oal__stock-badge--low ms-1" title="Only {{ stock.available }} available, ordered {{ item.quantity }}">
+                      <i class="fa-solid fa-box-open"></i> Low Stock · {{ stock.available }}
+                    </span>
+                    {% endif %}
+                  </span>
                   <span class="odt__items__qty">x{{ item.quantity }}</span>
                   <span class="odt__items__price">{{ item.total_price|default:"0.00" }} QR</span>
                 </div>
+                {% endwith %}
                 {% endfor %}
               </div>
               {% endif %}
@@ -767,11 +785,6 @@
                 </div>
                 <div class="odt__driver-card__info">
                   <span class="odt__driver-card__name">{{ delivery_task.driver }}</span>
-                  {% if delivery_task.driver.driver_phone %}
-                  <a href="tel:{{ delivery_task.driver.driver_phone }}" class="odt__driver-card__phone" hx-boost="false">
-                    <i class="fa-solid fa-phone"></i> {{ delivery_task.driver.driver_phone }}
-                  </a>
-                  {% endif %}
                 </div>
               </div>
               {% endif %}
@@ -839,7 +852,34 @@
       </div>
     </div>
   </div>
+
+  {% include "orders/parts/_reconfirm_modal.html" %}
 {% endblock content %}
 {% block extra_js %}
   <script type="text/javascript" src="{% static 'orders/js/orders_main.js' %}"></script>
+  <script>
+  // Reconfirm button handler for full Order Details page
+  (function() {
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.odp__reconfirm-btn');
+      if (!btn) return;
+      e.preventDefault();
+      var orderId = btn.getAttribute('data-reconfirm-order-id');
+      if (!orderId || typeof window.openReconfirmModal !== 'function') return;
+      window.openReconfirmModal(function(comment) {
+        return fetch('{% url "orders:update_order_status" %}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+          body: JSON.stringify({ order_id: parseInt(orderId), status: 'ready_to_pickup', comment: comment || '' })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) { window.location.reload(); }
+          else { alert('Error: ' + (data.error || 'Unknown error')); }
+        })
+        .catch(function(err) { alert('Network error: ' + err); });
+      });
+    });
+  })();
+  </script>
 {% endblock extra_js %}

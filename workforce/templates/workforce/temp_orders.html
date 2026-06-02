@@ -14,27 +14,33 @@
             <span class="oli__hero__subtitle">| Synced from external sources (last 25 per source)</span>
         </div>
         <div class="oli__hero__right d-flex align-items-center gap-3">
-            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-dark btn-sm">
-                <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
+            <a href="{% url 'workforce:wf_orders_to_publish' %}" class="btn btn-outline-dark btn-sm position-relative">
+                <i class="fa-solid fa-rocket me-1"></i>Publish to Tasks
+                {% if pending_publish_count %}
+                <span class="badge rounded-pill bg-warning text-dark ms-1">{{ pending_publish_count }}</span>
+                {% endif %}
+            </a>
+            <a href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="btn btn-outline-dark btn-sm position-relative">
+                <i class="fa-solid fa-truck-fast me-1"></i>Publish to Fleet
+                {% if unpublished_tasks_count %}
+                <span class="badge rounded-pill bg-warning text-dark ms-1">{{ unpublished_tasks_count }}</span>
+                {% endif %}
             </a>
             {% if last_sync %}
             <span class="text-muted small" title="Last sync">
                 <i class="fa-regular fa-clock me-1"></i>{{ last_sync|timesince }} ago
             </span>
             {% endif %}
-            <span class="d-inline-flex flex-column align-items-center" style="min-width:70px;max-width:70px;line-height:1.1;">
-                <span style="font-size:0.75rem;color:#000;font-weight:600;">Auto Sync</span>
-                <span id="autoSyncTimer" style="font-size:0.75rem;color:#000;"></span>
-            </span>
-            <button type="button" class="btn btn-dark btn-sm" id="syncBtn" onclick="syncAllSources()">
-                <i class="fa-solid fa-sync me-1"></i>Sync Now
-            </button>
-            <button type="button" class="btn btn-outline-dark btn-sm" onclick="openPublicLinkModal()">
-                <i class="fa-solid fa-link me-1"></i>Public Links
+            <button type="button" class="btn btn-dark btn-sm d-inline-flex align-items-center gap-2" id="syncBtn" onclick="syncAllSources()" title="Sync Now">
+                <i class="fa-solid fa-sync"></i>
+                <span id="autoSyncTimer" class="small" style="line-height:1;"></span>
             </button>
             <button type="button" class="btn btn-warning btn-sm d-none" id="autoImportBtn" onclick="openAutoImport()">
                 <i class="fa-solid fa-bolt me-1"></i>Auto-Import <span id="autoImportBtnCount"></span>
             </button>
+            <a href="{% url 'workforce:temp_orders_browse' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-list me-1"></i>Browse All
+            </a>
             <a href="{% url 'workforce:temp_order_config' %}" class="btn btn-outline-secondary btn-sm">
                 <i class="fa-solid fa-gear me-1"></i>Config
             </a>
@@ -317,6 +323,12 @@
                             data-raw-row="{{ row.raw_row|escapejs }}">
                             <i class="fa-solid fa-eye"></i>
                         </button>
+                        {% if row.status != 'imported' %}
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 ms-1"
+                                onclick="deleteTempRow({{ row.id }})" title="Delete this temp row">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -343,6 +355,9 @@
         </button>
         <button type="button" class="btn btn-warning btn-sm" onclick="openAutoImport()">
             <i class="fa-solid fa-bolt me-1"></i>Auto-Import
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteSelected()">
+            <i class="fa-solid fa-trash-can me-1"></i>Delete Selected
         </button>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSelection()">
             <i class="fa-solid fa-times me-1"></i>Clear
@@ -627,6 +642,52 @@ function updateSelectedCount() {
 }
 function clearSelection() { document.querySelectorAll('.row-checkbox').forEach(c => c.checked = false); document.getElementById('selectAllRows').checked = false; updateSelectedCount(); }
 
+// ─── Delete ───
+async function postDelete(ids) {
+    const resp = await fetch('{% url "workforce:temp_orders_delete" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ ids })
+    });
+    return resp.json();
+}
+async function deleteTempRow(id) {
+    if (!confirm('Delete this temp row? This cannot be undone.')) return;
+    try {
+        const data = await postDelete([id]);
+        if (data.success) {
+            const tr = document.querySelector(`tr[data-temp-id="${id}"]`);
+            if (tr) tr.remove();
+            updateSelectedCount();
+        } else {
+            alert(data.error || 'Delete failed');
+        }
+    } catch(e) {
+        alert('Delete failed: ' + e.message);
+    }
+}
+async function deleteSelected() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (!checked.length) { alert('Select rows first'); return; }
+    const ids = [...checked].map(c => parseInt(c.dataset.tempId));
+    if (!confirm(`Delete ${ids.length} temp row(s)? Imported rows will be skipped. This cannot be undone.`)) return;
+    try {
+        const data = await postDelete(ids);
+        if (data.success) {
+            ids.forEach(id => {
+                const tr = document.querySelector(`tr[data-temp-id="${id}"]`);
+                if (tr && !tr.classList.contains('table-secondary')) tr.remove();
+            });
+            clearSelection();
+            if (data.skipped_imported) alert(data.message);
+        } else {
+            alert(data.error || 'Delete failed');
+        }
+    } catch(e) {
+        alert('Delete failed: ' + e.message);
+    }
+}
+
 // ─── Auto-Import ───
 async function openAutoImport() {
     const checked = document.querySelectorAll('.row-checkbox:checked');
@@ -679,6 +740,12 @@ async function openAutoImport() {
                 const label = statusLabel[r.status] || r.status;
                 const bCls = badgeCls[r.status] || 'bg-secondary';
                 const orderRef = r.order_number ? `<span class="badge bg-dark ms-2">${escHtml(r.order_number)}</span>` : '';
+                const accuracyBadge = r.accuracy
+                    ? `<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">${escHtml(r.accuracy)}</span>`
+                    : '';
+                const confBadge = (r.confidence !== undefined && r.confidence !== null)
+                    ? `<span class="badge bg-light text-dark ms-1" style="font-size:0.6rem">conf ${escHtml(r.confidence)}</span>`
+                    : '';
                 const warnings = (r.warnings || []).map(w =>
                     `<div class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escHtml(w)}</div>`
                 ).join('');
@@ -688,6 +755,7 @@ async function openAutoImport() {
                     <td>
                         <span class="fw-semibold">Row #${r.id}</span>${orderRef}
                         <span class="badge ${bCls} ms-2" style="font-size:0.6rem">${label}</span>
+                        ${accuracyBadge}${confBadge}
                         ${warnings}${error}
                     </td>
                 </tr>`;
@@ -853,6 +921,17 @@ function renderPreviewTable() {
 }
 
 // ─── Step 2: Verify (editable) ───
+// Capture currently-edited inputs back into previewRows before any re-render
+// so unsaved edits are not lost when adding/removing rows.
+function captureVerifyInputs() {
+    const inputs = document.querySelectorAll('#previewModalBody input[data-field]');
+    inputs.forEach(inp => {
+        const idx = parseInt(inp.dataset.idx);
+        const field = inp.dataset.field;
+        if (previewRows[idx]) previewRows[idx][field] = inp.value;
+    });
+}
+
 function goToVerify() {
     document.getElementById('previewStep1Title').classList.add('d-none');
     document.getElementById('previewStep2Title').classList.remove('d-none');
@@ -872,10 +951,18 @@ function goToVerify() {
         html += `<div class="table-responsive"><table class="table table-sm table-bordered small align-middle mb-0">`;
         html += `<thead class="table-light"><tr><th style="width:160px">Source Column</th><th style="width:180px">→ Field</th><th>Value (editable)</th></tr></thead><tbody>`;
 
-        _mappedFieldsFor(r).forEach(({ dbField, srcCol, meta }) => {
+        // Show ALL DB fields in verify step so any field can be edited,
+        // not just the ones currently in the column mapping.
+        const mapped = _mappedFieldsFor(r);
+        const mappedKeys = new Set(mapped.map(m => m.dbField));
+        const srcByKey = Object.fromEntries(mapped.map(m => [m.dbField, m.srcCol]));
+        DB_FIELDS.forEach(meta => {
+            const dbField = meta.key;
+            const srcCol = srcByKey[dbField] || '';
             const val = r[dbField] || '';
             const isRequired = meta.label && meta.label.includes('*');
-            html += `<tr>`;
+            const rowCls = mappedKeys.has(dbField) ? '' : ' class="table-warning"';
+            html += `<tr${rowCls}>`;
             html += `<td class="text-muted small text-nowrap">${escHtml(srcCol) || '<em>—</em>'}</td>`;
             html += `<td class="fw-semibold text-nowrap small">${escHtml(meta.label)}</td>`;
             html += `<td><input type="text" class="form-control form-control-sm py-0" style="font-size:0.75rem" data-field="${dbField}" data-idx="${i}" value="${escHtml(String(val))}"${isRequired ? ' required' : ''}></td>`;
@@ -890,6 +977,7 @@ function goToVerify() {
 }
 
 function removePreviewRow(idx) {
+    captureVerifyInputs();  // preserve other rows' unsaved edits
     previewRows.splice(idx, 1);
     goToVerify(); // re-render
 }
@@ -897,12 +985,7 @@ function removePreviewRow(idx) {
 // ─── Step 3: Transfer ───
 async function transferOrders() {
     // Collect edited values from inputs
-    const inputs = document.querySelectorAll('#previewModalBody input[data-field]');
-    inputs.forEach(inp => {
-        const idx = parseInt(inp.dataset.idx);
-        const field = inp.dataset.field;
-        if (previewRows[idx]) previewRows[idx][field] = inp.value;
-    });
+    captureVerifyInputs();
 
     if (!previewRows.length) { alert('No rows to transfer'); return; }
     if (!confirm(`Transfer ${previewRows.length} row(s) to main orders?`)) return;

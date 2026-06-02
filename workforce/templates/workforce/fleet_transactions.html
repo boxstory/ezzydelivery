@@ -82,6 +82,7 @@
             <form method="get" id="filterForm">
                 <input type="hidden" name="driver_id" value="{{ selected_driver.driver_id }}">
                 <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
+                <input type="hidden" name="view" value="{{ view_type }}">
                 <div class="ftr__filter-row">
                     <div class="ftr__filter-group">
                         <label class="ftr__filter-label"><i class="fa-solid fa-calendar me-1"></i>Date Range</label>
@@ -118,6 +119,24 @@
                             <option value="">All Status</option>
                             <option value="settled" {% if status == 'settled' %}selected{% endif %}>Settled</option>
                             <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                        </select>
+                    </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-building me-1"></i>Business</label>
+                        <select name="business" class="ftr__filter-select">
+                            <option value="">All Businesses</option>
+                            {% for biz in driver_businesses %}
+                            <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-wallet me-1"></i>Payment Method</label>
+                        <select name="payment_method" class="ftr__filter-select">
+                            <option value="">All Methods</option>
+                            {% for pm_code, pm_label in payment_method_choices %}
+                            <option value="{{ pm_code }}" {% if payment_method_filter == pm_code %}selected{% endif %}>{{ pm_label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="ftr__filter-actions">

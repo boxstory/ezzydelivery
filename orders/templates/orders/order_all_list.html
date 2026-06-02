@@ -5,7 +5,7 @@
 {% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}?v=20260215e"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260429a"
         rel="stylesheet"
         type="text/css" />
 {% endblock extra_css %}
@@ -137,6 +137,17 @@
                 <span class="pwa-order-card-full__number">#{{ order.order_number }}</span>
                 {% order_status_badge order %}
               </div>
+              {% with delivery=order.delivery_task.first %}
+                {% if delivery and delivery.failure_reason %}
+                <span class="pwa-order-card-full__fail" title="{% if delivery.failure_notes %}{{ delivery.failure_notes }}{% else %}{{ delivery.get_failure_reason_display }}{% endif %}">
+                  <i class="fa-solid fa-circle-exclamation"></i> {{ delivery.get_failure_reason_display }}{% if delivery.dl_task_status != 'failed' %} (prev){% endif %}
+                </span>
+                {% elif delivery and fallback_failure_notes|get_item:order.id %}
+                <span class="pwa-order-card-full__fail" title="{{ fallback_failure_notes|get_item:order.id }}">
+                  <i class="fa-solid fa-circle-exclamation"></i> {{ fallback_failure_notes|get_item:order.id|truncatechars:40 }}{% if delivery.dl_task_status != 'failed' %} (prev){% endif %}
+                </span>
+                {% endif %}
+              {% endwith %}
               <p class="pwa-order-card-full__customer">{{ order.customer_name }}</p>
               <div class="pwa-order-card-full__meta">
                 <span class="pwa-order-card-full__meta-item">
@@ -170,8 +181,8 @@
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--review" data-status="to_review" title="Hold for Review">
               <i class="fas fa-clock"></i>
             </button>
-            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--confirmed" data-status="ready_to_pickup" title="Ready to pickup">
-              <i class="fas fa-clipboard-check"></i>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--reconfirmed" data-status="ready_to_pickup" data-needs-comment="true" title="Reconfirmed">
+              <i class="fas fa-check-double"></i>
             </button>
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--publish" data-status="publish" title="Publish">
               <i class="fas fa-rocket"></i>
@@ -254,11 +265,6 @@
               </h1>
             </div>
             <div class="oal__header-actions" id="orders_all_list_nav_actions">
-              <a class="oal__btn oal__btn--outline"
-                 href="{% url 'delivery:all_delivery_tasks' %}"
-                 id="orders_all_list_btn_go_tasks">
-                <i class="fa-solid fa-truck"></i> Go to Tasks
-              </a>
               <a class="oal__btn oal__btn--outline"
                  href="{% url 'orders:get_order_by_api' %}"
                  id="orders_all_list_btn_api_upload">
@@ -428,6 +434,26 @@
             </form>
           </div>
 
+          {% if has_ecom_api %}
+          <div class="oal__api-pending mb-3" id="orders_api_pending_section">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-cloud-arrow-down me-1 text-primary"></i>
+                    New Orders to Import
+                </h5>
+                <span class="text-muted small">— Latest 10 from your store</span>
+            </div>
+            <div id="orders_api_pending_panel"
+                 hx-get="{% url 'orders:orders_api_pending_list' %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="text-muted small py-2">
+                    <i class="fa-solid fa-spinner fa-spin me-1"></i> Fetching latest orders from your store...
+                </div>
+            </div>
+          </div>
+          {% endif %}
+
           <div id="orders_table_view" class="orders-view-container">
             {% include "orders/parts/order_list_table_view.html" %}
           </div>
@@ -478,6 +504,8 @@
       </div>
     </div>
   </div>
+
+  {% include "orders/parts/_reconfirm_modal.html" %}
 
 {% endblock content %}
 {% block extra_js %}
@@ -1053,6 +1081,49 @@
     });
   })();
 
+  // ===== Desktop Reconfirm action button =====
+  (function() {
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.oal__action-btn--reconfirm');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof window.openReconfirmModal !== 'function') return;
+
+      var orderId = btn.getAttribute('data-order-id');
+      window.openReconfirmModal(function(comment) {
+        btn.disabled = true;
+        var origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        var payload = { order_id: parseInt(orderId), status: 'ready_to_pickup' };
+        if (comment) payload.comment = comment;
+        return fetch('{% url "orders:update_order_status" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+          },
+          body: JSON.stringify(payload)
+        })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+          if (data.success) {
+            window.location.reload();
+          } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+          }
+        })
+        .catch(function(err) {
+          alert('Network error: ' + err);
+          btn.innerHTML = origHtml;
+          btn.disabled = false;
+        });
+      });
+    });
+  })();
+
   // ===== Order Detail Panel =====
   function openOrderDetailPanel(orderId) {
     var panel = document.getElementById('orderDetailPanel');
@@ -1098,6 +1169,28 @@
     }
   });
 
+  // ===== Reconfirm button (delegated from inside the slide-in panel) =====
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.odp__reconfirm-btn');
+    if (!btn) return;
+    e.preventDefault();
+    var orderId = btn.getAttribute('data-reconfirm-order-id');
+    if (!orderId || typeof window.openReconfirmModal !== 'function') return;
+    window.openReconfirmModal(function(comment) {
+      return fetch('{% url "orders:update_order_status" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ order_id: parseInt(orderId), status: 'ready_to_pickup', comment: comment || '' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) { window.location.reload(); }
+        else { alert('Error: ' + (data.error || 'Unknown error')); }
+      })
+      .catch(function(err) { alert('Network error: ' + err); });
+    });
+  });
+
   // ===== Mobile Card Status Actions =====
   (function() {
     function showToast(msg) {
@@ -1115,31 +1208,21 @@
       if (btn) btn.classList.add('pwa-card-actions__btn--active');
     });
 
-    document.addEventListener('click', function(e) {
-      var btn = e.target.closest('.pwa-card-actions__btn');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-
+    function submitStatusUpdate(btn, orderId, newStatus, comment) {
       var card = btn.closest('.pwa-order-card-full');
-      var orderId = card.getAttribute('data-order-id');
-      var newStatus = btn.getAttribute('data-status');
-      var currentStatus = card.getAttribute('data-current-status');
-
-      if (newStatus === currentStatus) return;
-      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) return;
-
-      // Disable all buttons on this card
       card.querySelectorAll('.pwa-card-actions__btn').forEach(function(b) { b.disabled = true; });
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-      fetch('{% url "orders:update_order_status" %}', {
+      var payload = { order_id: parseInt(orderId), status: newStatus };
+      if (comment) payload.comment = comment;
+
+      return fetch('{% url "orders:update_order_status" %}', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': '{{ csrf_token }}'
         },
-        body: JSON.stringify({ order_id: parseInt(orderId), status: newStatus })
+        body: JSON.stringify(payload)
       })
       .then(function(resp) { return resp.json(); })
       .then(function(data) {
@@ -1155,6 +1238,31 @@
         alert('Network error: ' + err);
         window.location.reload();
       });
+    }
+
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.pwa-card-actions__btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      var card = btn.closest('.pwa-order-card-full');
+      var orderId = card.getAttribute('data-order-id');
+      var newStatus = btn.getAttribute('data-status');
+      var currentStatus = card.getAttribute('data-current-status');
+
+      if (newStatus === currentStatus) return;
+      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) return;
+
+      // Reconfirm flow: collect a comment before submitting
+      if (btn.getAttribute('data-needs-comment') === 'true' && typeof window.openReconfirmModal === 'function') {
+        window.openReconfirmModal(function(comment) {
+          return submitStatusUpdate(btn, orderId, newStatus, comment);
+        });
+        return;
+      }
+
+      submitStatusUpdate(btn, orderId, newStatus, '');
     });
   })();
   </script>

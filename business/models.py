@@ -281,6 +281,10 @@ class BusinessApiSettings(models.Model):
     product_api_endpoint = models.CharField(max_length=255, blank=True, null=True)
     google_sheet_url = models.TextField(blank=True, null=True,
         help_text='Google Sheets URL (published as CSV or shareable link)')
+    google_sheet_gid = models.BigIntegerField(blank=True, null=True,
+        help_text='Worksheet (tab) gid to import from. NULL = use first tab or gid in URL.')
+    google_sheet_tab_name = models.CharField(max_length=255, blank=True, default='',
+        help_text='Last-known title of the selected worksheet (display only).')
 
     # TikTok Shop specific fields
     tiktok_shop_id = models.CharField(max_length=100, blank=True, null=True,
@@ -294,6 +298,8 @@ class BusinessApiSettings(models.Model):
 
     column_mapping = models.JSONField(blank=True, null=True, default=None,
         help_text='Google Sheet column mapping: {"customer_name": "Col Header", "phone": "Col Header", ...}')
+    last_headers = models.JSONField(blank=True, default=list,
+        help_text='Last-seen header row from the source sheet, used to map raw_row positions to db fields.')
 
     is_verify_api = models.BooleanField(default=False)
     is_default = models.BooleanField(default=False)
@@ -810,6 +816,7 @@ class WhatsAppNotificationTrigger(models.Model):
     trigger_status = models.CharField(max_length=30, choices=TRIGGER_STATUS_CHOICES)
     is_active = models.BooleanField(default=True)
     custom_message = models.TextField(blank=True, default='', help_text="Custom message template. Use {customer_name}, {order_number}, {driver_name}, {driver_phone}.")
+    notification_phone = models.CharField(max_length=30, blank=True, default='', help_text="Additional phone number (with country code, e.g. 97455512345) that should also receive this notification. Leave blank to notify customer only.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

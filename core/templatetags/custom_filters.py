@@ -9,6 +9,31 @@ import logging
 register = template.Library()
 logger = logging.getLogger(__name__)
 
+
+@register.filter
+def short_timesince(value):
+    """Compact timesince: abbreviates unit names but keeps the same structure.
+
+    '5 hours, 12 minutes' -> '5 hr, 12 min'
+    '2 days, 3 hours'     -> '2 d, 3 hr'
+    """
+    if not value:
+        return ''
+    from django.utils.timesince import timesince
+    raw = timesince(value)
+    abbrev = [
+        ('minutes', 'min'), ('minute', 'min'),
+        ('hours', 'hr'), ('hour', 'hr'),
+        ('days', 'd'), ('day', 'd'),
+        ('weeks', 'wk'), ('week', 'wk'),
+        ('months', 'mo'), ('month', 'mo'),
+        ('years', 'yr'), ('year', 'yr'),
+    ]
+    for long, short in abbrev:
+        raw = re.sub(r'\b' + long + r'\b', short, raw)
+    return raw
+
+
 @register.filter
 def mul(value, arg):
     """Multiply the value by the argument."""
@@ -31,6 +56,16 @@ def div(value, arg):
         return float(value) / float(arg)
     except (ValueError, TypeError):
         return 0
+
+@register.filter
+def get_item(dictionary, key):
+    """Look up a value in a dict by key (templates can't do dict[key] syntax)."""
+    if dictionary is None:
+        return None
+    try:
+        return dictionary.get(key)
+    except AttributeError:
+        return None
 
 @register.filter
 def floatformat_custom(value, arg):

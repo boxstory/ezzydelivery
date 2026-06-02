@@ -321,7 +321,13 @@ class Order(models.Model):
         Check stock availability for this order's items.
         Only applicable for businesses with fulfillment_service_enabled.
         Returns: 'ok', 'low_stock', 'out_of_stock', or None (no fulfillment)
+
+        Terminal statuses (delivered/cancelled/failed/rejected/returned) skip the
+        check — once an order is closed, the stock badge is no longer actionable
+        and only causes confusion (e.g. a delivered order showing "Out of Stock").
         """
+        if self.order_status in ('delivered', 'cancelled', 'failed', 'rejected', 'returned'):
+            return None
         if not self.business or not getattr(self.business, 'fulfillment_service_enabled', False):
             return None
 
@@ -500,14 +506,18 @@ class OrderItem(models.Model):
         return 'Item'
 
     @property
-    def stock_status(self):
-        """Check if this item is in stock. Returns 'in_stock' or 'out_of_stock'."""
+    def stock_info(self):
+        """
+        Per-item stock check. Returns a dict:
+          {'status': 'in_stock'|'low_stock'|'out_of_stock'|'not_tracked', 'available': int}
+        'not_tracked' means the business has no fulfillment / warehouse — nothing to display.
+        """
         if not self.product or not self.order:
-            return 'in_stock'
+            return {'status': 'not_tracked', 'available': 0}
 
         business = self.order.business
         if not business or not getattr(business, 'fulfillment_service_enabled', False):
-            return 'in_stock'
+            return {'status': 'not_tracked', 'available': 0}
 
         from warehouse import models as wh_models
         linked_warehouses = wh_models.SellerWarehouseLink.objects.filter(
@@ -515,16 +525,27 @@ class OrderItem(models.Model):
         ).values_list('warehouse_id', flat=True)
 
         if not linked_warehouses:
-            return 'in_stock'
+            return {'status': 'not_tracked', 'available': 0}
 
         stock = wh_models.StockLevel.objects.filter(
             product=self.product,
             warehouse_id__in=linked_warehouses
         ).first()
 
-        if not stock or stock.quantity_available <= 0:
-            return 'out_of_stock'
-        return 'in_stock'
+        available = stock.quantity_available if stock else 0
+        if available <= 0:
+            status = 'out_of_stock'
+        elif available < (self.quantity or 0):
+            status = 'low_stock'
+        else:
+            status = 'in_stock'
+        return {'status': status, 'available': available}
+
+    @property
+    def stock_status(self):
+        """Legacy: returns 'in_stock' or 'out_of_stock'. Kept for existing callers."""
+        info = self.stock_info
+        return 'out_of_stock' if info['status'] == 'out_of_stock' else 'in_stock'
 
     def __str__(self):
         return f"{self.order.order_number} - {self.product} x {self.quantity}" if self.product else f"{self.order.order_number} - Item"

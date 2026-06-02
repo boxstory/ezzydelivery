@@ -163,7 +163,7 @@
               <div class="wh__meta">
                 ID: <code class="wh__code">{{ stock.product.product_id|default:"-" }}</code>
                 {% if stock.product.size %} | Size: {{ stock.product.size }}{% endif %}
-                {% if stock.product.color %} | {{ stock.product.color.color_name }}{% endif %}
+                {% if stock.product.color %} | {{ stock.product.color.color_variant }}{% endif %}
               </div>
               {% with aliases=stock.product.get_client_names_list %}
               {% if aliases %}
@@ -204,7 +204,7 @@
             <td class="wh__td wh__td--center">
               <span class="wh__amount--success">{{ stock.product.item_price|default:0 }} QAR</span>
               {% if stock.product.unit %}
-              <div class="wh__meta">/{{ stock.product.unit.name }}</div>
+              <div class="wh__meta">/{{ stock.product.unit.unit_variant }}</div>
               {% endif %}
             </td>
             <td class="wh__td wh__td--center">
@@ -221,6 +221,11 @@
               <strong class="wh__amount--success">{{ item_value|floatformat:2 }} QAR</strong>
             </td>
             <td class="wh__td wh__td--center">
+              <button type="button" class="wh__action-btn wh__action-btn--pill js-view-stock"
+                      data-detail-url="{% url 'warehouse:stock_level_detail_modal' stock.id %}"
+                      title="Quick View">
+                <i class="fas fa-eye"></i> View
+              </button>
               <a href="{% url 'warehouse:stock_card' stock.product.id %}" class="wh__action-btn wh__action-btn--pill"
                  title="View Stock Card"
                  hx-get="{% url 'warehouse:stock_card' stock.product.id %}"
@@ -291,6 +296,18 @@
   </div>
 </div>
 
+<!-- Quick View modal -->
+<div class="modal fade" id="inventoryDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" id="inventoryDetailModalContent">
+      <div class="modal-body p-5 text-center">
+        <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+        <p class="mt-3 text-muted mb-0">Loading...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   const currentSort = '{{ sort_field }}';
@@ -306,6 +323,34 @@
       params.delete('page');
       window.location.href = '?' + params.toString();
     });
+  });
+
+  const spinnerHtml = '<div class="modal-body p-5 text-center"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i><p class="mt-3 text-muted mb-0">Loading...</p></div>';
+
+  document.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.js-view-stock');
+    if (!btn) return;
+    e.preventDefault();
+    const url = btn.dataset.detailUrl;
+    if (!url) return;
+    const modalEl = document.getElementById('inventoryDetailModal');
+    const modalContent = document.getElementById('inventoryDetailModalContent');
+    if (!modalEl || !modalContent) return;
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+      console.error('Bootstrap not loaded yet');
+      return;
+    }
+    const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    modalContent.innerHTML = spinnerHtml;
+    bsModal.show();
+    try {
+      const resp = await fetch(url, { credentials: 'same-origin' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      modalContent.innerHTML = await resp.text();
+    } catch (err) {
+      modalContent.innerHTML = '<div class="modal-body p-4"><div class="alert alert-danger mb-0">Failed to load: ' + err.message + '</div></div>';
+    }
   });
 })();
 </script>

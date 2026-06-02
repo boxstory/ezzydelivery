@@ -234,6 +234,8 @@ class TaskCompletionSerializer(serializers.Serializer):
     signature = serializers.FileField(required=False, allow_null=True)
     photo = serializers.FileField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+    failure_reason = serializers.CharField(required=False, allow_blank=True, max_length=50)
+    failure_notes = serializers.CharField(required=False, allow_blank=True)
     cod_collected = serializers.BooleanField(required=False, default=False)
     cod_amount_collected = serializers.IntegerField(required=False, allow_null=True)
     completion_latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)

@@ -15,7 +15,7 @@
     <ul id="workforce_sidebar_menu_main" class="navbar-nav">
 
       <!-- Import Section -->
-      <li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}active{% endif %}">
+      <li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,google_sheet_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}active{% endif %}">
         <div id="workforce_sidebar_link_import" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-import" data-title="Import">
           <i class="fa-solid fa-file-import me-2"></i>
           <span>Import</span>
@@ -23,7 +23,7 @@
           <span class="badge ms-auto me-2" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders_parent">{{ temp_orders_count|default:"0" }}</span>
           <i class="fa-solid fa-chevron-down"></i>
         </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}show{% endif %}" id="submenu-import">
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,google_sheet_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}show{% endif %}" id="submenu-import">
           <ul class="nav flex-column">
             <li class="nav-item {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}">
               <a id="workforce_sidebar_link_temp_orders" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}"
@@ -53,6 +53,13 @@
                  href="{% url 'workforce:onedrive_sources' %}">
                 <i class="fa-solid fa-cloud-arrow-down me-2"></i>
                 Shared Sheet / Excel
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'google_sheet_sources' %}active{% endif %}">
+              <a id="workforce_sidebar_link_google_sheet" class="nav-link btn {% if request.resolver_match.url_name == 'google_sheet_sources' %}active{% endif %}"
+                 href="{% url 'workforce:google_sheet_sources' %}">
+                <i class="fa-brands fa-google me-2"></i>
+                Google Sheets
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'wf_api_orders' %}active{% endif %}">
@@ -835,6 +842,40 @@
           <i class="fa-solid fa-address-book me-2"></i>
           <span>Contacts</span>
         </a>
+      </li>
+
+      <!-- WAHA WhatsApp Bridge (htpasswd-gated by nginx) -->
+      <li id="workforce_sidebar_menu_wa" class="nav-item">
+        <div id="workforce_sidebar_link_wa" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-wa" data-title="WhatsApp">
+          <i class="fa-brands fa-whatsapp me-2"></i>
+          <span>WhatsApp</span>
+          <i class="fa-solid fa-chevron-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu" id="submenu-wa">
+          <ul class="nav flex-column">
+            <li class="wf-sidebar__item--wa-chats nav-item">
+              <a id="workforce_sidebar_link_wa_chats" class="nav-link btn"
+                 href="/waha/wa-chats/">
+                <i class="fa-solid fa-comments me-2"></i>
+                Live Chats
+              </a>
+            </li>
+            <li class="wf-sidebar__item--wa-dashboard nav-item">
+              <a id="workforce_sidebar_link_wa_dashboard" class="nav-link btn"
+                 href="/waha/wa-dashboard/">
+                <i class="fa-solid fa-qrcode me-2"></i>
+                Session Status
+              </a>
+            </li>
+            <li class="wf-sidebar__item--wa-chats-tab nav-item">
+              <a id="workforce_sidebar_link_wa_chats_tab" class="nav-link btn"
+                 href="/waha/wa-chats/" target="_blank" rel="noopener">
+                <i class="fa-solid fa-up-right-from-square me-2"></i>
+                Open Chats in Tab
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
 
       <p class="dsb-section">Admin</p>

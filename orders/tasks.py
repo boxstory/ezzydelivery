@@ -8,6 +8,42 @@ from celery import shared_task
 
 logger = logging.getLogger(__name__)
 
+TEMP_ORDER_PER_SOURCE_LIMIT = 1000
+TEMP_ORDER_CLEANUP_BATCH = 100
+
+
+def _enforce_temp_order_limit(filter_kwargs, limit=TEMP_ORDER_PER_SOURCE_LIMIT):
+    """Cap TempOrders per source instance.
+
+    Hysteresis: only triggers when at least ``TEMP_ORDER_CLEANUP_BATCH``
+    rows over the limit, and always deletes in multiples of that batch.
+    So a source's count oscillates between ``limit`` and
+    ``limit + batch - 1`` instead of being trimmed on every single
+    overflow row. Keeps all ``status='new'`` rows (work-in-progress);
+    drops oldest ``imported``/``skipped`` rows. Returns count deleted.
+    """
+    from django.db.models import Case, When, IntegerField
+    from orders.models import TempOrder
+
+    qs = TempOrder.objects.filter(**filter_kwargs)
+    total = qs.count()
+    excess = total - limit
+    if excess < TEMP_ORDER_CLEANUP_BATCH:
+        return 0
+    delete_count = (excess // TEMP_ORDER_CLEANUP_BATCH) * TEMP_ORDER_CLEANUP_BATCH
+    keep_count = total - delete_count
+    keep_ids = list(
+        qs.annotate(
+            _new_first=Case(
+                When(status='new', then=0),
+                default=1,
+                output_field=IntegerField(),
+            )
+        ).order_by('_new_first', '-id').values_list('id', flat=True)[:keep_count]
+    )
+    deleted, _ = qs.exclude(id__in=keep_ids).delete()
+    return deleted
+
 
 def _convert_excel_date(value):
     """Convert various date formats to readable date strings.
@@ -408,6 +444,10 @@ def _sync_onedrive_source(source):
             )
             created += 1
 
+    _enforce_temp_order_limit({
+        'source_type': 'onedrive', 'onedrive_source': source,
+    })
+
     return created, updated
 
 
@@ -481,11 +521,19 @@ def _sync_google_sheet_source(api_settings):
     gid = int(gid_match.group(1)) if gid_match else 0
 
     spreadsheet = gc.open_by_key(sheet_id)
+    # Saved tab on the BusinessApiSettings row takes priority over the URL gid.
+    saved_gid = getattr(api_settings, 'google_sheet_gid', None)
     worksheet = None
-    for ws in spreadsheet.worksheets():
-        if ws.id == gid:
-            worksheet = ws
-            break
+    if saved_gid is not None:
+        for ws in spreadsheet.worksheets():
+            if ws.id == int(saved_gid):
+                worksheet = ws
+                break
+    if worksheet is None:
+        for ws in spreadsheet.worksheets():
+            if ws.id == gid:
+                worksheet = ws
+                break
     if worksheet is None:
         worksheet = spreadsheet.sheet1
 
@@ -495,6 +543,11 @@ def _sync_google_sheet_source(api_settings):
 
     headers = all_values[0]
     data_rows = all_values[1:]
+
+    # Persist headers so preview/transfer can map raw_row positions back to db fields
+    if list(api_settings.last_headers or []) != list(headers):
+        api_settings.last_headers = list(headers)
+        api_settings.save(update_fields=['last_headers'])
 
     # Column mapping — use saved mapping only (business-level or per-source)
     raw_biz_full = api_settings.business.import_mapping or {}
@@ -581,7 +634,11 @@ def _sync_google_sheet_source(api_settings):
 
     existing = {
         to.row_num: to
-        for to in TempOrder.objects.filter(source_type='google_sheet', api_settings=api_settings)
+        for to in TempOrder.objects.filter(
+            source_type='google_sheet',
+            api_settings=api_settings,
+            sheet_name=worksheet.title,
+        )
     }
 
     # Imported client codes
@@ -672,6 +729,12 @@ def _sync_google_sheet_source(api_settings):
                 **defaults,
             )
             created += 1
+
+    _enforce_temp_order_limit({
+        'source_type': 'google_sheet',
+        'api_settings': api_settings,
+        'sheet_name': worksheet.title,
+    })
 
     return created, updated
 
@@ -777,6 +840,10 @@ def _sync_api_source(api_settings):
                 **defaults,
             )
             created += 1
+
+    _enforce_temp_order_limit({
+        'source_type': api_type, 'api_settings': api_settings,
+    })
 
     return created, updated
 
@@ -1214,5 +1281,9 @@ def _sync_public_link_source(source):
 
     source.last_sync_count = len(seen_row_nums)
     source.save()
+
+    _enforce_temp_order_limit({
+        'source_type': 'public_link', 'public_link_source': source,
+    })
 
     return created, updated

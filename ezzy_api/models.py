@@ -105,15 +105,13 @@ class ClientApiKey(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.api_key:
-            # Generate a unique API key
             while True:
-                key = get_random_string(32)
+                key = f"ezz_key_{get_random_string(32)}"
                 if not ClientApiKey.objects.filter(api_key=key).exists():
                     self.api_key = key
                     break
         if not self.api_secret:
-            # Generate a secret key
-            self.api_secret = get_random_string(32)
+            self.api_secret = f"ezz_sec_{get_random_string(32)}"
         super().save(*args, **kwargs)
 
     def is_valid(self):

@@ -34,9 +34,9 @@
                     <span class="small fw-semibold text-dark">Profile Progress</span>
                     <span class="small fw-bold" style="color:var(--brand-primary)">{{ completion_percentage }}%</span>
                 </div>
-                <div class="progress" style="height:10px;border-radius:8px;background:#e9ecef;">
+                <div class="progress" style="height:14px;border-radius:8px;background:#e9ecef;">
                     <div class="progress-bar" role="progressbar"
-                         style="width:{{ completion_percentage }}%;background:var(--brand-primary);"
+                         style="width:{{ completion_percentage }}%;background:var(--brand-primary);font-weight:600;"
                          aria-valuenow="{{ completion_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
             </div>
@@ -80,6 +80,7 @@
                         <input type="text" name="first_name" id="id_pf_first_name"
                             class="form-control{% if profileupdateform.first_name.errors %} is-invalid{% endif %}"
                             placeholder="First Name"
+                            autocomplete="given-name" autocapitalize="words"
                             value="{{ profileupdateform.first_name.value|default:'' }}" required>
                         {% if profileupdateform.first_name.errors %}<div class="invalid-feedback">{{ profileupdateform.first_name.errors.0 }}</div>{% endif %}
                     </div>
@@ -94,6 +95,7 @@
                         <input type="text" name="last_name" id="id_pf_last_name"
                             class="form-control{% if profileupdateform.last_name.errors %} is-invalid{% endif %}"
                             placeholder="Last Name"
+                            autocomplete="family-name" autocapitalize="words"
                             value="{{ profileupdateform.last_name.value|default:'' }}" required>
                         {% if profileupdateform.last_name.errors %}<div class="invalid-feedback">{{ profileupdateform.last_name.errors.0 }}</div>{% endif %}
                     </div>
@@ -122,6 +124,7 @@
                         <input type="text" name="nationlity" id="id_pf_nationlity"
                             class="form-control{% if profileupdateform.nationlity.errors %} is-invalid{% endif %}"
                             placeholder="e.g. Qatari, Indian, Filipino"
+                            autocomplete="country-name" autocapitalize="words"
                             value="{{ profileupdateform.nationlity.value|default:'' }}" required>
                         {% if profileupdateform.nationlity.errors %}<div class="invalid-feedback">{{ profileupdateform.nationlity.errors.0 }}</div>{% endif %}
                     </div>
@@ -143,6 +146,7 @@
                             <input type="tel" name="phone" id="id_pf_phone"
                                 class="form-control{% if profileupdateform.phone.errors %} is-invalid{% endif %}"
                                 placeholder="e.g. 33001122"
+                                autocomplete="tel" inputmode="tel"
                                 value="{{ profileupdateform.phone.value|default:'' }}" required>
                             {% if profileupdateform.phone.errors %}<div class="invalid-feedback">{{ profileupdateform.phone.errors.0 }}</div>{% endif %}
                         </div>
@@ -160,6 +164,7 @@
                             <input type="tel" name="whatsapp" id="id_pf_whatsapp"
                                 class="form-control{% if profileupdateform.whatsapp.errors %} is-invalid{% endif %}"
                                 placeholder="e.g. 97433001122"
+                                autocomplete="tel" inputmode="tel"
                                 value="{{ profileupdateform.whatsapp.value|default:'' }}" required>
                             {% if profileupdateform.whatsapp.errors %}<div class="invalid-feedback">{{ profileupdateform.whatsapp.errors.0 }}</div>{% endif %}
                         </div>
@@ -176,6 +181,7 @@
                         <input type="email" name="email" id="id_pf_email"
                             class="form-control{% if profileupdateform.email.errors %} is-invalid{% endif %}"
                             placeholder="your@email.com"
+                            autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false"
                             value="{{ profileupdateform.email.value|default:'' }}">
                         {% if profileupdateform.email.errors %}<div class="invalid-feedback">{{ profileupdateform.email.errors.0 }}</div>{% endif %}
                     </div>
@@ -195,6 +201,7 @@
                         <input type="text" name="zone_name" id="id_pf_zone_name"
                             class="form-control{% if profileupdateform.zone_name.errors %} is-invalid{% endif %}"
                             placeholder="e.g. Al Sadd, Lusail, West Bay"
+                            autocomplete="address-level2" autocapitalize="words"
                             value="{{ profileupdateform.zone_name.value|default:'' }}" required>
                         {% if profileupdateform.zone_name.errors %}<div class="invalid-feedback">{{ profileupdateform.zone_name.errors.0 }}</div>{% endif %}
                     </div>

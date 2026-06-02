@@ -14,9 +14,18 @@
                 <h2><i class="fa-solid fa-list-check me-1"></i>All Orders</h2>
             </div>
             <div class="oli__hero__right d-flex align-items-center gap-3">
+                {% if tasks_to_fleet_count is not None %}
+                <a href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="btn btn-outline-dark btn-sm position-relative">
+                    <i class="fa-solid fa-truck me-1"></i>Tasks to Fleet
+                    {% if tasks_to_fleet_count %}
+                    <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle">{{ tasks_to_fleet_count }}</span>
+                    {% endif %}
+                </a>
+                {% else %}
                 <a href="{% url 'workforce:dl_list_all' %}" class="btn btn-outline-dark btn-sm">
                     <i class="fa-solid fa-truck me-1"></i>Go to Tasks
                 </a>
+                {% endif %}
                 <div class="oli__hero__count">
                     <span class="oli__hero__count-value">{{ orders.paginator.count|default:"0" }}</span>
                     <span class="oli__hero__count-label">orders</span>
@@ -318,6 +327,12 @@
                         <button type="button" class="orc__btn orc__btn--err" title="Delete" hx-post="{% url 'workforce:delete_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML swap:200ms" hx-confirm="Permanently delete order {{ order.order_number|default:order.client_order_code }}? This cannot be undone."><i class="fa-solid fa-trash"></i></button>
                         {% endif %}
                         <a href="https://wa.me/{{ order.customer_phone|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="orc__btn orc__btn--wa" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+                        <button type="button"
+                                class="orc__btn orc__btn--wa-send"
+                                title="Send WhatsApp via Evolution API"
+                                onclick="WsmwList.open({{ order.id }}, '{{ order.order_number|escapejs }}')">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
                     </div>
                 </div>
                 {% endfor %}
@@ -361,6 +376,66 @@
                 <div class="text-center py-5">
                     <i class="fa-solid fa-spinner fa-spin fa-3x text-muted"></i>
                     <p class="mt-3 text-muted">Loading order details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Send Modal (shared, Evolution API) -->
+    {{ wa_instances|json_script:"wsmwListInstancesData" }}
+    <div class="modal fade" id="wsmwListModal" tabindex="-1" aria-labelledby="wsmwListTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered wsmw__dialog">
+            <div class="modal-content wsmw__content">
+                <div class="wsmw__header">
+                    <span class="wsmw__header-icon"><i class="fa-brands fa-whatsapp"></i></span>
+                    <div>
+                        <h5 class="wsmw__title" id="wsmwListTitle">Send WhatsApp Message</h5>
+                        <span class="wsmw__subtitle" id="wsmwListSubtitle">via Evolution API</span>
+                    </div>
+                    <button type="button" class="wsmw__close" data-bs-dismiss="modal" aria-label="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="wsmw__body">
+                    <div class="wsmw__field">
+                        <label class="wsmw__label" for="wsmwListInstance">
+                            <i class="fa-solid fa-mobile-screen"></i> From (Instance)
+                        </label>
+                        {% if wa_instances %}
+                        <select class="wsmw__select" id="wsmwListInstance">
+                            {% for inst in wa_instances %}
+                            <option value="{{ inst.name }}"{% if inst.is_default %} selected{% endif %}>
+                                {{ inst.name }}{% if inst.number %} — {{ inst.number }}{% endif %}{% if inst.is_default %}  (default){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="wsmw__instance-meta" id="wsmwListInstanceMeta"></div>
+                        {% else %}
+                        <select class="wsmw__select" id="wsmwListInstance" disabled>
+                            <option value="">{% if wa_instances_error %}{{ wa_instances_error }}{% else %}No Evolution instances available{% endif %}</option>
+                        </select>
+                        {% endif %}
+                    </div>
+                    <div class="wsmw__field">
+                        <label class="wsmw__label" for="wsmwListTo">
+                            <i class="fa-solid fa-user"></i> To (Customer Number)
+                        </label>
+                        <input type="text" class="wsmw__input" id="wsmwListTo" placeholder="9665XXXXXXXX">
+                    </div>
+                    <div class="wsmw__field">
+                        <label class="wsmw__label" for="wsmwListMessage">
+                            <i class="fa-solid fa-comment"></i> Message
+                        </label>
+                        <textarea class="wsmw__textarea" id="wsmwListMessage" rows="6" maxlength="4000"></textarea>
+                        <span class="wsmw__char-count" id="wsmwListCharCount">0 / 4000</span>
+                    </div>
+                </div>
+                <div class="wsmw__footer">
+                    <span class="wsmw__status" id="wsmwListStatus"></span>
+                    <button type="button" class="wsmw__btn-cancel" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="wsmw__btn-send" id="wsmwListSendBtn" onclick="WsmwList.send()">
+                        <i class="fa-solid fa-paper-plane"></i> Send
+                    </button>
                 </div>
             </div>
         </div>
@@ -725,7 +800,135 @@
         return map[status] || '';
     }
 
+    // ===== WhatsApp Send Modal (shared, list page) =====
+    window.WsmwList = (function() {
+        var modalEl, modal, currentOrderId = null, instances = [];
+        var dataNode = document.getElementById('wsmwListInstancesData');
+        if (dataNode) { try { instances = JSON.parse(dataNode.textContent) || []; } catch (e) {} }
 
+        function el(id) { return document.getElementById(id); }
+
+        function setStatus(msg, kind) {
+            var s = el('wsmwListStatus');
+            if (!s) return;
+            s.className = 'wsmw__status' + (kind ? ' wsmw__status--' + kind : '');
+            s.textContent = msg || '';
+        }
+
+        function updateInstanceMeta() {
+            var sel = el('wsmwListInstance');
+            var meta = el('wsmwListInstanceMeta');
+            if (!sel || !meta) return;
+            var inst = instances.find(function(i) { return i.name === sel.value; });
+            if (!inst) { meta.innerHTML = ''; return; }
+            var chipCls = inst.status ? (inst.connected ? 'wsmw__chip--ok' : 'wsmw__chip--bad') : '';
+            var parts = [];
+            if (inst.number) parts.push('<span class="wsmw__chip">📱 ' + inst.number + '</span>');
+            if (inst.status) parts.push('<span class="wsmw__chip ' + chipCls + '">' + inst.status + '</span>');
+            if (inst.is_default) parts.push('<span class="wsmw__chip">default</span>');
+            meta.innerHTML = parts.join('');
+        }
+
+        function updateCharCount() {
+            var ta = el('wsmwListMessage');
+            var cc = el('wsmwListCharCount');
+            if (ta && cc) cc.textContent = ta.value.length + ' / 4000';
+        }
+
+        function open(orderId, orderNumber) {
+            modalEl = modalEl || el('wsmwListModal');
+            if (!modalEl || !window.bootstrap) return;
+            modal = modal || new bootstrap.Modal(modalEl);
+            currentOrderId = orderId;
+
+            el('wsmwListSubtitle').textContent = 'Order ' + (orderNumber || orderId) + ' · via Evolution API';
+            el('wsmwListTo').value = '';
+            el('wsmwListMessage').value = 'Loading…';
+            updateCharCount();
+            updateInstanceMeta();
+            setStatus('');
+            modal.show();
+
+            fetch('/workforce/orders/' + orderId + '/whatsapp-defaults/', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            }).then(function(r) {
+                var ct = r.headers.get('content-type') || '';
+                if (ct.indexOf('application/json') === -1) throw new Error('HTTP ' + r.status);
+                return r.json();
+            }).then(function(data) {
+                if (data && data.success) {
+                    el('wsmwListTo').value = data.to || '';
+                    el('wsmwListMessage').value = data.message || '';
+                    updateCharCount();
+                } else {
+                    setStatus('Could not load defaults', 'bad');
+                    el('wsmwListMessage').value = '';
+                    updateCharCount();
+                }
+            }).catch(function(err) {
+                setStatus('Failed to load defaults: ' + err.message, 'bad');
+                el('wsmwListMessage').value = '';
+                updateCharCount();
+            });
+        }
+
+        function send() {
+            if (!currentOrderId) return;
+            var btn = el('wsmwListSendBtn');
+            var instance = (el('wsmwListInstance').value || '').trim();
+            var to = (el('wsmwListTo').value || '').trim();
+            var message = (el('wsmwListMessage').value || '').trim();
+            if (!instance) { setStatus('Pick an instance to send from', 'bad'); return; }
+            if (!to) { setStatus('Enter a recipient number', 'bad'); return; }
+            if (!message) { setStatus('Message cannot be empty', 'bad'); return; }
+
+            var originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…';
+            setStatus('Sending via ' + instance + '…');
+
+            fetch('/workforce/orders/' + currentOrderId + '/send-whatsapp/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ instance: instance, to: to, message: message })
+            }).then(function(r) {
+                var ct = r.headers.get('content-type') || '';
+                if (ct.indexOf('application/json') === -1) {
+                    throw new Error('Server returned ' + r.status + ' (non-JSON). ' +
+                        (r.status === 403 ? 'CSRF/session — reload and retry.' : ''));
+                }
+                return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+            }).then(function(res) {
+                if (res && res.ok && res.data && res.data.success) {
+                    setStatus('✓ Sent to ' + (res.data.phone || to), 'ok');
+                    setTimeout(function() { if (modal) modal.hide(); }, 900);
+                } else {
+                    setStatus('Failed: ' + ((res && res.data && res.data.error) || 'Unknown error'), 'bad');
+                }
+            }).catch(function(err) {
+                setStatus('Failed: ' + err.message, 'bad');
+            }).finally(function() {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var sel = el('wsmwListInstance');
+            var ta = el('wsmwListMessage');
+            if (sel) sel.addEventListener('change', updateInstanceMeta);
+            if (ta) ta.addEventListener('input', updateCharCount);
+        });
+
+        return { open: open, send: send };
+    })();
 
     </script>
 {% endblock content %}

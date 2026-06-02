@@ -4,55 +4,159 @@
 </div>
 {% endif %}
 
-{% if api_products %}
-<h6 class="text-muted mb-2 mt-3 d-flex align-items-center gap-2">
-    <i class="fa-solid fa-cloud me-1"></i> {{ api_products_platform|title }} Products
-    <span class="badge bg-primary">{{ api_products|length }} variants</span>
-</h6>
-<div class="table-responsive">
-    <table class="table table-sm table-hover align-middle mb-0">
-        <thead class="table-light">
-            <tr>
-                <th style="width:36px">#</th>
-                <th style="width:44px">Img</th>
-                <th>Product</th>
-                <th>Variant</th>
-                <th>SKU</th>
-                <th>Barcode</th>
-                <th>Option 1</th>
-                <th>Option 2</th>
-                <th>Option 3</th>
-                <th class="text-end">Price</th>
-                <th class="text-end">Stock</th>
-                <th>Vendor</th>
-                <th>Type</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in api_products %}
-            <tr>
-                <td class="text-muted small">{{ forloop.counter }}</td>
-                <td>
-                    {% if p.image %}
-                    <img src="{{ p.image }}" alt="" style="max-height:32px;max-width:32px;border-radius:3px;object-fit:cover;cursor:pointer;" onclick="document.getElementById('sldProductImgOverlay').style.display='flex';document.getElementById('sldProductImgFull').src=this.src;">
-                    {% else %}-{% endif %}
-                </td>
-                <td><strong>{{ p.title }}</strong></td>
-                <td><span class="badge bg-light text-dark">{{ p.variant_title|default:"Default" }}</span></td>
-                <td><code class="small">{{ p.sku|default:"-" }}</code></td>
-                <td class="small">{{ p.barcode|default:"-" }}</td>
-                <td class="small">{{ p.option1|default:"-" }}</td>
-                <td class="small">{{ p.option2|default:"-" }}</td>
-                <td class="small">{{ p.option3|default:"-" }}</td>
-                <td class="text-end fw-semibold">{{ p.price|default:"0" }}</td>
-                <td class="text-end {% if p.inventory_qty <= 0 %}text-danger{% else %}text-success{% endif %}">{{ p.inventory_qty }}</td>
-                <td class="small">{{ p.vendor|default:"-" }}</td>
-                <td class="small">{{ p.product_type|default:"-" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+{% if resolved_handle %}
+<div class="alert alert-info py-2 small mb-3">
+    <i class="fa-solid fa-circle-info me-1"></i>
+    Auto-detected Shopify handle <strong>{{ resolved_handle }}</strong> from the custom domain. Saved to the API config.
 </div>
+{% endif %}
+
+{% if import_result %}
+<div class="alert {% if import_result.imported %}alert-success{% else %}alert-warning{% endif %} d-flex align-items-center mb-3">
+    <i class="fa-solid fa-{% if import_result.imported %}circle-check{% else %}circle-info{% endif %} me-2"></i>
+    <div class="flex-grow-1 small">
+        <strong>{{ import_result.imported }}</strong> imported.
+        {% if import_result.skipped_duplicate %}<span class="ms-2"><strong>{{ import_result.skipped_duplicate }}</strong> skipped (duplicate SKU).</span>{% endif %}
+        {% if import_result.skipped_invalid %}<span class="ms-2"><strong>{{ import_result.skipped_invalid }}</strong> skipped (missing title/SKU).</span>{% endif %}
+        <span class="ms-2 text-muted">Refresh the page to see them in <em>Local Products</em>.</span>
+    </div>
+</div>
+{% endif %}
+
+{% if api_products %}
+<form id="sld_api_products_form"
+      hx-post="{% url 'workforce:seller_api_products_import' business.business_id %}"
+      hx-target="#seller-api-products-container"
+      hx-swap="innerHTML"
+      hx-indicator="#sld_api_import_spinner">
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2 mt-3">
+        <h6 class="text-muted mb-0 me-2 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-cloud me-1"></i> {{ api_products_platform|title }} Products
+            <span class="badge bg-primary">{{ api_products|length }} variants</span>
+        </h6>
+        <button type="submit" class="btn btn-sm btn-primary" id="sld_btn_import_selected" disabled>
+            <i class="fa-solid fa-download me-1"></i> Import Selected (<span id="sld_import_count">0</span>)
+        </button>
+        <span id="sld_api_import_spinner" class="htmx-indicator text-muted small">
+            <i class="fa-solid fa-spinner fa-spin me-1"></i> Importing...
+        </span>
+        <span class="text-muted small ms-auto">Already-imported rows are skipped.</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="sld-col-check">
+                        <input type="checkbox" id="sld_chk_all" class="form-check-input" aria-label="Select all">
+                    </th>
+                    <th class="sld-col-num">#</th>
+                    <th class="sld-col-img">Img</th>
+                    <th>Product</th>
+                    <th>Variant</th>
+                    <th>SKU</th>
+                    <th>Barcode</th>
+                    <th>Option 1</th>
+                    <th>Option 2</th>
+                    <th>Option 3</th>
+                    <th class="text-end">Price</th>
+                    <th class="text-end">Stock</th>
+                    <th>Vendor</th>
+                    <th>Type</th>
+                    <th class="sld-col-status">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in api_products %}
+                {% with already_imported=p.sku|yesno:"yes,no" %}
+                <tr>
+                    <td>
+                        {% if p.sku and p.sku in imported_skus %}
+                        <input type="checkbox" class="form-check-input" disabled aria-label="Already imported">
+                        {% else %}
+                        <input type="checkbox" class="form-check-input sld-row-chk"
+                               name="selected" value="{{ forloop.counter0 }}"
+                               aria-label="Select for import">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_title" value="{{ p.title }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_variant_title" value="{{ p.variant_title }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_sku" value="{{ p.sku }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_barcode" value="{{ p.barcode }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_price" value="{{ p.price }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_option1" value="{{ p.option1 }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_vendor" value="{{ p.vendor }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_product_type" value="{{ p.product_type }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_platform_id" value="{{ p.platform_id }}">
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_variant_id" value="{{ p.variant_id }}">
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">{{ forloop.counter }}</td>
+                    <td>
+                        {% if p.image %}
+                        <img src="{{ p.image }}" alt="" class="sld-thumb"
+                             onclick="document.getElementById('sldProductImgOverlay').style.display='flex';document.getElementById('sldProductImgFull').src=this.src;">
+                        {% else %}-{% endif %}
+                    </td>
+                    <td><strong>{{ p.title }}</strong></td>
+                    <td><span class="badge bg-light text-dark">{{ p.variant_title|default:"Default" }}</span></td>
+                    <td><code class="small">{{ p.sku|default:"-" }}</code></td>
+                    <td class="small">{{ p.barcode|default:"-" }}</td>
+                    <td class="small">{{ p.option1|default:"-" }}</td>
+                    <td class="small">{{ p.option2|default:"-" }}</td>
+                    <td class="small">{{ p.option3|default:"-" }}</td>
+                    <td class="text-end fw-semibold">{{ p.price|default:"0" }}</td>
+                    <td class="text-end {% if p.inventory_qty <= 0 %}text-danger{% else %}text-success{% endif %}">{{ p.inventory_qty }}</td>
+                    <td class="small">{{ p.vendor|default:"-" }}</td>
+                    <td class="small">{{ p.product_type|default:"-" }}</td>
+                    <td>
+                        {% if p.sku and p.sku in imported_skus %}
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Imported</span>
+                        {% else %}
+                        <span class="badge bg-light text-muted border">New</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+<script>
+(function() {
+    var form = document.getElementById('sld_api_products_form');
+    if (!form) return;
+    var chkAll = form.querySelector('#sld_chk_all');
+    var rowChks = form.querySelectorAll('.sld-row-chk');
+    var btn = form.querySelector('#sld_btn_import_selected');
+    var countEl = form.querySelector('#sld_import_count');
+
+    function refreshCount() {
+        var n = 0;
+        rowChks.forEach(function(cb) { if (cb.checked) n++; });
+        if (countEl) countEl.textContent = n;
+        if (btn) btn.disabled = (n === 0);
+        if (chkAll) {
+            chkAll.checked = (n > 0 && n === rowChks.length);
+            chkAll.indeterminate = (n > 0 && n < rowChks.length);
+        }
+    }
+    if (chkAll) {
+        chkAll.addEventListener('change', function() {
+            rowChks.forEach(function(cb) { cb.checked = chkAll.checked; });
+            refreshCount();
+        });
+    }
+    rowChks.forEach(function(cb) { cb.addEventListener('change', refreshCount); });
+    form.addEventListener('submit', function(e) {
+        var anyChecked = false;
+        rowChks.forEach(function(cb) { if (cb.checked) anyChecked = true; });
+        if (!anyChecked) { e.preventDefault(); }
+    });
+    refreshCount();
+})();
+</script>
 {% elif not api_products_error and api_products_platform %}
 <div class="text-center text-muted py-3">
     <i class="fa-solid fa-cloud fa-2x mb-2 d-block"></i>

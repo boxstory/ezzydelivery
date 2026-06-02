@@ -17,6 +17,9 @@ urlpatterns = [
     path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
     path('sellers/api-configs/', workforce_views.wf_seller_api_configs, name='wf_seller_api_configs'),
     path('sellers/api-configs/<int:api_id>/approve/', workforce_views.wf_approve_api_config, name='wf_approve_api_config'),
+    path('sellers/api-configs/<int:api_id>/get/', workforce_views.wf_get_api_config, name='wf_get_api_config'),
+    path('sellers/api-configs/<int:api_id>/update/', workforce_views.wf_update_api_config, name='wf_update_api_config'),
+    path('sellers/api-configs/<int:api_id>/delete/', workforce_views.wf_delete_api_config, name='wf_delete_api_config'),
     path('sellers/api-configs/<int:api_id>/test/', workforce_views.wf_test_api_config, name='wf_test_api_config'),
     path('sellers/api-configs/<int:api_id>/test/result/', workforce_views.wf_test_api_config_result, name='wf_test_api_config_result'),
     path('sellers/api-configs/google-sheet/save/', workforce_views.wf_save_google_sheet, name='wf_save_google_sheet'),
@@ -24,6 +27,8 @@ urlpatterns = [
     path('google-sheets/auth/callback/', workforce_views.google_sheets_auth_callback, name='google_sheets_auth_callback'),
     path('sellers/<int:business_id>/', workforce_views.seller_detail, name='seller_detail'),
     path('sellers/<int:business_id>/api-products/', workforce_views.seller_api_products, name='seller_api_products'),
+    path('sellers/<int:business_id>/api-products/import/', workforce_views.seller_api_products_import, name='seller_api_products_import'),
+    path('sellers/<int:business_id>/api-orders/', workforce_views.seller_api_orders, name='seller_api_orders'),
     path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
 
     # Drivers section urls -------------------------------------------------------------------
@@ -63,6 +68,8 @@ urlpatterns = [
     path('orders/api-orders/import/', workforce_views.import_api_orders, name='import_api_orders'),
     path('orders/api-orders/preview/', workforce_views.preview_api_import, name='preview_api_import'),
     path('orders/api-orders/sheet-headers/', workforce_views.wf_sheet_headers, name='wf_sheet_headers'),
+    path('orders/api-orders/sheet-worksheets/', workforce_views.wf_sheet_worksheets, name='wf_sheet_worksheets'),
+    path('orders/api-orders/sheet-save-tab/', workforce_views.wf_sheet_save_tab, name='wf_sheet_save_tab'),
     path('orders/api-orders/source-headers/', workforce_views.wf_source_headers, name='wf_source_headers'),
     path('orders/api-orders/upload-sample-headers/', workforce_views.wf_upload_sample_headers, name='wf_upload_sample_headers'),
     path('orders/api-orders/save-mapping/', workforce_views.wf_save_column_mapping, name='wf_save_column_mapping'),
@@ -84,6 +91,8 @@ urlpatterns = [
 
     # Order detail and actions
     path('orders/<int:order_id>/', workforce_views.order_detail, name='order_detail'),
+    path('orders/<int:order_id>/whatsapp-defaults/', workforce_views.order_whatsapp_defaults, name='order_whatsapp_defaults'),
+    path('orders/<int:order_id>/send-whatsapp/', workforce_views.send_order_whatsapp, name='send_order_whatsapp'),
     path('orders/<int:order_id>/edit/', workforce_views.order_edit, name='order_edit'),
     path('orders/<int:order_id>/items/add/', workforce_views.order_item_add, name='order_item_add'),
     path('orders/<int:order_id>/items/<int:item_id>/update/', workforce_views.order_item_update, name='order_item_update'),
@@ -278,14 +287,20 @@ urlpatterns = [
     path('orders/temp/config/', workforce_views.temp_order_config, name='temp_order_config'),
     path('orders/temp/', workforce_views.temp_orders, name='temp_orders'),
     path('orders/temp/by-date/', workforce_views.temp_orders_by_date, name='temp_orders_by_date'),
+    path('orders/temp/browse/', workforce_views.temp_orders_browse, name='temp_orders_browse'),
     path('orders/temp/sync/', workforce_views.temp_orders_sync, name='temp_orders_sync'),
     path('orders/temp/preview/', workforce_views.temp_orders_preview, name='temp_orders_preview'),
     path('orders/temp/transfer/', workforce_views.temp_orders_transfer, name='temp_orders_transfer'),
     path('orders/temp/auto-import/', workforce_views.temp_orders_auto_import, name='temp_orders_auto_import'),
+    path('orders/temp/delete/', workforce_views.temp_orders_delete, name='temp_orders_delete'),
+    path('orders/temp/resync/', workforce_views.temp_orders_resync, name='temp_orders_resync'),
     path('orders/temp/public-links/', workforce_views.public_link_sources, name='public_link_sources'),
     path('public-link-sources/', workforce_views.public_link_sources_page, name='public_link_sources_page'),
     path('orders/temp/public-links/<int:source_id>/delete/', workforce_views.public_link_source_delete, name='public_link_source_delete'),
     path('orders/temp/public-links/<int:source_id>/save-mapping/', workforce_views.public_link_save_mapping, name='public_link_save_mapping'),
+
+    # Google Sheet Import Sources (UI parallel to OneDrive)
+    path('google-sheet-sources/', workforce_views.google_sheet_sources, name='google_sheet_sources'),
 
     # OneDrive Import Sources
     path('onedrive-sources/', workforce_views.onedrive_sources, name='onedrive_sources'),

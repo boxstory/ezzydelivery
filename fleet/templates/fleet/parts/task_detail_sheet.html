@@ -207,15 +207,15 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             <label class="td-form-label"><i class="fa-solid fa-credit-card me-1"></i>Payment Mode</label>
             <div class="td-payment-methods">
                 <label class="td-payment-radio">
-                    <input type="radio" name="tdPaymentMethod" value="cash" checked>
+                    <input type="radio" name="tdPaymentMethod" value="cash" onchange="onPaymentMethodPick(this)">
                     <span class="td-payment-radio__label"><i class="fa-solid fa-money-bill"></i> Cash</span>
                 </label>
                 <label class="td-payment-radio">
-                    <input type="radio" name="tdPaymentMethod" value="pos">
+                    <input type="radio" name="tdPaymentMethod" value="pos" onchange="onPaymentMethodPick(this)">
                     <span class="td-payment-radio__label"><i class="fa-solid fa-credit-card"></i> POS</span>
                 </label>
                 <label class="td-payment-radio">
-                    <input type="radio" name="tdPaymentMethod" value="fawran">
+                    <input type="radio" name="tdPaymentMethod" value="fawran" onchange="onPaymentMethodPick(this)">
                     <span class="td-payment-radio__label"><i class="fa-solid fa-mobile-screen"></i> Fawran</span>
                 </label>
             </div>
@@ -276,14 +276,18 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         <div class="td-form-group">
             <label class="td-form-label"><i class="fa-solid fa-triangle-exclamation me-1"></i>Reason for Failure <span style="color:var(--fleet-danger)">*</span></label>
             <div class="td-reason-grid">
-                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Customer not reachable')">Not Reachable</button>
-                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Customer refused delivery')">Refused</button>
-                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Wrong address')">Wrong Address</button>
-                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Customer not home')">Not Home</button>
-                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'No COD cash available')">No COD Cash</button>
-                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Postponed by customer')">Postponed</button>
+                <button type="button" class="td-reason-btn" data-reason-key="customer_unreachable" onclick="selectReason(this)">Not Reachable</button>
+                <button type="button" class="td-reason-btn" data-reason-key="customer_refused" onclick="selectReason(this)">Refused</button>
+                <button type="button" class="td-reason-btn" data-reason-key="wrong_address" onclick="selectReason(this)">Wrong Address</button>
+                <button type="button" class="td-reason-btn" data-reason-key="customer_not_home" onclick="selectReason(this)">Not Home</button>
+                <button type="button" class="td-reason-btn" data-reason-key="cod_amount_dispute" onclick="selectReason(this)">No COD Cash</button>
+                <button type="button" class="td-reason-btn" data-reason-key="customer_requested_reschedule" onclick="selectReason(this)">Postponed</button>
+                <button type="button" class="td-reason-btn" data-reason-key="address_not_found" onclick="selectReason(this)">Address Not Found</button>
+                <button type="button" class="td-reason-btn" data-reason-key="vehicle_issue" onclick="selectReason(this)">Vehicle Issue</button>
+                <button type="button" class="td-reason-btn" data-reason-key="other" onclick="selectReason(this)">Other</button>
             </div>
-            <textarea id="tdFailReason" class="td-form-textarea" placeholder="Add notes (or type custom reason)..." rows="2"></textarea>
+            <input type="hidden" id="tdFailReasonKey" value="">
+            <textarea id="tdFailReason" class="td-form-textarea" placeholder="Add extra notes (optional)..." rows="2"></textarea>
         </div>
         <button id="tdFailedBtn" class="fleet-btn td-confirm-btn td-confirm-btn--danger" onclick="submitFailed()">
             <i class="fa-solid fa-xmark me-2"></i>Confirm Failed
@@ -838,11 +842,15 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         document.getElementById('tdCodCollected').checked = false;
         document.getElementById('tdCodAmountRow').style.display = 'none';
         document.getElementById('tdFailReason').value = '';
+        document.getElementById('tdFailReasonKey').value = '';
         document.querySelectorAll('.td-reason-btn').forEach(b => b.classList.remove('selected'));
-        // Pre-select payment method from task data
-        const pm = card.dataset.paymentMethod || 'cash';
-        const pmRadio = document.querySelector(`input[name="tdPaymentMethod"][value="${pm}"]`);
-        if (pmRadio) pmRadio.checked = true;
+        // Pre-select payment method from task data (clear all first — no silent default)
+        document.querySelectorAll('input[name="tdPaymentMethod"]').forEach(r => r.checked = false);
+        const pm = card.dataset.paymentMethod;
+        if (pm) {
+            const pmRadio = document.querySelector(`input[name="tdPaymentMethod"][value="${pm}"]`);
+            if (pmRadio) pmRadio.checked = true;
+        }
         // Pre-fill split payment inputs from task data
         const splitCash = card.dataset.paymentSplitCash || '';
         const splitPos = card.dataset.paymentSplitPos || '';
@@ -914,13 +922,23 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
     window.toggleCodAmount = function(chk) {
         document.getElementById('tdCodAmountRow').style.display = chk.checked ? '' : 'none';
         if (chk.checked) {
-            // Pre-fill cash with full COD amount
-            const codAmt = parseFloat(document.getElementById('tdCodAmount').value) || 0;
-            document.getElementById('tdSplitCash').value = codAmt > 0 ? codAmt.toFixed(2) : '';
+            // Clear split rows — driver must enter the breakdown explicitly
+            document.getElementById('tdSplitCash').value = '';
             document.getElementById('tdSplitPos').value = '';
             document.getElementById('tdSplitFawran').value = '';
             updateRemaining();
         }
+    };
+
+    window.onPaymentMethodPick = function(radio) {
+        if (!radio.checked) return;
+        const codAmt = parseFloat(document.getElementById('tdCodAmount').value) || 0;
+        if (codAmt <= 0) return;
+        const map = { cash: 'tdSplitCash', pos: 'tdSplitPos', fawran: 'tdSplitFawran' };
+        Object.values(map).forEach(id => { document.getElementById(id).value = ''; });
+        const fillId = map[radio.value];
+        if (fillId) document.getElementById(fillId).value = codAmt.toFixed(2);
+        updateRemaining();
     };
 
     window.updateRemaining = function() {
@@ -936,6 +954,17 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             document.getElementById('tdRemaining').style.color = 'var(--fleet-warning)';
         } else {
             document.getElementById('tdRemaining').style.color = 'var(--fleet-success)';
+        }
+
+        // If no payment mode is selected yet, auto-select the dominant split method
+        const alreadyPicked = document.querySelector('input[name="tdPaymentMethod"]:checked');
+        if (!alreadyPicked) {
+            const max = Math.max(cash, pos, fawran);
+            if (max > 0) {
+                const dominant = cash === max ? 'cash' : (fawran === max ? 'fawran' : 'pos');
+                const r = document.querySelector(`input[name="tdPaymentMethod"][value="${dominant}"]`);
+                if (r) r.checked = true;
+            }
         }
     };
 
@@ -956,6 +985,13 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             return;
         }
 
+        // Payment mode must be explicitly selected — no silent defaulting
+        const selectedPay = document.querySelector('input[name="tdPaymentMethod"]:checked');
+        if (!selectedPay) {
+            showToast('⚠️ Please select a Payment Mode (Cash / POS / Fawran) before confirming.', 'error');
+            return;
+        }
+
         // If COD collected, validate split payment totals match COD amount
         if (codCollected) {
             const codAmt = parseFloat(document.getElementById('tdCodAmount').value) || 0;
@@ -966,6 +1002,18 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             if (Math.abs(total - codAmt) > 0.01) {
                 showToast(`⚠️ Split payments (${total.toFixed(2)} QR) must equal COD amount (${codAmt.toFixed(2)} QR)`, 'error');
                 return;
+            }
+
+            // Split's largest-amount method must match the selected Payment Mode
+            const splitByMethod = { cash, pos, fawran };
+            const splitMax = Math.max(cash, pos, fawran);
+            if (splitMax > 0) {
+                const dominant = Object.keys(splitByMethod).find(k => splitByMethod[k] === splitMax);
+                if (dominant !== selectedPay.value) {
+                    const nice = { cash: 'Cash', pos: 'POS', fawran: 'Fawran' };
+                    showToast(`⚠️ Payment Mode (${nice[selectedPay.value]}) doesn't match the largest split (${nice[dominant]} ${splitMax.toFixed(2)} QR). Fix the breakdown or the mode.`, 'error');
+                    return;
+                }
             }
         }
 
@@ -1017,23 +1065,29 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         document.getElementById('tdFailedSheet').classList.remove('open');
     };
 
-    window.selectReason = function(btn, reason) {
+    window.selectReason = function(btn) {
         document.querySelectorAll('.td-reason-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
-        const ta = document.getElementById('tdFailReason');
-        ta.value = reason;
+        const key = btn.getAttribute('data-reason-key') || '';
+        document.getElementById('tdFailReasonKey').value = key;
     };
 
     window.submitFailed = function() {
-        const reason = document.getElementById('tdFailReason').value.trim();
-        if (!reason) { showToast('Please enter a reason for failure', 'warning'); return; }
+        const reasonKey = document.getElementById('tdFailReasonKey').value.trim();
+        const notes = document.getElementById('tdFailReason').value.trim();
+        if (!reasonKey) { showToast('Please select a failure reason', 'warning'); return; }
         const btn = document.getElementById('tdFailedBtn');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const fd = new FormData();
         fd.append('status', 'failed');
-        fd.append('notes', reason);
+        fd.append('failure_reason', reasonKey);
+        fd.append('failure_notes', notes);
+        // keep `notes` for the order status history label
+        const selectedBtn = document.querySelector('.td-reason-btn.selected');
+        const reasonLabel = selectedBtn ? selectedBtn.textContent.trim() : reasonKey;
+        fd.append('notes', notes ? (reasonLabel + ' — ' + notes) : reasonLabel);
         fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf },
