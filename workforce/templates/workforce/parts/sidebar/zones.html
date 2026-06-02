@@ -1,0 +1,26 @@
+{% load workforce_tags %}
+{% url 'delivery:zone_map' as u_zone_map %}
+{% url 'delivery:zone_list' as u_zone_list %}
+{% url 'delivery:zone_groups' as u_zone_groups %}
+{% url 'delivery:zone_areas' as u_zone_areas %}
+{% url 'workforce:qnas_lookup_tool' as u_qnas_lookup_tool %}
+{% url 'workforce:qnas_test' as u_qnas_test %}
+{% with active="zone_map,zone_list,zone_groups,zone_areas,qnas_test,qnas_lookup_tool" %}
+<li id="workforce_sidebar_menu_zones" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_zones" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-zones" data-title="Zones">
+    <i class="fa-solid fa-map-location-dot me-2"></i>
+    <span>Zones</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-zones" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_zone_map" url=u_zone_map icon="fa-solid fa-map" label="Zone Map" active_names="zone_map" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_zone_list" url=u_zone_list icon="fa-solid fa-list" label="Zone List" active_names="zone_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_zone_groups" url=u_zone_groups icon="fa-solid fa-layer-group" label="Zone Groups" active_names="zone_groups" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_zone_areas" url=u_zone_areas icon="fa-solid fa-location-dot" label="Zone Areas" active_names="zone_areas" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_qnas_lookup" url=u_qnas_lookup_tool icon="fa-solid fa-search-location" label="QNAS Lookup" active_names="qnas_lookup_tool" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_qnas_test" url=u_qnas_test icon="fa-solid fa-flask" label="QNAS API Test" active_names="qnas_test" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

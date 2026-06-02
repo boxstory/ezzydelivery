@@ -1,0 +1,408 @@
+{% comment %}
+Purpose: Temp Order detail modal
+Used by: temp_orders.html, temp_orders_browse.html
+Notes:   needs CSRF token on host page
+{% endcomment %}
+
+<div class="modal fade" id="tempOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title"><i class="fa-solid fa-file-lines me-2"></i>Temp Order Detail</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3" id="tempOrderModalBody"></div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-info btn-sm text-white" id="tempOrderRefetchBtn"
+                        title="Re-fetch this row from its upstream source and refresh the popup">
+                    <i class="fa-solid fa-rotate me-1"></i>Refetch from source
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    // Idempotent: do not redefine if the host page already declared these.
+    if (typeof window.escHtml !== 'function') {
+        window.escHtml = function (s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+    }
+
+    if (typeof window.DB_FIELDS === 'undefined') {
+        window.DB_FIELDS = [
+            {key: 'client_order_code', label: 'Order ID', group: 'Order'},
+            {key: 'order_date', label: 'Order Date', group: 'Order'},
+            {key: 'customer_name', label: 'Customer Name *', group: 'Customer'},
+            {key: 'customer_phone', label: 'Phone 1 *', group: 'Customer'},
+            {key: 'customer_whatsapp', label: 'Phone 2 / WhatsApp', group: 'Customer'},
+            {key: 'customer_email', label: 'Email', group: 'Customer'},
+            {key: 'customer_address', label: 'Customer Address *', group: 'Address'},
+            {key: 'dl_landmark', label: 'City / Landmark', group: 'Address'},
+            {key: 'dl_building', label: 'Villa / Building No', group: 'Address'},
+            {key: 'dl_street', label: 'Street No', group: 'Address'},
+            {key: 'dl_zone', label: 'Zone No', group: 'Address'},
+            {key: 'location_link', label: 'Location Link', group: 'Address'},
+            {key: 'dl_latitude', label: 'Latitude', group: 'Address'},
+            {key: 'dl_longitude', label: 'Longitude', group: 'Address'},
+            {key: 'deadline_date', label: 'Day & Time Preference', group: 'Delivery'},
+            {key: 'package_desc', label: 'Package Desc', group: 'Package'},
+            {key: 'package_qty', label: 'Package Qty', group: 'Package'},
+            {key: 'cod_amount', label: 'Price / COD Amount', group: 'Package'},
+            {key: 'product_1', label: 'Product 1', group: 'Products'},
+            {key: 'count_1', label: 'Count 1', group: 'Products'},
+            {key: 'product_2', label: 'Product 2', group: 'Products'},
+            {key: 'count_2', label: 'Count 2', group: 'Products'},
+            {key: 'product_3', label: 'Product 3', group: 'Products'},
+            {key: 'count_3', label: 'Count 3', group: 'Products'},
+            {key: 'product_4', label: 'Product 4', group: 'Products'},
+            {key: 'count_4', label: 'Count 4', group: 'Products'},
+            {key: 'product_5', label: 'Product 5', group: 'Products'},
+            {key: 'count_5', label: 'Count 5', group: 'Products'},
+            {key: 'product_6', label: 'Product 6', group: 'Products'},
+            {key: 'count_6', label: 'Count 6', group: 'Products'},
+            {key: 'product_7', label: 'Product 7', group: 'Products'},
+            {key: 'count_7', label: 'Count 7', group: 'Products'},
+            {key: 'product_8', label: 'Product 8', group: 'Products'},
+            {key: 'count_8', label: 'Count 8', group: 'Products'},
+            {key: 'product_9', label: 'Product 9', group: 'Products'},
+            {key: 'count_9', label: 'Count 9', group: 'Products'},
+            {key: 'product_10', label: 'Product 10', group: 'Products'},
+            {key: 'count_10', label: 'Count 10', group: 'Products'},
+            {key: 'seller_notes', label: 'Notes By Seller', group: 'Notes'},
+            {key: 'internal_notes', label: 'Notes By Ezzy', group: 'Notes'},
+        ];
+    }
+
+    function _csrfToken() {
+        const inp = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (inp) return inp.value;
+        const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+        return c ? c.split('=')[1].trim() : '';
+    }
+
+    if (typeof window.showDetail !== 'function') {
+        window.showDetail = async function (el) {
+            const d = el.dataset;
+            const tempId = parseInt(d.tempId || d.id, 10);
+            const modalEl = document.getElementById('tempOrderModal');
+            modalEl.dataset.currentTempId = String(tempId);
+            modalEl.dataset.currentSourceEl = '';
+            // Keep a back-reference so Refetch can re-render against the same source dataset.
+            window.__tempOrderSourceEl = el;
+
+            const body = document.getElementById('tempOrderModalBody');
+            body.innerHTML = `<div class="text-center py-4">
+                <i class="fa-solid fa-spinner fa-spin fa-2x text-muted"></i>
+                <p class="mt-2 text-muted small mb-0">Loading full detail...</p>
+            </div>`;
+            new bootstrap.Modal(modalEl).show();
+
+            try {
+                const resp = await fetch('{% url "workforce:temp_orders_preview" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _csrfToken() },
+                    body: JSON.stringify({ ids: [tempId] }),
+                });
+                const data = await resp.json();
+                if (!data.success || !data.rows || !data.rows.length) {
+                    body.innerHTML = `<div class="p-3 text-danger">${window.escHtml(data.error || 'Failed to load detail')}</div>`;
+                    return;
+                }
+                window.renderTempOrderDetail(data.rows[0], d);
+            } catch (e) {
+                body.innerHTML = `<div class="p-3 text-danger">Error: ${window.escHtml(e.message)}</div>`;
+            }
+        };
+    }
+
+    if (typeof window.refetchCurrentTempOrder !== 'function') {
+        window.refetchCurrentTempOrder = async function () {
+            const modalEl = document.getElementById('tempOrderModal');
+            const tempId = parseInt(modalEl.dataset.currentTempId || '0', 10);
+            if (!tempId) { alert('No temp order loaded.'); return; }
+
+            const btn = document.getElementById('tempOrderRefetchBtn');
+            const orig = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Refetching…';
+
+            try {
+                const resp = await fetch('{% url "workforce:temp_orders_resync" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _csrfToken() },
+                    body: JSON.stringify({ ids: [tempId] }),
+                });
+                const result = await resp.json();
+                if (!result.success) {
+                    alert('Refetch failed: ' + (result.error || 'unknown error'));
+                    return;
+                }
+                if (result.errors && result.errors.length) {
+                    alert('Refetch reported errors: ' + result.errors.map(e => e.error || JSON.stringify(e)).join('; '));
+                }
+
+                // Update the underlying table row (browse / temp_orders pages both use data-temp-id="N").
+                (result.rows || []).forEach(r => {
+                    const row = document.querySelector(`tr[data-temp-id="${r.id}"]`);
+                    if (!row) return;
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 8) {
+                        if (cells[4]) cells[4].textContent = r.client_order_code || '—';
+                        if (cells[5]) cells[5].textContent = r.customer_name || '—';
+                        if (cells[7]) cells[7].textContent = r.customer_address || '—';
+                    }
+                    if (r.changed) {
+                        row.style.transition = 'background-color 1.2s';
+                        row.style.backgroundColor = '#fff3cd';
+                        setTimeout(() => row.style.backgroundColor = '', 1500);
+                    }
+                });
+
+                // Re-render the popup body against the freshly-synced row.
+                const sourceEl = window.__tempOrderSourceEl || modalEl;
+                await window.showDetail(sourceEl);
+
+                // Inline feedback at top of popup so the user can SEE that the
+                // fetch ran, whether it changed anything, and (if 0) understand why.
+                const body = document.getElementById('tempOrderModalBody');
+                if (body) {
+                    const sourceLabel = (modalEl.dataset.sourceTypeHint || '').toLowerCase();
+                    const isSheet = ['onedrive','google_sheet','public_link',''].some(s => sourceLabel.includes(s));
+                    let banner;
+                    if (result.updated > 0) {
+                        banner = `<div class="alert alert-success py-2 px-3 mb-2 small">
+                            <i class="fa-solid fa-check-circle me-1"></i>
+                            Refetched from source — <strong>${result.updated} field(s) changed</strong>. See Change Timeline below.
+                        </div>`;
+                    } else {
+                        const lagHint = isSheet
+                            ? '<div class="text-muted small mt-1"><i class="fa-solid fa-info-circle me-1"></i>If you just edited the sheet in Excel Online, SharePoint may take 10–30 s to publish the new version to the download link. Wait a moment and click again.</div>'
+                            : '';
+                        banner = `<div class="alert alert-secondary py-2 px-3 mb-2 small">
+                            <i class="fa-solid fa-rotate me-1"></i>
+                            Refetched from source — <strong>no changes detected</strong>. Live data matches stored data.
+                            ${lagHint}
+                        </div>`;
+                    }
+                    body.insertAdjacentHTML('afterbegin', banner);
+                }
+            } catch (e) {
+                alert('Refetch error: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            }
+        };
+    }
+
+    document.addEventListener('click', function (ev) {
+        const btn = ev.target.closest('#tempOrderRefetchBtn');
+        if (btn) window.refetchCurrentTempOrder();
+    });
+
+    if (typeof window.renderTempOrderDetail !== 'function') {
+        window.renderTempOrderDetail = function (r, d) {
+            const escHtml = window.escHtml;
+            const DB_FIELDS = window.DB_FIELDS;
+
+            const statusBadge = r.status === 'imported' ? '<span class="badge bg-success">Imported</span>'
+                : r.status === 'skipped' ? '<span class="badge bg-secondary">Skipped</span>'
+                : '<span class="badge bg-warning text-dark">New</span>';
+            const srcIcon = { onedrive:'<i class="fa-solid fa-cloud me-1"></i>OneDrive', google_sheet:'<i class="fa-solid fa-table me-1"></i>Google Sheet',
+                shopify:'<i class="fa-brands fa-shopify me-1"></i>Shopify', woocommerce:'<i class="fa-brands fa-wordpress me-1"></i>WooCommerce',
+                public_link:'<i class="fa-solid fa-link me-1"></i>Public Link' }[r.source_type] || r.source_type;
+
+            let importedOrderHtml = '';
+            // Prefer live values from the preview response; fall back to the trigger
+            // element's data attrs (which may be stale after an in-session import).
+            const impOrderId = r.imported_order_id || d.importedOrderId || '';
+            const impOrderNo = r.imported_order_number || d.importedOrderNo || '';
+            if (r.status === 'imported' && impOrderNo) {
+                const viewUrl = `/workforce/orders/${impOrderId}/`;
+                importedOrderHtml = `<div class="d-flex align-items-center gap-2 mt-2 mb-1">
+                    <span class="badge bg-success">Imported</span>
+                    <span class="fw-semibold">${escHtml(impOrderNo)}</span>
+                    <a href="${viewUrl}" class="btn btn-sm btn-outline-primary py-0 px-2" target="_blank">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>View Order
+                    </a>
+                </div>`;
+            }
+
+            const groups = {};
+            DB_FIELDS.forEach(f => {
+                const v = r[f.key];
+                if (v == null || String(v).trim() === '') return;
+                if (!groups[f.group]) groups[f.group] = [];
+                groups[f.group].push({ label: f.label.replace(/ \*$/, ''), value: String(v) });
+            });
+
+            const groupIcon = {
+                'Order':    'fa-solid fa-receipt',
+                'Customer': 'fa-solid fa-user',
+                'Address':  'fa-solid fa-location-dot',
+                'Delivery': 'fa-solid fa-truck',
+                'Package':  'fa-solid fa-box',
+                'Products': 'fa-solid fa-list',
+                'Notes':    'fa-solid fa-note-sticky',
+            };
+
+            const groupOrder = ['Order', 'Customer', 'Address', 'Delivery', 'Package', 'Products', 'Notes'];
+            let groupsHtml = '<div class="row g-2">';
+            groupOrder.forEach(g => {
+                if (!groups[g]) return;
+                const colCls = (g === 'Products' || g === 'Notes') ? 'col-12' : 'col-md-6';
+                groupsHtml += `<div class="${colCls}">
+                    <div class="border rounded h-100">
+                        <div class="px-2 py-1 bg-light border-bottom small fw-semibold">
+                            <i class="${groupIcon[g] || 'fa-solid fa-circle-info'} me-1 text-muted"></i>${g}
+                        </div>
+                        <table class="table table-sm small mb-0">
+                            <tbody>`;
+                groups[g].forEach(item => {
+                    groupsHtml += `<tr>
+                        <td class="text-muted" style="width:130px">${escHtml(item.label)}</td>
+                        <td>${escHtml(item.value)}</td>
+                    </tr>`;
+                });
+                groupsHtml += `</tbody></table></div></div>`;
+            });
+            groupsHtml += '</div>';
+
+            const metaHtml = `<div class="border rounded p-2 mb-2 bg-light small">
+                <div class="d-flex flex-wrap gap-3 align-items-center">
+                    <span><span class="text-muted">Status:</span> ${statusBadge}</span>
+                    <span><span class="text-muted">Source:</span> ${srcIcon} <span class="text-muted">${escHtml(r.source_label||'')}</span></span>
+                    <span><span class="text-muted">Business:</span> <span class="fw-semibold">${escHtml(r.business_name||'')}</span></span>
+                    ${r.sheet_name ? `<span><span class="text-muted">Sheet:</span> ${escHtml(r.sheet_name)}</span>` : ''}
+                    ${r.row_num ? `<span><span class="text-muted">Row #:</span> ${r.row_num}</span>` : ''}
+                    ${r.platform_id ? `<span><span class="text-muted">Platform ID:</span> ${escHtml(r.platform_id)}</span>` : ''}
+                </div>
+            </div>`;
+
+            let rawHtml = '';
+            const raw = r.raw_row;
+            const emptyCell = '<span class="text-muted fst-italic">empty</span>';
+            if (Array.isArray(raw) && raw.length) {
+                const headers = r.raw_headers || [];
+                const rowCount = Math.max(raw.length, headers.length);
+                rawHtml = '<details class="mt-3"><summary class="fw-semibold small text-muted"><i class="fa-solid fa-database me-1"></i>Raw Row Data</summary>'
+                    + '<div class="table-responsive mt-2"><table class="table table-sm table-bordered small mb-0"><tbody>';
+                for (let i = 0; i < rowCount; i++) {
+                    const cell = raw[i];
+                    const colLabel = headers[i] || ('Col ' + (i+1));
+                    const display = (cell == null || cell === '') ? emptyCell : escHtml(cell);
+                    rawHtml += `<tr><td class="text-muted" style="width:160px">${escHtml(colLabel)}</td><td>${display}</td></tr>`;
+                }
+                rawHtml += '</tbody></table></div></details>';
+            } else if (raw && typeof raw === 'object') {
+                const keys = Object.keys(raw);
+                if (keys.length) {
+                    rawHtml = '<details class="mt-3"><summary class="fw-semibold small text-muted"><i class="fa-solid fa-database me-1"></i>Raw Row Data</summary>'
+                        + '<div class="table-responsive mt-2"><table class="table table-sm table-bordered small mb-0"><tbody>';
+                    keys.forEach(k => {
+                        const v = raw[k];
+                        const display = (v == null || v === '') ? emptyCell : escHtml(String(v));
+                        rawHtml += `<tr><td class="text-muted" style="width:160px">${escHtml(k)}</td><td>${display}</td></tr>`;
+                    });
+                    rawHtml += '</tbody></table></div></details>';
+                }
+            }
+
+            const syncedAt = d.syncedAt || '';
+            const createdAt = d.createdAt || '';
+            const tsLine = (syncedAt || createdAt) ? `<div class="d-flex gap-3 mt-2 small text-muted">
+                ${syncedAt ? `<span><i class="fa-regular fa-clock me-1"></i>Synced: ${escHtml(syncedAt)}</span>` : ''}
+                ${createdAt ? `<span><i class="fa-regular fa-calendar me-1"></i>Created: ${escHtml(createdAt)}</span>` : ''}
+            </div>` : '';
+
+            const history = Array.isArray(r.change_history) ? r.change_history : [];
+            const sourceBadge = (src) => {
+                const map = {
+                    'resync-api': 'bg-info', 'resync-mapping': 'bg-secondary',
+                    'sync-shopify': 'bg-success', 'sync-woocommerce': 'bg-success',
+                    'sync-onedrive': 'bg-primary', 'sync-google-sheet': 'bg-primary',
+                    'sync-public-link': 'bg-primary',
+                    'auto-import': 'bg-dark',
+                    'refetch-shopify': 'bg-info', 'refetch-woocommerce': 'bg-info',
+                    'refetch-onedrive': 'bg-info', 'refetch-google_sheet': 'bg-info',
+                    'refetch-public_link': 'bg-info',
+                };
+                return `<span class="badge ${map[src] || 'bg-light text-dark border'} text-white">${escHtml(src)}</span>`;
+            };
+            const fmtVal = (v) => {
+                if (v === null || v === undefined || v === '') return '<span class="text-muted fst-italic">empty</span>';
+                return escHtml(String(v));
+            };
+            const dbFieldLabel = {};
+            (window.DB_FIELDS || []).forEach(f => { dbFieldLabel[f.key] = f.label.replace(/ \*$/, ''); });
+            const keymap = (r && r.change_log_keymap) || {};
+            const fieldLabel = (raw) => {
+                // 1. Direct DB field key (e.g. 'customer_name' → 'Customer Name')
+                if (raw in dbFieldLabel) {
+                    return `${escHtml(dbFieldLabel[raw])} <span class="text-muted">(${escHtml(raw)})</span>`;
+                }
+                // 2. Sheet header name mapped to a DB field (e.g. 'Note' → seller_notes → 'Notes By Seller')
+                const dbField = keymap[raw];
+                if (dbField && dbField in dbFieldLabel) {
+                    return `${escHtml(dbFieldLabel[dbField])} <span class="text-muted">(${escHtml(raw)})</span>`;
+                }
+                // 3. Unmapped raw header — show as-is
+                return `<code>${escHtml(raw)}</code>`;
+            };
+            let timelineBody;
+            if (history.length) {
+                const items = history.slice().reverse().map(entry => {
+                    const changes = entry.changes || {};
+                    const hasChanges = Object.keys(changes).length > 0;
+                    // Audit entry (no diff) — render as a single-line pulse.
+                    if (!hasChanges) {
+                        const note = entry.note ? `<span class="text-muted ms-2">— ${escHtml(entry.note)}</span>` : '';
+                        return `<li class="mb-2 small">
+                            <i class="fa-regular fa-circle-dot me-1 text-muted"></i>${escHtml(entry.at || '')}
+                            ${sourceBadge(entry.source || 'unknown')}${note}
+                        </li>`;
+                    }
+                    const rows = Object.keys(changes).map(field => {
+                        const [b, a] = changes[field];
+                        return `<tr>
+                            <td class="text-muted small" style="width:200px">${fieldLabel(field)}</td>
+                            <td class="small">${fmtVal(b)}</td>
+                            <td class="text-muted text-center" style="width:24px">→</td>
+                            <td class="small">${fmtVal(a)}</td>
+                        </tr>`;
+                    }).join('');
+                    return `<li class="mb-2">
+                        <div class="small text-muted mb-1">
+                            <i class="fa-regular fa-clock me-1"></i>${escHtml(entry.at || '')}
+                            ${sourceBadge(entry.source || 'unknown')}
+                        </div>
+                        <div class="table-responsive"><table class="table table-sm table-bordered small mb-0"><tbody>${rows}</tbody></table></div>
+                    </li>`;
+                }).join('');
+                timelineBody = `<ol class="list-unstyled mt-2 mb-0">${items}</ol>`;
+            } else {
+                timelineBody = `<div class="small text-muted mt-2 fst-italic">
+                    No changes logged yet. Entries appear here after a Refetch, Resync, or scheduled sync detects a field change.
+                </div>`;
+            }
+            const timelineCount = history.length
+                ? ` <span class="text-muted">(${history.length} ${history.length === 1 ? 'entry' : 'entries'})</span>`
+                : '';
+            const timelineHtml = `<details class="mt-3" open>
+                <summary class="fw-semibold small text-muted">
+                    <i class="fa-solid fa-clock-rotate-left me-1"></i>Change Timeline${timelineCount}
+                </summary>
+                ${timelineBody}
+            </details>`;
+
+            document.getElementById('tempOrderModalBody').innerHTML = `
+                ${metaHtml}
+                ${groupsHtml}
+                ${importedOrderHtml}
+                ${tsLine}${rawHtml}${timelineHtml}`;
+        };
+    }
+})();
+</script>

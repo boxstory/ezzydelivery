@@ -67,6 +67,30 @@
                 {% endfor %}
             </div>
         </form>
+
+        <hr style="margin:var(--spacing-md) 0; border:0; border-top:1px solid var(--fleet-grey-200);">
+
+        <form method="POST" action="{% url 'fleet:driver_settings' %}" id="notifyForm">
+            {% csrf_token %}
+            <label class="fleet-avail__option" style="display:flex; align-items:center; justify-content:space-between; gap:var(--spacing-sm);
+                          padding:var(--spacing-md); border-radius:var(--radius-sm);
+                          border:2px solid {% if driver.to_be_notified %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
+                          background:{% if driver.to_be_notified %}var(--fleet-grey-50){% else %}var(--fleet-white){% endif %};
+                          cursor:pointer;">
+                <div>
+                    <div style="font-size:var(--font-size-sm); font-weight:700;">
+                        <i class="fa-solid fa-bell" style="margin-right:0.4rem;"></i>Receive task notifications
+                    </div>
+                    <div style="font-size:var(--font-size-xs); color:var(--fleet-grey-600); margin-top:0.25rem;">
+                        Get a WhatsApp ping when a new task is published. Turn off to stay assigned without alerts.
+                    </div>
+                </div>
+                <input type="checkbox" name="to_be_notified" value="1"
+                       {% if driver.to_be_notified %}checked{% endif %}
+                       onchange="document.getElementById('notifyForm').submit();"
+                       style="width:1.25rem; height:1.25rem; flex-shrink:0; cursor:pointer; accent-color:var(--fleet-primary);">
+            </label>
+        </form>
     </div>
 </div>
 

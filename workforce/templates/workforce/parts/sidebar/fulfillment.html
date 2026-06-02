@@ -1,0 +1,20 @@
+{% load workforce_tags %}
+{% url 'workforce:suppliers_list' as u_suppliers_list %}
+{% url 'workforce:fulfilled_orders_list' as u_fulfilled_orders_list %}
+{% url 'workforce:warehouses_list' as u_warehouses_list %}
+{% with active="suppliers_list,fulfilled_orders_list,warehouses_list" %}
+<li id="workforce_sidebar_menu_fulfillment" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_fulfillment" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-fulfillment" data-title="Fulfillment">
+    <i class="fa-solid fa-truck-ramp-box me-2"></i>
+    <span>Fulfillment</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-fulfillment" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_suppliers" url=u_suppliers_list icon="fa-solid fa-building" label="Businesses" active_names="suppliers_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_purchase_orders" url=u_fulfilled_orders_list icon="fa-solid fa-receipt" label="Purchase Orders" active_names="fulfilled_orders_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_warehouses_list" url=u_warehouses_list icon="fa-solid fa-warehouse" label="WH-Business Links" active_names="warehouses_list" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

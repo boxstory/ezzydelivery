@@ -1,0 +1,22 @@
+{% load workforce_tags %}
+{% url 'workforce:auto_triggers_list' as u_auto_triggers_list %}
+{% url 'workforce:auto_flows_list' as u_auto_flows_list %}
+{% url 'workforce:auto_flow_add' as u_auto_flow_add %}
+{% url 'workforce:whatsapp_instances_list' as u_whatsapp_instances_list %}
+{% with active="auto_triggers_list,auto_flows_list,auto_flow_add,auto_flow_edit,auto_flow_logs,whatsapp_instances_list" %}
+<li id="workforce_sidebar_menu_triggers" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_triggers" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-triggers" data-title="Auto Triggers">
+    <i class="fa-solid fa-bolt me-2"></i>
+    <span>Auto Triggers</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-triggers" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_auto_triggers" url=u_auto_triggers_list icon="fa-solid fa-list" label="All Triggers" active_names="auto_triggers_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_auto_flows" url=u_auto_flows_list icon="fa-solid fa-diagram-project" label="Flows" active_names="auto_flows_list,auto_flow_edit,auto_flow_logs" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_auto_flow_add" url=u_auto_flow_add icon="fa-solid fa-plus" label="Add Flow" active_names="auto_flow_add" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wa_instances" url=u_whatsapp_instances_list icon="fa-brands fa-whatsapp" label="WA Instances" active_names="whatsapp_instances_list" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

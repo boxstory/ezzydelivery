@@ -181,6 +181,8 @@ _DASHBOARD_HTML = r"""<!doctype html>
       <div class="wa-qr-hint">Open WhatsApp → Linked devices → Link a device</div>
     </div>
     <div class="wa-foot">
+      <a href="/waha/wa-chats/" target="_blank" rel="noopener">Chat Dashboard</a>
+      <span class="sep">·</span>
       <a href="/waha/" target="_blank" rel="noopener">WAHA Swagger</a>
       <span class="sep">·</span>
       <a href="/waha/api/sessions/%SESSION%" target="_blank" rel="noopener">Raw session JSON</a>
@@ -244,6 +246,32 @@ _DASHBOARD_HTML = r"""<!doctype html>
     descEl.textContent = 'Connected as: ' + formatPhone(data && data.me);
     clearActions();
     hideQr();
+    const btn = makeBtn('Logout (unlink this device)', { danger: true });
+    btn.addEventListener('click', async function () {
+      if (!window.confirm('Log out the WhatsApp session? This unlinks the '
+        + 'device — you will need to re-scan a QR code to reconnect.')) {
+        return;
+      }
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = 'Logging out…';
+      try {
+        await fetch('/waha/api/sessions/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ name: SESSION })
+        });
+      } catch (e) {
+        // best-effort; status poll will reflect outcome
+      }
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        fetchStatus();
+      }, 2000);
+    });
+    actionsEl.appendChild(btn);
   }
 
   function renderScan() {

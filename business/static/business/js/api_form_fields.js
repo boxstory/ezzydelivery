@@ -9,8 +9,13 @@
             autofill: { site_api_url: '' },
         },
         shopify: {
-            show: ['api_access_token', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            labels: { site_api_url: 'Store URL (e.g. mystore.myshopify.com)' },
+            show: ['api_key', 'api_secret', 'api_access_token', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
+            labels: {
+                api_key: 'Client ID (Shopify Custom App API key)',
+                api_secret: 'Client Secret (Shopify Custom App API secret key)',
+                api_access_token: 'Admin API Access Token (starts with shpat_)',
+                site_api_url: 'Store URL (e.g. mystore.myshopify.com)',
+            },
             autofill: {
                 order_api_endpoint: '/admin/api/2024-01/orders.json',
                 product_api_endpoint: '/admin/api/2024-01/products.json',
@@ -91,6 +96,11 @@
         var showFields = config.show || [];
         var labelOverrides = config.labels || {};
         var autofillValues = config.autofill || {};
+
+        var shopifyGuide = document.getElementById('client_api_shopify_setup_help');
+        if (shopifyGuide) {
+            shopifyGuide.style.display = (apiType === 'shopify') ? '' : 'none';
+        }
 
         ALL_FIELDS.forEach(function (field) {
             var wrapper = getWrapper(field);

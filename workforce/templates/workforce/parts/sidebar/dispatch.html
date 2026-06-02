@@ -1,0 +1,21 @@
+{% url 'workforce:dispatch_dashboard' as u_dispatch_dashboard %}
+{% url 'workforce:dispatch_batch_list' as u_dispatch_batch_list %}
+{% url 'workforce:dispatch_shift_list' as u_dispatch_shift_list %}
+{% url 'workforce:dispatch_kpi_dashboard' as u_dispatch_kpi_dashboard %}
+{% url 'workforce:dispatch_config_list' as u_dispatch_config_list %}
+<li id="workforce_sidebar_menu_dispatch" class="nav-item {% if 'dispatch' in request.resolver_match.url_name %}active{% endif %}">
+  <div id="workforce_sidebar_link_dispatch" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-dispatch" data-title="Dispatch">
+    <i class="fa-solid fa-layer-group me-2"></i>
+    <span>Dispatch</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-dispatch" class="multi-level collapse submenu {% if 'dispatch' in request.resolver_match.url_name %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_dispatch_dashboard" url=u_dispatch_dashboard icon="fa-solid fa-gauge-high" label="Dashboard" active_names="dispatch_dashboard" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_dispatch_batches" url=u_dispatch_batch_list icon="fa-solid fa-boxes-stacked" label="All Batches" active_names="dispatch_batch_list,dispatch_batch_detail" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_dispatch_shifts" url=u_dispatch_shift_list icon="fa-solid fa-calendar-days" label="Rider Shifts" active_names="dispatch_shift_list,dispatch_shift_create,dispatch_shift_detail,dispatch_shift_edit" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_dispatch_kpis" url=u_dispatch_kpi_dashboard icon="fa-solid fa-chart-line" label="KPI Dashboard" active_names="dispatch_kpi_dashboard,dispatch_rider_kpi" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_dispatch_config" url=u_dispatch_config_list icon="fa-solid fa-sliders" label="Configuration" active_names="dispatch_config_list,dispatch_config_edit" %}
+    </ul>
+  </div>
+</li>

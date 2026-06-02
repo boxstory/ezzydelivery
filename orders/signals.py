@@ -234,9 +234,9 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
             try:
                 from core.auto_flow_executor import execute_flows_for_trigger
                 if instance.order_status == 'publish':
-                    execute_flows_for_trigger('staff_order_publish', extra_context=order_ctx)
+                    execute_flows_for_trigger('staff_order_publish', order=instance, extra_context=order_ctx)
                 elif instance.order_status == 'cancelled':
-                    execute_flows_for_trigger('staff_order_cancel', extra_context=order_ctx)
+                    execute_flows_for_trigger('staff_order_cancel', order=instance, extra_context=order_ctx)
             except Exception as e:
                 logger.warning(f"Auto flow failed for order status change {instance.pk}: {e}")
 

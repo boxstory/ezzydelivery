@@ -393,9 +393,10 @@
     color: var(--brand-primary, #f7c000);
 }
 
-.ftr__filter-select,
-.ftr__filter-input {
+select.ftr__filter-select,
+input.ftr__filter-input {
     width: 100%;
+    min-height: 36px; max-height: 36px;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--brand-grey-300, #dcdcdc);
     border-radius: var(--brand-radius-sm, 0.5rem);
@@ -406,8 +407,8 @@
     appearance: auto;
 }
 
-.ftr__filter-select:focus,
-.ftr__filter-input:focus {
+select.ftr__filter-select:focus,
+input.ftr__filter-input:focus {
     outline: none;
     border-color: var(--brand-primary, #f7c000);
     box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.15);
@@ -1354,36 +1355,134 @@
 }
 
 /* ================================================
-   PRINT STYLES
+   PRINT STYLES — show only the transactions table
    ================================================ */
+@page {
+    size: A4 landscape;
+    margin: 10mm;
+}
+
 @media print {
+    /* Hide all dashboard chrome */
+    nav,
+    .navbar,
+    .site-nav,
+    .wf-sidebar,
+    [class*="sidebar"],
     .ftr__hero,
     .ftr__toolbar,
+    .ftr__card--filter,
+    .ftr__card--driver,
     .ftr__filter-actions,
     .ftr__btn,
     .ftr__demo-form,
     .ftr__bulk,
     .ftr__th--check,
+    .ftr__th--sort i,
     .ftr__checkbox,
-    .ftr__modal {
+    .ftr__modal,
+    .ftr__drawer,
+    .ftr__drawer-backdrop,
+    .ftr__profile,
+    .ftr__pagination,
+    .ftr__tabs,
+    .ftr__breakdown,
+    .ftr__summary,
+    .ftr__stats,
+    .ftr__action,
+    .pgn,
+    .pgn__container,
+    .htmx-loader,
+    #htmx-loading-indicator,
+    .toast-container,
+    .modal,
+    .modal-backdrop,
+    .pg-hdr,
+    .pg-filter,
+    footer,
+    .footer {
         display: none !important;
     }
 
-    .ftr {
-        padding: 0;
-        background: #fff;
+    /* Strip surrounding layout */
+    html, body, main, #main-content, .container, .container-fluid,
+    .row, .col, [class*="col-"], .d-flex {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        overflow: visible !important;
     }
+
+    .ftr {
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    /* Print-only header injected via template */
+    .ftr__print-header {
+        display: block !important;
+        padding: 0 0 8mm 0;
+        border-bottom: 2px solid #111;
+        margin-bottom: 6mm;
+    }
+    .ftr__print-header h1 {
+        font-size: 16pt;
+        margin: 0 0 2mm 0;
+    }
+    .ftr__print-header__meta {
+        font-size: 9pt;
+        color: #444;
+    }
+    .ftr__print-header__meta span { margin-right: 12px; }
 
     .ftr__card,
-    .ftr__profile,
     .ftr__table-wrap {
-        break-inside: avoid;
-        border: 1px solid #ddd;
+        break-inside: auto;
+        border: none !important;
+        box-shadow: none !important;
+        background: #fff !important;
+        padding: 0 !important;
     }
 
+    /* Show only the transactions table card */
+    .ftr__card:not(:has(#transactionsTable)):not(.ftr__card--print-keep) {
+        display: none !important;
+    }
+
+    .ftr__table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 8pt;
+    }
+    .ftr__table thead { display: table-header-group; }
+    .ftr__table tr { page-break-inside: avoid; }
     .ftr__table th,
     .ftr__table td {
-        padding: 0.375rem 0.5rem;
-        font-size: 0.7rem;
+        padding: 4px 6px !important;
+        font-size: 8pt !important;
+        border: 1px solid #999 !important;
+        background: #fff !important;
+        color: #111 !important;
+    }
+    .ftr__table th {
+        background: #f0f0f0 !important;
+        font-weight: 600 !important;
+    }
+    .ftr__table .ftr__th--check,
+    .ftr__table td:first-child,
+    .ftr__table td:last-child,
+    .ftr__table th:last-child {
+        display: none !important;
+    }
+    /* Strip colored type pills, keep just text */
+    .ftr__txn-type {
+        background: transparent !important;
+        color: #111 !important;
+        padding: 0 !important;
+        border: none !important;
     }
 }

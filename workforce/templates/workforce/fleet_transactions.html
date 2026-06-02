@@ -139,6 +139,10 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-hashtag me-1"></i>Task Number</label>
+                        <input type="text" name="task_search" value="{{ task_search }}" class="ftr__filter-input" placeholder="Search task #">
+                    </div>
                     <div class="ftr__filter-actions">
                         <button type="submit" class="ftr__btn ftr__btn--primary">
                             <i class="fa-solid fa-filter me-1"></i>Apply
@@ -169,13 +173,29 @@
         <button type="button" class="ftr__btn ftr__btn--outline" onclick="window.print()">
             <i class="fa-solid fa-print"></i> Print Report
         </button>
-        <button type="button" class="ftr__btn ftr__btn--primary" onclick="exportToCSV()">
+        <a href="?{{ request.GET.urlencode }}{% if request.GET %}&{% endif %}export=csv" class="ftr__btn ftr__btn--primary" id="exportCsvLink">
             <i class="fa-solid fa-file-export"></i> Export CSV
-        </button>
+        </a>
         <button type="button" class="ftr__btn ftr__btn--outline" id="recalcBtn" onclick="recalculateBalances()">
             <i class="fa-solid fa-rotate"></i> Recalculate Balances
         </button>
         <span class="ftr__toolbar-count">{{ transactions.paginator.count }} transaction{{ transactions.paginator.count|pluralize }}</span>
+    </div>
+
+    <!-- Print-only header: shows in print preview only -->
+    <div class="ftr__print-header" style="display:none;">
+        <h1>Fleet Transactions Report</h1>
+        <div class="ftr__print-header__meta">
+            {% if selected_driver %}<span><strong>Driver:</strong> {{ selected_driver.driver_id }} — {{ selected_driver.user.get_full_name|default:selected_driver.user.username }}</span>{% endif %}
+            <span><strong>View:</strong> {{ view_type|capfirst }}</span>
+            {% if status %}<span><strong>Status:</strong> {{ status|capfirst }}</span>{% endif %}
+            {% if txn_type %}<span><strong>Type:</strong> {{ txn_type }}</span>{% endif %}
+            {% if date_from or date_to %}<span><strong>Date:</strong> {{ date_from|default:"—" }} → {{ date_to|default:"—" }}</span>{% endif %}
+            {% if payment_method_filter %}<span><strong>Payment:</strong> {{ payment_method_filter|capfirst }}</span>{% endif %}
+            {% if task_search %}<span><strong>Task #:</strong> {{ task_search }}</span>{% endif %}
+            <span><strong>Generated:</strong> {% now "Y-m-d H:i" %}</span>
+            <span><strong>Total:</strong> {{ transactions.paginator.count }} transaction{{ transactions.paginator.count|pluralize }}</span>
+        </div>
     </div>
 
     <!-- Transactions Table -->
@@ -372,10 +392,18 @@
                                 {% endif %}
                             </div>
                             {% elif txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_collection' %}
-                            <button type="button" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#001f3f;color:#fff;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;"
-                                    onclick="openCodDrawer({{ txn.id }}, '{{ txn.transaction_code|default:txn.id }}', {{ txn.is_received|yesno:'true,false' }}, {{ txn.is_verified|yesno:'true,false' }})">
-                                <i class="fa-solid fa-eye"></i> View
-                            </button>
+                            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                                <button type="button" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#001f3f;color:#fff;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;"
+                                        onclick="openCodDrawer({{ txn.id }}, '{{ txn.transaction_code|default:txn.id }}', {{ txn.is_received|yesno:'true,false' }}, {{ txn.is_verified|yesno:'true,false' }})">
+                                    <i class="fa-solid fa-eye"></i> View
+                                </button>
+                                {% if txn.transaction_type == 'cod_collection' and txn.delivery_task and not txn.delivery_task.cod_settled %}
+                                <button type="button" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;"
+                                        onclick="openCodCorrectModal({{ txn.delivery_task.id }}, '{{ txn.delivery_task.dl_task_number|escapejs }}', {{ txn.delivery_task.cod_collected|yesno:'true,false' }}, '{{ txn.delivery_task.cod_collected_amount|default:'0' }}', '{{ txn.delivery_task.payment_method|default:'' }}')">
+                                    <i class="fa-solid fa-pen-to-square"></i> Edit COD
+                                </button>
+                                {% endif %}
+                            </div>
                             {% else %}
                             -
                             {% endif %}
@@ -394,6 +422,76 @@
         <i class="fa-solid fa-receipt"></i>
         <h3>No Transactions Found</h3>
         <p>This driver has no transactions yet. Click "Generate Demo Transactions" to create sample data.</p>
+    </div>
+    {% endif %}
+
+    {% if task_search and unmatched_tasks %}
+    <div class="ftr__card mt-3">
+        <div class="ftr__card-header">
+            <i class="fa-solid fa-clipboard-list ftr__card-icon"></i>
+            <span class="ftr__card-title">MATCHING TASKS WITHOUT TRANSACTIONS</span>
+            <span class="ftr__toolbar-count ms-2">{{ unmatched_tasks|length }} task{{ unmatched_tasks|length|pluralize }}</span>
+        </div>
+        <div class="ftr__card-body">
+            <p class="text-muted small mb-2">
+                <i class="fa-solid fa-circle-info me-1"></i>
+                These tasks match "<strong>{{ task_search }}</strong>" but have no DriverTransaction record (e.g. delivered without COD, or no earning entry yet).
+            </p>
+            <div class="ftr__table-wrap">
+                <table class="ftr__table">
+                    <thead>
+                        <tr>
+                            <th>Task #</th>
+                            <th>Order</th>
+                            <th>Business</th>
+                            <th>Status</th>
+                            <th>COD</th>
+                            <th>Payment Method</th>
+                            <th>Completed</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in unmatched_tasks %}
+                        <tr>
+                            <td><code class="ftr__code">{{ t.dl_task_number }}</code></td>
+                            <td>{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}-{% endif %}</td>
+                            <td>{% if t.business %}{{ t.business.business_name }}{% else %}-{% endif %}</td>
+                            <td>
+                                <span class="ftr__txn-type">{{ t.get_dl_task_status_display|default:t.dl_task_status }}</span>
+                            </td>
+                            <td>
+                                {% if t.cod_collected %}
+                                    <strong>QAR {{ t.cod_collected_amount|floatformat:2 }}</strong>
+                                    {% if t.cod_settled %}<span class="ftr__txn-type ftr__txn-type--verified ms-1">Settled</span>{% endif %}
+                                {% else %}
+                                    <span class="text-muted">No COD</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if t.payment_method == 'cash' %}<i class="fa-solid fa-money-bill" style="color: #059669;"></i> Cash
+                                {% elif t.payment_method == 'pos' %}<i class="fa-solid fa-credit-card" style="color: #2563eb;"></i> POS
+                                {% elif t.payment_method == 'fawran' %}<i class="fa-solid fa-mobile-screen" style="color: #7c3aed;"></i> Fawran
+                                {% elif t.payment_method == 'bank' %}<i class="fa-solid fa-building-columns" style="color: #8b5cf6;"></i> Bank
+                                {% elif t.payment_method == 'atm' %}<i class="fa-solid fa-credit-card" style="color: #06b6d4;"></i> ATM
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>{% if t.completed_at %}{{ t.completed_at|date:"d M Y, h:i A" }}{% else %}-{% endif %}</td>
+                            <td>
+                                <a href="{% url 'workforce:delivery_task_detail' t.id %}" class="ftr__ref-link me-2">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> View
+                                </a>
+                                <button type="button" class="ftr__btn ftr__btn--outline btn-sm"
+                                        onclick="openCodCorrectModal({{ t.id }}, '{{ t.dl_task_number|escapejs }}', {{ t.cod_collected|yesno:'true,false' }}, '{{ t.cod_collected_amount|default:'0' }}', '{{ t.payment_method|default:'' }}')">
+                                    <i class="fa-solid fa-pen-to-square"></i> Edit COD
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     {% endif %}
 
@@ -433,6 +531,65 @@
     <div class="ftr__drawer-footer">
         <div class="ftr__drawer-total">Total: <span id="drawerTotal">QAR 0.00</span></div>
         <button type="button" class="ftr__btn ftr__btn--outline" onclick="closeCodDrawer()">Close</button>
+    </div>
+</div>
+
+<!-- COD Correction Modal -->
+<div class="modal fade" id="codCorrectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-pen-to-square me-2"></i>Correct COD for Task <code id="codCorrectTaskNumber">-</code></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="codCorrectTaskId" value="">
+                <div id="codCorrectError" class="alert alert-danger d-none mb-3"></div>
+                <div class="mb-2 small text-muted">
+                    Current: <strong id="codCorrectCurrent">-</strong>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="codCorrectCollected" checked>
+                    <label class="form-check-label" for="codCorrectCollected">
+                        COD was collected
+                    </label>
+                </div>
+
+                <div class="mb-3" id="codCorrectAmountWrap">
+                    <label class="form-label">COD Amount Collected (QAR)</label>
+                    <input type="number" step="0.01" min="0" class="form-control" id="codCorrectAmount" placeholder="0.00">
+                </div>
+
+                <div class="mb-3" id="codCorrectMethodWrap">
+                    <label class="form-label">Payment Method</label>
+                    <select class="form-select" id="codCorrectMethod">
+                        <option value="">Select payment method…</option>
+                        <option value="cash">Cash</option>
+                        <option value="pos">POS</option>
+                        <option value="fawran">Fawran</option>
+                        <option value="bank">Bank</option>
+                        <option value="atm">ATM</option>
+                    </select>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Reason / Note <span class="text-muted small">(optional, for audit)</span></label>
+                    <input type="text" class="form-control" id="codCorrectReason" maxlength="255" placeholder="e.g. Driver collected cash but forgot to update app">
+                </div>
+
+                <div class="alert alert-warning small mb-0">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                    This will update the delivery task and create or update the linked COD transaction. Driver wallet balances will be recalculated.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="codCorrectSubmitBtn" onclick="submitCodCorrection()">
+                    <i class="fa-solid fa-check me-1"></i>Save Correction
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1047,6 +1204,94 @@ function recalculateBalances() {
         btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Recalculate Balances';
     });
 }
+
+// COD Correction Modal --------------------------------------------------------
+function openCodCorrectModal(taskId, taskNumber, codCollected, amount, paymentMethod) {
+    var modalEl = document.getElementById('codCorrectModal');
+    if (!modalEl) return;
+    document.getElementById('codCorrectTaskId').value = taskId;
+    document.getElementById('codCorrectTaskNumber').textContent = taskNumber;
+    var collectedCb = document.getElementById('codCorrectCollected');
+    collectedCb.checked = !!codCollected;
+    document.getElementById('codCorrectAmount').value = (parseFloat(amount) || 0).toFixed(2);
+    document.getElementById('codCorrectMethod').value = paymentMethod || '';
+    document.getElementById('codCorrectReason').value = '';
+    document.getElementById('codCorrectError').classList.add('d-none');
+    document.getElementById('codCorrectError').textContent = '';
+    document.getElementById('codCorrectCurrent').textContent =
+        codCollected
+            ? ('Collected QAR ' + (parseFloat(amount) || 0).toFixed(2) + (paymentMethod ? ' via ' + paymentMethod : ''))
+            : 'Not collected';
+    toggleCodCorrectFields();
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+}
+
+function toggleCodCorrectFields() {
+    var collected = document.getElementById('codCorrectCollected').checked;
+    document.getElementById('codCorrectAmountWrap').style.display = collected ? '' : 'none';
+    document.getElementById('codCorrectMethodWrap').style.display = collected ? '' : 'none';
+}
+
+function submitCodCorrection() {
+    var btn = document.getElementById('codCorrectSubmitBtn');
+    var errorBox = document.getElementById('codCorrectError');
+    errorBox.classList.add('d-none');
+    errorBox.textContent = '';
+
+    var taskId = document.getElementById('codCorrectTaskId').value;
+    var collected = document.getElementById('codCorrectCollected').checked;
+    var amount = document.getElementById('codCorrectAmount').value || '0';
+    var method = document.getElementById('codCorrectMethod').value || '';
+    var reason = document.getElementById('codCorrectReason').value || '';
+
+    if (collected && (!method || parseFloat(amount) <= 0)) {
+        errorBox.textContent = 'Amount and payment method are required when COD is marked as collected.';
+        errorBox.classList.remove('d-none');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving…';
+
+    fetch('/workforce/fleet/tasks/' + taskId + '/cod-correct/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({
+            cod_collected: collected,
+            amount: amount,
+            payment_method: method,
+            reason: reason,
+        }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+        if (res.ok && res.data.success) {
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Saved';
+            setTimeout(function() { window.location.reload(); }, 600);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Correction';
+            errorBox.textContent = (res.data && res.data.error) || 'Failed to save correction';
+            errorBox.classList.remove('d-none');
+        }
+    })
+    .catch(function(e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Save Correction';
+        errorBox.textContent = 'Network error: ' + e;
+        errorBox.classList.remove('d-none');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var cb = document.getElementById('codCorrectCollected');
+    if (cb) cb.addEventListener('change', toggleCodCorrectFields);
+});
+// -----------------------------------------------------------------------------
 
 function getCookie(name) {
     var cookieValue = null;

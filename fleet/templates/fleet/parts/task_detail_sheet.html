@@ -781,8 +781,27 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         // Seed COD section in delivered sheet
         const codSection = document.getElementById('tdCodSection');
         if (d.cod && parseFloat(d.cod) > 0) {
+            const codAmt = parseFloat(d.cod);
             codSection.style.display = '';
             document.getElementById('tdCodAmount').value = d.cod;
+            // Default toggle ON + reveal split breakdown so driver sees Cash/POS/Fawran inputs immediately
+            const cb = document.getElementById('tdCodCollected');
+            cb.checked = true;
+            document.getElementById('tdCodAmountRow').style.display = '';
+            // Pre-fill cash with full COD amount if no split values are already set
+            const splitCashEl = document.getElementById('tdSplitCash');
+            const splitPosEl = document.getElementById('tdSplitPos');
+            const splitFawranEl = document.getElementById('tdSplitFawran');
+            const hasAnySplit = (parseFloat(splitCashEl.value) || 0) + (parseFloat(splitPosEl.value) || 0) + (parseFloat(splitFawranEl.value) || 0);
+            if (hasAnySplit <= 0) {
+                splitCashEl.value = codAmt.toFixed(2);
+                // Default Payment Mode to cash to mirror the dominant split
+                const cashRadio = document.querySelector('input[name="tdPaymentMethod"][value="cash"]');
+                if (cashRadio && !document.querySelector('input[name="tdPaymentMethod"]:checked')) {
+                    cashRadio.checked = true;
+                }
+            }
+            if (typeof window.updateRemaining === 'function') window.updateRemaining();
         } else {
             codSection.style.display = 'none';
         }
@@ -922,10 +941,16 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
     window.toggleCodAmount = function(chk) {
         document.getElementById('tdCodAmountRow').style.display = chk.checked ? '' : 'none';
         if (chk.checked) {
-            // Clear split rows — driver must enter the breakdown explicitly
-            document.getElementById('tdSplitCash').value = '';
-            document.getElementById('tdSplitPos').value = '';
-            document.getElementById('tdSplitFawran').value = '';
+            // Pre-fill cash with full COD amount when driver re-enables collection
+            // (driver can edit the split if payment was via POS/Fawran or mixed)
+            const codAmt = parseFloat(document.getElementById('tdCodAmount').value) || 0;
+            const splitCashEl = document.getElementById('tdSplitCash');
+            const splitPosEl = document.getElementById('tdSplitPos');
+            const splitFawranEl = document.getElementById('tdSplitFawran');
+            const hasAnySplit = (parseFloat(splitCashEl.value) || 0) + (parseFloat(splitPosEl.value) || 0) + (parseFloat(splitFawranEl.value) || 0);
+            if (hasAnySplit <= 0 && codAmt > 0) {
+                splitCashEl.value = codAmt.toFixed(2);
+            }
             updateRemaining();
         }
     };

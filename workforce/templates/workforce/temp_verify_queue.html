@@ -1,0 +1,463 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static custom_filters %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/verify_queue.css' %}?v=20260514a">
+{% endblock %}
+
+{% block content %}
+<div class="vfq">
+    <header class="vfq__hero">
+        <div class="vfq__hero-left">
+            <h2 class="vfq__hero-title"><i class="fa-solid fa-location-dot"></i>Address Verify Queue</h2>
+            <p class="vfq__hero-subtitle">Customer WhatsApp address verification jobs from auto-import</p>
+        </div>
+        <div class="vfq__hero-actions">
+            <a href="{% url 'workforce:temp_orders' %}" class="vfq__hero-btn">
+                <i class="fa-solid fa-arrow-left"></i>Temp Orders
+            </a>
+            <a href="{% url 'workforce:temp_auto_stages' %}" class="vfq__hero-btn">
+                <i class="fa-solid fa-list-check"></i>Stage Config
+            </a>
+        </div>
+    </header>
+
+    <!-- WAHA Connection Status -->
+    {% if waha_status %}
+    <div class="vfq__waha vfq__waha--{{ waha_status.status|lower }}{% if not waha_status.messaging_enabled %} vfq__waha--paused{% endif %}">
+        <div class="vfq__waha-left">
+            <span class="vfq__waha-dot"></span>
+            <div class="vfq__waha-text">
+                <div class="vfq__waha-title">
+                    {% if waha_status.status == 'WORKING' %}WAHA Connected
+                    {% elif waha_status.status == 'SCAN_QR_CODE' %}WAHA Waiting for QR Scan
+                    {% elif waha_status.status == 'STARTING' %}WAHA Starting…
+                    {% elif waha_status.status == 'STOPPED' %}WAHA Stopped
+                    {% elif waha_status.status == 'FAILED' %}WAHA Failed
+                    {% elif waha_status.status == 'NOT_CONFIGURED' %}WAHA Not Configured
+                    {% elif waha_status.status == 'UNREACHABLE' %}WAHA Unreachable
+                    {% else %}WAHA — {{ waha_status.status }}{% endif %}
+                    {% if not waha_status.messaging_enabled %}
+                        <span class="vfq__waha-pause-tag">Messaging paused</span>
+                    {% endif %}
+                </div>
+                <div class="vfq__waha-meta">
+                    {% if waha_status.phone %}
+                        <span class="vfq__waha-phone"><i class="fa-brands fa-whatsapp"></i> {{ waha_status.phone }}</span>
+                        {% if waha_status.push_name %}<span class="vfq__waha-pushname">{{ waha_status.push_name }}</span>{% endif %}
+                    {% elif waha_status.status == 'NOT_CONFIGURED' %}
+                        <span class="vfq__waha-hint">Set <code>WAHA_API_KEY</code> in env to configure.</span>
+                    {% elif waha_status.error %}
+                        <span class="vfq__waha-hint">{{ waha_status.error }}</span>
+                    {% else %}
+                        <span class="vfq__waha-hint">No number linked yet.</span>
+                    {% endif %}
+                    <span class="vfq__waha-session">session: <code>{{ waha_status.session }}</code></span>
+                    {% if waha_status.used_for_verify %}<span class="vfq__waha-flag">verify-queue: ON</span>{% else %}<span class="vfq__waha-flag vfq__waha-flag--off">verify-queue: OFF</span>{% endif %}
+                    {% if waha_status.used_for_orders %}<span class="vfq__waha-flag">orders: ON</span>{% else %}<span class="vfq__waha-flag vfq__waha-flag--off">orders: OFF</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="vfq__waha-actions">
+            <button type="button" id="wahaMessagingToggle"
+                    class="vfq__waha-toggle {% if waha_status.messaging_enabled %}vfq__waha-toggle--on{% else %}vfq__waha-toggle--off{% endif %}"
+                    onclick="toggleWahaMessaging(this)"
+                    title="Master kill switch for verify-queue WhatsApp sends">
+                <span class="vfq__waha-toggle-track">
+                    <span class="vfq__waha-toggle-knob"></span>
+                </span>
+                <span class="vfq__waha-toggle-label">
+                    Messaging: <strong>{% if waha_status.messaging_enabled %}ON{% else %}OFF{% endif %}</strong>
+                </span>
+            </button>
+            <a href="/waha/wa-dashboard/" target="_blank" class="vfq__waha-btn" title="WAHA session dashboard (QR / restart)">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>WAHA dashboard
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Failed-sends alert: shown only when there are failed jobs that haven't been cancelled. -->
+    {% with failed_count=status_counts|get_item:'failed'|default:0 %}
+    {% if failed_count and not filters.status == 'failed' %}
+    <div class="vfq__alert vfq__alert--danger">
+        <i class="fa-solid fa-triangle-exclamation vfq__alert-icon"></i>
+        <div class="vfq__alert-body">
+            <strong>{{ failed_count }} WhatsApp send{{ failed_count|pluralize }} failed</strong> after the max-retry limit.
+            <span class="vfq__alert-hint">Open the failed list to inspect errors and retry.</span>
+        </div>
+        <div class="vfq__alert-actions">
+            <a href="?status=failed{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}"
+               class="vfq__alert-btn">
+                <i class="fa-solid fa-filter"></i>Show failed
+            </a>
+            <button type="button" class="vfq__alert-btn vfq__alert-btn--ghost" onclick="retryAllFailed()">
+                <i class="fa-solid fa-rotate"></i>Re-queue all
+            </button>
+        </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Status filter chips -->
+    <div class="vfq__chips">
+        <a href="?{% if filters.kind %}kind={{ filters.kind }}&{% endif %}{% if filters.business %}business={{ filters.business }}&{% endif %}{% if filters.q %}q={{ filters.q }}&{% endif %}"
+           class="vfq__chip {% if not filters.status %}vfq__chip--active{% endif %}">
+            All <span class="vfq__chip-count">{{ total_count }}</span>
+        </a>
+        {% for code, label in status_choices %}
+        <a href="?status={{ code }}{% if filters.kind %}&kind={{ filters.kind }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}"
+           class="vfq__chip {% if filters.status == code %}vfq__chip--active{% endif %}">
+            {{ label }} <span class="vfq__chip-count">{{ status_counts|get_item:code|default:0 }}</span>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Kind filter chips -->
+    <div class="vfq__chips vfq__chips--kind">
+        <span class="vfq__chips-label">Kind:</span>
+        <a href="?{% if filters.status %}status={{ filters.status }}&{% endif %}{% if filters.business %}business={{ filters.business }}&{% endif %}{% if filters.q %}q={{ filters.q }}&{% endif %}"
+           class="vfq__chip {% if not filters.kind %}vfq__chip--active{% endif %}">
+            All kinds
+        </a>
+        {% for code, label in kind_choices %}
+        <a href="?kind={{ code }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}"
+           class="vfq__chip vfq__chip--kind-{{ code }} {% if filters.kind == code %}vfq__chip--active{% endif %}">
+            {% if code == 'delivery_failed' %}<i class="fa-solid fa-truck-droplet"></i>{% else %}<i class="fa-solid fa-cloud-arrow-down"></i>{% endif %}
+            {{ label }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Filter bar -->
+    <form method="get" class="vfq__filters">
+        {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+        {% if filters.kind %}<input type="hidden" name="kind" value="{{ filters.kind }}">{% endif %}
+        <div class="vfq__filter-field">
+            <label class="vfq__filter-label">Business</label>
+            <select name="business" class="vfq__filter-select">
+                <option value="">All businesses</option>
+                {% for b in all_businesses %}
+                <option value="{{ b.business_id }}" {% if filters.business == b.business_id|stringformat:"s" %}selected{% endif %}>{{ b.business_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="vfq__filter-field">
+            <label class="vfq__filter-label">From</label>
+            <input type="date" name="date_from" value="{{ filters.date_from }}" class="vfq__filter-input">
+        </div>
+        <div class="vfq__filter-field">
+            <label class="vfq__filter-label">To</label>
+            <input type="date" name="date_to" value="{{ filters.date_to }}" class="vfq__filter-input">
+        </div>
+        <div class="vfq__filter-field vfq__filter-field--grow">
+            <label class="vfq__filter-label">Search</label>
+            <input type="text" name="q" value="{{ filters.q }}" class="vfq__filter-input"
+                   placeholder="Phone, order number, or customer name">
+        </div>
+        <div class="vfq__filter-actions">
+            <button type="submit" class="vfq__btn vfq__btn--primary"><i class="fa-solid fa-filter"></i>Filter</button>
+            <a href="{% url 'workforce:temp_verify_queue' %}" class="vfq__btn vfq__btn--ghost">Reset</a>
+        </div>
+    </form>
+
+    {% if jobs %}
+    <div class="vfq__card">
+        <div class="vfq__table-wrap">
+            <table class="vfq__table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Kind</th>
+                        <th>Order</th>
+                        <th>Business</th>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Scheduled</th>
+                        <th>Sent</th>
+                        <th>Replied</th>
+                        <th>Applied Coords</th>
+                        <th>Last Error</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for j in jobs %}
+                    <tr data-job-id="{{ j.id }}" class="vfq__row--kind-{{ j.kind }}">
+                        <td data-label="#"><span class="vfq__id">#{{ j.id }}</span></td>
+                        <td data-label="Kind">
+                            {% if j.kind == 'delivery_failed' %}
+                                <span class="vfq__kind vfq__kind--recovery" title="{{ j.driver_failure_note }}">
+                                    <i class="fa-solid fa-truck-droplet"></i> Recovery
+                                </span>
+                            {% else %}
+                                <span class="vfq__kind vfq__kind--import">
+                                    <i class="fa-solid fa-cloud-arrow-down"></i> Import
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Order">
+                            {% if j.order %}
+                            <a href="{% url 'workforce:order_detail' j.order.id %}" target="_blank" class="vfq__order-link">
+                                {{ j.order.order_number }}
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            </a>
+                            {% else %}<span class="vfq__time--muted">—</span>{% endif %}
+                        </td>
+                        <td data-label="Business">
+                            <span class="vfq__biz-tag" title="{{ j.order.business.business_name }}">{{ j.order.business.business_name|truncatechars:18 }}</span>
+                        </td>
+                        <td data-label="Customer">
+                            <span class="vfq__customer">{{ j.order.customer_name|truncatechars:20|default:"—" }}</span>
+                        </td>
+                        <td data-label="Phone"><span class="vfq__phone">{{ j.phone }}</span></td>
+                        <td data-label="Status">
+                            <span class="vfq__badge vfq__badge--{{ j.status }}">{{ j.get_status_display }}</span>
+                        </td>
+                        <td data-label="Created"><span class="vfq__time">{{ j.created_at|date:"d M H:i" }}</span></td>
+                        <td data-label="Scheduled">
+                            {% if j.scheduled_for %}
+                                <span class="vfq__time" title="Send not allowed before this time">
+                                    <i class="fa-regular fa-clock"></i> {{ j.scheduled_for|date:"d M H:i" }}
+                                </span>
+                            {% else %}<span class="vfq__time vfq__time--muted">—</span>{% endif %}
+                        </td>
+                        <td data-label="Sent">
+                            {% if j.sent_at %}<span class="vfq__time">{{ j.sent_at|date:"d M H:i" }}</span>
+                            {% else %}<span class="vfq__time vfq__time--muted">—</span>{% endif %}
+                        </td>
+                        <td data-label="Replied">
+                            {% if j.replied_at %}<span class="vfq__time">{{ j.replied_at|date:"d M H:i" }}</span>
+                            {% else %}<span class="vfq__time vfq__time--muted">—</span>{% endif %}
+                        </td>
+                        <td data-label="Applied Coords">
+                            {% if j.applied_latitude and j.applied_longitude %}
+                                <a href="https://maps.google.com/?q={{ j.applied_latitude }},{{ j.applied_longitude }}"
+                                   target="_blank" class="vfq__coord-link" title="View on Google Maps">
+                                    <i class="fa-solid fa-map-location-dot"></i>{{ j.applied_latitude|floatformat:5 }}, {{ j.applied_longitude|floatformat:5 }}
+                                </a>
+                            {% else %}<span class="vfq__time--muted">—</span>{% endif %}
+                        </td>
+                        <td data-label="Last Error">
+                            {% if j.last_error %}
+                            <span class="vfq__error" title="{{ j.last_error }}">{{ j.last_error }}</span>
+                            {% else %}<span class="vfq__time--muted">—</span>{% endif %}
+                        </td>
+                        <td data-label="Actions">
+                            <div class="vfq__actions">
+                                {% if j.status == 'queued' or j.status == 'failed' %}
+                                    <button type="button" class="vfq__action vfq__action--send"
+                                            onclick="jobAction({{ j.id }}, 'send_now', this)"
+                                            title="Send WhatsApp now" aria-label="Send WhatsApp now">
+                                        <i class="fa-solid fa-paper-plane"></i>
+                                    </button>
+                                    <button type="button" class="vfq__action vfq__action--cancel"
+                                            onclick="jobAction({{ j.id }}, 'cancel', this)"
+                                            title="Cancel" aria-label="Cancel job">
+                                        <i class="fa-solid fa-ban"></i>
+                                    </button>
+                                {% elif j.status == 'sent' %}
+                                    <button type="button" class="vfq__action vfq__action--send"
+                                            onclick="jobAction({{ j.id }}, 'resend', this)"
+                                            title="Re-send WhatsApp" aria-label="Re-send WhatsApp">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                    <button type="button" class="vfq__action vfq__action--success"
+                                            onclick="jobAction({{ j.id }}, 'mark_verified', this)"
+                                            title="Mark verified manually" aria-label="Mark verified manually">
+                                        <i class="fa-solid fa-check"></i>
+                                    </button>
+                                    <button type="button" class="vfq__action vfq__action--cancel"
+                                            onclick="jobAction({{ j.id }}, 'cancel', this)"
+                                            title="Cancel" aria-label="Cancel job">
+                                        <i class="fa-solid fa-ban"></i>
+                                    </button>
+                                {% elif j.status == 'manual_review' %}
+                                    {% if j.received_message and j.received_message.latitude %}
+                                    <button type="button" class="vfq__action vfq__action--apply"
+                                            onclick="jobAction({{ j.id }}, 'apply_to_order', this)"
+                                            title="Apply received pin to this order">
+                                        <i class="fa-solid fa-check"></i> Apply pin
+                                    </button>
+                                    <button type="button" class="vfq__action vfq__action--info"
+                                            onclick="applyToOther({{ j.id }})"
+                                            title="Apply pin to a different order" aria-label="Apply pin to a different order">
+                                        <i class="fa-solid fa-shuffle"></i>
+                                    </button>
+                                    {% endif %}
+                                    <button type="button" class="vfq__action vfq__action--cancel"
+                                            onclick="jobAction({{ j.id }}, 'cancel', this)"
+                                            title="Cancel" aria-label="Cancel job">
+                                        <i class="fa-solid fa-ban"></i>
+                                    </button>
+                                {% else %}
+                                    <span class="vfq__action--muted">—</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if jobs.has_other_pages %}
+    <div class="vfq__pager">
+        {% if jobs.has_previous %}
+        <a class="vfq__pager-link" href="?page={{ jobs.previous_page_number }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">
+            <i class="fa-solid fa-chevron-left"></i> Prev
+        </a>
+        {% endif %}
+        <span class="vfq__pager-current">{{ jobs.number }} / {{ jobs.paginator.num_pages }}</span>
+        {% if jobs.has_next %}
+        <a class="vfq__pager-link" href="?page={{ jobs.next_page_number }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">
+            Next <i class="fa-solid fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="vfq__empty">
+        <i class="fa-solid fa-inbox"></i>
+        <p class="vfq__empty-title">No verification jobs match these filters</p>
+        <p class="vfq__empty-text">Try widening the date range, clearing the search, or pick a different status.</p>
+        <a href="{% url 'workforce:temp_orders' %}" class="vfq__empty-cta">
+            <i class="fa-solid fa-circle-arrow-left vfq__empty-cta-icon"></i>
+            <span class="vfq__empty-cta-text">Back to Temp Orders</span>
+        </a>
+    </div>
+    {% endif %}
+
+    <div id="verifyQueueToast" class="vfq__toast d-none" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+const ACTION_URL_BASE = '/workforce/orders/temp/verify-queue/';
+const CSRF = (() => {
+    const inp = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (inp) return inp.value;
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return c ? c.split('=')[1].trim() : '';
+})();
+
+function showToast(msg, isError) {
+    const t = document.getElementById('verifyQueueToast');
+    t.textContent = msg;
+    t.classList.remove('vfq__toast--success', 'vfq__toast--error');
+    t.classList.add(isError ? 'vfq__toast--error' : 'vfq__toast--success');
+    t.classList.remove('d-none');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.classList.add('d-none'), 2200);
+}
+
+// Bulk re-queue all failed jobs visible to the user — hits the existing
+// per-job 'resend' action sequentially so the drain worker picks them up
+// on the next tick. Quiet sequential POSTs to keep the rate-limit policy
+// (per-business cap) intact even when re-queuing in bulk.
+async function retryAllFailed() {
+    if (!confirm('Re-queue ALL failed verification jobs? They will be picked up by the drain worker on the next tick.')) return;
+    try {
+        const resp = await fetch(window.location.pathname + '?status=failed&page_size=500', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+        });
+        const html = await resp.text();
+        const ids = [];
+        // Extract job IDs from the rendered HTML (data-job-id attributes).
+        const matches = html.match(/data-job-id="(\d+)"/g) || [];
+        matches.forEach(m => {
+            const id = m.match(/\d+/);
+            if (id) ids.push(parseInt(id[0], 10));
+        });
+        if (!ids.length) {
+            showToast('No failed jobs to retry');
+            return;
+        }
+        let ok = 0, fail = 0;
+        for (const id of ids) {
+            try {
+                const r = await fetch(ACTION_URL_BASE + id + '/action/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                    body: JSON.stringify({ action: 'resend' }),
+                });
+                const d = await r.json();
+                if (d.success) { ok++; } else { fail++; }
+            } catch (e) { fail++; }
+        }
+        showToast(`Re-queued ${ok} job${ok === 1 ? '' : 's'}` + (fail ? ` (${fail} failed)` : ''), fail > 0);
+        setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+        showToast('Error: ' + e.message, true);
+    }
+}
+
+async function toggleWahaMessaging(btn) {
+    const labelEl = btn.querySelector('.vfq__waha-toggle-label strong');
+    const wasOn = btn.classList.contains('vfq__waha-toggle--on');
+    if (wasOn && !confirm('Pause all WhatsApp sends for the verify queue? Queued jobs will stay queued until you turn it back on.')) return;
+    btn.disabled = true;
+    try {
+        const resp = await fetch(ACTION_URL_BASE + 'toggle-messaging/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({}),
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'toggle failed');
+        const isOn = !!data.verify_messaging_enabled;
+        btn.classList.toggle('vfq__waha-toggle--on', isOn);
+        btn.classList.toggle('vfq__waha-toggle--off', !isOn);
+        if (labelEl) labelEl.textContent = isOn ? 'ON' : 'OFF';
+        // Toggle the banner-wide paused state badge
+        const banner = btn.closest('.vfq__waha');
+        if (banner) banner.classList.toggle('vfq__waha--paused', !isOn);
+        showToast('Messaging ' + (isOn ? 'enabled' : 'paused'));
+    } catch (e) {
+        showToast('Error: ' + e.message, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function jobAction(jobId, action, btn, extraBody) {
+    const confirms = {
+        cancel: 'Cancel this verification job?',
+        mark_verified: 'Mark this job verified manually (no coords applied)?',
+        apply_to_order: 'Apply the received WhatsApp pin to this order?',
+    };
+    if (confirms[action] && !confirm(confirms[action])) return;
+    if (btn) btn.disabled = true;
+    try {
+        const body = { action, ...(extraBody || {}) };
+        const resp = await fetch(`${ACTION_URL_BASE}${jobId}/action/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'action failed');
+        showToast(`Job #${jobId}: ${data.status}`);
+        setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+        showToast('Error: ' + e.message, true);
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function applyToOther(jobId) {
+    const orderId = prompt('Enter the target Order ID (numeric DB id, not the OEZ-… order number) to attach this WhatsApp pin to:');
+    if (!orderId) return;
+    if (!/^\d+$/.test(orderId.trim())) {
+        showToast('Order ID must be numeric', true);
+        return;
+    }
+    return jobAction(jobId, 'apply_to_order', null, { order_id: parseInt(orderId.trim(), 10) });
+}
+</script>
+
+<form style="display:none">{% csrf_token %}</form>
+{% endblock %}

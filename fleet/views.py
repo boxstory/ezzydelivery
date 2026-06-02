@@ -2274,15 +2274,26 @@ def driver_settings(request):
         )
 
         if request.method == 'POST':
+            updated_fields = []
             new_availability = request.POST.get('driver_availability', '').strip()
             valid_choices = [c[0] for c in fleet_models.DRIVER_AVAILABILITY_CHOICES]
-            if new_availability in valid_choices:
-                driver.driver_availability = new_availability
-                driver.save(update_fields=['driver_availability'])
-                logger.info(f"Driver {driver.driver_id} updated availability to {new_availability}")
-                messages.success(request, "Availability updated successfully.")
-            else:
+            if new_availability and new_availability not in valid_choices:
                 messages.warning(request, "Invalid availability option.")
+                return redirect('fleet:driver_settings')
+            if new_availability and new_availability != driver.driver_availability:
+                driver.driver_availability = new_availability
+                updated_fields.append('driver_availability')
+
+            # Notification opt-in (unchecked checkbox → no value posted).
+            new_notify = bool(request.POST.get('to_be_notified'))
+            if new_notify != driver.to_be_notified:
+                driver.to_be_notified = new_notify
+                updated_fields.append('to_be_notified')
+
+            if updated_fields:
+                driver.save(update_fields=updated_fields)
+                logger.info(f"Driver {driver.driver_id} updated {', '.join(updated_fields)}")
+                messages.success(request, "Settings updated.")
             return redirect('fleet:driver_settings')
 
         availability_choices = fleet_models.DRIVER_AVAILABILITY_CHOICES
@@ -2384,6 +2395,7 @@ def driver_tasks(request):
     status_filter = request.GET.get('status', 'all')
     sort_by = request.GET.get('sort', 'date')
     zone_filter = request.GET.get('zone', '')
+    search_query = request.GET.get('search', '').strip()
     page = request.GET.get('page', 1)
 
     base_qs = delivery_models.DeliveryTask.objects.select_related(
@@ -2470,6 +2482,27 @@ def driver_tasks(request):
         elif status_filter == 'non_reachable':
             accepted_tasks = accepted_tasks.filter(dl_task_status='non_reachable')
 
+    # Search filter (name, mobile, task/order number)
+    if search_query:
+        from django.db.models import Q
+        digits = ''.join(c for c in search_query if c.isdigit())
+        q = (
+            Q(dl_to_address__full_name__icontains=search_query)
+            | Q(order__customer_name__icontains=search_query)
+            | Q(order__order_number__icontains=search_query)
+            | Q(dl_to_address__mobile_no__icontains=search_query)
+            | Q(order__customer_phone__icontains=search_query)
+        )
+        if digits:
+            q |= Q(dl_to_address__mobile_no__icontains=digits)
+            q |= Q(order__customer_phone__icontains=digits)
+            if digits.isdigit():
+                q |= Q(id=int(digits))
+        all_tasks = all_tasks.filter(q)
+        assigned_tasks = assigned_tasks.filter(q)
+        accepted_tasks = accepted_tasks.filter(q)
+        history_tasks = history_tasks.filter(q)
+
     # Sort
     if sort_by == 'zone':
         sort_order = ['dl_to_address__dl_zone', '-dl_task_date', '-id']
@@ -2554,6 +2587,7 @@ def driver_tasks(request):
         'status_filter': status_filter,
         'sort_by': sort_by,
         'zone_filter': zone_filter,
+        'search_query': search_query,
         'available_zones': available_zones,
         'zone_group_map': zone_group_map,
         'zone_name_map': zone_name_map,

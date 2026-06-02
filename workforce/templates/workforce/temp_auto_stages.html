@@ -1,0 +1,169 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static custom_filters %}
+
+{% block content %}
+<div style="min-width:0;max-width:100%">
+    <header class="oli__hero">
+        <div class="oli__hero__left">
+            <h2><i class="fa-solid fa-list-check me-1"></i>Auto-Import Stages</h2>
+            <span class="oli__hero__subtitle">| Pick which stages run when auto-importing a temp order, per business</span>
+        </div>
+        <div class="oli__hero__right d-flex gap-2">
+            <a href="{% url 'workforce:temp_orders' %}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i>Back to Temp Orders
+            </a>
+        </div>
+    </header>
+
+    <div class="px-2 mb-2 small text-muted">
+        Each tick enables that stage for the business. Unticked stages are skipped during auto-import.
+        Click a column header to toggle that stage for every business. Use the row buttons to toggle all stages for one business.
+        Changes save automatically.
+    </div>
+
+    <div class="table-responsive px-2">
+        <table class="table table-sm table-hover align-middle" style="font-size:0.85rem;">
+            <thead class="table-dark">
+                <tr>
+                    <th style="min-width:220px">Business</th>
+                    {% for key in stage_keys %}
+                    <th class="text-center" style="min-width:120px">
+                        <div class="d-flex flex-column align-items-center gap-1">
+                            <span>{{ stage_labels|get_item:key }}</span>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-outline-light btn-sm py-0 px-1"
+                                        style="font-size:0.6rem;line-height:1"
+                                        onclick="bulkToggle('{{ key }}', true)" title="Enable for all businesses">
+                                    All on
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm py-0 px-1"
+                                        style="font-size:0.6rem;line-height:1"
+                                        onclick="bulkToggle('{{ key }}', false)" title="Disable for all businesses">
+                                    All off
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    {% endfor %}
+                    <th class="text-center" style="min-width:110px">Row Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr data-biz-id="{{ row.business_id }}">
+                    <td class="fw-semibold">{{ row.business_name }}</td>
+                    {% for key in stage_keys %}
+                    <td class="text-center">
+                        <input type="checkbox" class="form-check-input bapi__stage-cb"
+                               data-biz-id="{{ row.business_id }}"
+                               data-stage="{{ key }}"
+                               {% if row.stages|get_item:key %}checked{% endif %}
+                               onchange="saveStage(this)">
+                    </td>
+                    {% endfor %}
+                    <td class="text-center">
+                        <button type="button" class="btn btn-outline-success btn-sm py-0 px-2 me-1"
+                                style="font-size:0.7rem;"
+                                onclick="rowToggle({{ row.business_id }}, true)" title="Enable all stages">
+                            <i class="fa-solid fa-check"></i> All
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2"
+                                style="font-size:0.7rem;"
+                                onclick="rowToggle({{ row.business_id }}, false)" title="Disable all stages">
+                            <i class="fa-solid fa-times"></i> None
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="{{ stage_keys|length|add:2 }}" class="text-center text-muted py-4">
+                    No businesses have <code>temp_order_enabled</code> turned on yet.
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="stageSaveToast"
+         class="position-fixed bottom-0 end-0 m-3 px-3 py-2 rounded shadow-sm small d-none"
+         style="background:var(--brand-primary,#ffd400);color:#000;z-index:2000">
+        Saving…
+    </div>
+</div>
+
+<script>
+const STAGE_KEYS = {{ stage_keys|safe }};
+const SAVE_URL = '{% url "workforce:temp_auto_stages_save" %}';
+const CSRF = (() => {
+    const inp = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (inp) return inp.value;
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return c ? c.split('=')[1].trim() : '';
+})();
+
+function showToast(msg, isError) {
+    const t = document.getElementById('stageSaveToast');
+    t.textContent = msg;
+    t.style.background = isError ? '#dc3545' : 'var(--brand-primary, #ffd400)';
+    t.style.color = isError ? '#fff' : '#000';
+    t.classList.remove('d-none');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.classList.add('d-none'), 1500);
+}
+
+function collectRowStages(bizId) {
+    const stages = {};
+    document.querySelectorAll(`.bapi__stage-cb[data-biz-id="${bizId}"]`).forEach(cb => {
+        stages[cb.dataset.stage] = cb.checked;
+    });
+    return stages;
+}
+
+async function saveStage(cb) {
+    const bizId = cb.dataset.bizId;
+    const stages = collectRowStages(bizId);
+    const original = cb.checked;
+    try {
+        const resp = await fetch(SAVE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ business_id: parseInt(bizId, 10), stages }),
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Save failed');
+        showToast('Saved');
+    } catch (e) {
+        cb.checked = !original; // revert
+        showToast('Error: ' + e.message, true);
+    }
+}
+
+async function bulkToggle(stage, value) {
+    if (!confirm(`${value ? 'Enable' : 'Disable'} "${stage}" for ALL businesses?`)) return;
+    try {
+        const resp = await fetch(SAVE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ bulk: true, stage, value }),
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Bulk save failed');
+        // Update all matching checkboxes in the table
+        document.querySelectorAll(`.bapi__stage-cb[data-stage="${stage}"]`).forEach(cb => {
+            cb.checked = value;
+        });
+        showToast(`Updated ${data.updated} business${data.updated === 1 ? '' : 'es'}`);
+    } catch (e) {
+        showToast('Error: ' + e.message, true);
+    }
+}
+
+async function rowToggle(bizId, value) {
+    const cbs = document.querySelectorAll(`.bapi__stage-cb[data-biz-id="${bizId}"]`);
+    cbs.forEach(cb => { cb.checked = value; });
+    if (cbs.length) await saveStage(cbs[0]); // saveStage reads the whole row
+}
+</script>
+
+{# CSRF token for the page (in case the dashboard base doesn't already render one) #}
+<form style="display:none">{% csrf_token %}</form>
+{% endblock %}

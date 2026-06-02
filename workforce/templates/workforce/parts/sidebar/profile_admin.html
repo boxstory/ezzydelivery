@@ -1,0 +1,20 @@
+{% if user_profile %}
+<li id="workforce_sidebar_menu_profile" class="nav-item">
+  <a id="workforce_sidebar_link_profile" class="nav-link btn"
+     href="{% url 'core:profile' user_profile.user_number %}" data-title="Profile">
+    <i class="fa-solid fa-user me-2"></i>
+    <span>Profile</span>
+  </a>
+</li>
+{% endif %}
+
+{% if user.profile.is_superadmin %}
+<li id="workforce_sidebar_menu_admin" class="nav-item">
+  <a id="workforce_sidebar_link_admin" class="nav-link btn"
+     href="{% url 'admin:index' %}" target="_blank" data-title="Django Admin">
+    <i class="fa-solid fa-screwdriver-wrench me-2"></i>
+    <span>Django Admin</span>
+    <i class="fa-solid fa-external-link-alt ms-auto small"></i>
+  </a>
+</li>
+{% endif %}

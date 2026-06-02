@@ -164,23 +164,17 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <!-- Zone / Address -->
                     <td class="dl-table__td-zone">
                         <div class="dl-table__address-stack">
-                            {% if dl.order.dl_zone %}
-                            {% get_zone_display dl.order as zone_display %}
                             <div class="dl-table__address-line1">
-                                <strong>{{ zone_display }}</strong>{% if dl.order.latitude and dl.order.longitude %} <a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map"><i class="fa-solid fa-location-dot"></i></a>{% endif %}
+                                {% if dl.order.latitude and dl.order.longitude %}<a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-location-dot"></i></a>{% else %}<span class="dl-table__location-pin dl-table__location-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %} {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>—</strong>{% endif %}
                             </div>
+                            {% if dl.order.dl_zone %}
                             <div class="dl-table__address-line2">
                                 Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
                             </div>
-                            <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
-                                {{ dl.order.customer_address|default:""|truncatechars:40 }}
-                            </div>
-                            {% else %}
-                            <div class="dl-table__address-line1">—</div>
-                            <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
-                                {{ dl.order.customer_address|default:""|truncatechars:40 }}
-                            </div>
                             {% endif %}
+                            <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
+                                {{ dl.order.customer_address|default:""|truncatechars:40 }}
+                            </div>
                         </div>
                     </td>
                     <!-- COD / Verify -->

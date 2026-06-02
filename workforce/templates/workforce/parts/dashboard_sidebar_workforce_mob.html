@@ -20,6 +20,13 @@
             Staff Dashboard
         </a>
 
+        <!-- Temp Orders (promoted to top-level) -->
+        <div id="workforce_sidebar_mob_section_temp_orders" class="wsm__nav-section">
+            <a id="workforce_sidebar_mob_link_temp_orders" href="{% url 'workforce:temp_orders' %}" class="wsm__nav-link wsm__nav-link--top">
+                <i class="fa-solid fa-inbox"></i><span>Temp Orders{% if temp_orders_sync_errors %} <i class="fa-solid fa-triangle-exclamation wf-sidebar__inline-warning"></i>{% endif %}{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
+            </a>
+        </div>
+
         <!-- Sellers -->
         <div id="workforce_sidebar_mob_section_sellers" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('sellers')">
@@ -44,43 +51,6 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_seller_api_configs" href="{% url 'workforce:wf_seller_api_configs' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-plug"></i><span>API Configs</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- Import -->
-        <div id="workforce_sidebar_mob_section_import" class="wsm__nav-section">
-            <div class="wsm__nav-header" onclick="toggleMobileSection('import')">
-                <div class="wsm__nav-header-title">
-                    <i class="fa-solid fa-file-import"></i>
-                    <span>Import{% if temp_orders_sync_errors %} <i class="fa-solid fa-triangle-exclamation" style="color:#dc3545;font-size:0.6rem"></i>{% endif %}{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
-                </div>
-                <i class="fa-solid fa-chevron-down"></i>
-            </div>
-            <div class="wsm__nav-submenu" id="mobile-section-import">
-                <a id="workforce_sidebar_mob_link_temp_orders" href="{% url 'workforce:temp_orders' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-inbox"></i><span>Temp Orders{% if temp_orders_sync_errors %} <i class="fa-solid fa-triangle-exclamation" style="color:#dc3545;font-size:0.55rem"></i>{% endif %}{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_temp_orders_by_date" href="{% url 'workforce:temp_orders_by_date' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-calendar-days"></i><span>Fetch by Date</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_orders_bulk" href="{% url 'workforce:wf_orders_bulk_import' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-file-csv"></i><span>CSV / Excel Upload</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_onedrive" href="{% url 'workforce:onedrive_sources' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-cloud-arrow-down"></i><span>Shared Sheet / Excel</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_google_sheet" href="{% url 'workforce:google_sheet_sources' %}" class="wsm__nav-link">
-                    <i class="fa-brands fa-google"></i><span>Google Sheets</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_api_orders" href="{% url 'workforce:wf_api_orders' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-plug"></i><span>API/Auto Trigger</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_import_history" href="{% url 'workforce:import_history' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-clock-rotate-left"></i><span>Import History</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_webhook_imports" href="{% url 'workforce:wf_webhook_imports' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-satellite-dish"></i><span>Webhook Imports</span>
                 </a>
             </div>
         </div>
@@ -141,6 +111,10 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_tasks_live_map" href="{% url 'workforce:tasks_live_map' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-map-location-dot"></i><span>Live Map</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_tasks_verify_queue" href="{% url 'workforce:temp_verify_queue' %}" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-location-dot"></i><span>Address Verify Queue</span>
+                    {% if address_verify_pending_count %}<span class="badge ms-auto" style="background:var(--brand-primary);color:#000;font-size:0.6rem;">{{ address_verify_pending_count }}</span>{% endif %}
                 </a>
                 <a id="workforce_sidebar_mob_link_tasks_fulfilled" href="{% url 'workforce:dl_list_fulfilled_clients' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-box-open"></i><span>Fulfilled Clients</span>
@@ -456,6 +430,46 @@
             </div>
         </div>
 
+        <!-- Import Config (renamed from Import; Temp Orders promoted to top-level) -->
+        <div id="workforce_sidebar_mob_section_import" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('import')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>Import Config</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-import">
+                <a id="workforce_sidebar_mob_link_temp_orders_by_date" href="{% url 'workforce:temp_orders_by_date' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-calendar-days"></i><span>Fetch by Date</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_temp_auto_stages" href="{% url 'workforce:temp_auto_stages' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-list-check"></i><span>Auto-Import Stages</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_temp_verify_queue" href="{% url 'workforce:temp_verify_queue' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-location-dot"></i><span>Address Verify Queue</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_orders_bulk" href="{% url 'workforce:wf_orders_bulk_import' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-file-csv"></i><span>CSV / Excel Upload</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_onedrive" href="{% url 'workforce:onedrive_sources' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-cloud-arrow-down"></i><span>Shared Sheet / Excel</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_google_sheet" href="{% url 'workforce:google_sheet_sources' %}" class="wsm__nav-link">
+                    <i class="fa-brands fa-google"></i><span>Google Sheets</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_api_orders" href="{% url 'workforce:wf_api_orders' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plug"></i><span>API/Auto Trigger</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_import_history" href="{% url 'workforce:import_history' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-clock-rotate-left"></i><span>Import History</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_webhook_imports" href="{% url 'workforce:wf_webhook_imports' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-satellite-dish"></i><span>Webhook Imports</span>
+                </a>
+            </div>
+        </div>
+
         <!-- Export Orders -->
         <div id="workforce_sidebar_mob_section_export" class="wsm__nav-section">
             <a id="workforce_sidebar_mob_link_export" href="{% url 'workforce:wf_export_page' %}" class="wsm__nav-link wsm__nav-link--top">
@@ -510,14 +524,6 @@
                     <i class="fa-solid fa-users-line"></i><span>Team</span>
                 </a>
             </div>
-        </div>
-
-        <!-- Staff Contacts -->
-        <div id="workforce_sidebar_mob_section_contacts" class="wsm__nav-single">
-            <a id="workforce_sidebar_mob_link_contacts" href="{% url 'workforce:staff_contacts' %}">
-                <i class="fa-solid fa-address-book"></i>
-                <span>Staff Contacts</span>
-            </a>
         </div>
 
         <!-- WAHA WhatsApp (htpasswd-gated by nginx) -->
@@ -611,11 +617,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Map path prefixes to {section, highlight link} for sub-pages (longer prefixes first)
     var subpageMap = [
         // Import
-        {re: /^\/workforce\/orders\/temp\//,                    section: 'import',        link: 'workforce_sidebar_mob_link_temp_orders'},
+        {re: /^\/workforce\/orders\/temp\/auto-stages/,         section: 'import',        link: 'workforce_sidebar_mob_link_temp_auto_stages'},
+        {re: /^\/workforce\/orders\/temp\/verify-queue/,        section: 'import',        link: 'workforce_sidebar_mob_link_temp_verify_queue'},
+        {re: /^\/workforce\/orders\/temp\//,                    section: null,            link: 'workforce_sidebar_mob_link_temp_orders'},
         {re: /^\/workforce\/orders\/bulk-import\//,             section: 'import',        link: 'workforce_sidebar_mob_link_orders_bulk'},
         {re: /^\/workforce\/orders\/api-orders\//,              section: 'import',        link: 'workforce_sidebar_mob_link_api_orders'},
         {re: /^\/workforce\/onedrive-sources\//,                section: 'import',        link: 'workforce_sidebar_mob_link_onedrive'},
-        {re: /^\/workforce\/import-wizard\//,                   section: 'import',        link: 'workforce_sidebar_mob_link_temp_orders'},
+        {re: /^\/workforce\/import-wizard\//,                   section: 'import',        link: null},
         {re: /^\/workforce\/import-history\//,                  section: 'import',        link: 'workforce_sidebar_mob_link_import_history'},
         {re: /^\/workforce\/webhook-imports\//,                  section: 'import',        link: 'workforce_sidebar_mob_link_webhook_imports'},
         // Orders

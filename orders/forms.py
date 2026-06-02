@@ -162,7 +162,8 @@ class AddOrderForm(forms.ModelForm):
             self.fields['dl_zone'].initial = '0'
 
             self.fields['cod_status_by_client'].widget = forms.Select(
-                choices=COD_STATUS_BY_CLIENT, attrs={'class': 'form-control'})
+                choices=[('', '— Select —')] + list(COD_STATUS_BY_CLIENT),
+                attrs={'class': 'form-control'})
 
         # Access the form data to filter pickup_location choices
         # Show fulfillment stores first when fulfillment service is enabled
@@ -544,7 +545,8 @@ class UpdateOrderForm(forms.ModelForm):
                     attrs={'class': 'form-check-input '})
 
             self.fields['cod_status_by_client'].widget = forms.Select(
-                choices=COD_STATUS_BY_CLIENT, attrs={'class': 'form-control'})
+                choices=[('', '— Select —')] + list(COD_STATUS_BY_CLIENT),
+                attrs={'class': 'form-control'})
             # @todo: need to specify business only products
 
 

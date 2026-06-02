@@ -129,6 +129,27 @@
                                 {% else %}
                                 <span class="wod__badge">{{ order.verification_status }}</span>
                                 {% endif %}
+                                {% if address_verify_job %}
+                                <div class="mt-1">
+                                    <span class="wod__field-label" style="font-size:0.7rem;">WhatsApp Verify:</span>
+                                    {% if address_verify_job.status == 'queued' %}
+                                        <span class="badge bg-secondary" style="font-size:0.6rem;">Queued</span>
+                                    {% elif address_verify_job.status == 'sent' %}
+                                        <span class="badge bg-info text-dark" style="font-size:0.6rem;" title="Sent {{ address_verify_job.sent_at|date:'d M H:i' }}">Sent — awaiting reply</span>
+                                    {% elif address_verify_job.status == 'verified' %}
+                                        <span class="badge bg-success" style="font-size:0.6rem;" title="Pinned {{ address_verify_job.replied_at|date:'d M H:i' }}">📍 Pinned by customer</span>
+                                    {% elif address_verify_job.status == 'manual_review' %}
+                                        <span class="badge bg-warning text-dark" style="font-size:0.6rem;">Manual review</span>
+                                    {% elif address_verify_job.status == 'failed' %}
+                                        <span class="badge bg-danger" style="font-size:0.6rem;" title="{{ address_verify_job.last_error }}">Send failed</span>
+                                    {% elif address_verify_job.status == 'cancelled' %}
+                                        <span class="badge bg-light text-dark border" style="font-size:0.6rem;">Cancelled</span>
+                                    {% endif %}
+                                    <a href="{% url 'workforce:temp_verify_queue' %}?q={{ order.order_number }}" class="ms-1 small" title="Open verify queue filtered to this order">
+                                        <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem;"></i>
+                                    </a>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -264,6 +285,71 @@
                                 {% endif %}
                             </div>
                         </div>
+                        {% if address_verify_job %}
+                        <div class="col-12">
+                            <div class="wod__wa-verify wod__wa-verify--{{ address_verify_job.status }} wod__wa-verify--kind-{{ address_verify_job.kind }}" id="waVerifyBlock-{{ address_verify_job.id }}">
+                                <div class="wod__wa-verify-head">
+                                    {% if address_verify_job.kind == 'delivery_failed' %}
+                                        <span class="wod__wa-verify-label wod__wa-verify-label--recovery"><i class="fa-solid fa-truck-droplet"></i> Delivery Recovery:</span>
+                                    {% else %}
+                                        <span class="wod__wa-verify-label">Auto-verify link:</span>
+                                    {% endif %}
+                                    {% if address_verify_job.status == 'queued' %}
+                                        <span class="wod__wa-verify-badge wod__wa-verify-badge--queued"><i class="fa-solid fa-hourglass-half"></i> Queued</span>
+                                    {% elif address_verify_job.status == 'sent' %}
+                                        <span class="wod__wa-verify-badge wod__wa-verify-badge--sent"><i class="fa-solid fa-paper-plane"></i> Sent</span>
+                                    {% elif address_verify_job.status == 'verified' %}
+                                        <span class="wod__wa-verify-badge wod__wa-verify-badge--verified"><i class="fa-solid fa-location-dot"></i> Pinned by customer</span>
+                                    {% elif address_verify_job.status == 'manual_review' %}
+                                        <span class="wod__wa-verify-badge wod__wa-verify-badge--manual"><i class="fa-solid fa-user-clock"></i> Manual review</span>
+                                    {% elif address_verify_job.status == 'failed' %}
+                                        <span class="wod__wa-verify-badge wod__wa-verify-badge--failed"><i class="fa-solid fa-circle-xmark"></i> Send failed</span>
+                                    {% elif address_verify_job.status == 'cancelled' %}
+                                        <span class="wod__wa-verify-badge wod__wa-verify-badge--cancelled"><i class="fa-solid fa-ban"></i> Cancelled</span>
+                                    {% endif %}
+                                </div>
+                                <div class="wod__wa-verify-meta">
+                                    {% if address_verify_job.scheduled_for and address_verify_job.status == 'queued' %}<span><i class="fa-regular fa-clock"></i> Scheduled {{ address_verify_job.scheduled_for|date:"d M H:i" }}</span>{% endif %}
+                                    {% if address_verify_job.sent_at %}<span>Sent {{ address_verify_job.sent_at|date:"d M H:i" }}</span>{% endif %}
+                                    {% if address_verify_job.replied_at %}<span>· Replied {{ address_verify_job.replied_at|date:"d M H:i" }}</span>{% endif %}
+                                    {% if address_verify_job.send_attempts %}<span>· {{ address_verify_job.send_attempts }} attempt{{ address_verify_job.send_attempts|pluralize }}</span>{% endif %}
+                                </div>
+                                {% if address_verify_job.kind == 'delivery_failed' and address_verify_job.driver_failure_note %}
+                                <div class="wod__wa-verify-note">
+                                    <i class="fa-solid fa-comment-dots"></i> Driver: {{ address_verify_job.driver_failure_note }}
+                                </div>
+                                {% endif %}
+                                {% if address_verify_job.status == 'failed' and address_verify_job.last_error %}
+                                <div class="wod__wa-verify-error" title="{{ address_verify_job.last_error }}">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ address_verify_job.last_error|truncatechars:80 }}
+                                </div>
+                                {% endif %}
+                                <div class="wod__wa-verify-actions">
+                                    {% if address_verify_job.status == 'failed' or address_verify_job.status == 'queued' %}
+                                        <button type="button" class="wod__wa-verify-btn wod__wa-verify-btn--primary"
+                                                onclick="waVerifyAction({{ address_verify_job.id }}, 'send_now', this)">
+                                            <i class="fa-solid fa-paper-plane"></i> Send now
+                                        </button>
+                                    {% endif %}
+                                    {% if address_verify_job.status == 'sent' %}
+                                        <button type="button" class="wod__wa-verify-btn"
+                                                onclick="waVerifyAction({{ address_verify_job.id }}, 'resend', this)">
+                                            <i class="fa-solid fa-rotate"></i> Re-send
+                                        </button>
+                                    {% endif %}
+                                    {% if address_verify_job.status == 'failed' %}
+                                        <button type="button" class="wod__wa-verify-btn"
+                                                onclick="waVerifyAction({{ address_verify_job.id }}, 'resend', this)">
+                                            <i class="fa-solid fa-rotate"></i> Re-queue
+                                        </button>
+                                    {% endif %}
+                                    <a href="{% url 'workforce:temp_verify_queue' %}?q={{ order.order_number }}" target="_blank" class="wod__wa-verify-btn wod__wa-verify-btn--ghost">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Queue
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -744,6 +830,41 @@ function getCSRFToken() {
 
     // Return whatever we found (might be invalid)
     return getCookie('csrftoken') || '';
+}
+
+
+// ===== WhatsApp Verify Job Actions (per-order block) =====
+// Mirrors the verify-queue page actions: posts {action} to the per-job
+// endpoint and reloads the page on success so the block re-renders with
+// the new status.
+window.waVerifyAction = async function(jobId, action, btn) {
+    var confirms = {
+        send_now: 'Send the WhatsApp verify link to this customer now?',
+        resend:   'Re-queue this verification job? It will be sent on the next drain tick.',
+    };
+    if (confirms[action] && !confirm(confirms[action])) return;
+    var oldHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+    try {
+        var resp = await fetch('/workforce/orders/temp/verify-queue/' + jobId + '/action/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfTokenForOrderDetail() },
+            body: JSON.stringify({ action: action }),
+        });
+        var data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Action failed');
+        setTimeout(function () { window.location.reload(); }, 500);
+    } catch (e) {
+        alert('Error: ' + e.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+    }
+};
+
+function csrfTokenForOrderDetail() {
+    var inp = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (inp) return inp.value;
+    var c = document.cookie.split(';').find(function (x) { return x.trim().startsWith('csrftoken='); });
+    return c ? c.split('=')[1].trim() : '';
 }
 
 

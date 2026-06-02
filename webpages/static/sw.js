@@ -1,7 +1,7 @@
 // EzzyDriver Service Worker
-const CACHE_NAME = 'ezzydriver-v5';
-const STATIC_CACHE = 'ezzydriver-static-v5';
-const DYNAMIC_CACHE = 'ezzydriver-dynamic-v5';
+const CACHE_NAME = 'ezzydriver-v6';
+const STATIC_CACHE = 'ezzydriver-static-v6';
+const DYNAMIC_CACHE = 'ezzydriver-dynamic-v6';
 
 // Static assets to cache
 const STATIC_ASSETS = [

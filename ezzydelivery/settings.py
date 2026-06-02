@@ -837,5 +837,24 @@ WAHA_DEFAULT_FROM = config('WAHA_DEFAULT_FROM', default='EzzyDelivery')
 # Bearer token used by internal callers of /api/integrations/waha/messages/
 # and /api/integrations/waha/send/ (agent API + send proxy).
 WAHA_AGENT_TOKEN = config('WAHA_AGENT_TOKEN', default='')
+
+# Address verification queue (auto-import → WhatsApp link → customer location pin)
+# - USE_WAHA: when True the verify-queue drain worker sends via WAHA so inbound
+#   replies land on the WAHA webhook (independent of WAHA_ENABLED, which gates
+#   order-notification routing platform-wide).
+# - SEND_RATE: max verify-link messages per drain tick (per minute via beat).
+# - PER_BUSINESS_MAX_PER_HOUR: rolling cap to spread sends across merchants.
+# - MAX_ATTEMPTS: jobs flipped to status='failed' after this many failed sends.
+# - MATCH_WINDOW_HOURS: inbound location pin auto-applies if within this many
+#   hours of `sent_at`; older pins land in 'manual_review' for agent confirm.
+WAHA_VERIFY_USE_WAHA = config('WAHA_VERIFY_USE_WAHA', default=False, cast=bool)
+WAHA_VERIFY_SEND_RATE = config('WAHA_VERIFY_SEND_RATE', default=20, cast=int)
+WAHA_VERIFY_PER_BUSINESS_MAX_PER_HOUR = config('WAHA_VERIFY_PER_BUSINESS_MAX_PER_HOUR', default=50, cast=int)
+WAHA_VERIFY_MAX_ATTEMPTS = config('WAHA_VERIFY_MAX_ATTEMPTS', default=3, cast=int)
+WAHA_VERIFY_MATCH_WINDOW_HOURS = config('WAHA_VERIFY_MATCH_WINDOW_HOURS', default=24, cast=int)
+# Grace window after a driver marks a delivery failed before the recovery
+# WhatsApp goes out. The driver (or staff) can undo the failed status during
+# this window to auto-cancel the pending recovery job.
+WAHA_DELIVERY_RECOVERY_DELAY_MINUTES = config('WAHA_DELIVERY_RECOVERY_DELAY_MINUTES', default=10, cast=int)
 # ==========================================
 

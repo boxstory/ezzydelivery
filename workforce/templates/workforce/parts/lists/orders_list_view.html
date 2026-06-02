@@ -232,8 +232,8 @@
                         <span class="orc__cphone">{{ order.customer_phone }}</span>
                     </div>
                     <div class="orc__cell orc__cell--addr" title="{{ order.customer_address }}">
-                        {% if order.dl_zone or order.dl_street or order.dl_building or order.coords_accuracy %}
                         <span class="orc__zone-line">
+                            {% if order.latitude and order.longitude %}<a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="orc__map-pin" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-location-dot"></i></a>{% else %}<span class="orc__map-pin orc__map-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %}
                             {% if order.dl_zone or order.dl_street or order.dl_building %}
                             <span class="orc__zone">Z{{ order.dl_zone|default:"-" }} / S{{ order.dl_street|default:"-" }} / B{{ order.dl_building|default:"-" }}</span>
                             {% endif %}
@@ -244,7 +244,6 @@
                             </span>
                             {% endif %}
                         </span>
-                        {% endif %}
                         <span class="orc__addr">{{ order.customer_address }}</span>
                         {% if order.latitude and order.longitude %}
                         <span class="orc__coords">

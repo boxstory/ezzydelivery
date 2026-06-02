@@ -875,13 +875,13 @@ def business_settings_api_list(request, business_id):
     business = user_business
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
     api_keys = ezzy_api_models.ClientApiKey.objects.filter(business=business).order_by('-created_at')
-
-
+    has_shopify_integration = business_apis.filter(api_type__icontains='shopify').exists()
 
     context = {
         'business': business,
         'business_apis': business_apis,
         'api_keys': api_keys,
+        'has_shopify_integration': has_shopify_integration,
     }
     return render(request, 'business/parts/business_settings_api_list.html', context)
 

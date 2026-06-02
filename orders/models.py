@@ -832,6 +832,10 @@ class TempOrder(models.Model):
     # Raw row data for reference
     raw_row = models.JSONField(default=list, blank=True)
 
+    # Append-only diff log; entries shape: {at, source, changes:{field:[before,after]}}.
+    # Trimmed to last 30 by append_change_log helper.
+    change_history = models.JSONField(default=list, blank=True)
+
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='new', db_index=True)
     imported_order = models.ForeignKey(
         'orders.Order', on_delete=models.SET_NULL,
@@ -858,6 +862,118 @@ class TempOrder(models.Model):
         if self.public_link_source:
             return self.public_link_source.label
         return self.get_source_type_display()
+
+    CHANGE_LOG_IGNORE_FIELDS = {
+        'raw_row', 'synced_at', 'created_at', 'id', 'change_history',
+    }
+    CHANGE_LOG_MAX_ENTRIES = 30
+
+    def _source_headers(self):
+        if self.onedrive_source_id and self.onedrive_source:
+            return list(self.onedrive_source.last_headers or [])
+        if self.public_link_source_id and self.public_link_source:
+            return list(getattr(self.public_link_source, 'last_headers', None) or [])
+        if self.api_settings_id and self.api_settings:
+            return list(getattr(self.api_settings, 'last_headers', None) or [])
+        return []
+
+    def _expand_raw_row_diff(self, old_raw, new_raw):
+        """Return {cell_key: [before, after]} for raw_row cells that differ."""
+        diffs = {}
+        if isinstance(old_raw, list) and isinstance(new_raw, list):
+            headers = self._source_headers()
+            n = max(len(old_raw), len(new_raw))
+            for i in range(n):
+                b = old_raw[i] if i < len(old_raw) else ''
+                a = new_raw[i] if i < len(new_raw) else ''
+                if b == a:
+                    continue
+                key = headers[i] if i < len(headers) and headers[i] else f'raw[{i}]'
+                diffs[key] = [b, a]
+        elif isinstance(old_raw, dict) and isinstance(new_raw, dict):
+            for k in set(old_raw.keys()) | set(new_raw.keys()):
+                b = old_raw.get(k, '')
+                a = new_raw.get(k, '')
+                if b == a:
+                    continue
+                diffs[k] = [b, a]
+        return diffs
+
+    def append_change_log(self, source, before, after):
+        """Append a diff entry to ``change_history`` and save just that column.
+
+        ``before``/``after`` are dicts of {field_name: value}. Direct
+        denormalized fields are diffed by name. The ``raw_row`` blob is
+        expanded into per-cell entries (using source header names for lists,
+        dict keys for Shopify/Woo) so virtual fields like seller_notes,
+        internal_notes, products, etc. show up in the timeline.
+        Returns the appended entry, or None if nothing meaningful changed.
+        """
+        from django.utils import timezone
+
+        ignore = self.CHANGE_LOG_IGNORE_FIELDS
+        changes = {}
+        for k, new_val in (after or {}).items():
+            if k in ignore:
+                continue
+            old_val = (before or {}).get(k)
+            if old_val == new_val:
+                continue
+            changes[k] = [old_val, new_val]
+
+        # Expand raw_row into per-cell/key diffs if it changed.
+        old_raw = (before or {}).get('raw_row')
+        new_raw = (after or {}).get('raw_row')
+        if old_raw is not None or new_raw is not None:
+            for k, pair in self._expand_raw_row_diff(old_raw, new_raw).items():
+                if k in changes:  # don't shadow a direct-field entry
+                    continue
+                changes[k] = pair
+
+        if not changes:
+            return None
+
+        def _truncate(v):
+            s = '' if v is None else str(v)
+            return s if len(s) <= 200 else s[:197] + '…'
+
+        entry = {
+            'at': timezone.now().isoformat(timespec='seconds'),
+            'source': source,
+            'changes': {k: [_truncate(b), _truncate(a)] for k, (b, a) in changes.items()},
+        }
+
+        history = list(self.change_history or [])
+        history.append(entry)
+        if len(history) > self.CHANGE_LOG_MAX_ENTRIES:
+            history = history[-self.CHANGE_LOG_MAX_ENTRIES:]
+        self.change_history = history
+        self.save(update_fields=['change_history'])
+        return entry
+
+    def log_audit_event(self, source, note):
+        """Append a minimal audit entry (no field diff) to ``change_history``.
+
+        Used when ops need to see THAT an event happened even when nothing
+        downstream actually changed — e.g. a manual refetch that found no
+        diff, or an auto-import that ran without modifying any field.
+        Entry shape: ``{'at': iso, 'source': str, 'note': str}``. The popup
+        renderer detects entries without a ``changes`` dict and shows them
+        as a single-line pulse.
+        """
+        from django.utils import timezone
+        entry = {
+            'at': timezone.now().isoformat(timespec='seconds'),
+            'source': source,
+            'note': note,
+        }
+        history = list(self.change_history or [])
+        history.append(entry)
+        if len(history) > self.CHANGE_LOG_MAX_ENTRIES:
+            history = history[-self.CHANGE_LOG_MAX_ENTRIES:]
+        self.change_history = history
+        self.save(update_fields=['change_history'])
+        return entry
 
 
 class ImportLog(models.Model):

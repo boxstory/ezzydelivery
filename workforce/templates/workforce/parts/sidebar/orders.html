@@ -1,0 +1,31 @@
+{% load workforce_tags %}
+{% url 'workforce:wf_orders_add' as u_wf_orders_add %}
+{% url 'workforce:wf_orders_all' as u_wf_orders_all %}
+{% url 'workforce:wf_orders_fulfilled_clients' as u_wf_orders_fulfilled_clients %}
+{% url 'workforce:wf_orders_non_fulfilled_clients' as u_wf_orders_non_fulfilled_clients %}
+{% url 'workforce:wf_orders_by_seller' as u_wf_orders_by_seller %}
+{% url 'workforce:wf_orders_to_publish' as u_wf_orders_to_publish %}
+{% url 'workforce:wf_orders_published' as u_wf_orders_published %}
+{% url 'workforce:wf_orders_reported' as u_wf_orders_reported %}
+{% with active="wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,order_detail,order_edit,orders_pending_verification" %}
+<li id="workforce_sidebar_menu_orders" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_orders" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-orders" data-title="Orders">
+    <i class="fa-solid fa-box me-2"></i>
+    <span>Orders</span>
+    <span class="badge wf-sidebar__badge ms-auto me-2" data-badge="pending_publish_parent">{{ pending_publish_count|default:"0" }}</span>
+    <i class="fa-solid fa-chevron-down"></i>
+  </div>
+  <div id="submenu-orders" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_add" url=u_wf_orders_add icon="fa-solid fa-plus" label="Add Order" active_names="wf_orders_add" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_all" url=u_wf_orders_all icon="fa-solid fa-list" label="All Orders List" active_names="wf_orders_all,order_detail,order_edit" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_fulfilled_clients" url=u_wf_orders_fulfilled_clients icon="fa-solid fa-truck-ramp-box" label="Fulfilled Clients" active_names="wf_orders_fulfilled_clients" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_non_fulfilled_clients" url=u_wf_orders_non_fulfilled_clients icon="fa-solid fa-truck-fast" label="Non-Fulfilled Clients" active_names="wf_orders_non_fulfilled_clients" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_by_seller" url=u_wf_orders_by_seller icon="fa-solid fa-store" label="Order by Seller" active_names="wf_orders_by_seller" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_to_publish" url=u_wf_orders_to_publish icon="fa-solid fa-spinner" label="Publish to Task" active_names="wf_orders_to_publish" badge_var=pending_publish_count badge_default_zero=True badge_key="pending_publish" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_published" url=u_wf_orders_published icon="fa-solid fa-circle-check" label="Published Orders" active_names="wf_orders_published" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_reported" url=u_wf_orders_reported icon="fa-solid fa-flag" label="Reported" active_names="wf_orders_reported" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

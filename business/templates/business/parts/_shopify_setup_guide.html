@@ -1,0 +1,36 @@
+{# Purpose: Shopify Custom App + OAuth setup guide note shown on API list / add / update pages. #}
+{# Used by: business/parts/business_settings_api_list.html, business_settings_api_add.html, business_settings_api_update.html #}
+{# Notes: Static content, no context required. Safe to include anywhere. #}
+
+<section class="bapi__section" id="client_api_shopify_setup_help" style="display:none;">
+    <div class="bapi__section-header">
+        <h2 class="bapi__section-title" id="client_api_shopify_setup_help_title">
+            <i class="fa-brands fa-shopify"></i>
+            Shopify Setup Guide
+        </h2>
+    </div>
+
+    <div class="bapi__tip-banner">
+        <i class="fa-solid fa-circle-info"></i>
+        <div>
+            <p class="mb-2"><strong>To connect a Shopify store, choose one of the following:</strong></p>
+
+            <p class="mb-1"><strong>Option 1 &mdash; Custom App (manual Access Token)</strong></p>
+            <ol class="mb-3">
+                <li>In Shopify Admin go to <em>Settings &rarr; Apps and sales channels &rarr; Develop apps &rarr; Create an app</em>.</li>
+                <li>Configure <em>Admin API scopes</em>: <code>read_orders</code>, <code>write_orders</code>, <code>read_products</code>, <code>read_customers</code>, <code>read_fulfillments</code>, <code>write_fulfillments</code>.</li>
+                <li>Install the app, then copy the <strong>Admin API access token</strong> (starts with <code>shpat_</code>).</li>
+                <li>Paste that token into the <strong>Access Token</strong> field on the Add / Edit Integration page on this dashboard.</li>
+            </ol>
+
+            <p class="mb-1"><strong>Option 2 &mdash; OAuth flow (recommended)</strong></p>
+            <ol class="mb-2">
+                <li>Save your Shopify <strong>Client ID</strong>, <strong>Client Secret</strong>, and <strong>Store URL</strong> on the integration form.</li>
+                <li>Click <strong>Connect (OAuth)</strong> on the integration card on the API list page.</li>
+                <li>Authorize the app on Shopify; the platform exchanges the code for a permanent <code>shpat_</code> token automatically via <code>/business/shopify/oauth/callback/</code>.</li>
+            </ol>
+
+            <p class="mb-0"><small>Common error: pasting the <strong>API Secret</strong> into the Access Token field returns Shopify <code>401 Unauthorized</code>. Use a token that starts with <code>shpat_</code>.</small></p>
+        </div>
+    </div>
+</section>

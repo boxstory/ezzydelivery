@@ -3839,17 +3839,18 @@ def webhook_inbound_order(request, webhook_key):
                 )
                 mapped['package_desc'] = desc
 
-        # Create TempOrder
+        # Create TempOrder — coerce to '' since these columns are NOT NULL and
+        # a mapped value may be an explicit None that .get(key, '') won't catch.
         orders_models.TempOrder.objects.create(
             business=business,
             source_type='webhook',
-            platform_id=mapped.get('client_order_code', ''),
-            client_order_code=mapped.get('client_order_code', ''),
-            customer_name=mapped.get('customer_name', ''),
-            customer_phone=mapped.get('customer_phone', ''),
-            customer_address=mapped.get('customer_address', ''),
-            cod_amount=mapped.get('cod_amount', ''),
-            package_desc=mapped.get('package_desc', ''),
+            platform_id=mapped.get('client_order_code') or '',
+            client_order_code=mapped.get('client_order_code') or '',
+            customer_name=mapped.get('customer_name') or '',
+            customer_phone=mapped.get('customer_phone') or '',
+            customer_address=mapped.get('customer_address') or '',
+            cod_amount=mapped.get('cod_amount') or '',
+            package_desc=mapped.get('package_desc') or '',
             raw_row=order_data,
             status='new',
         )

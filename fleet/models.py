@@ -183,6 +183,13 @@ class Driver(models.Model):
         help_text="Miscellaneous driver metadata (push notification tokens, app settings, etc.)"
     )
 
+    to_be_notified = models.BooleanField(
+        default=True, db_index=True,
+        help_text="Include this driver in auto-task WhatsApp/push notifications "
+                  "(broadcasts via 'all_active_drivers', 'available_drivers', "
+                  "'zone_drivers' autoflow recipients)."
+    )
+
     # Zone Preferences
     preferred_zone_groups = models.ManyToManyField(
         'delivery.ZoneGroup',

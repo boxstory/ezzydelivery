@@ -1,0 +1,26 @@
+{% load workforce_tags %}
+{% url 'warehouse:inventory_list' as u_inventory_list %}
+{% url 'warehouse:transaction_list' as u_transaction_list %}
+{% url 'warehouse:low_stock_alerts' as u_low_stock_alerts %}
+{% url 'warehouse:receive_stock' as u_receive_stock %}
+{% url 'warehouse:pick_list_list' as u_pick_list_list %}
+{% url 'warehouse:cycle_count_list' as u_cycle_count_list %}
+{% with active="inventory_list,stock_card,transaction_list,low_stock_alerts,location_list,location_add,receive_stock,confirm_receive,pick_list_list,create_pick_list,pick_list_detail,cycle_count_list,create_cycle_count,cycle_count_detail,inventory_reports,inventory_restock_list" %}
+<li id="workforce_sidebar_menu_wh_inventory" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_wh_inventory_menu" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-wh-inventory" data-title="Inventory">
+    <i class="fa-solid fa-boxes-stacked me-2"></i>
+    <span>Inventory</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-wh-inventory" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_inventory" url=u_inventory_list icon="fa-solid fa-list" label="View Inventory" active_names="inventory_list,stock_card" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_transactions" url=u_transaction_list icon="fa-solid fa-arrow-right-arrow-left" label="Transactions" active_names="transaction_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_alerts" url=u_low_stock_alerts icon="fa-solid fa-triangle-exclamation" label="Low Stock Alerts" active_names="low_stock_alerts" badge_var=low_stock_count badge_key="low_stock" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_receive" url=u_receive_stock icon="fa-solid fa-truck-loading" label="Receive Stock" active_names="receive_stock,confirm_receive" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_pick_lists" url=u_pick_list_list icon="fa-solid fa-clipboard-list" label="Pick Lists" active_names="pick_list_list,create_pick_list,pick_list_detail" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_cycle_counts" url=u_cycle_count_list icon="fa-solid fa-rotate" label="Cycle Counts" active_names="cycle_count_list,create_cycle_count,cycle_count_detail" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

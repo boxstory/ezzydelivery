@@ -159,6 +159,8 @@ def _row_to_dict(row, chat_id):
     payload = row.raw_payload if isinstance(row.raw_payload, dict) else {}
     inner = payload.get('payload') if isinstance(payload, dict) else None
     type_source = inner if isinstance(inner, dict) else payload
+    if _is_noise_message(type_source):
+        return None
     mtype = _msg_type(type_source) or row.message_type or 'text'
     if mtype == 'unknown' and row.message_type:
         mtype = row.message_type
@@ -170,6 +172,30 @@ def _row_to_dict(row, chat_id):
         sender = _group_sender(sender_payload)
         if sender and sender.get('id'):
             sender['color'] = _sender_color(sender['id'])
+
+    # Surface lat/lng + linked AddressVerificationJob (if any) so the inbox UI
+    # can render a Google Maps link and "Apply to order" CTA for manual_review
+    # jobs created by the auto-import → verify-link flow.
+    location = None
+    if mtype == 'location' and row.latitude is not None and row.longitude is not None:
+        location = {
+            'latitude':  float(row.latitude),
+            'longitude': float(row.longitude),
+        }
+    verification_job = None
+    try:
+        vjob = row.verification_jobs_received.select_related('order').order_by('-id').first()
+        if vjob:
+            verification_job = {
+                'id': vjob.id,
+                'status': vjob.status,
+                'order_id': vjob.order_id,
+                'order_number': vjob.order.order_number if vjob.order_id else None,
+                'customer_name': vjob.order.customer_name if vjob.order_id else None,
+            }
+    except Exception:
+        verification_job = None
+
     return {
         'id': row.pk,
         'waha_id': row.waha_message_id,
@@ -181,11 +207,32 @@ def _row_to_dict(row, chat_id):
         'media': media,
         'timestamp': int(row.received_at.timestamp()) if row.received_at else 0,
         'sender': sender,
+        'location': location,
+        'verification_job': verification_job,
     }
+
+
+_NOISE_RAW_TYPES = {
+    'e2e_notification',     # encryption setup — invisible in WhatsApp Web too
+    'notification',          # generic protocol notification
+    'notification_template', # group/system templated notification
+    'protocol',              # protocol-level placeholder
+}
+
+
+def _is_noise_message(payload):
+    """True for protocol-only messages (encryption setup, etc.). Hidden from UI."""
+    if not isinstance(payload, dict):
+        return False
+    data = payload.get('_data') if isinstance(payload.get('_data'), dict) else {}
+    raw = (data.get('type') or payload.get('type') or '').lower()
+    return raw in _NOISE_RAW_TYPES
 
 
 def _live_to_dict(msg, chat_id):
     if not isinstance(msg, dict):
+        return None
+    if _is_noise_message(msg):
         return None
     waha_id = msg.get('id') or ''
     mtype = _msg_type(msg)
@@ -216,6 +263,13 @@ def _live_to_dict(msg, chat_id):
 
 
 def _messages_response(request, chat_id):
+    """
+    Two modes:
+      - Initial open  (no before_ts): newest `limit` messages = DB recent + WAHA live, deduped.
+      - Scroll-up    (before_ts=X):   newest `limit` messages older than X.
+                                       DB by received_at < X; WAHA by offset, filtered by ts.
+    Always returned ASCENDING by ts so the JS can append/prepend without re-sorting.
+    """
     if not chat_id:
         return JsonResponse({"ok": False, "error": "chatId required"}, status=400)
 
@@ -223,49 +277,119 @@ def _messages_response(request, chat_id):
     is_group = str(chat_id).endswith('@g.us')
 
     try:
-        limit = int(request.GET.get('limit', '1000'))
+        limit = int(request.GET.get('limit', '50'))
     except (TypeError, ValueError):
-        limit = 1000
+        limit = 50
     if limit < 1:
         limit = 1
-    if limit > 2000:
-        limit = 2000
+    if limit > 200:
+        limit = 200
 
-    now_qatar = datetime.now(QATAR_OFFSET)
-    today_start_qatar = datetime.combine(now_qatar.date(), time(0, 0), tzinfo=QATAR_OFFSET)
-    today_start_utc = today_start_qatar.astimezone(dt_tz.utc)
-    today_start_ts = int(today_start_utc.timestamp())
+    try:
+        before_ts = int(request.GET.get('before_ts', '0') or '0')
+    except (TypeError, ValueError):
+        before_ts = 0
 
+    base = _waha_base()
+    session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
+    api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
+
+    if before_ts > 0:
+        # ---- Older-page mode ----
+        cutoff_dt = datetime.fromtimestamp(before_ts, tz=dt_tz.utc)
+        qs = (
+            WhatsAppMessage.objects
+            .filter(received_at__lt=cutoff_dt)
+            .filter(Q(from_number=stripped_id) | Q(to_number=stripped_id))
+            .order_by('-received_at')[:limit]
+        )
+        db_rows = list(qs)
+        db_dicts = [d for d in (_row_to_dict(r, chat_id) for r in db_rows) if d is not None]
+        seen_ids = {r.waha_message_id for r in db_rows if r.waha_message_id}
+
+        # WAHA paginates by offset (newest first). We don't know exactly how
+        # many newer-than-cutoff items WAHA holds, so pull a generous batch
+        # and filter by ts — caller passes `older_offset` to skip already-shown.
+        try:
+            older_offset = int(request.GET.get('older_offset', '0') or '0')
+        except (TypeError, ValueError):
+            older_offset = 0
+        if older_offset < 0:
+            older_offset = 0
+
+        live_msgs = []
+        url = f"{base}/api/{session}/chats/{chat_id}/messages"
+        try:
+            resp = requests.get(
+                url,
+                params={'limit': limit, 'offset': older_offset, 'downloadMedia': 'false'},
+                headers={'X-Api-Key': api_key},
+                timeout=27,
+            )
+            if 200 <= resp.status_code < 300:
+                try:
+                    body = resp.json()
+                    if isinstance(body, list):
+                        live_msgs = body
+                    elif isinstance(body, dict) and isinstance(body.get('messages'), list):
+                        live_msgs = body['messages']
+                except ValueError:
+                    pass
+        except (requests.exceptions.Timeout, requests.exceptions.RequestException) as e:
+            logger.warning("waha older messages failed: %s", e)
+
+        live_dicts = []
+        for m in live_msgs:
+            if not isinstance(m, dict):
+                continue
+            wid = str(m.get('id') or '')
+            if wid and wid in seen_ids:
+                continue
+            ts = int(m.get('timestamp') or 0)
+            if ts >= before_ts:
+                continue  # already shown
+            d = _live_to_dict(m, chat_id)
+            if d is not None:
+                live_dicts.append(d)
+                if wid:
+                    seen_ids.add(wid)
+
+        merged = db_dicts + live_dicts
+        merged.sort(key=lambda x: x.get('timestamp') or 0)
+        # Trim to caller's requested page size from the OLDER end (we want the
+        # newest items just-before before_ts, so keep the tail).
+        if len(merged) > limit:
+            merged = merged[-limit:]
+        has_more = len(db_rows) >= limit or len(live_msgs) > 0
+
+        resp = JsonResponse(
+            {"ok": True, "messages": merged, "is_group": is_group, "has_more": has_more},
+            status=200,
+        )
+        resp['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        return resp
+
+    # ---- Initial-open mode ----
     qs = (
         WhatsAppMessage.objects
-        .filter(received_at__lt=today_start_utc)
         .filter(Q(from_number=stripped_id) | Q(to_number=stripped_id))
         .order_by('-received_at')[:limit]
     )
     db_rows = list(qs)
-    db_rows.reverse()
-
-    db_dicts = [_row_to_dict(r, chat_id) for r in db_rows]
+    db_dicts = [d for d in (_row_to_dict(r, chat_id) for r in db_rows) if d is not None]
     seen_ids = {r.waha_message_id for r in db_rows if r.waha_message_id}
 
-    if not db_rows:
-        live_limit = 300
-        cutoff_ts = 0
-    else:
-        live_limit = 100
-        cutoff_ts = today_start_ts
-
+    # Match WAHA fetch size to user's request — WEBJS scales ~linearly with limit
+    # and this endpoint must finish within gunicorn's 30s window.
+    live_limit = limit
     live_msgs = []
-    base = _waha_base()
-    session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
-    api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
     url = f"{base}/api/{session}/chats/{chat_id}/messages"
     try:
         resp = requests.get(
             url,
             params={'limit': live_limit, 'downloadMedia': 'false'},
             headers={'X-Api-Key': api_key},
-            timeout=20,
+            timeout=27,
         )
         if 200 <= resp.status_code < 300:
             try:
@@ -278,10 +402,8 @@ def _messages_response(request, chat_id):
                 live_msgs = []
         else:
             logger.warning("waha live messages non-2xx: %s", resp.status_code)
-            live_msgs = []
     except (requests.exceptions.Timeout, requests.exceptions.RequestException) as e:
         logger.warning("waha live messages failed: %s", e)
-        live_msgs = []
 
     live_dicts = []
     for m in live_msgs:
@@ -289,9 +411,6 @@ def _messages_response(request, chat_id):
             continue
         wid = str(m.get('id') or '')
         if wid and wid in seen_ids:
-            continue
-        ts = int(m.get('timestamp') or 0)
-        if ts < cutoff_ts:
             continue
         d = _live_to_dict(m, chat_id)
         if d is not None:
@@ -301,8 +420,46 @@ def _messages_response(request, chat_id):
 
     merged = db_dicts + live_dicts
     merged.sort(key=lambda x: x.get('timestamp') or 0)
+    if len(merged) > limit:
+        merged = merged[-limit:]
+    has_more = len(db_rows) >= limit or len(live_msgs) >= live_limit
 
-    return JsonResponse({"ok": True, "messages": merged, "is_group": is_group}, status=200)
+    resp = JsonResponse(
+        {"ok": True, "messages": merged, "is_group": is_group, "has_more": has_more},
+        status=200,
+    )
+    resp['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+    return resp
+
+
+def _chat_latest_response(request):
+    """Latest received_at per phone-number digits, both directions.
+
+    Used by the chat-list UI to bump WAHA's `chat.timestamp` when our DB has
+    seen a more recent message via webhook. Returns {digits: epoch_ts}.
+    """
+    from django.db.models import Max
+    latest = {}
+
+    rows = WhatsAppMessage.objects.values('from_number').annotate(ts=Max('received_at'))
+    for r in rows:
+        n = r.get('from_number') or ''
+        ts = r.get('ts')
+        if not n or not ts:
+            continue
+        latest[n] = max(latest.get(n, 0), int(ts.timestamp()))
+
+    rows = WhatsAppMessage.objects.values('to_number').annotate(ts=Max('received_at'))
+    for r in rows:
+        n = r.get('to_number') or ''
+        ts = r.get('ts')
+        if not n or not ts:
+            continue
+        latest[n] = max(latest.get(n, 0), int(ts.timestamp()))
+
+    resp = JsonResponse({"ok": True, "latest": latest}, status=200)
+    resp['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+    return resp
 
 
 @require_http_methods(["GET", "POST"])
@@ -313,6 +470,9 @@ def wa_chats(request):
     if request.GET.get('messages') == '1':
         chat_id = (request.GET.get('chatId') or '').strip()
         return _messages_response(request, chat_id)
+
+    if request.GET.get('chat_latest') == '1':
+        return _chat_latest_response(request)
 
     return _render_page(request)
 
@@ -476,13 +636,8 @@ def wa_chats_resync(request):
 
 
 def _render_page(request):
-    bearer = getattr(settings, 'WAHA_AGENT_TOKEN', '') or ''
     session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
-    html = (
-        _CHATS_HTML
-        .replace('%BEARER%', bearer)
-        .replace('%SESSION%', session)
-    )
+    html = _CHATS_HTML.replace('%SESSION%', session)
     return HttpResponse(html, content_type='text/html; charset=utf-8')
 
 
@@ -621,12 +776,70 @@ body {
   max-width: 11rem;
 }
 .wa-row__time { font-size: 0.6875rem; color: var(--wa-muted); flex: 0 0 auto; }
+.wa-row__time--unread { color: var(--wa-brand); font-weight: 600; }
+.wa-row__pin {
+  font-size: 0.625rem;
+  color: var(--wa-muted-2);
+  margin-left: 0.25rem;
+  vertical-align: middle;
+}
+.wa-row__unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.375rem;
+  border-radius: 0.625rem;
+  background: var(--wa-brand);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+.wa-row__pv-line {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
 .wa-row__preview {
   color: var(--wa-muted);
   font-size: 0.8125rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.wa-row__labels {
+  display: flex;
+  align-items: center;
+  gap: 0.1875rem;
+  flex: 0 0 auto;
+  max-width: 55%;
+  overflow: hidden;
+}
+.wa-label-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.125rem 0.3125rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  max-width: 5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+.wa-label-chip__dot {
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 50%;
+  margin-right: 0.1875rem;
+  flex: 0 0 auto;
 }
 
 /* Conversation */
@@ -798,7 +1011,6 @@ body {
   'use strict';
 
   var SESSION = '%SESSION%';
-  var BEARER  = '%BEARER%';
 
   var SENDER_PALETTE = ["#06cf9c","#7f66ff","#e542a3","#3fa9f5","#f5871f","#15c2c4","#b85cff","#f04a4a"];
   var LABEL_CACHE_KEY = 'wa_label_map_v1';
@@ -811,15 +1023,27 @@ body {
   })();
 
   var state = {
-    chats: [],            // raw WAHA chats
+    chats: [],            // raw WAHA chats (accumulated across pages)
+    chatIds: null,        // Set of c.id for O(1) dedupe across pages
     rendered: [],         // currently rendered list (after filters)
     activeChatId: null,
     activeChatName: null,
     activeIsGroup: false,
     labelMap: null,       // {label_id: Set(chat_id)}
     labels: [],           // [{id,name,color}]
+    labelsByChat: null,   // {chat_id: [labelObj, ...]} — built from labelMap
     labelsLoaded: false,
+    chatsOffset: 0,       // next batch starts here
+    chatsLoading: false,
+    chatsExhausted: false,
+    // Per-conversation message pagination
+    msgs: [],             // currently rendered messages, ASC by ts
+    msgsOldestTs: 0,      // earliest ts in `msgs`; cursor for older pages
+    msgsLiveOffsetSeen: 0,// WAHA offset already fetched for this chat
+    msgsHasMore: true,    // false once we run out of older history
+    msgsLoading: false,
   };
+  var CHATS_PAGE_SIZE = 50;
 
   function $(id) { return document.getElementById(id); }
   function escapeHtml(s) {
@@ -870,21 +1094,117 @@ body {
   function chatIsGroup(id) { return String(id || '').endsWith('@g.us'); }
 
   // ---------- Chat list load + render ----------
-  function loadChats() {
-    return fetch('/waha/api/' + encodeURIComponent(SESSION) + '/chats?limit=2000', { credentials: 'same-origin' })
+  // append=true → fetch the NEXT page and append. append=false → reset, fetch first page.
+  // The poll loop calls loadChats() (no append) every 30s to refresh the top of the list.
+  function loadChats(append) {
+    if (state.chatsLoading) return Promise.resolve();
+    if (append && state.chatsExhausted) return Promise.resolve();
+    var firstLoad = !append && state.chats.length === 0;
+    if (firstLoad) {
+      state.chatsOffset = 0;
+      state.chatsExhausted = false;
+      state.chatIds = new Set();
+    } else if (!state.chatIds) {
+      state.chatIds = new Set(state.chats.map(function (c) { return c.id; }));
+    }
+    state.chatsLoading = true;
+    // append → next page; refresh poll → re-fetch first page (merge, don't reset).
+    var fetchOffset = append ? state.chatsOffset : 0;
+    var url = '/waha/api/' + encodeURIComponent(SESSION) +
+              '/chats?limit=' + CHATS_PAGE_SIZE + '&offset=' + fetchOffset;
+    return fetch(url, { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : []; })
       .then(function (data) {
         var list = Array.isArray(data) ? data : (data && Array.isArray(data.chats) ? data.chats : []);
-        state.chats = list.map(function (c) {
+        if (append) {
+          if (list.length < CHATS_PAGE_SIZE) state.chatsExhausted = true;
+          state.chatsOffset += list.length;
+        }
+        var mapped = list.map(function (c) {
           var id = c.id && c.id._serialized ? c.id._serialized : (c.id || '');
+          var lastMsg = c.lastMessage || {};
+          var lastType = ((lastMsg._data && lastMsg._data.type) || lastMsg.type || '').toString().toLowerCase();
+          // WAHA returns the literal string "Unknown number" for unsaved contacts.
+          // Treat it the same as a missing name so we can fall back to the phone digits.
+          var waName = (c.name || c.formattedTitle || c.pushname || '').trim();
+          var hasRealName = !!waName && waName.toLowerCase() !== 'unknown number';
+          var digits = (c.id && c.id.user) || String(id || '').split('@')[0] || '';
+          var displayName = hasRealName ? waName : (digits ? '+' + digits : String(id));
           return {
             id: String(id || ''),
-            name: c.name || c.formattedTitle || c.pushname || (c.id && c.id.user) || String(id || ''),
-            lastMessage: (c.lastMessage && c.lastMessage.body) || '',
-            timestamp: c.timestamp || (c.lastMessage && c.lastMessage.timestamp) || 0,
+            name: displayName,
+            hasName: hasRealName,
+            lastMessage: lastMsg.body || '',
+            lastType: lastType,
+            timestamp: c.timestamp || lastMsg.timestamp || 0,
+            pinned: !!c.pinned,
+            unread: parseInt(c.unreadCount, 10) || 0,
           };
-        }).filter(function (c) { return !!c.id; });
+        }).filter(function (c) {
+          if (!c.id) return false;
+          // Hide rows whose only activity is a protocol notification (encryption setup)
+          // when there's also no contact name and no body — pure inbox noise.
+          var noisyType = c.lastType === 'e2e_notification' ||
+                          c.lastType === 'notification' ||
+                          c.lastType === 'notification_template' ||
+                          c.lastType === 'protocol';
+          if (noisyType && !c.hasName && !c.lastMessage) return false;
+          return true;
+        });
+        if (append) {
+          mapped.forEach(function (c) {
+            if (!state.chatIds.has(c.id)) {
+              state.chatIds.add(c.id);
+              state.chats.push(c);
+            }
+          });
+        } else if (state.chats.length === 0) {
+          state.chats = mapped;
+          state.chatIds = new Set(mapped.map(function (c) { return c.id; }));
+        } else {
+          // Polling refresh: merge first-page updates into existing chats so
+          // scroll-loaded pages aren't discarded. New chats are prepended (sort
+          // re-orders by timestamp anyway); known chats get fresh metadata.
+          mapped.forEach(function (c) {
+            if (state.chatIds.has(c.id)) {
+              for (var i = 0; i < state.chats.length; i++) {
+                if (state.chats[i].id === c.id) {
+                  state.chats[i] = c;
+                  break;
+                }
+              }
+            } else {
+              state.chatIds.add(c.id);
+              state.chats.unshift(c);
+            }
+          });
+        }
+        state.chatsLoading = false;
         renderList();
+        // Bump timestamps from our DB if a webhook has seen a more recent
+        // message than WAHA's chat.timestamp (WhatsApp Web cache often lags).
+        return enrichChatTimes();
+      })
+      .catch(function () {
+        state.chatsLoading = false;
+      });
+  }
+  function enrichChatTimes() {
+    return fetch('/waha/wa-chats/?chat_latest=1', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.ok || !j.latest) return;
+        var latest = j.latest;
+        var changed = false;
+        state.chats.forEach(function (c) {
+          var digits = String(c.id).split('@')[0];
+          var dbTs = latest[digits];
+          if (dbTs && dbTs > (c.timestamp || 0)) {
+            c.timestamp = dbTs;
+            changed = true;
+          }
+        });
+        if (changed) renderList();
       })
       .catch(function () { /* ignore */ });
   }
@@ -927,7 +1247,13 @@ body {
       }
     }
 
-    filtered.sort(function (a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
+    // WhatsApp ordering: pinned first (preserving recency within pinned),
+    // then everything else by timestamp desc. Virtual phone-search rows go to top.
+    filtered.sort(function (a, b) {
+      if (!!a.virtual !== !!b.virtual) return a.virtual ? -1 : 1;
+      if (!!a.pinned  !== !!b.pinned)  return a.pinned  ? -1 : 1;
+      return (b.timestamp || 0) - (a.timestamp || 0);
+    });
 
     state.rendered = filtered;
 
@@ -958,15 +1284,33 @@ body {
       nm.className = 'wa-row__name';
       nm.textContent = c.name;
       var tm = document.createElement('div');
-      tm.className = 'wa-row__time';
+      tm.className = 'wa-row__time' + (c.unread > 0 ? ' wa-row__time--unread' : '');
       tm.textContent = fmtShortTime(c.timestamp);
       top.appendChild(nm); top.appendChild(tm);
 
+      var pvLine = document.createElement('div');
+      pvLine.className = 'wa-row__pv-line';
       var pv = document.createElement('div');
       pv.className = 'wa-row__preview';
       pv.textContent = c.lastMessage || (c.virtual ? 'Tap to start' : '');
+      pvLine.appendChild(pv);
+      if (c.pinned) {
+        var pin = document.createElement('span');
+        pin.className = 'wa-row__pin';
+        pin.textContent = '\u{1F4CC}'; // 📌
+        pin.title = 'Pinned';
+        pvLine.appendChild(pin);
+      }
+      if (c.unread > 0) {
+        var bd = document.createElement('span');
+        bd.className = 'wa-row__unread';
+        bd.textContent = c.unread > 99 ? '99+' : String(c.unread);
+        pvLine.appendChild(bd);
+      }
+      var chips = renderLabelChips(c.id);
+      if (chips) pvLine.appendChild(chips);
 
-      body.appendChild(top); body.appendChild(pv);
+      body.appendChild(top); body.appendChild(pvLine);
       row.appendChild(av); row.appendChild(body);
       row.addEventListener('click', function () { openChat(c.id, c.name); });
 
@@ -1008,9 +1352,59 @@ body {
     });
     state.labelMap = map;
     state.labels = Array.isArray(cached.labels) ? cached.labels : [];
+    state.labelsByChat = buildLabelsByChat(map, state.labels);
     populateLabelSelect();
     state.labelsLoaded = true;
     return true;
+  }
+  function buildLabelsByChat(labelMap, labels) {
+    // Reverse-index { chat_id: [labelObj, ...] } for O(1) lookup at render time.
+    var byChat = {};
+    if (!labelMap || !labels) return byChat;
+    var labelById = {};
+    labels.forEach(function (l) { if (l && l.id != null) labelById[String(l.id)] = l; });
+    Object.keys(labelMap).forEach(function (lid) {
+      var lbl = labelById[String(lid)];
+      if (!lbl) return;
+      var ids = labelMap[lid];
+      if (!ids || typeof ids.forEach !== 'function') return;
+      ids.forEach(function (chatId) {
+        if (!byChat[chatId]) byChat[chatId] = [];
+        byChat[chatId].push(lbl);
+      });
+    });
+    return byChat;
+  }
+  function chatLabels(chatId) {
+    return (state.labelsByChat && state.labelsByChat[chatId]) || [];
+  }
+  function renderLabelChips(chatId) {
+    var lbls = chatLabels(chatId);
+    if (!lbls.length) return null;
+    var wrap = document.createElement('div');
+    wrap.className = 'wa-row__labels';
+    lbls.forEach(function (l) {
+      var color = l.colorHex || '#8696a0';
+      var chip = document.createElement('span');
+      chip.className = 'wa-label-chip';
+      // Tinted bg + matching dark text — readable on the muted sidebar.
+      chip.style.background = hexAlpha(color, 0.16);
+      chip.style.color = color;
+      var dot = document.createElement('span');
+      dot.className = 'wa-label-chip__dot';
+      dot.style.background = color;
+      chip.appendChild(dot);
+      chip.appendChild(document.createTextNode(l.name || ''));
+      wrap.appendChild(chip);
+    });
+    return wrap;
+  }
+  function hexAlpha(hex, a) {
+    // #rrggbb → rgba(r,g,b,a). Falls back to muted on parse failure.
+    var m = /^#([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return 'rgba(134,150,160,' + a + ')';
+    var n = parseInt(m[1], 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
   }
   function populateLabelSelect() {
     var sel = $('wa-label-filter');
@@ -1037,7 +1431,12 @@ body {
       .then(function (labels) {
         if (!Array.isArray(labels)) labels = [];
         state.labels = labels.map(function (lb) {
-          return { id: String(lb.id || ''), name: lb.name || '', color: lb.color || '' };
+          return {
+            id: String(lb.id || ''),
+            name: lb.name || '',
+            color: lb.color || '',
+            colorHex: lb.colorHex || '',
+          };
         }).filter(function (lb) { return !!lb.id; });
         populateLabelSelect();
 
@@ -1059,8 +1458,11 @@ body {
         });
         Promise.all(pending).then(function () {
           state.labelMap = map;
+          state.labelsByChat = buildLabelsByChat(map, state.labels);
           state.labelsLoaded = true;
           writeLabelCache(map, state.labels);
+          // Re-render so freshly-loaded label chips appear in the chat list.
+          renderList();
         });
       })
       .catch(function () { /* ignore */ });
@@ -1087,19 +1489,97 @@ body {
     loadMessages();
   }
 
+  // Initial chat-open: newest 50, replace.
   function loadMessages() {
     if (!state.activeChatId) return;
-    var url = '/waha/wa-chats/?messages=1&chatId=' + encodeURIComponent(state.activeChatId) + '&limit=1000';
+    state.msgs = [];
+    state.msgsHasMore = true;
+    state.msgsLoading = false;
+    state.msgsOldestTs = 0;
+    state.msgsLiveOffsetSeen = 0;
+    var box = $('wa-msgs');
+    if (box) box.innerHTML = '<div class="wa-empty">Loading messages…</div>';
+    hideError();
+    var chatIdAtCall = state.activeChatId;
+    var url = '/waha/wa-chats/?messages=1&chatId=' + encodeURIComponent(chatIdAtCall) + '&limit=50';
+    state.msgsLoading = true;
     fetch(url, { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data || !data.ok) {
-          showError((data && data.error) || 'Failed to load messages');
+      .then(function (r) {
+        return r.text().then(function (raw) {
+          var data = null;
+          try { data = JSON.parse(raw); } catch (e) {}
+          return { ok: r.ok, status: r.status, data: data };
+        });
+      })
+      .then(function (res) {
+        state.msgsLoading = false;
+        if (chatIdAtCall !== state.activeChatId) return; // user switched chats
+        if (!res.ok || !res.data || !res.data.ok) {
+          var msg = (res.data && res.data.error) || ('HTTP ' + res.status);
+          if (box) box.innerHTML = '';
+          showError('Failed to load messages: ' + msg);
           return;
         }
-        renderMessages(data.messages || []);
+        state.msgs = res.data.messages || [];
+        state.msgsHasMore = !!res.data.has_more;
+        state.msgsOldestTs = state.msgs.length ? (state.msgs[0].timestamp || 0) : 0;
+        state.msgsLiveOffsetSeen = 50;
+        renderMessages(state.msgs);
       })
-      .catch(function (e) { showError('Network error: ' + e); });
+      .catch(function (e) {
+        state.msgsLoading = false;
+        if (box) box.innerHTML = '';
+        showError('Network error: ' + e);
+      });
+  }
+
+  // Scroll-up older page: fetch 50 messages older than the current oldest.
+  function loadOlderMessages() {
+    if (!state.activeChatId) return;
+    if (state.msgsLoading || !state.msgsHasMore || !state.msgsOldestTs) return;
+    var chatIdAtCall = state.activeChatId;
+    var box = $('wa-msgs');
+    if (!box) return;
+    state.msgsLoading = true;
+    // Show a tiny indicator at the top
+    var loader = document.createElement('div');
+    loader.className = 'wa-empty wa-empty--top';
+    loader.textContent = 'Loading older messages…';
+    box.insertBefore(loader, box.firstChild);
+    var prevHeight = box.scrollHeight;
+    var url = '/waha/wa-chats/?messages=1&chatId=' + encodeURIComponent(chatIdAtCall) +
+              '&limit=50&before_ts=' + state.msgsOldestTs +
+              '&older_offset=' + (state.msgsLiveOffsetSeen || 0);
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) {
+        return r.text().then(function (raw) {
+          var data = null;
+          try { data = JSON.parse(raw); } catch (e) {}
+          return { ok: r.ok, status: r.status, data: data };
+        });
+      })
+      .then(function (res) {
+        state.msgsLoading = false;
+        if (loader.parentNode) loader.parentNode.removeChild(loader);
+        if (chatIdAtCall !== state.activeChatId) return;
+        if (!res.ok || !res.data || !res.data.ok) return;
+        var older = res.data.messages || [];
+        if (!older.length) {
+          state.msgsHasMore = false;
+          return;
+        }
+        state.msgs = older.concat(state.msgs);
+        state.msgsOldestTs = older[0].timestamp || state.msgsOldestTs;
+        state.msgsLiveOffsetSeen += older.length;
+        state.msgsHasMore = !!res.data.has_more;
+        renderMessages(state.msgs);
+        // Preserve scroll position so user stays on the same content.
+        box.scrollTop = box.scrollHeight - prevHeight;
+      })
+      .catch(function () {
+        state.msgsLoading = false;
+        if (loader.parentNode) loader.parentNode.removeChild(loader);
+      });
   }
 
   function renderBody(msg) {
@@ -1141,9 +1621,82 @@ body {
       a.textContent = '📎 ' + (msg.body || 'Document');
       wrap.appendChild(a);
     } else if (t === 'location') {
-      var loc = document.createElement('span');
-      loc.textContent = '📍 location';
-      wrap.appendChild(loc);
+      var locBox = document.createElement('div');
+      locBox.className = 'wa-location';
+      if (msg.location && typeof msg.location.latitude === 'number') {
+        var lat = msg.location.latitude;
+        var lng = msg.location.longitude;
+        var a = document.createElement('a');
+        a.href = 'https://maps.google.com/?q=' + lat + ',' + lng;
+        a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = '📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+        a.style.textDecoration = 'underline';
+        locBox.appendChild(a);
+      } else {
+        var loc = document.createElement('span');
+        loc.textContent = '📍 location';
+        locBox.appendChild(loc);
+      }
+      // Verification-job CTA: shows the matched order + quick-apply for manual_review jobs.
+      var vj = msg.verification_job;
+      if (vj) {
+        var meta = document.createElement('div');
+        meta.style.marginTop = '4px';
+        meta.style.fontSize = '0.7rem';
+        var statusColors = {
+          'verified':      'background:#198754;color:#fff;',
+          'manual_review': 'background:#ffc107;color:#000;',
+          'sent':          'background:#0dcaf0;color:#000;',
+          'queued':        'background:#6c757d;color:#fff;',
+          'failed':        'background:#dc3545;color:#fff;',
+          'cancelled':     'background:#e9ecef;color:#495057;',
+        };
+        var badge = document.createElement('span');
+        badge.style.cssText = 'padding:2px 6px;border-radius:6px;margin-right:6px;' + (statusColors[vj.status] || '');
+        badge.textContent = vj.status.replace('_', ' ');
+        meta.appendChild(badge);
+        if (vj.order_number) {
+          var orderLink = document.createElement('a');
+          orderLink.href = '/workforce/orders/' + vj.order_id + '/';
+          orderLink.target = '_blank';
+          orderLink.textContent = vj.order_number + (vj.customer_name ? ' · ' + vj.customer_name : '');
+          orderLink.style.color = 'inherit';
+          orderLink.style.textDecoration = 'underline';
+          meta.appendChild(orderLink);
+        }
+        if (vj.status === 'manual_review') {
+          var applyBtn = document.createElement('button');
+          applyBtn.type = 'button';
+          applyBtn.textContent = 'Apply pin';
+          applyBtn.style.cssText = 'margin-left:6px;padding:2px 8px;background:#198754;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.65rem;';
+          applyBtn.onclick = function () {
+            if (!confirm('Apply this WhatsApp pin to order ' + (vj.order_number || ('#' + vj.order_id)) + '?')) return;
+            applyBtn.disabled = true; applyBtn.textContent = '...';
+            var csrf = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value
+              || (document.cookie.split(';').find(function (c) { return c.trim().startsWith('csrftoken='); }) || '=').split('=')[1] || '';
+            fetch('/workforce/orders/temp/verify-queue/' + vj.id + '/action/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+              body: JSON.stringify({ action: 'apply_to_order' }),
+            }).then(function (r) { return r.json(); }).then(function (data) {
+              if (data.success) {
+                badge.textContent = 'verified';
+                badge.style.cssText = 'padding:2px 6px;border-radius:6px;margin-right:6px;' + statusColors['verified'];
+                applyBtn.remove();
+              } else {
+                applyBtn.disabled = false; applyBtn.textContent = 'Apply pin';
+                alert('Error: ' + (data.error || 'apply failed'));
+              }
+            }).catch(function (err) {
+              applyBtn.disabled = false; applyBtn.textContent = 'Apply pin';
+              alert('Error: ' + err.message);
+            });
+          };
+          meta.appendChild(applyBtn);
+        }
+        locBox.appendChild(meta);
+      }
+      wrap.appendChild(locBox);
     } else if (t === 'sticker' && media && media.url) {
       var st = document.createElement('img');
       st.className = 'wa-media-img';
@@ -1251,11 +1804,16 @@ body {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + BEARER,
       },
       body: JSON.stringify({ to: state.activeChatId, text: txt }),
     })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
+      .then(function (r) {
+        return r.text().then(function (raw) {
+          var j = null;
+          try { j = JSON.parse(raw); } catch (e) {}
+          return { ok: r.ok, status: r.status, body: j, raw: raw };
+        });
+      })
       .then(function (res) {
         btn.disabled = false;
         if (res.ok && res.body && res.body.ok) {
@@ -1307,6 +1865,41 @@ body {
   $('wa-label-filter').addEventListener('change', renderList);
   $('wa-resync').addEventListener('click', resyncActive);
   $('wa-comp-send').addEventListener('click', sendMessage);
+
+  // Infinite scroll on the chat list: bottom → next page of chats.
+  (function wireInfiniteScroll() {
+    var listEl = $('wa-list');
+    if (!listEl) return;
+    var ticking = false;
+    listEl.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        if (state.chatsLoading || state.chatsExhausted) return;
+        var threshold = 200;  // px from bottom
+        if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - threshold) {
+          loadChats(true);
+        }
+      });
+    });
+  })();
+
+  // Scroll-up on the messages pane: top → previous page of messages.
+  (function wireMessagesScroll() {
+    var msgsEl = $('wa-msgs');
+    if (!msgsEl) return;
+    var ticking = false;
+    msgsEl.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        if (state.msgsLoading || !state.msgsHasMore) return;
+        if (msgsEl.scrollTop < 80) loadOlderMessages();
+      });
+    });
+  })();
   $('wa-comp-ta').addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

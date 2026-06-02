@@ -4,6 +4,18 @@ Provides sidebar badge counts for the workforce dashboard.
 """
 
 
+def _safe_count_avj():
+    """Count AddressVerificationJob rows that need ops attention. Returns 0 if
+    the whatsapp app or its migrations aren't ready (defensive)."""
+    try:
+        from whatsapp.models import AddressVerificationJob
+        return AddressVerificationJob.objects.filter(
+            status__in=('queued', 'sent', 'manual_review', 'failed')
+        ).count()
+    except Exception:
+        return 0
+
+
 def workforce_sidebar_counts(request):
     """
     Provide sidebar badge counts for workforce dashboard.
@@ -82,6 +94,11 @@ def workforce_sidebar_counts(request):
         'followup_count': DeliveryTask.objects.filter(
             dl_task_status='pending'
         ).count(),
+
+        # Address verification jobs awaiting attention (queued + sent +
+        # manual_review). Surfaces in the Tasks/Import sidebar badges so ops
+        # notice the WhatsApp pipeline backlog.
+        'address_verify_pending_count': _safe_count_avj(),
     }
 
     cache.set(cache_key, counts, 60)  # 60 second TTL

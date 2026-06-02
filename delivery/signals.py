@@ -427,6 +427,26 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
             except Exception as e:
                 logger.exception(f"Error incrementing failed_attempt_count for task {instance.pk}: {e}")
 
+            # Enqueue a delivery-recovery WhatsApp (10-min grace window before send).
+            # See whatsapp.tasks.drain_verification_queue — picks up jobs with
+            # scheduled_for <= now and builds a recovery message including the
+            # driver's failure reason. Uses get_or_create on (task,kind,queued)
+            # so a duplicate save of the same failed status doesn't double-enqueue.
+            try:
+                _enqueue_delivery_recovery_job(instance)
+            except Exception as e:
+                logger.exception(f"Failed to enqueue recovery job for task {instance.pk}: {e}")
+
+        # If driver/staff undoes the failed status BEFORE the 10-min timer fires
+        # and the WhatsApp goes out, auto-cancel the pending recovery job so the
+        # customer doesn't get a stale apology. Once status is 'sent' it's too
+        # late — the message already left the platform.
+        if old_status == 'failed' and new_status != 'failed':
+            try:
+                _cancel_pending_recovery_jobs(instance)
+            except Exception as e:
+                logger.exception(f"Failed to cancel pending recovery job for task {instance.pk}: {e}")
+
         # Notify driver when task is assigned to them
         if old_status is not None and new_status == 'assigned' and instance.driver_id:
             try:
@@ -610,3 +630,95 @@ def _create_hub_delivery_tasks(batch):
         f"Hub batch {batch.batch_number}: created {created_count} delivery tasks, "
         f"earnings_processed={batch.earnings_processed}"
     )
+
+
+# =============================================================================
+# Delivery-Recovery Job helpers
+# (called from the post_save DeliveryTask handler when a task is marked failed)
+# =============================================================================
+
+def _enqueue_delivery_recovery_job(task):
+    """Create an AddressVerificationJob (kind='delivery_failed', scheduled_for=
+    now+10min) so the drain worker contacts the customer 10 min after the
+    driver marked the task failed. Idempotent — skips if a queued recovery
+    job already exists for this order.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    from whatsapp.models import AddressVerificationJob
+    from core.templatetags.custom_filters import whatsapp_number
+
+    if not task.order_id:
+        return
+
+    order = task.order
+    phone_norm = whatsapp_number(order.customer_whatsapp or order.customer_phone)
+    if not phone_norm:
+        logger.warning(
+            f"Skipped recovery enqueue for task {task.dl_task_number}: no phone on order {order.order_number}"
+        )
+        return
+
+    # Avoid duplicate enqueue if multiple saves fire the failed transition.
+    existing = AddressVerificationJob.objects.filter(
+        order=order, kind='delivery_failed', status='queued',
+    ).order_by('-created_at').first()
+    if existing:
+        logger.info(
+            f"Recovery job already queued for order {order.order_number} "
+            f"(job #{existing.id}); not creating duplicate."
+        )
+        return
+
+    # Compose driver_failure_note from the structured reason + free-form notes.
+    reason_label = ''
+    if task.failure_reason:
+        reason_label = dict(task.FAILURE_REASON_CHOICES).get(task.failure_reason, task.failure_reason)
+    note_parts = []
+    if reason_label:
+        note_parts.append(reason_label)
+    if task.failure_notes:
+        note_parts.append(task.failure_notes.strip())
+    failure_note = ' — '.join(note_parts)[:1000]
+
+    grace_min = getattr(__import__('django.conf', fromlist=['settings']).settings,
+                        'WAHA_DELIVERY_RECOVERY_DELAY_MINUTES', 10)
+    job = AddressVerificationJob.objects.create(
+        order=order,
+        phone=phone_norm,
+        kind='delivery_failed',
+        status='queued',
+        scheduled_for=timezone.now() + timedelta(minutes=grace_min),
+        driver_failure_note=failure_note,
+    )
+    logger.info(
+        f"Enqueued delivery-recovery job #{job.id} for order {order.order_number} "
+        f"(sends at {job.scheduled_for.isoformat()}, reason={reason_label!r})"
+    )
+
+
+def _cancel_pending_recovery_jobs(task):
+    """Cancel any queued delivery-recovery jobs for this order. Called when a
+    task moves out of 'failed' state before the 10-min timer fires. Once a job
+    is in 'sent' state, the WhatsApp has already gone out so we leave it.
+    """
+    from whatsapp.models import AddressVerificationJob
+
+    if not task.order_id:
+        return
+
+    qs = AddressVerificationJob.objects.filter(
+        order_id=task.order_id, kind='delivery_failed', status='queued',
+    )
+    if qs.exists():
+        from django.utils import timezone
+        count = qs.count()
+        qs.update(
+            status='cancelled',
+            completed_at=timezone.now(),
+            notes='Auto-cancelled: task moved out of failed state before recovery send',
+        )
+        logger.info(
+            f"Cancelled {count} queued recovery job(s) for task {task.dl_task_number} "
+            f"(status reverted from 'failed')"
+        )

@@ -79,9 +79,14 @@ def _convert_excel_date(value):
     if not s:
         return ''
 
-    # Already a proper date string (YYYY-MM-DD or ISO format)
-    if re.match(r'^\d{4}-\d{2}-\d{2}', s):
-        return s
+    # Strip midnight tail so '2026-05-13 00:00:00' and '2026-05-13' converge
+    # (prevents sync/remap flipping the field on every run).
+    m = re.match(r'^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2}))?', s)
+    if m:
+        date_part, hh, mm, ss = m.group(1), m.group(2), m.group(3), m.group(4)
+        if hh is None or (hh == '00' and mm == '00' and ss == '00'):
+            return date_part
+        return f"{date_part} {hh}:{mm}:{ss}"
 
     # Excel serial date number
     try:
@@ -429,12 +434,17 @@ def _sync_onedrive_source(source):
             if temp_order.status == 'imported':
                 defaults.pop('status', None)
             changed = False
+            before, after = {}, {}
             for key, val in defaults.items():
-                if getattr(temp_order, key) != val:
+                old_val = getattr(temp_order, key)
+                if old_val != val:
+                    before[key] = old_val
+                    after[key] = val
                     setattr(temp_order, key, val)
                     changed = True
             if changed:
                 temp_order.save()
+                temp_order.append_change_log('sync-onedrive', before, after)
                 updated += 1
         else:
             TempOrder.objects.create(
@@ -486,7 +496,7 @@ def _sync_google_sheet_source(api_settings):
     from pathlib import Path
     from orders.models import TempOrder, Order
 
-    sheet_url = api_settings.google_sheet_url or api_settings.site_api_url or ''
+    sheet_url = api_settings.google_sheet_url or ''
     if not sheet_url:
         return 0, 0
 
@@ -715,12 +725,17 @@ def _sync_google_sheet_source(api_settings):
             if temp_order.status == 'imported':
                 defaults.pop('status', None)
             changed = False
+            before, after = {}, {}
             for key, val in defaults.items():
-                if getattr(temp_order, key) != val:
+                old_val = getattr(temp_order, key)
+                if old_val != val:
+                    before[key] = old_val
+                    after[key] = val
                     setattr(temp_order, key, val)
                     changed = True
             if changed:
                 temp_order.save()
+                temp_order.append_change_log('sync-google-sheet', before, after)
                 updated += 1
         else:
             TempOrder.objects.create(
@@ -805,17 +820,20 @@ def _sync_api_source(api_settings):
         already_imported = pid in imported_pids
         status = 'imported' if already_imported else 'new'
 
+        # Coerce every mapped field to '' — TempOrder string columns are NOT
+        # NULL, and source feeds (e.g. Shopify shipping_address.phone) deliver
+        # an explicit None that .get(key, '') does NOT replace.
         defaults = {
             'business': business,
             'source_type': api_type,
-            'client_order_code': o.get('order_id', '') or o.get('platform_id', ''),
-            'customer_name': o.get('customer', '') or o.get('name', ''),
-            'customer_phone': o.get('phone', ''),
-            'customer_address': o.get('address', ''),
+            'client_order_code': o.get('order_id') or o.get('platform_id') or '',
+            'customer_name': o.get('customer') or o.get('name') or '',
+            'customer_phone': o.get('phone') or '',
+            'customer_address': o.get('address') or '',
             'cod_amount': str(o.get('cod', '')) if o.get('cod') else '',
-            'order_date': _convert_excel_date(o.get('date', '')),
-            'package_desc': o.get('package_desc', ''),
-            'financial_status': o.get('financial_status', ''),
+            'order_date': _convert_excel_date(o.get('date', '')) or '',
+            'package_desc': o.get('package_desc') or '',
+            'financial_status': o.get('financial_status') or '',
             'raw_row': o,
             'status': status,
         }
@@ -826,12 +844,17 @@ def _sync_api_source(api_settings):
             if temp_order.status == 'imported':
                 defaults.pop('status', None)
             changed = False
+            before, after = {}, {}
             for key, val in defaults.items():
-                if getattr(temp_order, key) != val:
+                old_val = getattr(temp_order, key)
+                if old_val != val:
+                    before[key] = old_val
+                    after[key] = val
                     setattr(temp_order, key, val)
                     changed = True
             if changed:
                 temp_order.save()
+                temp_order.append_change_log(f'sync-{api_type}', before, after)
                 updated += 1
         else:
             TempOrder.objects.create(
@@ -848,124 +871,167 @@ def _sync_api_source(api_settings):
     return created, updated
 
 
-def _fetch_shopify_orders(api_settings):
+def _shopify_order_to_row(o):
+    """Convert a Shopify Order resource into the row-dict shape used by TempOrder.raw_row."""
+    ship = getattr(o, 'shipping_address', None)
+    line_items = getattr(o, 'line_items', []) or []
+    items_data = []
+    for li in line_items:
+        variant = getattr(li, 'variant_title', '') or ''
+        item_name = li.title or ''
+        if variant and variant.lower() != 'default title':
+            item_name = f"{item_name} - {variant}"
+        items_data.append({
+            'name': item_name,
+            'qty': li.quantity,
+            'price': li.price,
+            'sku': getattr(li, 'sku', '') or '',
+        })
+    customer_name = ''
+    if ship:
+        first = getattr(ship, 'first_name', '') or ''
+        last = getattr(ship, 'last_name', '') or ''
+        customer_name = f"{first} {last}".strip()
+    if not customer_name:
+        cust = getattr(o, 'customer', None)
+        if cust:
+            first = getattr(cust, 'first_name', '') or ''
+            last = getattr(cust, 'last_name', '') or ''
+            customer_name = f"{first} {last}".strip()
+    fin_status = getattr(o, 'financial_status', '') or ''
+    row = {
+        'platform_id': str(o.id),
+        'order_id': o.name,
+        'name': customer_name or (getattr(o, 'contact_email', '') or ''),
+        'customer': customer_name or (getattr(o, 'contact_email', '') or ''),
+        'phone': (getattr(ship, 'phone', '') or '') if ship else '',
+        'address': ', '.join(filter(None, [
+            getattr(ship, 'address1', '') or '',
+            getattr(ship, 'address2', '') or '',
+        ])) if ship else '',
+        'cod': '' if fin_status == 'paid' else o.total_price,
+        'total_price': o.total_price,
+        'date': o.created_at,
+        'financial_status': fin_status,
+        'source': 'shopify',
+        'line_items': items_data,
+    }
+    for idx, item in enumerate(items_data[:5], 1):
+        row[f'product_{idx}'] = item['name']
+        row[f'count_{idx}'] = str(item['qty'])
+    desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
+    row['package_desc'] = ', '.join(desc_parts)
+    row['package_qty'] = str(sum(it['qty'] for it in items_data))
+    return row
+
+
+def _shopify_activate(api_settings):
+    """Open a Shopify session for the given api_settings; caller is responsible
+    for calling shopify.ShopifyResource.clear_session() afterwards."""
     import shopify
     shop_name = (api_settings.site_api_url or '').replace('https://', '').replace('http://', '').replace('.myshopify.com', '').strip()
     session = shopify.Session(shop_name, api_settings.api_version or '2023-10', api_settings.api_access_token)
     shopify.ShopifyResource.activate_session(session)
+    return shopify
+
+
+def _fetch_shopify_orders(api_settings):
+    shopify = _shopify_activate(api_settings)
     try:
         orders = shopify.Order.find(limit=50, status='any')
-        result = []
-        for o in orders:
-            ship = getattr(o, 'shipping_address', None)
-            # Build line items summary
-            line_items = getattr(o, 'line_items', []) or []
-            items_data = []
-            for li in line_items:
-                variant = getattr(li, 'variant_title', '') or ''
-                item_name = li.title or ''
-                if variant and variant.lower() != 'default title':
-                    item_name = f"{item_name} - {variant}"
-                items_data.append({
-                    'name': item_name,
-                    'qty': li.quantity,
-                    'price': li.price,
-                    'sku': getattr(li, 'sku', '') or '',
-                })
-            # Build product columns (product_1..5, count_1..5) for import wizard compatibility
-            # Get customer name from shipping address or customer object
-            customer_name = ''
-            if ship:
-                first = getattr(ship, 'first_name', '') or ''
-                last = getattr(ship, 'last_name', '') or ''
-                customer_name = f"{first} {last}".strip()
-            if not customer_name:
-                cust = getattr(o, 'customer', None)
-                if cust:
-                    first = getattr(cust, 'first_name', '') or ''
-                    last = getattr(cust, 'last_name', '') or ''
-                    customer_name = f"{first} {last}".strip()
-            fin_status = getattr(o, 'financial_status', '') or ''
-            row = {
-                'platform_id': str(o.id),
-                'order_id': o.name,
-                'name': customer_name or (getattr(o, 'contact_email', '') or ''),
-                'customer': customer_name or (getattr(o, 'contact_email', '') or ''),
-                'phone': getattr(ship, 'phone', '') if ship else '',
-                'address': ', '.join(filter(None, [
-                    getattr(ship, 'address1', '') or '',
-                    getattr(ship, 'address2', '') or '',
-                ])) if ship else '',
-                'cod': '' if fin_status == 'paid' else o.total_price,
-                'total_price': o.total_price,
-                'date': o.created_at,
-                'financial_status': fin_status,
-                'source': 'shopify',
-                'line_items': items_data,
-            }
-            # Flatten first 5 items into product_N / count_N fields
-            for idx, item in enumerate(items_data[:5], 1):
-                row[f'product_{idx}'] = item['name']
-                row[f'count_{idx}'] = str(item['qty'])
-            # Combined description as fallback (Shopify has no native package_desc)
-            desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
-            row['package_desc'] = ', '.join(desc_parts)
-            row['package_qty'] = str(sum(it['qty'] for it in items_data))
-            result.append(row)
-        return result
+        return [_shopify_order_to_row(o) for o in orders]
     finally:
         shopify.ShopifyResource.clear_session()
 
 
-def _fetch_woocommerce_orders(api_settings):
+def _fetch_single_shopify_order(api_settings, platform_id):
+    """Fetch one Shopify order by its internal id. Returns row-dict or None.
+
+    Used by the per-row Resync flow to refresh a single TempOrder without
+    paginating the entire order list. Works for orders outside the recent 50.
+    """
+    shopify = _shopify_activate(api_settings)
+    try:
+        try:
+            o = shopify.Order.find(int(platform_id))
+        except Exception:
+            return None
+        if not o:
+            return None
+        return _shopify_order_to_row(o)
+    finally:
+        shopify.ShopifyResource.clear_session()
+
+
+def _woo_order_to_row(o):
+    """Convert a WooCommerce order dict into the row-dict shape used by TempOrder.raw_row."""
+    billing = o.get('billing', {})
+    shipping = o.get('shipping', {})
+    addr_parts = [shipping.get('address_1') or billing.get('address_1'), shipping.get('city') or billing.get('city')]
+    items_data = []
+    for li in o.get('line_items', []):
+        items_data.append({
+            'name': li.get('name', ''),
+            'qty': li.get('quantity', 1),
+            'price': li.get('price', '0'),
+            'sku': li.get('sku', ''),
+        })
+    customer_name = f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip()
+    row = {
+        'platform_id': str(o.get('id')),
+        'order_id': f"#{o.get('number')}",
+        'name': customer_name,
+        'customer': customer_name,
+        'phone': billing.get('phone', ''),
+        'address': ', '.join(filter(None, addr_parts)),
+        'cod': o.get('total'),
+        'date': o.get('date_created'),
+        'source': 'woocommerce',
+        'line_items': items_data,
+    }
+    for idx, item in enumerate(items_data[:5], 1):
+        row[f'product_{idx}'] = item['name']
+        row[f'count_{idx}'] = str(item['qty'])
+    desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
+    row['package_desc'] = ', '.join(desc_parts)
+    row['package_qty'] = str(sum(it['qty'] for it in items_data))
+    return row
+
+
+def _woo_api_client(api_settings):
     from woocommerce import API as WooAPI
-    wcapi = WooAPI(
+    return WooAPI(
         url=api_settings.site_api_url or '',
         consumer_key=api_settings.api_key or '',
         consumer_secret=api_settings.api_secret or '',
         version='wc/v3',
         timeout=15,
     )
+
+
+def _fetch_woocommerce_orders(api_settings):
+    wcapi = _woo_api_client(api_settings)
     r = wcapi.get('orders', params={'per_page': 50, 'orderby': 'date', 'order': 'desc'})
     if r.status_code != 200:
         raise RuntimeError(f"WooCommerce API error {r.status_code}")
+    return [_woo_order_to_row(o) for o in r.json()]
 
-    result = []
-    for o in r.json():
-        billing = o.get('billing', {})
-        shipping = o.get('shipping', {})
-        addr_parts = [shipping.get('address_1') or billing.get('address_1'), shipping.get('city') or billing.get('city')]
-        # Build line items
-        items_data = []
-        for li in o.get('line_items', []):
-            items_data.append({
-                'name': li.get('name', ''),
-                'qty': li.get('quantity', 1),
-                'price': li.get('price', '0'),
-                'sku': li.get('sku', ''),
-            })
-        customer_name = f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip()
-        row = {
-            'platform_id': str(o.get('id')),
-            'order_id': f"#{o.get('number')}",
-            'name': customer_name,
-            'customer': customer_name,
-            'phone': billing.get('phone', ''),
-            'address': ', '.join(filter(None, addr_parts)),
-            'cod': o.get('total'),
-            'date': o.get('date_created'),
-            'source': 'woocommerce',
-            'line_items': items_data,
-        }
-        for idx, item in enumerate(items_data[:5], 1):
-            row[f'product_{idx}'] = item['name']
-            row[f'count_{idx}'] = str(item['qty'])
-        # Combined description as fallback (WooCommerce has no native package_desc)
-        desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
-        row['package_desc'] = ', '.join(desc_parts)
-        row['package_qty'] = str(sum(it['qty'] for it in items_data))
-        result.append(row)
-    return result
+
+def _fetch_single_woo_order(api_settings, platform_id):
+    """Fetch one WooCommerce order by id. Returns row-dict or None."""
+    wcapi = _woo_api_client(api_settings)
+    try:
+        r = wcapi.get(f'orders/{platform_id}')
+    except Exception:
+        return None
+    if r.status_code == 404:
+        return None
+    if r.status_code != 200:
+        raise RuntimeError(f"WooCommerce API error {r.status_code}")
+    data = r.json()
+    if not data or not data.get('id'):
+        return None
+    return _woo_order_to_row(data)
 
 
 # =============================================================================
@@ -1264,12 +1330,17 @@ def _sync_public_link_source(source):
             if existing_to.status == 'imported':
                 defaults.pop('status', None)
             changed = False
+            before, after = {}, {}
             for key, val in defaults.items():
-                if getattr(existing_to, key) != val:
+                old_val = getattr(existing_to, key)
+                if old_val != val:
+                    before[key] = old_val
+                    after[key] = val
                     setattr(existing_to, key, val)
                     changed = True
             if changed:
                 existing_to.save()
+                existing_to.append_change_log('sync-public-link', before, after)
                 updated += 1
         else:
             TempOrder.objects.create(

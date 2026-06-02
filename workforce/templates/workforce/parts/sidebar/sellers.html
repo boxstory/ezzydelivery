@@ -1,0 +1,24 @@
+{% load workforce_tags %}
+{% url 'workforce:sellers_list' as u_sellers_list %}
+{% url 'workforce:sellers_pending' as u_sellers_pending %}
+{% url 'workforce:sellers_active' as u_sellers_active %}
+{% url 'workforce:sellers_inactive' as u_sellers_inactive %}
+{% url 'workforce:wf_seller_api_configs' as u_wf_seller_api_configs %}
+{% with active="sellers_list,sellers_pending,sellers_active,sellers_inactive,seller_detail,wf_seller_api_configs,wf_test_api_config" %}
+<li id="workforce_sidebar_menu_sellers" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_sellers" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-sellers" data-title="Sellers">
+    <i class="fa-solid fa-store me-2"></i>
+    <span>Sellers</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-sellers" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_all_sellers" url=u_sellers_list icon="fa-solid fa-list" label="All Sellers" active_names="sellers_list,seller_detail" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_sellers_pending" url=u_sellers_pending icon="fa-solid fa-clock" label="Pending Approval" active_names="sellers_pending" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_sellers_active" url=u_sellers_active icon="fa-solid fa-circle-check" label="Active Sellers" active_names="sellers_active" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_sellers_inactive" url=u_sellers_inactive icon="fa-solid fa-circle-xmark" label="Inactive Sellers" active_names="sellers_inactive" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_api_configs" url=u_wf_seller_api_configs icon="fa-solid fa-plug" label="API Configs" active_names="wf_seller_api_configs,wf_test_api_config" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

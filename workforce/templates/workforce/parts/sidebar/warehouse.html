@@ -1,0 +1,29 @@
+{% url 'warehouse:dashboard' as u_wh_dashboard %}
+{% url 'warehouse:warehouse_list' as u_warehouse_list %}
+{% url 'warehouse:location_list' as u_location_list %}
+{% url 'warehouse:warehouse_location_list' as u_warehouse_location_list %}
+{% url 'warehouse:seller_warehouse_links' as u_seller_warehouse_links %}
+{% url 'workforce:product_requests_list' as u_product_requests_list %}
+{% with rm=request.resolver_match %}
+<li id="workforce_sidebar_menu_warehouse" class="nav-item {% if rm.app_name == 'warehouse' or rm.url_name == 'product_requests_list' %}active{% endif %}">
+  <div id="workforce_sidebar_link_warehouse" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-warehouse" data-title="Warehouse">
+    <i class="fa-solid fa-warehouse me-2"></i>
+    <span>Warehouse</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-warehouse" class="multi-level collapse submenu {% if rm.app_name == 'warehouse' or rm.url_name == 'product_requests_list' %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% if rm.url_name == 'dashboard' and rm.app_name == 'warehouse' %}
+        {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_dashboard" url=u_wh_dashboard icon="fa-solid fa-gauge-high" label="WH Dashboard" is_active=True %}
+      {% else %}
+        {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_dashboard" url=u_wh_dashboard icon="fa-solid fa-gauge-high" label="WH Dashboard" %}
+      {% endif %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_warehouses" url=u_warehouse_list icon="fa-solid fa-building-warehouse" label="Warehouses" active_names="warehouse_list,warehouse_add,warehouse_detail" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_storage_locations" url=u_location_list icon="fa-solid fa-shelves" label="Storage Locations" active_names="location_list,location_add" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_pickup_dispatch_locations" url=u_warehouse_location_list icon="fa-solid fa-map-marker-alt" label="Pickup/Dispatch Locations" active_names="warehouse_location_list,warehouse_location_add" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wh_seller_links" url=u_seller_warehouse_links icon="fa-solid fa-link" label="Seller-WH Links" active_names="seller_warehouse_links,seller_warehouse_link_detail,seller_warehouse_link_add,seller_warehouse_link_edit" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_product_requests" url=u_product_requests_list icon="fa-solid fa-inbox" label="Product Requests" active_names="product_requests_list" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

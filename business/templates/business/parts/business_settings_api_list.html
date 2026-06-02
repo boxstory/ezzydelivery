@@ -165,6 +165,13 @@
           </div>
 
           <div class="bapi__card-actions">
+            {% if 'shopify' in api.api_type|lower %}
+            <a href="{% url 'business:shopify_oauth_start' business.business_id api.id %}" class="bapi__action bapi__action--test"
+               onclick="return confirm('You will be redirected to Shopify to authorize this app. Make sure Client ID, Client Secret, and Store URL are saved first. Continue?')">
+              <i class="fa-solid fa-link"></i>
+              Connect (OAuth)
+            </a>
+            {% endif %}
             <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="bapi__action bapi__action--test">
               <i class="fa-solid fa-vial"></i>
               Test
@@ -202,6 +209,11 @@
       {% endif %}
     </div>
   </section>
+
+  {% if has_shopify_integration %}
+    {% include "business/parts/_shopify_setup_guide.html" %}
+    <script>document.getElementById('client_api_shopify_setup_help').style.display = '';</script>
+  {% endif %}
 
   <!-- API Keys Section -->
   <section class="bapi__section" id="client_api_list_section_api_keys">

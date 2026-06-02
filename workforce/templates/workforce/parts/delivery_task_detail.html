@@ -777,7 +777,7 @@
             </div>
 
             <!-- Payment Method Card -->
-            {% if task.payment_method or task.cod_collected %}
+            {% if task.payment_method or task.cod_collected or task.order.cod_amount or task.order.cod_status_by_client or task.order.cod_status_by_staff %}
             <div class="dtd__card">
                 <div class="dtd__card__head">
                     <div class="dtd__card__head-left">
@@ -787,6 +787,18 @@
                 </div>
                 <div class="dtd__card__body">
                     <div class="dtd__fields">
+                        {% if task.order.cod_status_by_client %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-circle-info"></i> Order Payment</span>
+                            <span class="dtd__field__value">{{ task.order.get_cod_status_by_client_display|default:task.order.cod_status_by_client }}</span>
+                        </div>
+                        {% endif %}
+                        {% if task.order.cod_amount is not None %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-money-bill-wave"></i> COD Amount (Order)</span>
+                            <span class="dtd__field__value fw-semibold">{{ task.order.cod_amount|default:0 }} QAR</span>
+                        </div>
+                        {% endif %}
                         {% if task.payment_method %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-wallet"></i> Method</span>
@@ -1186,7 +1198,7 @@
         var cod = '{{ task.order.cod_amount|default:""|escapejs }}';
         var customerName = '{{ task.order.customer_name|default:""|escapejs }}';
         var sellerName = '{{ task.order.business.business_name|default:""|escapejs }}';
-        var verifyUrl = '{% with av=task.order.address_verifications.first %}{% with phone=task.order.customer_phone|default:"" %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url "verify_location_short" phone av.verification_token %}{% endif %}{% endwith %}{% endwith %}';
+        var verifyUrl = '{% with av=task.order.address_verifications.first %}{% with phone=task.order.customer_phone|default:"" %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url "verify_location_short" phone|cut:'/' av.verification_token %}{% endif %}{% endwith %}{% endwith %}';
 
         var msg = 'Hello' + (customerName ? ' ' + customerName : '') + '! \ud83d\udc4b This is EzzyDelivery.\n\n\ud83d\udce6 Order: ' + (order || '\u2014');
         if (sellerName) msg += '\n\ud83c\udfea From: ' + sellerName;

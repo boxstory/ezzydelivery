@@ -2,983 +2,126 @@
 
 <div id="workforce_sidebar_main" class="d-none d-md-block flex-shrink-0 col-md-3 col-lg-2 pe-0 dashboard-sidebar">
   <div class="wf-sidebar__sticky">
-  <div id="workforce_sidebar_header" class="sidebar-header">
-    <a id="workforce_sidebar_btn_dashboard" class="nav-link dashboard-title"
-       href="{% url 'workforce:wf_dashboard' %}">
-      <span>Dashboard</span>
-      <span><i class="fa-solid fa-users me-1"></i>Staff Dashboard</span>
-    </a>
+    <div id="workforce_sidebar_header" class="sidebar-header">
+      <a id="workforce_sidebar_btn_dashboard" class="nav-link dashboard-title"
+         href="{% url 'workforce:wf_dashboard' %}">
+        <span>Dashboard</span>
+        <span><i class="fa-solid fa-users me-1"></i>Staff Dashboard</span>
+      </a>
+    </div>
+    <hr />
+
+    <div id="workforce_sidebar_nav">
+      <ul id="workforce_sidebar_menu_main" class="navbar-nav">
+
+        {% include "workforce/parts/sidebar/temp_orders.html" %}
+        {% include "workforce/parts/sidebar/orders.html" %}
+        {% include "workforce/parts/sidebar/tasks.html" %}
+        {% include "workforce/parts/sidebar/fleet_accounts.html" %}
+
+        <p class="dsb-section">Finance &amp; Fulfillment</p>
+        {% include "workforce/parts/sidebar/finance.html" %}
+        {% include "workforce/parts/sidebar/fulfillment.html" %}
+        {% include "workforce/parts/sidebar/warehouse.html" %}
+        {% include "workforce/parts/sidebar/inventory.html" %}
+
+        <p class="dsb-section">Operations</p>
+        {% include "workforce/parts/sidebar/dispatch.html" %}
+        {% if user.profile.is_superadmin %}
+          {% include "workforce/parts/sidebar/triggers.html" %}
+        {% endif %}
+        {% include "workforce/parts/sidebar/zones.html" %}
+        {% include "workforce/parts/sidebar/sellers.html" %}
+        {% include "workforce/parts/sidebar/verifications.html" %}
+
+        {% include "workforce/parts/sidebar/import.html" %}
+
+        <p class="dsb-section">Reports &amp; Tools</p>
+        {% include "workforce/parts/sidebar/reports.html" %}
+        {% include "workforce/parts/sidebar/forms.html" %}
+        {% include "workforce/parts/sidebar/whatsapp.html" %}
+
+        <p class="dsb-section">Admin</p>
+        {% include "workforce/parts/sidebar/profile_admin.html" %}
+
+      </ul>
+    </div>
   </div>
-  <hr />
-
-  <div id="workforce_sidebar_nav">
-    <ul id="workforce_sidebar_menu_main" class="navbar-nav">
-
-      <!-- Import Section -->
-      <li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,google_sheet_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}active{% endif %}">
-        <div id="workforce_sidebar_link_import" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-import" data-title="Import">
-          <i class="fa-solid fa-file-import me-2"></i>
-          <span>Import</span>
-          {% if temp_orders_sync_errors %}<span class="badge ms-auto me-2" style="background:#dc3545;color:#fff;padding:.25rem .4rem;font-size:0.55rem;line-height:1.2;" title="Sync errors: {{ temp_orders_sync_errors|length }} source(s) failed" data-badge="sync_errors_parent"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
-          <span class="badge ms-auto me-2" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders_parent">{{ temp_orders_count|default:"0" }}</span>
-          <i class="fa-solid fa-chevron-down"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_bulk_import,onedrive_sources,google_sheet_sources,wf_api_orders,temp_orders,temp_orders_by_date,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager,wf_export_page,dl_tasks_export_page' %}show{% endif %}" id="submenu-import">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}">
-              <a id="workforce_sidebar_link_temp_orders" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'temp_orders' %}active{% endif %}"
-                 href="{% url 'workforce:temp_orders' %}">
-                <i class="fa-solid fa-inbox me-2"></i>
-                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Temp Orders</span>
-                {% if temp_orders_sync_errors %}<span class="badge" style="flex:0 0 auto;background:#dc3545;color:#fff;padding:.25rem .4rem;font-size:0.55rem;line-height:1.2;" title="Sync errors: {{ temp_orders_sync_errors|length }} source(s) failed" data-badge="sync_errors"><i class="fa-solid fa-triangle-exclamation" style="font-size:0.5rem"></i></span>{% endif %}
-                <span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="temp_orders">{{ temp_orders_count|default:"0" }}</span>
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'temp_orders_by_date' %}active{% endif %}">
-              <a id="workforce_sidebar_link_temp_orders_by_date" class="nav-link btn {% if request.resolver_match.url_name == 'temp_orders_by_date' %}active{% endif %}"
-                 href="{% url 'workforce:temp_orders_by_date' %}">
-                <i class="fa-solid fa-calendar-days me-2"></i>
-                Fetch by Date
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_bulk_import' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_bulk" class="nav-link btn {% if request.resolver_match.url_name == 'wf_orders_bulk_import' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_bulk_import' %}">
-                <i class="fa-solid fa-file-csv me-2"></i>
-                CSV / Excel Upload
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'onedrive_sources' %}active{% endif %}">
-              <a id="workforce_sidebar_link_onedrive" class="nav-link btn {% if request.resolver_match.url_name == 'onedrive_sources' %}active{% endif %}"
-                 href="{% url 'workforce:onedrive_sources' %}">
-                <i class="fa-solid fa-cloud-arrow-down me-2"></i>
-                Shared Sheet / Excel
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'google_sheet_sources' %}active{% endif %}">
-              <a id="workforce_sidebar_link_google_sheet" class="nav-link btn {% if request.resolver_match.url_name == 'google_sheet_sources' %}active{% endif %}"
-                 href="{% url 'workforce:google_sheet_sources' %}">
-                <i class="fa-brands fa-google me-2"></i>
-                Google Sheets
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_api_orders' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_api_orders" class="nav-link btn {% if request.resolver_match.url_name == 'wf_api_orders' %}active{% endif %}"
-                 href="{% url 'workforce:wf_api_orders' %}">
-                <i class="fa-solid fa-plug me-2"></i>
-                API/Auto Trigger
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'import_history' %}active{% endif %}">
-              <a id="workforce_sidebar_link_import_history" class="nav-link btn {% if request.resolver_match.url_name == 'import_history' %}active{% endif %}"
-                 href="{% url 'workforce:import_history' %}">
-                <i class="fa-solid fa-clock-rotate-left me-2"></i>
-                Import History
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_mapping_manager' %}active{% endif %}">
-              <a id="workforce_sidebar_link_mapping_manager" class="nav-link btn {% if request.resolver_match.url_name == 'wf_mapping_manager' %}active{% endif %}"
-                 href="{% url 'workforce:wf_mapping_manager' %}">
-                <i class="fa-solid fa-sliders me-2"></i>
-                Column Mapping
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_webhook_imports' %}active{% endif %}">
-              <a id="workforce_sidebar_link_webhook_imports" class="nav-link btn {% if request.resolver_match.url_name == 'wf_webhook_imports' %}active{% endif %}"
-                 href="{% url 'workforce:wf_webhook_imports' %}">
-                <i class="fa-solid fa-satellite-dish me-2"></i>
-                Webhook Imports
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_export_page' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_export_page" class="nav-link btn {% if request.resolver_match.url_name == 'wf_export_page' %}active{% endif %}"
-                 href="{% url 'workforce:wf_export_page' %}">
-                <i class="fa-solid fa-file-arrow-down me-2"></i>
-                Export Orders
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dl_tasks_export_page' %}active{% endif %}">
-              <a id="workforce_sidebar_link_dl_tasks_export" class="nav-link btn {% if request.resolver_match.url_name == 'dl_tasks_export_page' %}active{% endif %}"
-                 href="{% url 'workforce:dl_tasks_export_page' %}">
-                <i class="fa-solid fa-truck-fast me-2"></i>
-                Export DL Tasks
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Orders Section -->
-      <li id="workforce_sidebar_menu_orders" class="nav-item {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,order_detail,order_edit,orders_pending_verification' %}active{% endif %}">
-        <div id="workforce_sidebar_link_orders" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-orders" data-title="Orders">
-          <i class="fa-solid fa-box me-2"></i>
-          <span>Orders</span>
-          <span class="badge ms-auto me-2" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="pending_publish_parent">{{ pending_publish_count|default:"0" }}</span>
-          <i class="fa-solid fa-chevron-down"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,order_detail,order_edit,orders_pending_verification' %}show{% endif %}" id="submenu-orders">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_add' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_add" class="nav-link btn {% if request.resolver_match.url_name == 'wf_orders_add' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_add' %}">
-                <i class="fa-solid fa-plus me-2"></i>
-                Add Order
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'wf_orders_all,order_detail,order_edit' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_all" class="nav-link btn {% if request.resolver_match.url_name in 'wf_orders_all,order_detail,order_edit' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_all' %}">
-                <i class="fa-solid fa-list me-2"></i>
-                All Orders List
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_fulfilled_clients' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_fulfilled_clients" class="nav-link btn {% if request.resolver_match.url_name == 'wf_orders_fulfilled_clients' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_fulfilled_clients' %}">
-                <i class="fa-solid fa-truck-ramp-box me-2"></i>
-                Fulfilled Clients
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_non_fulfilled_clients' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_non_fulfilled_clients" class="nav-link btn {% if request.resolver_match.url_name == 'wf_orders_non_fulfilled_clients' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_non_fulfilled_clients' %}">
-                <i class="fa-solid fa-truck-fast me-2"></i>
-                Non-Fulfilled Clients
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_by_seller' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_by_seller" class="nav-link btn {% if request.resolver_match.url_name == 'wf_orders_by_seller' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_by_seller' %}">
-                <i class="fa-solid fa-store me-2"></i>
-                Order by Seller
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_to_publish' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_to_publish" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'wf_orders_to_publish' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_to_publish' %}">
-                <i class="fa-solid fa-spinner me-2"></i>
-                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Publish to Task</span>
-                <span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="pending_publish">{{ pending_publish_count|default:"0" }}</span>
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_published' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_published" class="nav-link btn {% if request.resolver_match.url_name == 'wf_orders_published' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_published' %}">
-                <i class="fa-solid fa-circle-check me-2"></i>
-                Published Orders
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_orders_reported' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wf_orders_reported" class="nav-link btn {% if request.resolver_match.url_name == 'wf_orders_reported' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_reported' %}">
-                <i class="fa-solid fa-flag me-2"></i>
-                Reported
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Tasks Section -->
-      <li id="workforce_sidebar_menu_tasks" class="nav-item {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_reported,tasks_live_map,delivery_task_detail,delivery_task_edit,hub_batch_list,hub_batch_create,hub_batch_detail' %}active{% endif %}">
-        <div id="workforce_sidebar_link_tasks" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-deliveries" data-title="Tasks">
-          <i class="fa-solid fa-truck-fast me-2"></i>
-          <span>Tasks</span>
-          <span class="badge ms-auto me-2" style="background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="unpublished_tasks_parent">{{ unpublished_tasks_count|default:"0" }}</span>
-          <i class="fa-solid fa-chevron-down"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_reported,tasks_live_map,delivery_task_detail,delivery_task_edit,hub_batch_list,hub_batch_create,hub_batch_detail' %}show{% endif %}" id="submenu-deliveries">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name in 'dl_list_all,delivery_task_detail,delivery_task_edit' %}active{% endif %}">
-              <a id="workforce_sidebar_link_all_tasks" class="nav-link btn {% if request.resolver_match.url_name in 'dl_list_all,delivery_task_detail,delivery_task_edit' %}active{% endif %}"
-                 href="{% url 'workforce:dl_list_all' %}">
-                <i class="fa-solid fa-list me-2"></i>
-                All Tasks List
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'tasks_followup_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_followup" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'tasks_followup_list' %}active{% endif %}"
-                 href="{% url 'workforce:tasks_followup_list' %}">
-                <i class="fa-solid fa-phone me-2"></i>
-                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">FollowUp List</span>
-                {% if followup_count %}<span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="followup">{{ followup_count }}</span>{% endif %}
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'tasks_live_map' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_live_map" class="nav-link btn {% if request.resolver_match.url_name == 'tasks_live_map' %}active{% endif %}"
-                 href="{% url 'workforce:tasks_live_map' %}">
-                <i class="fa-solid fa-map-location-dot me-2"></i>
-                Live Map
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dl_list_fulfilled_clients' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_fulfilled_clients" class="nav-link btn {% if request.resolver_match.url_name == 'dl_list_fulfilled_clients' %}active{% endif %}"
-                 href="{% url 'workforce:dl_list_fulfilled_clients' %}">
-                <i class="fa-solid fa-truck-ramp-box me-2"></i>
-                Fulfilled Clients
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dl_list_non_fulfilled_clients' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_non_fulfilled_clients" class="nav-link btn {% if request.resolver_match.url_name == 'dl_list_non_fulfilled_clients' %}active{% endif %}"
-                 href="{% url 'workforce:dl_list_non_fulfilled_clients' %}">
-                <i class="fa-solid fa-truck-fast me-2"></i>
-                Non-Fulfilled Clients
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dl_list_ready_to_published_to_dms' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_unpublished" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'dl_list_ready_to_published_to_dms' %}active{% endif %}"
-                 href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}">
-                <i class="fa-solid fa-spinner me-2"></i>
-                <span style="flex:1 1 70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Unpublished Tasks</span>
-                <span class="badge" style="flex:0 0 auto;max-width:30%;background:var(--brand-primary);color:#000;padding:.25rem .4rem;font-size:0.6rem;line-height:1.2;" data-badge="unpublished_tasks">{{ unpublished_tasks_count|default:"0" }}</span>
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dl_list_incompleted_details' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_incompleted" class="nav-link btn {% if request.resolver_match.url_name == 'dl_list_incompleted_details' %}active{% endif %}"
-                 href="{% url 'workforce:dl_list_incompleted_details' %}">
-                <i class="fa-solid fa-check-double me-2"></i>
-                Incompleted List
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dl_list_published_to_dms' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_published" class="nav-link btn {% if request.resolver_match.url_name == 'dl_list_published_to_dms' %}active{% endif %}"
-                 href="{% url 'workforce:dl_list_published_to_dms' %}">
-                <i class="fa-solid fa-circle-check me-2"></i>
-                Published List
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'tasks_reported' %}active{% endif %}">
-              <a id="workforce_sidebar_link_tasks_reported" class="nav-link btn {% if request.resolver_match.url_name == 'tasks_reported' %}active{% endif %}"
-                 href="{% url 'workforce:tasks_reported' %}">
-                <i class="fa-solid fa-flag me-2"></i>
-                Reported
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Fleet Accounts Section -->
-      <li id="workforce_sidebar_menu_fleet" class="nav-item {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}active{% endif %}">
-        <div id="workforce_sidebar_link_fleet" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-accounts" data-title="Fleet A/Cs">
-          <i class="fa-solid fa-wallet me-2"></i>
-          <span>Fleet A/Cs</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,drivers_list,drivers_pending,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks' %}show{% endif %}" id="submenu-accounts">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name in 'drivers_list,driver_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_all_drivers" class="nav-link btn {% if request.resolver_match.url_name in 'drivers_list,driver_detail' %}active{% endif %}"
-                 href="{% url 'workforce:drivers_list' %}">
-                <i class="fa-solid fa-motorcycle me-2"></i>
-                All Drivers
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'wf_driver_tasks' %}active{% endif %}">
-              <a id="workforce_sidebar_link_driver_tasks" class="nav-link btn {% if request.resolver_match.url_name == 'wf_driver_tasks' %}active{% endif %}"
-                 href="{% url 'workforce:wf_driver_tasks' %}">
-                <i class="fa-solid fa-list-check me-2"></i>
-                Driver Tasks
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'fleet_cod_in_hand' %}active{% endif %}">
-              <a id="workforce_sidebar_link_fleet_cod" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_cod_in_hand' %}active{% endif %}"
-                 href="{% url 'workforce:fleet_cod_in_hand' %}">
-                <i class="fa-solid fa-sack-dollar me-2"></i>
-                COD with Fleet
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_fleet_cod_collection" class="nav-link btn"
-                 href="{% url 'fleet:cod_collection' %}">
-                <i class="fa-solid fa-inbox me-2"></i>
-                COD Collection
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'fleet_drivers_earnings' %}active{% endif %}">
-              <a id="workforce_sidebar_link_fleet_earnings" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_drivers_earnings' %}active{% endif %}"
-                 href="{% url 'workforce:fleet_drivers_earnings' %}">
-                <i class="fa-solid fa-money-bill-wave me-2"></i>
-                DLs Earnings
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'earnings_verification' %}active{% endif %}">
-              <a id="workforce_sidebar_link_earnings_verification" class="nav-link btn {% if request.resolver_match.url_name == 'earnings_verification' %}active{% endif %}"
-                 href="{% url 'workforce:earnings_verification' %}">
-                <i class="fa-solid fa-clipboard-check me-2"></i>
-                Earnings Verification
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <p class="dsb-section">Finance & Fulfillment</p>
-
-      <!-- Finance Section -->
-      <li id="workforce_sidebar_menu_finance" class="nav-item {% if request.resolver_match.url_name in 'workforce_finance_dashboard,fleet_transactions,cod_settlement_report' %}active{% endif %}">
-        <div id="workforce_sidebar_link_finance" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-finance" data-title="Finance">
-          <i class="fa-solid fa-chart-line me-2"></i>
-          <span>Finance</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'workforce_finance_dashboard,fleet_transactions,cod_settlement_report' %}show{% endif %}" id="submenu-finance">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'workforce_finance_dashboard' %}active{% endif %}">
-              <a id="workforce_sidebar_link_finance_overview" class="nav-link btn {% if request.resolver_match.url_name == 'workforce_finance_dashboard' %}active{% endif %}"
-                 href="{% url 'workforce:workforce_finance_dashboard' %}">
-                <i class="fa-solid fa-chart-pie me-2"></i>
-                Finance Overview
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}">
-              <a id="workforce_sidebar_link_finance_transactions" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_transactions' %}active{% endif %}"
-                 href="{% url 'workforce:fleet_transactions' %}">
-                <i class="fa-solid fa-motorcycle me-2"></i>
-                Driver Transactions
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'seller_transactions' %}active{% endif %}">
-              <a id="workforce_sidebar_link_seller_transactions" class="nav-link btn {% if request.resolver_match.url_name == 'seller_transactions' %}active{% endif %}"
-                 href="{% url 'workforce:seller_transactions' %}">
-                <i class="fa-solid fa-store me-2"></i>
-                Seller Transactions
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'cod_settlement_report' %}active{% endif %}">
-              <a id="workforce_sidebar_link_cod_settlement" class="nav-link btn {% if request.resolver_match.url_name == 'cod_settlement_report' %}active{% endif %}"
-                 href="{% url 'workforce:cod_settlement_report' %}">
-                <i class="fa-solid fa-file-invoice-dollar me-2"></i>
-                COD Settlement Requests
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_driver_cod_requests" class="nav-link btn"
-                 href="{% url 'workforce:cod_settlement_report' %}">
-                <i class="fa-solid fa-hand-holding-dollar me-2"></i>
-                Driver COD Requests
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Fulfillment Service Section -->
-      <li id="workforce_sidebar_menu_fulfillment" class="nav-item {% if request.resolver_match.url_name in 'suppliers_list,fulfilled_orders_list,warehouses_list' %}active{% endif %}">
-        <div id="workforce_sidebar_link_fulfillment" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-fulfillment" data-title="Fulfillment">
-          <i class="fa-solid fa-truck-ramp-box me-2"></i>
-          <span>Fulfillment</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'suppliers_list,fulfilled_orders_list,warehouses_list' %}show{% endif %}" id="submenu-fulfillment">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'suppliers_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_suppliers" class="nav-link btn {% if request.resolver_match.url_name == 'suppliers_list' %}active{% endif %}"
-                 href="{% url 'workforce:suppliers_list' %}">
-                <i class="fa-solid fa-building me-2"></i>
-                Businesses
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'fulfilled_orders_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_purchase_orders" class="nav-link btn {% if request.resolver_match.url_name == 'fulfilled_orders_list' %}active{% endif %}"
-                 href="{% url 'workforce:fulfilled_orders_list' %}">
-                <i class="fa-solid fa-receipt me-2"></i>
-                Purchase Orders
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'warehouses_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_warehouses_list" class="nav-link btn {% if request.resolver_match.url_name == 'warehouses_list' %}active{% endif %}"
-                 href="{% url 'workforce:warehouses_list' %}">
-                <i class="fa-solid fa-warehouse me-2"></i>
-                WH-Business Links
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Warehouse Management Section -->
-      <li id="workforce_sidebar_menu_warehouse" class="nav-item {% if request.resolver_match.app_name == 'warehouse' or request.resolver_match.url_name == 'product_requests_list' %}active{% endif %}">
-        <div id="workforce_sidebar_link_warehouse" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-warehouse" data-title="Warehouse">
-          <i class="fa-solid fa-warehouse me-2"></i>
-          <span>Warehouse</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.app_name == 'warehouse' or request.resolver_match.url_name == 'product_requests_list' %}show{% endif %}" id="submenu-warehouse">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'dashboard' and request.resolver_match.app_name == 'warehouse' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_dashboard" class="nav-link btn {% if request.resolver_match.url_name == 'dashboard' and request.resolver_match.app_name == 'warehouse' %}active{% endif %}"
-                 href="{% url 'warehouse:dashboard' %}">
-                <i class="fa-solid fa-gauge-high me-2"></i>
-                WH Dashboard
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'warehouse_list' or request.resolver_match.url_name == 'warehouse_add' or request.resolver_match.url_name == 'warehouse_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_warehouses" class="nav-link btn {% if request.resolver_match.url_name == 'warehouse_list' or request.resolver_match.url_name == 'warehouse_add' or request.resolver_match.url_name == 'warehouse_detail' %}active{% endif %}"
-                 href="{% url 'warehouse:warehouse_list' %}">
-                <i class="fa-solid fa-building-warehouse me-2"></i>
-                Warehouses
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'location_list' or request.resolver_match.url_name == 'location_add' %}active{% endif %}">
-              <a id="workforce_sidebar_link_storage_locations" class="nav-link btn {% if request.resolver_match.url_name == 'location_list' or request.resolver_match.url_name == 'location_add' %}active{% endif %}"
-                 href="{% url 'warehouse:location_list' %}">
-                <i class="fa-solid fa-shelves me-2"></i>
-                Storage Locations
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'warehouse_location_list' or request.resolver_match.url_name == 'warehouse_location_add' %}active{% endif %}">
-              <a id="workforce_sidebar_link_pickup_dispatch_locations" class="nav-link btn {% if request.resolver_match.url_name == 'warehouse_location_list' or request.resolver_match.url_name == 'warehouse_location_add' %}active{% endif %}"
-                 href="{% url 'warehouse:warehouse_location_list' %}">
-                <i class="fa-solid fa-map-marker-alt me-2"></i>
-                Pickup/Dispatch Locations
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'seller_warehouse_links' or request.resolver_match.url_name == 'seller_warehouse_link_detail' or request.resolver_match.url_name == 'seller_warehouse_link_add' or request.resolver_match.url_name == 'seller_warehouse_link_edit' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_seller_links" class="nav-link btn {% if request.resolver_match.url_name == 'seller_warehouse_links' or request.resolver_match.url_name == 'seller_warehouse_link_detail' or request.resolver_match.url_name == 'seller_warehouse_link_add' or request.resolver_match.url_name == 'seller_warehouse_link_edit' %}active{% endif %}"
-                 href="{% url 'warehouse:seller_warehouse_links' %}">
-                <i class="fa-solid fa-link me-2"></i>
-                Seller-WH Links
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'product_requests_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_product_requests" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_requests_list' %}active{% endif %}"
-                 href="{% url 'workforce:product_requests_list' %}">
-                <i class="fa-solid fa-inbox me-2"></i>
-                <span class="flex-grow-1">Product Requests</span>
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Inventory Management Section -->
-      <li id="workforce_sidebar_menu_wh_inventory" class="nav-item {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,location_list,location_add,receive_stock,confirm_receive,pick_list_list,create_pick_list,pick_list_detail,cycle_count_list,create_cycle_count,cycle_count_detail,inventory_reports,inventory_restock_list' %}active{% endif %}">
-        <div id="workforce_sidebar_link_wh_inventory_menu" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-wh-inventory" data-title="Inventory">
-          <i class="fa-solid fa-boxes-stacked me-2"></i>
-          <span>Inventory</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,location_list,location_add,receive_stock,confirm_receive,pick_list_list,create_pick_list,pick_list_detail,cycle_count_list,create_cycle_count,cycle_count_detail,inventory_reports,inventory_restock_list' %}show{% endif %}" id="submenu-wh-inventory">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_inventory" class="nav-link btn {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}"
-                 href="{% url 'warehouse:inventory_list' %}">
-                <i class="fa-solid fa-list me-2"></i>
-                View Inventory
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_transactions" class="nav-link btn {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}"
-                 href="{% url 'warehouse:transaction_list' %}">
-                <i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
-                Transactions
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'low_stock_alerts' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_alerts" class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'low_stock_alerts' %}active{% endif %}"
-                 href="{% url 'warehouse:low_stock_alerts' %}">
-                <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                <span class="flex-grow-1">Low Stock Alerts</span>
-                {% if low_stock_count %}<span class="badge badge-error ms-auto" data-badge="low_stock">{{ low_stock_count }}</span>{% endif %}
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'receive_stock' or request.resolver_match.url_name == 'confirm_receive' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_receive" class="nav-link btn {% if request.resolver_match.url_name == 'receive_stock' or request.resolver_match.url_name == 'confirm_receive' %}active{% endif %}"
-                 href="{% url 'warehouse:receive_stock' %}">
-                <i class="fa-solid fa-truck-loading me-2"></i>
-                Receive Stock
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'pick_list_list' or request.resolver_match.url_name == 'create_pick_list' or request.resolver_match.url_name == 'pick_list_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_pick_lists" class="nav-link btn {% if request.resolver_match.url_name == 'pick_list_list' or request.resolver_match.url_name == 'create_pick_list' or request.resolver_match.url_name == 'pick_list_detail' %}active{% endif %}"
-                 href="{% url 'warehouse:pick_list_list' %}">
-                <i class="fa-solid fa-clipboard-list me-2"></i>
-                Pick Lists
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'cycle_count_list' or request.resolver_match.url_name == 'create_cycle_count' or request.resolver_match.url_name == 'cycle_count_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wh_cycle_counts" class="nav-link btn {% if request.resolver_match.url_name == 'cycle_count_list' or request.resolver_match.url_name == 'create_cycle_count' or request.resolver_match.url_name == 'cycle_count_detail' %}active{% endif %}"
-                 href="{% url 'warehouse:cycle_count_list' %}">
-                <i class="fa-solid fa-rotate me-2"></i>
-                Cycle Counts
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <p class="dsb-section">Operations</p>
-
-      <!-- Dispatch & Batching Section -->
-      <li id="workforce_sidebar_menu_dispatch" class="nav-item {% if 'dispatch' in request.resolver_match.url_name %}active{% endif %}">
-        <div id="workforce_sidebar_link_dispatch" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-dispatch" data-title="Dispatch">
-          <i class="fa-solid fa-layer-group me-2"></i>
-          <span>Dispatch</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if 'dispatch' in request.resolver_match.url_name %}show{% endif %}" id="submenu-dispatch">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'dispatch_dashboard' %}active{% endif %}">
-              <a id="workforce_sidebar_link_dispatch_dashboard" class="nav-link btn {% if request.resolver_match.url_name == 'dispatch_dashboard' %}active{% endif %}"
-                 href="{% url 'workforce:dispatch_dashboard' %}">
-                <i class="fa-solid fa-gauge-high me-2"></i>
-                Dashboard
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dispatch_batch_list' or request.resolver_match.url_name == 'dispatch_batch_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_dispatch_batches" class="nav-link btn {% if request.resolver_match.url_name == 'dispatch_batch_list' or request.resolver_match.url_name == 'dispatch_batch_detail' %}active{% endif %}"
-                 href="{% url 'workforce:dispatch_batch_list' %}">
-                <i class="fa-solid fa-boxes-stacked me-2"></i>
-                All Batches
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'dispatch_shift_list,dispatch_shift_create,dispatch_shift_detail,dispatch_shift_edit' %}active{% endif %}">
-              <a id="workforce_sidebar_link_dispatch_shifts" class="nav-link btn {% if request.resolver_match.url_name in 'dispatch_shift_list,dispatch_shift_create,dispatch_shift_detail,dispatch_shift_edit' %}active{% endif %}"
-                 href="{% url 'workforce:dispatch_shift_list' %}">
-                <i class="fa-solid fa-calendar-days me-2"></i>
-                Rider Shifts
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dispatch_kpi_dashboard' or request.resolver_match.url_name == 'dispatch_rider_kpi' %}active{% endif %}">
-              <a id="workforce_sidebar_link_dispatch_kpis" class="nav-link btn {% if request.resolver_match.url_name == 'dispatch_kpi_dashboard' or request.resolver_match.url_name == 'dispatch_rider_kpi' %}active{% endif %}"
-                 href="{% url 'workforce:dispatch_kpi_dashboard' %}">
-                <i class="fa-solid fa-chart-line me-2"></i>
-                KPI Dashboard
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'dispatch_config_list' or request.resolver_match.url_name == 'dispatch_config_edit' %}active{% endif %}">
-              <a id="workforce_sidebar_link_dispatch_config" class="nav-link btn {% if request.resolver_match.url_name == 'dispatch_config_list' or request.resolver_match.url_name == 'dispatch_config_edit' %}active{% endif %}"
-                 href="{% url 'workforce:dispatch_config_list' %}">
-                <i class="fa-solid fa-sliders me-2"></i>
-                Configuration
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Auto Triggers Section (superuser only) -->
-      {% if user.profile.is_superadmin %}
-      <li id="workforce_sidebar_menu_triggers" class="nav-item {% if request.resolver_match.url_name in 'auto_triggers_list,auto_flows_list,auto_flow_add,auto_flow_edit,auto_flow_logs,whatsapp_instances_list' %}active{% endif %}">
-        <div id="workforce_sidebar_link_triggers" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-triggers" data-title="Auto Triggers">
-          <i class="fa-solid fa-bolt me-2"></i>
-          <span>Auto Triggers</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'auto_triggers_list,auto_flows_list,auto_flow_add,auto_flow_edit,auto_flow_logs,whatsapp_instances_list' %}show{% endif %}" id="submenu-triggers">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'auto_triggers_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_auto_triggers" class="nav-link btn {% if request.resolver_match.url_name == 'auto_triggers_list' %}active{% endif %}"
-                 href="{% url 'workforce:auto_triggers_list' %}">
-                <i class="fa-solid fa-list me-2"></i>
-                All Triggers
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'auto_flows_list,auto_flow_edit,auto_flow_logs' %}active{% endif %}">
-              <a id="workforce_sidebar_link_auto_flows" class="nav-link btn {% if request.resolver_match.url_name in 'auto_flows_list,auto_flow_edit,auto_flow_logs' %}active{% endif %}"
-                 href="{% url 'workforce:auto_flows_list' %}">
-                <i class="fa-solid fa-diagram-project me-2"></i>
-                Flows
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'auto_flow_add' %}active{% endif %}">
-              <a id="workforce_sidebar_link_auto_flow_add" class="nav-link btn {% if request.resolver_match.url_name == 'auto_flow_add' %}active{% endif %}"
-                 href="{% url 'workforce:auto_flow_add' %}">
-                <i class="fa-solid fa-plus me-2"></i>
-                Add Flow
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'whatsapp_instances_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_wa_instances" class="nav-link btn {% if request.resolver_match.url_name == 'whatsapp_instances_list' %}active{% endif %}"
-                 href="{% url 'workforce:whatsapp_instances_list' %}">
-                <i class="fa-brands fa-whatsapp me-2"></i>
-                WA Instances
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-      {% endif %}
-
-      <!-- Zones Section -->
-      <li id="workforce_sidebar_menu_zones" class="nav-item {% if request.resolver_match.url_name in 'zone_map,zone_list,zone_groups,zone_areas,qnas_test,qnas_lookup_tool' %}active{% endif %}">
-        <div id="workforce_sidebar_link_zones" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-zones" data-title="Zones">
-          <i class="fa-solid fa-map-location-dot me-2"></i>
-          <span>Zones</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name == 'zone_map' or request.resolver_match.url_name == 'zone_list' or request.resolver_match.url_name == 'zone_groups' or request.resolver_match.url_name == 'zone_areas' or request.resolver_match.url_name == 'qnas_test' or request.resolver_match.url_name == 'qnas_lookup_tool' %}show{% endif %}" id="submenu-zones">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'zone_map' %}active{% endif %}">
-              <a id="workforce_sidebar_link_zone_map" class="nav-link btn {% if request.resolver_match.url_name == 'zone_map' %}active{% endif %}"
-                 href="{% url 'delivery:zone_map' %}">
-                <i class="fa-solid fa-map me-2"></i>
-                Zone Map
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'zone_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_zone_list" class="nav-link btn {% if request.resolver_match.url_name == 'zone_list' %}active{% endif %}"
-                 href="{% url 'delivery:zone_list' %}">
-                <i class="fa-solid fa-list me-2"></i>
-                Zone List
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'zone_groups' %}active{% endif %}">
-              <a id="workforce_sidebar_link_zone_groups" class="nav-link btn {% if request.resolver_match.url_name == 'zone_groups' %}active{% endif %}"
-                 href="{% url 'delivery:zone_groups' %}">
-                <i class="fa-solid fa-layer-group me-2"></i>
-                Zone Groups
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'zone_areas' %}active{% endif %}">
-              <a id="workforce_sidebar_link_zone_areas" class="nav-link btn {% if request.resolver_match.url_name == 'zone_areas' %}active{% endif %}"
-                 href="{% url 'delivery:zone_areas' %}">
-                <i class="fa-solid fa-location-dot me-2"></i>
-                Zone Areas
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'qnas_lookup_tool' %}active{% endif %}">
-              <a id="workforce_sidebar_link_qnas_lookup" class="nav-link btn {% if request.resolver_match.url_name == 'qnas_lookup_tool' %}active{% endif %}"
-                 href="{% url 'workforce:qnas_lookup_tool' %}">
-                <i class="fa-solid fa-search-location me-2"></i>
-                QNAS Lookup
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'qnas_test' %}active{% endif %}">
-              <a id="workforce_sidebar_link_qnas_test" class="nav-link btn {% if request.resolver_match.url_name == 'qnas_test' %}active{% endif %}"
-                 href="{% url 'workforce:qnas_test' %}">
-                <i class="fa-solid fa-flask me-2"></i>
-                QNAS API Test
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Sellers Section -->
-      <li id="workforce_sidebar_menu_sellers" class="nav-item {% if request.resolver_match.url_name in 'sellers_list,sellers_pending,sellers_active,sellers_inactive,seller_detail,wf_seller_api_configs,wf_test_api_config' %}active{% endif %}">
-        <div id="workforce_sidebar_link_sellers" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-sellers" data-title="Sellers">
-          <i class="fa-solid fa-store me-2"></i>
-          <span>Sellers</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'sellers_list,sellers_pending,sellers_active,sellers_inactive,seller_detail,wf_seller_api_configs,wf_test_api_config' %}show{% endif %}" id="submenu-sellers">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'sellers_list' or request.resolver_match.url_name == 'seller_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_all_sellers" class="nav-link btn {% if request.resolver_match.url_name == 'sellers_list' or request.resolver_match.url_name == 'seller_detail' %}active{% endif %}"
-                 href="{% url 'workforce:sellers_list' %}">
-                <i class="fa-solid fa-list me-2"></i>
-                All Sellers
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'sellers_pending' %}active{% endif %}">
-              <a id="workforce_sidebar_link_sellers_pending" class="nav-link btn {% if request.resolver_match.url_name == 'sellers_pending' %}active{% endif %}"
-                 href="{% url 'workforce:sellers_pending' %}">
-                <i class="fa-solid fa-clock me-2"></i>
-                Pending Approval
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'sellers_active' %}active{% endif %}">
-              <a id="workforce_sidebar_link_sellers_active" class="nav-link btn {% if request.resolver_match.url_name == 'sellers_active' %}active{% endif %}"
-                 href="{% url 'workforce:sellers_active' %}">
-                <i class="fa-solid fa-circle-check me-2"></i>
-                Active Sellers
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'sellers_inactive' %}active{% endif %}">
-              <a id="workforce_sidebar_link_sellers_inactive" class="nav-link btn {% if request.resolver_match.url_name == 'sellers_inactive' %}active{% endif %}"
-                 href="{% url 'workforce:sellers_inactive' %}">
-                <i class="fa-solid fa-circle-xmark me-2"></i>
-                Inactive Sellers
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'wf_seller_api_configs,wf_test_api_config' %}active{% endif %}">
-              <a id="workforce_sidebar_link_seller_api_configs" class="nav-link btn {% if request.resolver_match.url_name in 'wf_seller_api_configs,wf_test_api_config' %}active{% endif %}"
-                 href="{% url 'workforce:wf_seller_api_configs' %}">
-                <i class="fa-solid fa-plug me-2"></i>
-                API Configs
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- Verifications Section -->
-      <li id="workforce_sidebar_menu_verifications" class="nav-item {% if request.resolver_match.url_name in 'user_verification_list,team_verification_list,business_verification_list,driver_verification_list' %}active{% endif %}">
-        <div id="workforce_sidebar_link_verifications" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-verifications" data-title="Verifications">
-          <i class="fa-solid fa-clipboard-check me-2"></i>
-          <span>Verifications</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'user_verification_list,team_verification_list,business_verification_list,driver_verification_list' %}show{% endif %}" id="submenu-verifications">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'user_verification_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_verify_all" class="nav-link btn {% if request.resolver_match.url_name == 'user_verification_list' %}active{% endif %}"
-                 href="{% url 'workforce:user_verification_list' %}">
-                <i class="fa-solid fa-list me-2"></i>
-                All Users
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'business_verification_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_verify_business" class="nav-link btn {% if request.resolver_match.url_name == 'business_verification_list' %}active{% endif %}"
-                 href="{% url 'workforce:business_verification_list' %}">
-                <i class="fa-solid fa-building-circle-check me-2"></i>
-                Business
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'driver_verification_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_verify_driver" class="nav-link btn {% if request.resolver_match.url_name == 'driver_verification_list' %}active{% endif %}"
-                 href="{% url 'workforce:driver_verification_list' %}">
-                <i class="fa-solid fa-car me-2"></i>
-                Drivers
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'team_verification_list' %}active{% endif %}">
-              <a id="workforce_sidebar_link_verify_team" class="nav-link btn {% if request.resolver_match.url_name == 'team_verification_list' %}active{% endif %}"
-                 href="{% url 'workforce:team_verification_list' %}">
-                <i class="fa-solid fa-users me-2"></i>
-                Team
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <p class="dsb-section">Reports & Tools</p>
-
-<!-- Reports Section -->
-      <li id="workforce_sidebar_menu_reports" class="nav-item {% if request.resolver_match.url_name in 'staff_reports,fleet_task_sheet,fleet_task_sheets_list,receipt_templates_list,receipt_template_create,receipt_template_edit,receipt_template_preview,driver_documents_list,driver_document_detail,vehicle_documents_list,vehicle_document_detail,store_documents_list,store_document_detail,business_licenses_list,business_license_detail' %}active{% endif %}">
-        <div id="workforce_sidebar_link_reports" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-reports" data-title="Reports">
-          <i class="fa-solid fa-chart-bar me-2"></i>
-          <span>Reports</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'staff_reports,fleet_task_sheet,fleet_task_sheets_list,receipt_templates_list,receipt_template_create,receipt_template_edit,receipt_template_preview,driver_documents_list,driver_document_detail,vehicle_documents_list,vehicle_document_detail,store_documents_list,store_document_detail,business_licenses_list,business_license_detail' %}show{% endif %}" id="submenu-reports">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'staff_reports' %}active{% endif %}">
-              <a id="workforce_sidebar_link_staff_reports" class="nav-link btn {% if request.resolver_match.url_name == 'staff_reports' %}active{% endif %}"
-                 href="{% url 'workforce:staff_reports' %}">
-                <i class="fa-solid fa-chart-line me-2"></i>
-                Dashboard
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'fleet_task_sheets_list' or request.resolver_match.url_name == 'fleet_task_sheet' %}active{% endif %}">
-              <a id="workforce_sidebar_link_task_sheets" class="nav-link btn {% if request.resolver_match.url_name == 'fleet_task_sheets_list' or request.resolver_match.url_name == 'fleet_task_sheet' %}active{% endif %}"
-                 href="{% url 'workforce:fleet_task_sheets_list' %}">
-                <i class="fa-solid fa-file-pdf me-2"></i>
-                Fleet Task Sheets
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'receipt_templates_list,receipt_template_create,receipt_template_edit,receipt_template_preview' %}active{% endif %}">
-              <a id="workforce_sidebar_link_receipt_templates" class="nav-link btn {% if request.resolver_match.url_name in 'receipt_templates_list,receipt_template_create,receipt_template_edit,receipt_template_preview' %}active{% endif %}"
-                 href="{% url 'workforce:receipt_templates_list' %}">
-                <i class="fa-solid fa-file-invoice me-2"></i>
-                Receipt Templates
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'driver_documents_list,driver_document_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_driver_documents" class="nav-link btn {% if request.resolver_match.url_name in 'driver_documents_list,driver_document_detail' %}active{% endif %}"
-                 href="{% url 'workforce:driver_documents_list' %}">
-                <i class="fa-solid fa-id-card me-2"></i>
-                Driver IDs
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'vehicle_documents_list,vehicle_document_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_vehicle_documents" class="nav-link btn {% if request.resolver_match.url_name in 'vehicle_documents_list,vehicle_document_detail' %}active{% endif %}"
-                 href="{% url 'workforce:vehicle_documents_list' %}">
-                <i class="fa-solid fa-car me-2"></i>
-                Vehicle Docs
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'store_documents_list,store_document_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_store_documents" class="nav-link btn {% if request.resolver_match.url_name in 'store_documents_list,store_document_detail' %}active{% endif %}"
-                 href="{% url 'workforce:store_documents_list' %}">
-                <i class="fa-solid fa-store me-2"></i>
-                Store Docs
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'business_licenses_list,business_license_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_business_licenses" class="nav-link btn {% if request.resolver_match.url_name in 'business_licenses_list,business_license_detail' %}active{% endif %}"
-                 href="{% url 'workforce:business_licenses_list' %}">
-                <i class="fa-solid fa-certificate me-2"></i>
-                Business Licenses
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- FORMS / INQUIRIES -->
-      <li id="workforce_sidebar_menu_forms" class="nav-item {% if request.resolver_match.url_name in 'pricing_inquiries_list,pricing_inquiry_detail,whatsapp_inquiries_list,whatsapp_inquiry_detail' %}active{% endif %}">
-        <div id="workforce_sidebar_link_forms" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-forms" data-title="Forms">
-          <i class="fa-solid fa-envelope-open-text me-2"></i>
-          <span>Forms</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'pricing_inquiries_list,pricing_inquiry_detail,whatsapp_inquiries_list,whatsapp_inquiry_detail' %}show{% endif %}" id="submenu-forms">
-          <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name in 'pricing_inquiries_list,pricing_inquiry_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_pricing_inquiries" class="nav-link btn {% if request.resolver_match.url_name in 'pricing_inquiries_list,pricing_inquiry_detail' %}active{% endif %}"
-                 href="{% url 'workforce:pricing_inquiries_list' %}">
-                <i class="fa-solid fa-file-alt me-2"></i>
-                Pricing Inquiries
-              </a>
-            </li>
-            <li class="nav-item {% if request.resolver_match.url_name in 'whatsapp_inquiries_list,whatsapp_inquiry_detail' %}active{% endif %}">
-              <a id="workforce_sidebar_link_whatsapp_inquiries" class="nav-link btn {% if request.resolver_match.url_name in 'whatsapp_inquiries_list,whatsapp_inquiry_detail' %}active{% endif %}"
-                 href="{% url 'workforce:whatsapp_inquiries_list' %}">
-                <i class="fa-brands fa-whatsapp me-2"></i>
-                WhatsApp Inquiries
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <li id="workforce_sidebar_menu_contacts" class="nav-item {% if request.resolver_match.url_name == 'staff_contacts' %}active{% endif %}">
-        <a id="workforce_sidebar_link_contacts" class="nav-link btn {% if request.resolver_match.url_name == 'staff_contacts' %}active{% endif %}"
-           href="{% url 'workforce:staff_contacts' %}" data-title="Contacts">
-          <i class="fa-solid fa-address-book me-2"></i>
-          <span>Contacts</span>
-        </a>
-      </li>
-
-      <!-- WAHA WhatsApp Bridge (htpasswd-gated by nginx) -->
-      <li id="workforce_sidebar_menu_wa" class="nav-item">
-        <div id="workforce_sidebar_link_wa" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-wa" data-title="WhatsApp">
-          <i class="fa-brands fa-whatsapp me-2"></i>
-          <span>WhatsApp</span>
-          <i class="fa-solid fa-chevron-down ms-auto"></i>
-        </div>
-        <div class="multi-level collapse submenu" id="submenu-wa">
-          <ul class="nav flex-column">
-            <li class="wf-sidebar__item--wa-chats nav-item">
-              <a id="workforce_sidebar_link_wa_chats" class="nav-link btn"
-                 href="/waha/wa-chats/">
-                <i class="fa-solid fa-comments me-2"></i>
-                Live Chats
-              </a>
-            </li>
-            <li class="wf-sidebar__item--wa-dashboard nav-item">
-              <a id="workforce_sidebar_link_wa_dashboard" class="nav-link btn"
-                 href="/waha/wa-dashboard/">
-                <i class="fa-solid fa-qrcode me-2"></i>
-                Session Status
-              </a>
-            </li>
-            <li class="wf-sidebar__item--wa-chats-tab nav-item">
-              <a id="workforce_sidebar_link_wa_chats_tab" class="nav-link btn"
-                 href="/waha/wa-chats/" target="_blank" rel="noopener">
-                <i class="fa-solid fa-up-right-from-square me-2"></i>
-                Open Chats in Tab
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <p class="dsb-section">Admin</p>
-
-      {% if user_profile %}
-      <li id="workforce_sidebar_menu_profile" class="nav-item">
-        <a id="workforce_sidebar_link_profile" class="nav-link btn"
-           href="{% url 'core:profile' user_profile.user_number %}" data-title="Profile">
-          <i class="fa-solid fa-user me-2"></i>
-          <span>Profile</span>
-        </a>
-      </li>
-      {% endif %}
-
-      {% if user.profile.is_superadmin %}
-      <li id="workforce_sidebar_menu_admin" class="nav-item">
-        <a id="workforce_sidebar_link_admin" class="nav-link btn"
-           href="{% url 'admin:index' %}" target="_blank" data-title="Django Admin">
-          <i class="fa-solid fa-screwdriver-wrench me-2"></i>
-          <span>Django Admin</span>
-          <i class="fa-solid fa-external-link-alt ms-auto small"></i>
-        </a>
-      </li>
-      {% endif %}
-    </ul>
-  </div>
-  </div><!-- /.wf-sidebar__sticky -->
 </div>
 
 <script>
-// Desktop sidebar: auto-expand section and highlight link for sub-pages
-document.addEventListener('DOMContentLoaded', function() {
-    var path = window.location.pathname;
+// Desktop sidebar: auto-expand section and highlight link for sub-pages.
+document.addEventListener('DOMContentLoaded', function () {
+  var path = window.location.pathname;
 
-    var subpageMap = [
-        {re: /^\/workforce\/orders\/temp\//,                    menu: 'submenu-import',       link: 'workforce_sidebar_link_temp_orders'},
-        {re: /^\/workforce\/orders\/bulk-import\//,             menu: 'submenu-import',       link: 'workforce_sidebar_link_wf_orders_bulk'},
-        {re: /^\/workforce\/orders\/api-orders\//,              menu: 'submenu-import',       link: 'workforce_sidebar_link_wf_api_orders'},
-        {re: /^\/workforce\/onedrive-sources\//,                menu: 'submenu-import',       link: 'workforce_sidebar_link_onedrive'},
-        {re: /^\/workforce\/import-wizard\//,                   menu: 'submenu-import',       link: 'workforce_sidebar_link_temp_orders'},
-        {re: /^\/workforce\/import-history\//,                  menu: 'submenu-import',       link: 'workforce_sidebar_link_import_history'},
-        {re: /^\/workforce\/import-wizard\/mapping-manager\//,  menu: 'submenu-import',       link: 'workforce_sidebar_link_mapping_manager'},
-        {re: /^\/workforce\/webhook-imports\//,                  menu: 'submenu-import',       link: 'workforce_sidebar_link_webhook_imports'},
-        {re: /^\/workforce\/orders\/pending-verification\//,    menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},
-        {re: /^\/workforce\/orders\/\d+/,                       menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},
-        {re: /^\/workforce\/order\//,                           menu: 'submenu-orders',       link: 'workforce_sidebar_link_wf_orders_all'},
-        {re: /^\/workforce\/delivery-task\/\d+/,                menu: 'submenu-deliveries',   link: 'workforce_sidebar_link_all_tasks'},
-        {re: /^\/workforce\/hub\//,                             menu: 'submenu-deliveries',   link: 'workforce_sidebar_link_all_tasks'},
-        {re: /^\/workforce\/tasks\//,                           menu: 'submenu-deliveries',   link: null},
-        {re: /^\/workforce\/fleet\/driver-tasks/,               menu: 'submenu-accounts',     link: 'workforce_sidebar_link_driver_tasks'},
-        {re: /^\/workforce\/fleet\/task-sheet/,                 menu: 'submenu-reports',      link: 'workforce_sidebar_link_task_sheets'},
-        {re: /^\/workforce\/fleet\/cod-settlement\//,           menu: 'submenu-finance',      link: 'workforce_sidebar_link_cod_settlement'},
-        {re: /^\/workforce\/drivers\/\d+/,                      menu: 'submenu-accounts',     link: 'workforce_sidebar_link_all_drivers'},
-        {re: /^\/workforce\/drivers\//,                         menu: 'submenu-accounts',     link: null},
-        {re: /^\/workforce\/fleet\//,                           menu: 'submenu-accounts',     link: null},
-        {re: /^\/workforce\/sellers\/api-configs\/\d+/,         menu: 'submenu-sellers',      link: 'workforce_sidebar_link_seller_api_configs'},
-        {re: /^\/workforce\/sellers\/\d+/,                      menu: 'submenu-sellers',      link: 'workforce_sidebar_link_all_sellers'},
-        {re: /^\/workforce\/sellers\//,                         menu: 'submenu-sellers',      link: null},
-        {re: /^\/workforce\/finance\//,                         menu: 'submenu-finance',      link: 'workforce_sidebar_link_finance_overview'},
-        {re: /^\/workforce\/seller-transactions\//,             menu: 'submenu-finance',      link: 'workforce_sidebar_link_seller_transactions'},
-        {re: /^\/workforce\/fleet\/transactions\//,             menu: 'submenu-finance',      link: 'workforce_sidebar_link_finance_transactions'},
-        {re: /^\/workforce\/suppliers\//,                       menu: 'submenu-fulfillment',  link: 'workforce_sidebar_link_suppliers'},
-        {re: /^\/workforce\/purchase-orders\//,                 menu: 'submenu-fulfillment',  link: 'workforce_sidebar_link_purchase_orders'},
-        {re: /^\/workforce\/warehouses\//,                      menu: 'submenu-fulfillment',  link: 'workforce_sidebar_link_warehouses_list'},
-        {re: /^\/workforce\/dispatch\/batches\/\d+/,            menu: 'submenu-dispatch',     link: 'workforce_sidebar_link_dispatch_batches'},
-        {re: /^\/workforce\/dispatch\/shifts\/\d+/,             menu: 'submenu-dispatch',     link: 'workforce_sidebar_link_dispatch_shifts'},
-        {re: /^\/workforce\/dispatch\/kpis\/rider\//,           menu: 'submenu-dispatch',     link: 'workforce_sidebar_link_dispatch_kpis'},
-        {re: /^\/workforce\/dispatch\/config\/\d+/,             menu: 'submenu-dispatch',     link: 'workforce_sidebar_link_dispatch_config'},
-        {re: /^\/workforce\/dispatch\//,                        menu: 'submenu-dispatch',     link: null},
-        {re: /^\/workforce\/auto-triggers\/flows\/\d+/,         menu: 'submenu-triggers',     link: 'workforce_sidebar_link_auto_flows'},
-        {re: /^\/workforce\/auto-triggers\//,                   menu: 'submenu-triggers',     link: null},
-        {re: /^\/workforce\/tools\//,                           menu: 'submenu-zones',        link: null},
-        {re: /^\/workforce\/verification\//,                    menu: 'submenu-verifications', link: null},
-        {re: /^\/workforce\/receipt-templates\/\d+/,            menu: 'submenu-reports',      link: 'workforce_sidebar_link_receipt_templates'},
-        {re: /^\/workforce\/receipt-templates\//,               menu: 'submenu-reports',      link: 'workforce_sidebar_link_receipt_templates'},
-        {re: /^\/workforce\/documents\//,                       menu: 'submenu-reports',      link: null},
-        {re: /^\/workforce\/reports\//,                         menu: 'submenu-reports',      link: 'workforce_sidebar_link_staff_reports'},
-        {re: /^\/workforce\/inventory\//,                       menu: 'submenu-wh-inventory', link: null},
-        {re: /^\/workforce\/product-requests\//,                menu: 'submenu-warehouse',    link: 'workforce_sidebar_link_product_requests'},
-        {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     menu: 'submenu-forms',        link: 'workforce_sidebar_link_pricing_inquiries'},
-        {re: /^\/workforce\/forms\/whatsapp-inquiries\/\d+/,    menu: 'submenu-forms',        link: 'workforce_sidebar_link_whatsapp_inquiries'},
-        {re: /^\/workforce\/forms\//,                           menu: 'submenu-forms',        link: null},
-    ];
+  var subpageMap = [
+    {re: /^\/workforce\/orders\/temp\//,                    menu: 'submenu-import',        link: 'workforce_sidebar_link_temp_orders'},
+    {re: /^\/workforce\/orders\/bulk-import\//,             menu: 'submenu-import',        link: 'workforce_sidebar_link_wf_orders_bulk'},
+    {re: /^\/workforce\/orders\/api-orders\//,              menu: 'submenu-import',        link: 'workforce_sidebar_link_wf_api_orders'},
+    {re: /^\/workforce\/onedrive-sources\//,                menu: 'submenu-import',        link: 'workforce_sidebar_link_onedrive'},
+    {re: /^\/workforce\/import-wizard\//,                   menu: 'submenu-import',        link: 'workforce_sidebar_link_temp_orders'},
+    {re: /^\/workforce\/import-history\//,                  menu: 'submenu-import',        link: 'workforce_sidebar_link_import_history'},
+    {re: /^\/workforce\/import-wizard\/mapping-manager\//,  menu: 'submenu-import',        link: 'workforce_sidebar_link_mapping_manager'},
+    {re: /^\/workforce\/webhook-imports\//,                 menu: 'submenu-import',        link: 'workforce_sidebar_link_webhook_imports'},
+    {re: /^\/workforce\/orders\/pending-verification\//,    menu: 'submenu-orders',        link: 'workforce_sidebar_link_wf_orders_all'},
+    {re: /^\/workforce\/orders\/\d+/,                       menu: 'submenu-orders',        link: 'workforce_sidebar_link_wf_orders_all'},
+    {re: /^\/workforce\/order\//,                           menu: 'submenu-orders',        link: 'workforce_sidebar_link_wf_orders_all'},
+    {re: /^\/workforce\/delivery-task\/\d+/,                menu: 'submenu-deliveries',    link: 'workforce_sidebar_link_all_tasks'},
+    {re: /^\/workforce\/hub\//,                             menu: 'submenu-deliveries',    link: 'workforce_sidebar_link_all_tasks'},
+    {re: /^\/workforce\/tasks\//,                           menu: 'submenu-deliveries',    link: null},
+    {re: /^\/workforce\/fleet\/driver-tasks/,               menu: 'submenu-accounts',      link: 'workforce_sidebar_link_driver_tasks'},
+    {re: /^\/workforce\/fleet\/task-sheet/,                 menu: 'submenu-reports',       link: 'workforce_sidebar_link_task_sheets'},
+    {re: /^\/workforce\/fleet\/cod-settlement\//,           menu: 'submenu-finance',       link: 'workforce_sidebar_link_cod_settlement'},
+    {re: /^\/workforce\/drivers\/\d+/,                      menu: 'submenu-accounts',      link: 'workforce_sidebar_link_all_drivers'},
+    {re: /^\/workforce\/drivers\//,                         menu: 'submenu-accounts',      link: null},
+    {re: /^\/workforce\/fleet\//,                           menu: 'submenu-accounts',      link: null},
+    {re: /^\/workforce\/sellers\/api-configs\/\d+/,         menu: 'submenu-sellers',       link: 'workforce_sidebar_link_seller_api_configs'},
+    {re: /^\/workforce\/sellers\/\d+/,                      menu: 'submenu-sellers',       link: 'workforce_sidebar_link_all_sellers'},
+    {re: /^\/workforce\/sellers\//,                         menu: 'submenu-sellers',       link: null},
+    {re: /^\/workforce\/finance\//,                         menu: 'submenu-finance',       link: 'workforce_sidebar_link_finance_overview'},
+    {re: /^\/workforce\/seller-transactions\//,             menu: 'submenu-finance',       link: 'workforce_sidebar_link_seller_transactions'},
+    {re: /^\/workforce\/fleet\/transactions\//,             menu: 'submenu-finance',       link: 'workforce_sidebar_link_finance_transactions'},
+    {re: /^\/workforce\/suppliers\//,                       menu: 'submenu-fulfillment',   link: 'workforce_sidebar_link_suppliers'},
+    {re: /^\/workforce\/purchase-orders\//,                 menu: 'submenu-fulfillment',   link: 'workforce_sidebar_link_purchase_orders'},
+    {re: /^\/workforce\/warehouses\//,                      menu: 'submenu-fulfillment',   link: 'workforce_sidebar_link_warehouses_list'},
+    {re: /^\/workforce\/dispatch\/batches\/\d+/,            menu: 'submenu-dispatch',      link: 'workforce_sidebar_link_dispatch_batches'},
+    {re: /^\/workforce\/dispatch\/shifts\/\d+/,             menu: 'submenu-dispatch',      link: 'workforce_sidebar_link_dispatch_shifts'},
+    {re: /^\/workforce\/dispatch\/kpis\/rider\//,           menu: 'submenu-dispatch',      link: 'workforce_sidebar_link_dispatch_kpis'},
+    {re: /^\/workforce\/dispatch\/config\/\d+/,             menu: 'submenu-dispatch',      link: 'workforce_sidebar_link_dispatch_config'},
+    {re: /^\/workforce\/dispatch\//,                        menu: 'submenu-dispatch',      link: null},
+    {re: /^\/workforce\/auto-triggers\/flows\/\d+/,         menu: 'submenu-triggers',      link: 'workforce_sidebar_link_auto_flows'},
+    {re: /^\/workforce\/auto-triggers\//,                   menu: 'submenu-triggers',      link: null},
+    {re: /^\/workforce\/tools\//,                           menu: 'submenu-zones',         link: null},
+    {re: /^\/workforce\/verification\//,                    menu: 'submenu-verifications', link: null},
+    {re: /^\/workforce\/receipt-templates\/\d+/,            menu: 'submenu-reports',       link: 'workforce_sidebar_link_receipt_templates'},
+    {re: /^\/workforce\/receipt-templates\//,               menu: 'submenu-reports',       link: 'workforce_sidebar_link_receipt_templates'},
+    {re: /^\/workforce\/documents\//,                       menu: 'submenu-reports',       link: null},
+    {re: /^\/workforce\/reports\//,                         menu: 'submenu-reports',       link: 'workforce_sidebar_link_staff_reports'},
+    {re: /^\/workforce\/inventory\//,                       menu: 'submenu-wh-inventory',  link: null},
+    {re: /^\/workforce\/product-requests\//,                menu: 'submenu-warehouse',     link: 'workforce_sidebar_link_product_requests'},
+    {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     menu: 'submenu-forms',         link: 'workforce_sidebar_link_pricing_inquiries'},
+    {re: /^\/workforce\/forms\/whatsapp-inquiries\/\d+/,    menu: 'submenu-forms',         link: 'workforce_sidebar_link_whatsapp_inquiries'},
+    {re: /^\/workforce\/forms\//,                           menu: 'submenu-forms',         link: null}
+  ];
 
-    for (var i = 0; i < subpageMap.length; i++) {
-        if (subpageMap[i].re.test(path)) {
-            var submenu = document.getElementById(subpageMap[i].menu);
-            if (submenu && !submenu.classList.contains('show')) {
-                submenu.classList.add('show');
-            }
-            if (subpageMap[i].link && submenu && !submenu.querySelector('.nav-link.active')) {
-                var lnk = document.getElementById(subpageMap[i].link);
-                if (lnk) lnk.classList.add('active');
-            }
-            // Also mark parent nav-item active
-            if (submenu) {
-                var parentLi = submenu.parentElement;
-                if (parentLi && parentLi.classList.contains('nav-item') && !parentLi.classList.contains('active')) {
-                    parentLi.classList.add('active');
-                }
-            }
-            break;
+  for (var i = 0; i < subpageMap.length; i++) {
+    if (subpageMap[i].re.test(path)) {
+      var submenu = document.getElementById(subpageMap[i].menu);
+      if (submenu && !submenu.classList.contains('show')) {
+        submenu.classList.add('show');
+      }
+      if (subpageMap[i].link && submenu && !submenu.querySelector('.nav-link.active')) {
+        var lnk = document.getElementById(subpageMap[i].link);
+        if (lnk) lnk.classList.add('active');
+      }
+      if (submenu) {
+        var parentLi = submenu.parentElement;
+        if (parentLi && parentLi.classList.contains('nav-item') && !parentLi.classList.contains('active')) {
+          parentLi.classList.add('active');
         }
+      }
+      break;
     }
+  }
 });
 </script>

@@ -1,0 +1,34 @@
+{% load workforce_tags %}
+{% url 'workforce:temp_orders_by_date' as u_temp_orders_by_date %}
+{% url 'workforce:temp_auto_stages' as u_temp_auto_stages %}
+{% url 'workforce:temp_verify_queue' as u_temp_verify_queue %}
+{% url 'workforce:wf_orders_bulk_import' as u_wf_orders_bulk_import %}
+{% url 'workforce:onedrive_sources' as u_onedrive_sources %}
+{% url 'workforce:google_sheet_sources' as u_google_sheet_sources %}
+{% url 'workforce:wf_api_orders' as u_wf_api_orders %}
+{% url 'workforce:import_history' as u_import_history %}
+{% url 'workforce:wf_mapping_manager' as u_wf_mapping_manager %}
+{% url 'workforce:wf_webhook_imports' as u_wf_webhook_imports %}
+{% with active="wf_orders_bulk_import,onedrive_sources,google_sheet_sources,wf_api_orders,temp_orders_by_date,temp_auto_stages,temp_verify_queue,import_history,import_wizard,wf_webhook_imports,wf_mapping_manager" %}
+<li id="workforce_sidebar_menu_import" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_import" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-import" data-title="Import Config">
+    <i class="fa-solid fa-file-import me-2"></i>
+    <span>Import Config</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-import" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_temp_orders_by_date" url=u_temp_orders_by_date icon="fa-solid fa-calendar-days" label="Fetch by Date" active_names="temp_orders_by_date" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_temp_auto_stages" url=u_temp_auto_stages icon="fa-solid fa-list-check" label="Auto-Import Stages" active_names="temp_auto_stages" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_temp_verify_queue" url=u_temp_verify_queue icon="fa-solid fa-location-dot" label="Address Verify Queue" active_names="temp_verify_queue" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_bulk" url=u_wf_orders_bulk_import icon="fa-solid fa-file-csv" label="CSV / Excel Upload" active_names="wf_orders_bulk_import" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_onedrive" url=u_onedrive_sources icon="fa-solid fa-cloud-arrow-down" label="Shared Sheet / Excel" active_names="onedrive_sources" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_google_sheet" url=u_google_sheet_sources icon="fa-brands fa-google" label="Google Sheets" active_names="google_sheet_sources" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_api_orders" url=u_wf_api_orders icon="fa-solid fa-plug" label="API/Auto Trigger" active_names="wf_api_orders" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_import_history" url=u_import_history icon="fa-solid fa-clock-rotate-left" label="Import History" active_names="import_history" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_mapping_manager" url=u_wf_mapping_manager icon="fa-solid fa-sliders" label="Column Mapping" active_names="wf_mapping_manager" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_webhook_imports" url=u_wf_webhook_imports icon="fa-solid fa-satellite-dish" label="Webhook Imports" active_names="wf_webhook_imports" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

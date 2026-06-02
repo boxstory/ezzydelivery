@@ -135,14 +135,6 @@
         </div>
     </div>
 
-    <!-- Submit COD Button -->
-    <div style="position: sticky; bottom: calc(5rem + env(safe-area-inset-bottom, 0px) + 1rem); z-index: 100; margin-top: var(--spacing-lg);">
-        <a href="{% url 'fleet:cod_submission' %}" class="fleet-btn fleet-btn--dark fleet-btn--block fleet-btn--lg">
-            <i class="fa-solid fa-building-columns me-2"></i>
-            Submit COD to Office
-        </a>
-    </div>
-
     {% else %}
     <!-- Empty State -->
     <div class="fleet-empty">
@@ -162,6 +154,15 @@
 <!-- COD Transactions (Deposits/Settlements) -->
 {% if cod_transactions %}
 <div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s;">
+    {% if cod_in_hand_list %}
+    <!-- Submit COD Button -->
+    <div class="fleet-card__body">
+        <a href="{% url 'fleet:cod_submission' %}" class="fleet-btn fleet-btn--dark fleet-btn--block fleet-btn--lg">
+            <i class="fa-solid fa-building-columns me-2"></i>
+            Submit COD to Office
+        </a>
+    </div>
+    {% endif %}
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">COD Submissions ({{ cod_transactions|length }})</h3>
     </div>

@@ -1,0 +1,544 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'orders/css/orders.css' %}?v=2" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div style="min-width:0;max-width:100%">
+
+    {% csrf_token %}
+
+    <!-- Hero -->
+    <header class="oli__hero">
+        <div class="oli__hero__left">
+            <h2><i class="fa-solid fa-list me-1"></i>Browse Temp Orders</h2>
+            <span class="oli__hero__subtitle">| Full paginated history per business</span>
+        </div>
+        <div class="oli__hero__right d-flex align-items-center gap-3">
+            <button type="button" class="btn btn-warning btn-sm d-none" id="autoImportBtn" onclick="openAutoImport()">
+                <i class="fa-solid fa-bolt me-1"></i>Auto-Import <span id="autoImportBtnCount"></span>
+            </button>
+            {% if selected_business %}
+            <button type="button" class="btn btn-info btn-sm text-white" id="resyncFilteredBtn" onclick="resyncFiltered()"
+                    title="Re-fetch every row that matches the current filter (capped at 500) from its upstream source.">
+                <i class="fa-solid fa-rotate me-1"></i>Resync filtered
+            </button>
+            {% endif %}
+            <a href="{% url 'workforce:temp_orders' %}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i>Temp Orders
+            </a>
+            {% if selected_business %}
+            <div class="oli__hero__count">
+                <span class="oli__hero__count-value">{{ total_count|default:"0" }}</span>
+                <span class="oli__hero__count-label">total rows</span>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Filter form -->
+    <form method="get" class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-2 px-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label small text-muted mb-1">Business</label>
+                    <select name="business" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">— Select a business —</option>
+                        {% for biz in all_businesses %}
+                        <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>
+                            {{ biz.business_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small text-muted mb-1">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="new" {% if filters.status == "new" %}selected{% endif %}>New ({{ status_counts.new|default:0 }})</option>
+                        <option value="imported" {% if filters.status == "imported" %}selected{% endif %}>Imported ({{ status_counts.imported|default:0 }})</option>
+                        <option value="skipped" {% if filters.status == "skipped" %}selected{% endif %}>Skipped ({{ status_counts.skipped|default:0 }})</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small text-muted mb-1">Source</label>
+                    <select name="source_type" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="onedrive" {% if filters.source_type == "onedrive" %}selected{% endif %}>OneDrive ({{ source_counts.onedrive|default:0 }})</option>
+                        <option value="google_sheet" {% if filters.source_type == "google_sheet" %}selected{% endif %}>Google Sheet ({{ source_counts.google_sheet|default:0 }})</option>
+                        <option value="shopify" {% if filters.source_type == "shopify" %}selected{% endif %}>Shopify ({{ source_counts.shopify|default:0 }})</option>
+                        <option value="woocommerce" {% if filters.source_type == "woocommerce" %}selected{% endif %}>WooCommerce ({{ source_counts.woocommerce|default:0 }})</option>
+                        <option value="public_link" {% if filters.source_type == "public_link" %}selected{% endif %}>Public Link ({{ source_counts.public_link|default:0 }})</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label small text-muted mb-1">Search</label>
+                    <input type="text" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Order code, name, phone…">
+                </div>
+                <div class="col-12 col-md-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fa-solid fa-filter"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% if not selected_business %}
+        <div class="alert alert-light border text-center py-4">
+            <i class="fa-solid fa-arrow-up text-muted mb-2 d-block" style="font-size:1.25rem;"></i>
+            <div class="text-muted">Select a business above to view its temp orders.</div>
+        </div>
+    {% elif rows_page and rows_page.object_list %}
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th style="width:30px">
+                                <input type="checkbox" class="form-check-input" id="selectAllRows" onchange="toggleSelectAll(this)">
+                            </th>
+                            <th>ID</th>
+                            <th>Source</th>
+                            <th>Tab / Row</th>
+                            <th>Order Code</th>
+                            <th>Customer</th>
+                            <th>Phone</th>
+                            <th>Address</th>
+                            <th>COD</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Synced</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for to in rows_page.object_list %}
+                        <tr data-temp-id="{{ to.id }}"
+                            data-imported-order-id="{% if to.imported_order %}{{ to.imported_order.id }}{% endif %}"
+                            data-imported-order-no="{% if to.imported_order %}{{ to.imported_order.order_number }}{% endif %}"
+                            data-synced-at="{{ to.synced_at|date:'Y-m-d H:i' }}"
+                            data-created-at="{{ to.created_at|date:'Y-m-d H:i' }}"
+                            onclick="onRowClick(event)"
+                            style="cursor:pointer;"
+                            class="tob-row {% if to.status == 'imported' %}table-secondary{% elif to.status == 'skipped' %}table-light{% endif %}">
+                            <td>
+                                <input type="checkbox" class="form-check-input row-checkbox"
+                                       data-temp-id="{{ to.id }}"
+                                       onchange="updateSelectedCount()"
+                                       onclick="event.stopPropagation()">
+                            </td>
+                            <td><span class="text-muted small">#{{ to.id }}</span></td>
+                            <td><span class="badge bg-light text-dark border">{{ to.source_label }}</span></td>
+                            <td class="small text-muted">
+                                {% if to.sheet_name %}{{ to.sheet_name|truncatechars:18 }}{% endif %}
+                                {% if to.row_num %} · row {{ to.row_num }}{% endif %}
+                                {% if to.platform_id %}<div>id {{ to.platform_id|truncatechars:14 }}</div>{% endif %}
+                            </td>
+                            <td class="small">{{ to.client_order_code|default:"—" }}</td>
+                            <td class="small">{{ to.customer_name|default:"—"|truncatechars:24 }}</td>
+                            <td class="small">{{ to.customer_phone|default:"—" }}</td>
+                            <td class="small text-muted">{{ to.customer_address|default:"—"|truncatechars:40 }}</td>
+                            <td class="small">{{ to.cod_amount|default:"—" }}</td>
+                            <td class="small">{{ to.order_date|default:"—" }}</td>
+                            <td>
+                                {% if to.status == "new" %}
+                                    <span class="badge bg-warning text-dark">New</span>
+                                {% elif to.status == "imported" %}
+                                    <span class="badge bg-success">Imported{% if to.imported_order %} · #{{ to.imported_order_id }}{% endif %}</span>
+                                {% elif to.status == "skipped" %}
+                                    <span class="badge bg-secondary">Skipped</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">{{ to.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ to.synced_at|timesince }} ago</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% include "includes/components/_pagination.html" with page_obj=rows_page filter_params=filter_params per_page=per_page pagination_id="temp_orders_browse" %}
+
+        <!-- Bulk Action Bar -->
+        <div class="px-2 py-2 d-flex align-items-center gap-2 bg-light border-top" id="bulkImportBar" style="display:none !important;position:sticky;bottom:0;z-index:10;">
+            <span class="fw-semibold small"><span id="selectedCount">0</span> selected</span>
+            <button type="button" class="btn btn-warning btn-sm" onclick="openAutoImport()">
+                <i class="fa-solid fa-bolt me-1"></i>Auto-Import
+            </button>
+            <button type="button" class="btn btn-info btn-sm text-white" onclick="resyncSelected()" id="resyncBtn"
+                    title="Re-fetch selected rows from their upstream source (Shopify/Woo/OneDrive/Google Sheet/Public Link), refresh raw_row, and re-apply the current column mapping.">
+                <i class="fa-solid fa-rotate me-1"></i>Resync
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSelection()">
+                <i class="fa-solid fa-times me-1"></i>Clear
+            </button>
+        </div>
+    {% else %}
+        <div class="alert alert-light border text-center py-4">
+            <i class="fa-regular fa-folder-open text-muted mb-2 d-block" style="font-size:1.25rem;"></i>
+            <div class="text-muted">No temp orders match the current filters.</div>
+        </div>
+    {% endif %}
+
+</div>
+
+{% include "workforce/parts/temp_order_detail_modal.html" %}
+
+<!-- Auto-Import Result Modal -->
+<div class="modal fade" id="autoImportModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title">
+                    <i class="fa-solid fa-bolt me-2"></i>Auto-Import Results
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3" id="autoImportModalBody">
+                <div class="text-center py-5">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2 text-muted">Running auto-import pipeline...</p>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"
+                        id="autoImportCloseBtn">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CSRF = (() => {
+    const inp = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (inp) return inp.value;
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return c ? c.split('=')[1].trim() : '';
+})();
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.row-checkbox:not(:disabled)').forEach(c => c.checked = cb.checked);
+    updateSelectedCount();
+}
+function updateSelectedCount() {
+    const n = document.querySelectorAll('.row-checkbox:checked').length;
+    const countEl = document.getElementById('selectedCount');
+    if (countEl) countEl.textContent = n;
+    const bar = document.getElementById('bulkImportBar');
+    if (bar) bar.style.setProperty('display', n > 0 ? 'flex' : 'none', 'important');
+    const autoHdrBtn = document.getElementById('autoImportBtn');
+    if (autoHdrBtn) {
+        if (n > 0) { autoHdrBtn.classList.remove('d-none'); document.getElementById('autoImportBtnCount').textContent = `(${n})`; }
+        else { autoHdrBtn.classList.add('d-none'); }
+    }
+}
+function clearSelection() {
+    document.querySelectorAll('.row-checkbox').forEach(c => c.checked = false);
+    const sa = document.getElementById('selectAllRows');
+    if (sa) sa.checked = false;
+    updateSelectedCount();
+}
+
+function onRowClick(event) {
+    // Skip when the click landed on an interactive control inside the row.
+    const t = event.target;
+    if (t.closest('input, button, a, label, .form-check-input')) return;
+    const tr = event.currentTarget;
+    if (typeof window.showDetail === 'function') window.showDetail(tr);
+}
+
+async function resyncSelected() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (!checked.length) { alert('Select rows first'); return; }
+    const ids = [...checked].map(c => parseInt(c.dataset.tempId));
+    if (!confirm(`Resync ${ids.length} row(s)? This re-fetches the latest data from the upstream source (Shopify/Woo by order id, sheets by source) and re-applies the current column mapping. May take a few seconds per source.`)) return;
+
+    const btn = document.getElementById('resyncBtn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Resyncing...';
+
+    try {
+        const resp = await fetch('{% url "workforce:temp_orders_resync" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ ids })
+        });
+        const result = await resp.json();
+        if (!result.success) {
+            alert('Resync failed: ' + (result.error || 'unknown error'));
+            return;
+        }
+
+        (result.rows || []).forEach(r => {
+            const row = document.querySelector(`tr[data-temp-id="${r.id}"]`);
+            if (!row) return;
+            const cells = row.querySelectorAll('td');
+            // table columns: 0:checkbox 1:ID 2:Source 3:Tab/Row 4:Code 5:Customer 6:Phone 7:Address 8:COD 9:Date 10:Status 11:Synced
+            if (cells[4]) cells[4].textContent = r.client_order_code || '—';
+            if (cells[5]) cells[5].textContent = r.customer_name || '—';
+            if (cells[7]) cells[7].textContent = r.customer_address || '—';
+            if (r.changed) row.style.transition = 'background-color 1.2s';
+            if (r.changed) { row.style.backgroundColor = '#fff3cd'; setTimeout(() => row.style.backgroundColor = '', 1500); }
+        });
+
+        // Refresh the detail popup if it's open and showing one of the resynced rows.
+        const modalEl = document.getElementById('tempOrderModal');
+        const openTempId = parseInt(modalEl?.dataset.currentTempId || '0', 10);
+        if (openTempId && (result.rows || []).some(r => r.id === openTempId) && typeof window.showDetail === 'function') {
+            const sourceEl = window.__tempOrderSourceEl || document.querySelector(`tr[data-temp-id="${openTempId}"]`);
+            if (sourceEl) window.showDetail(sourceEl);
+        }
+
+        const msg = `Resync complete — ${result.updated} updated, ${result.unchanged} unchanged` +
+            (result.skipped ? `, ${result.skipped} skipped (no mapping)` : '');
+        alert(msg);
+    } catch(e) {
+        alert('Resync error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+    }
+}
+
+async function resyncFiltered() {
+    const params = new URLSearchParams(window.location.search);
+    const filters = {
+        business: params.get('business') || '',
+        status: params.get('status') || '',
+        source_type: params.get('source_type') || '',
+        q: params.get('q') || '',
+    };
+    if (!filters.business) { alert('Select a business filter first.'); return; }
+
+    const totalRows = parseInt(document.querySelector('.oli__hero__count-value')?.textContent.replace(/\D/g, '') || '0');
+    const filterDesc = [];
+    if (filters.status) filterDesc.push(`status=${filters.status}`);
+    if (filters.source_type) filterDesc.push(`source=${filters.source_type}`);
+    if (filters.q) filterDesc.push(`q=${filters.q}`);
+    const filterStr = filterDesc.length ? ` (${filterDesc.join(', ')})` : '';
+    if (!confirm(`Resync every row for this business${filterStr}? Up to 500 rows will be re-fetched from upstream (Shopify/Woo per order, sheets per source). This may take a while.`)) return;
+
+    const btn = document.getElementById('resyncFilteredBtn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Resyncing…';
+
+    try {
+        const resp = await fetch('{% url "workforce:temp_orders_resync" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ filters })
+        });
+        const result = await resp.json();
+        if (!result.success) {
+            alert('Resync failed: ' + (result.error || 'unknown error'));
+            return;
+        }
+
+        (result.rows || []).forEach(r => {
+            const row = document.querySelector(`tr[data-temp-id="${r.id}"]`);
+            if (!row) return;
+            const cells = row.querySelectorAll('td');
+            if (cells[4]) cells[4].textContent = r.client_order_code || '—';
+            if (cells[5]) cells[5].textContent = r.customer_name || '—';
+            if (cells[7]) cells[7].textContent = r.customer_address || '—';
+            if (r.changed) { row.style.transition = 'background-color 1.2s'; row.style.backgroundColor = '#fff3cd'; setTimeout(() => row.style.backgroundColor = '', 1500); }
+        });
+
+        const modalEl = document.getElementById('tempOrderModal');
+        const openTempId = parseInt(modalEl?.dataset.currentTempId || '0', 10);
+        if (openTempId && (result.rows || []).some(r => r.id === openTempId) && typeof window.showDetail === 'function') {
+            const sourceEl = window.__tempOrderSourceEl || document.querySelector(`tr[data-temp-id="${openTempId}"]`);
+            if (sourceEl) window.showDetail(sourceEl);
+        }
+
+        const capNote = (result.total_processed === result.bulk_cap) ? ` (capped at ${result.bulk_cap})` : '';
+        const errNote = (result.errors && result.errors.length) ? `, ${result.errors.length} error(s)` : '';
+        alert(`Resync filtered complete — processed ${result.total_processed}${capNote}: ${result.updated} updated, ${result.unchanged} unchanged${errNote}.`);
+    } catch(e) {
+        alert('Resync error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+    }
+}
+
+async function openAutoImport() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (!checked.length) { alert('Select rows first'); return; }
+    const ids = [...checked].map(c => parseInt(c.dataset.tempId));
+    if (!confirm(`Auto-import ${ids.length} row(s)? This will create orders, geocode addresses, and publish tasks to drivers where all checks pass.`)) return;
+
+    const spinnerHtml = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2 text-muted">Running auto-import pipeline...</p></div>';
+    document.getElementById('autoImportModalBody').innerHTML = spinnerHtml;
+    document.getElementById('autoImportCloseBtn').disabled = true;
+
+    const modal = new bootstrap.Modal(document.getElementById('autoImportModal'));
+    modal.show();
+
+    try {
+        const resp = await fetch('{% url "workforce:temp_orders_auto_import" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ ids })
+        });
+        const result = await resp.json();
+
+        const statusIcon = {
+            fully_automated: '<i class="fa-solid fa-circle-check text-success"></i>',
+            needs_review: '<i class="fa-solid fa-triangle-exclamation text-warning"></i>',
+            failed: '<i class="fa-solid fa-circle-xmark text-danger"></i>',
+        };
+        const statusLabel = {
+            fully_automated: 'Fully Automated',
+            needs_review: 'Needs Review',
+            failed: 'Failed',
+        };
+        const badgeCls = {
+            fully_automated: 'bg-success',
+            needs_review: 'bg-warning text-dark',
+            failed: 'bg-danger',
+        };
+
+        let summaryHtml = `<div class="row g-3 mb-3 text-center">
+            <div class="col-4"><div class="fs-3 fw-bold text-success">${result.fully_automated || 0}</div><div class="small text-muted">Fully Automated</div></div>
+            <div class="col-4"><div class="fs-3 fw-bold text-warning">${result.needs_review || 0}</div><div class="small text-muted">Needs Review</div></div>
+            <div class="col-4"><div class="fs-3 fw-bold text-danger">${result.failed || 0}</div><div class="small text-muted">Failed</div></div>
+        </div>`;
+
+        // Refetch summary banner (added with the pre-import refetch step).
+        if (result.refetch) {
+            const rf = result.refetch;
+            const errBlock = (rf.errors && rf.errors.length)
+                ? `<details class="mt-1"><summary class="small">${rf.errors.length} error(s)</summary><ul class="small mb-0 ps-3">${rf.errors.map(e => `<li>id ${escHtml(e.id || '?')}: ${escHtml(e.error || '')}</li>`).join('')}</ul></details>`
+                : '';
+            const cls = rf.errors && rf.errors.length ? 'alert-warning' : (rf.updated > 0 ? 'alert-success' : 'alert-secondary');
+            summaryHtml += `<div class="alert ${cls} py-2 px-3 mb-2 small">
+                <i class="fa-solid fa-rotate me-1"></i>
+                Refreshed from source first: <strong>${rf.updated || 0}</strong> updated, <strong>${rf.skipped || 0}</strong> skipped, <strong>${(rf.errors||[]).length}</strong> error(s).
+                ${errBlock}
+            </div>`;
+        }
+
+        let rowsHtml = '';
+        if (result.rows && result.rows.length) {
+            rowsHtml = '<div class="border rounded"><table class="table table-sm small mb-0"><tbody>';
+            result.rows.forEach(r => {
+                const icon = statusIcon[r.status] || '';
+                const label = statusLabel[r.status] || r.status;
+                const bCls = badgeCls[r.status] || 'bg-secondary';
+                // Build order detail link when the import created an Order.
+                const orderHref = r.order_number ? `/workforce/orders/${encodeURIComponent(r.order_number)}/` : null;
+                const orderRef = r.order_number
+                    ? (orderHref
+                        ? `<a class="badge bg-dark ms-2 text-decoration-none" href="${orderHref}" target="_blank" title="Open ${escHtml(r.order_number)}">${escHtml(r.order_number)} <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size:0.55rem"></i></a>`
+                        : `<span class="badge bg-dark ms-2">${escHtml(r.order_number)}</span>`)
+                    : '';
+                const accuracyBadge = r.accuracy
+                    ? `<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">${escHtml(r.accuracy)}</span>`
+                    : '';
+                const confBadge = (r.confidence !== undefined && r.confidence !== null)
+                    ? `<span class="badge bg-light text-dark ms-1" style="font-size:0.6rem">conf ${escHtml(r.confidence)}</span>`
+                    : '';
+                const warnings = (r.warnings || []).map(w =>
+                    `<div class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escHtml(w)}</div>`
+                ).join('');
+                const error = r.error ? `<div class="text-danger"><i class="fa-solid fa-circle-xmark me-1"></i>${escHtml(r.error)}</div>` : '';
+
+                const STAGE_ORDER = ['refetch','ai_parse','match_products','auto_pickup','geocode','set_publish','send_whatsapp','publish'];
+                const stageOutcomeCls = (v) => {
+                    const s = String(v || '');
+                    if (s.startsWith('failed') || s.startsWith('blocked')) return 'bg-danger';
+                    if (s.startsWith('ok') || s.startsWith('updated') || s === 'queued') return 'bg-success';
+                    if (s === 'disabled' || s === 'skipped' || s === 'no-diff' || s.includes('already') || s.includes('not-applicable')) return 'bg-light text-dark border';
+                    return 'bg-warning text-dark';
+                };
+                const stagesHtml = (r.stages && Object.keys(r.stages).length)
+                    ? `<div class="mt-1">${STAGE_ORDER.filter(k => k in r.stages).map(k => {
+                        const cls = stageOutcomeCls(r.stages[k]);
+                        const label = `${escHtml(k)}: ${escHtml(r.stages[k])}`;
+                        // Clickable when we know the Order — opens the Order detail in new tab.
+                        return orderHref
+                            ? `<a href="${orderHref}" target="_blank" class="badge ${cls} me-1 text-decoration-none" style="font-size:0.6rem" title="${label} — open ${escHtml(r.order_number)}">${label}</a>`
+                            : `<span class="badge ${cls} me-1" style="font-size:0.6rem" title="${label}">${label}</span>`;
+                      }).join('')}</div>`
+                    : '';
+
+                rowsHtml += `<tr data-temp-id="${r.id}">
+                    <td class="text-center" style="width:32px">${icon}</td>
+                    <td>
+                        <span class="fw-semibold">Row #${r.id}</span>${orderRef}
+                        <span class="badge ${bCls} ms-2" style="font-size:0.6rem">${label}</span>
+                        ${accuracyBadge}${confBadge}
+                        ${stagesHtml}
+                        ${warnings}${error}
+                    </td>
+                </tr>`;
+            });
+            rowsHtml += '</tbody></table></div>';
+        }
+
+        document.getElementById('autoImportModalBody').innerHTML = summaryHtml + rowsHtml;
+        document.getElementById('autoImportCloseBtn').disabled = false;
+
+        // Poll AutoFlow status per created Order so the modal surfaces
+        // customer-notify and driver-notify outcomes that fire post-save.
+        const createdOrderIds = (result.rows || [])
+            .filter(r => r.order_number)
+            .map(r => ({ id: r.order_number, internalId: null }));
+        // Need numeric order id to call the polling endpoint; the response gives
+        // order_number but not internal id, so we look it up on the row via a quick fetch.
+        // Simpler: assume the test row has imported_order_id via TempOrder lookup.
+        // For now we poll using TempOrder ids → fetch the Order via temp_orders_preview.
+        const tempIdsWithOrder = (result.rows || []).filter(r => r.order_number).map(r => r.id);
+        if (tempIdsWithOrder.length) {
+            setTimeout(async () => {
+                for (const tid of tempIdsWithOrder) {
+                    try {
+                        const previewResp = await fetch('{% url "workforce:temp_orders_preview" %}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                            body: JSON.stringify({ ids: [tid] }),
+                        });
+                        const previewData = await previewResp.json();
+                        const orderId = previewData?.rows?.[0]?.imported_order_id;
+                        if (!orderId) continue;
+                        const flowResp = await fetch(`/workforce/orders/${orderId}/autoflow-status/`);
+                        const flowData = await flowResp.json();
+                        const row = document.querySelector(`#autoImportModalBody tr[data-temp-id="${tid}"]`);
+                        const target = row || document.querySelector(`#autoImportModalBody tr:nth-child(${tempIdsWithOrder.indexOf(tid) + 1})`);
+                        if (target && flowData.logs) {
+                            const summary = flowData.logs.map(l => {
+                                const cls = l.status === 'success' ? 'bg-success' : (l.status === 'failed' ? 'bg-danger' : 'bg-secondary');
+                                const dur = l.duration_ms ? ` (${l.duration_ms}ms)` : '';
+                                return `<span class="badge ${cls} me-1" style="font-size:0.6rem" title="${escHtml(l.error || l.result_short)}">${escHtml(l.flow_name)}: ${escHtml(l.status)}${dur}</span>`;
+                            }).join('');
+                            const div = document.createElement('div');
+                            div.className = 'mt-1';
+                            div.innerHTML = '<strong class="small text-muted me-1">AutoFlows:</strong>' + (summary || '<em class="small text-muted">none recorded</em>');
+                            target.querySelector('td:last-child')?.appendChild(div);
+                        }
+                    } catch (e) { /* polling is best-effort */ }
+                }
+            }, 5000);
+        }
+
+        const anyCreated = (result.fully_automated || 0) + (result.needs_review || 0);
+        if (anyCreated > 0) {
+            setTimeout(() => window.location.reload(), 12000);
+        }
+    } catch(e) {
+        document.getElementById('autoImportModalBody').innerHTML =
+            `<div class="text-danger p-3"><i class="fa-solid fa-circle-xmark me-2"></i>Error: ${escHtml(e.message)}</div>`;
+        document.getElementById('autoImportCloseBtn').disabled = false;
+    }
+}
+</script>
+{% endblock content %}

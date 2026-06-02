@@ -394,6 +394,7 @@ class AutoFlowLog(models.Model):
         ('success', 'Success'),
         ('failed', 'Failed'),
         ('test', 'Test'),
+        ('throttled', 'Throttled'),
     ]
 
     flow = models.ForeignKey(AutoFlow, on_delete=models.CASCADE, related_name='logs')
@@ -410,6 +411,32 @@ class AutoFlowLog(models.Model):
 
     def __str__(self):
         return f"[{self.status}] {self.flow.name} @ {self.executed_at}"
+
+
+class AutoFlowThrottle(models.Model):
+    """Per-flow rate-limit state for throttled AutoFlows.
+
+    When a flow's ``action_config`` carries ``throttle_minutes``, the executor
+    sends at most one message per window. Publishes inside the window are not
+    sent — they only bump ``pending_count``, which is folded into the count
+    reported by the next message once the window elapses.
+    """
+
+    flow = models.OneToOneField(
+        AutoFlow, on_delete=models.CASCADE, related_name='throttle'
+    )
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    pending_count = models.PositiveIntegerField(
+        default=0,
+        help_text='Tasks published since the last message went out.'
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Auto Flow Throttle'
+
+    def __str__(self):
+        return f"{self.flow.name} — pending={self.pending_count}"
 
 
 class WhatsAppInstance(models.Model):

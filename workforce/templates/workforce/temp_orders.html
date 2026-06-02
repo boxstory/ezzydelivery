@@ -2,128 +2,26 @@
 {% load static %}
 
 {% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'orders/css/orders.css' %}?v=20260514a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div style="min-width:0;max-width:100%">
-    <!-- Page Header -->
-    <header class="oli__hero">
-        <div class="oli__hero__left">
-            <h2><i class="fa-solid fa-cloud-arrow-down me-1"></i>Temp Orders</h2>
-            <span class="oli__hero__subtitle">| Synced from external sources (last 25 per source)</span>
-        </div>
-        <div class="oli__hero__right d-flex align-items-center gap-3">
-            <a href="{% url 'workforce:wf_orders_to_publish' %}" class="btn btn-outline-dark btn-sm position-relative">
-                <i class="fa-solid fa-rocket me-1"></i>Publish to Tasks
-                {% if pending_publish_count %}
-                <span class="badge rounded-pill bg-warning text-dark ms-1">{{ pending_publish_count }}</span>
-                {% endif %}
-            </a>
-            <a href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="btn btn-outline-dark btn-sm position-relative">
-                <i class="fa-solid fa-truck-fast me-1"></i>Publish to Fleet
-                {% if unpublished_tasks_count %}
-                <span class="badge rounded-pill bg-warning text-dark ms-1">{{ unpublished_tasks_count }}</span>
-                {% endif %}
-            </a>
-            {% if last_sync %}
-            <span class="text-muted small" title="Last sync">
-                <i class="fa-regular fa-clock me-1"></i>{{ last_sync|timesince }} ago
-            </span>
-            {% endif %}
-            <button type="button" class="btn btn-dark btn-sm d-inline-flex align-items-center gap-2" id="syncBtn" onclick="syncAllSources()" title="Sync Now">
-                <i class="fa-solid fa-sync"></i>
-                <span id="autoSyncTimer" class="small" style="line-height:1;"></span>
-            </button>
-            <button type="button" class="btn btn-warning btn-sm d-none" id="autoImportBtn" onclick="openAutoImport()">
-                <i class="fa-solid fa-bolt me-1"></i>Auto-Import <span id="autoImportBtnCount"></span>
-            </button>
-            <a href="{% url 'workforce:temp_orders_browse' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="fa-solid fa-list me-1"></i>Browse All
-            </a>
-            <a href="{% url 'workforce:temp_order_config' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="fa-solid fa-gear me-1"></i>Config
-            </a>
-            <div class="oli__hero__count">
-                <span class="oli__hero__count-value">{{ new_count|default:"0" }}</span>
-                <span class="oli__hero__count-label">not imported</span>
+<div class="wf-temp-orders" style="min-width:0;max-width:100%">
+    <!-- Slim Page Header -->
+    <header class="wf-temp-orders__hero">
+        <div class="wf-temp-orders__hero__title-wrap">
+            <span class="wf-temp-orders__hero__icon"><i class="fa-solid fa-cloud-arrow-down"></i></span>
+            <div>
+                <h2 class="wf-temp-orders__hero__title">Temp Orders</h2>
+                <span class="wf-temp-orders__hero__sub">Synced from external sources · last 25 per source</span>
             </div>
         </div>
+        {% if last_sync %}
+        <span class="wf-temp-orders__hero__sync" title="Last sync">
+            <i class="fa-regular fa-clock"></i> Last sync {{ last_sync|timesince }} ago
+        </span>
+        {% endif %}
     </header>
-
-    <!-- Source Type Tabs -->
-    <div class="d-flex flex-wrap gap-2 mb-2 px-2">
-        <a href="{% url 'workforce:temp_orders' %}{% if filters.business %}?business={{ filters.business }}{% endif %}{% if filters.status %}{% if filters.business %}&{% else %}?{% endif %}status={{ filters.status }}{% endif %}"
-           class="badge rounded-pill {% if not filters.source_type %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            <i class="fa-solid fa-layer-group me-1"></i>All
-        </a>
-        {% if source_type_counts.onedrive %}
-        <a href="?source_type=onedrive{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
-           class="badge rounded-pill {% if filters.source_type == 'onedrive' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            <i class="fa-solid fa-cloud me-1"></i>OneDrive {{ source_type_counts.onedrive }}
-        </a>
-        {% endif %}
-        {% if source_type_counts.google_sheet %}
-        <a href="?source_type=google_sheet{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
-           class="badge rounded-pill {% if filters.source_type == 'google_sheet' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            <i class="fa-solid fa-table me-1"></i>Google Sheet {{ source_type_counts.google_sheet }}
-        </a>
-        {% endif %}
-        {% if source_type_counts.shopify %}
-        <a href="?source_type=shopify{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
-           class="badge rounded-pill {% if filters.source_type == 'shopify' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            <i class="fa-brands fa-shopify me-1"></i>Shopify {{ source_type_counts.shopify }}
-        </a>
-        {% endif %}
-        {% if source_type_counts.woocommerce %}
-        <a href="?source_type=woocommerce{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
-           class="badge rounded-pill {% if filters.source_type == 'woocommerce' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            <i class="fa-brands fa-wordpress me-1"></i>WooCommerce {{ source_type_counts.woocommerce }}
-        </a>
-        {% endif %}
-        {% if source_type_counts.public_link %}
-        <a href="?source_type=public_link{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}"
-           class="badge rounded-pill {% if filters.source_type == 'public_link' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            <i class="fa-solid fa-link me-1"></i>Public Link {{ source_type_counts.public_link }}
-        </a>
-        {% endif %}
-    </div>
-
-    <!-- Status Tabs -->
-    <div class="d-flex flex-wrap gap-2 mb-2 px-2">
-        <a href="{% url 'workforce:temp_orders' %}{% if filters.business %}?business={{ filters.business }}{% endif %}{% if filters.source_type %}{% if filters.business %}&{% else %}?{% endif %}source_type={{ filters.source_type }}{% endif %}"
-           class="badge rounded-pill {% if not filters.status %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
-            All {{ total_count|default:"0" }}
-        </a>
-        {% if status_counts.new %}
-        <a href="?status=new{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
-           class="badge rounded-pill {% if filters.status == 'new' %}bg-warning text-dark{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
-            New {{ status_counts.new }}
-        </a>
-        {% endif %}
-        {% if status_counts.imported %}
-        <a href="?status=imported{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
-           class="badge rounded-pill {% if filters.status == 'imported' %}bg-success{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
-            Imported {{ status_counts.imported }}
-        </a>
-        {% endif %}
-        {% if status_counts.skipped %}
-        <a href="?status=skipped{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
-           class="badge rounded-pill {% if filters.status == 'skipped' %}bg-secondary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.75rem;padding:0.3rem 0.6rem;">
-            Skipped {{ status_counts.skipped }}
-        </a>
-        {% endif %}
-    </div>
 
     <!-- Unmapped Sources Warning -->
     {% if unmapped_sources %}
@@ -143,46 +41,158 @@
     </div>
     {% endif %}
 
-    <!-- Business Breakdown Pills -->
-    {% if biz_counts %}
-    <div class="d-flex flex-wrap gap-2 mb-3 px-2">
-        {% for bc in biz_counts %}
-        <a href="?business={{ bc.business_id }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.source_type %}&source_type={{ filters.source_type }}{% endif %}"
-           class="badge rounded-pill {% if filters.business == bc.business_id|stringformat:'s' %}bg-primary{% else %}bg-dark{% endif %} text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            {{ bc.business_name }} <span class="fw-bold">{{ bc.count }}</span>
-        </a>
-        {% endfor %}
-        {% if filters.business %}
-        <a href="{% url 'workforce:temp_orders' %}{% if filters.status %}?status={{ filters.status }}{% endif %}{% if filters.source_type %}{% if filters.status %}&{% else %}?{% endif %}source_type={{ filters.source_type }}{% endif %}"
-           class="badge rounded-pill bg-outline-secondary text-dark border text-decoration-none"
-           style="font-size:0.8rem;padding:0.4rem 0.8rem;">
-            <i class="fa-solid fa-times me-1"></i>Clear
+    {% csrf_token %}
+
+    <!-- Dashboard Cards: state + pipeline + sync + tools -->
+    <section class="wf-temp-orders__cards" aria-label="Temp orders dashboard">
+
+        <!-- Card 1: NEW ORDERS (hero state) -->
+        <article class="wf-temp-orders__card wf-temp-orders__card--new {% if new_count %}is-alert{% endif %}">
+            <header class="wf-temp-orders__card__head">
+                <span class="wf-temp-orders__card__icon">
+                    <i class="fa-solid {% if new_count %}fa-bolt{% else %}fa-circle-check{% endif %}"></i>
+                </span>
+                <span class="wf-temp-orders__card__label">New Orders</span>
+            </header>
+            <div class="wf-temp-orders__card__metric">
+                <span class="wf-temp-orders__card__value">{{ new_count|default:"0" }}</span>
+                <span class="wf-temp-orders__card__sub">
+                    {% if new_count %}awaiting import{% else %}all caught up{% endif %}
+                </span>
+            </div>
+            <div class="wf-temp-orders__card__actions">
+                {% if new_count %}
+                <a href="?status=new" class="wf-temp-orders__btn wf-temp-orders__btn--primary">
+                    <i class="fa-solid fa-arrow-right"></i> Review
+                </a>
+                {% endif %}
+                <button type="button" class="wf-temp-orders__btn wf-temp-orders__btn--alt d-none" id="autoImportBtn" onclick="openAutoImport()">
+                    <i class="fa-solid fa-bolt"></i> Auto-Import <span id="autoImportBtnCount"></span>
+                </button>
+            </div>
+        </article>
+
+        <!-- Card 2: PIPELINE QUEUE -->
+        <article class="wf-temp-orders__card">
+            <header class="wf-temp-orders__card__head">
+                <span class="wf-temp-orders__card__icon wf-temp-orders__card__icon--info">
+                    <i class="fa-solid fa-stream"></i>
+                </span>
+                <span class="wf-temp-orders__card__label">Pipeline Queue</span>
+            </header>
+            <div class="wf-temp-orders__queue">
+                <a href="{% url 'workforce:wf_orders_to_publish' %}" class="wf-temp-orders__queue-row">
+                    <span class="wf-temp-orders__queue-row__icon"><i class="fa-solid fa-rocket"></i></span>
+                    <span class="wf-temp-orders__queue-row__text">Publish to Tasks</span>
+                    <span class="wf-temp-orders__queue-row__count{% if pending_publish_count %} is-active{% endif %}">{{ pending_publish_count|default:"0" }}</span>
+                    <i class="fa-solid fa-chevron-right wf-temp-orders__queue-row__chev"></i>
+                </a>
+                <a href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="wf-temp-orders__queue-row">
+                    <span class="wf-temp-orders__queue-row__icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="wf-temp-orders__queue-row__text">Publish to Fleet</span>
+                    <span class="wf-temp-orders__queue-row__count{% if unpublished_tasks_count %} is-active{% endif %}">{{ unpublished_tasks_count|default:"0" }}</span>
+                    <i class="fa-solid fa-chevron-right wf-temp-orders__queue-row__chev"></i>
+                </a>
+                <a href="{% url 'workforce:temp_verify_queue' %}" class="wf-temp-orders__queue-row" title="Customer WhatsApp address verification queue">
+                    <span class="wf-temp-orders__queue-row__icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="wf-temp-orders__queue-row__text">Verify Queue</span>
+                    <span class="wf-temp-orders__queue-row__count{% if address_verify_pending_count %} is-active{% endif %}">{{ address_verify_pending_count|default:"0" }}</span>
+                    <i class="fa-solid fa-chevron-right wf-temp-orders__queue-row__chev"></i>
+                </a>
+            </div>
+        </article>
+
+        <!-- Card 3: SYNC -->
+        <article class="wf-temp-orders__card">
+            <header class="wf-temp-orders__card__head">
+                <span class="wf-temp-orders__card__icon wf-temp-orders__card__icon--sync">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </span>
+                <span class="wf-temp-orders__card__label">Sync</span>
+            </header>
+            <div class="wf-temp-orders__sync-meta">
+                {% if last_sync %}
+                    <span class="wf-temp-orders__sync-meta__time">{{ last_sync|timesince }} ago</span>
+                    <span class="wf-temp-orders__sync-meta__sub">last sync</span>
+                {% else %}
+                    <span class="wf-temp-orders__sync-meta__time">—</span>
+                    <span class="wf-temp-orders__sync-meta__sub">never synced</span>
+                {% endif %}
+            </div>
+            <div class="wf-temp-orders__card__actions">
+                <button type="button" class="wf-temp-orders__btn wf-temp-orders__btn--dark" id="syncBtn" onclick="syncAllSources()">
+                    <i class="fa-solid fa-sync"></i> Sync Now <span id="autoSyncTimer" class="wf-temp-orders__sync-timer"></span>
+                </button>
+            </div>
+        </article>
+
+        <!-- Card 4: SHORTCUTS / TOOLS -->
+        <article class="wf-temp-orders__card">
+            <header class="wf-temp-orders__card__head">
+                <span class="wf-temp-orders__card__icon wf-temp-orders__card__icon--muted">
+                    <i class="fa-solid fa-toolbox"></i>
+                </span>
+                <span class="wf-temp-orders__card__label">Tools</span>
+            </header>
+            <div class="wf-temp-orders__tools">
+                <a href="{% url 'workforce:temp_orders' %}" class="wf-temp-orders__tools-stat">
+                    <span class="wf-temp-orders__tools-stat__label">Total</span>
+                    <span class="wf-temp-orders__tools-stat__value">{{ total_count|default:"0" }}</span>
+                </a>
+                <a href="?status=imported" class="wf-temp-orders__tools-stat wf-temp-orders__tools-stat--success">
+                    <span class="wf-temp-orders__tools-stat__label">Imported</span>
+                    <span class="wf-temp-orders__tools-stat__value">{{ status_counts.imported|default:"0" }}</span>
+                </a>
+            </div>
+            <div class="wf-temp-orders__card__actions wf-temp-orders__card__actions--split">
+                <a href="{% url 'workforce:temp_orders_browse' %}" class="wf-temp-orders__btn wf-temp-orders__btn--ghost">
+                    <i class="fa-solid fa-list"></i> Browse
+                </a>
+                <a href="{% url 'workforce:temp_order_config' %}" class="wf-temp-orders__btn wf-temp-orders__btn--ghost">
+                    <i class="fa-solid fa-gear"></i> Config
+                </a>
+            </div>
+        </article>
+    </section>
+
+    <!-- Filter cluster -->
+    <form id="filterForm" method="get" action="{{ request.path }}" class="wf-temp-orders__filters">
+        {% if filters.sort %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+        <label class="wf-temp-orders__filter-field">
+            <span class="wf-temp-orders__filter-label"><i class="fa-solid fa-layer-group"></i> Source</span>
+            <select class="form-select form-select-sm" name="source_type" onchange="this.form.submit()">
+                <option value="">All sources</option>
+                {% if source_type_counts.onedrive %}<option value="onedrive" {% if filters.source_type == 'onedrive' %}selected{% endif %}>OneDrive ({{ source_type_counts.onedrive }})</option>{% endif %}
+                {% if source_type_counts.google_sheet %}<option value="google_sheet" {% if filters.source_type == 'google_sheet' %}selected{% endif %}>Google Sheet ({{ source_type_counts.google_sheet }})</option>{% endif %}
+                {% if source_type_counts.shopify %}<option value="shopify" {% if filters.source_type == 'shopify' %}selected{% endif %}>Shopify ({{ source_type_counts.shopify }})</option>{% endif %}
+                {% if source_type_counts.woocommerce %}<option value="woocommerce" {% if filters.source_type == 'woocommerce' %}selected{% endif %}>WooCommerce ({{ source_type_counts.woocommerce }})</option>{% endif %}
+                {% if source_type_counts.public_link %}<option value="public_link" {% if filters.source_type == 'public_link' %}selected{% endif %}>Public Link ({{ source_type_counts.public_link }})</option>{% endif %}
+            </select>
+        </label>
+        <label class="wf-temp-orders__filter-field">
+            <span class="wf-temp-orders__filter-label"><i class="fa-solid fa-circle-dot"></i> Status</span>
+            <select class="form-select form-select-sm" name="status" onchange="this.form.submit()">
+                <option value="">All statuses</option>
+                {% if status_counts.new %}<option value="new" {% if filters.status == 'new' %}selected{% endif %}>New ({{ status_counts.new }})</option>{% endif %}
+                {% if status_counts.imported %}<option value="imported" {% if filters.status == 'imported' %}selected{% endif %}>Imported ({{ status_counts.imported }})</option>{% endif %}
+                {% if status_counts.skipped %}<option value="skipped" {% if filters.status == 'skipped' %}selected{% endif %}>Skipped ({{ status_counts.skipped }})</option>{% endif %}
+            </select>
+        </label>
+        <label class="wf-temp-orders__filter-field wf-temp-orders__filter-field--wide">
+            <span class="wf-temp-orders__filter-label"><i class="fa-solid fa-store"></i> Business</span>
+            <select class="form-select form-select-sm" name="business" id="pgf_business" onchange="this.form.submit()">
+                <option value="">All businesses</option>
+                {% for biz in all_businesses %}
+                <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        {% if filters.business or filters.status or filters.source_type %}
+        <a href="{% url 'workforce:temp_orders' %}" class="wf-temp-orders__filter-clear" title="Clear all filters">
+            <i class="fa-solid fa-xmark"></i> Clear
         </a>
         {% endif %}
-    </div>
-    {% endif %}
-
-    {% csrf_token %}
-    <!-- Filter -->
-    <div class="pg-filter">
-        <form id="filterForm" method="get" action="{{ request.path }}">
-            {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
-            {% if filters.source_type %}<input type="hidden" name="source_type" value="{{ filters.source_type }}">{% endif %}
-            {% if filters.sort %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
-            <div class="pg-filter__row mb-2">
-                <select class="form-select form-select-sm pg-filter__select-biz" name="business" id="pgf_business" onchange="this.form.submit()">
-                    <option value="">All Businesses</option>
-                    {% for biz in all_businesses %}
-                    <option value="{{ biz.business_id }}"
-                            {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>
-                        {{ biz.business_name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </form>
-    </div>
+    </form>
 
     <!-- Temp Orders Table -->
     {% if biz_groups %}
@@ -372,18 +382,7 @@
     {% endif %}
 </div>
 
-<!-- Detail Modal (single row view) -->
-<div class="modal fade" id="tempOrderModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title"><i class="fa-solid fa-file-lines me-2"></i>Temp Order Detail</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-3" id="tempOrderModalBody"></div>
-        </div>
-    </div>
-</div>
+{% include "workforce/parts/temp_order_detail_modal.html" %}
 
 <!-- Preview & Transfer Modal (multi-step) -->
 <div class="modal fade" id="previewModal" tabindex="-1" data-bs-backdrop="static">
@@ -564,69 +563,6 @@ document.querySelectorAll('.fmt-datetime').forEach(td => {
     }
 });
 
-// ─── Detail Modal (single row) ───
-function showDetail(btn) {
-    const d = btn.dataset;
-    const statusBadge = d.status === 'imported' ? '<span class="badge bg-success">Imported</span>'
-        : d.status === 'skipped' ? '<span class="badge bg-secondary">Skipped</span>'
-        : '<span class="badge bg-warning text-dark">New</span>';
-    const srcIcon = { onedrive:'<i class="fa-solid fa-cloud me-1"></i>OneDrive', google_sheet:'<i class="fa-solid fa-table me-1"></i>Google Sheet',
-        shopify:'<i class="fa-brands fa-shopify me-1"></i>Shopify', woocommerce:'<i class="fa-brands fa-wordpress me-1"></i>WooCommerce',
-        public_link:'<i class="fa-solid fa-link me-1"></i>Public Link' }[d.sourceType] || d.sourceType;
-
-    let importedOrderHtml = '';
-    if (d.status === 'imported' && d.importedOrderNo) {
-        const viewUrl = `/workforce/orders/${d.importedOrderId}/`;
-        importedOrderHtml = `<div class="d-flex align-items-center gap-2 mt-2 mb-1">
-            <span class="badge bg-success">Imported</span>
-            <span class="fw-semibold">${escHtml(d.importedOrderNo)}</span>
-            <a href="${viewUrl}" class="btn btn-sm btn-outline-primary py-0 px-2" target="_blank">
-                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>View Order
-            </a>
-        </div>`;
-    }
-
-    let rawHtml = '';
-    try {
-        const raw = JSON.parse(d.rawRow.replace(/'/g, '"'));
-        if (Array.isArray(raw) && raw.length) {
-            rawHtml = '<div class="mt-3"><h6 class="fw-semibold mb-2"><i class="fa-solid fa-database me-1"></i>Raw Row Data</h6><div class="table-responsive"><table class="table table-sm table-bordered small mb-0"><tbody>';
-            raw.forEach((cell, i) => { if (cell) rawHtml += `<tr><td class="text-muted" style="width:60px">Col ${i+1}</td><td>${escHtml(cell)}</td></tr>`; });
-            rawHtml += '</tbody></table></div></div>';
-        }
-    } catch(e) {}
-
-    document.getElementById('tempOrderModalBody').innerHTML = `
-        <div class="row g-3">
-            <div class="col-md-6"><table class="table table-sm small mb-0"><tbody>
-                <tr><td class="text-muted fw-semibold" style="width:130px">Status</td><td>${statusBadge}</td></tr>
-                <tr><td class="text-muted fw-semibold">Source</td><td>${srcIcon} <span class="text-muted small">${escHtml(d.sourceLabel||'')}</span></td></tr>
-                <tr><td class="text-muted fw-semibold">Business</td><td>${escHtml(d.business)}</td></tr>
-                <tr><td class="text-muted fw-semibold">Sheet</td><td>${escHtml(d.sheet||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Row #</td><td>${d.rowNum||'—'}</td></tr>
-                <tr><td class="text-muted fw-semibold">Platform ID</td><td>${escHtml(d.platformId||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Order Code</td><td class="fw-semibold">${escHtml(d.clientOrderCode||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Order Date</td><td>${escHtml(d.orderDate||'—')}</td></tr>
-            </tbody></table></div>
-            <div class="col-md-6"><table class="table table-sm small mb-0"><tbody>
-                <tr><td class="text-muted fw-semibold" style="width:130px">Customer</td><td>${escHtml(d.customerName||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Phone</td><td>${escHtml(d.customerPhone||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Address</td><td>${escHtml(d.customerAddress||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Zone</td><td>${escHtml(d.dlZone||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Street</td><td>${escHtml(d.dlStreet||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Building</td><td>${escHtml(d.dlBuilding||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">COD</td><td class="fw-semibold">${escHtml(d.codAmount||'—')}</td></tr>
-                <tr><td class="text-muted fw-semibold">Package</td><td>${escHtml(d.packageDesc||'—')}</td></tr>
-            </tbody></table></div>
-        </div>
-        ${importedOrderHtml}
-        <div class="d-flex gap-3 mt-2 small text-muted">
-            <span><i class="fa-regular fa-clock me-1"></i>Synced: ${d.syncedAt}</span>
-            <span><i class="fa-regular fa-calendar me-1"></i>Created: ${d.createdAt}</span>
-        </div>${rawHtml}`;
-    new bootstrap.Modal(document.getElementById('tempOrderModal')).show();
-}
-
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 // ─── Selection ───
@@ -689,24 +625,160 @@ async function deleteSelected() {
 }
 
 // ─── Auto-Import ───
+const STAGE_KEYS = ['ai_parse', 'match_products', 'auto_pickup', 'geocode', 'set_publish', 'send_whatsapp', 'publish'];
+const STAGE_LABELS = {
+    ai_parse:       'AI Address Parse',
+    match_products: 'Match Products',
+    auto_pickup:    'Auto-Assign Pickup',
+    geocode:        'QNAS Geocode',
+    set_publish:    'Set Order Status → Publish',
+    send_whatsapp:  'Send WhatsApp Verify Link',
+    publish:        'Publish to Fleet',
+};
+const STAGE_DESC = {
+    ai_parse:       'Extract zone/street/building from free-text address when missing',
+    match_products: 'Parse line items and link them to your Product catalog',
+    auto_pickup:    'Pick the default / fulfillment pickup location automatically',
+    geocode:        'Run QNAS to verify the address and produce coordinates',
+    set_publish:    'After QNAS, keep order at status="publish" (off = revert to to_review for manual approval)',
+    send_whatsapp:  'Send the customer the same verify-address WhatsApp message you would send manually from the order detail page',
+    publish:        'Publish the order to the fleet driver board (requires geocode)',
+};
+
+// Cache of business_id → saved stage defaults (loaded on demand)
+const stageDefaultsCache = {};
+
+async function loadStageDefaults(bizIds) {
+    const missing = bizIds.filter(id => !(id in stageDefaultsCache));
+    if (!missing.length) return;
+    const resp = await fetch('{% url "workforce:temp_auto_stages_get" %}?ids=' + missing.join(','));
+    const data = await resp.json();
+    if (data.success) {
+        for (const [id, info] of Object.entries(data.results)) {
+            stageDefaultsCache[id] = info;
+        }
+    }
+}
+
+// Selected rows + chosen stages persisted between the pre-step and the run
+let _pendingAutoImport = null;
+
 async function openAutoImport() {
     const checked = document.querySelectorAll('.row-checkbox:checked');
     if (!checked.length) { alert('Select rows first'); return; }
-    const ids = [...checked].map(c => parseInt(c.dataset.tempId));
-    if (!confirm(`Auto-import ${ids.length} row(s)? This will create orders, geocode addresses, and publish tasks to drivers where all checks pass.`)) return;
+
+    // Collect ids + unique business ids from the row TR
+    const ids = [];
+    const bizSet = new Set();
+    checked.forEach(c => {
+        ids.push(parseInt(c.dataset.tempId));
+        const tr = c.closest('tr');
+        if (tr && tr.dataset.bizId) bizSet.add(tr.dataset.bizId);
+    });
+    const bizIds = [...bizSet];
+
+    _pendingAutoImport = { ids, bizIds };
+
+    // Show modal with pre-step (stage picker)
+    const modal = new bootstrap.Modal(document.getElementById('autoImportModal'));
+    document.getElementById('autoImportModalBody').innerHTML =
+        '<div class="text-center py-4"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2 text-muted">Loading saved stage defaults...</p></div>';
+    document.getElementById('autoImportCloseBtn').disabled = false;
+    modal.show();
+
+    await loadStageDefaults(bizIds);
+    renderStagePicker(ids, bizIds);
+}
+
+function _stageIntersection(bizIds) {
+    // For each stage, true only if every business has it on; "mixed" otherwise
+    const result = {};
+    STAGE_KEYS.forEach(k => {
+        const vals = bizIds.map(b => (stageDefaultsCache[b] && stageDefaultsCache[b].stages) ? stageDefaultsCache[b].stages[k] : true);
+        if (vals.every(v => v === true))       result[k] = { value: true,  mixed: false };
+        else if (vals.every(v => v === false)) result[k] = { value: false, mixed: false };
+        else                                   result[k] = { value: true,  mixed: true };
+    });
+    return result;
+}
+
+function renderStagePicker(ids, bizIds) {
+    const intersection = _stageIntersection(bizIds);
+    const bizNames = bizIds.map(b => stageDefaultsCache[b] ? stageDefaultsCache[b].business_name : `#${b}`);
+    const bizSummary = bizIds.length === 1
+        ? `<span class="badge bg-dark">${escHtml(bizNames[0])}</span>`
+        : `<span class="badge bg-dark">${bizIds.length} businesses</span> <span class="text-muted small">${escHtml(bizNames.slice(0, 3).join(', '))}${bizIds.length > 3 ? '…' : ''}</span>`;
+
+    let stagesHtml = '<div class="border rounded p-3 mb-3">';
+    stagesHtml += '<div class="small text-muted mb-2">Tick the stages that should run for this batch. Pre-filled from each business\'s saved defaults.</div>';
+    STAGE_KEYS.forEach(k => {
+        const s = intersection[k];
+        const mixedLabel = s.mixed ? '<span class="badge bg-warning text-dark ms-2" style="font-size:0.6rem">mixed across businesses</span>' : '';
+        stagesHtml += `<div class="form-check mb-2">
+            <input class="form-check-input bapi__stage-pick" type="checkbox"
+                   id="stage_${k}" data-stage="${k}" ${s.value ? 'checked' : ''}>
+            <label class="form-check-label" for="stage_${k}">
+                <span class="fw-semibold">${STAGE_LABELS[k]}</span>${mixedLabel}
+                <div class="small text-muted">${STAGE_DESC[k]}</div>
+            </label>
+        </div>`;
+    });
+    stagesHtml += '</div>';
+
+    const overrideHtml = `<div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" role="switch" id="stageOverrideAll" checked>
+        <label class="form-check-label small" for="stageOverrideAll">
+            Apply these stages to all selected rows
+            <span class="text-muted">(off = use each business's saved defaults; the ticks above are ignored)</span>
+        </label>
+    </div>`;
+
+    document.getElementById('autoImportModalBody').innerHTML = `
+        <div class="mb-2">
+            <span class="fw-semibold">${ids.length} row${ids.length === 1 ? '' : 's'}</span>
+            <span class="text-muted small ms-2">across</span>
+            ${bizSummary}
+            <a href="{% url 'workforce:temp_auto_stages' %}" target="_blank" class="ms-2 small">
+                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Manage defaults
+            </a>
+        </div>
+        ${stagesHtml}
+        ${overrideHtml}
+        <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-warning btn-sm" onclick="runAutoImport()">
+                <i class="fa-solid fa-bolt me-1"></i>Run Auto-Import
+            </button>
+        </div>
+    `;
+}
+
+async function runAutoImport() {
+    if (!_pendingAutoImport) return;
+    const { ids } = _pendingAutoImport;
+
+    // Build stage override or null (= use saved per-business defaults)
+    let stages = null;
+    if (document.getElementById('stageOverrideAll').checked) {
+        stages = {};
+        document.querySelectorAll('.bapi__stage-pick').forEach(cb => {
+            stages[cb.dataset.stage] = cb.checked;
+        });
+    }
 
     const spinnerHtml = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2 text-muted">Running auto-import pipeline...</p></div>';
     document.getElementById('autoImportModalBody').innerHTML = spinnerHtml;
     document.getElementById('autoImportCloseBtn').disabled = true;
 
-    const modal = new bootstrap.Modal(document.getElementById('autoImportModal'));
-    modal.show();
+    const modal = bootstrap.Modal.getInstance(document.getElementById('autoImportModal'));
 
     try {
+        const body = { ids };
+        if (stages !== null) body.stages = stages;
         const resp = await fetch('{% url "workforce:temp_orders_auto_import" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-            body: JSON.stringify({ ids })
+            body: JSON.stringify(body)
         });
         const result = await resp.json();
 
@@ -732,14 +804,38 @@ async function openAutoImport() {
             <div class="col-4"><div class="fs-3 fw-bold text-danger">${result.failed || 0}</div><div class="small text-muted">Failed</div></div>
         </div>`;
 
+        if (result.refetch) {
+            const rf = result.refetch;
+            const errBlock = (rf.errors && rf.errors.length)
+                ? `<details class="mt-1"><summary class="small">${rf.errors.length} error(s)</summary><ul class="small mb-0 ps-3">${rf.errors.map(e => `<li>id ${escHtml(e.id || '?')}: ${escHtml(e.error || '')}</li>`).join('')}</ul></details>`
+                : '';
+            const cls = rf.errors && rf.errors.length ? 'alert-warning' : (rf.updated > 0 ? 'alert-success' : 'alert-secondary');
+            summaryHtml += `<div class="alert ${cls} py-2 px-3 mb-2 small">
+                <i class="fa-solid fa-rotate me-1"></i>
+                Refreshed from source first: <strong>${rf.updated || 0}</strong> updated, <strong>${rf.skipped || 0}</strong> skipped, <strong>${(rf.errors||[]).length}</strong> error(s).
+                ${errBlock}
+            </div>`;
+        }
+
         let rowsHtml = '';
         if (result.rows && result.rows.length) {
             rowsHtml = '<div class="border rounded"><table class="table table-sm small mb-0"><tbody>';
+            const STAGE_ORDER = ['refetch','ai_parse','match_products','auto_pickup','geocode','set_publish','send_whatsapp','publish'];
+            const stageOutcomeCls = (v) => {
+                const s = String(v || '');
+                if (s.startsWith('failed') || s.startsWith('blocked')) return 'bg-danger';
+                if (s.startsWith('ok') || s.startsWith('updated') || s === 'queued') return 'bg-success';
+                if (s === 'disabled' || s === 'skipped' || s === 'no-diff' || s.includes('already') || s.includes('not-applicable')) return 'bg-light text-dark border';
+                return 'bg-warning text-dark';
+            };
             result.rows.forEach(r => {
                 const icon = statusIcon[r.status] || '';
                 const label = statusLabel[r.status] || r.status;
                 const bCls = badgeCls[r.status] || 'bg-secondary';
-                const orderRef = r.order_number ? `<span class="badge bg-dark ms-2">${escHtml(r.order_number)}</span>` : '';
+                const orderHref = r.order_number ? `/workforce/orders/${encodeURIComponent(r.order_number)}/` : null;
+                const orderRef = r.order_number
+                    ? `<a class="badge bg-dark ms-2 text-decoration-none" href="${orderHref}" target="_blank" title="Open ${escHtml(r.order_number)}">${escHtml(r.order_number)} <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size:0.55rem"></i></a>`
+                    : '';
                 const accuracyBadge = r.accuracy
                     ? `<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">${escHtml(r.accuracy)}</span>`
                     : '';
@@ -750,12 +846,22 @@ async function openAutoImport() {
                     `<div class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escHtml(w)}</div>`
                 ).join('');
                 const error = r.error ? `<div class="text-danger"><i class="fa-solid fa-circle-xmark me-1"></i>${escHtml(r.error)}</div>` : '';
-                rowsHtml += `<tr>
+                const stagesHtml = (r.stages && Object.keys(r.stages).length)
+                    ? `<div class="mt-1">${STAGE_ORDER.filter(k => k in r.stages).map(k => {
+                        const cls = stageOutcomeCls(r.stages[k]);
+                        const label = `${escHtml(k)}: ${escHtml(r.stages[k])}`;
+                        return orderHref
+                            ? `<a href="${orderHref}" target="_blank" class="badge ${cls} me-1 text-decoration-none" style="font-size:0.6rem" title="${label} — open ${escHtml(r.order_number)}">${label}</a>`
+                            : `<span class="badge ${cls} me-1" style="font-size:0.6rem" title="${label}">${label}</span>`;
+                      }).join('')}</div>`
+                    : '';
+                rowsHtml += `<tr data-temp-id="${r.id}">
                     <td class="text-center" style="width:32px">${icon}</td>
                     <td>
                         <span class="fw-semibold">Row #${r.id}</span>${orderRef}
                         <span class="badge ${bCls} ms-2" style="font-size:0.6rem">${label}</span>
                         ${accuracyBadge}${confBadge}
+                        ${stagesHtml}
                         ${warnings}${error}
                     </td>
                 </tr>`;
@@ -766,9 +872,48 @@ async function openAutoImport() {
         document.getElementById('autoImportModalBody').innerHTML = summaryHtml + rowsHtml;
         document.getElementById('autoImportCloseBtn').disabled = false;
 
+        // Poll autoflow status per imported Order so customer/driver notify
+        // outcomes (fired by post-save signals) show up in the result modal.
+        const tempIdsWithOrder = (result.rows || []).filter(r => r.order_number).map(r => r.id);
+        if (tempIdsWithOrder.length) {
+            setTimeout(async () => {
+                for (const tid of tempIdsWithOrder) {
+                    try {
+                        const previewResp = await fetch('{% url "workforce:temp_orders_preview" %}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                            body: JSON.stringify({ ids: [tid] }),
+                        });
+                        const previewData = await previewResp.json();
+                        const orderId = previewData?.rows?.[0]?.imported_order_id;
+                        if (!orderId) continue;
+                        const flowResp = await fetch(`/workforce/orders/${orderId}/autoflow-status/`);
+                        const flowData = await flowResp.json();
+                        const target = document.querySelector(`#autoImportModalBody tr[data-temp-id="${tid}"]`);
+                        if (target && flowData.logs) {
+                            const summary = flowData.logs.map(l => {
+                                const cls = l.status === 'success' ? 'bg-success' : (l.status === 'failed' ? 'bg-danger' : 'bg-secondary');
+                                const dur = l.duration_ms ? ` (${l.duration_ms}ms)` : '';
+                                return `<span class="badge ${cls} me-1" style="font-size:0.6rem" title="${escHtml(l.error || l.result_short)}">${escHtml(l.flow_name)}: ${escHtml(l.status)}${dur}</span>`;
+                            }).join('');
+                            const div = document.createElement('div');
+                            div.className = 'mt-1';
+                            div.innerHTML = '<strong class="small text-muted me-1">AutoFlows:</strong>' + (summary || '<em class="small text-muted">none recorded</em>');
+                            target.querySelector('td:last-child')?.appendChild(div);
+                        }
+                    } catch (e) { /* best-effort */ }
+                }
+            }, 5000);
+        }
+
         const anyCreated = (result.fully_automated || 0) + (result.needs_review || 0);
         if (anyCreated > 0) {
-            setTimeout(() => window.location.reload(), 4000);
+            setTimeout(() => {
+                modal.hide();
+                window.location.reload();
+            }, 12000);
+        } else {
+            setTimeout(() => modal.hide(), 6000);
         }
     } catch(e) {
         document.getElementById('autoImportModalBody').innerHTML =

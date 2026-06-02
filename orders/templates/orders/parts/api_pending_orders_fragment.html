@@ -1,0 +1,164 @@
+{% if api_orders_error %}
+<div class="alert alert-danger py-2 small mb-3">
+    <i class="fa-solid fa-exclamation-triangle me-1"></i> API Error: {{ api_orders_error }}
+</div>
+{% endif %}
+
+{% if resolved_handle %}
+<div class="alert alert-info py-2 small mb-3">
+    <i class="fa-solid fa-circle-info me-1"></i>
+    Auto-detected Shopify handle <strong>{{ resolved_handle }}</strong> from the custom domain. Saved to the API config.
+</div>
+{% endif %}
+
+{% if import_result %}
+<div class="alert {% if import_result.saved %}alert-success{% else %}alert-warning{% endif %} py-2 small mb-3">
+    <i class="fa-solid fa-{% if import_result.saved %}circle-check{% else %}circle-info{% endif %} me-1"></i>
+    <strong>{{ import_result.saved }}</strong> imported.
+    {% if import_result.skipped_duplicate %}<span class="ms-2"><strong>{{ import_result.skipped_duplicate }}</strong> skipped (already imported).</span>{% endif %}
+    {% if import_result.skipped_invalid %}<span class="ms-2"><strong>{{ import_result.skipped_invalid }}</strong> skipped (missing customer name and phone).</span>{% endif %}
+    {% if import_result.errors %}
+    <ul class="mb-0 mt-1 ps-3">
+        {% for e in import_result.errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if api_orders %}
+<form id="orders_api_pending_form"
+      hx-post="{% url 'orders:orders_api_pending_import' %}"
+      hx-target="#orders_api_pending_panel"
+      hx-swap="innerHTML"
+      hx-indicator="#orders_api_pending_spinner">
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <span class="badge bg-primary">{{ api_orders|length }} from {{ api_orders_platform|title }}</span>
+        <button type="submit" class="btn btn-sm btn-primary" id="orders_api_pending_import_btn" disabled>
+            <i class="fa-solid fa-download me-1"></i> Import Selected (<span id="orders_api_pending_count">0</span>)
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                hx-get="{% url 'orders:orders_api_pending_list' %}"
+                hx-target="#orders_api_pending_panel"
+                hx-swap="innerHTML">
+            <i class="fa-solid fa-arrows-rotate me-1"></i> Refresh
+        </button>
+        <span id="orders_api_pending_spinner" class="htmx-indicator text-muted small">
+            <i class="fa-solid fa-spinner fa-spin me-1"></i> Working...
+        </span>
+        <span class="text-muted small ms-auto">Already-imported orders are skipped.</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="oapi-col-check">
+                        <input type="checkbox" id="orders_api_pending_chk_all" class="form-check-input" aria-label="Select all">
+                    </th>
+                    <th class="oapi-col-num">#</th>
+                    <th>Order</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                    <th>Status</th>
+                    <th class="text-end">Items</th>
+                    <th class="text-end">Total</th>
+                    <th class="oapi-col-status">Local</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in api_orders %}
+                {% with code=o.name|cut:"#" %}
+                <tr>
+                    <td>
+                        {% if code in imported_codes %}
+                        <input type="checkbox" class="form-check-input" disabled aria-label="Already imported">
+                        {% else %}
+                        <input type="checkbox" class="form-check-input oapi-row-chk"
+                               name="selected" value="{{ forloop.counter0 }}"
+                               aria-label="Select for import">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_platform_id" value="{{ o.platform_id }}">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_name" value="{{ o.name }}">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_customer_name" value="{{ o.customer_name }}">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_customer_phone" value="{{ o.customer_phone }}">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_customer_address" value="{{ o.customer_address }}">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_total_price" value="{{ o.total_price }}">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_financial_status" value="{{ o.financial_status }}">
+                        <input type="hidden" name="o_{{ forloop.counter0 }}_line_items_json" value="{{ o.line_items_json }}">
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">{{ forloop.counter }}</td>
+                    <td><strong>{{ o.name|default:o.platform_id }}</strong></td>
+                    <td class="small text-muted">{{ o.created_at|default:"-" }}</td>
+                    <td class="small">{{ o.customer_name|default:"-" }}</td>
+                    <td class="small"><code>{{ o.customer_phone|default:"-" }}</code></td>
+                    <td class="small text-muted text-truncate oapi-col-address">{{ o.customer_address|default:"-" }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ o.financial_status|default:"-" }}</span></td>
+                    <td class="text-end">{{ o.item_count }}</td>
+                    <td class="text-end fw-semibold">{{ o.total_price|default:"0" }} {{ o.currency }}</td>
+                    <td>
+                        {% if code in imported_codes %}
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Imported</span>
+                        {% else %}
+                        <span class="badge bg-light text-muted border">New</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+<script>
+(function() {
+    var form = document.getElementById('orders_api_pending_form');
+    if (!form) return;
+    var chkAll = form.querySelector('#orders_api_pending_chk_all');
+    var rowChks = form.querySelectorAll('.oapi-row-chk');
+    var btn = form.querySelector('#orders_api_pending_import_btn');
+    var countEl = form.querySelector('#orders_api_pending_count');
+    function refreshCount() {
+        var n = 0;
+        rowChks.forEach(function(cb) { if (cb.checked) n++; });
+        if (countEl) countEl.textContent = n;
+        if (btn) btn.disabled = (n === 0);
+        if (chkAll) {
+            chkAll.checked = (n > 0 && n === rowChks.length);
+            chkAll.indeterminate = (n > 0 && n < rowChks.length);
+        }
+    }
+    if (chkAll) {
+        chkAll.addEventListener('change', function() {
+            rowChks.forEach(function(cb) { cb.checked = chkAll.checked; });
+            refreshCount();
+        });
+    }
+    rowChks.forEach(function(cb) { cb.addEventListener('change', refreshCount); });
+    form.addEventListener('submit', function(e) {
+        var anyChecked = false;
+        rowChks.forEach(function(cb) { if (cb.checked) anyChecked = true; });
+        if (!anyChecked) e.preventDefault();
+    });
+    refreshCount();
+})();
+</script>
+{% elif not api_orders_error and api_orders_platform %}
+<div class="text-center text-muted py-3 small">
+    <i class="fa-solid fa-cloud me-1"></i>
+    No new {{ api_orders_platform|title }} orders to import.
+    <button type="button" class="btn btn-sm btn-link"
+            hx-get="{% url 'orders:orders_api_pending_list' %}"
+            hx-target="#orders_api_pending_panel"
+            hx-swap="innerHTML">
+        <i class="fa-solid fa-arrows-rotate me-1"></i> Refresh
+    </button>
+</div>
+{% elif not api_orders_platform %}
+<div class="text-center text-muted py-3 small">
+    No Shopify or WooCommerce API configured for this business.
+</div>
+{% endif %}

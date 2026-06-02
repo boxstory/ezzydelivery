@@ -83,6 +83,14 @@ app.conf.beat_schedule = {
             'max_sleep': 8,
         },
     },
+
+    # Drain the address-verification queue: sends rate-limited WhatsApp
+    # verify-link messages for orders enqueued by the auto-import stage.
+    # Rate per tick: WAHA_VERIFY_SEND_RATE (default 20).
+    'whatsapp-drain-verification-queue': {
+        'task': 'whatsapp.tasks.drain_verification_queue',
+        'schedule': 60.0,
+    },
 }
 
 # Task routing

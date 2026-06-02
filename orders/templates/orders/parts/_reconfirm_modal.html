@@ -1,0 +1,66 @@
+<!-- Reconfirm Comment Modal (shared between mobile orders pages) -->
+<div class="reconfirm-modal" id="reconfirm_modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="reconfirm-modal__backdrop" data-reconfirm-close></div>
+  <div class="reconfirm-modal__sheet">
+    <div class="reconfirm-modal__header">
+      <span class="reconfirm-modal__title">
+        <i class="fas fa-check-double me-2"></i>Reconfirm Order
+      </span>
+      <button type="button" class="reconfirm-modal__close" data-reconfirm-close aria-label="Close">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+    <div class="reconfirm-modal__body">
+      <p class="reconfirm-modal__subtitle">Add a note about this reconfirmation (optional but recommended).</p>
+      <textarea id="reconfirm_modal_comment"
+                class="form-control reconfirm-modal__textarea"
+                rows="3"
+                placeholder="e.g. Customer confirmed delivery tomorrow 3pm"></textarea>
+    </div>
+    <div class="reconfirm-modal__footer">
+      <button type="button" class="btn btn-light reconfirm-modal__btn" data-reconfirm-close>Cancel</button>
+      <button type="button" class="btn btn-primary reconfirm-modal__btn reconfirm-modal__btn--submit" id="reconfirm_modal_submit">
+        <i class="fas fa-check me-1"></i>Confirm
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var modal = document.getElementById('reconfirm_modal');
+  if (!modal) return;
+  var commentEl = document.getElementById('reconfirm_modal_comment');
+  var submitBtn = document.getElementById('reconfirm_modal_submit');
+  var pendingCb = null;
+
+  function open(cb) {
+    pendingCb = cb;
+    commentEl.value = '';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(function() { commentEl.focus(); }, 50);
+  }
+  function close() {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    pendingCb = null;
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fas fa-check me-1"></i>Confirm';
+  }
+
+  modal.addEventListener('click', function(e) {
+    if (e.target.closest('[data-reconfirm-close]')) close();
+  });
+
+  submitBtn.addEventListener('click', function() {
+    if (!pendingCb) return;
+    var comment = commentEl.value.trim();
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+    Promise.resolve(pendingCb(comment)).then(close).catch(close);
+  });
+
+  window.openReconfirmModal = open;
+})();
+</script>

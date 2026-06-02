@@ -1,0 +1,44 @@
+{% load workforce_tags %}
+{% comment %}
+Workforce sidebar — leaf nav-link partial.
+
+Required:
+  id            -- element id for the <a>
+  url           -- href value
+  label         -- visible text
+Optional:
+  icon          -- full Font Awesome classes (default "fa-solid fa-circle")
+  active_names  -- comma-separated url_name list that activates this link.
+                   Exact membership match via the in_csv filter.
+  is_active     -- pre-computed boolean. Use when active_names can't express
+                   the condition (e.g. requires app_name check). Overrides
+                   active_names match when truthy.
+  badge_var     -- value rendered inside the count badge
+  badge_default_zero -- if truthy, badge always renders (uses "0" when badge_var is empty)
+  badge_key     -- data-badge attribute on the count badge
+  error_pill    -- truthy value (e.g. a list) shows the warning pill
+  error_pill_key   -- data-badge on the warning pill
+  error_pill_title -- title/tooltip on the warning pill
+{% endcomment %}
+{% with active=active_names|default:"" %}
+<li class="nav-item{% if is_active or request.resolver_match.url_name|in_csv:active %} active{% endif %}">
+  <a id="{{ id }}"
+     href="{{ url }}"
+     class="nav-link btn{% if badge_var or badge_default_zero or error_pill %} wf-sidebar__link--with-badge{% endif %}{% if is_active or request.resolver_match.url_name|in_csv:active %} active{% endif %}">
+    <i class="{{ icon|default:'fa-solid fa-circle' }} me-2"></i>
+    <span class="wf-sidebar__label">{{ label }}</span>
+    {% if error_pill %}
+      <span class="badge wf-sidebar__badge wf-sidebar__badge--danger"
+            {% if error_pill_title %}title="{{ error_pill_title }}"{% endif %}
+            {% if error_pill_key %}data-badge="{{ error_pill_key }}"{% endif %}>
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </span>
+    {% endif %}
+    {% if badge_default_zero %}
+      <span class="badge wf-sidebar__badge"{% if badge_key %} data-badge="{{ badge_key }}"{% endif %}>{{ badge_var|default:"0" }}</span>
+    {% elif badge_var %}
+      <span class="badge wf-sidebar__badge"{% if badge_key %} data-badge="{{ badge_key }}"{% endif %}>{{ badge_var }}</span>
+    {% endif %}
+  </a>
+</li>
+{% endwith %}

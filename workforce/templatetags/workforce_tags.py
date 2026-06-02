@@ -18,3 +18,16 @@ def get_item(dictionary, key):
     if dictionary is None:
         return ''
     return dictionary.get(key, '')
+
+
+@register.filter
+def in_csv(value, csv):
+    """Membership test against a comma-separated string.
+
+    Why: the sidebar partials need exact url_name matching against a list of
+    names. The default template `in` does substring matching on strings, which
+    falsely matches e.g. 'temp_orders' inside 'temp_orders_by_date'.
+    """
+    if not value or not csv:
+        return False
+    return value in {name.strip() for name in csv.split(',')}

@@ -51,21 +51,65 @@ QATAR_PATTERNS = {
     ],
 }
 
-# Google Maps link patterns — extract lat/lng from various URL formats
+# Google Maps link patterns — extract lat/lng from various URL formats.
+# Order matters: marker/destination coords first, view-center (@) last,
+# because Google Maps URLs often pan the view away from the actual pin.
 GOOGLE_MAPS_PATTERNS = [
+    # /data=!3d{lat}!4d{lng} — the actual place marker (highest priority)
+    r'!3d([-\d.]+)!4d([-\d.]+)',
     # https://maps.google.com/?q=25.3548,51.4218
     r'maps\.google\.com/?\?[^"\s]*q=([-\d.]+),([-\d.]+)',
     # https://www.google.com/maps?q=25.3548,51.4218
     r'google\.com/maps\?[^"\s]*q=([-\d.]+),([-\d.]+)',
-    # https://www.google.com/maps/place/.../@25.3548,51.4218,17z
-    r'google\.com/maps/[^"\s]*@([-\d.]+),([-\d.]+)',
-    # https://maps.app.goo.gl/... (short links — can't extract coords, but detect presence)
-    # https://goo.gl/maps/...
     # https://www.google.com/maps/search/25.3548,51.4218
     r'google\.com/maps/search/([-\d.]+),([-\d.]+)',
     # Plain Google Maps with ll= parameter
     r'maps\.google\.com[^"\s]*ll=([-\d.]+),([-\d.]+)',
+    # https://www.google.com/maps/place/.../@25.3548,51.4218,17z
+    # NOTE: this is the view center, not the marker — keep last.
+    r'google\.com/maps/[^"\s]*@([-\d.]+),([-\d.]+)',
 ]
+
+# DMS coordinates inside /maps/place/<title>/ segment, e.g.
+# /place/25%C2%B012'22.3%22N+51%C2%B022'35.4%22E/  ->  25°12'22.3"N 51°22'35.4"E
+# Allows the degree symbol to appear url-encoded (%C2%B0) or literal (°),
+# and quotes to be either ASCII (' ") or url-encoded (%22).
+DMS_PLACE_PATTERN = (
+    r'/maps/place/'
+    r'(\d{1,3})(?:%C2%B0|°)'                  # degrees lat
+    r'(\d{1,2})'                              # minutes lat
+    r'(?:%E2%80%B2|%27|\'|′)?'                # optional minute mark (incl. %27)
+    r'([\d.]+)'                               # seconds lat
+    r'(?:%E2%80%B3|%22|"|″)?'                 # optional second mark (incl. %22)
+    r'([NS])'
+    r'(?:%20|\+|\s)+'                         # separator (space, +, or %20)
+    r'(\d{1,3})(?:%C2%B0|°)'                  # degrees lng
+    r'(\d{1,2})'                              # minutes lng
+    r'(?:%E2%80%B2|%27|\'|′)?'
+    r'([\d.]+)'
+    r'(?:%E2%80%B3|%22|"|″)?'
+    r'([EW])'
+)
+
+
+def _dms_to_decimal(deg: str, minutes: str, seconds: str, hemi: str) -> float:
+    val = float(deg) + float(minutes) / 60.0 + float(seconds) / 3600.0
+    if hemi.upper() in ('S', 'W'):
+        val = -val
+    return val
+
+
+def _extract_dms_from_place(text: str):
+    """Pull DMS coords out of a /maps/place/<DMS>/ segment. Returns (lat, lng) or None."""
+    match = re.search(DMS_PLACE_PATTERN, text, re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        lat = _dms_to_decimal(match.group(1), match.group(2), match.group(3), match.group(4))
+        lng = _dms_to_decimal(match.group(5), match.group(6), match.group(7), match.group(8))
+        return lat, lng
+    except (ValueError, IndexError):
+        return None
 
 # Raw lat/lng patterns in text (Qatar region: lat ~24-27, lng ~50-52)
 RAW_COORDS_PATTERNS = [
@@ -84,17 +128,26 @@ def extract_coords_from_text(text: str):
     if not text:
         return None, None, None, None
 
-    # 1. Try Google Maps links
+    link_match = re.search(GOOGLE_LINK_PATTERN, text, re.IGNORECASE)
+    link = link_match.group(1) if link_match else None
+
+    # 1. Try Google Maps URL coordinate patterns (marker first, view-center last).
+    #    !3d!4d wins over @ because the latter is the camera position.
     for pattern in GOOGLE_MAPS_PATTERNS:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             lat, lng = float(match.group(1)), float(match.group(2))
             # Validate Qatar region
             if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
-                # Extract full link
-                link_match = re.search(GOOGLE_LINK_PATTERN, text, re.IGNORECASE)
-                link = link_match.group(1) if link_match else None
                 return lat, lng, 'google_maps', link
+
+    # 2. DMS coordinates inside /maps/place/<DMS>/ — used when the URL has the
+    #    place title in DMS form but no !3d!4d data segment.
+    dms = _extract_dms_from_place(text)
+    if dms:
+        lat, lng = dms
+        if 24.0 <= lat <= 27.0 and 50.0 <= lng <= 52.5:
+            return lat, lng, 'google_maps', link
 
     # 2. Try raw coordinates
     for pattern in RAW_COORDS_PATTERNS:

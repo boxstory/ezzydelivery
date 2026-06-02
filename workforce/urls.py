@@ -175,6 +175,7 @@ urlpatterns = [
     path('fleet/recalculate-cod-balances/', workforce_views.recalculate_cod_balances, name='recalculate_cod_balances'),
     path('fleet/transactions/<int:txn_id>/cod-details/', workforce_views.fleet_transaction_cod_details, name='fleet_transaction_cod_details'),
     path('fleet/transactions/<int:txn_id>/update-status/', workforce_views.fleet_transaction_update_status, name='fleet_transaction_update_status'),
+    path('fleet/tasks/<int:task_id>/cod-correct/', workforce_views.fleet_task_cod_correct, name='fleet_task_cod_correct'),
 
     # COD Settlement Report URLs
     path('fleet/cod-settlement/', workforce_views.cod_settlement_report, name='cod_settlement_report'),
@@ -218,7 +219,6 @@ urlpatterns = [
 
     # Quick Links URLs
     path('reports/', workforce_views.staff_reports, name='staff_reports'),
-    path('contacts/', workforce_views.staff_contacts, name='staff_contacts'),
 
     # Workflow guide
     path('workflow-guide/', workforce_views.workflow_guide, name='workflow_guide'),
@@ -292,8 +292,15 @@ urlpatterns = [
     path('orders/temp/preview/', workforce_views.temp_orders_preview, name='temp_orders_preview'),
     path('orders/temp/transfer/', workforce_views.temp_orders_transfer, name='temp_orders_transfer'),
     path('orders/temp/auto-import/', workforce_views.temp_orders_auto_import, name='temp_orders_auto_import'),
+    path('orders/temp/auto-stages/', workforce_views.temp_auto_stages, name='temp_auto_stages'),
+    path('orders/temp/auto-stages/save/', workforce_views.temp_auto_stages_save, name='temp_auto_stages_save'),
+    path('orders/temp/auto-stages/get/', workforce_views.temp_auto_stages_get, name='temp_auto_stages_get'),
+    path('orders/temp/verify-queue/', workforce_views.temp_verify_queue, name='temp_verify_queue'),
+    path('orders/temp/verify-queue/<int:job_id>/action/', workforce_views.temp_verify_queue_action, name='temp_verify_queue_action'),
+    path('orders/temp/verify-queue/toggle-messaging/', workforce_views.temp_verify_queue_toggle_messaging, name='temp_verify_queue_toggle_messaging'),
     path('orders/temp/delete/', workforce_views.temp_orders_delete, name='temp_orders_delete'),
     path('orders/temp/resync/', workforce_views.temp_orders_resync, name='temp_orders_resync'),
+    path('orders/<int:order_id>/autoflow-status/', workforce_views.order_autoflow_status, name='order_autoflow_status'),
     path('orders/temp/public-links/', workforce_views.public_link_sources, name='public_link_sources'),
     path('public-link-sources/', workforce_views.public_link_sources_page, name='public_link_sources_page'),
     path('orders/temp/public-links/<int:source_id>/delete/', workforce_views.public_link_source_delete, name='public_link_source_delete'),

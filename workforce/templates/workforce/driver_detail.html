@@ -137,6 +137,10 @@
         <i class="fa-solid fa-folder-open"></i> Documents
         <span class="wdd__tabs__count">{{ documents|length }}</span>
     </button>
+    <button class="wdd__tabs__btn" data-tab="zones" role="tab" aria-selected="false">
+        <i class="fa-solid fa-map-location-dot"></i> Zones &amp; Notify
+        <span class="wdd__tabs__count">{{ preferred_zone_ids|length }}</span>
+    </button>
     <button class="wdd__tabs__btn" data-tab="settings" role="tab" aria-selected="false">
         <i class="fa-solid fa-gear"></i> Settings
     </button>
@@ -730,6 +734,87 @@
     </div>
 </div>
 
+<!-- Tab: Zones & Notify -->
+<div id="panel-zones" class="wdd__panel" role="tabpanel">
+    <div class="wdd__card" style="max-width:900px;">
+        <div class="wdd__card__header">
+            <i class="fa-solid fa-map-location-dot"></i> Preferred Zone Groups &amp; Notifications
+        </div>
+        <div class="wdd__card__body">
+            <form id="workforce_driver_detail_form_zones" method="POST"
+                  action="{% url 'workforce:driver_detail' driver.driver_id %}">
+                {% csrf_token %}
+                <input type="hidden" name="zones_form" value="1">
+
+                <div class="wdd__form-group wdd__form-group--full mb-3">
+                    <label class="wdd__form-label d-flex align-items-center gap-2">
+                        <input type="checkbox" name="to_be_notified" value="1"
+                            {% if driver.to_be_notified %}checked{% endif %}
+                            class="form-check-input m-0">
+                        <i class="fa-solid fa-bell"></i> Receive task notifications
+                    </label>
+                    <small class="wdd__form-help">
+                        When ticked, this driver is included in AutoFlow broadcasts (recipient types
+                        <code>all_active_drivers</code>, <code>available_drivers</code>, <code>zone_drivers</code>).
+                        Untick to silence without changing their status or availability.
+                    </small>
+                </div>
+
+                <div class="wdd__form-group wdd__form-group--full">
+                    <label class="wdd__form-label">
+                        <i class="fa-solid fa-layer-group"></i> Preferred Zone Groups
+                    </label>
+                    <small class="wdd__form-help d-block mb-2">
+                        Pick the wide areas this driver wants to cover. Used by the
+                        <code>zone_drivers</code> AutoFlow recipient and by dispatch suggestions.
+                    </small>
+                    {% if all_zone_groups %}
+                    <div class="row g-2">
+                        {% for zg in all_zone_groups %}
+                        <div class="col-12 col-md-6">
+                            <label class="d-flex align-items-start gap-2 p-2 border rounded
+                                   {% if zg.id in preferred_zone_ids %}border-primary bg-light{% endif %}"
+                                   style="cursor:pointer;">
+                                <input type="checkbox" name="preferred_zone_groups" value="{{ zg.id }}"
+                                    {% if zg.id in preferred_zone_ids %}checked{% endif %}
+                                    class="form-check-input mt-1">
+                                <span>
+                                    <span class="fw-semibold">{{ zg.name }}</span>
+                                    <span class="badge bg-light text-dark border ms-1" style="font-size:0.65rem">
+                                        {{ zg.zone_count }} zone{{ zg.zone_count|pluralize }}
+                                    </span>
+                                    {% if zg.zone_numbers_display %}
+                                    <span class="d-block text-muted small mt-1">
+                                        Zones: {{ zg.zone_numbers_display }}
+                                    </span>
+                                    {% endif %}
+                                    {% if zg.description %}
+                                    <span class="d-block text-muted small">{{ zg.description }}</span>
+                                    {% endif %}
+                                </span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-light border small mb-0">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        No active zone groups configured yet. Add some in
+                        <a href="/admin/delivery/zonegroup/" target="_blank">Django admin → Zone Groups</a>.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="wdd__form-actions mt-3">
+                    <button type="submit" class="wdd__btn wdd__btn--primary">
+                        <i class="fa-solid fa-save"></i> Save Zones &amp; Notify
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Tab: Settings -->
 <div id="panel-settings" class="wdd__panel" role="tabpanel">
     <div class="wdd__card" style="max-width:700px;">
@@ -890,34 +975,48 @@ docModal.addEventListener('click', function(e) { if (e.target === docModal) clos
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && docModal.classList.contains('show')) closeDocModal(); });
 
 // Form submit
-document.getElementById('workforce_driver_detail_form_update').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var btn = this.querySelector('button[type="submit"]');
-    var msg = document.getElementById('updateMessage');
+function _submitDriverForm(form, btn, msg, doneLabel) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-
     var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]').value;
-
     fetch('{% url "workforce:driver_detail" driver.driver_id %}', {
         method: 'POST',
-        body: new FormData(this),
+        body: new FormData(form),
         headers: { 'X-CSRFToken': csrfToken }
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        msg.className = 'wdd__toast show ' + (data.success ? 'success' : 'error');
-        msg.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
+        if (msg) {
+            msg.className = 'wdd__toast show ' + (data.success ? 'success' : 'error');
+            msg.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
+        }
         if (data.success) setTimeout(function() { location.reload(); }, 1500);
-        else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes'; }
+        else { btn.disabled = false; btn.innerHTML = doneLabel; }
     })
     .catch(function() {
-        msg.className = 'wdd__toast show error';
-        msg.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
+        if (msg) {
+            msg.className = 'wdd__toast show error';
+            msg.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
+        }
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
+        btn.innerHTML = doneLabel;
     });
+}
+
+document.getElementById('workforce_driver_detail_form_update').addEventListener('submit', function(e) {
+    e.preventDefault();
+    _submitDriverForm(this, this.querySelector('button[type="submit"]'), document.getElementById('updateMessage'),
+        '<i class="fa-solid fa-save"></i> Save Changes');
 });
+
+var zonesForm = document.getElementById('workforce_driver_detail_form_zones');
+if (zonesForm) {
+    zonesForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        _submitDriverForm(this, this.querySelector('button[type="submit"]'), document.getElementById('updateMessage'),
+            '<i class="fa-solid fa-save"></i> Save Zones &amp; Notify');
+    });
+}
 
 // Request Status Change modal (staff only, non-superadmin)
 (function() {
