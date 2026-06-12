@@ -547,7 +547,8 @@ def send_admin_inquiry_notification(inquiry):
     Returns:
         dict: Response with success status
     """
-    # Build notification message with inquiry details
+    inquiry_url = f"https://ezzydelivery.qa/3pl/inquiry/{inquiry.id}/preview/"
+
     message = f"""📩 *NEW 3PL INQUIRY RECEIVED*
 
 *Company:* {inquiry.business_name}
@@ -566,7 +567,8 @@ def send_admin_inquiry_notification(inquiry):
 *Submitted:* {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
 *Inquiry ID:* {inquiry.id}
 
-👉 Login to dashboard to view full details
+👉 View inquiry details:
+{inquiry_url}
 """
 
     return send_whatsapp_message_api('97466451589', message)

@@ -23,6 +23,7 @@ urlpatterns = [
     path('3pl/pricing/', webpages_views.delivery_pricing, name='delivery_pricing'),
     path('3pl/inquiry/', webpages_views.delivery_inquiry, name='delivery_inquiry'),
     path('3pl/inquiry/success/', webpages_views.inquiry_success, name='inquiry_success'),
+    path('3pl/inquiry/<int:inquiry_id>/preview/', webpages_views.inquiry_preview, name='inquiry_preview'),
     path('affiliate/', webpages_views.affiliate, name='affiliate_marketing'),
 
 

@@ -306,6 +306,14 @@ def inquiry_success(request):
     return render(request, 'webpages/inquiry_success.html', {'seo': meta})
 
 
+@login_required
+def inquiry_preview(request, inquiry_id):
+    """Read-only plain-page preview of a PricingEnquiry — linked from WhatsApp admin notifications."""
+    from django.shortcuts import get_object_or_404
+    inquiry = get_object_or_404(PricingEnquiry, pk=inquiry_id)
+    return render(request, 'webpages/inquiry_preview.html', {'inquiry': inquiry})
+
+
 def about(request):
     meta = SEOMetadata.get_about_meta()
     brands = list(business_models.Business.objects.all())
