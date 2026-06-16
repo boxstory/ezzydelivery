@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}P2P Delivery Price Calculator — Qatar | EzzyDelivery{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'webpages/css/p2p-pricing.css' %}?v=20260615i">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="p2p">
+
+    <!-- Hero -->
+    <section class="p2p__hero">
+        <div class="p2p__hero-inner">
+            <span class="p2p__hero-chip">
+                <i class="fa-solid fa-route"></i> One-Time Delivery
+            </span>
+            <h1 class="p2p__hero-title">P2P Delivery Price Calculator</h1>
+            <p class="p2p__hero-desc">
+                Get an instant estimate for your one-time delivery across Qatar.<br class="d-none d-md-inline">
+                Type a locality, or paste a link directly from Google Maps or Apple Maps.
+            </p>
+        </div>
+    </section>
+
+    <!-- Calculator -->
+    <section class="p2p__calc">
+        <div class="p2p__calc-card">
+
+            <!-- Step 1: Where to? -->
+            <div class="p2p__step">
+                <div class="p2p__step-head">
+                    <span class="p2p__step-num">1</span>
+                    <div>
+                        <h2 class="p2p__step-title">Where to?</h2>
+                        <p class="p2p__step-sub">Pickup and drop-off areas in Qatar</p>
+                    </div>
+                </div>
+
+                <div class="p2p__loc-row">
+
+                    <!-- FROM -->
+                    <div class="p2p__loc-card p2p__loc-card--from">
+                        <div class="p2p__loc-label">
+                            <i class="fa-solid fa-circle-dot"></i> From
+                        </div>
+                        <div class="p2p__loc-field">
+                            <input id="p2p_from_input"
+                                   class="p2p__loc-input"
+                                   type="text"
+                                   placeholder="Area name or paste map link…"
+                                   autocomplete="off"
+                                   spellcheck="false">
+                            <button id="p2p_from_clear" class="p2p__loc-clear d-none" aria-label="Clear from location">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div id="p2p_from_dropdown" class="p2p__dropdown d-none"></div>
+                        <div id="p2p_from_resolved" class="p2p__resolved d-none"></div>
+                    </div>
+
+                    <!-- Swap -->
+                    <button id="p2p_swap" class="p2p__swap" aria-label="Swap from and to locations">
+                        <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                    </button>
+
+                    <!-- TO -->
+                    <div class="p2p__loc-card p2p__loc-card--to">
+                        <div class="p2p__loc-label">
+                            <i class="fa-solid fa-location-dot"></i> To
+                        </div>
+                        <div class="p2p__loc-field">
+                            <input id="p2p_to_input"
+                                   class="p2p__loc-input"
+                                   type="text"
+                                   placeholder="Area name or paste map link…"
+                                   autocomplete="off"
+                                   spellcheck="false">
+                            <button id="p2p_to_clear" class="p2p__loc-clear d-none" aria-label="Clear to location">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div id="p2p_to_dropdown" class="p2p__dropdown d-none"></div>
+                        <div id="p2p_to_resolved" class="p2p__resolved d-none"></div>
+                    </div>
+
+                </div>
+
+                <!-- Popular Zone Chips -->
+                <div class="p2p__popular-wrap">
+                    <span class="p2p__popular-label">Popular areas</span>
+                    <div id="p2p_popular_chips" class="p2p__popular"></div>
+                </div>
+
+                <p class="p2p__hint">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    Tip: paste a Google Maps or Apple Maps share link directly into either box
+                </p>
+
+            </div>
+
+            <div class="p2p__step-divider"></div>
+
+            <!-- Step 2: Category -->
+            <div class="p2p__step">
+                <div class="p2p__step-head">
+                    <span class="p2p__step-num">2</span>
+                    <div>
+                        <h2 class="p2p__step-title">What are you sending?</h2>
+                        <p class="p2p__step-sub">Optional — helps us prepare for your delivery</p>
+                    </div>
+                </div>
+
+                <div id="p2p_cat_chips" class="p2p__cat-chips"></div>
+
+                <div class="p2p__cat-search-wrap">
+                    <div class="p2p__cat-search-field">
+                        <i class="fa-solid fa-magnifying-glass p2p__cat-search-icon"></i>
+                        <input id="p2p_cat_search"
+                               class="p2p__cat-search"
+                               type="text"
+                               placeholder="Search other categories…"
+                               autocomplete="off">
+                        <button id="p2p_cat_clear" class="p2p__cat-clear d-none" aria-label="Clear category">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div id="p2p_cat_dropdown" class="p2p__cat-dropdown d-none"></div>
+                </div>
+            </div>
+
+            <div class="p2p__step-divider"></div>
+
+            <!-- Step 3: Package Size -->
+            <div class="p2p__step">
+                <div class="p2p__step-head">
+                    <span class="p2p__step-num">3</span>
+                    <div>
+                        <h2 class="p2p__step-title">Package size</h2>
+                        <p class="p2p__step-sub">Optional — approximate dimensions &amp; weight</p>
+                    </div>
+                </div>
+
+                <div class="p2p__sizes">
+                    <button class="p2p__size-card" data-size="xs" data-label="Envelope / Docs">
+                        <span class="p2p__size-box p2p__size-box--xs"></span>
+                        <span class="p2p__size-tag">XS</span>
+                        <span class="p2p__size-name">Envelope</span>
+                        <span class="p2p__size-weight">≤ 0.5 kg</span>
+                    </button>
+                    <button class="p2p__size-card" data-size="s" data-label="Small Box">
+                        <span class="p2p__size-box p2p__size-box--s"></span>
+                        <span class="p2p__size-tag">S</span>
+                        <span class="p2p__size-name">Small box</span>
+                        <span class="p2p__size-weight">≤ 3 kg</span>
+                    </button>
+                    <button class="p2p__size-card" data-size="m" data-label="Medium Box">
+                        <span class="p2p__size-box p2p__size-box--m"></span>
+                        <span class="p2p__size-tag">M</span>
+                        <span class="p2p__size-name">Medium box</span>
+                        <span class="p2p__size-weight">≤ 10 kg</span>
+                    </button>
+                    <button class="p2p__size-card" data-size="l" data-label="Large Box">
+                        <span class="p2p__size-box p2p__size-box--l"></span>
+                        <span class="p2p__size-tag">L</span>
+                        <span class="p2p__size-name">Large box</span>
+                        <span class="p2p__size-weight">≤ 25 kg</span>
+                    </button>
+                    <button class="p2p__size-card" data-size="xl" data-label="Bulky / Extra Large">
+                        <span class="p2p__size-box p2p__size-box--xl"></span>
+                        <span class="p2p__size-tag">XL</span>
+                        <span class="p2p__size-name">Bulky item</span>
+                        <span class="p2p__size-weight">25 kg+</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p2p__step-divider"></div>
+
+            <!-- Step 4: Vehicle Required -->
+            <div class="p2p__step">
+                <div class="p2p__step-head">
+                    <span class="p2p__step-num">4</span>
+                    <div>
+                        <h2 class="p2p__step-title">Vehicle required</h2>
+                        <p class="p2p__step-sub">Optional — select based on your item size</p>
+                    </div>
+                </div>
+
+                <div class="p2p__vehicles">
+                    <button class="p2p__vehicle-card" data-vehicle="bike" data-label="Motorcycle">
+                        <i class="fa-solid fa-motorcycle p2p__vehicle-icon"></i>
+                        <span class="p2p__vehicle-name">Bike</span>
+                        <span class="p2p__vehicle-cap">Docs · XS–S</span>
+                    </button>
+                    <button class="p2p__vehicle-card" data-vehicle="car" data-label="Car">
+                        <i class="fa-solid fa-car p2p__vehicle-icon"></i>
+                        <span class="p2p__vehicle-name">Car</span>
+                        <span class="p2p__vehicle-cap">S–M · ≤ 20 kg</span>
+                    </button>
+                    <button class="p2p__vehicle-card" data-vehicle="suv" data-label="SUV / Pickup">
+                        <i class="fa-solid fa-truck-pickup p2p__vehicle-icon"></i>
+                        <span class="p2p__vehicle-name">SUV / Pickup</span>
+                        <span class="p2p__vehicle-cap">M–L · ≤ 60 kg</span>
+                    </button>
+                    <button class="p2p__vehicle-card" data-vehicle="van" data-label="Van">
+                        <i class="fa-solid fa-van-shuttle p2p__vehicle-icon"></i>
+                        <span class="p2p__vehicle-name">Van</span>
+                        <span class="p2p__vehicle-cap">L–XL · Bulky</span>
+                    </button>
+                    <button class="p2p__vehicle-card" data-vehicle="truck" data-label="Truck">
+                        <i class="fa-solid fa-truck p2p__vehicle-icon"></i>
+                        <span class="p2p__vehicle-name">Truck</span>
+                        <span class="p2p__vehicle-cap">XL · Heavy cargo</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Result (shown after locations + package size selected) -->
+            <div id="p2p_result" class="p2p__result d-none">
+
+                <div id="p2p_result_meta" class="p2p__result-meta d-none">
+                    <span id="p2p_result_category" class="p2p__result-meta-item"></span>
+                    <span id="p2p_result_size" class="p2p__result-meta-item"></span>
+                </div>
+
+                <div class="p2p__result-route">
+                    <span id="p2p_result_from" class="p2p__result-area"></span>
+                    <i class="fa-solid fa-arrow-right p2p__result-arrow"></i>
+                    <span id="p2p_result_to" class="p2p__result-area"></span>
+                    <span class="p2p__result-dist-badge">
+                        <i class="fa-solid fa-road"></i>
+                        <span id="p2p_result_km_low"></span>–<span id="p2p_result_km_high"></span> km
+                    </span>
+                </div>
+
+                <!-- Auto-price mode: XS/S with Bike or Car -->
+                <div id="p2p_price_section">
+                    <div class="p2p__result-price-wrap">
+                        <span class="p2p__result-price__label">Estimated Price</span>
+                        <span class="p2p__result-price__amount">
+                            <span id="p2p_result_price"></span>
+                            <span class="p2p__result-price__currency">QR</span>
+                        </span>
+                        <span class="p2p__result-price__note">one-time delivery · Qatar</span>
+                    </div>
+                    <div class="p2p__result-actions">
+                        <a id="p2p_wa_btn" href="#" class="p2p__btn p2p__btn--whatsapp" target="_blank" rel="noopener noreferrer">
+                            <i class="fa-brands fa-whatsapp"></i> Book on WhatsApp
+                        </a>
+                    </div>
+                    <p class="p2p__result-disclaimer">
+                        Estimate only — final price confirmed on booking. May vary for large or heavy items.
+                    </p>
+                </div>
+
+                <!-- Custom quote mode: M/L/XL or SUV/Van/Truck -->
+                <div id="p2p_quote_section" class="p2p__quote-section d-none">
+                    <div class="p2p__quote-msg">
+                        <i class="fa-brands fa-whatsapp p2p__quote-icon"></i>
+                        <div>
+                            <strong class="p2p__quote-title">Send us a message for the price</strong>
+                            <p class="p2p__quote-sub">Large items or special vehicles need a custom quote. Message us on WhatsApp and we'll confirm your price right away.</p>
+                        </div>
+                    </div>
+                    <div class="p2p__result-actions">
+                        <a id="p2p_wa_quote_btn" href="#" class="p2p__btn p2p__btn--whatsapp" target="_blank" rel="noopener noreferrer">
+                            <i class="fa-brands fa-whatsapp"></i> Get Price on WhatsApp
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Pricing Tiers -->
+    <section class="p2p__tiers">
+        <div class="p2p__tiers-inner">
+            <h2 class="p2p__tiers-title">Pricing Tiers</h2>
+            <div class="p2p__tiers-grid">
+                <div class="p2p__tier">
+                    <span class="p2p__tier-range">Up to 10 km</span>
+                    <span class="p2p__tier-price">25 QR</span>
+                </div>
+                <div class="p2p__tier">
+                    <span class="p2p__tier-range">10 – 20 km</span>
+                    <span class="p2p__tier-price">35 QR</span>
+                </div>
+                <div class="p2p__tier">
+                    <span class="p2p__tier-range">20 – 30 km</span>
+                    <span class="p2p__tier-price">40 QR</span>
+                </div>
+                <div class="p2p__tier">
+                    <span class="p2p__tier-range">Beyond 30 km</span>
+                    <span class="p2p__tier-price">55 QR</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+{% csrf_token %}
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+window.P2P_LOCALITIES = {{ localities_json|safe }};
+window.P2P_POPULAR    = {{ popular_json|safe }};
+</script>
+<script src="{% static 'webpages/js/p2p-calculator.js' %}?v=20260615j"></script>
+{% endblock extra_js %}

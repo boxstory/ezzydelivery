@@ -119,6 +119,7 @@ urlpatterns = [
 
     # Reports & CSV Export
     path('reports/', business_views.reports_dashboard, name='reports_dashboard'),
+    path('reports/stats/', business_views.reports_stats_partial, name='reports_stats_partial'),
     path('reports/orders/csv/', business_views.export_orders_csv, name='export_orders_csv'),
     path('reports/cod/csv/', business_views.export_cod_csv, name='export_cod_csv'),
     path('reports/performance/csv/', business_views.export_performance_csv, name='export_performance_csv'),

@@ -269,3 +269,15 @@ def driver_pending_tasks(request):
         return {'pending_tasks_count': count}
     except Exception:
         return {'pending_tasks_count': 0}
+
+
+def google_one_tap(request):
+    # Purpose: Expose Google One Tap client_id to public templates (empty string when logged in)
+    if request.user.is_authenticated:
+        return {'GOOGLE_ONE_TAP_CLIENT_ID': ''}
+    try:
+        from allauth.socialaccount.models import SocialApp
+        app = SocialApp.objects.only('client_id').get(provider='google')
+        return {'GOOGLE_ONE_TAP_CLIENT_ID': app.client_id}
+    except Exception:
+        return {'GOOGLE_ONE_TAP_CLIENT_ID': ''}

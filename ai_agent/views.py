@@ -143,7 +143,7 @@ class ChatStreamAPIView(APIView):
                 user=request.user,
                 tools_enabled=True
             ):
-                yield f"data: {json.dumps(chunk)}\n\n"
+                yield f"data: {json.dumps(chunk, default=str)}\n\n"
 
         response = StreamingHttpResponse(
             generate(),

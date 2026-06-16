@@ -106,6 +106,7 @@ class BaseTool(ABC):
 
         Override this method for custom validation logic.
         """
+        params = params or {}
         # Basic required field check
         required = self.parameters_schema.get('required', [])
         for field in required:

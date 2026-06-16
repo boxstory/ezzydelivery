@@ -36,11 +36,12 @@
             {% elif profile.is_driver %}
                 <li class="cnav__item breadcrumb-item">
                     <a href="{% url 'core:driver_register' %}"
-                       class="cnav__link {% if '/dashboard/' in request.path %}cnav__link--active{% endif %}">
+                       class="cnav__link {% if '/driver/register/' in request.path %}cnav__link--active{% endif %}">
                         <i class="fa-solid fa-id-card me-1"></i>
                         Driver Info
                     </a>
                 </li>
+                {% if profile.verification_status == 'verified' %}
                 <li class="cnav__item breadcrumb-item">
                     <a href="{% url 'fleet:vehicle_add' %}"
                        class="cnav__link {% if '/vehicle_add/' in request.path %}cnav__link--active{% endif %}">
@@ -55,6 +56,7 @@
                         Documents
                     </a>
                 </li>
+                {% endif %}
             {% endif %}
         </ol>
     </nav>

@@ -1,0 +1,542 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/ai-config.css' %}?v=5" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+
+{% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-success alert-dismissible fade show mx-3 mt-3" role="alert">
+    {{ msg }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endif %}
+
+<!-- Header -->
+<header class="aic__hero d-flex align-items-center gap-3">
+  <div>
+    <h2><i class="fa-solid fa-microchip me-1" aria-hidden="true"></i>AI Agent Config</h2>
+    <span class="aic__hero__subtitle">Manage AI providers, models, budgets, and API credentials</span>
+  </div>
+  <div class="ms-auto">
+    {% if agent_status.available %}
+      <span class="aic__status-badge aic__status-badge--ok">
+        <i class="fa-solid fa-circle-check"></i> Online
+      </span>
+    {% else %}
+      <span class="aic__status-badge aic__status-badge--err">
+        <i class="fa-solid fa-circle-xmark"></i> Offline
+      </span>
+    {% endif %}
+  </div>
+</header>
+
+<div class="col-12 p-3">
+
+  <!-- Live Stats Row -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="aic__stat-card">
+        <div class="aic__stat-card__value">{{ today_usage.calls }}</div>
+        <div class="aic__stat-card__label">API calls today</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="aic__stat-card">
+        <div class="aic__stat-card__value">${{ today_usage.cost|floatformat:4 }}</div>
+        <div class="aic__stat-card__label">Cost today</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="aic__stat-card">
+        <div class="aic__stat-card__value">${{ today_usage.month_cost|floatformat:2 }}</div>
+        <div class="aic__stat-card__label">Cost this month</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="aic__stat-card">
+        <div class="aic__stat-card__value">{{ today_usage.active_conversations }}</div>
+        <div class="aic__stat-card__label">Active conversations (24h)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Budget Progress -->
+  {% if budget_usage %}
+  <div class="card mb-4">
+    <div class="card-header"><strong>Budget Usage</strong></div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <div class="d-flex justify-content-between mb-1">
+            <small class="fw-semibold">Daily</small>
+            <small>${{ budget_usage.daily_used|floatformat:3 }} / ${{ budget_usage.daily_budget|floatformat:2 }}</small>
+          </div>
+          <div class="aic__budget-bar">
+            {% widthratio budget_usage.daily_used budget_usage.daily_budget 100 as dpct %}
+            <div class="aic__budget-bar__fill {% if dpct >= 80 %}aic__budget-bar__fill--danger{% elif dpct >= 60 %}aic__budget-bar__fill--warn{% endif %}"
+                 style="width:{{ dpct|default:0 }}%"></div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="d-flex justify-content-between mb-1">
+            <small class="fw-semibold">Monthly</small>
+            <small>${{ budget_usage.monthly_used|floatformat:2 }} / ${{ budget_usage.monthly_budget|floatformat:2 }}</small>
+          </div>
+          <div class="aic__budget-bar">
+            {% widthratio budget_usage.monthly_used budget_usage.monthly_budget 100 as mpct %}
+            <div class="aic__budget-bar__fill {% if mpct >= 80 %}aic__budget-bar__fill--danger{% elif mpct >= 60 %}aic__budget-bar__fill--warn{% endif %}"
+                 style="width:{{ mpct|default:0 }}%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="row g-3">
+
+      <!-- LEFT COLUMN -->
+      <div class="col-12 col-lg-6">
+
+        <!-- Business Dashboard AI -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-robot text-primary"></i>
+            <strong>Business Dashboard AI</strong>
+            <span class="badge bg-light text-dark border ms-auto">Chat Assistant</span>
+          </div>
+          <div class="card-body">
+            <p class="aic__section-title">Provider</p>
+            <div class="aic__provider-list mb-3" data-group="chat">
+              <label class="aic__provider-row {% if chat_provider == 'anthropic' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_CHAT_PROVIDER" value="anthropic" {% if chat_provider == 'anthropic' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--anthropic">A</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Anthropic</span>
+                  <span class="aic__provider-sub d-block">Claude Sonnet / Haiku / Opus</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if chat_provider == 'openai' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_CHAT_PROVIDER" value="openai" {% if chat_provider == 'openai' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--openai">AI</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">OpenAI</span>
+                  <span class="aic__provider-sub d-block">GPT-4o / GPT-4 Turbo</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if chat_provider == 'gemini' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_CHAT_PROVIDER" value="gemini" {% if chat_provider == 'gemini' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--gemini">G</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Google</span>
+                  <span class="aic__provider-sub d-block">Gemini 2.0 / 1.5 Pro</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if chat_provider == 'xai' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_CHAT_PROVIDER" value="xai" {% if chat_provider == 'xai' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--xai">xAI</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">xAI</span>
+                  <span class="aic__provider-sub d-block">Grok 3 / Grok 3 Mini</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if chat_provider == 'groq' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_CHAT_PROVIDER" value="groq" {% if chat_provider == 'groq' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--groq">GQ</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Groq</span>
+                  <span class="aic__provider-sub d-block">Llama 3.3 / Mixtral (Fast inference)</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+            </div>
+            <label class="form-label small fw-semibold" for="AI_CHAT_MODEL">Model</label>
+            <select class="form-select form-select-sm" id="AI_CHAT_MODEL" name="AI_CHAT_MODEL"
+                    data-current="{{ env.AI_CHAT_MODEL|default:'' }}">
+            </select>
+          </div>
+        </div>
+
+        <!-- WhatsApp Reply AI -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-brands fa-whatsapp text-success"></i>
+            <strong>WhatsApp Reply AI</strong>
+            <span class="badge bg-light text-dark border ms-auto">Auto-reply</span>
+          </div>
+          <div class="card-body">
+            <p class="aic__section-title">Provider</p>
+            <div class="aic__provider-list mb-3" data-group="wa">
+              <label class="aic__provider-row {% if wa_provider == 'anthropic' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_WA_PROVIDER" value="anthropic" {% if wa_provider == 'anthropic' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--anthropic">A</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Anthropic</span>
+                  <span class="aic__provider-sub d-block">Claude Sonnet / Haiku / Opus</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if wa_provider == 'openai' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_WA_PROVIDER" value="openai" {% if wa_provider == 'openai' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--openai">AI</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">OpenAI</span>
+                  <span class="aic__provider-sub d-block">GPT-4o / GPT-4 Turbo</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if wa_provider == 'gemini' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_WA_PROVIDER" value="gemini" {% if wa_provider == 'gemini' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--gemini">G</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Google</span>
+                  <span class="aic__provider-sub d-block">Gemini 2.0 / 1.5 Pro</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if wa_provider == 'xai' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_WA_PROVIDER" value="xai" {% if wa_provider == 'xai' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--xai">xAI</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">xAI</span>
+                  <span class="aic__provider-sub d-block">Grok 3 / Grok 3 Mini</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+              <label class="aic__provider-row {% if wa_provider == 'groq' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_WA_PROVIDER" value="groq" {% if wa_provider == 'groq' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--groq">GQ</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Groq</span>
+                  <span class="aic__provider-sub d-block">Llama 3.3 / Mixtral (Fast inference)</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
+            </div>
+            <label class="form-label small fw-semibold" for="AI_WA_MODEL">Model</label>
+            <select class="form-select form-select-sm" id="AI_WA_MODEL" name="AI_WA_MODEL"
+                    data-current="{{ env.AI_WA_MODEL|default:'' }}">
+            </select>
+          </div>
+        </div>
+
+        <!-- Feature Flags -->
+        <div class="card mb-3">
+          <div class="card-header"><strong>Feature Flags</strong></div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <div class="fw-semibold small">AI Agent Enabled</div>
+                <div class="text-muted" style="font-size:0.78rem">Business dashboard chat assistant</div>
+              </div>
+              <select class="form-select form-select-sm w-auto" name="AI_AGENT_ENABLED">
+                <option value="True" {% if env.AI_AGENT_ENABLED != 'False' %}selected{% endif %}>Enabled</option>
+                <option value="False" {% if env.AI_AGENT_ENABLED == 'False' %}selected{% endif %}>Disabled</option>
+              </select>
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <div class="fw-semibold small">WhatsApp AI Enabled</div>
+                <div class="text-muted" style="font-size:0.78rem">AI responds to WhatsApp messages automatically</div>
+              </div>
+              <select class="form-select form-select-sm w-auto" name="AI_AGENT_WHATSAPP_ENABLED">
+                <option value="True" {% if env.AI_AGENT_WHATSAPP_ENABLED != 'False' %}selected{% endif %}>Enabled</option>
+                <option value="False" {% if env.AI_AGENT_WHATSAPP_ENABLED == 'False' %}selected{% endif %}>Disabled</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="col-12 col-lg-6">
+
+        <!-- API Keys -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-key text-warning"></i>
+            <strong>API Keys</strong>
+            <small class="text-muted ms-1">(leave blank to keep existing)</small>
+          </div>
+          <div class="card-body d-flex flex-column gap-4" id="aic-keys-body">
+
+            <div data-key-provider="anthropic">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="aic__provider-pill aic__provider-pill--anthropic">Anthropic</span>
+                {% if masked_anthropic_key %}
+                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
+                  <span class="aic__key-mask">{{ masked_anthropic_key }}</span>
+                {% else %}
+                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
+                  <span class="text-danger small">Not set</span>
+                {% endif %}
+              </div>
+              <input type="password" class="form-control form-control-sm font-monospace" name="ANTHROPIC_API_KEY"
+                     autocomplete="off" placeholder="sk-ant-api03-...">
+              <div class="form-text">console.anthropic.com → API Keys</div>
+            </div>
+
+            <div data-key-provider="openai">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="aic__provider-pill aic__provider-pill--openai">OpenAI</span>
+                {% if masked_openai_key %}
+                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
+                  <span class="aic__key-mask">{{ masked_openai_key }}</span>
+                {% else %}
+                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
+                  <span class="text-muted small">Not set</span>
+                {% endif %}
+              </div>
+              <input type="password" class="form-control form-control-sm font-monospace" name="OPENAI_API_KEY"
+                     autocomplete="off" placeholder="sk-...">
+              <div class="form-text">platform.openai.com → API Keys</div>
+            </div>
+
+            <div data-key-provider="gemini">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="aic__provider-pill aic__provider-pill--gemini">Google</span>
+                {% if masked_gemini_key %}
+                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
+                  <span class="aic__key-mask">{{ masked_gemini_key }}</span>
+                {% else %}
+                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
+                  <span class="text-muted small">Not set</span>
+                {% endif %}
+              </div>
+              <input type="password" class="form-control form-control-sm font-monospace" name="GOOGLE_AI_API_KEY"
+                     autocomplete="off" placeholder="AIza...">
+              <div class="form-text">aistudio.google.com → Get API Key</div>
+            </div>
+
+            <div data-key-provider="groq">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="aic__provider-pill aic__provider-pill--groq">Groq</span>
+                {% if masked_groq_key %}
+                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
+                  <span class="aic__key-mask">{{ masked_groq_key }}</span>
+                {% else %}
+                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
+                  <span class="text-muted small">Not set</span>
+                {% endif %}
+              </div>
+              <input type="password" class="form-control form-control-sm font-monospace" name="GROQ_API_KEY"
+                     autocomplete="off" placeholder="gsk_...">
+              <div class="form-text">console.groq.com → API Keys</div>
+            </div>
+
+            <div data-key-provider="xai">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="aic__provider-pill aic__provider-pill--xai">xAI</span>
+                {% if masked_xai_key %}
+                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
+                  <span class="aic__key-mask">{{ masked_xai_key }}</span>
+                {% else %}
+                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
+                  <span class="text-muted small">Not set</span>
+                {% endif %}
+              </div>
+              <input type="password" class="form-control form-control-sm font-monospace" name="XAI_API_KEY"
+                     autocomplete="off" placeholder="xai-...">
+              <div class="form-text">console.x.ai → API Keys</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Budget -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-wallet text-success"></i>
+            <strong>Budget Limits (USD)</strong>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label small fw-semibold" for="AI_AGENT_DAILY_BUDGET">Daily limit ($)</label>
+                <input type="number" class="form-control form-control-sm" id="AI_AGENT_DAILY_BUDGET" name="AI_AGENT_DAILY_BUDGET"
+                       value="{{ env.AI_AGENT_DAILY_BUDGET|default:'5.0' }}" min="0.1" max="1000" step="0.5">
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold" for="AI_AGENT_MONTHLY_BUDGET">Monthly limit ($)</label>
+                <input type="number" class="form-control form-control-sm" id="AI_AGENT_MONTHLY_BUDGET" name="AI_AGENT_MONTHLY_BUDGET"
+                       value="{{ env.AI_AGENT_MONTHLY_BUDGET|default:'25.0' }}" min="1" max="10000" step="1">
+              </div>
+            </div>
+            <div class="row g-3 mt-0">
+              <div class="col-6">
+                <label class="form-label small fw-semibold" for="AI_AGENT_MAX_TOKENS">Max tokens / response</label>
+                <input type="number" class="form-control form-control-sm" id="AI_AGENT_MAX_TOKENS" name="AI_AGENT_MAX_TOKENS"
+                       value="{{ env.AI_AGENT_MAX_TOKENS|default:'4096' }}" min="256" max="32000" step="256">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rate Limits -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-gauge-high"></i>
+            <strong>Rate Limits (requests / day)</strong>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label small fw-semibold" for="AI_AGENT_RATE_LIMIT_USER">Per user</label>
+                <input type="number" class="form-control form-control-sm" id="AI_AGENT_RATE_LIMIT_USER" name="AI_AGENT_RATE_LIMIT_USER"
+                       value="{{ env.AI_AGENT_RATE_LIMIT_USER|default:'50' }}" min="1" max="10000">
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold" for="AI_AGENT_RATE_LIMIT_BUSINESS">Per business</label>
+                <input type="number" class="form-control form-control-sm" id="AI_AGENT_RATE_LIMIT_BUSINESS" name="AI_AGENT_RATE_LIMIT_BUSINESS"
+                       value="{{ env.AI_AGENT_RATE_LIMIT_BUSINESS|default:'200' }}" min="1" max="10000">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert phones -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-brands fa-whatsapp text-success"></i>
+            <strong>Budget Alert Recipients</strong>
+          </div>
+          <div class="card-body">
+            <label class="form-label small fw-semibold" for="AI_AGENT_ALERT_PHONES">WhatsApp numbers (comma-separated, with country code)</label>
+            <input type="text" class="form-control form-control-sm font-monospace" id="AI_AGENT_ALERT_PHONES" name="AI_AGENT_ALERT_PHONES"
+                   value="{{ env.AI_AGENT_ALERT_PHONES|default:'' }}" placeholder="97412345678,97487654321">
+            <div class="form-text">Alerts sent when budget reaches 80% and 100%</div>
+          </div>
+        </div>
+
+        {% if not agent_status.available and agent_status.message %}
+        <div class="alert alert-danger py-2 small">
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
+          <strong>Agent offline:</strong> {{ agent_status.message }}
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- Save -->
+    <div class="d-flex gap-2 mt-2 pb-4">
+      <button type="submit" class="btn btn-primary">
+        <i class="fa-solid fa-floppy-disk me-1"></i> Save &amp; Reload Server
+      </button>
+      <a href="{% url 'workforce:auto_triggers_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+(function () {
+  const MODELS_URL = '{% url "workforce:wf_ai_models_api" %}';
+  // Fallback models used while loading or on error
+  const FALLBACK = {{ models_by_provider_json|safe }};
+  // In-memory cache per provider so switching back is instant
+  const _cache = {};
+
+  function setLoading(sel, on) {
+    sel.disabled = on;
+    if (on) {
+      sel.innerHTML = '<option>Loading…</option>';
+    }
+  }
+
+  function populateSelect(sel, models, currentVal) {
+    sel.innerHTML = '';
+    sel.disabled = false;
+    if (!models || !models.length) {
+      sel.innerHTML = '<option value="">No models found</option>';
+      return;
+    }
+    models.forEach(function (m) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.label || m.id;
+      if (m.id === currentVal) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!sel.value && sel.options.length) sel.options[0].selected = true;
+  }
+
+  function loadModels(sel, provider, currentVal) {
+    if (_cache[provider]) {
+      populateSelect(sel, _cache[provider], currentVal);
+      return;
+    }
+    setLoading(sel, true);
+    fetch(MODELS_URL + '?provider=' + encodeURIComponent(provider))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) throw new Error(data.error);
+        _cache[provider] = data.models;
+        populateSelect(sel, data.models, currentVal);
+      })
+      .catch(function (err) {
+        console.warn('Model fetch failed for', provider, err);
+        // Fall back to hardcoded list
+        const fb = FALLBACK[provider] || [];
+        populateSelect(sel, fb, currentVal);
+      });
+  }
+
+  // --- API key visibility ---
+  function getActiveProviders() {
+    const active = new Set();
+    document.querySelectorAll('.aic__provider-list input[type=radio]:checked').forEach(function (r) {
+      active.add(r.value);
+    });
+    return active;
+  }
+
+  function syncKeyVisibility() {
+    const active = getActiveProviders();
+    document.querySelectorAll('#aic-keys-body [data-key-provider]').forEach(function (el) {
+      el.style.display = active.has(el.dataset.keyProvider) ? '' : 'none';
+    });
+  }
+
+  function initGroup(groupAttr, selectId) {
+    const list = document.querySelector('.aic__provider-list[data-group="' + groupAttr + '"]');
+    const sel  = document.getElementById(selectId);
+    if (!list || !sel) return;
+
+    const initialVal      = sel.dataset.current || '';
+    const checkedRadio    = list.querySelector('input[type=radio]:checked');
+    const initialProvider = checkedRadio ? checkedRadio.value : 'anthropic';
+    loadModels(sel, initialProvider, initialVal);
+
+    list.querySelectorAll('label.aic__provider-row').forEach(function (row) {
+      row.addEventListener('click', function () {
+        list.querySelectorAll('label.aic__provider-row').forEach(function (r) {
+          r.classList.remove('aic__provider-row--active');
+        });
+        row.classList.add('aic__provider-row--active');
+        const radio = row.querySelector('input[type=radio]');
+        if (radio) radio.checked = true;
+        loadModels(sel, radio.value, '');
+        syncKeyVisibility();
+      });
+    });
+  }
+
+  initGroup('chat', 'AI_CHAT_MODEL');
+  initGroup('wa',   'AI_WA_MODEL');
+  syncKeyVisibility(); // set initial state
+})();
+</script>
+{% endblock content %}

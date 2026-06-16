@@ -15426,6 +15426,7 @@ def _resolve_temp_order_mapping(temp_order):
         raw_biz = raw_biz_full.get('public_link', {}) if is_nested else raw_biz_full
     elif temp_order.source_type == 'google_sheet' and temp_order.api_settings_id:
         api = temp_order.api_settings
+        headers = api.last_headers or []
         raw_source = api.column_mapping or {}
         raw_biz = raw_biz_full.get('google_sheet', {}) if is_nested else raw_biz_full
     else:
@@ -20778,3 +20779,336 @@ def view_user_business_profile(request, profile_id):
     }
 
     return render(request, 'workforce/view_business_profile.html', context)
+
+
+# ---------------------------------------------------------------------------
+# AI Agent Configuration
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='account_login')
+@superuser_required
+def wf_ai_config(request):
+    from django.conf import settings as django_settings
+    from pathlib import Path
+    import subprocess
+
+    ENV_PATH = Path(django_settings.BASE_DIR) / '.env'
+
+    EDITABLE_KEYS = [
+        # Provider API keys
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'GOOGLE_AI_API_KEY',
+        'XAI_API_KEY',
+        'GROQ_API_KEY',
+        # Business dashboard AI
+        'AI_CHAT_PROVIDER',
+        'AI_CHAT_MODEL',
+        # WhatsApp reply AI
+        'AI_WA_PROVIDER',
+        'AI_WA_MODEL',
+        # Shared agent settings
+        'AI_AGENT_MAX_TOKENS',
+        'AI_AGENT_DAILY_BUDGET',
+        'AI_AGENT_MONTHLY_BUDGET',
+        'AI_AGENT_RATE_LIMIT_USER',
+        'AI_AGENT_RATE_LIMIT_BUSINESS',
+        'AI_AGENT_ALERT_PHONES',
+        'AI_AGENT_ENABLED',
+        'AI_AGENT_WHATSAPP_ENABLED',
+    ]
+    BLANK_SKIP_KEYS = {'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_AI_API_KEY', 'XAI_API_KEY', 'GROQ_API_KEY'}
+
+    def read_env():
+        env = {}
+        try:
+            for line in ENV_PATH.read_text().splitlines():
+                line = line.strip()
+                if '=' in line and not line.startswith('#'):
+                    k, _, v = line.partition('=')
+                    env[k.strip()] = v.strip()
+        except FileNotFoundError:
+            pass
+        return env
+
+    def write_env_key(key, value):
+        try:
+            text = ENV_PATH.read_text()
+        except FileNotFoundError:
+            text = ''
+        lines = text.splitlines(keepends=True)
+        replaced = False
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(f'{key}=') or (not stripped.startswith('#') and stripped.startswith(key) and '=' in stripped and stripped.split('=', 1)[0].strip() == key):
+                new_lines.append(f'{key}={value}\n')
+                replaced = True
+            else:
+                new_lines.append(line)
+        if not replaced:
+            new_lines.append(f'{key}={value}\n')
+        ENV_PATH.write_text(''.join(new_lines))
+
+    save_msg = None
+    save_error = None
+
+    if request.method == 'POST':
+        for key in EDITABLE_KEYS:
+            if key in request.POST:
+                val = request.POST[key].strip()
+                if key in BLANK_SKIP_KEYS and not val:
+                    continue
+                write_env_key(key, val)
+        try:
+            result = subprocess.run(
+                ['bash', '-c', "kill -HUP $(pgrep -f 'gunicorn.*ezzydelivery' | head -1)"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                save_msg = 'Settings saved and server reloaded.'
+            else:
+                save_msg = 'Settings saved. Server reload may be needed manually.'
+        except Exception:
+            save_msg = 'Settings saved. Please reload the server.'
+        from django.contrib import messages as django_messages
+        django_messages.success(request, save_msg)
+        return redirect('workforce:wf_ai_config')
+
+    env = read_env()
+
+    # Live status from claude_service
+    agent_status = {}
+    budget_usage = {}
+    today_usage = {}
+    try:
+        from ai_agent.services.claude_service import get_claude_service, PRICING
+        from ai_agent.models import UsageLog, Conversation
+        from django.db.models import Sum, Count
+        from datetime import timedelta
+
+        svc = get_claude_service()
+        available, status_msg = svc.is_available()
+        agent_status = {'available': available, 'message': status_msg, 'model': svc.model}
+        budget_usage = svc.budget_tracker.get_usage()
+
+        today = timezone.now().date()
+        today_stats = UsageLog.objects.filter(created_at__date=today).aggregate(
+            calls=Count('id'),
+            tokens_in=Sum('tokens_input'),
+            tokens_out=Sum('tokens_output'),
+            cost=Sum('estimated_cost'),
+        )
+        month_start = today.replace(day=1)
+        month_stats = UsageLog.objects.filter(created_at__date__gte=month_start).aggregate(
+            calls=Count('id'),
+            cost=Sum('estimated_cost'),
+        )
+        active_convs = Conversation.objects.filter(
+            status='active',
+            last_activity__gte=timezone.now() - timedelta(hours=24)
+        ).count()
+        today_usage = {
+            'calls': today_stats['calls'] or 0,
+            'tokens_in': today_stats['tokens_in'] or 0,
+            'tokens_out': today_stats['tokens_out'] or 0,
+            'cost': float(today_stats['cost'] or 0),
+            'month_calls': month_stats['calls'] or 0,
+            'month_cost': float(month_stats['cost'] or 0),
+            'active_conversations': active_convs,
+        }
+        pricing_map = PRICING
+    except Exception as e:
+        agent_status = {'available': False, 'message': str(e), 'model': ''}
+        pricing_map = {}
+
+    import json as _json
+
+    models_by_provider = {
+        'anthropic': [
+            {'id': 'claude-sonnet-4-6',        'label': 'Claude Sonnet 4.6 (Latest)'},
+            {'id': 'claude-sonnet-4-20250514',  'label': 'Claude Sonnet 4 (May 2025)'},
+            {'id': 'claude-3-5-sonnet-20241022','label': 'Claude 3.5 Sonnet'},
+            {'id': 'claude-3-haiku-20240307',   'label': 'Claude 3 Haiku (Fast / Cheap)'},
+            {'id': 'claude-3-opus-20240229',    'label': 'Claude 3 Opus (Powerful)'},
+        ],
+        'openai': [
+            {'id': 'gpt-4o',          'label': 'GPT-4o (Latest)'},
+            {'id': 'gpt-4o-mini',     'label': 'GPT-4o Mini (Fast)'},
+            {'id': 'gpt-4-turbo',     'label': 'GPT-4 Turbo'},
+            {'id': 'gpt-3.5-turbo',   'label': 'GPT-3.5 Turbo (Cheap)'},
+        ],
+        'gemini': [
+            {'id': 'gemini-2.0-flash',  'label': 'Gemini 2.0 Flash (Latest)'},
+            {'id': 'gemini-1.5-pro',    'label': 'Gemini 1.5 Pro'},
+            {'id': 'gemini-1.5-flash',  'label': 'Gemini 1.5 Flash (Fast)'},
+            {'id': 'gemini-pro',        'label': 'Gemini Pro'},
+        ],
+        'xai': [
+            {'id': 'grok-3',            'label': 'Grok 3 (Latest)'},
+            {'id': 'grok-3-mini',       'label': 'Grok 3 Mini (Fast)'},
+            {'id': 'grok-2-1212',       'label': 'Grok 2'},
+            {'id': 'grok-beta',         'label': 'Grok Beta'},
+        ],
+        'groq': [
+            {'id': 'llama-3.1-8b-instant',    'label': 'Llama 3.1 8B Instant (Recommended — high rate limit)'},
+            {'id': 'llama-3.3-70b-versatile', 'label': 'Llama 3.3 70B (Free tier: 12K TPM — may fail with tools)'},
+            {'id': 'mixtral-8x7b-32768',      'label': 'Mixtral 8x7B (Long context)'},
+            {'id': 'gemma2-9b-it',            'label': 'Gemma 2 9B'},
+            {'id': 'qwen/qwen3-32b',          'label': 'Qwen 3 32B (Free tier: 6K TPM — too low for tools)'},
+        ],
+    }
+
+    def _mask(key):
+        return (key[:12] + '...' + key[-4:]) if len(key) > 16 else ('*' * len(key) if key else '')
+
+    return render(request, 'workforce/ai_config.html', {
+        'env': env,
+        'chat_provider':  env.get('AI_CHAT_PROVIDER', 'anthropic') or 'anthropic',
+        'wa_provider':    env.get('AI_WA_PROVIDER',   'anthropic') or 'anthropic',
+        'masked_anthropic_key': _mask(env.get('ANTHROPIC_API_KEY', '')),
+        'masked_openai_key':    _mask(env.get('OPENAI_API_KEY', '')),
+        'masked_gemini_key':    _mask(env.get('GOOGLE_AI_API_KEY', '')),
+        'masked_xai_key':       _mask(env.get('XAI_API_KEY', '')),
+        'masked_groq_key':      _mask(env.get('GROQ_API_KEY', '')),
+        'models_by_provider_json': _json.dumps(models_by_provider),
+        'agent_status': agent_status,
+        'budget_usage': budget_usage,
+        'today_usage': today_usage,
+        'pricing_map': pricing_map,
+    })
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def wf_ai_models_api(request):
+    """
+    AJAX endpoint: return model list for a given AI provider.
+    Fetches live from provider API and caches for 1 hour.
+    GET ?provider=groq
+    """
+    import requests as http
+    from django.core.cache import cache
+    from django.conf import settings as dj_settings
+
+    provider = request.GET.get('provider', '').strip().lower()
+    if not provider:
+        return JsonResponse({'error': 'provider required'}, status=400)
+
+    cache_key = f'ai_models_{provider}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse({'models': cached, 'cached': True})
+
+    def _fetch():
+        timeout = 10
+        try:
+            if provider == 'anthropic':
+                key = getattr(dj_settings, 'ANTHROPIC_API_KEY', '')
+                if not key:
+                    return None, 'Anthropic API key not configured'
+                r = http.get(
+                    'https://api.anthropic.com/v1/models',
+                    headers={'x-api-key': key, 'anthropic-version': '2023-06-01'},
+                    timeout=timeout,
+                )
+                if r.status_code != 200:
+                    return None, f'Anthropic API error {r.status_code}'
+                data = r.json().get('data', [])
+                # Only chat models (exclude image/embedding models)
+                models = [
+                    {'id': m['id'], 'label': m.get('display_name', m['id'])}
+                    for m in data
+                    if 'claude' in m['id']
+                ]
+
+            elif provider in ('openai', 'xai', 'groq'):
+                key_map = {
+                    'openai': ('OPENAI_API_KEY',  'https://api.openai.com/v1/models'),
+                    'xai':    ('XAI_API_KEY',     'https://api.x.ai/v1/models'),
+                    'groq':   ('GROQ_API_KEY',    'https://api.groq.com/openai/v1/models'),
+                }
+                key_setting, url = key_map[provider]
+                key = getattr(dj_settings, key_setting, '')
+                if not key:
+                    return None, f'{provider} API key not configured'
+                r = http.get(
+                    url,
+                    headers={'Authorization': f'Bearer {key}'},
+                    timeout=timeout,
+                )
+                if r.status_code != 200:
+                    return None, f'{provider} API error {r.status_code}'
+                data = r.json().get('data', [])
+                def _is_chat(model_id):
+                    skip = {'whisper', 'tts', 'dall-e', 'embedding', 'babbage', 'davinci', 'ada', 'curie'}
+                    return not any(s in model_id for s in skip)
+                live_ids = {m['id'] for m in data if _is_chat(m['id'])}
+                # Build label map from our known list so curated labels show in the dropdown
+                from ai_agent.services.unified_service import OpenAICompatService  # noqa
+                known_labels = {
+                    'openai': {
+                        'gpt-4o':        'GPT-4o (Latest)',
+                        'gpt-4o-mini':   'GPT-4o Mini (Fast)',
+                        'gpt-4-turbo':   'GPT-4 Turbo',
+                        'gpt-3.5-turbo': 'GPT-3.5 Turbo (Cheap)',
+                    },
+                    'xai': {
+                        'grok-3':      'Grok 3 (Latest)',
+                        'grok-3-mini': 'Grok 3 Mini (Fast)',
+                        'grok-2-1212': 'Grok 2',
+                        'grok-beta':   'Grok Beta',
+                    },
+                    'groq': {
+                        'llama-3.1-8b-instant':    'Llama 3.1 8B Instant (Recommended — high rate limit)',
+                        'llama-3.3-70b-versatile': 'Llama 3.3 70B (Free tier: 12K TPM — may fail with tools)',
+                        'mixtral-8x7b-32768':      'Mixtral 8x7B (Long context)',
+                        'gemma2-9b-it':            'Gemma 2 9B',
+                        'qwen/qwen3-32b':          'Qwen 3 32B (Free tier: 6K TPM — too low for tools)',
+                    },
+                }.get(provider, {})
+                # Pin known models first in our preferred order, then append unknown live models
+                pinned_ids = list(known_labels.keys())
+                pinned = [
+                    {'id': mid, 'label': known_labels[mid]}
+                    for mid in pinned_ids if mid in live_ids
+                ]
+                extras = sorted(
+                    [{'id': mid, 'label': mid} for mid in live_ids if mid not in known_labels],
+                    key=lambda x: x['id'], reverse=True,
+                )
+                models = pinned + extras
+
+            elif provider == 'gemini':
+                key = getattr(dj_settings, 'GOOGLE_AI_API_KEY', '')
+                if not key:
+                    return None, 'Google AI API key not configured'
+                r = http.get(
+                    f'https://generativelanguage.googleapis.com/v1beta/models?key={key}',
+                    timeout=timeout,
+                )
+                if r.status_code != 200:
+                    return None, f'Gemini API error {r.status_code}'
+                data = r.json().get('models', [])
+                models = [
+                    {
+                        'id': m['name'].replace('models/', ''),
+                        'label': m.get('displayName', m['name'].replace('models/', '')),
+                    }
+                    for m in data
+                    if 'generateContent' in m.get('supportedGenerationMethods', [])
+                ]
+            else:
+                return None, f'Unknown provider: {provider}'
+
+            return models, None
+
+        except Exception as e:
+            return None, str(e)
+
+    models, err = _fetch()
+    if err:
+        return JsonResponse({'error': err}, status=502)
+
+    cache.set(cache_key, models, timeout=3600)
+    return JsonResponse({'models': models, 'cached': False})

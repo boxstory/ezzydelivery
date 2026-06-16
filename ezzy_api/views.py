@@ -1048,6 +1048,13 @@ def driver_complete_task(request, task_id):
         }
         _send_webhook_event('task_completed', webhook_payload, business=task.business)
 
+        # Push status back to WooCommerce if the order originated there
+        if task.order and status_value in ('delivered', 'failed', 'cancelled'):
+            try:
+                _push_woo_order_status(task.order, status_value)
+            except Exception:
+                pass
+
         # Fire auto flows
         try:
             from core.auto_flow_executor import execute_flows_for_trigger
@@ -1061,7 +1068,7 @@ def driver_complete_task(request, task_id):
             'task': task_serializer.data,
             'documents_uploaded': documents_created
         }, status=status.HTTP_200_OK)
-    
+
     except delivery_models.DeliveryTask.DoesNotExist:
         return Response(
             {'error': 'Task not found'},
@@ -1818,15 +1825,15 @@ def _create_order_from_woocommerce(order_data, business):
     try:
         # Generate unique order number
         order_number = f"WC-{order_data.get('id')}"
-        
+
         # Check if order already exists
         if orders_models.Order.objects.filter(order_number=order_number).exists():
             return None
-        
+
         # Extract shipping information
         shipping = order_data.get('shipping', {})
         billing = order_data.get('billing', {})
-        
+
         # Create order
         order = orders_models.Order.objects.create(
             order_number=order_number,
@@ -1838,12 +1845,44 @@ def _create_order_from_woocommerce(order_data, business):
             cod_amount=_woo_cod_amount(order_data),
             cod_status_by_client=_woo_cod_status(order_data),
             order_status='to_review',
-            order_date=datetime.strptime(order_data.get('date_created', '')[:10], '%Y-%m-%d').date() if order_data.get('date_created') else timezone.now().date()
+            order_date=datetime.strptime(order_data.get('date_created', '')[:10], '%Y-%m-%d').date() if order_data.get('date_created') else timezone.now().date(),
+            original_order_data={'source': 'woocommerce', 'platform_id': str(order_data.get('id', ''))},
         )
-        
+
         return order
     except Exception as e:
         raise Exception(f"Error creating order: {str(e)}")
+
+
+def _push_woo_order_status(order, new_status):
+    """Push delivery status back to WooCommerce after task completion."""
+    WC_STATUS_MAP = {'delivered': 'completed', 'failed': 'failed', 'cancelled': 'cancelled'}
+    wc_status = WC_STATUS_MAP.get(new_status)
+    if not wc_status:
+        return
+    try:
+        api_settings = business_models.BusinessApiSettings.objects.filter(
+            business=order.business, api_type='woocommerce', is_verify_api=True,
+        ).first()
+        if not api_settings:
+            return
+        wc_id = None
+        if order.original_order_data and isinstance(order.original_order_data, dict):
+            wc_id = order.original_order_data.get('platform_id')
+        if not wc_id and order.order_number.startswith('WC-'):
+            wc_id = order.order_number[3:]
+        if not wc_id:
+            return
+        wcapi = API(
+            url=api_settings.site_api_url,
+            consumer_key=api_settings.api_key,
+            consumer_secret=api_settings.api_secret,
+            version='wc/v3',
+            timeout=10,
+        )
+        wcapi.put(f'orders/{wc_id}', data={'status': wc_status})
+    except Exception:
+        logger.exception("WooCommerce status push failed for order %s", order.order_number)
 
 
 # ==================== WEBHOOK APIs ====================
@@ -3700,8 +3739,11 @@ def webhook_inbound_order(request, webhook_key):
     URL: /api/webhooks/order/inbound/<webhook_key>/
     Accepts single order dict or list of orders.
     Stores as TempOrder(source_type='webhook') + WebhookImportLog.
+    Verifies X-WC-Webhook-Signature when wc_webhook_secret is set.
+    Handles WooCommerce order.updated and order.deleted topics.
     """
     import json as _json
+    import base64
 
     try:
         wk = ezzy_api_models.WebhookImportKey.objects.select_related('business').get(key=webhook_key)
@@ -3711,7 +3753,70 @@ def webhook_inbound_order(request, webhook_key):
     if not wk.is_active:
         return Response({'success': False, 'error': 'Webhook key is disabled'}, status=403)
 
+    # --- WooCommerce HMAC-SHA256 signature verification ---
+    wc_sig_header = request.META.get('HTTP_X_WC_WEBHOOK_SIGNATURE', '')
+    if wc_sig_header and wk.wc_webhook_secret:
+        try:
+            raw_body = request.body
+            expected = base64.b64encode(
+                hmac.new(
+                    wk.wc_webhook_secret.encode('utf-8'),
+                    raw_body,
+                    hashlib.sha256,
+                ).digest()
+            ).decode('utf-8')
+            if not hmac.compare_digest(wc_sig_header, expected):
+                return Response({'success': False, 'error': 'Invalid webhook signature'}, status=401)
+        except Exception:
+            return Response({'success': False, 'error': 'Signature verification error'}, status=401)
+
     business = wk.business
+    wc_topic = request.META.get('HTTP_X_WC_WEBHOOK_TOPIC', '')
+
+    # --- Handle WooCommerce order.deleted ---
+    if wc_topic == 'order.deleted':
+        payload = request.data if isinstance(request.data, dict) else {}
+        wc_id = str(payload.get('id', ''))
+        if wc_id:
+            orders_models.TempOrder.objects.filter(
+                business=business, source_type='webhook', platform_id=wc_id,
+            ).update(status='cancelled')
+        ezzy_api_models.WebhookImportLog.objects.create(
+            webhook_key=wk, business=business,
+            payload=payload, ip_address=request.META.get('REMOTE_ADDR'),
+            headers={'HTTP_X_WC_WEBHOOK_TOPIC': wc_topic},
+            status='processed', orders_created=0,
+        )
+        return Response({'success': True, 'message': 'order.deleted acknowledged'}, status=200)
+
+    # --- Handle WooCommerce order.updated: sync fields on the real Order ---
+    if wc_topic == 'order.updated':
+        payload = request.data if isinstance(request.data, dict) else {}
+        wc_id = str(payload.get('id', ''))
+        if wc_id:
+            billing = payload.get('billing', {})
+            shipping = payload.get('shipping', {})
+            updates = {}
+            name = f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip()
+            if name:
+                updates['customer_name'] = name
+            if billing.get('phone'):
+                updates['customer_phone'] = billing['phone']
+            addr = f"{shipping.get('address_1', '')} {shipping.get('city', '')}".strip()
+            if addr:
+                updates['customer_address'] = addr
+            if updates:
+                orders_models.Order.objects.filter(
+                    business=business,
+                    order_number=f'WC-{wc_id}',
+                ).update(**updates)
+        ezzy_api_models.WebhookImportLog.objects.create(
+            webhook_key=wk, business=business,
+            payload=payload, ip_address=request.META.get('REMOTE_ADDR'),
+            headers={'HTTP_X_WC_WEBHOOK_TOPIC': wc_topic},
+            status='processed', orders_created=0,
+        )
+        return Response({'success': True, 'message': 'order.updated acknowledged'}, status=200)
 
     # Get client IP
     x_fwd = request.META.get('HTTP_X_FORWARDED_FOR')

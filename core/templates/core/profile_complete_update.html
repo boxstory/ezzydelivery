@@ -320,7 +320,6 @@
                                     <span>Role selected:
                                         {% if profile.is_business %}<strong>Business</strong>{% endif %}
                                         {% if profile.is_driver %}<strong>Driver</strong>{% endif %}
-                                        — <a href="{% if profile.is_business %}{% url 'core:business_register' %}{% else %}{% url 'core:driver_register' %}{% endif %}" class="alert-link">Continue to Step 3 &rarr;</a>
                                     </span>
                                 </div>
                                 {% endif %}
@@ -336,6 +335,25 @@
                                 </button>
 
                                 {% if profile.is_business or profile.is_driver %}
+                                {% if completion_percentage >= 50 %}
+                                <div class="mt-3">
+                                    <a href="{% if profile.is_business %}{% url 'core:business_register' %}{% else %}{% url 'core:driver_register' %}{% endif %}"
+                                       class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold text-decoration-none">
+                                        <i class="fa-solid fa-arrow-right"></i>
+                                        <span>Continue to Step 3</span>
+                                    </a>
+                                </div>
+                                {% else %}
+                                <div class="mt-3">
+                                    <button class="btn btn-secondary w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold" disabled>
+                                        <i class="fa-solid fa-lock"></i>
+                                        <span>Complete Profile to Continue</span>
+                                    </button>
+                                </div>
+                                {% endif %}
+                                {% endif %}
+
+                                {% if profile.verification_status == 'verified' and completion_percentage == 100 %}
                                 <div class="mt-3">
                                     <a href="{% url 'core:main_dashboard' %}"
                                        class="btn btn-dark w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold text-decoration-none">

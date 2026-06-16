@@ -373,7 +373,12 @@ async function resyncFiltered() {
 async function openAutoImport() {
     const checked = document.querySelectorAll('.row-checkbox:checked');
     if (!checked.length) { alert('Select rows first'); return; }
+    const AUTO_IMPORT_BATCH_CAP = 25;
     const ids = [...checked].map(c => parseInt(c.dataset.tempId));
+    if (ids.length > AUTO_IMPORT_BATCH_CAP) {
+        alert(`Please select at most ${AUTO_IMPORT_BATCH_CAP} rows at a time. You have ${ids.length} selected — auto-import batches this large can time out. Deselect some rows and run in batches.`);
+        return;
+    }
     if (!confirm(`Auto-import ${ids.length} row(s)? This will create orders, geocode addresses, and publish tasks to drivers where all checks pass.`)) return;
 
     const spinnerHtml = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2 text-muted">Running auto-import pipeline...</p></div>';

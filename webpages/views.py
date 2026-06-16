@@ -100,6 +100,77 @@ def delivery_pricing(request):
     }
     return render(request, 'webpages/3pl_pricing.html', data)
 
+def p2p_pricing(request):
+    import json as _json
+    from delivery.models import ZoneName, ZoneArea
+
+    # Hardcoded extras for well-known areas absent from DB
+    _extras = [
+        {'name': 'West Bay',     'zone': 'Doha',      'lat': 25.3272, 'lng': 51.5310},
+        {'name': 'Al Wakrah',    'zone': 'South',     'lat': 25.1719, 'lng': 51.5989},
+        {'name': 'Abu Hamour',   'zone': 'Doha',      'lat': 25.2390, 'lng': 51.4654},
+        {'name': 'Garaffa',      'zone': 'Al Rayyan', 'lat': 25.2900, 'lng': 51.4400},
+        {'name': 'Al Rayyan',    'zone': 'Al Rayyan', 'lat': 25.2546, 'lng': 51.4225},
+        {'name': 'Al Khor City', 'zone': 'North',     'lat': 25.6839, 'lng': 51.5037},
+        {'name': 'Education City','zone': 'Al Rayyan','lat': 25.3152, 'lng': 51.4249},
+        {'name': 'Corniche',     'zone': 'Doha',      'lat': 25.3068, 'lng': 51.5352},
+    ]
+
+    seen = {e['name'] for e in _extras}
+    localities = list(_extras)
+
+    # Add all active ZoneName records (deduplicated by name)
+    for z in ZoneName.objects.filter(is_active=True, latitude__isnull=False).order_by('zone_number'):
+        if z.zone_name not in seen:
+            seen.add(z.zone_name)
+            localities.append({'name': z.zone_name, 'zone': f'Zone {z.zone_number}', 'lat': float(z.latitude), 'lng': float(z.longitude)})
+
+    # Add all active ZoneArea records with coords (deduplicated by name)
+    for a in ZoneArea.objects.filter(is_active=True, latitude__isnull=False).select_related('zone').order_by('area_name'):
+        if a.area_name not in seen:
+            seen.add(a.area_name)
+            localities.append({'name': a.area_name, 'zone': a.zone.zone_name, 'lat': float(a.latitude), 'lng': float(a.longitude)})
+
+    # Popular chips — well-known names in display order
+    _popular_names = [
+        'West Bay', 'The Pearl', 'The Pearl Island', 'Lusail', 'Al Sadd',
+        'Mushaireb', 'Industrial Area', 'Al Khor', 'Al Khor City', 'Old Airport',
+        'Al Waab', 'Al Gharrafa', 'Gharrafat Al Rayyan', 'Muaither', 'Al Thumama',
+        'Duhail', 'Hamad International Airport', 'Al Wakrah', 'Abu Hamour',
+        'Education City', 'Al Rayyan', 'Corniche', 'Madinat Khalifa North',
+        'Madinat Khalifa South', 'Fereej Bin Omran', 'Al Mansoura', 'Najma',
+        'Al Aziziya', 'Mesaieed', 'Al Daayen', 'Nuaija', 'Onaiza',
+        'Fereej Al Nasr', 'Al Dafna', 'Wholesale Market',
+        'Fereej Al Soudan', 'Al Sailiya', 'Bu Sidra', 'Fereej Al Manaseer',
+        'Fereej Al Murra', 'Al Ghanim Al Jadeed',
+    ]
+    loc_index = {l['name']: l for l in localities}
+    popular = [loc_index[n] for n in _popular_names if n in loc_index]
+
+    return render(request, 'webpages/p2p_pricing.html', {
+        'localities_json': _json.dumps(localities),
+        'popular_json': _json.dumps(popular),
+    })
+
+@require_http_methods(["POST"])
+def p2p_resolve_url(request):
+    import json
+    import requests as http_req
+    from urllib.parse import urlparse
+    try:
+        body = json.loads(request.body)
+        url = body.get('url', '').strip()
+        if not url.startswith('http'):
+            return JsonResponse({'error': 'invalid url'}, status=400)
+        allowed_hosts = ['goo.gl', 'maps.app.goo.gl', 'maps.google.com', 'maps.apple.com']
+        host = urlparse(url).hostname or ''
+        if not any(host == d or host.endswith('.' + d) for d in allowed_hosts):
+            return JsonResponse({'error': 'domain not allowed'}, status=400)
+        resp = http_req.head(url, allow_redirects=True, timeout=5)
+        return JsonResponse({'resolved_url': resp.url})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 def _save_step1_to_db(inquiry, data):
     """Save step 1 fields to a PricingEnquiry instance."""
     inquiry.full_name = data.get('full_name', '')

@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from ai_agent.models import Conversation, ConversationMessage
 from ai_agent.services.claude_service import get_claude_service
+from ai_agent.services.unified_service import get_chat_service
 from ai_agent.tools import tool_registry
 from ai_agent.tools.base import get_user_role
 from ai_agent.prompts.system_prompts import get_prompt_for_role_and_channel
@@ -35,8 +36,8 @@ class AgentService:
 
     MAX_TOOL_ITERATIONS = 10  # Prevent infinite tool loops
 
-    def __init__(self):
-        self.claude_service = get_claude_service()
+    def __init__(self, purpose: str = 'chat'):
+        self.claude_service = get_chat_service(purpose)
 
     def get_or_create_conversation(
         self,
@@ -149,7 +150,7 @@ class AgentService:
                 tool_results_content.append({
                     'type': 'tool_result',
                     'tool_use_id': result['tool_call_id'],
-                    'content': json.dumps(result['result']),
+                    'content': json.dumps(result['result'], default=str),
                 })
 
             # Add assistant message and tool results to history
@@ -342,7 +343,7 @@ class AgentService:
                 tool_results_content.append({
                     'type': 'tool_result',
                     'tool_use_id': tc['id'],
-                    'content': json.dumps(result_data),
+                    'content': json.dumps(result_data, default=str),
                 })
             messages.append({'role': 'user', 'content': tool_results_content})
 
@@ -402,21 +403,22 @@ class AgentService:
             business=conversation.business
         )
 
-        # Store tool call in conversation
+        # Sanitise result so Decimal/date values don't break the JSONField or psycopg2
+        safe_result = json.loads(json.dumps(result, default=str))
         ConversationMessage.objects.create(
             conversation=conversation,
             role='tool',
-            content=json.dumps(result),
+            content=json.dumps(safe_result),
             tool_name=tool_name,
             tool_input=tool_input,
-            tool_output=result
+            tool_output=safe_result
         )
 
         return {
             'tool_name': tool_name,
             'tool_call_id': tool_call.get('id'),
             'input': tool_input,
-            'result': result,
+            'result': safe_result,
         }
 
     def execute_single_tool(
@@ -484,13 +486,12 @@ class AgentService:
             return False
 
 
-# Singleton instance
-_agent_service = None
+_agent_service_cache: dict = {}
 
 
-def get_agent_service() -> AgentService:
-    """Get the singleton AgentService instance."""
-    global _agent_service
-    if _agent_service is None:
-        _agent_service = AgentService()
-    return _agent_service
+def get_agent_service(purpose: str = 'chat') -> AgentService:
+    """Get AgentService for the given purpose ('chat' or 'wa')."""
+    global _agent_service_cache
+    if purpose not in _agent_service_cache:
+        _agent_service_cache[purpose] = AgentService(purpose=purpose)
+    return _agent_service_cache[purpose]

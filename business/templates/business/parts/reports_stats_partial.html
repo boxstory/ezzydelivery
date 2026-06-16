@@ -1,0 +1,89 @@
+{# Purpose: HTMX partial — summary stat cards for reports date range #}
+{# Used by: business/reports_dashboard.html via hx-get to reports_stats_partial #}
+{% load i18n %}
+
+<div class="row g-3 mb-4" id="brp_stats_grid">
+
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="card brp__stat-card text-center h-100">
+      <div class="card-body p-3">
+        <div class="brp__stat-icon brp__stat-icon--total mb-2">
+          <i class="fa-solid fa-basket-shopping"></i>
+        </div>
+        <div class="brp__stat-value">{{ stats.total }}</div>
+        <div class="brp__stat-label">{% trans "Total Orders" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="card brp__stat-card text-center h-100">
+      <div class="card-body p-3">
+        <div class="brp__stat-icon brp__stat-icon--delivered mb-2">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="brp__stat-value brp__stat-value--green">{{ stats.delivered }}</div>
+        <div class="brp__stat-label">{% trans "Delivered" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="card brp__stat-card text-center h-100">
+      <div class="card-body p-3">
+        <div class="brp__stat-icon brp__stat-icon--pending mb-2">
+          <i class="fa-solid fa-hourglass-half"></i>
+        </div>
+        <div class="brp__stat-value brp__stat-value--orange">{{ stats.pending }}</div>
+        <div class="brp__stat-label">{% trans "Pending" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="card brp__stat-card text-center h-100">
+      <div class="card-body p-3">
+        <div class="brp__stat-icon brp__stat-icon--cancelled mb-2">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </div>
+        <div class="brp__stat-value brp__stat-value--red">{{ stats.cancelled }}</div>
+        <div class="brp__stat-label">{% trans "Cancelled" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="card brp__stat-card text-center h-100">
+      <div class="card-body p-3">
+        <div class="brp__stat-icon brp__stat-icon--cod mb-2">
+          <i class="fa-solid fa-hand-holding-dollar"></i>
+        </div>
+        <div class="brp__stat-value">{{ stats.cod_orders }}</div>
+        <div class="brp__stat-label">{% trans "COD Orders" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="card brp__stat-card text-center h-100">
+      <div class="card-body p-3">
+        <div class="brp__stat-icon brp__stat-icon--rate mb-2">
+          <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div class="brp__stat-value brp__stat-value--{% if stats.success_rate >= 80 %}green{% elif stats.success_rate >= 50 %}orange{% else %}red{% endif %}">{{ stats.success_rate }}%</div>
+        <div class="brp__stat-label">{% trans "Success Rate" %}</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% if stats.cod_total %}
+<div class="alert brp__cod-alert d-flex align-items-center gap-2 mb-4">
+  <i class="fa-solid fa-coins fa-lg"></i>
+  <span>
+    {% trans "Total COD value in this period" %}: <strong>QAR {{ stats.cod_total|floatformat:2 }}</strong>
+    &nbsp;·&nbsp; {{ stats.cod_orders }} {% trans "COD orders" %}
+  </span>
+</div>
+{% endif %}

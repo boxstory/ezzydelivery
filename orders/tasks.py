@@ -1011,10 +1011,21 @@ def _woo_api_client(api_settings):
 
 def _fetch_woocommerce_orders(api_settings):
     wcapi = _woo_api_client(api_settings)
-    r = wcapi.get('orders', params={'per_page': 50, 'orderby': 'date', 'order': 'desc'})
-    if r.status_code != 200:
-        raise RuntimeError(f"WooCommerce API error {r.status_code}")
-    return [_woo_order_to_row(o) for o in r.json()]
+    all_orders = []
+    page = 1
+    while True:
+        r = wcapi.get('orders', params={'per_page': 100, 'page': page, 'orderby': 'date', 'order': 'desc'})
+        if r.status_code != 200:
+            raise RuntimeError(f"WooCommerce API error {r.status_code}")
+        batch = r.json()
+        if not batch:
+            break
+        all_orders.extend([_woo_order_to_row(o) for o in batch])
+        total_pages = int(r.headers.get('X-WP-TotalPages', 1))
+        if page >= total_pages:
+            break
+        page += 1
+    return all_orders
 
 
 def _fetch_single_woo_order(api_settings, platform_id):

@@ -2749,6 +2749,52 @@ def reports_dashboard(request):
 
 @login_required
 @business_required
+def reports_stats_partial(request):
+    """HTMX partial: summary stat cards for the selected date range."""
+    from datetime import date as date_cls, timedelta
+    from orders.models import Order
+    from django.db.models import Count, Sum, Q
+
+    date_from_str = request.GET.get('date_from')
+    date_to_str = request.GET.get('date_to')
+
+    today = date_cls.today()
+    try:
+        date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date() if date_from_str else today - timedelta(days=30)
+        date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date() if date_to_str else today
+    except ValueError:
+        date_from = today - timedelta(days=30)
+        date_to = today
+
+    qs = Order.objects.filter(
+        business=request.current_business,
+        created_at__date__gte=date_from,
+        created_at__date__lte=date_to,
+    )
+    stats = qs.aggregate(
+        total=Count('id'),
+        delivered=Count('id', filter=Q(order_status='delivered')),
+        pending=Count('id', filter=Q(order_status='publish')),
+        cancelled=Count('id', filter=Q(order_status='cancelled')),
+        failed=Count('id', filter=Q(order_status='failed')),
+        cod_orders=Count('id', filter=Q(cod_amount__gt=0)),
+        cod_total=Sum('cod_amount', filter=Q(cod_amount__gt=0)),
+    )
+    total = stats['total'] or 0
+    delivered = stats['delivered'] or 0
+    success_rate = round(delivered / total * 100, 1) if total > 0 else 0
+    stats['success_rate'] = success_rate
+    stats['cod_total'] = stats['cod_total'] or 0
+
+    return render(request, 'business/parts/reports_stats_partial.html', {
+        'stats': stats,
+        'date_from': date_from,
+        'date_to': date_to,
+    })
+
+
+@login_required
+@business_required
 def export_orders_csv(request):
     """Export orders as CSV with date range and status filters."""
     import csv

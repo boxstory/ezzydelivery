@@ -132,6 +132,8 @@ class WebhookImportKey(models.Model):
         related_name='webhook_import_key',
     )
     key = models.CharField(max_length=48, unique=True, db_index=True)
+    wc_webhook_secret = models.CharField(max_length=64, blank=True, default='',
+        help_text="WooCommerce webhook secret for HMAC-SHA256 signature verification")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_used = models.DateTimeField(blank=True, null=True)

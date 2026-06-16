@@ -772,3 +772,111 @@ class GetBusinessCustomersTool(BaseTool):
         }
 
 
+
+
+@register_tool
+class GetBusinessProductsTool(BaseTool):
+    """
+    List products in the business product catalog.
+    """
+
+    name = 'get_business_products'
+    allowed_roles = ['business']
+    description = '''List products in your product catalog with stock quantities.
+
+    Returns product names, SKUs, prices, and current stock_qty.
+    Use low_stock_only=true to find products running low on stock.
+    '''
+
+    parameters_schema = {
+        'type': 'object',
+        'properties': {
+            'search': {
+                'type': 'string',
+                'description': 'Filter by product name, brand, or SKU',
+            },
+            'low_stock_only': {
+                'type': 'boolean',
+                'description': 'Set true to return only products at or below the threshold',
+            },
+            'low_stock_threshold': {
+                'type': 'integer',
+                'description': 'Quantity threshold for low stock (default 5)',
+            },
+            'limit': {
+                'type': 'integer',
+                'description': 'Max results (default 20, max 50)',
+            },
+        },
+        'required': [],
+    }
+
+    input_schema = parameters_schema
+
+    def run(self, params, user=None, business=None):
+        params = dict(params or {})
+        if business:
+            params['_business'] = business
+        return super().run(params, user=user, business=business)
+
+    def execute(self, search: Optional[str] = None, low_stock_only: bool = False,
+                low_stock_threshold: int = 5, limit: int = 20, _business=None) -> Dict[str, Any]:
+        from product.models import Product, ProductInventory
+        from django.db.models import Q, OuterRef, Subquery, IntegerField
+        from django.db.models.functions import Coalesce
+
+        if not _business:
+            raise ToolError('Business context required', 'NO_BUSINESS')
+
+        search    = (search or '').strip()
+        limit     = min(int(limit or 20), 50)
+        threshold = int(low_stock_threshold or 5)
+
+        # Annotate each product with its latest inventory quantity
+        latest_inv = ProductInventory.objects.filter(
+            item_sku=OuterRef('pk')
+        ).order_by('-updated_at').values('item_quantity')[:1]
+
+        qs = (
+            Product.objects
+            .filter(business=_business)
+            .annotate(stock_qty=Coalesce(Subquery(latest_inv, output_field=IntegerField()), 0))
+            .select_related('color', 'product_category')
+        )
+
+        if search:
+            qs = qs.filter(
+                Q(item_name__icontains=search) |
+                Q(brand_name__icontains=search) |
+                Q(item_sku__icontains=search) |
+                Q(client_names__icontains=search)
+            )
+
+        if low_stock_only:
+            qs = qs.filter(stock_qty__lte=threshold).order_by('stock_qty')
+        else:
+            qs = qs.order_by('-created_at')
+
+        total = qs.count()
+        products = []
+        for p in qs[:limit]:
+            products.append({
+                'product_id':  p.product_id,
+                'name':        f'{p.brand_name} {p.item_name}'.strip(),
+                'sku':         p.item_sku,
+                'price':       p.item_price,
+                'stock_qty':   p.stock_qty,
+                'color':       p.color.color_variant if p.color else None,
+                'size':        p.size,
+                'category':    str(p.product_category) if p.product_category else None,
+                'description': p.item_discription,
+            })
+
+        return {
+            'total_products':    total,
+            'returned':          len(products),
+            'low_stock_only':    low_stock_only,
+            'low_stock_threshold': threshold,
+            'search':            search or None,
+            'products':          products,
+        }

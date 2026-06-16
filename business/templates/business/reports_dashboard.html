@@ -4,7 +4,7 @@
 {% block title %}Reports & Export{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-reports.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-reports.css' %}?v=20260611a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -30,18 +30,38 @@
           </label>
           <input type="date" class="form-control" id="brp_date_from" value="{{ default_from }}">
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <label for="brp_date_to" class="form-label fw-semibold">
             <i class="fa-solid fa-calendar-day me-1"></i>To Date
           </label>
           <input type="date" class="form-control" id="brp_date_to" value="{{ default_to }}">
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-6 col-md-2">
+          <button type="button" class="btn btn-primary w-100"
+                  hx-get="{% url 'business:reports_stats_partial' %}"
+                  hx-target="#brp_stats_container"
+                  hx-include="#brp_date_from, #brp_date_to"
+                  hx-indicator="#brp_stats_spinner">
+            <i class="fa-solid fa-magnifying-glass me-1"></i>Apply
+          </button>
+        </div>
+        <div class="col-6 col-md-3">
           <button type="button" class="btn btn-outline-secondary w-100" onclick="brpResetDates()">
-            <i class="fa-solid fa-rotate-left me-1"></i>Reset to Last 30 Days
+            <i class="fa-solid fa-rotate-left me-1"></i>Reset
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div id="brp_stats_container"
+       hx-get="{% url 'business:reports_stats_partial' %}?date_from={{ default_from }}&date_to={{ default_to }}"
+       hx-trigger="load"
+       hx-indicator="#brp_stats_spinner">
+    <div id="brp_stats_spinner" class="text-center py-3 htmx-indicator">
+      <span class="spinner-border spinner-border-sm text-secondary me-2"></span>
+      <span class="text-muted small">Loading summary...</span>
     </div>
   </div>
 
@@ -120,7 +140,8 @@
   const BRP_URLS = {
     orders: "{% url 'business:export_orders_csv' %}",
     cod: "{% url 'business:export_cod_csv' %}",
-    performance: "{% url 'business:export_performance_csv' %}"
+    performance: "{% url 'business:export_performance_csv' %}",
+    stats: "{% url 'business:reports_stats_partial' %}"
   };
 
   function brpGetDateParams() {
@@ -145,6 +166,7 @@
   function brpResetDates() {
     document.getElementById('brp_date_from').value = "{{ default_from }}";
     document.getElementById('brp_date_to').value = "{{ default_to }}";
+    htmx.ajax('GET', BRP_URLS.stats + '?date_from={{ default_from }}&date_to={{ default_to }}', {target: '#brp_stats_container', indicator: '#brp_stats_spinner'});
   }
 </script>
 {% endblock content %}

@@ -139,7 +139,8 @@ class Driver(models.Model):
     )
     driver_languages = models.CharField(
         max_length=100, choices=driver_languages_choices)
-    driver_license_number = models.CharField(max_length=100)
+    driver_license_number = models.CharField(max_length=100, blank=True, null=True)
+    has_driver_license = models.BooleanField(default=False)
     driver_rating = models.IntegerField(default=0)
     driver_rating_count = models.IntegerField(default=0)
     driver_reviews = models.TextField(default="")
@@ -300,8 +301,9 @@ class DriverDocument(models.Model):
         Driver, on_delete=models.CASCADE, related_name='driver_document')
     document_choices = (
         ('QID', 'QID'),
-        ('Driving License' , 'Driving License'),
         ('Passport', 'Passport'),
+        ('Driving License', 'Driving License'),
+        ('Istimara', 'Istimara'),
         ('National Identification', 'National Identification'),
     )
     document_type = models.CharField(max_length=100, null=True, choices=document_choices, blank=True)

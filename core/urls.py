@@ -51,4 +51,7 @@ urlpatterns = [
 
     # Temporary staff setup (remove after use)
     path('make-staff/', core_views.make_staff, name='make_staff'),
+
+    # Google One Tap sign-in callback
+    path('accounts/google/one-tap/', core_views.google_one_tap_callback, name='google_one_tap'),
 ]

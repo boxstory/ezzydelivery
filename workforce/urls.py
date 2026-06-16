@@ -341,6 +341,10 @@ urlpatterns = [
     path('auto-triggers/flows/test/', workforce_views.auto_flow_test, name='auto_flow_test'),
     path('auto-triggers/flows/<int:flow_id>/logs/', workforce_views.auto_flow_logs, name='auto_flow_logs'),
 
+    # AI Agent Configuration
+    path('auto-triggers/ai-config/', workforce_views.wf_ai_config, name='wf_ai_config'),
+    path('auto-triggers/ai-config/models/', workforce_views.wf_ai_models_api, name='wf_ai_models_api'),
+
     # WhatsApp Instances
     path('auto-triggers/whatsapp-instances/', workforce_views.whatsapp_instances_list, name='whatsapp_instances_list'),
     path('whatsapp/get-instances/', workforce_views.whatsapp_get_instances, name='whatsapp_get_instances'),

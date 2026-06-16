@@ -144,8 +144,8 @@ class ProfileForm(forms.ModelForm):
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'}),
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}),
-            'phone': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number'}),
-            'whatsapp': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'WhatsApp Number'}),
+            'phone': forms.HiddenInput(),
+            'whatsapp': forms.HiddenInput(),
             'zone_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zone/Area Name'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Full Address', 'rows': 3}),
             'nationlity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nationality'}),
@@ -249,7 +249,7 @@ class ProfileUpdateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Make all fields required for profile completion except instagram
         for field_name in self.fields:
-            if field_name != 'instagram':
+            if field_name not in ('instagram', 'address'):
                 self.fields[field_name].required = True
 
     def clean_username(self):

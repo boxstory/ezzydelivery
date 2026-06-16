@@ -36,7 +36,13 @@ class DriverJoinForm(forms.ModelForm):
                    'wallet_balance', 'credit_limit', 'cod_in_hand', 'total_earnings', 'pending_earnings',
                    'last_settlement_date', 'preferred_zone_groups', 'driver_availability', ]
         labels = {
-                "driver_bio": "About Skill and Experiance",
+                "driver_bio": "About Skills & Experience",
+                "has_driver_license": "I have a valid driving license",
+            }
+        widgets = {
+                "driver_bio": forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Write about your skills and experience...'}),
+                "has_driver_license": forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
+                "driver_license_number": forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 1234567'}),
             }
 
     def __init__(self, *args, **kwargs):
@@ -59,16 +65,21 @@ class DriverVehicleForm(forms.ModelForm):
     class Meta:
         model = fleet_models.DriverVehicle
         fields = '__all__'
-        exclude = ['driver', 'vehicle_date',
+        exclude = ['driver', 'vehicle_date', 'vehicle_status', 'vehicle_photo',
                    'updated_at', 'created_at']
+        widgets = {
+            'vehicle_no':    forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 12345'}),
+            'vehicle_model': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Toyota Hilux'}),
+            'vehicle_color': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. White'}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_show_labels = True
-        self.fields['vehicle_type'].widget = forms.RadioSelect(
-            choices=VEHICLE_CHOICES)
-        self.fields['vehicle_type'].widget.attrs['class'] = 'input-block-level'
+        self.fields['vehicle_type'].widget = forms.Select(
+            choices=[('none', '— Select type —')] + VEHICLE_CHOICES)
+        self.fields['vehicle_type'].widget.attrs['class'] = 'form-select'
 
 
 class DriverDocumentForm(forms.ModelForm):

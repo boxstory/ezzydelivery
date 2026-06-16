@@ -232,6 +232,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.i18n',
                 # SEO context processors for Qatar delivery keywords
                 'core.context_processors.seo_defaults',
                 'core.context_processors.site_info',
@@ -254,6 +255,8 @@ TEMPLATES = [
                 # Fleet PWA bottom nav: pending tasks badge count
                 'core.context_processors.driver_pending_tasks',
                 'core.context_processors.dl_task_status_choices',
+                # Google One Tap: exposes client_id to public templates
+                'core.context_processors.google_one_tap',
             ],
         },
     },
@@ -430,6 +433,15 @@ CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # Soft limit 25 minutes
 
 # Celery Beat settings
 CELERY_BEAT_SCHEDULER = 'celery.beat:PersistentScheduler'
+
+from celery.schedules import crontab  # noqa: E402
+CELERY_BEAT_SCHEDULE = {
+    # Pull new orders from WooCommerce/Shopify/Google Sheets/OneDrive every 30 min
+    'sync-all-temp-orders-every-30min': {
+        'task': 'orders.tasks.sync_all_temp_orders',
+        'schedule': crontab(minute='*/30'),
+    },
+}
 
 # Task result expiration
 CELERY_RESULT_EXPIRES = 3600  # 1 hour
@@ -783,12 +795,35 @@ LOGGING = {
 # Purpose: AI Operations Agent using Claude API
 # ==========================================
 
-# Anthropic API Configuration
+# AI Provider API Keys
 try:
     ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY') or ''
 except Exception:
     ANTHROPIC_API_KEY = ''
-AI_AGENT_MODEL = config('AI_AGENT_MODEL', default='claude-sonnet-4-20250514')
+try:
+    OPENAI_API_KEY = config('OPENAI_API_KEY') or ''
+except Exception:
+    OPENAI_API_KEY = ''
+try:
+    GOOGLE_AI_API_KEY = config('GOOGLE_AI_API_KEY') or ''
+except Exception:
+    GOOGLE_AI_API_KEY = ''
+try:
+    XAI_API_KEY = config('XAI_API_KEY') or ''
+except Exception:
+    XAI_API_KEY = ''
+try:
+    GROQ_API_KEY = config('GROQ_API_KEY') or ''
+except Exception:
+    GROQ_API_KEY = ''
+
+# Provider selection per use-case
+AI_CHAT_PROVIDER = config('AI_CHAT_PROVIDER', default='anthropic')  # business dashboard
+AI_CHAT_MODEL    = config('AI_CHAT_MODEL',    default='claude-sonnet-4-6')
+AI_WA_PROVIDER   = config('AI_WA_PROVIDER',   default='anthropic')  # WhatsApp reply
+AI_WA_MODEL      = config('AI_WA_MODEL',      default='claude-sonnet-4-6')
+
+AI_AGENT_MODEL = config('AI_AGENT_MODEL', default='claude-sonnet-4-6')
 AI_AGENT_MAX_TOKENS = config('AI_AGENT_MAX_TOKENS', default=4096, cast=int)
 
 # Rate Limits (requests per minute)

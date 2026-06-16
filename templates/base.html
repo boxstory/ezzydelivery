@@ -24,6 +24,27 @@
   {% include "includes/footer.html" %}
   <!-- extra js -->
   {% include 'includes/scripts.html' %}
+  {% if not user.is_authenticated and GOOGLE_ONE_TAP_CLIENT_ID %}
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <div id="g_id_onload"
+       data-client_id="{{ GOOGLE_ONE_TAP_CLIENT_ID }}"
+       data-callback="handleOneTapCredentialResponse"
+       data-auto_prompt="true"
+       data-cancel_on_tap_outside="false"
+       data-itp_support="true">
+  </div>
+  <script>
+  function handleOneTapCredentialResponse(response) {
+    var fd = new FormData();
+    fd.append('credential', response.credential);
+    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    fetch("{% url 'core:google_one_tap' %}", { method: 'POST', body: fd })
+      .then(function(r) { return r.json(); })
+      .then(function(data) { if (data.success) window.location.href = data.redirect; })
+      .catch(function() {});
+  }
+  </script>
+  {% endif %}
   {% block extra_js %}
   {% endblock extra_js %}
 </body>

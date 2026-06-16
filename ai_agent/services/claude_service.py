@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Pricing per 1M tokens (as of 2024)
 PRICING = {
+    'claude-sonnet-4-6': {'input': 3.00, 'output': 15.00},
     'claude-sonnet-4-20250514': {'input': 3.00, 'output': 15.00},
     'claude-3-5-sonnet-20241022': {'input': 3.00, 'output': 15.00},
     'claude-3-haiku-20240307': {'input': 0.25, 'output': 1.25},
@@ -308,7 +309,7 @@ class ClaudeService:
 
     def __init__(self):
         self.api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
-        self.model = getattr(settings, 'AI_AGENT_MODEL', 'claude-sonnet-4-20250514')
+        self.model = getattr(settings, 'AI_AGENT_MODEL', 'claude-sonnet-4-6')
         self.max_tokens = getattr(settings, 'AI_AGENT_MAX_TOKENS', 4096)
         self.enabled = getattr(settings, 'AI_AGENT_ENABLED', True)
 
@@ -344,7 +345,7 @@ class ClaudeService:
 
     def _calculate_cost(self, tokens_input: int, tokens_output: int) -> Decimal:
         """Calculate cost for token usage."""
-        pricing = PRICING.get(self.model, PRICING['claude-sonnet-4-20250514'])
+        pricing = PRICING.get(self.model, PRICING['claude-sonnet-4-6'])
 
         input_cost = (tokens_input / 1_000_000) * pricing['input']
         output_cost = (tokens_output / 1_000_000) * pricing['output']

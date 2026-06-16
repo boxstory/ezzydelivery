@@ -16,9 +16,8 @@
                         <div class="col-lg-8">
                             <div class="card mb-4" id="core_profile_add_card_info">
                                 <div class="card-body">
-                                    <!-- WhatsApp & Phone Validation Alerts (added dynamically by JS) -->
+                                    <!-- Phone Validation Alert (added dynamically by JS) -->
                                     <div id="core_profile_add_phone_alert_container"></div>
-                                    <div id="core_profile_add_whatsapp_alert_container"></div>
 
                                     {% if profileaddform.errors %}
                                         <div class="alert alert-danger alert-dismissible fade show">
@@ -74,26 +73,44 @@
                                             </p>
                                         </div>
                                         <div class="col-sm-9">
-                                            <p class="mb-0">{{ profileaddform.phone | as_crispy_field }}</p>
+                                            {{ profileaddform.phone }}
+                                            {% if profileaddform.phone.errors %}<div class="text-danger small mb-1">{{ profileaddform.phone.errors|join:", " }}</div>{% endif %}
+                                            <div class="input-group">
+                                                <select id="core_profile_add_phone_code" class="form-select" style="max-width:160px;">
+                                                    <option value="974" selected>🇶🇦 +974 Qatar</option>
+                                                    <option value="971">🇦🇪 +971 UAE</option>
+                                                    <option value="966">🇸🇦 +966 Saudi</option>
+                                                    <option value="965">🇰🇼 +965 Kuwait</option>
+                                                    <option value="973">🇧🇭 +973 Bahrain</option>
+                                                    <option value="968">🇴🇲 +968 Oman</option>
+                                                    <option value="962">🇯🇴 +962 Jordan</option>
+                                                    <option value="961">🇱🇧 +961 Lebanon</option>
+                                                    <option value="91">🇮🇳 +91 India</option>
+                                                    <option value="92">🇵🇰 +92 Pakistan</option>
+                                                    <option value="977">🇳🇵 +977 Nepal</option>
+                                                    <option value="63">🇵🇭 +63 Philippines</option>
+                                                    <option value="94">🇱🇰 +94 Sri Lanka</option>
+                                                    <option value="880">🇧🇩 +880 Bangladesh</option>
+                                                    <option value="20">🇪🇬 +20 Egypt</option>
+                                                    <option value="1">🇺🇸 +1 USA</option>
+                                                    <option value="44">🇬🇧 +44 UK</option>
+                                                    <option value="other">Other...</option>
+                                                </select>
+                                                <input type="text" id="core_profile_add_phone_code_custom" class="form-control" placeholder="+code" inputmode="numeric" maxlength="5" style="display:none; max-width:70px;">
+                                                <input type="text" id="core_profile_add_phone_local" class="form-control" placeholder="Local number" inputmode="numeric" maxlength="12">
+                                            </div>
                                             <div id="core_profile_add_phone_status_message" class="text-danger small mt-1" style="display: none;"></div>
                                         </div>
                                     </div>
                                     <hr />
                                     <div class="row">
                                         <div class="col-sm-3">
-                                            <p class="mb-0">Whatsapp
-                                                <span id="core_profile_add_whatsapp_status_icon" style="display: none; margin-left: 0.5rem;">
-                                                    <i class="fa-solid fa-circle-xmark text-danger"></i>
-                                                </span>
-                                            </p>
+                                            <p class="mb-0">Whatsapp</p>
                                         </div>
                                         <div class="col-sm-9">
-                                            <p class="text-muted mb-0">
-                                                {{ profileaddform.whatsapp.error }}
-                                                {{ profileaddform.whatsapp | as_crispy_field }}
-                                            </p>
-                                            <small class="text-muted d-block mt-1">Format: 10-15 digits. Examples: 97433123456 (Qatar), 971501234567 (UAE), 12025551234 (USA), 923001234567 (Pakistan)</small>
-                                            <div id="core_profile_add_whatsapp_status_message" class="text-danger small mt-1" style="display: none;"></div>
+                                            {{ profileaddform.whatsapp }}
+                                            {% if profileaddform.whatsapp.errors %}<div class="text-danger small mb-1">{{ profileaddform.whatsapp.errors|join:", " }}</div>{% endif %}
+                                            <input type="text" id="core_profile_add_wa_full" class="form-control" placeholder="e.g. 97466123456" inputmode="numeric" maxlength="15">
                                         </div>
                                     </div>
                                     <hr />
@@ -134,139 +151,94 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const whatsappInput = document.querySelector('[name="whatsapp"]');
-    const phoneInput = document.querySelector('[name="phone"]');
-    const whatsappStatusIcon = document.getElementById('core_profile_add_whatsapp_status_icon');
-    const whatsappStatusMessage = document.getElementById('core_profile_add_whatsapp_status_message');
-    const phoneStatusIcon = document.getElementById('core_profile_add_phone_status_icon');
-    const phoneStatusMessage = document.getElementById('core_profile_add_phone_status_message');
-    const phoneAlertContainer = document.getElementById('core_profile_add_phone_alert_container');
-    const whatsappAlertContainer = document.getElementById('core_profile_add_whatsapp_alert_container');
-    const submitButton = document.getElementById('core_profile_update_btn_submit');
+    const phoneInput      = document.querySelector('[name="phone"]');
+    const whatsappInput   = document.querySelector('[name="whatsapp"]');
+    const phoneCode       = document.getElementById('core_profile_add_phone_code');
+    const phoneCodeCustom = document.getElementById('core_profile_add_phone_code_custom');
+    const phoneLocal      = document.getElementById('core_profile_add_phone_local');
+    const waFull          = document.getElementById('core_profile_add_wa_full');
 
-    if (!whatsappInput || !phoneInput) return;
+    const phoneStatusIcon       = document.getElementById('core_profile_add_phone_status_icon');
+    const phoneStatusMessage    = document.getElementById('core_profile_add_phone_status_message');
+    const phoneAlertContainer   = document.getElementById('core_profile_add_phone_alert_container');
+    const submitButton          = document.getElementById('core_profile_update_btn_submit');
 
-    whatsappInput.type = 'text';
-    whatsappInput.inputMode = 'numeric';
-    phoneInput.type = 'text';
-    phoneInput.inputMode = 'numeric';
+    if (!phoneInput || !whatsappInput || !phoneCode || !phoneLocal) return;
 
-    let isWhatsAppAvailable = true;
+    const COUNTRY_CODES = ['974','971','966','965','973','968','962','961','977','880','91','92','63','94','20','44','1'];
+
+    function parseStoredNumber(value) {
+        if (!value) return { code: '974', local: '' };
+        const digits = String(value).replace(/\D/g, '');
+        const sorted = [...COUNTRY_CODES].sort((a, b) => b.length - a.length);
+        for (const code of sorted) {
+            if (digits.startsWith(code)) return { code, local: digits.slice(code.length) };
+        }
+        return { code: 'other', local: digits };
+    }
+
+    function getPhoneCode() {
+        return phoneCode.value === 'other' ? phoneCodeCustom.value.replace(/\D/g, '') : phoneCode.value;
+    }
+
+    function syncPhoneHidden() {
+        const code  = getPhoneCode();
+        const local = phoneLocal.value.replace(/\D/g, '');
+        phoneInput.value = (code && local) ? code + local : '';
+    }
+
+    function syncWaHidden() {
+        whatsappInput.value = waFull ? waFull.value.replace(/\D/g, '') : '';
+    }
+
+    function autoFillWa() {
+        if (!whatsappManuallyEdited && waFull) {
+            waFull.value = phoneInput.value;
+            syncWaHidden();
+        }
+    }
+
+    function toggleCustomCode(selectEl, customEl) {
+        if (selectEl.value === 'other') {
+            customEl.style.display = '';
+            customEl.focus();
+        } else {
+            customEl.style.display = 'none';
+            customEl.value = '';
+        }
+    }
+
+    // Restore split fields from stored value (after form re-render with errors)
+    const initPhone = parseStoredNumber(phoneInput.value);
+    if (COUNTRY_CODES.includes(initPhone.code)) {
+        phoneCode.value  = initPhone.code;
+        phoneCodeCustom.style.display = 'none';
+    } else {
+        phoneCode.value  = 'other';
+        phoneCodeCustom.value = initPhone.code;
+        phoneCodeCustom.style.display = '';
+    }
+    phoneLocal.value = initPhone.local;
+
+    // Restore WA field from stored value
+    if (waFull) waFull.value = whatsappInput.value || phoneInput.value;
+    syncWaHidden();
+
     let isPhoneAvailable = true;
-    let currentErrorMessage = '';
+    let whatsappManuallyEdited = !!(whatsappInput.value && whatsappInput.value !== phoneInput.value);
+    let phoneDebounceTimer;
 
     if (phoneStatusIcon) {
         phoneStatusIcon.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (phoneStatusMessage && phoneStatusMessage.textContent) {
+            e.preventDefault(); e.stopPropagation();
+            if (phoneStatusMessage && phoneStatusMessage.textContent)
                 alert('⚠️ Phone Error:\n\n' + phoneStatusMessage.textContent);
-            }
-        });
-    }
-
-    if (whatsappStatusIcon) {
-        whatsappStatusIcon.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (currentErrorMessage) {
-                alert('⚠️ WhatsApp Error:\n\n' + currentErrorMessage);
-            }
-        });
-    }
-
-    function checkWhatsAppAvailability() {
-        const whatsappNumber = whatsappInput.value.trim();
-
-        if (!whatsappNumber) {
-            whatsappStatusIcon.style.display = 'none';
-            whatsappStatusMessage.style.display = 'none';
-            whatsappAlertContainer.innerHTML = '';
-            whatsappInput.style.borderColor = '';
-            whatsappInput.classList.remove('is-invalid');
-            isWhatsAppAvailable = false;
-            updateButtonStates();
-            return;
-        }
-
-        whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-warning"></i>';
-        whatsappStatusIcon.style.display = 'inline-block';
-
-        fetch(`{% url 'core:check_whatsapp_availability' %}?whatsapp=${encodeURIComponent(whatsappNumber)}&phone=${encodeURIComponent(phoneInput.value.trim())}`, {
-            method: 'GET',
-            headers: {'Content-Type': 'application/json'},
-            credentials: 'same-origin'
-        })
-        .then(response => {
-            if (!response.ok) {
-                isWhatsAppAvailable = true;
-                whatsappStatusIcon.style.display = 'none';
-                whatsappStatusMessage.style.display = 'none';
-                whatsappAlertContainer.innerHTML = '';
-                updateButtonStates();
-                return null;
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data) return;
-
-            isWhatsAppAvailable = data.available;
-
-            if (data.available) {
-                whatsappStatusIcon.style.display = 'inline-block';
-                whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-check-circle text-success"></i>';
-                whatsappStatusMessage.style.display = 'none';
-                whatsappStatusMessage.textContent = '';
-                whatsappAlertContainer.innerHTML = '';
-                whatsappInput.style.borderColor = '';
-                whatsappInput.classList.remove('is-invalid');
-            } else {
-                const errorMsg = data.message || 'This WhatsApp number is already in use';
-                currentErrorMessage = errorMsg;
-
-                whatsappStatusIcon.style.display = 'inline-block';
-                whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger"></i>';
-                whatsappStatusIcon.title = `Click to see error: ${errorMsg}`;
-
-                whatsappStatusMessage.style.display = 'block';
-                whatsappStatusMessage.textContent = errorMsg;
-
-                const alertHTML = `
-                    <div class="alert alert-danger d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
-                        <i class="fa-solid fa-circle-xmark fs-5 mt-1"></i>
-                        <div>
-                            <strong class="d-block mb-1">⚠️ WhatsApp Format Error</strong>
-                            <span class="small">${errorMsg}</span>
-                        </div>
-                    </div>
-                `;
-                whatsappAlertContainer.innerHTML = alertHTML;
-
-                whatsappInput.style.borderColor = '#dc3545';
-                whatsappInput.classList.add('is-invalid');
-
-                setTimeout(() => {
-                    whatsappAlertContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }, 100);
-            }
-
-            updateButtonStates();
-        })
-        .catch(error => {
-            console.error('Error checking WhatsApp:', error);
-            isWhatsAppAvailable = true;
-            whatsappStatusIcon.style.display = 'none';
-            whatsappStatusMessage.style.display = 'none';
-            whatsappAlertContainer.innerHTML = '';
-            updateButtonStates();
         });
     }
 
     function checkPhoneAvailability() {
-        const phoneNumber = phoneInput.value.trim();
-
-        if (!phoneNumber) {
+        const phNumber = phoneInput.value.trim();
+        if (!phNumber) {
             phoneStatusIcon.style.display = 'none';
             phoneStatusMessage.style.display = 'none';
             phoneAlertContainer.innerHTML = '';
@@ -274,124 +246,74 @@ document.addEventListener('DOMContentLoaded', function() {
             updateButtonStates();
             return;
         }
-
-        const params = new URLSearchParams({
-            phone: phoneNumber,
-            whatsapp: whatsappInput.value.trim()
-        });
-        fetch(`{% url 'core:check_phone_availability' %}?${params.toString()}`, {
-            method: 'GET',
-            headers: {'Content-Type': 'application/json'},
-            credentials: 'same-origin'
+        fetch(`{% url 'core:check_phone_availability' %}?phone=${encodeURIComponent(phNumber)}&whatsapp=${encodeURIComponent(whatsappInput.value.trim())}`, {
+            method: 'GET', headers: {'Content-Type': 'application/json'}, credentials: 'same-origin'
         })
-        .then(response => {
-            if (!response.ok) {
-                isPhoneAvailable = true;
-                phoneStatusIcon.style.display = 'none';
-                phoneStatusMessage.style.display = 'none';
-                phoneAlertContainer.innerHTML = '';
-                return null;
-            }
-            return response.json();
-        })
+        .then(r => r.ok ? r.json() : null)
         .then(data => {
-            if (!data) return;
-
+            if (!data) { isPhoneAvailable = true; phoneStatusIcon.style.display = 'none'; phoneAlertContainer.innerHTML = ''; updateButtonStates(); return; }
             isPhoneAvailable = data.available;
-
             if (!data.available) {
-                const phoneErrorMsg = data.message || 'This phone number is already in use';
-
+                const msg = data.message || 'This phone number is already in use';
                 phoneStatusIcon.style.display = 'inline-block';
-                phoneStatusIcon.title = `Click to see error: ${phoneErrorMsg}`;
-
+                phoneStatusMessage.textContent = msg;
                 phoneStatusMessage.style.display = 'block';
-                phoneStatusMessage.textContent = phoneErrorMsg;
-
-                const alertHTML = `
-                    <div class="alert alert-danger d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
-                        <i class="fa-solid fa-circle-xmark fs-5 mt-1"></i>
-                        <div>
-                            <strong class="d-block mb-1">Phone Number Not Available</strong>
-                            <span class="small">${phoneErrorMsg}</span>
-                        </div>
-                    </div>
-                `;
-                phoneAlertContainer.innerHTML = alertHTML;
-
-                phoneInput.style.borderColor = '#dc3545';
-                phoneInput.classList.add('is-invalid');
-
-                setTimeout(() => {
-                    phoneAlertContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }, 100);
+                phoneAlertContainer.innerHTML = `<div class="alert alert-danger d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert"><i class="fa-solid fa-circle-xmark fs-5 mt-1"></i><div><strong class="d-block mb-1">Phone Not Available</strong><span class="small">${msg}</span></div></div>`;
+                phoneLocal.classList.add('is-invalid');
+                setTimeout(() => phoneAlertContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
             } else {
                 phoneStatusIcon.style.display = 'none';
                 phoneStatusMessage.style.display = 'none';
-                phoneStatusMessage.textContent = '';
                 phoneAlertContainer.innerHTML = '';
-                phoneInput.style.borderColor = '';
-                phoneInput.classList.remove('is-invalid');
+                phoneLocal.classList.remove('is-invalid');
             }
-
             updateButtonStates();
         })
-        .catch(error => {
-            console.error('Error checking phone:', error);
-            isPhoneAvailable = true;
-            phoneStatusIcon.style.display = 'none';
-            phoneStatusMessage.style.display = 'none';
-            phoneAlertContainer.innerHTML = '';
-            updateButtonStates();
-        });
+        .catch(() => { isPhoneAvailable = true; phoneStatusIcon.style.display = 'none'; phoneAlertContainer.innerHTML = ''; updateButtonStates(); });
     }
 
     function updateButtonStates() {
-        const bothAvailable = isPhoneAvailable && isWhatsAppAvailable;
-
         if (submitButton) {
-            submitButton.disabled = !bothAvailable;
-            submitButton.style.opacity = bothAvailable ? '1' : '0.5';
-            submitButton.style.cursor = bothAvailable ? 'pointer' : 'not-allowed';
-
-            if (!bothAvailable) {
-                let issues = [];
-                if (!isPhoneAvailable) issues.push('Mobile number');
-                if (!isWhatsAppAvailable) issues.push('WhatsApp number');
-                submitButton.title = `⚠️ Fix ${issues.join(' and ')} (must be available and unique)`;
-            } else {
-                submitButton.title = 'Submit your profile';
-            }
+            submitButton.disabled = !isPhoneAvailable;
+            submitButton.style.opacity = isPhoneAvailable ? '1' : '0.5';
+            submitButton.style.cursor  = isPhoneAvailable ? 'pointer' : 'not-allowed';
+            submitButton.title = isPhoneAvailable ? 'Submit your profile' : '⚠️ Fix Mobile number';
         }
     }
 
-    checkWhatsAppAvailability();
-    checkPhoneAvailability();
-
-    let debounceTimer;
-    let phoneDebounceTimer;
-
-    whatsappInput.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            checkWhatsAppAvailability();
-        }, 1500);
+    // Phone code select — show/hide custom input and re-sync WA
+    phoneCode.addEventListener('change', function() {
+        toggleCustomCode(phoneCode, phoneCodeCustom);
+        syncPhoneHidden();
+        autoFillWa();
     });
 
-    phoneInput.addEventListener('input', function() {
-        clearTimeout(phoneDebounceTimer);
-        phoneDebounceTimer = setTimeout(() => {
+    // Phone split inputs
+    [phoneCodeCustom, phoneLocal].forEach(el => {
+        el.addEventListener('input', function() {
+            syncPhoneHidden();
+            autoFillWa();
+            clearTimeout(phoneDebounceTimer);
+            phoneDebounceTimer = setTimeout(checkPhoneAvailability, 1500);
+        });
+        el.addEventListener('blur', function() {
+            syncPhoneHidden();
+            autoFillWa();
             checkPhoneAvailability();
-        }, 1500);
+        });
     });
 
-    whatsappInput.addEventListener('blur', function() {
-        checkWhatsAppAvailability();
-    });
+    // WhatsApp editable input
+    if (waFull) {
+        waFull.addEventListener('input', function() {
+            whatsappManuallyEdited = true;
+            syncWaHidden();
+        });
+    }
 
-    phoneInput.addEventListener('blur', function() {
-        checkPhoneAvailability();
-    });
+    // Initial availability check if values already set
+    if (phoneInput.value) checkPhoneAvailability();
+    updateButtonStates();
 });
 </script>
 {% endblock content %}

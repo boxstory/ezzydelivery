@@ -101,11 +101,9 @@
           {% if order.cod_amount %}
           <div class="oal__table-cod-cell">
             <span class="oal__table-cod-value">{{ order.cod_amount }} QR</span>
-            <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}collected{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
-              {% if order.cod_status_by_staff == 'fully_paid' %}<i class="fa-solid fa-check"></i> Collected
-              {% elif order.cod_status_by_staff == 'cod_with_driver' %}<i class="fa-solid fa-user-check"></i> With Driver
-              {% elif order.cod_status_by_staff == 'cod_with_ezzy' %}<i class="fa-solid fa-building"></i> With Ezzy
-              {% elif order.cod_status_by_staff == 'partially_collected' %}<i class="fa-solid fa-adjust"></i> Partial
+            <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' or order.cod_status_by_staff == 'cod_with_driver' or order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+              {% if order.cod_status_by_staff == 'fully_paid' or order.cod_status_by_staff == 'cod_with_driver' or order.cod_status_by_staff == 'cod_with_ezzy' %}<i class="fa-solid fa-check"></i> Collected
+              {% elif order.cod_status_by_staff == 'partially_collected' %}<i class="fa-solid fa-check"></i> Collected (Partial)
               {% elif order.cod_status_by_staff == 'cod_settled_with_business' %}<i class="fa-solid fa-handshake"></i> Settled
               {% else %}<i class="fa-solid fa-hourglass-half"></i> Pending
               {% endif %}
@@ -128,15 +126,11 @@
               <i class="fa-solid fa-box-open"></i> Low Stock
             </span>
             {% endif %}
-            <span class="ob__ ob__--{{ order.order_status }} status-cell__display">
-              <i class="fa-solid {% if order.order_status == 'publish' %}fa-rocket{% elif order.order_status == 'ready_to_pickup' %}fa-clipboard-check{% elif order.order_status == 'cancelled' %}fa-ban{% elif order.order_status == 'delivered' %}fa-check{% else %}fa-clock{% endif %}"></i>
-              {{ order.get_order_status_display }}
-              <i class="fa-solid fa-pen-to-square status-cell__edit-icon"></i>
-            </span>
             {% with delivery=order.delivery_task.first %}
-            <span class="ob__ ob__--dl-{% if delivery %}{{ delivery.dl_task_status }}{% elif order.task_created %}task_created{% elif order.order_status == 'publish' %}published{% else %}none{% endif %}">
-              <i class="fa-solid {% if delivery and delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery and delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery and delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery and delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% elif order.task_created %}fa-clipboard-check{% elif order.order_status == 'publish' %}fa-paper-plane{% else %}fa-minus{% endif %}"></i>
-              {% if delivery and delivery.dl_task_status == 'delivered' %}Delivered{% elif delivery and delivery.dl_task_status == 'assigned' %}Assigned{% elif delivery and delivery.dl_task_status == 'accepted' %}Accepted{% elif delivery and delivery.dl_task_status == 'picked_up' %}Picked Up{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}In Transit{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}Failed{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}Cancelled{% elif order.task_created %}Task Created{% elif order.order_status == 'publish' %}In DL Task{% else %}No Task{% endif %}
+            <span class="ob__ ob__--{% if delivery %}dl-{{ delivery.dl_task_status }}{% elif order.task_created %}dl-task_created{% else %}{{ order.order_status }}{% endif %} status-cell__display">
+              <i class="fa-solid {% if delivery %}{% if delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% else %}fa-minus{% endif %}{% elif order.task_created %}fa-clipboard-check{% elif order.order_status == 'publish' %}fa-rocket{% elif order.order_status == 'ready_to_pickup' %}fa-clipboard-check{% elif order.order_status == 'cancelled' %}fa-ban{% elif order.order_status == 'delivered' %}fa-check{% else %}fa-clock{% endif %}"></i>
+              {% if delivery %}{% if delivery.dl_task_status == 'delivered' %}Delivered{% elif delivery.dl_task_status == 'assigned' %}Assigned{% elif delivery.dl_task_status == 'accepted' %}Accepted{% elif delivery.dl_task_status == 'picked_up' %}Picked Up{% elif delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}In Transit{% elif delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}Failed{% elif delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}Cancelled{% else %}{{ delivery.get_dl_task_status_display }}{% endif %}{% elif order.task_created %}Task Created{% else %}{{ order.get_order_status_display }}{% endif %}
+              <i class="fa-solid fa-pen-to-square status-cell__edit-icon"></i>
             </span>
             {% if delivery and delivery.failure_reason %}
             <span class="oal__fail-reason" title="{% if delivery.failure_notes %}{{ delivery.failure_notes }}{% else %}{{ delivery.get_failure_reason_display }}{% endif %}">
