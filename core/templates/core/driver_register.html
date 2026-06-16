@@ -9,8 +9,12 @@
 
 {% block content %}
 <!-- Step Indicator -->
-{% with ob_step=3 ob_role='driver' %}
-    {% include "core/includes/ob_step_indicator.html" %}
+{% with ob_role='driver' %}
+    {% if show_status_only or profile.verification_status == 'verified' %}
+        {% with ob_step=4 %}{% include "core/includes/ob_step_indicator.html" %}{% endwith %}
+    {% else %}
+        {% with ob_step=3 %}{% include "core/includes/ob_step_indicator.html" %}{% endwith %}
+    {% endif %}
 {% endwith %}
 
 <div class="cdr__container" id="core_driver_register_container_main" style="border-radius: 0 0 var(--brand-radius-lg, 0.875rem) var(--brand-radius-lg, 0.875rem);">
@@ -50,22 +54,34 @@
             </a>
         </div>
 
-        {% elif profile.verification_status == 'pending' or profile.verification_status == 'under_review' %}
-        <!-- PENDING VERIFICATION -->
-        <div class="cdr__alert--warning">
-            <i class="fa-solid fa-clock me-2"></i>
-            <strong>Application Pending:</strong> Your driver verification is under review. We'll notify you once it's approved!
+        {% else %}
+        {% if show_status_only %}
+        <!-- STEP 4: STATUS ONLY - no form -->
+        <div class="text-center py-4">
+            <div class="mb-3">
+                <i class="fa-solid fa-hourglass-half fa-3x text-warning"></i>
+            </div>
+            <h4 class="fw-bold mb-2">Application Under Review</h4>
+            <p class="text-muted mb-4">
+                Your driver application has been submitted and is currently being reviewed by our team.<br>
+                We will notify you once a decision is made.
+            </p>
+            <div class="d-inline-flex flex-column gap-2 align-items-center">
+                <span class="badge bg-warning text-dark px-3 py-2 fs-6">
+                    <i class="fa-solid fa-clock me-2"></i>
+                    Status: {{ profile.get_verification_status_display }}
+                </span>
+            </div>
         </div>
-
-        <div class="cdr__action-buttons">
-            <a href="{% url 'core:profile_view' %}" class="btn cdr__btn-action cdr__btn-save">
+        <div class="cdr__action-buttons mt-4">
+            <a href="{% url 'core:driver_register' %}?edit=1" class="btn cdr__btn-action cdr__btn-save">
+                <i class="fa-solid fa-arrow-left me-2"></i>Back
+            </a>
+            <a href="{% url 'core:profile_view' %}" class="btn cdr__btn-action cdr__btn-change-role">
                 <i class="fa-solid fa-user me-2"></i>View Profile
             </a>
         </div>
-
-        {% else %}
-        <!-- NOT YET VERIFIED - Show Form -->
-        {% if completion_percentage >= 100 %}
+        {% elif completion_percentage >= 100 %}
         <div class="cdr__alert--success">
             <i class="fa-solid fa-check-circle me-2"></i>
             <strong>Ready to Apply!</strong> Your driver information is complete. Click "Apply for Verification" to submit your application.
@@ -77,7 +93,17 @@
         </div>
         {% endif %}
 
-        <form id="core_driver_register_form_main" method="post" novalidate>
+        {% if not show_status_only %}
+        {% if is_pending %}
+        <div class="alert alert-warning d-flex align-items-start gap-3 mb-4">
+            <i class="fa-solid fa-clock fs-5 mt-1"></i>
+            <div>
+                <strong class="d-block">Application Pending</strong>
+                <span class="small">Your application is under review. You can still update your details below.</span>
+            </div>
+        </div>
+        {% endif %}
+        <form id="core_driver_register_form_main" method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
 
             <!-- Contact Information -->
@@ -110,11 +136,24 @@
 
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label">Driver License Number <span class="text-danger">*</span></label>
-                    {{ form.driver_license_number }}
-                    {% if form.driver_license_number.errors %}
-                        <div class="text-danger small">{{ form.driver_license_number.errors }}</div>
-                    {% endif %}
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="form-check form-switch mb-0 d-flex align-items-center gap-2">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="id_has_driver_license" name="has_driver_license"
+                                   style="width:3em; height:1.5em; cursor:pointer;"
+                                   {% if form.has_driver_license.value %}checked{% endif %}>
+                            <label class="form-check-label mb-0" for="id_has_driver_license">
+                                License Available <span class="text-danger">*</span>
+                            </label>
+                        </div>
+                        <div id="core_driver_license_number_wrap" style="display:none; flex:1;">
+                            <label class="form-label mb-1" for="{{ form.driver_license_number.id_for_label }}">License Number</label>
+                            {{ form.driver_license_number }}
+                            {% if form.driver_license_number.errors %}
+                                <div class="text-danger small">{{ form.driver_license_number.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-md-6">
@@ -134,16 +173,83 @@
                 </div>
             </div>
 
+            <!-- Vehicle Section -->
+            <div class="cdr__section-title mt-4">
+                <i class="fa-solid fa-car-side me-2"></i>Vehicle
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Vehicle Type <span class="text-danger">*</span></label>
+                    {{ vehicle_form.vehicle_type }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Plate Number</label>
+                    {{ vehicle_form.vehicle_no }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Model <span class="text-danger">*</span></label>
+                    {{ vehicle_form.vehicle_model }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Color</label>
+                    {{ vehicle_form.vehicle_color }}
+                </div>
+            </div>
+
+            <!-- Documents Section -->
+            <div class="cdr__section-title mt-4">
+                <i class="fa-solid fa-file-alt me-2"></i>Documents
+            </div>
+            <div class="row g-3">
+                {% for item in doc_list %}
+                <div class="col-md-6">
+                    <div class="border rounded p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label fw-semibold mb-0">{{ item.type }}</label>
+                            {% if item.doc %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle small">
+                                <i class="fa-solid fa-check me-1"></i>Uploaded
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle small">
+                                <i class="fa-solid fa-upload me-1"></i>Missing
+                            </span>
+                            {% endif %}
+                        </div>
+                        <input type="text" name="doc_no_{{ item.key }}" class="form-control form-control-sm mb-2"
+                               placeholder="{{ item.type }} number"
+                               value="{{ item.doc.document_no|default:'' }}">
+                        <input type="file" name="doc_{{ item.key }}" class="form-control form-control-sm" accept="image/*,.pdf">
+                        {% if item.doc and item.doc.document_file %}
+                        <div class="mt-2">
+                            <img src="{{ item.doc.document_file.url }}" alt="{{ item.type }}"
+                                 class="img-thumbnail" style="max-height:80px; max-width:100%; object-fit:cover; cursor:pointer;"
+                                 onclick="window.open(this.src,'_blank')"
+                                 title="Click to view full size">
+                            <div class="small text-muted mt-1">
+                                <i class="fa-solid fa-file-image me-1"></i>{{ item.doc.document_file.name|slice:"-25:" }}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
             <!-- Action Buttons -->
             <div class="cdr__action-buttons">
+                <a href="{% if is_pending %}{% url 'core:driver_register' %}{% else %}{% url 'core:profile_complete_update' %}{% endif %}" class="btn cdr__btn-action cdr__btn-save">
+                    <i class="fa-solid fa-arrow-left me-2"></i>Back
+                </a>
+
                 <button id="core_driver_register_btn_save" type="submit" name="action" value="save" class="btn cdr__btn-action cdr__btn-save">
                     <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
                 </button>
 
                 <button id="core_driver_register_btn_apply" type="submit" name="action" value="apply_verification"
-                        class="btn cdr__btn-action cdr__btn-apply"
-                        {% if completion_percentage < 100 %}disabled{% endif %}>
-                    <i class="fa-solid fa-paper-plane me-2"></i>Apply for Verification
+                        class="btn cdr__btn-action cdr__btn-apply">
+                    <i class="fa-solid fa-paper-plane me-2"></i>Save & Submit for Verification
                 </button>
             </div>
 
@@ -155,6 +261,29 @@
             {% endif %}
         </form>
         {% endif %}
+        {% endif %}
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const toggle = document.getElementById('{{ form.has_driver_license.id_for_label }}');
+    const wrap   = document.getElementById('core_driver_license_number_wrap');
+    if (!toggle || !wrap) return;
+    function update() { wrap.style.display = toggle.checked ? '' : 'none'; }
+    toggle.addEventListener('change', update);
+    update();
+});
+</script>
+
+{% if not is_update and profile.phone %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const profilePhone = '{{ profile.phone }}';
+    const phoneField    = document.querySelector('[name="driver_phone"]');
+    const whatsappField = document.querySelector('[name="driver_whatsapp"]');
+    if (phoneField && !phoneField.value)    phoneField.value    = profilePhone;
+    if (whatsappField && !whatsappField.value) whatsappField.value = profilePhone;
+});
+</script>
+{% endif %}
 {% endblock content %}

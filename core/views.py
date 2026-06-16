@@ -150,6 +150,22 @@ def calculate_completion_percentage(obj, required_fields):
     return int((completed / len(required_fields)) * 100)
 
 
+def calculate_driver_completion(driver):
+    """Completion % for driver registration including vehicle type, model, and documents."""
+    DRIVER_FIELDS = ['driver_phone', 'driver_whatsapp', 'driver_languages', 'driver_bio', 'has_driver_license']
+    TOTAL = len(DRIVER_FIELDS) + 3  # +2 vehicle, +1 documents (min 2 required)
+    completed = sum(1 for f in DRIVER_FIELDS if getattr(driver, f, None))
+    vehicle = driver.driver_vehicle.filter(vehicle_type__isnull=False).exclude(vehicle_type='none').first()
+    if vehicle:
+        completed += 1
+        if vehicle.vehicle_model:
+            completed += 1
+    doc_count = driver.driver_document.filter(document_file__isnull=False).exclude(document_file='').count()
+    if doc_count >= 2:
+        completed += 1
+    return int((completed / TOTAL) * 100)
+
+
 def validate_image_upload(uploaded_file):
     """Validate uploaded image file"""
     # Check if it's an actual uploaded file (not an ImageFieldFile from database)
@@ -1024,6 +1040,10 @@ def profile_complete_update(request):
         messages.error(request, "Please create a profile first!")
         return redirect('core:profile_add')
 
+    # Redirect pending/under_review drivers straight to step 4
+    if profile.is_driver and profile.verification_status in ('pending', 'under_review'):
+        return redirect('core:driver_register')
+
     # Ensure profile username matches Django User username
     if profile.username != request.user.username:
         profile.username = request.user.username
@@ -1259,8 +1279,12 @@ def driver_register(request):
         driver = None
         is_update = False
 
+    # Primary vehicle (one per driver, edit in place)
+    primary_vehicle = driver.driver_vehicle.first() if driver else None
+
     if request.method == 'POST':
         form = fleet_forms.DriverJoinForm(request.POST, instance=driver)
+        vehicle_form = fleet_forms.DriverVehicleForm(request.POST, request.FILES, prefix='veh', instance=primary_vehicle)
         action = request.POST.get('action')
 
         if form.is_valid():
@@ -1279,10 +1303,31 @@ def driver_register(request):
 
             driver.save()
 
-            # Calculate completion
-            required_fields = ['driver_phone', 'driver_whatsapp', 'driver_languages',
-                             'driver_license_number', 'driver_bio']
-            completion_percentage = calculate_completion_percentage(driver, required_fields)
+            # Save/update primary vehicle if a type is selected
+            veh_type = request.POST.get('veh-vehicle_type', '')
+            if veh_type and veh_type != 'none' and vehicle_form.is_valid():
+                vehicle = vehicle_form.save(commit=False)
+                vehicle.driver = driver
+                vehicle.save()
+                primary_vehicle = vehicle
+
+            # Save documents (QID, Passport, Driving License, Istimara)
+            DOC_TYPES = ['QID', 'Passport', 'Driving License', 'Istimara']
+            for doc_type in DOC_TYPES:
+                file_key = f'doc_{doc_type.replace(" ", "_")}'
+                if file_key in request.FILES:
+                    doc, _ = fleet_models.DriverDocument.objects.get_or_create(
+                        driver=driver, document_type=doc_type,
+                        defaults={'document_no': ''}
+                    )
+                    doc.document_file = request.FILES[file_key]
+                    doc_no = request.POST.get(f'doc_no_{doc_type.replace(" ", "_")}', '')
+                    if doc_no:
+                        doc.document_no = doc_no
+                    doc.save()
+
+            # Calculate completion (includes vehicle_type + vehicle_model)
+            completion_percentage = calculate_driver_completion(driver)
 
             if action == 'save':
                 messages.success(request, f"Driver information saved! ({completion_percentage}% complete)")
@@ -1300,29 +1345,46 @@ def driver_register(request):
                     return redirect('core:profile_view')
                 else:
                     logger.warning(f"Incomplete driver profile for user {request.user.id}: {completion_percentage}%")
-                    messages.error(request, f"Please complete all required fields. ({completion_percentage}% complete)")
+                    messages.warning(request, f"Progress saved ({completion_percentage}% complete). Fill all required fields to submit for verification.")
+                    return redirect('core:driver_register')
         else:
+            vehicle_form = fleet_forms.DriverVehicleForm(prefix='veh', instance=primary_vehicle)
             logger.warning(f"Invalid driver form for user {request.user.id}")
             messages.error(request, "Please correct the errors below.")
     else:
         form = fleet_forms.DriverJoinForm(instance=driver)
+        vehicle_form = fleet_forms.DriverVehicleForm(prefix='veh', instance=primary_vehicle)
 
-    # Calculate completion
-    if driver:
-        required_fields = ['driver_phone', 'driver_whatsapp', 'driver_languages',
-                         'driver_license_number', 'driver_bio']
-        completion_percentage = calculate_completion_percentage(driver, required_fields)
-    else:
-        completion_percentage = 0
+    # Calculate completion (includes vehicle_type + vehicle_model)
+    completion_percentage = calculate_driver_completion(driver) if driver else 0
 
     can_apply = profile.can_apply_for_verification()
 
+    # Build documents list for template
+    DOC_TYPES = ['QID', 'Passport', 'Driving License', 'Istimara']
+    existing_docs = {}
+    if driver:
+        for doc in driver.driver_document.filter(document_type__in=DOC_TYPES):
+            existing_docs[doc.document_type] = doc
+    doc_list = [
+        {'type': dt, 'key': dt.replace(' ', '_'), 'doc': existing_docs.get(dt)}
+        for dt in DOC_TYPES
+    ]
+
+    is_pending = profile.verification_status in ('pending', 'under_review')
+    edit_mode = request.GET.get('edit') == '1'
+    show_status_only = is_pending and not edit_mode
+
     context = {
         'form': form,
+        'vehicle_form': vehicle_form,
         'profile': profile,
         'completion_percentage': completion_percentage,
         'can_apply': can_apply,
         'is_update': is_update,
+        'doc_list': doc_list,
+        'show_status_only': show_status_only,
+        'is_pending': is_pending,
     }
     return render(request, 'core/driver_register.html', context)
 
@@ -1542,3 +1604,63 @@ class RateLimitedSignupView(SignupView):
 def rate_limit_exceeded(request, exception=None):
     """Handle 429 Too Many Attempts errors."""
     return render(request, '429.html', status=429)
+
+
+@require_POST
+def google_one_tap_callback(request):
+    # Purpose: Verify Google One Tap JWT credential, find/create user, return redirect URL
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+    from allauth.socialaccount.models import SocialApp, SocialAccount
+    from allauth.account.models import EmailAddress
+    from django.contrib.auth import login as auth_login
+    from django.conf import settings as django_settings
+
+    credential = request.POST.get('credential', '').strip()
+    if not credential:
+        return JsonResponse({'error': 'missing credential'}, status=400)
+
+    try:
+        app = SocialApp.objects.get(provider='google')
+        idinfo = id_token.verify_oauth2_token(
+            credential, google_requests.Request(), app.client_id
+        )
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+    google_sub = idinfo['sub']
+    email = idinfo.get('email', '')
+    first_name = idinfo.get('given_name', '')
+    last_name = idinfo.get('family_name', '')
+
+    try:
+        social = SocialAccount.objects.select_related('user').get(
+            provider='google', uid=google_sub
+        )
+        user = social.user
+    except SocialAccount.DoesNotExist:
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            base = email.split('@')[0][:8].lower()
+            suffix = secrets.token_hex(2)
+            username = f"{base}{suffix}"[:12]
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+            )
+            user.set_unusable_password()
+            user.save()
+            EmailAddress.objects.get_or_create(
+                user=user, email=email,
+                defaults={'verified': True, 'primary': True}
+            )
+        SocialAccount.objects.create(
+            user=user, provider='google', uid=google_sub, extra_data=idinfo
+        )
+
+    auth_login(request, user,
+               backend='allauth.account.auth_backends.AuthenticationBackend')
+    return JsonResponse({'success': True, 'redirect': django_settings.LOGIN_REDIRECT_URL})
