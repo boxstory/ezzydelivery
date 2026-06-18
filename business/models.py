@@ -114,9 +114,11 @@ class Business(models.Model):
     business_whatsapp = models.CharField(
         max_length=100, blank=True, null=True)
 
+    business_website = models.CharField(max_length=255, blank=True, null=True)
     business_facebook_page = models.CharField(
         max_length=100, blank=True, null=True)
     business_instagram = models.CharField(max_length=100, blank=True, null=True)
+    business_tiktok = models.CharField(max_length=100, blank=True, null=True)
     business_since = models.DateField(blank=True, null=True)
     business_product_category = models.CharField(
         max_length=100, blank=True, null=True)

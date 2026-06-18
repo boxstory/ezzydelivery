@@ -150,6 +150,17 @@ def calculate_completion_percentage(obj, required_fields):
     return int((completed / len(required_fields)) * 100)
 
 
+def calculate_business_completion(business):
+    """Business registration completion: 6 core fields + at least 2 marketplace fields = 7 items."""
+    CORE = ['business_name', 'business_phone', 'business_whatsapp',
+            'business_email', 'business_product_category', 'business_qid']
+    MARKETPLACE = ['business_website', 'business_facebook_page',
+                   'business_instagram', 'business_tiktok']
+    core_done = sum(1 for f in CORE if getattr(business, f, None))
+    marketplace_done = 1 if sum(1 for f in MARKETPLACE if getattr(business, f, None)) >= 2 else 0
+    return int(((core_done + marketplace_done) / 7) * 100)
+
+
 def calculate_driver_completion(driver):
     """Completion % for driver registration including vehicle type, model, and documents."""
     DRIVER_FIELDS = ['driver_phone', 'driver_whatsapp', 'driver_languages', 'driver_bio', 'has_driver_license']
@@ -271,10 +282,17 @@ def join_business(request):
         if not profile:
             raise core_models.Profile.DoesNotExist()
 
-        # Check if role already selected
-        if profile.is_driver or profile.is_business:
-            logger.info(f"User {request.user.id} already has role selected")
+        # If already a driver, they can't switch to business from here
+        if profile.is_driver:
+            logger.info(f"User {request.user.id} is already a driver, redirecting to profile")
             return redirect('core:profile', user_number=_get_user_number(request.user.id))
+
+        # If already marked as business, forward to business_register to finish the form.
+        # profile_complete_update sets is_business=True before redirecting here; hitting
+        # the back button and trying again should not dead-end the user on their profile.
+        if profile.is_business:
+            logger.info(f"User {request.user.id} already has business role, forwarding to business_register")
+            return redirect('core:business_register')
 
         joinusform = core_forms.JoinUsForm(request.POST or None, instance=profile)
 
@@ -1040,9 +1058,12 @@ def profile_complete_update(request):
         messages.error(request, "Please create a profile first!")
         return redirect('core:profile_add')
 
-    # Redirect pending/under_review drivers straight to step 4
-    if profile.is_driver and profile.verification_status in ('pending', 'under_review'):
-        return redirect('core:driver_register')
+    # Redirect pending/under_review users straight to step 4
+    if profile.verification_status in ('pending', 'under_review'):
+        if profile.is_business:
+            return redirect('core:business_register')
+        if profile.is_driver:
+            return redirect('core:driver_register')
 
     # Ensure profile username matches Django User username
     if profile.username != request.user.username:
@@ -1148,11 +1169,20 @@ def profile_complete_update(request):
 
     completion_percentage = profile.get_profile_completion_percentage()
 
+    if (profile.is_business or profile.is_driver) and profile.verification_status in ('pending', 'under_review'):
+        ob_step = 4
+        ob_role = 'business' if profile.is_business else 'driver'
+    else:
+        ob_step = 1
+        ob_role = ''
+
     context = {
         'form': form,
         'profile': profile,
         'completion_percentage': completion_percentage,
         'team_invitations': team_invitations,
+        'ob_step': ob_step,
+        'ob_role': ob_role,
     }
     return render(request, 'core/profile_complete_update.html', context)
 
@@ -1201,9 +1231,7 @@ def business_register(request):
             business.save()
 
             # Calculate completion percentage
-            required_fields = ['business_name', 'business_phone', 'business_whatsapp',
-                             'business_email', 'business_product_category', 'business_qid']
-            completion_percentage = calculate_completion_percentage(business, required_fields)
+            completion_percentage = calculate_business_completion(business)
 
             if action == 'save':
                 messages.success(request, f"Business information saved! ({completion_percentage}% complete)")
@@ -1229,14 +1257,11 @@ def business_register(request):
         form = business_forms.businessRegisterForm(instance=business)
 
     # Calculate completion
-    if business:
-        required_fields = ['business_name', 'business_phone', 'business_whatsapp',
-                         'business_email', 'business_product_category', 'business_qid']
-        completion_percentage = calculate_completion_percentage(business, required_fields)
-    else:
-        completion_percentage = 0
+    completion_percentage = calculate_business_completion(business) if business else 0
 
     can_apply = profile.can_apply_for_verification()
+
+    ob_step = 4 if profile.verification_status in ('pending', 'under_review') else 3
 
     context = {
         'form': form,
@@ -1244,6 +1269,7 @@ def business_register(request):
         'completion_percentage': completion_percentage,
         'can_apply': can_apply,
         'is_update': is_update,
+        'ob_step': ob_step,
     }
     return render(request, 'core/business_register.html', context)
 

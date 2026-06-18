@@ -1433,6 +1433,7 @@ def add_order(request):
                 cod_amount=safe_int(request.POST.get('cod_amount')),
                 dl_amount=safe_int(request.POST.get('dl_amount')),
                 order_type=request.POST.get('order_type', 'normal_delivery'),
+                delivery_speed=request.POST.get('delivery_speed', 'standard'),
                 scheduled_delivery=scheduled_delivery,
                 scheduled_date=scheduled_date,
                 scheduled_time=scheduled_time,
@@ -7897,6 +7898,27 @@ def user_verification_list(request):
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
+@require_http_methods(["GET"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def check_business_code_unique(request):
+    """AJAX endpoint to check if a business code is already taken"""
+    code = request.GET.get('code', '').strip().upper()
+    exclude_id = request.GET.get('exclude_business_id')
+
+    if not code:
+        return JsonResponse({'available': False, 'error': 'Code is required'})
+
+    qs = business_models.Business.objects.filter(business_code__iexact=code)
+    if exclude_id:
+        try:
+            qs = qs.exclude(business_id=int(exclude_id))
+        except (ValueError, TypeError):
+            pass
+
+    return JsonResponse({'available': not qs.exists(), 'code': code})
+
+
 def update_verification_status(request, profile_id):
     """AJAX endpoint to update user verification status"""
     from core import models as core_models
@@ -7936,6 +7958,9 @@ def update_verification_status(request, profile_id):
                     from business import models as business_models
                     business = business_models.Business.objects.get(user=profile.user)
                     business.business_status = 'active'
+                    new_code = data.get('business_code', '').strip().upper()
+                    if new_code:
+                        business.business_code = new_code
                     business.save()
                 except business_models.Business.DoesNotExist:
                     pass
@@ -11547,6 +11572,8 @@ def sellers_list(request):
     """
     View to display all sellers/businesses in the system
     """
+    from django.db.models import Count, Q as DQ
+
     # Get all businesses
     businesses = business_models.Business.objects.select_related(
         'profile', 'business_profile'
@@ -11558,7 +11585,6 @@ def sellers_list(request):
     verification_status = request.GET.get('verification', '').strip()
 
     if search:
-        from django.db.models import Q
         businesses = businesses.filter(
             Q(business_name__icontains=search) |
             Q(business_email__icontains=search) |
@@ -11569,24 +11595,24 @@ def sellers_list(request):
     if status:
         businesses = businesses.filter(business_status=status)
 
-    if verification_status:
+    if verification_status == 'not_applied':
+        # Businesses with no linked profile (never started verification)
+        businesses = businesses.filter(profile__isnull=True)
+    elif verification_status:
         businesses = businesses.filter(profile__verification_status=verification_status)
 
-    # Order by most recent
-    businesses = businesses.order_by('-business_since', '-business_id')
+    # Newest first — use business_id DESC so null-date businesses don't sink to bottom
+    businesses = businesses.order_by('-business_id')
 
-    # Count statistics using single aggregation query
-    from django.db.models import Count, Q as DQ
+    # Count statistics
     stats = business_models.Business.objects.aggregate(
         total=Count('business_id'),
         active=Count('business_id', filter=DQ(business_status='active')),
-        pending=Count('business_id', filter=DQ(profile__verification_status='pending')),
+        pending_verif=Count('business_id', filter=DQ(profile__verification_status='pending')),
         inactive=Count('business_id', filter=DQ(business_status='inactive')),
+        not_applied=Count('business_id', filter=DQ(profile__isnull=True)),
+        biz_pending=Count('business_id', filter=DQ(business_status='pending')),
     )
-    total_sellers = stats['total']
-    active_sellers = stats['active']
-    pending_sellers = stats['pending']
-    inactive_sellers = stats['inactive']
 
     # Paginate
     page_obj = paginate_queryset(request, businesses, items_per_page=25)
@@ -11594,10 +11620,12 @@ def sellers_list(request):
     context = {
         'page_title': 'All Sellers',
         'page_obj': page_obj,
-        'total_sellers': total_sellers,
-        'active_sellers': active_sellers,
-        'pending_sellers': pending_sellers,
-        'inactive_sellers': inactive_sellers,
+        'total_sellers': stats['total'],
+        'active_sellers': stats['active'],
+        'pending_sellers': stats['pending_verif'],
+        'inactive_sellers': stats['inactive'],
+        'not_applied_sellers': stats['not_applied'],
+        'biz_pending_sellers': stats['biz_pending'],
         'search': search,
         'status': status,
         'verification': verification_status,
@@ -11856,6 +11884,10 @@ def seller_detail(request, business_id):
                 business.fulfillment_activated_at = timezone.now()
             elif not fulfillment_enabled:
                 business.fulfillment_service_enabled = False
+                from business.models import PickupLocation
+                PickupLocation.objects.filter(
+                    business=business, is_fulfilment_center=True
+                ).update(pickup_status='inactive')
 
             business.save()
 
@@ -12858,6 +12890,23 @@ def driver_detail(request, driver_id):
     }
 
     return render(request, 'workforce/driver_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_toggle_status(request, driver_id):
+    """Toggle driver active/suspended status via POST."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
+    if driver.driver_status == 'approved':
+        driver.driver_status = 'suspended'
+    elif driver.driver_status == 'suspended':
+        driver.driver_status = 'approved'
+    else:
+        return JsonResponse({'success': False, 'error': 'Only approved/suspended drivers can be toggled'}, status=400)
+    driver.save(update_fields=['driver_status'])
+    return JsonResponse({'success': True, 'status': driver.driver_status})
 
 
 @login_required(login_url='/accounts/login/')

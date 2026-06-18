@@ -467,6 +467,22 @@ def _create_delivery_task_from_order(order):
                     f"(fulfilment={fallback_pl.is_fulfilment_center})"
                 )
 
+        # For fulfillment orders, auto-assign the best warehouse location as hub_warehouse
+        if (order.pickup_location and order.pickup_location.is_fulfilment_center
+                and not order.hub_warehouse_id):
+            try:
+                from warehouse.utils import get_recommended_warehouse_location
+                wh_location = get_recommended_warehouse_location(order)
+                if wh_location:
+                    order.hub_warehouse = wh_location
+                    order.save(update_fields=['hub_warehouse'])
+                    logger.info(
+                        f"Order {order.order_number}: auto-assigned hub_warehouse "
+                        f"'{wh_location.warehouse.name} / {wh_location.name}' via priority"
+                    )
+            except Exception as e:
+                logger.warning(f"hub_warehouse auto-assign failed for {order.order_number}: {e}")
+
         # Hub delivery orders: delivery task created later when batch arrives at hub.
         # Ensure address update and geocode are still created, but skip task creation.
         if order.is_hub_delivery:
@@ -556,14 +572,8 @@ def _create_delivery_task_from_order(order):
                     if order_dirty_fields:
                         order.save(update_fields=order_dirty_fields)
 
-        # Map order_type → dl_speed
-        order_type_to_speed = {
-            'normal_delivery': 'Normal',
-            'pick_and_drop': 'Normal',
-        }
-        dl_speed = order_type_to_speed.get(order.order_type or '', 'Normal')
-        if order.scheduled_delivery:
-            dl_speed = 'Same Day'
+        # Map delivery_speed → dl_speed (same_day overrides everything)
+        dl_speed = 'Same Day' if order.delivery_speed == 'same_day' else 'Normal'
 
         # Map Order.coords_accuracy → DeliveryTask.address_accuracy
         # Keys must match Order.COORDS_ACCURACY choices (orders/models.py)

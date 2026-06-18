@@ -127,8 +127,10 @@ class businessRegisterForm(forms.ModelForm):
             'business_whatsapp',
             'business_email',
             'business_bio',
+            'business_website',
             'business_facebook_page',
             'business_instagram',
+            'business_tiktok',
             'business_since',
             'business_product_category',
             'business_languages',
@@ -145,14 +147,16 @@ class businessRegisterForm(forms.ModelForm):
             'business_email': forms.EmailInput(attrs={'class': 'form-control'}),
             'business_bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'business_qid': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_website': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'https://yourstore.com'}),
             'business_facebook_page': forms.TextInput(attrs={'class': 'form-control'}),
             'business_instagram': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_tiktok': forms.TextInput(attrs={'class': 'form-control'}),
             'business_languages': forms.Select(
                 choices=business_LANGUAGE_CHOICES,
                 attrs={'class': 'form-select'}),
             'business_status': forms.Select(
                 choices=business_STATUS_CHOICES),
-            'business_since': forms.TextInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'business_since': forms.TextInput(attrs={'type': 'month', 'class': 'form-control'}),
         }
         labels = {
             "business_name": "business Name",
@@ -161,6 +165,24 @@ class businessRegisterForm(forms.ModelForm):
             "business_qid": "Passport/QID/CR No",
 
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.business_since:
+            self.initial['business_since'] = self.instance.business_since.strftime('%Y-%m')
+
+    def clean_business_since(self):
+        from datetime import date
+        value = self.data.get('business_since') or self.cleaned_data.get('business_since')
+        if not value:
+            return None
+        if hasattr(value, 'year'):
+            return date(value.year, value.month, 1)
+        try:
+            year, month = str(value).split('-')
+            return date(int(year), int(month), 1)
+        except (ValueError, AttributeError):
+            raise forms.ValidationError("Please select a valid month and year.")
 
     def clean_business_phone(self):
         """Validate phone number contains only digits"""

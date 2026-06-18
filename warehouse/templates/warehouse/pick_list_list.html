@@ -87,6 +87,7 @@
     {% for pl in pick_lists %}
     <div class="pkl-mob__card">
       <!-- Top: Number + Status -->
+      {% if pl.has_urgent %}<div class="pkl-mob__urgent-banner"><i class="fas fa-bolt"></i> Same Day — Urgent</div>{% endif %}
       <div class="pkl-mob__top">
         {% if is_superadmin %}
         <input type="checkbox" name="pk_ids" value="{{ pl.pk }}" class="form-check-input pkl-cb me-2" onchange="pklUpdateCount()" onclick="event.stopPropagation()">
@@ -201,9 +202,12 @@
         </thead>
         <tbody>
           {% for pl in pick_lists %}
-          <tr>
+          <tr{% if pl.has_urgent %} class="pkl-row--urgent"{% endif %}>
             {% if is_superadmin %}<td class="wh__td"><input type="checkbox" name="pk_ids" value="{{ pl.pk }}" class="form-check-input pkl-cb" onchange="pklUpdateCount()"></td>{% endif %}
-            <td class="wh__td"><strong>{{ pl.pick_number }}</strong></td>
+            <td class="wh__td">
+              <strong>{{ pl.pick_number }}</strong>
+              {% if pl.has_urgent %}<span class="pkl-urgent-badge"><i class="fas fa-bolt"></i> Same Day</span>{% endif %}
+            </td>
             <td class="wh__td">{{ pl.business.business_name|default:"-" }}</td>
             <td class="wh__td">{{ pl.warehouse.name }}{% if pl.zone %} <span class="wh__code">{{ pl.zone.code }}</span>{% endif %}</td>
             <td class="wh__td">

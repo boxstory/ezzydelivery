@@ -14,9 +14,7 @@
         <div class="row justify-content-center">
             <div class="col-12 col-lg-10 col-xl-8">
                 <!-- Step Indicator -->
-                {% with ob_step=1 ob_role='' %}
-                    {% include "core/includes/ob_step_indicator.html" %}
-                {% endwith %}
+                {% include "core/includes/ob_step_indicator.html" %}
 
                 <div class="card border-0 shadow-lg" id="core_profile_complete_card_main" style="border-radius: 0 0 var(--brand-radius-lg, 0.875rem) var(--brand-radius-lg, 0.875rem);">
                     <!-- Header with Progress Circle -->
@@ -351,6 +349,15 @@
                                     </button>
                                 </div>
                                 {% endif %}
+                                {% endif %}
+
+                                {% if profile.verification_status == 'pending' or profile.verification_status == 'under_review' %}
+                                <div class="mt-3">
+                                    <div class="alert alert-warning d-flex align-items-center gap-2 mb-0">
+                                        <i class="fa-solid fa-clock"></i>
+                                        <span>Your application is <strong>pending review</strong>. We'll notify you once it's approved.</span>
+                                    </div>
+                                </div>
                                 {% endif %}
 
                                 {% if profile.verification_status == 'verified' and completion_percentage == 100 %}

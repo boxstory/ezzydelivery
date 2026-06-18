@@ -51,10 +51,18 @@
         </div>
     </div>
     <div class="wdd__hero__right">
-        <span class="wdd__hero__status wdd__hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}rejected{% else %}pending{% endif %}">
+        <span id="wdd_status_badge" class="wdd__hero__status wdd__hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}rejected{% else %}pending{% endif %}">
             <i class="fa-solid fa-circle"></i>
-            {{ driver.driver_status }}
+            <span id="wdd_status_text">{{ driver.driver_status }}</span>
         </span>
+        {% if driver.driver_status == 'approved' or driver.driver_status == 'suspended' %}
+        <button id="wdd_toggle_btn" class="btn btn-sm wdd__hero__toggle {% if driver.driver_status == 'approved' %}wdd__hero__toggle--deactivate{% else %}wdd__hero__toggle--activate{% endif %}"
+            data-url="{% url 'workforce:driver_toggle_status' driver.driver_id %}"
+            data-current="{{ driver.driver_status }}">
+            <i class="fa-solid {% if driver.driver_status == 'approved' %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
+            <span id="wdd_toggle_label">{% if driver.driver_status == 'approved' %}Deactivate{% else %}Activate{% endif %}</span>
+        </button>
+        {% endif %}
         {% if driver.driver_rating > 0 %}
         <span class="wdd__hero__rating">
             <i class="fa-solid fa-star"></i> {{ driver.driver_rating }}/5
@@ -929,6 +937,48 @@
 
 {% block extra_js %}
 <script>
+// Driver active/suspend toggle
+(function() {
+    var btn = document.getElementById('wdd_toggle_btn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        btn.disabled = true;
+        var csrfToken = document.cookie.match(/csrftoken=([^;]+)/);
+        csrfToken = csrfToken ? csrfToken[1] : '';
+        fetch(btn.dataset.url, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success) { btn.disabled = false; return; }
+            var newStatus = data.status;
+            var badge = document.getElementById('wdd_status_badge');
+            var statusText = document.getElementById('wdd_status_text');
+            var label = document.getElementById('wdd_toggle_label');
+            var icon = btn.querySelector('i');
+            badge.classList.remove('wdd__hero__status--approved', 'wdd__hero__status--rejected');
+            if (newStatus === 'approved') {
+                badge.classList.add('wdd__hero__status--approved');
+                statusText.textContent = 'approved';
+                btn.classList.remove('wdd__hero__toggle--activate');
+                btn.classList.add('wdd__hero__toggle--deactivate');
+                icon.classList.replace('fa-toggle-off', 'fa-toggle-on');
+                label.textContent = 'Deactivate';
+            } else {
+                badge.classList.add('wdd__hero__status--rejected');
+                statusText.textContent = 'suspended';
+                btn.classList.remove('wdd__hero__toggle--deactivate');
+                btn.classList.add('wdd__hero__toggle--activate');
+                icon.classList.replace('fa-toggle-on', 'fa-toggle-off');
+                label.textContent = 'Activate';
+            }
+            btn.disabled = false;
+        })
+        .catch(function() { btn.disabled = false; });
+    });
+})();
+
 // Tab switching
 document.querySelectorAll('.wdd__tabs__btn').forEach(function(btn) {
     btn.addEventListener('click', function() {

@@ -4,7 +4,7 @@
 {% block title %}Business Registration - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'core/css/core.css' %}?v=20260417015">
+<link rel="stylesheet" href="{% static 'core/css/core.css' %}?v=20260617002">
 {% endblock %}
 
 {% block extra_js %}
@@ -13,7 +13,7 @@
 
 {% block content %}
 <!-- Step Indicator -->
-{% with ob_step=3 ob_role='business' %}
+{% with ob_role='business' %}
     {% include "core/includes/ob_step_indicator.html" %}
 {% endwith %}
 
@@ -106,6 +106,19 @@
                     {% endif %}
                 </div>
 
+                <div class="col-md-6">
+                    <label class="form-label">Preferred Language</label>
+                    {{ form.business_languages }}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">CR Number / QID / Passport <span class="text-danger">*</span></label>
+                    {{ form.business_qid }}
+                    {% if form.business_qid.errors %}
+                        <div class="text-danger small">{{ form.business_qid.errors }}</div>
+                    {% endif %}
+                </div>
+
                 <div class="col-12">
                     <label class="form-label">Business Description</label>
                     {{ form.business_bio }}
@@ -126,14 +139,27 @@
 
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label">
-                        Business Phone <span class="text-danger">*</span>
-                        <span id="core_business_phone_status_icon" style="display: none; margin-left: 0.5rem; cursor: pointer;" title="Click to see error details">
-                            <i class="fa-solid fa-circle-xmark text-danger"></i>
-                        </span>
-                    </label>
-                    {{ form.business_phone }}
-                    <small class="form-text text-muted d-block">10-15 digits. Examples: 97433123456 (Qatar), 971501234567 (UAE), 12025551234 (USA), 923001234567 (Pakistan)</small>
+                    <div class="d-flex gap-2 align-items-end">
+                        <div class="flex-shrink-0">
+                            <label class="form-label text-muted small mb-1">Code</label>
+                            <div class="input-group">
+                                <span class="input-group-text fw-semibold text-muted px-2">+</span>
+                                <input type="text" id="phone_country_code" class="form-control cbr__phone-cc"
+                                       value="974" inputmode="numeric" maxlength="4" aria-label="Country code" placeholder="974">
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <label class="form-label mb-1">
+                                Business Phone <span class="text-danger">*</span>
+                                <span id="core_business_phone_status_icon" style="display: none; margin-left: 0.5rem; cursor: pointer;" title="Click to see error details">
+                                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                                </span>
+                            </label>
+                            <input type="text" id="phone_local_input" class="form-control"
+                                   inputmode="numeric" placeholder="33123456" aria-label="Phone number">
+                        </div>
+                    </div>
+                    <input type="hidden" name="business_phone" id="id_business_phone" value="{{ form.business_phone.value|default:'' }}">
                     <div id="core_business_phone_status_message" class="text-danger small mt-1" style="display: none;"></div>
                     {% if form.business_phone.errors %}
                         <div class="text-danger small">{{ form.business_phone.errors }}</div>
@@ -147,8 +173,11 @@
                             <i class="fa-solid fa-circle-xmark text-danger"></i>
                         </span>
                     </label>
-                    {{ form.business_whatsapp }}
-                    <small class="form-text text-muted d-block">10-15 digits. Examples: 97433123456 (Qatar), 971501234567 (UAE), 12025551234 (USA), 923001234567 (Pakistan)</small>
+                    <input type="text" name="business_whatsapp" id="id_business_whatsapp"
+                           class="form-control" inputmode="numeric"
+                           placeholder="e.g. 97433123456"
+                           value="{{ form.business_whatsapp.value|default:'' }}">
+                    <small class="form-text text-muted d-block">Auto-filled from phone with country code — edit if different</small>
                     <div id="core_business_whatsapp_status_message" class="text-danger small mt-1" style="display: none;"></div>
                     {% if form.business_whatsapp.errors %}
                         <div class="text-danger small">{{ form.business_whatsapp.errors }}</div>
@@ -163,25 +192,26 @@
                     {% endif %}
                 </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">QID/Passport/CR Number <span class="text-danger">*</span></label>
-                    {{ form.business_qid }}
-                    {% if form.business_qid.errors %}
-                        <div class="text-danger small">{{ form.business_qid.errors }}</div>
-                    {% endif %}
-                </div>
             </div>
 
-            <!-- Social Media (Optional) -->
+            <!-- Marketplaces -->
             <div class="cbr__section-title">
-                <i class="fa-brands fa-facebook me-2"></i>Social Media (Optional)
+                <i class="fa-solid fa-store me-2"></i>Marketplaces
             </div>
 
             <div class="row g-3">
                 <div class="col-md-6">
+                    <label class="form-label">Website</label>
+                    {{ form.business_website }}
+                    {% if form.business_website.errors %}
+                        <div class="text-danger small">{{ form.business_website.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
                     <label class="form-label">Facebook Page</label>
                     {{ form.business_facebook_page }}
-                    <small class="form-text text-muted">Username only - no slashes or spaces (e.g., yourbusinessname)</small>
+                    <small class="form-text text-muted">Username only (e.g., yourbusinessname)</small>
                     {% if form.business_facebook_page.errors %}
                         <div class="text-danger small">{{ form.business_facebook_page.errors }}</div>
                     {% endif %}
@@ -190,9 +220,18 @@
                 <div class="col-md-6">
                     <label class="form-label">Instagram</label>
                     {{ form.business_instagram }}
-                    <small class="form-text text-muted">Username only - no slashes or spaces (e.g., yourbusinessname)</small>
+                    <small class="form-text text-muted">Username only (e.g., yourbusinessname)</small>
                     {% if form.business_instagram.errors %}
                         <div class="text-danger small">{{ form.business_instagram.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">TikTok</label>
+                    {{ form.business_tiktok }}
+                    <small class="form-text text-muted">Username only (e.g., yourbusinessname)</small>
+                    {% if form.business_tiktok.errors %}
+                        <div class="text-danger small">{{ form.business_tiktok.errors }}</div>
                     {% endif %}
                 </div>
 
@@ -201,10 +240,6 @@
                     {{ form.business_since }}
                 </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Preferred Language</label>
-                    {{ form.business_languages }}
-                </div>
             </div>
 
             <!-- Action Buttons -->
@@ -233,177 +268,112 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const phoneInput = document.querySelector('[name="business_phone"]');
-    const whatsappInput = document.querySelector('[name="business_whatsapp"]');
+    const phoneCcEl    = document.getElementById('phone_country_code');
+    const phoneLocalEl = document.getElementById('phone_local_input');
+    const phoneHidden  = document.getElementById('id_business_phone');
+    const waInput      = document.getElementById('id_business_whatsapp');
+
+    if (!phoneCcEl || !phoneLocalEl || !phoneHidden) return;
+
     const phoneStatusIcon = document.getElementById('core_business_phone_status_icon');
-    const phoneStatusMessage = document.getElementById('core_business_phone_status_message');
-    const whatsappStatusIcon = document.getElementById('core_business_whatsapp_status_icon');
-    const whatsappStatusMessage = document.getElementById('core_business_whatsapp_status_message');
-    const phoneAlertContainer = document.getElementById('core_business_phone_alert_container');
-    const whatsappAlertContainer = document.getElementById('core_business_whatsapp_alert_container');
+    const phoneStatusMsg  = document.getElementById('core_business_phone_status_message');
+    const waStatusIcon    = document.getElementById('core_business_whatsapp_status_icon');
+    const waStatusMsg     = document.getElementById('core_business_whatsapp_status_message');
+    const phoneAlertBox   = document.getElementById('core_business_phone_alert_container');
+    const waAlertBox      = document.getElementById('core_business_whatsapp_alert_container');
 
-    if (!phoneInput || !whatsappInput) return;
+    let waManuallyEdited = false;
 
-    // Set as text input with numeric keyboard
-    phoneInput.type = 'text';
-    phoneInput.inputMode = 'numeric';
-    phoneInput.placeholder = 'e.g., 97433123456 or +1-202-555-1234';
-
-    whatsappInput.type = 'text';
-    whatsappInput.inputMode = 'numeric';
-    whatsappInput.placeholder = 'e.g., 97433123456 or +1-202-555-1234';
-
-    let isPhoneAvailable = false;
-    let isWhatsAppAvailable = false;
-
-    function checkPhoneAvailability() {
-        const phoneNumber = phoneInput.value.trim();
-
-        if (!phoneNumber) {
-            phoneStatusIcon.style.display = 'none';
-            phoneStatusMessage.style.display = 'none';
-            phoneAlertContainer.innerHTML = '';
-            phoneInput.style.borderColor = '';
-            phoneInput.classList.remove('is-invalid');
-            isPhoneAvailable = false;
-            return;
-        }
-
-        const digits_only = phoneNumber.replace(/\D/g, '');
-
-        // Client-side validation first
-        if (digits_only.length < 10) {
-            phoneStatusIcon.style.display = 'inline-block';
-            phoneStatusIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger" style="margin-left: 0.5rem;"></i>';
-            phoneStatusMessage.style.display = 'block';
-            phoneStatusMessage.textContent = `Phone must be at least 10 digits. You provided ${digits_only.length} digits`;
-            phoneInput.style.borderColor = '#dc3545';
-            phoneInput.classList.add('is-invalid');
-            isPhoneAvailable = false;
-            return;
-        }
-
-        if (digits_only.length > 15) {
-            phoneStatusIcon.style.display = 'inline-block';
-            phoneStatusIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger" style="margin-left: 0.5rem;"></i>';
-            phoneStatusMessage.style.display = 'block';
-            phoneStatusMessage.textContent = `Phone cannot exceed 15 digits. You provided ${digits_only.length} digits`;
-            phoneInput.style.borderColor = '#dc3545';
-            phoneInput.classList.add('is-invalid');
-            isPhoneAvailable = false;
-            return;
-        }
-
-        // Format is valid
-        phoneStatusIcon.style.display = 'inline-block';
-        phoneStatusIcon.innerHTML = '<i class="fa-solid fa-check-circle text-success" style="margin-left: 0.5rem;"></i>';
-        phoneStatusMessage.style.display = 'none';
-        phoneAlertContainer.innerHTML = '';
-        phoneInput.style.borderColor = '';
-        phoneInput.classList.remove('is-invalid');
-        isPhoneAvailable = true;
+    // Parse existing phone value into CC + local on page load
+    const storedPhone = phoneHidden.value.replace(/\D/g, '');
+    if (storedPhone.startsWith('974') && storedPhone.length > 3) {
+        phoneCcEl.value    = '974';
+        phoneLocalEl.value = storedPhone.slice(3);
+    } else if (storedPhone) {
+        phoneLocalEl.value = storedPhone;
     }
 
-    function checkWhatsAppAvailability() {
-        const whatsappNumber = whatsappInput.value.trim();
-
-        if (!whatsappNumber) {
-            whatsappStatusIcon.style.display = 'none';
-            whatsappStatusMessage.style.display = 'none';
-            whatsappAlertContainer.innerHTML = '';
-            whatsappInput.style.borderColor = '';
-            whatsappInput.classList.remove('is-invalid');
-            isWhatsAppAvailable = false;
-            return;
-        }
-
-        const digits_only = whatsappNumber.replace(/\D/g, '');
-
-        // Client-side validation
-        if (digits_only.length < 10) {
-            whatsappStatusIcon.style.display = 'inline-block';
-            whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger" style="margin-left: 0.5rem;"></i>';
-            whatsappStatusMessage.style.display = 'block';
-            whatsappStatusMessage.textContent = `WhatsApp must be at least 10 digits. You provided ${digits_only.length} digits`;
-            whatsappInput.style.borderColor = '#dc3545';
-            whatsappInput.classList.add('is-invalid');
-
-            const alertHTML = `
-                <div class="alert alert-danger d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
-                    <i class="fa-solid fa-circle-xmark fs-5 mt-1"></i>
-                    <div>
-                        <strong class="d-block mb-1">⚠️ WhatsApp Format Error</strong>
-                        <span class="small">WhatsApp must be at least 10 digits. You provided ${digits_only.length} digits</span>
-                    </div>
-                </div>
-            `;
-            whatsappAlertContainer.innerHTML = alertHTML;
-            isWhatsAppAvailable = false;
-            return;
-        }
-
-        if (digits_only.length > 15) {
-            whatsappStatusIcon.style.display = 'inline-block';
-            whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger" style="margin-left: 0.5rem;"></i>';
-            whatsappStatusMessage.style.display = 'block';
-            whatsappStatusMessage.textContent = `WhatsApp cannot exceed 15 digits. You provided ${digits_only.length} digits`;
-            whatsappInput.style.borderColor = '#dc3545';
-            whatsappInput.classList.add('is-invalid');
-
-            const alertHTML = `
-                <div class="alert alert-danger d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
-                    <i class="fa-solid fa-circle-xmark fs-5 mt-1"></i>
-                    <div>
-                        <strong class="d-block mb-1">⚠️ WhatsApp Format Error</strong>
-                        <span class="small">WhatsApp cannot exceed 15 digits. You provided ${digits_only.length} digits</span>
-                    </div>
-                </div>
-            `;
-            whatsappAlertContainer.innerHTML = alertHTML;
-            isWhatsAppAvailable = false;
-            return;
-        }
-
-        // Format is valid
-        whatsappStatusIcon.style.display = 'inline-block';
-        whatsappStatusIcon.innerHTML = '<i class="fa-solid fa-check-circle text-success" style="margin-left: 0.5rem;"></i>';
-        whatsappStatusMessage.style.display = 'none';
-        whatsappAlertContainer.innerHTML = '';
-        whatsappInput.style.borderColor = '';
-        whatsappInput.classList.remove('is-invalid');
-        isWhatsAppAvailable = true;
+    function getCombinedPhone() {
+        return phoneCcEl.value.replace(/\D/g, '') + phoneLocalEl.value.replace(/\D/g, '');
     }
 
-    // Event listeners with 1500ms debounce
-    let phoneDebounceTimer;
-    let whatsappDebounceTimer;
+    function syncPhoneHidden() {
+        phoneHidden.value = getCombinedPhone();
+    }
 
-    phoneInput.addEventListener('input', function() {
-        clearTimeout(phoneDebounceTimer);
-        phoneDebounceTimer = setTimeout(() => {
-            checkPhoneAvailability();
-        }, 1500);
-    });
+    function autoFillWa() {
+        if (waManuallyEdited || !waInput) return;
+        waInput.value = getCombinedPhone();
+        checkWa();
+    }
 
-    whatsappInput.addEventListener('input', function() {
-        clearTimeout(whatsappDebounceTimer);
-        whatsappDebounceTimer = setTimeout(() => {
-            checkWhatsAppAvailability();
-        }, 1500);
-    });
+    function validate(digits, statusIcon, statusMsg, alertBox, label) {
+        if (!digits) {
+            statusIcon.style.display = 'none';
+            statusMsg.style.display  = 'none';
+            if (alertBox) alertBox.innerHTML = '';
+            return;
+        }
+        if (digits.length < 10) {
+            statusIcon.style.display = 'inline-block';
+            statusIcon.innerHTML     = '<i class="fa-solid fa-circle-xmark text-danger ms-2"></i>';
+            statusMsg.style.display  = 'block';
+            statusMsg.textContent    = `${label} must be at least 10 digits total. You have ${digits.length}`;
+            if (alertBox) alertBox.innerHTML = '';
+            return;
+        }
+        if (digits.length > 15) {
+            statusIcon.style.display = 'inline-block';
+            statusIcon.innerHTML     = '<i class="fa-solid fa-circle-xmark text-danger ms-2"></i>';
+            statusMsg.style.display  = 'block';
+            statusMsg.textContent    = `${label} cannot exceed 15 digits. You have ${digits.length}`;
+            if (alertBox) alertBox.innerHTML = '';
+            return;
+        }
+        statusIcon.style.display = 'inline-block';
+        statusIcon.innerHTML     = '<i class="fa-solid fa-check-circle text-success ms-2"></i>';
+        statusMsg.style.display  = 'none';
+        if (alertBox) alertBox.innerHTML = '';
+    }
 
-    // Check on blur (focus out)
-    phoneInput.addEventListener('blur', function() {
-        checkPhoneAvailability();
-    });
+    function checkPhone() {
+        syncPhoneHidden();
+        validate(phoneHidden.value, phoneStatusIcon, phoneStatusMsg, phoneAlertBox, 'Phone');
+    }
 
-    whatsappInput.addEventListener('blur', function() {
-        checkWhatsAppAvailability();
-    });
+    function checkWa() {
+        if (!waInput) return;
+        validate(waInput.value.replace(/\D/g, ''), waStatusIcon, waStatusMsg, waAlertBox, 'WhatsApp');
+    }
 
-    // Check on page load
-    checkPhoneAvailability();
-    checkWhatsAppAvailability();
+    let phoneTimer, waTimer;
+
+    function onPhoneInput() {
+        clearTimeout(phoneTimer);
+        phoneTimer = setTimeout(() => { checkPhone(); autoFillWa(); }, 600);
+    }
+
+    phoneCcEl.addEventListener('input', onPhoneInput);
+    phoneLocalEl.addEventListener('input', onPhoneInput);
+    phoneCcEl.addEventListener('blur', () => { checkPhone(); autoFillWa(); });
+    phoneLocalEl.addEventListener('blur', () => { checkPhone(); autoFillWa(); });
+
+    if (waInput) {
+        waInput.addEventListener('input', function() {
+            waManuallyEdited = true;
+            clearTimeout(waTimer);
+            waTimer = setTimeout(checkWa, 600);
+        });
+        waInput.addEventListener('blur', checkWa);
+    }
+
+    const form = document.getElementById('core_business_register_form_main');
+    if (form) {
+        form.addEventListener('submit', syncPhoneHidden);
+    }
+
+    checkPhone();
+    checkWa();
 });
 </script>
 {% endblock content %}

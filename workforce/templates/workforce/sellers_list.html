@@ -17,7 +17,7 @@
 
     <!-- Stat Cards -->
     <div class="sll__stats">
-        <div class="sll__stat-card">
+        <a href="?" class="sll__stat-card sll__stat-card--link {% if not status and not verification %}sll__stat-card--active{% endif %}">
             <div class="sll__stat-icon sll__stat-icon--primary">
                 <i class="fa-solid fa-store"></i>
             </div>
@@ -25,8 +25,8 @@
                 <div class="sll__stat-value">{{ total_sellers }}</div>
                 <div class="sll__stat-label">Total Sellers</div>
             </div>
-        </div>
-        <div class="sll__stat-card">
+        </a>
+        <a href="?status=active" class="sll__stat-card sll__stat-card--link {% if status == 'active' %}sll__stat-card--active{% endif %}">
             <div class="sll__stat-icon sll__stat-icon--success">
                 <i class="fa-solid fa-circle-check"></i>
             </div>
@@ -34,17 +34,26 @@
                 <div class="sll__stat-value">{{ active_sellers }}</div>
                 <div class="sll__stat-label">Active Sellers</div>
             </div>
-        </div>
-        <div class="sll__stat-card">
+        </a>
+        <a href="?verification=pending" class="sll__stat-card sll__stat-card--link {% if verification == 'pending' %}sll__stat-card--active{% endif %}">
             <div class="sll__stat-icon sll__stat-icon--warning">
                 <i class="fa-solid fa-clock"></i>
             </div>
             <div class="sll__stat-body">
                 <div class="sll__stat-value">{{ pending_sellers }}</div>
-                <div class="sll__stat-label">Pending Approval</div>
+                <div class="sll__stat-label">Pending Verification</div>
             </div>
-        </div>
-        <div class="sll__stat-card">
+        </a>
+        <a href="?verification=not_applied" class="sll__stat-card sll__stat-card--link {% if verification == 'not_applied' %}sll__stat-card--active{% endif %}">
+            <div class="sll__stat-icon sll__stat-icon--muted">
+                <i class="fa-solid fa-file-circle-question"></i>
+            </div>
+            <div class="sll__stat-body">
+                <div class="sll__stat-value">{{ not_applied_sellers }}</div>
+                <div class="sll__stat-label">Not Applied</div>
+            </div>
+        </a>
+        <a href="?status=inactive" class="sll__stat-card sll__stat-card--link {% if status == 'inactive' %}sll__stat-card--active{% endif %}">
             <div class="sll__stat-icon sll__stat-icon--danger">
                 <i class="fa-solid fa-circle-xmark"></i>
             </div>
@@ -52,7 +61,7 @@
                 <div class="sll__stat-value">{{ inactive_sellers }}</div>
                 <div class="sll__stat-label">Inactive Sellers</div>
             </div>
-        </div>
+        </a>
     </div>
 
     <!-- Filter -->
@@ -83,6 +92,7 @@
                 <select id="statusFilter" name="status" class="sll__filter-input">
                     <option value="">All Status</option>
                     <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending (New)</option>
                     <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option>
                     <option value="suspended" {% if status == 'suspended' %}selected{% endif %}>Suspended</option>
                 </select>
@@ -93,7 +103,10 @@
                 </label>
                 <select id="verificationFilter" name="verification" class="sll__filter-input">
                     <option value="">All</option>
+                    <option value="not_applied" {% if verification == 'not_applied' %}selected{% endif %}>Not Applied</option>
                     <option value="pending" {% if verification == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="under_review" {% if verification == 'under_review' %}selected{% endif %}>Under Review</option>
+                    <option value="incomplete" {% if verification == 'incomplete' %}selected{% endif %}>Incomplete</option>
                     <option value="verified" {% if verification == 'verified' %}selected{% endif %}>Verified</option>
                     <option value="rejected" {% if verification == 'rejected' %}selected{% endif %}>Rejected</option>
                 </select>
@@ -153,11 +166,11 @@
                     </td>
                     <td>
                         {% if business.profile %}
-                        <span class="sll__badge {% if business.profile.verification_status == 'verified' %}sll__badge--success{% elif business.profile.verification_status == 'pending' %}sll__badge--warning{% else %}sll__badge--danger{% endif %}">
-                            {{ business.profile.verification_status|title }}
+                        <span class="sll__badge {% if business.profile.verification_status == 'verified' %}sll__badge--success{% elif business.profile.verification_status == 'pending' %}sll__badge--warning{% elif business.profile.verification_status == 'under_review' %}sll__badge--info{% elif business.profile.verification_status == 'rejected' %}sll__badge--danger{% else %}sll__badge--muted{% endif %}">
+                            {{ business.profile.get_verification_status_display }}
                         </span>
                         {% else %}
-                        <span class="sll__text-muted">N/A</span>
+                        <span class="sll__badge sll__badge--muted"><i class="fa-solid fa-file-circle-question"></i> Not Applied</span>
                         {% endif %}
                     </td>
                     <td>

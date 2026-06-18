@@ -833,9 +833,16 @@ def pick_list_list(request):
         ).values_list('warehouse_id', flat=True)
         pick_lists = warehouse_models.PickList.objects.filter(warehouse_id__in=linked_warehouse_ids)
 
+    from django.db.models import Exists, OuterRef
+    same_day_subq = Exists(
+        warehouse_models.PickListItem.objects.filter(
+            pick_list=OuterRef('pk'),
+            order__delivery_speed='same_day'
+        )
+    )
     pick_lists = pick_lists.select_related(
         'warehouse', 'assigned_to', 'business', 'zone'
-    ).order_by('-created_at')
+    ).annotate(has_urgent=same_day_subq).order_by('-has_urgent', '-created_at')
 
     # Filters
     status = request.GET.get('status')

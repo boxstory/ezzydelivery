@@ -288,6 +288,8 @@
                 data-is-business="1"
                 data-is-driver="0"
                 data-biz-name="{{ business.business_name }}"
+                data-biz-id="{{ business.business_id }}"
+                data-biz-code="{{ business.business_code|default:'' }}"
                 data-driver-code=""
                 data-team-memberships="[]">
                 <i class="fa-solid fa-check-double"></i> Approve
@@ -359,6 +361,23 @@
                 <i class="fa-solid fa-circle-info"></i>
                 <span>This will verify the business account and set its status to Active.</span>
             </div>
+
+            <!-- Business Code Entry -->
+            <div class="uvl__modal__field mt-3">
+                <label class="uvl__modal__field-label" for="uvlBizCode">
+                    <i class="fa-solid fa-hashtag"></i> Business Code <span class="text-danger">*</span>
+                </label>
+                <div class="d-flex gap-2 align-items-center">
+                    <input type="text" id="uvlBizCode" class="uvl__modal__input form-control text-uppercase"
+                        placeholder="e.g. SHOP001" maxlength="50" autocomplete="off"
+                        style="text-transform:uppercase; letter-spacing:0.05em;">
+                    <button type="button" id="uvlBizCodeCheckBtn" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap;">
+                        <i class="fa-solid fa-magnifying-glass"></i> Check
+                    </button>
+                </div>
+                <div id="uvlBizCodeStatus" class="small mt-1" style="min-height:1.2em;"></div>
+            </div>
+
             <div class="uvl__modal__checks">
                 <label class="uvl__modal__check">
                     <input type="checkbox" id="uvlChkProfile" checked>
@@ -485,35 +504,108 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* ---------- APPROVE ---------- */
-    var chkProfile = document.getElementById('uvlChkProfile');
-    var confirmBtn = document.getElementById('uvlApproveConfirmBtn');
+    var chkProfile  = document.getElementById('uvlChkProfile');
+    var confirmBtn  = document.getElementById('uvlApproveConfirmBtn');
+    var bizCodeInput  = document.getElementById('uvlBizCode');
+    var bizCodeStatus = document.getElementById('uvlBizCodeStatus');
+    var bizCodeCheckBtn = document.getElementById('uvlBizCodeCheckBtn');
+    var currentBizId = null;
+    var bizCodeVerified = false;  // true only after a unique check passes
 
-    chkProfile.addEventListener('change', function() {
-        confirmBtn.disabled = !chkProfile.checked;
+    function updateConfirmBtn() {
+        confirmBtn.disabled = !chkProfile.checked || !bizCodeVerified;
+    }
+
+    function setBizCodeStatus(msg, type) {
+        // type: 'ok' | 'error' | 'info'
+        var colors = { ok: 'text-success', error: 'text-danger', info: 'text-muted' };
+        bizCodeStatus.className = 'small mt-1 ' + (colors[type] || 'text-muted');
+        bizCodeStatus.textContent = msg;
+    }
+
+    function checkBizCodeUnique() {
+        var code = bizCodeInput.value.trim().toUpperCase();
+        if (!code) {
+            setBizCodeStatus('Enter a code to check.', 'info');
+            bizCodeVerified = false;
+            updateConfirmBtn();
+            return;
+        }
+        setBizCodeStatus('Checking...', 'info');
+        bizCodeCheckBtn.disabled = true;
+        fetch('/workforce/verification/check-business-code/?code=' + encodeURIComponent(code) + '&exclude_business_id=' + (currentBizId || ''), {
+            credentials: 'same-origin'
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.available) {
+                setBizCodeStatus('✓ "' + data.code + '" is available.', 'ok');
+                bizCodeVerified = true;
+            } else {
+                setBizCodeStatus('✗ "' + code + '" is already taken. Choose another.', 'error');
+                bizCodeVerified = false;
+            }
+            updateConfirmBtn();
+        })
+        .catch(function() {
+            setBizCodeStatus('Check failed. Try again.', 'error');
+            bizCodeVerified = false;
+            updateConfirmBtn();
+        })
+        .finally(function() {
+            bizCodeCheckBtn.disabled = false;
+        });
+    }
+
+    bizCodeCheckBtn.addEventListener('click', checkBizCodeUnique);
+
+    // Reset verification state whenever the input is changed
+    bizCodeInput.addEventListener('input', function() {
+        bizCodeVerified = false;
+        setBizCodeStatus('', 'info');
+        updateConfirmBtn();
     });
+
+    bizCodeInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); checkBizCodeUnique(); }
+    });
+
+    chkProfile.addEventListener('change', updateConfirmBtn);
 
     function openApproveModal(btn) {
         currentProfileId = btn.dataset.profileId;
-        var name = btn.dataset.userName;
-        var email = btn.dataset.userEmail;
-        var bizName = btn.dataset.bizName;
+        currentBizId = btn.dataset.bizId || '';
+        var email    = btn.dataset.userEmail;
+        var bizName  = btn.dataset.bizName;
+        var existingCode = btn.dataset.bizCode || '';
 
         document.getElementById('uvlApproveUser').textContent = bizName + ' (' + email + ')';
         document.getElementById('uvlChkBizName').textContent = 'Activate "' + bizName + '" business account';
 
         chkProfile.checked = true;
         document.getElementById('uvlChkBiz').checked = true;
-        confirmBtn.disabled = false;
+
+        // Pre-fill existing code but require re-check
+        bizCodeInput.value = existingCode.toUpperCase();
+        bizCodeVerified = false;
+        setBizCodeStatus(existingCode ? 'Code pre-filled — click Check to confirm it’s unique.' : 'Enter a unique business code before approving.', 'info');
+        updateConfirmBtn();
 
         openModal(approveOverlay);
+        setTimeout(function() { bizCodeInput.focus(); }, 200);
     }
 
     confirmBtn.addEventListener('click', function() {
         if (!currentProfileId || confirmBtn.disabled) return;
+        var code = bizCodeInput.value.trim().toUpperCase();
+        if (!bizCodeVerified || !code) {
+            setBizCodeStatus('Please check the code uniqueness first.', 'error');
+            return;
+        }
         confirmBtn.disabled = true;
         confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving...';
 
-        postVerification(currentProfileId, { status: 'verified' })
+        postVerification(currentProfileId, { status: 'verified', business_code: code })
         .then(function(data) {
             if (data.success) {
                 closeModal(approveOverlay);

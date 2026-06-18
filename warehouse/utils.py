@@ -185,8 +185,8 @@ def get_recommended_warehouse_location(order, user=None):
 
     # Extract order location data
     customer_zone = getattr(order, 'dl_zone', None)
-    customer_lat = getattr(order, 'customer_latitude', None)
-    customer_lon = getattr(order, 'customer_longitude', None)
+    customer_lat = getattr(order, 'latitude', None)
+    customer_lon = getattr(order, 'longitude', None)
 
     logger.info(
         f"Finding warehouse location for order {order.order_number} | "

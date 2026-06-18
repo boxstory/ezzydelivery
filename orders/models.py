@@ -76,6 +76,11 @@ ORDER_TYPE_CHOICES = [
         ('pick_and_drop', 'Pick and Drop'),
     ]
 
+DELIVERY_SPEED_CHOICES = [
+    ('standard', 'Standard (48hr)'),
+    ('same_day', 'Same Day'),
+]
+
 class Order(models.Model):
 
     # Create your models here.
@@ -112,6 +117,9 @@ class Order(models.Model):
     order_type = models.CharField(
         max_length=20, choices=ORDER_TYPE_CHOICES, default='normal_delivery',
         help_text="Order type: normal delivery or pick and drop")
+    delivery_speed = models.CharField(
+        max_length=20, choices=DELIVERY_SPEED_CHOICES, default='standard',
+        db_index=True, help_text="Delivery speed tier: same_day or standard (48hr)")
     scheduled_delivery = models.BooleanField(default=False, help_text="Whether delivery is scheduled for a specific time")
     scheduled_date = models.DateField(blank=True, null=True, help_text="Scheduled delivery date if scheduled_delivery is True")
     scheduled_time = models.TimeField(blank=True, null=True, help_text="Scheduled delivery time if scheduled_delivery is True")

@@ -1739,6 +1739,16 @@ def test_tiktokshop_connection(request):
 
 # ==================== HELPER FUNCTIONS ====================
 
+_SAME_DAY_KEYWORDS = ('same day', 'same-day', 'sameday', 'express', 'urgent', 'immediate', 'on demand', '1hr', '1 hr', '2hr', '2 hr')
+
+def _detect_delivery_speed(shipping_title):
+    """Return 'same_day' if the shipping method title signals urgency, else 'standard'."""
+    if not shipping_title:
+        return 'standard'
+    title_lower = shipping_title.lower()
+    return 'same_day' if any(kw in title_lower for kw in _SAME_DAY_KEYWORDS) else 'standard'
+
+
 def _shopify_cod_status(shopify_order):
     """Determine COD status from Shopify financial_status."""
     fs = getattr(shopify_order, 'financial_status', '') or ''
@@ -1776,7 +1786,12 @@ def _create_order_from_shopify(shopify_order, business):
         # Extract customer information
         customer = shopify_order.customer if hasattr(shopify_order, 'customer') else None
         shipping_address = shopify_order.shipping_address if hasattr(shopify_order, 'shipping_address') else None
-        
+
+        # Detect delivery speed from shipping method title
+        shipping_lines = getattr(shopify_order, 'shipping_lines', []) or []
+        shipping_title = shipping_lines[0].title if shipping_lines else ''
+        delivery_speed = _detect_delivery_speed(shipping_title)
+
         # Create order
         order = orders_models.Order.objects.create(
             order_number=order_number,
@@ -1787,6 +1802,7 @@ def _create_order_from_shopify(shopify_order, business):
             customer_address=f"{shipping_address.address1 or ''} {shipping_address.city or ''} {shipping_address.province or ''}".strip() if shipping_address else '',
             cod_amount=_shopify_cod_amount(shopify_order),
             cod_status_by_client=_shopify_cod_status(shopify_order),
+            delivery_speed=delivery_speed,
             order_status='to_review',
             order_date=datetime.strptime(shopify_order.created_at[:10], '%Y-%m-%d').date() if shopify_order.created_at else timezone.now().date()
         )
@@ -1834,6 +1850,11 @@ def _create_order_from_woocommerce(order_data, business):
         shipping = order_data.get('shipping', {})
         billing = order_data.get('billing', {})
 
+        # Detect delivery speed from WooCommerce shipping method title
+        woo_shipping_lines = order_data.get('shipping_lines', []) or []
+        woo_shipping_title = woo_shipping_lines[0].get('method_title', '') if woo_shipping_lines else ''
+        delivery_speed = _detect_delivery_speed(woo_shipping_title)
+
         # Create order
         order = orders_models.Order.objects.create(
             order_number=order_number,
@@ -1844,6 +1865,7 @@ def _create_order_from_woocommerce(order_data, business):
             customer_address=f"{shipping.get('address_1', '')} {shipping.get('city', '')} {shipping.get('state', '')}".strip(),
             cod_amount=_woo_cod_amount(order_data),
             cod_status_by_client=_woo_cod_status(order_data),
+            delivery_speed=delivery_speed,
             order_status='to_review',
             order_date=datetime.strptime(order_data.get('date_created', '')[:10], '%Y-%m-%d').date() if order_data.get('date_created') else timezone.now().date(),
             original_order_data={'source': 'woocommerce', 'platform_id': str(order_data.get('id', ''))},

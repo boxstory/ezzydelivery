@@ -25,29 +25,40 @@ def reserve_stock_for_order(order):
     try:
         order_items = OrderItem.objects.filter(order=order).select_related('product')
 
-        # Get warehouse IDs linked to this business
-        linked_warehouse_ids = SellerWarehouseLink.objects.filter(
+        # Get warehouse links ordered by priority (default first, then highest priority)
+        links = SellerWarehouseLink.objects.filter(
             business=order.business,
             is_active=True
-        ).values_list('warehouse_id', flat=True)
+        ).order_by('-is_default', '-priority')
 
-        if not linked_warehouse_ids:
+        if not links.exists():
             logger.warning(
                 f"No warehouse linked to business {order.business.business_name} "
                 f"for order {order.order_number} — skipping reservation"
             )
             return
 
+        # Build priority-ordered warehouse ID list for Case/When sorting
+        from django.db.models import Case, When, IntegerField as _IntField
+        priority_order = {link.warehouse_id: idx for idx, link in enumerate(links)}
+        linked_warehouse_ids = list(priority_order.keys())
+
         for item in order_items:
             if not item.product:
                 continue
 
-            # Find available stock in linked warehouses
+            # Find available stock — prefer higher-priority warehouses, then most stock
             stock_levels = StockLevel.objects.filter(
                 product=item.product,
                 warehouse_id__in=linked_warehouse_ids,
                 quantity_on_hand__gt=0
-            ).select_for_update().order_by('-quantity_on_hand')
+            ).select_for_update().order_by(
+                Case(
+                    *[When(warehouse_id=wid, then=rank) for wid, rank in priority_order.items()],
+                    output_field=_IntField()
+                ),
+                '-quantity_on_hand'
+            )
 
             remaining_qty = item.quantity
 

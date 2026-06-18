@@ -36,8 +36,11 @@
                 </thead>
                 <tbody>
                     {% for order in items_page %}
-                    <tr class="dli__row">
-                        <td class="dli__td dli__td--bold">{{ order.dl_task }}</td>
+                    <tr class="dli__row{% if order.delivery_speed == 'same_day' %} dli__row--urgent{% endif %}">
+                        <td class="dli__td dli__td--bold">
+                            {{ order.dl_task }}
+                            {% if order.delivery_speed == 'same_day' %}<span class="dli__speed-badge dli__speed-badge--urgent"><i class="fas fa-bolt"></i> Same Day</span>{% endif %}
+                        </td>
                         <td class="dli__td">{{ order.client_order_code }}</td>
                         <td class="dli__td">{{ order.customer_name }}</td>
                         <td class="dli__td">{{ order.customer_phone }}</td>

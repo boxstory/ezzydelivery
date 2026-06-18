@@ -787,6 +787,9 @@ LOGGING = {
 # END LOGGING CONFIGURATION
 # ==========================================
 
+# Shopify/WooCommerce product import forms embed 11 hidden fields per variant.
+# 250 products × ~10 variants × 11 = ~27,500 fields — raise limit accordingly.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 30000
 
 # ==========================================
 # AI AGENT CONFIGURATION
