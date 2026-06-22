@@ -6443,6 +6443,86 @@ def cancel_order(request, order_id):
         }, status=400)
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+def duplicate_order(request, order_id):
+    """
+    Duplicate an existing order into a fresh draft (status 'to_review') for a
+    repeat customer. Copies customer/address/items/COD but resets the workflow:
+    new order_number + client_order_code, no tasks, no COD collected, no locks,
+    verification back to pending. Redirects to the new order's detail page.
+    """
+    import uuid
+    from django.db import transaction
+
+    src = get_object_or_404(
+        orders_models.Order.objects.select_related('business', 'pickup_location')
+        .prefetch_related('order_items'),
+        id=order_id
+    )
+
+    try:
+        with transaction.atomic():
+            new_order = orders_models.Order.objects.create(
+                business=src.business,
+                client_order_code=f"WF-{uuid.uuid4().hex[:8].upper()}",  # new unique code per business
+                # --- copied delivery / customer data ---
+                customer_name=src.customer_name,
+                customer_phone=src.customer_phone,
+                customer_whatsapp=src.customer_whatsapp,
+                customer_address=src.customer_address,
+                dl_zone=src.dl_zone,
+                dl_street=src.dl_street,
+                dl_building=src.dl_building,
+                latitude=src.latitude,
+                longitude=src.longitude,
+                coords_accuracy=src.coords_accuracy,
+                pickup_location=src.pickup_location,
+                cod_amount=src.cod_amount,
+                dl_included=src.dl_included,
+                dl_amount=src.dl_amount,
+                order_notes=src.order_notes,
+                package_description=src.package_description,
+                package_qty=src.package_qty,
+                order_type=src.order_type,
+                delivery_speed=src.delivery_speed,
+                preferred_time_slot=src.preferred_time_slot,
+                # --- reset workflow ---
+                order_status='to_review',
+                task_status='new_order',
+                verification_status='pending',
+                platform='manual',
+            )
+
+            # Copy order items
+            for item in src.order_items.all():
+                orders_models.OrderItem.objects.create(
+                    order=new_order,
+                    product=item.product,
+                    quantity=item.quantity,
+                    unit_price=item.unit_price,
+                    notes=item.notes,
+                )
+
+            # Audit trail linking the duplicate to its source
+            orders_models.OrderComments.objects.create(
+                order=new_order,
+                name=request.user.username,
+                body=f"Repeated from order {src.order_number}",
+            )
+
+        messages.success(
+            request,
+            f"Order duplicated from {src.order_number}. Review and publish the new draft."
+        )
+        return redirect('workforce:order_detail', order_id=new_order.id)
+
+    except Exception as e:
+        logger.exception("Error duplicating order %s: %s", order_id, str(e))
+        messages.error(request, "An error occurred while duplicating the order.")
+        return redirect('workforce:order_detail', order_id=order_id)
+
+
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
