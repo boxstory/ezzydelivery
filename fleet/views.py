@@ -157,7 +157,7 @@ def fleet_dashboard(request):
         # Get recent transactions (last 10)
         recent_transactions = fleet_models.DriverTransaction.objects.filter(
             driver=driver
-        ).order_by('-created_at')[:10]
+        ).select_related('delivery_task', 'delivery_task__order').order_by('-created_at')[:10]
 
         unread_notifications = fleet_models.DriverNotification.objects.filter(
             driver=driver, is_read=False
@@ -176,10 +176,35 @@ def fleet_dashboard(request):
         _notif_events = list(
             fleet_models.DriverNotification.objects.filter(driver=driver).order_by('-created_at')[:10]
         )
+        # Build timeline grouped by order: a delivered task and its COD
+        # collection are the same event, so fold the COD amount into the task
+        # row instead of showing two separate entries for the same order.
         _timeline = []
+        _task_by_order = {}
         for t in _task_events:
-            _timeline.append({'type': 'task', 'obj': t, 'ts': t.completed_at})
+            # Delivered rows always show a COD value (0 for prepaid orders);
+            # a folded cod_collection txn below overrides with the actual amount.
+            _cod = None
+            if t.dl_task_status == 'delivered':
+                if t.cod_collected_amount is not None:
+                    _cod = t.cod_collected_amount
+                elif t.order:
+                    _cod = t.order.cod_amount or 0
+                else:
+                    _cod = 0
+            entry = {'type': 'task', 'obj': t, 'ts': t.completed_at, 'cod_amount': _cod}
+            _timeline.append(entry)
+            if t.order_id:
+                _task_by_order[t.order_id] = entry
         for t in _txn_events:
+            _order_id = t.delivery_task.order_id if t.delivery_task_id and t.delivery_task else None
+            # A COD collection belongs to its order's delivery — fold the amount
+            # into the task row when that delivery is shown, otherwise omit it.
+            # It is never a standalone timeline event.
+            if t.transaction_type == 'cod_collection' and _order_id:
+                if _order_id in _task_by_order:
+                    _task_by_order[_order_id]['cod_amount'] = t.amount
+                continue
             _timeline.append({'type': 'txn', 'obj': t, 'ts': t.created_at})
         for n in _notif_events:
             _timeline.append({'type': 'notif', 'obj': n, 'ts': n.created_at})

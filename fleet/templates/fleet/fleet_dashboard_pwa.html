@@ -220,14 +220,14 @@
                         {% if event.obj.order %}<span class="fleet-timeline__ref">#{{ event.obj.order.order_number|default:event.obj.id }}</span>{% endif %}
                     </div>
                     <div class="fleet-list-item__subtitle">
-                        {% if event.obj.order and event.obj.order.business %}{{ event.obj.order.business.business_name }} · {% endif %}{{ event.ts|timesince }} ago
+                        {% if event.obj.order and event.obj.order.business %}{{ event.obj.order.business.business_name }}{% endif %}
                     </div>
                 </div>
-                {% if event.obj.driver_earnings %}
                 <div class="fleet-list-item__action">
-                    <span class="fleet-timeline__earn">+{{ event.obj.driver_earnings|floatformat:0 }} QR</span>
+                    {% if event.obj.driver_earnings %}<span class="fleet-timeline__earn">+{{ event.obj.driver_earnings|floatformat:0 }} QR</span>{% endif %}
+                    {% if event.cod_amount is not None %}<span class="fleet-timeline__cod">COD {{ event.cod_amount|floatformat:0 }} QR</span>{% endif %}
+                    <span class="fleet-timeline__time">{{ event.ts|date:"M j, g:i A" }}</span>
                 </div>
-                {% endif %}
 
                 {% elif event.type == 'txn' %}
                 {# ── Transaction Event ── #}
@@ -242,12 +242,13 @@
                 </div>
                 <div class="fleet-list-item__content">
                     <div class="fleet-list-item__title">{{ event.obj.get_transaction_type_display }}</div>
-                    <div class="fleet-list-item__subtitle">{{ event.ts|timesince }} ago{% if event.obj.description %} · {{ event.obj.description|truncatechars:40 }}{% endif %}</div>
+                    {% if event.obj.description %}<div class="fleet-list-item__subtitle">{{ event.obj.description|truncatechars:40 }}</div>{% endif %}
                 </div>
                 <div class="fleet-list-item__action">
                     <span class="{% if event.obj.amount > 0 %}fleet-timeline__amount--positive{% else %}fleet-timeline__amount--negative{% endif %}">
                         {% if event.obj.amount > 0 %}+{% endif %}{{ event.obj.amount|floatformat:0 }} QR
                     </span>
+                    <span class="fleet-timeline__time">{{ event.ts|date:"M j, g:i A" }}</span>
                 </div>
 
                 {% elif event.type == 'notif' %}
@@ -257,13 +258,11 @@
                 </div>
                 <div class="fleet-list-item__content">
                     <div class="fleet-list-item__title">{{ event.obj.title|default:"Notification" }}</div>
-                    <div class="fleet-list-item__subtitle">{{ event.ts|timesince }} ago</div>
                 </div>
-                {% if not event.obj.is_read %}
                 <div class="fleet-list-item__action">
-                    <span class="fleet-timeline__unread-dot"></span>
+                    {% if not event.obj.is_read %}<span class="fleet-timeline__unread-dot"></span>{% endif %}
+                    <span class="fleet-timeline__time">{{ event.ts|date:"M j, g:i A" }}</span>
                 </div>
-                {% endif %}
                 {% endif %}
 
             </li>
