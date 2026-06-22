@@ -178,7 +178,7 @@ def all_delivery_tasks(request):
         dl_task_status__in=['pending', 'for_review'],
         order__verification_status='verified',
     ).exclude(
-        dl_task_status__in=['delivered', 'cancelled', 'failed']
+        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed']
     ).exclude(
         order__order_status='cancelled'
     ).order_by('-id')
@@ -204,7 +204,7 @@ def all_delivery_tasks(request):
     # History tasks: Completed tasks (delivered, failed, cancelled)
     history_tasks = base_qs.filter(
         driver=driver,
-        dl_task_status__in=['delivered', 'failed', 'cancelled']
+        dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'cancelled']
     ).order_by('-id')
 
     # Apply area filter to all querysets
@@ -261,8 +261,8 @@ def all_delivery_tasks(request):
             # Include failed and cancelled (for history tasks)
             history_tasks = history_tasks.filter(dl_task_status__in=['failed', 'cancelled'])
         elif status_filter == 'delivered':
-            # Delivered tasks (for history tasks)
-            history_tasks = history_tasks.filter(dl_task_status='delivered')
+            # Delivered tasks (for history tasks) — partial delivery counts as delivered
+            history_tasks = history_tasks.filter(dl_task_status__in=['delivered', 'partial_delivery'])
         elif status_filter == 'accepted':
             # Accepted but not started (for accepted/active tasks)
             accepted_tasks = accepted_tasks.filter(dl_task_status='accepted')

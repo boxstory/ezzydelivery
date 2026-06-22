@@ -1079,7 +1079,7 @@ def orders_to_publish(request):
         order__business__business_status='active',
         dl_task_publish=False,
     ).exclude(
-        dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
+        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed', 'rejected']
     ).count()
 
     data = {
@@ -5550,7 +5550,7 @@ def dl_list_all(request):
         order__business__business_status='active',
         dl_task_publish=False,
     ).exclude(
-        dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
+        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed', 'rejected']
     ).count()
 
     data = {
@@ -5755,7 +5755,7 @@ def dl_list_incompleted_details(request):
     ).filter(
         order__business__business_status='active',
     ).exclude(
-        dl_task_status__in=['delivered', 'cancelled']
+        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled']
     ).order_by('-created_at')
 
     # Get filter parameters
@@ -5866,7 +5866,7 @@ def dl_list_ready_to_published_to_dms(request):
         order__business__business_status='active',
         dl_task_publish=False,
     ).exclude(
-        dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
+        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed', 'rejected']
     ).order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
 
@@ -10475,7 +10475,7 @@ def staff_reports(request):
     task_stats = delivery_models.DeliveryTask.objects.aggregate(
         total=Count('id'),
         active=Count('id', filter=Q(dl_task_status__in=['in_transit', 'pending', 'address_pending'])),
-        completed=Count('id', filter=Q(dl_task_status='delivered')),
+        completed=Count('id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
     )
 
     # Get driver statistics in single query
@@ -11917,7 +11917,7 @@ def seller_detail(request, business_id):
     ).aggregate(
         total_tasks=Count('id'),
         in_transit=Count('id', filter=Q(dl_task_status='in_transit')),
-        completed=Count('id', filter=Q(dl_task_status='delivered')),
+        completed=Count('id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
     )
 
     # Calculate average orders per month (if business_since exists)
@@ -12834,7 +12834,7 @@ def driver_detail(request, driver_id):
         driver=driver
     ).aggregate(
         total_tasks=Count('id'),
-        completed_tasks=Count('id', filter=Q(dl_task_status='delivered')),
+        completed_tasks=Count('id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
         in_transit=Count('id', filter=Q(dl_task_status='in_transit')),
         failed_tasks=Count('id', filter=Q(dl_task_status__in=['failed', 'cancelled'])),
     )
@@ -19851,13 +19851,13 @@ def wf_driver_tasks(request):
         # --- Stats from filtered set ---
         agg = tasks.aggregate(
             total=Count('id'),
-            delivered=Count('id', filter=Q(dl_task_status='delivered')),
+            delivered=Count('id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
             in_progress=Count('id', filter=Q(dl_task_status__in=[
                 'accepted', 'picked_up', 'start_ride',
                 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'
             ])),
             failed=Count('id', filter=Q(dl_task_status__in=['failed', 'cancelled', 'rejected'])),
-            total_earnings=Sum('dl_price', filter=Q(dl_task_status='delivered')),
+            total_earnings=Sum('dl_price', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
             total_cod=Sum('order__cod_amount'),
             cod_in_hand=Sum('cod_collected_amount', filter=Q(cod_collected=True, cod_settled=False)),
             cod_settled=Sum('cod_collected_amount', filter=Q(cod_settled=True)),

@@ -165,12 +165,14 @@ def fleet_dashboard(request):
 
         # Build combined activity timeline
         from delivery import models as _dl_act
+        # NB: completed_at is only set for delivered/partial_delivery tasks, so
+        # ordering/filtering on it hides failed, accepted and out_for_delivery
+        # events. Use updated_at (always set) for the timeline timestamp.
         _task_events = list(
             _dl_act.DeliveryTask.objects.filter(
                 driver=driver,
-                dl_task_status__in=['delivered', 'failed', 'accepted', 'out_for_delivery'],
-                completed_at__isnull=False,
-            ).select_related('order', 'order__business').order_by('-completed_at')[:10]
+                dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'accepted', 'out_for_delivery'],
+            ).select_related('order', 'order__business').order_by('-updated_at')[:30]
         )
         _txn_events = list(recent_transactions)
         _notif_events = list(
@@ -185,14 +187,14 @@ def fleet_dashboard(request):
             # Delivered rows always show a COD value (0 for prepaid orders);
             # a folded cod_collection txn below overrides with the actual amount.
             _cod = None
-            if t.dl_task_status == 'delivered':
+            if t.dl_task_status in ('delivered', 'partial_delivery'):
                 if t.cod_collected_amount is not None:
                     _cod = t.cod_collected_amount
                 elif t.order:
                     _cod = t.order.cod_amount or 0
                 else:
                     _cod = 0
-            entry = {'type': 'task', 'obj': t, 'ts': t.completed_at, 'cod_amount': _cod}
+            entry = {'type': 'task', 'obj': t, 'ts': t.completed_at or t.updated_at, 'cod_amount': _cod}
             _timeline.append(entry)
             if t.order_id:
                 _task_by_order[t.order_id] = entry
@@ -209,7 +211,7 @@ def fleet_dashboard(request):
         for n in _notif_events:
             _timeline.append({'type': 'notif', 'obj': n, 'ts': n.created_at})
         _timeline.sort(key=lambda x: x['ts'], reverse=True)
-        activity_timeline = _timeline[:12]
+        activity_timeline = _timeline[:20]
 
         profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
             user_id=request.user.id, defaults={'profile': profile}
@@ -529,7 +531,7 @@ def cod_collection(request):
             driver=driver,
             cod_collected=True,
             cod_settled=False,
-            dl_task_status='delivered'
+            dl_task_status__in=['delivered', 'partial_delivery']
         ).select_related('order', 'order__business', 'dl_to_address')
         if date_cutoff:
             cod_in_hand_qs = cod_in_hand_qs.filter(completed_at__gte=date_cutoff)
@@ -549,7 +551,7 @@ def cod_collection(request):
 
         # All-time unsettled COD total (unaffected by date filter) for hero card
         all_time_cod_qs = delivery_models.DeliveryTask.objects.filter(
-            driver=driver, cod_collected=True, cod_settled=False, dl_task_status='delivered'
+            driver=driver, cod_collected=True, cod_settled=False, dl_task_status__in=['delivered','partial_delivery']
         )
         all_time_cod_total = all_time_cod_qs.aggregate(total=Sum('cod_collected_amount'))['total'] or 0
 
@@ -629,7 +631,7 @@ def cod_submission(request):
                 driver=driver,
                 cod_collected=True,
                 cod_settled=False,
-                dl_task_status='delivered'
+                dl_task_status__in=['delivered', 'partial_delivery']
             ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
 
             from django.db.models import Sum
@@ -699,7 +701,7 @@ def cod_submission(request):
                         driver=driver,
                         cod_collected=True,
                         cod_settled=False,
-                        dl_task_status='delivered'
+                        dl_task_status__in=['delivered', 'partial_delivery']
                     ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
 
                 if amount <= 0:
@@ -712,7 +714,7 @@ def cod_submission(request):
                             driver=driver,
                             cod_collected=True,
                             cod_settled=False,
-                            dl_task_status='delivered'
+                            dl_task_status__in=['delivered', 'partial_delivery']
                         ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
                         if driver.cod_in_hand != actual_cod:
                             driver.cod_in_hand = actual_cod
@@ -742,7 +744,7 @@ def cod_submission(request):
             driver=driver,
             cod_collected=True,
             cod_settled=False,
-            dl_task_status='delivered'
+            dl_task_status__in=['delivered', 'partial_delivery']
         ).select_related(
             'order',
             'order__business',
@@ -832,14 +834,14 @@ def cod_export(request):
                 id__in=delivery_ids,
                 cod_collected=True,
                 cod_settled=False,  # Only unsettled COD
-                dl_task_status='delivered'
+                dl_task_status__in=['delivered', 'partial_delivery']
             ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
         else:
             deliveries = delivery_models.DeliveryTask.objects.filter(
                 driver=driver,
                 cod_collected=True,
                 cod_settled=False,  # Only unsettled COD
-                dl_task_status='delivered'
+                dl_task_status__in=['delivered', 'partial_delivery']
             ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
 
         # Calculate total COD amount for selected deliveries
@@ -1320,7 +1322,7 @@ def driver_earnings(request):
         # Get completed delivery tasks using direct driver FK (consistent with dashboard)
         completed_tasks = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
-            dl_task_status__in=['delivered', 'failed'],
+            dl_task_status__in=['delivered', 'partial_delivery', 'failed'],
             dl_task_date__gte=start_date.date()
         ).select_related(
             'order', 'order__business', 'pickup_location', 'dl_to_address'
@@ -1328,7 +1330,7 @@ def driver_earnings(request):
 
         # Apply status filter
         if status_filter == 'delivered':
-            completed_tasks = completed_tasks.filter(dl_task_status='delivered')
+            completed_tasks = completed_tasks.filter(dl_task_status__in=['delivered', 'partial_delivery'])
         elif status_filter == 'returned':
             completed_tasks = completed_tasks.filter(dl_task_status='failed')
 
@@ -1351,7 +1353,7 @@ def driver_earnings(request):
         )
         total_delivery_fee = totals['total_earnings'] or 0
 
-        delivered_count = completed_tasks.filter(dl_task_status='delivered').count()
+        delivered_count = completed_tasks.filter(dl_task_status__in=['delivered', 'partial_delivery']).count()
         returned_count = completed_tasks.filter(dl_task_status='failed').count()
         total_count = completed_tasks.count()
 
@@ -1359,7 +1361,7 @@ def driver_earnings(request):
         # Only show published earnings (verified by staff)
         unsettled_tasks = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
-            dl_task_status='delivered',
+            dl_task_status__in=['delivered', 'partial_delivery'],
             earnings_settled=False,
             earnings_verification_status='published'  # Only published earnings can be settled
         ).select_related(
@@ -1393,7 +1395,7 @@ def driver_earnings(request):
         # Count pending verification (deliveries waiting for staff verification)
         pending_verification_count = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
-            dl_task_status='delivered',
+            dl_task_status__in=['delivered', 'partial_delivery'],
             earnings_verification_status='pending'
         ).count()
 
@@ -1709,7 +1711,7 @@ def driver_performance(request):
         # Calculate detailed metrics
         performance_metrics = {
             'total_tasks': deliveries.count(),
-            'completed_tasks': deliveries.filter(dl_task_status='delivered').count(),
+            'completed_tasks': deliveries.filter(dl_task_status__in=['delivered', 'partial_delivery']).count(),
             'failed_tasks': deliveries.filter(dl_task_status='failed').count(),
             'in_progress': deliveries.filter(dl_task_status__in=['picked_up', 'start_ride', 'in_transit', 'out_for_delivery']).count(),
             'cancelled_tasks': deliveries.filter(dl_task_status='cancelled').count(),
@@ -1739,7 +1741,7 @@ def driver_performance(request):
             daily_stats.append({
                 'date': day_start.strftime('%a %d'),
                 'total': day_deliveries.count(),
-                'completed': day_deliveries.filter(dl_task_status='delivered').count(),
+                'completed': day_deliveries.filter(dl_task_status__in=['delivered', 'partial_delivery']).count(),
                 'failed': day_deliveries.filter(dl_task_status='failed').count(),
             })
 
@@ -2448,7 +2450,7 @@ def driver_tasks(request):
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     history_tasks = base_qs.filter(
-        driver=driver, dl_task_publish=True, dl_task_status__in=['delivered', 'failed', 'cancelled']
+        driver=driver, dl_task_publish=True, dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'cancelled']
     ).order_by('-id')
 
     # Area filter
@@ -2497,7 +2499,7 @@ def driver_tasks(request):
         elif status_filter == 'failed':
             history_tasks = history_tasks.filter(dl_task_status__in=['failed', 'cancelled'])
         elif status_filter == 'delivered':
-            history_tasks = history_tasks.filter(dl_task_status='delivered')
+            history_tasks = history_tasks.filter(dl_task_status__in=['delivered', 'partial_delivery'])
         elif status_filter == 'accepted':
             accepted_tasks = accepted_tasks.filter(dl_task_status='accepted')
         elif status_filter == 'picked_up':
@@ -3437,7 +3439,7 @@ def staff_cod_submission_edit(request, txn_code):
             driver=txn.driver,
             cod_collected=True,
             cod_settled=False,
-            dl_task_status='delivered'
+            dl_task_status__in=['delivered', 'partial_delivery']
         ).exclude(
             id__in=linked_tasks.values_list('id', flat=True)
         ).select_related(

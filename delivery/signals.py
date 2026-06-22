@@ -79,7 +79,9 @@ def _sync_order_status_from_task(task):
 
         update_fields = []
 
-        if task.dl_task_status == 'delivered':
+        # Partial delivery is treated as Delivered for the order/client
+        # (the customer kept some items and it shows as Delivered to them).
+        if task.dl_task_status in ('delivered', 'partial_delivery'):
             order.order_status = 'delivered'
             update_fields.append('order_status')
             if order.business and order.business.fulfillment_service_enabled:
@@ -400,8 +402,8 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         if old_status is not None and old_status != new_status and instance.order_id:
             _sync_order_status_from_task(instance)
 
-        # Fire COD collected trigger when delivered with COD
-        if old_status is not None and new_status == 'delivered' and instance.cod_collected and instance.cod_collected_amount:
+        # Fire COD collected trigger when delivered (incl. partial) with COD
+        if old_status is not None and new_status in ('delivered', 'partial_delivery') and instance.cod_collected and instance.cod_collected_amount:
             try:
                 from core.auto_flow_executor import execute_flows_for_trigger
                 execute_flows_for_trigger('staff_cod_collected', task=instance)

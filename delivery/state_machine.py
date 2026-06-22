@@ -46,6 +46,7 @@ STATUS_STAGE = {
     'customer_delaying': 7,
     'dl_pending_payment': 7,
     'delivered':     8,
+    'partial_delivery': 8,
     'failed':        8,
     'rejected':      8,
     'cancelled':     8,
@@ -71,7 +72,7 @@ def _build_staff_transitions():
                 forward.add(target)
         transitions[status] = forward
     # Terminal statuses — no forward moves for staff
-    for terminal in ('delivered', 'failed', 'rejected', 'cancelled', 'dropsownlost'):
+    for terminal in ('delivered', 'partial_delivery', 'failed', 'rejected', 'cancelled', 'dropsownlost'):
         transitions[terminal] = set()
     return transitions
 
@@ -86,28 +87,29 @@ ADMIN_TRANSITIONS = {status: _ALL_STATUSES - {status} for status in _ALL_STATUSE
 
 DRIVER_TRANSITIONS = {
     'assigned':   {'accepted', 'rejected'},
-    'accepted':   {'picked_up', 'out_for_delivery', 'delivered', 'failed', 'rejected'},
-    'picked_up':  {'start_ride', 'in_transit', 'out_for_delivery', 'failed'},
-    'start_ride': {'in_transit', 'out_for_delivery', 'failed'},
-    'in_transit': {'out_for_delivery', 'contacted', 'non_reachable', 'address_pending',
+    'accepted':   {'picked_up', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed', 'rejected'},
+    'picked_up':  {'start_ride', 'in_transit', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed'},
+    'start_ride': {'in_transit', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed'},
+    'in_transit': {'out_for_delivery', 'delivered', 'partial_delivery', 'contacted', 'non_reachable', 'address_pending',
                    'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed'},
-    'out_for_delivery': {'delivered', 'contacted', 'non_reachable', 'address_pending',
+    'out_for_delivery': {'delivered', 'partial_delivery', 'contacted', 'non_reachable', 'address_pending',
                          'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed'},
-    'contacted':          {'delivered', 'non_reachable', 'failed', 'dl_pending_payment'},
+    'contacted':          {'delivered', 'partial_delivery', 'non_reachable', 'failed', 'dl_pending_payment'},
     'non_reachable':      {'contacted', 'customer_delaying', 'address_pending', 'failed'},
     'address_pending':    {'contacted', 'non_reachable', 'failed'},
     'customer_confirmation_pending': {'contacted', 'non_reachable', 'failed'},
     'customer_delaying':  {'contacted', 'failed'},
-    'dl_pending_payment': {'delivered', 'failed'},
+    'dl_pending_payment': {'delivered', 'partial_delivery', 'failed'},
     # Self-assign from pool
     'pending':    {'accepted'},
     'for_review': {'accepted'},
     # Terminal
-    'delivered':    set(),
-    'failed':       set(),
-    'rejected':     set(),
-    'cancelled':    set(),
-    'dropsownlost': set(),
+    'delivered':       set(),
+    'partial_delivery': set(),
+    'failed':          set(),
+    'rejected':        set(),
+    'cancelled':       set(),
+    'dropsownlost':    set(),
 }
 
 # ---------------------------------------------------------------------------

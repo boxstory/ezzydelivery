@@ -104,7 +104,7 @@ class WalletService:
                 cod_collected = DeliveryTask.objects.filter(
                     driver=driver,
                     cod_collected=True,
-                    dl_task_status='delivered',
+                    dl_task_status__in=['delivered', 'partial_delivery'],
                     completed_at__isnull=False
                 ).exclude(id__in=settled_task_ids)
 
@@ -736,7 +736,7 @@ class WalletService:
             total_deliveries=Count('id'),
             total_earnings=Sum('driver_earnings'),
             total_cod_collected=Sum('cod_collected_amount'),
-            successful=Count('id', filter=Q(dl_task_status='delivered')),
+            successful=Count('id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
             failed=Count('id', filter=Q(dl_task_status='failed'))
         )
 
