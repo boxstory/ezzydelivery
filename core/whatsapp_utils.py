@@ -90,21 +90,14 @@ def send_whatsapp_verification(phone_number, verification_code, verification_typ
         verification_type: Type of verification (password_reset, phone_add, etc.)
 
     Returns:
-        dict: Response from n8n webhook with success status and code
+        dict: Response from the messaging channel with success status and code
     """
     # Get n8n webhook URL from settings
     n8n_webhook_url = getattr(settings, 'N8N_WHATSAPP_WEBHOOK_URL', None)
     n8n_webhook_secret = getattr(settings, 'N8N_WEBHOOK_SECRET_KEY', None)
 
-    if not n8n_webhook_url:
-        return {
-            'success': False,
-            'error': 'N8N webhook URL not configured',
-            'code': None
-        }
-
-    # Validate HTTPS for production
-    if not settings.DEBUG and not n8n_webhook_url.startswith('https://'):
+    # Validate HTTPS for production when using the webhook channel
+    if n8n_webhook_url and not settings.DEBUG and not n8n_webhook_url.startswith('https://'):
         return {
             'success': False,
             'error': 'Webhook URL must use HTTPS in production',
@@ -166,6 +159,17 @@ Best regards,
     }
 
     message = message_templates.get(verification_type, f"Your EZZY verification code is: {verification_code}")
+
+    # If the n8n webhook is not configured, fall back to the Evolution API
+    # (the channel already used for other transactional WhatsApp messages).
+    if not n8n_webhook_url:
+        api_result = send_whatsapp_message_api(phone_number, message.strip())
+        return {
+            'success': api_result.get('success', False),
+            'code': verification_code,
+            'message': 'Verification code sent via Evolution API' if api_result.get('success') else None,
+            'error': None if api_result.get('success') else api_result.get('error', 'Failed to send via Evolution API')
+        }
 
     # Prepare webhook payload
     payload = {
@@ -232,12 +236,8 @@ def send_password_reset_completion_notification(user, phone_number):
     n8n_webhook_url = getattr(settings, 'N8N_PASSWORD_RESET_COMPLETE_WEBHOOK_URL', None)
     n8n_webhook_secret = getattr(settings, 'N8N_WEBHOOK_SECRET_KEY', None)
 
-    if not n8n_webhook_url:
-        # Silently fail if webhook not configured
-        return {'success': False, 'error': 'Webhook not configured'}
-
-    # Validate HTTPS for production
-    if not settings.DEBUG and not n8n_webhook_url.startswith('https://'):
+    # Validate HTTPS for production when using the webhook channel
+    if n8n_webhook_url and not settings.DEBUG and not n8n_webhook_url.startswith('https://'):
         return {'success': False, 'error': 'Webhook must use HTTPS in production'}
 
     message = f"""
@@ -250,6 +250,10 @@ Time: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 If you did not perform this action, please contact support immediately.
     """
+
+    # If the dedicated webhook is not configured, fall back to the Evolution API.
+    if not n8n_webhook_url:
+        return send_whatsapp_message_api(phone_number, message.strip())
 
     payload = {
         'phone': phone_number,
