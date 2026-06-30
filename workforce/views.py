@@ -9216,8 +9216,8 @@ def cod_business_settlement_report(request):
         g['tasks'].append(task)
         g['subtotal'] += (task.cod_collected_amount or Decimal('0'))
         # Delivery fee is shown for context only — the COD payout stays GROSS.
-        # Falls back to the 20 QR default when a task has no dl_price recorded.
-        g['fee_subtotal'] += Decimal(str(task.dl_price or 20))
+        # Read straight from the DB (dl_price defaults to 20 QR at the model level).
+        g['fee_subtotal'] += Decimal(str(task.dl_price or 0))
 
     business_groups = sorted(groups.values(), key=lambda g: g['subtotal'], reverse=True)
     grand_total = sum((g['subtotal'] for g in business_groups), Decimal('0'))
@@ -9412,7 +9412,7 @@ def cod_business_settlement_pdf(request):
     total_fee = Decimal('0')
     for i, t in enumerate(tasks_qs, 1):
         amt = t.cod_collected_amount or Decimal('0')
-        fee = Decimal(str(t.dl_price or 20))
+        fee = Decimal(str(t.dl_price or 0))
         total += amt
         total_fee += fee
         biz = t.order.business.business_name if t.order and t.order.business else '-'

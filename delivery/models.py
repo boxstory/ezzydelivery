@@ -245,7 +245,7 @@ class DeliveryTask(models.Model):
     ]
     dl_speed = models.CharField(
         max_length=100, choices=DL_SPEED_CHOICES, blank=True)
-    dl_price = models.IntegerField(null=True, blank=True)
+    dl_price = models.IntegerField(default=20, null=True, blank=True)
     dl_to_address = models.ForeignKey(
         DlAddressUpdate, on_delete=models.DO_NOTHING, blank=True, null=True)
 
