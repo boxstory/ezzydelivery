@@ -9211,12 +9211,17 @@ def cod_business_settlement_report(request):
             'business': biz,
             'tasks': [],
             'subtotal': Decimal('0'),
+            'fee_subtotal': Decimal('0'),
         })
         g['tasks'].append(task)
         g['subtotal'] += (task.cod_collected_amount or Decimal('0'))
+        # Delivery fee is shown for context only — the COD payout stays GROSS.
+        # Falls back to the 20 QR default when a task has no dl_price recorded.
+        g['fee_subtotal'] += Decimal(str(task.dl_price or 20))
 
     business_groups = sorted(groups.values(), key=lambda g: g['subtotal'], reverse=True)
     grand_total = sum((g['subtotal'] for g in business_groups), Decimal('0'))
+    grand_total_fee = sum((g['fee_subtotal'] for g in business_groups), Decimal('0'))
     task_count = sum(len(g['tasks']) for g in business_groups)
 
     # Business dropdown for the filter
@@ -9228,6 +9233,7 @@ def cod_business_settlement_report(request):
         'page_title': 'Business COD Payout',
         'business_groups': business_groups,
         'grand_total': grand_total,
+        'grand_total_fee': grand_total_fee,
         'task_count': task_count,
         'business_count': len(business_groups),
         'date_from': date_from,
@@ -9401,20 +9407,24 @@ def cod_business_settlement_pdf(request):
     elements.append(Paragraph(f'Date: {timezone.now().strftime("%d %b %Y, %H:%M")}', styles['Normal']))
     elements.append(Spacer(1, 16))
 
-    data = [['#', 'Business', 'Order', 'Customer', 'Delivered', 'COD (QR)']]
+    data = [['#', 'Business', 'Order', 'Customer', 'Delivered', 'Del. Fee', 'COD (QR)']]
     total = Decimal('0')
+    total_fee = Decimal('0')
     for i, t in enumerate(tasks_qs, 1):
         amt = t.cod_collected_amount or Decimal('0')
+        fee = Decimal(str(t.dl_price or 20))
         total += amt
+        total_fee += fee
         biz = t.order.business.business_name if t.order and t.order.business else '-'
         data.append([
             str(i), biz[:22],
             (t.order.order_number if t.order else '-') or '-',
             (t.order.customer_name if t.order else '-' or '-')[:16],
             t.completed_at.strftime('%d %b %Y') if t.completed_at else '-',
+            f'{fee:.2f}',
             f'{amt:.2f}',
         ])
-    data.append(['', '', '', '', 'Total:', f'{total:.2f}'])
+    data.append(['', '', '', '', 'Total:', f'{total_fee:.2f}', f'{total:.2f}'])
 
     table = Table(data, repeatRows=1)
     table.setStyle(TableStyle([

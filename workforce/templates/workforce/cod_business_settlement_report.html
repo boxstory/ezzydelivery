@@ -7,7 +7,7 @@
 {% block title %}Business COD Payout{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260630a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260630b" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -36,16 +36,22 @@
         <span class="bcp__stat-value">QAR {{ grand_total|floatformat:2 }}</span>
       </div>
     </div>
-    <div class="col-6 col-md-4">
+    <div class="col-6 col-md-2">
       <div class="bcp__stat">
         <span class="bcp__stat-label">Businesses</span>
         <span class="bcp__stat-value">{{ business_count }}</span>
       </div>
     </div>
-    <div class="col-6 col-md-4">
+    <div class="col-6 col-md-2">
       <div class="bcp__stat">
         <span class="bcp__stat-label">Deliveries</span>
         <span class="bcp__stat-value">{{ task_count }}</span>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="bcp__stat">
+        <span class="bcp__stat-label">Delivery Fees (info only)</span>
+        <span class="bcp__stat-value bcp__stat-value--muted">QAR {{ grand_total_fee|floatformat:2 }}</span>
       </div>
     </div>
   </div>
@@ -89,7 +95,11 @@
         <input type="checkbox" class="bcp__biz-check" data-business="{{ g.business.business_id }}">
         <span class="bcp__biz-name">{{ g.business.business_name }}</span>
       </label>
-      <span class="bcp__biz-subtotal">QAR {{ g.subtotal|floatformat:2 }} · {{ g.tasks|length }} deliver{{ g.tasks|length|pluralize:"y,ies" }}</span>
+      <span class="bcp__biz-subtotal">
+        COD QAR {{ g.subtotal|floatformat:2 }}
+        <span class="bcp__biz-fee">· fees QAR {{ g.fee_subtotal|floatformat:2 }}</span>
+        · {{ g.tasks|length }} deliver{{ g.tasks|length|pluralize:"y,ies" }}
+      </span>
     </div>
     <div class="table-responsive">
       <table class="table table-sm bcp__table mb-0">
@@ -100,6 +110,7 @@
             <th>Customer</th>
             <th>Delivered</th>
             <th>Recv'd (Ezzy)</th>
+            <th class="text-end">Delivery Fee</th>
             <th class="text-end">COD (QR)</th>
           </tr>
         </thead>
@@ -114,6 +125,7 @@
             <td>{% if t.order %}{{ t.order.customer_name|default:"-" }}{% else %}-{% endif %}</td>
             <td>{{ t.completed_at|date:"d M Y"|default:"-" }}</td>
             <td>{{ t.cod_settled_at|date:"d M Y"|default:"-" }}</td>
+            <td class="text-end bcp__fee-cell">{{ t.dl_price|default:20|floatformat:2 }}</td>
             <td class="text-end">{{ t.cod_collected_amount|floatformat:2 }}</td>
           </tr>
           {% endfor %}
