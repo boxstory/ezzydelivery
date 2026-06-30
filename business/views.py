@@ -2063,10 +2063,15 @@ def business_finance_dashboard(request):
         total_count=Count('id'),
     )
 
-    # COD client settlements for this business
+    # COD client settlements for this business — net of any payout reversals
+    # (a reversal claws a payout back when a settled order is later returned).
     cod_client_settled = abs(txns.filter(
         transaction_type='cod_client_settle'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+    cod_client_reversed = abs(txns.filter(
+        transaction_type='cod_client_settle_reversal'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+    cod_client_settled = cod_client_settled - cod_client_reversed
 
     # Charges billed to this business
     charges = txns.filter(
@@ -2207,15 +2212,21 @@ def business_cod_statement(request):
         total=Count('id'),
     )
 
-    # COD settlements to this business
+    # COD settlements to this business (includes payout reversals in the list)
     settlements = fleet_models.DriverTransaction.objects.filter(
         business=business,
-        transaction_type='cod_client_settle',
+        transaction_type__in=['cod_client_settle', 'cod_client_settle_reversal'],
         created_at__gte=start_date.date()
     ).select_related('created_by').order_by('-created_at')
 
-    total_settled = abs(settlements.aggregate(
+    # Net total = payouts minus reversals
+    settled_gross = abs(settlements.filter(
+        transaction_type='cod_client_settle').aggregate(
         total=Sum('amount'))['total'] or Decimal('0'))
+    settled_reversed = abs(settlements.filter(
+        transaction_type='cod_client_settle_reversal').aggregate(
+        total=Sum('amount'))['total'] or Decimal('0'))
+    total_settled = settled_gross - settled_reversed
 
     context = {
         'business': business,

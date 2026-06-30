@@ -419,6 +419,11 @@ class DeliveryTask(models.Model):
         null=True, blank=True,
         help_text="When COD was settled with the business client"
     )
+    cod_client_settle_txn = models.ForeignKey(
+        'fleet.DriverTransaction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='client_settled_tasks',
+        help_text="The COD client-settlement (business payout) transaction this task was paid in"
+    )
 
     # --- Hub Model (Two-Leg Delivery) ---
     TASK_LEG_CHOICES = [

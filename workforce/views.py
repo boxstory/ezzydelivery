@@ -9169,6 +9169,276 @@ def cod_settlement_pdf(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def cod_business_settlement_report(request):
+    """
+    Leg 3 — Business COD Payout report. Lists every delivery whose COD is held by
+    EzzyDelivery (driver already settled) but not yet paid to the business, grouped
+    by business with a checkbox per task so staff settle exactly what they choose.
+    """
+    from django.db.models import Sum, Count
+    from delivery import models as delivery_models
+    from decimal import Decimal
+
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    business_filter = request.GET.get('business_id', '')
+
+    # Candidates: COD collected, settled with EzzyDelivery (Leg 2 done), not yet
+    # paid to business. Gate on task-level cod_settled (cash physically with Ezzy).
+    tasks_qs = delivery_models.DeliveryTask.objects.filter(
+        cod_collected=True,
+        cod_settled=True,
+        cod_client_settled=False,
+        dl_task_status__in=['delivered', 'partial_delivery'],
+    ).select_related('order', 'order__business', 'driver').order_by('-completed_at')
+
+    # Date filter (default = ALL — no restriction on load)
+    if date_from:
+        tasks_qs = tasks_qs.filter(completed_at__date__gte=date_from)
+    if date_to:
+        tasks_qs = tasks_qs.filter(completed_at__date__lte=date_to)
+    if business_filter:
+        tasks_qs = tasks_qs.filter(order__business_id=business_filter)
+
+    # Group into per-business buckets for the template
+    groups = {}
+    for task in tasks_qs:
+        order = task.order
+        biz = order.business if order else None
+        if biz is None:
+            continue
+        g = groups.setdefault(biz.business_id, {
+            'business': biz,
+            'tasks': [],
+            'subtotal': Decimal('0'),
+        })
+        g['tasks'].append(task)
+        g['subtotal'] += (task.cod_collected_amount or Decimal('0'))
+
+    business_groups = sorted(groups.values(), key=lambda g: g['subtotal'], reverse=True)
+    grand_total = sum((g['subtotal'] for g in business_groups), Decimal('0'))
+    task_count = sum(len(g['tasks']) for g in business_groups)
+
+    # Business dropdown for the filter
+    all_businesses = business_models.Business.objects.filter(
+        business_id__in=[g['business'].business_id for g in business_groups]
+    ).order_by('business_name') if business_groups else business_models.Business.objects.none()
+
+    context = {
+        'page_title': 'Business COD Payout',
+        'business_groups': business_groups,
+        'grand_total': grand_total,
+        'task_count': task_count,
+        'business_count': len(business_groups),
+        'date_from': date_from,
+        'date_to': date_to,
+        'business_filter': business_filter,
+        'all_businesses': all_businesses,
+    }
+    return render(request, 'workforce/cod_business_settlement_report.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def cod_business_settlement_action(request):
+    """Process a Leg-3 business COD payout for the selected delivery tasks."""
+    from django.http import JsonResponse
+    from django.db import transaction as db_transaction
+    from fleet.wallet_service import WalletService
+    from delivery import models as delivery_models
+    from decimal import Decimal
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    task_ids = request.POST.getlist('task_ids[]')
+    payment_method = request.POST.get('payment_method', 'bank')
+    reference = request.POST.get('reference', '')
+
+    if not task_ids:
+        return JsonResponse({'error': 'No deliveries selected'}, status=400)
+    if len(task_ids) > 500:
+        return JsonResponse({'error': 'Maximum 500 deliveries can be settled at once'}, status=400)
+
+    # Map selected tasks → business, then settle per business atomically.
+    settled_businesses = []
+    total_settled = Decimal('0')
+
+    # Group the requested task ids by their order's business
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        id__in=task_ids
+    ).select_related('order', 'order__business')
+    by_business = {}
+    for t in tasks:
+        biz = t.order.business if t.order else None
+        if biz is None:
+            continue
+        by_business.setdefault(biz.business_id, {'business': biz, 'ids': []})['ids'].append(t.id)
+
+    for biz_id, data in by_business.items():
+        business = data['business']
+        try:
+            with db_transaction.atomic():
+                # Lock only currently-unsettled candidate rows and recompute the
+                # amount server-side — never trust a client-supplied total.
+                locked = list(delivery_models.DeliveryTask.objects.select_for_update().filter(
+                    id__in=data['ids'],
+                    cod_collected=True,
+                    cod_settled=True,
+                    cod_client_settled=False,
+                ).values_list('id', 'cod_collected_amount'))
+                if not locked:
+                    continue
+                locked_ids = [row[0] for row in locked]
+                amount = sum((row[1] or Decimal('0')) for row in locked)
+                if amount <= 0:
+                    continue
+
+                _txn, settled_count = WalletService.settle_cod_with_client(
+                    business=business,
+                    amount=amount,
+                    delivery_task_ids=locked_ids,
+                    created_by=request.user,
+                    reference_number=reference,
+                    notes=f"Business COD payout via {payment_method}",
+                    payment_method=payment_method,
+                )
+                if settled_count:
+                    settled_businesses.append({
+                        'business': business.business_name,
+                        'amount': float(amount),
+                        'tasks': settled_count,
+                    })
+                    total_settled += amount
+                    try:
+                        from core.auto_flow_executor import execute_flows_for_trigger
+                        execute_flows_for_trigger('business_cod_settled', extra_context={
+                            'business_name': business.business_name or '',
+                            'business_phone': getattr(business, 'business_phone', '') or '',
+                            'cod_amount': str(amount),
+                        })
+                    except Exception as e:
+                        logger.warning(f"Auto flow failed for business COD payout {biz_id}: {e}")
+        except Exception as e:
+            logger.error(f"Business COD payout error for {biz_id}: {e}")
+            continue
+
+    return JsonResponse({
+        'success': True,
+        'settled_count': len(settled_businesses),
+        'total_settled': float(total_settled),
+        'settled_businesses': settled_businesses,
+        'payment_method': payment_method,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def cod_business_settlement_reverse(request):
+    """Reverse a business COD payout (claw back when a settled order is returned)."""
+    from django.http import JsonResponse
+    from fleet.wallet_service import WalletService
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    txn_code = request.POST.get('txn_code', '').strip()
+    notes = request.POST.get('notes', '')
+    if not txn_code:
+        return JsonResponse({'error': 'Settlement transaction code required'}, status=400)
+
+    try:
+        settle_txn = fleet_models.DriverTransaction.objects.get(
+            transaction_code=txn_code, transaction_type='cod_client_settle'
+        )
+    except fleet_models.DriverTransaction.DoesNotExist:
+        return JsonResponse({'error': 'Settlement transaction not found'}, status=404)
+
+    reversal, count = WalletService.reverse_cod_client_settlement(
+        settle_txn=settle_txn,
+        created_by=request.user,
+        notes=notes or f"Reversal of business COD payout {txn_code}",
+    )
+    if not count:
+        return JsonResponse({'error': 'Nothing to reverse — payout already reversed or no tasks linked'}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'reversed_tasks': count,
+        'reversal_code': reversal.transaction_code if reversal else '',
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def cod_business_settlement_pdf(request):
+    """PDF manifest of unsettled business COD payouts (optionally one business)."""
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from io import BytesIO
+    from delivery import models as delivery_models
+    from decimal import Decimal
+
+    business_filter = request.GET.get('business_id', '')
+
+    tasks_qs = delivery_models.DeliveryTask.objects.filter(
+        cod_collected=True, cod_settled=True, cod_client_settled=False,
+        dl_task_status__in=['delivered', 'partial_delivery'],
+    ).select_related('order', 'order__business').order_by('order__business__business_name', '-completed_at')
+    if business_filter:
+        tasks_qs = tasks_qs.filter(order__business_id=business_filter)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=1, spaceAfter=20)
+    elements.append(Paragraph('Business COD Payout Report', title_style))
+    elements.append(Paragraph(f'Date: {timezone.now().strftime("%d %b %Y, %H:%M")}', styles['Normal']))
+    elements.append(Spacer(1, 16))
+
+    data = [['#', 'Business', 'Order', 'Customer', 'Delivered', 'COD (QR)']]
+    total = Decimal('0')
+    for i, t in enumerate(tasks_qs, 1):
+        amt = t.cod_collected_amount or Decimal('0')
+        total += amt
+        biz = t.order.business.business_name if t.order and t.order.business else '-'
+        data.append([
+            str(i), biz[:22],
+            (t.order.order_number if t.order else '-') or '-',
+            (t.order.customer_name if t.order else '-' or '-')[:16],
+            t.completed_at.strftime('%d %b %Y') if t.completed_at else '-',
+            f'{amt:.2f}',
+        ])
+    data.append(['', '', '', '', 'Total:', f'{total:.2f}'])
+
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0ea5e9')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#e5e7eb')),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f9ff')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+    elements.append(table)
+    doc.build(elements)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="business_cod_payout_{timezone.now().strftime("%Y%m%d_%H%M")}.pdf"'
+    return response
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 @require_http_methods(["GET", "POST"])
 def fleet_transactions(request):
     """View for fleet transactions with filtering and sorting"""
@@ -9603,7 +9873,12 @@ def seller_transactions(request):
     if seller_id:
         try:
             selected_seller = business_models.Business.objects.select_related('user').get(business_id=seller_id)
-            orders = Order.objects.filter(business=selected_seller).select_related('business')
+            # Only delivered / partial-delivery orders carry settleable COD — undelivered
+            # orders never had cash collected, so they must not inflate the COD figures.
+            orders = Order.objects.filter(
+                business=selected_seller,
+                delivery_task__dl_task_status__in=['delivered', 'partial_delivery'],
+            ).select_related('business').distinct()
         except business_models.Business.DoesNotExist:
             selected_seller = None
 
@@ -20788,6 +21063,16 @@ def process_cod_return(request, task_id):
 
     if not task.driver:
         return JsonResponse({'error': 'No driver assigned to this task'}, status=400)
+
+    # If the COD was already paid out to the business (Leg 3), the refund liability
+    # sits with the business, not the driver. Block here so we never reverse against
+    # the wrong party or silently wipe the 'settled with business' status. Staff must
+    # reverse the business payout first (Business COD Payout > Reverse).
+    if task.cod_client_settled:
+        return JsonResponse({
+            'error': 'COD already paid to the business. Reverse the business COD payout first, '
+                     'then process the return.'
+        }, status=400)
 
     data = json.loads(request.body) if request.content_type == 'application/json' else {}
     amount = data.get('amount', task.cod_collected_amount)

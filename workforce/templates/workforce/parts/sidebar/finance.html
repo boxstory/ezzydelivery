@@ -3,7 +3,8 @@
 {% url 'workforce:fleet_transactions' as u_fleet_transactions %}
 {% url 'workforce:seller_transactions' as u_seller_transactions %}
 {% url 'workforce:cod_settlement_report' as u_cod_settlement_report %}
-{% with active="workforce_finance_dashboard,fleet_transactions,cod_settlement_report" %}
+{% url 'workforce:cod_business_settlement_report' as u_cod_business_settlement_report %}
+{% with active="workforce_finance_dashboard,fleet_transactions,cod_settlement_report,cod_business_settlement_report" %}
 <li id="workforce_sidebar_menu_finance" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_finance" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-finance" data-title="Finance">
     <i class="fa-solid fa-chart-line me-2"></i>
@@ -17,6 +18,7 @@
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_transactions" url=u_seller_transactions icon="fa-solid fa-store" label="Seller Transactions" active_names="seller_transactions" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_settlement" url=u_cod_settlement_report icon="fa-solid fa-file-invoice-dollar" label="COD Settlement Requests" active_names="cod_settlement_report" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_driver_cod_requests" url=u_cod_settlement_report icon="fa-solid fa-hand-holding-dollar" label="Driver COD Requests" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_business_cod_payout" url=u_cod_business_settlement_report icon="fa-solid fa-building-columns" label="Business COD Payout" active_names="cod_business_settlement_report" %}
     </ul>
   </div>
 </li>

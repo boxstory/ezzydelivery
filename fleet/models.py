@@ -333,6 +333,7 @@ class DriverTransaction(models.Model):
         'cod_collection': 'CODC',
         'cod_driver_settle': 'CODS',
         'cod_client_settle': 'CODCS',
+        'cod_client_settle_reversal': 'CODCR',
         'cod_return': 'CODR',
         # Delivery / Service Charges
         'delivery_charge': 'DLVC',
@@ -357,6 +358,7 @@ class DriverTransaction(models.Model):
         ('cod_collection', 'COD Collection'),
         ('cod_driver_settle', 'COD Driver Settlement'),
         ('cod_client_settle', 'COD Client Settlement'),
+        ('cod_client_settle_reversal', 'COD Client Settlement Reversal'),
         ('cod_return', 'COD Return'),
         # Delivery / Service Charges
         ('delivery_charge', 'Delivery Charge'),

@@ -185,6 +185,12 @@ urlpatterns = [
     path('fleet/cod-settlement/action/', workforce_views.cod_settlement_action, name='cod_settlement_action'),
     path('fleet/cod-settlement/pdf/', workforce_views.cod_settlement_pdf, name='cod_settlement_pdf'),
 
+    # Business COD Payout (Leg 3 — EzzyDelivery → Business)
+    path('fleet/cod-business-settlement/', workforce_views.cod_business_settlement_report, name='cod_business_settlement_report'),
+    path('fleet/cod-business-settlement/action/', workforce_views.cod_business_settlement_action, name='cod_business_settlement_action'),
+    path('fleet/cod-business-settlement/reverse/', workforce_views.cod_business_settlement_reverse, name='cod_business_settlement_reverse'),
+    path('fleet/cod-business-settlement/pdf/', workforce_views.cod_business_settlement_pdf, name='cod_business_settlement_pdf'),
+
     # COD Submissions Management (Staff)
     path('fleet/cod-submissions/', workforce_views.staff_cod_submissions_redirect, name='staff_cod_submissions'),
     path('fleet/cod-submissions/<str:txn_code>/edit/', workforce_views.staff_cod_submission_edit_redirect, name='staff_cod_submission_edit'),

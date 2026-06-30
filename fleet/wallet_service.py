@@ -399,16 +399,112 @@ class WalletService:
                 business=business
             )
 
+            settled_count = 0
             if delivery_task_ids:
-                DeliveryTask.objects.filter(
+                # Idempotent: only flag tasks not already client-settled, so a
+                # re-run never re-flags or links to a second payout transaction.
+                now = timezone.now()
+                settled_ids = list(DeliveryTask.objects.filter(
                     id__in=delivery_task_ids,
-                    cod_collected=True
-                ).update(
-                    cod_client_settled=True,
-                    cod_client_settled_at=timezone.now()
+                    cod_collected=True,
+                    cod_client_settled=False,
+                ).values_list('id', flat=True))
+                settled_count = len(settled_ids)
+                if settled_ids:
+                    DeliveryTask.objects.filter(id__in=settled_ids).update(
+                        cod_client_settled=True,
+                        cod_client_settled_at=now,
+                        cod_client_settle_txn=trans,
+                    )
+                    # Advance order COD status to 'settled with business', but only
+                    # for orders whose every COD-collected task is now client-settled
+                    # (last-task rule — handles multi-task orders correctly).
+                    from orders.models import Order
+                    order_ids = set(DeliveryTask.objects.filter(
+                        id__in=settled_ids
+                    ).values_list('order_id', flat=True))
+                    for oid in order_ids:
+                        if oid is None:
+                            continue
+                        remaining = DeliveryTask.objects.filter(
+                            order_id=oid, cod_collected=True, cod_client_settled=False
+                        ).exists()
+                        if not remaining:
+                            Order.objects.filter(id=oid).update(
+                                cod_status_by_staff='cod_settled_with_business'
+                            )
+
+            return trans, settled_count
+
+    @staticmethod
+    def reverse_cod_client_settlement(settle_txn=None, task_ids=None, amount=None,
+                                      created_by=None, notes=None):
+        """
+        Reverse a business COD payout (Leg 3). Used when a settled order is later
+        returned/reversed and EzzyDelivery must claw the payout back from the business.
+
+        Resolves the affected tasks from ``settle_txn`` (via the
+        ``cod_client_settle_txn`` back-link) or an explicit ``task_ids`` list,
+        resets their client-settlement flags, restores order status to
+        'cod_with_ezzy', and records an offsetting ``cod_client_settle_reversal``
+        transaction against the business so the finance ledger self-corrects.
+
+        Returns: (reversal_txn, reversed_count)
+        """
+        with transaction.atomic():
+            tasks_qs = DeliveryTask.objects.select_for_update().filter(
+                cod_client_settled=True
+            )
+            if settle_txn is not None:
+                tasks_qs = tasks_qs.filter(cod_client_settle_txn=settle_txn)
+            elif task_ids:
+                tasks_qs = tasks_qs.filter(id__in=task_ids)
+            else:
+                raise ValueError("Provide either settle_txn or task_ids")
+
+            tasks = list(tasks_qs.select_related('order', 'order__business'))
+            if not tasks:
+                return None, 0
+
+            business = None
+            if settle_txn is not None and settle_txn.business_id:
+                business = settle_txn.business
+            else:
+                business = tasks[0].order.business if tasks[0].order else None
+
+            reversed_amount = amount if amount is not None else sum(
+                (t.cod_collected_amount or Decimal('0')) for t in tasks
+            )
+
+            reversal = WalletService.record_transaction(
+                driver=None,
+                transaction_type='cod_client_settle_reversal',
+                amount=reversed_amount,
+                description=(
+                    f"COD payout reversal for {business.business_name} - {reversed_amount} QR"
+                    if business else f"COD payout reversal - {reversed_amount} QR"
+                ),
+                created_by=created_by,
+                reference_number=(settle_txn.transaction_code if settle_txn else None),
+                notes=notes,
+                business=business,
+            )
+
+            task_ids_to_reset = [t.id for t in tasks]
+            DeliveryTask.objects.filter(id__in=task_ids_to_reset).update(
+                cod_client_settled=False,
+                cod_client_settled_at=None,
+                cod_client_settle_txn=None,
+            )
+            # Restore order COD status to 'with ezzy' (cash is back with EzzyDelivery)
+            from orders.models import Order
+            order_ids = {t.order_id for t in tasks if t.order_id}
+            if order_ids:
+                Order.objects.filter(id__in=order_ids).update(
+                    cod_status_by_staff='cod_with_ezzy'
                 )
 
-            return trans
+            return reversal, len(task_ids_to_reset)
 
     @staticmethod
     def record_cod_return(driver, delivery_task, amount, created_by=None, notes=None):

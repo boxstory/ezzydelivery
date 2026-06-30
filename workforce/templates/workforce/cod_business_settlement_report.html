@@ -1,0 +1,292 @@
+{# Purpose: Leg-3 Business COD Payout — staff select & settle COD held by EzzyDelivery to each business #}
+{# Used by: workforce.views.cod_business_settlement_report (URL workforce:cod_business_settlement_report) #}
+{# Notes: Per-task checkboxes grouped by business; live selected total; settle + reverse actions via fetch #}
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Business COD Payout{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260630a" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="wfd__hero">
+    <div class="wfd__hero-content">
+      <h1 class="wfd__hero-title"><i class="fa-solid fa-building-columns"></i> Business COD Payout</h1>
+      <p class="wfd__hero-subtitle">Pay collected COD held by EzzyDelivery out to each business</p>
+    </div>
+    <div class="wfd__hero-actions d-flex gap-2">
+      <a href="{% url 'workforce:cod_settlement_report' %}" class="btn btn-sm btn-outline-light">
+        <i class="fa-solid fa-arrow-left me-1"></i> Driver Settlement
+      </a>
+      <a href="{% url 'workforce:cod_business_settlement_pdf' %}{% if business_filter %}?business_id={{ business_filter }}{% endif %}"
+         class="btn btn-sm btn-outline-light" target="_blank" rel="noopener">
+        <i class="fa-solid fa-file-pdf me-1"></i> PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-4">
+      <div class="bcp__stat">
+        <span class="bcp__stat-label">Total Owed to Businesses</span>
+        <span class="bcp__stat-value">QAR {{ grand_total|floatformat:2 }}</span>
+      </div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="bcp__stat">
+        <span class="bcp__stat-label">Businesses</span>
+        <span class="bcp__stat-value">{{ business_count }}</span>
+      </div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="bcp__stat">
+        <span class="bcp__stat-label">Deliveries</span>
+        <span class="bcp__stat-value">{{ task_count }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="bcp__card mb-3">
+    <form method="GET" class="row g-3 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="bcp__label">From Date</label>
+        <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="bcp__label">To Date</label>
+        <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="bcp__label">Business</label>
+        <select name="business_id" class="form-select">
+          <option value="">All businesses</option>
+          {% for biz in all_businesses %}
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{{ biz.business_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3 d-flex gap-2">
+        <button type="submit" class="btn bcp__btn-primary"><i class="fa-solid fa-filter me-1"></i> Filter</button>
+        <a href="{% url 'workforce:cod_business_settlement_report' %}" class="btn btn-outline-secondary">Reset</a>
+      </div>
+    </form>
+  </div>
+
+  {% if business_groups %}
+  <div class="bcp__toolbar mb-2">
+    <label class="bcp__checkall"><input type="checkbox" id="bcp_select_all"> Select all</label>
+  </div>
+
+  {% for g in business_groups %}
+  <div class="bcp__card mb-3" data-business="{{ g.business.business_id }}">
+    <div class="bcp__biz-header">
+      <label class="bcp__checkall">
+        <input type="checkbox" class="bcp__biz-check" data-business="{{ g.business.business_id }}">
+        <span class="bcp__biz-name">{{ g.business.business_name }}</span>
+      </label>
+      <span class="bcp__biz-subtotal">QAR {{ g.subtotal|floatformat:2 }} · {{ g.tasks|length }} deliver{{ g.tasks|length|pluralize:"y,ies" }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm bcp__table mb-0">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Delivered</th>
+            <th>Recv'd (Ezzy)</th>
+            <th class="text-end">COD (QR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in g.tasks %}
+          <tr>
+            <td>
+              <input type="checkbox" class="bcp__task-check" data-business="{{ g.business.business_id }}"
+                     value="{{ t.id }}" data-amount="{{ t.cod_collected_amount|floatformat:2 }}">
+            </td>
+            <td>{% if t.order %}#{{ t.order.order_number|default:t.order_id }}{% else %}-{% endif %}</td>
+            <td>{% if t.order %}{{ t.order.customer_name|default:"-" }}{% else %}-{% endif %}</td>
+            <td>{{ t.completed_at|date:"d M Y"|default:"-" }}</td>
+            <td>{{ t.cod_settled_at|date:"d M Y"|default:"-" }}</td>
+            <td class="text-end">{{ t.cod_collected_amount|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Sticky action bar -->
+  <div class="bcp__actionbar" id="bcp_actionbar">
+    <div class="bcp__actionbar-info">
+      <span id="bcp_sel_count">0</span> selected ·
+      <strong>QAR <span id="bcp_sel_total">0.00</span></strong>
+    </div>
+    <button type="button" class="btn bcp__btn-primary" id="bcp_settle_btn" disabled>
+      <i class="fa-solid fa-money-bill-transfer me-1"></i> Settle Selected
+    </button>
+  </div>
+
+  {% else %}
+  <div class="bcp__empty">
+    <i class="fa-solid fa-circle-check"></i>
+    <p>No business COD pending payout. All collected COD held by EzzyDelivery has been settled.</p>
+  </div>
+  {% endif %}
+
+  <!-- Reverse a payout -->
+  <div class="bcp__card mt-4">
+    <div class="bcp__biz-header">
+      <span class="bcp__biz-name"><i class="fa-solid fa-rotate-left me-1"></i> Reverse a payout</span>
+    </div>
+    <div class="p-3">
+      <p class="text-muted small mb-2">Use when a settled order is returned and COD must be clawed back from the business.</p>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="bcp__label">Settlement Txn Code</label>
+          <input type="text" id="bcp_reverse_code" class="form-control" placeholder="CODCS-...">
+        </div>
+        <div class="col-12 col-md-5">
+          <label class="bcp__label">Reason / Notes</label>
+          <input type="text" id="bcp_reverse_notes" class="form-control" placeholder="Order returned by customer">
+        </div>
+        <div class="col-12 col-md-3">
+          <button type="button" class="btn btn-outline-danger w-100" id="bcp_reverse_btn">
+            <i class="fa-solid fa-rotate-left me-1"></i> Reverse Payout
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settle confirm modal -->
+<div class="modal fade" id="bcpSettleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Business COD Payout</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Pay out <strong>QAR <span id="bcp_modal_total">0.00</span></strong> across <span id="bcp_modal_count">0</span> deliver(ies).</p>
+        <div class="mb-2">
+          <label class="bcp__label">Payment Method</label>
+          <select id="bcp_payment_method" class="form-select">
+            <option value="bank">Bank Transfer</option>
+            <option value="cash">Cash</option>
+            <option value="fawran">Fawran</option>
+          </select>
+        </div>
+        <div>
+          <label class="bcp__label">Reference (optional)</label>
+          <input type="text" id="bcp_reference" class="form-control" placeholder="Transfer ref / cheque no.">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn bcp__btn-primary" id="bcp_confirm_settle">Confirm Payout</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const csrftoken = '{{ csrf_token }}';
+  const taskChecks = () => Array.from(document.querySelectorAll('.bcp__task-check'));
+  const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function recompute() {
+    let count = 0, total = 0;
+    taskChecks().forEach(c => {
+      if (c.checked) { count++; total += parseFloat(c.dataset.amount || '0'); }
+    });
+    document.getElementById('bcp_sel_count').textContent = count;
+    document.getElementById('bcp_sel_total').textContent = fmt(total);
+    document.getElementById('bcp_settle_btn').disabled = count === 0;
+    return { count, total };
+  }
+
+  // Per-business "select all"
+  document.querySelectorAll('.bcp__biz-check').forEach(bc => {
+    bc.addEventListener('change', () => {
+      const biz = bc.dataset.business;
+      document.querySelectorAll(`.bcp__task-check[data-business="${biz}"]`).forEach(c => { c.checked = bc.checked; });
+      recompute();
+    });
+  });
+
+  // Global "select all"
+  const selAll = document.getElementById('bcp_select_all');
+  if (selAll) selAll.addEventListener('change', () => {
+    taskChecks().forEach(c => { c.checked = selAll.checked; });
+    document.querySelectorAll('.bcp__biz-check').forEach(bc => { bc.checked = selAll.checked; });
+    recompute();
+  });
+
+  taskChecks().forEach(c => c.addEventListener('change', recompute));
+
+  // Settle flow
+  const settleBtn = document.getElementById('bcp_settle_btn');
+  if (settleBtn) settleBtn.addEventListener('click', () => {
+    const { count, total } = recompute();
+    if (!count) return;
+    document.getElementById('bcp_modal_total').textContent = fmt(total);
+    document.getElementById('bcp_modal_count').textContent = count;
+    new bootstrap.Modal(document.getElementById('bcpSettleModal')).show();
+  });
+
+  document.getElementById('bcp_confirm_settle')?.addEventListener('click', async function () {
+    this.disabled = true;
+    const ids = taskChecks().filter(c => c.checked).map(c => c.value);
+    const body = new URLSearchParams();
+    ids.forEach(id => body.append('task_ids[]', id));
+    body.append('payment_method', document.getElementById('bcp_payment_method').value);
+    body.append('reference', document.getElementById('bcp_reference').value);
+    try {
+      const resp = await fetch('{% url "workforce:cod_business_settlement_action" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await resp.json();
+      if (data.success) { window.location.reload(); }
+      else { alert(data.error || 'Settlement failed'); this.disabled = false; }
+    } catch (e) { alert('Network error'); this.disabled = false; }
+  });
+
+  // Reverse flow
+  document.getElementById('bcp_reverse_btn')?.addEventListener('click', async function () {
+    const code = document.getElementById('bcp_reverse_code').value.trim();
+    if (!code) { alert('Enter the settlement transaction code'); return; }
+    if (!confirm('Reverse payout ' + code + '? This claws COD back from the business.')) return;
+    this.disabled = true;
+    const body = new URLSearchParams();
+    body.append('txn_code', code);
+    body.append('notes', document.getElementById('bcp_reverse_notes').value);
+    try {
+      const resp = await fetch('{% url "workforce:cod_business_settlement_reverse" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await resp.json();
+      if (data.success) { alert('Reversed ' + data.reversed_tasks + ' deliveries (' + data.reversal_code + ')'); window.location.reload(); }
+      else { alert(data.error || 'Reversal failed'); this.disabled = false; }
+    } catch (e) { alert('Network error'); this.disabled = false; }
+  });
+
+  recompute();
+})();
+</script>
+{% endblock %}
