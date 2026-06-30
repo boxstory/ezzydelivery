@@ -152,24 +152,21 @@
                 </span>
               </div>
               <div class="pwa-order-card-full__footer">
-                {% if order.cod_amount %}
                 <span class="pwa-order-card-full__cod">
-                  <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount }}
+                  <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount|default:0 }}
                 </span>
-                {% else %}
                 <span class="pwa-order-card-full__date">{{ order.order_date|date:"d M Y" }}</span>
-                {% endif %}
-                {% if order.cod_amount %}
-                <span class="pwa-order-card-full__date">{{ order.order_date|date:"d M" }}</span>
-                {% endif %}
               </div>
             </div>
             <div class="pwa-order-card-full__arrow">
               <i class="fas fa-chevron-right pwa-order-card-full__chevron"></i>
             </div>
           </a>
-          {% if order.order_status != 'delivered' and order.order_status != 'cancelled' %}
           <div class="pwa-card-actions">
+            <a href="{% url 'business:print_waybill' %}?order_ids={{ order.id }}" target="_blank" rel="noopener" class="pwa-card-actions__btn pwa-card-actions__btn--print" title="Print Waybill">
+              <i class="fas fa-print"></i>
+            </a>
+            {% if order.order_status != 'delivered' and order.order_status != 'cancelled' %}
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--review" data-status="to_review" title="Hold for Review">
               <i class="fas fa-clock"></i>
             </button>
@@ -182,8 +179,8 @@
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--cancel" data-status="cancelled" title="Cancelled">
               <i class="fas fa-ban"></i>
             </button>
+            {% endif %}
           </div>
-          {% endif %}
         </div>
         {% endfor %}
       {% else %}

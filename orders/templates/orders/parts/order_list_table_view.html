@@ -98,9 +98,9 @@
 
         <!-- COD -->
         <td class="oal__table-td">
-          {% if order.cod_amount %}
           <div class="oal__table-cod-cell">
-            <span class="oal__table-cod-value">{{ order.cod_amount }} QR</span>
+            <span class="oal__table-cod-value">{{ order.cod_amount|default:0 }} QR</span>
+            {% if order.cod_amount %}
             <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' or order.cod_status_by_staff == 'cod_with_driver' or order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
               {% if order.cod_status_by_staff == 'fully_paid' or order.cod_status_by_staff == 'cod_with_driver' or order.cod_status_by_staff == 'cod_with_ezzy' %}<i class="fa-solid fa-check"></i> Collected
               {% elif order.cod_status_by_staff == 'partially_collected' %}<i class="fa-solid fa-check"></i> Collected (Partial)
@@ -108,10 +108,8 @@
               {% else %}<i class="fa-solid fa-hourglass-half"></i> Pending
               {% endif %}
             </span>
+            {% endif %}
           </div>
-          {% else %}
-          <span class="oal__table-no-cod">--</span>
-          {% endif %}
         </td>
 
         <!-- Status -->
@@ -158,6 +156,7 @@
         <!-- Actions -->
         <td class="oal__table-td oal__table-td--actions">
           <div class="oal__table-actions">
+            <a href="{% url 'business:print_waybill' %}?order_ids={{ order.id }}" target="_blank" rel="noopener" class="oal__action-btn" title="Print Waybill"><i class="fa-solid fa-print"></i></a>
             {% with action_delivery=order.delivery_task.first %}
             {% if order.order_status == 'delivered' or order.order_status == 'cancelled' %}
             <span class="oal__action-btn oal__action-btn--disabled" title="Cannot reconfirm {{ order.get_order_status_display }} orders"><i class="fa-solid fa-check-double"></i></span>

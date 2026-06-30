@@ -121,12 +121,13 @@ class AddOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
-                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status', 'order_source_text', 'preferred_time_slot']
+                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status', 'order_source_text', 'preferred_time_slot', 'delivery_speed']
         exclude = ['order_number', 'business', 'delivery_task', 'deadline_date', 'cod_status_by_staff',
                    'updated_at', 'created_at']
         widgets = {
             'order_notes': forms.TextInput(attrs={'class': 'form-control'}),
             'order_status': forms.Select(attrs={'class': 'form-control'}, choices=ORDER_STATUS),
+            'delivery_speed': forms.Select(attrs={'class': 'form-control'}),
             'client_order_code': forms.TextInput(attrs={'class': 'form-control', 'id': 'client_order_code_input'}),
             'latitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'longitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
@@ -140,6 +141,7 @@ class AddOrderForm(forms.ModelForm):
             'dl_building': 'Customer building No',
             'dl_street': 'Customer Street No',
             'dl_zone': 'Customer Zone No',
+            'delivery_speed': _('Delivery Speed'),
         }
 
     def __init__(self,  *args, **kwargs):
@@ -148,6 +150,9 @@ class AddOrderForm(forms.ModelForm):
         business = kwargs.pop('business', None)
 
         super().__init__(*args, **kwargs)
+
+        # Keep business_id for business-scoped validation (e.g. unique order code)
+        self.business_id = business_id
 
         # Store business_code for use in JavaScript
         if business_code:
@@ -205,6 +210,21 @@ class AddOrderForm(forms.ModelForm):
         if len(cleaned) >= 8:
             return phone.strip()
         raise forms.ValidationError('Enter a valid Qatar phone number (8 digits starting with 3, 5, 6, or 7).')
+
+    def clean_client_order_code(self):
+        code = (self.cleaned_data.get('client_order_code') or '').strip()
+        if code and self.business_id:
+            qs = Order.objects.filter(
+                business_id=self.business_id, client_order_code=code
+            )
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(
+                    f'Order number "{code}" already exists for your business. '
+                    'Please use a different order number.'
+                )
+        return code
 
     def clean_cod_amount(self):
         amount = self.cleaned_data.get('cod_amount', 0)

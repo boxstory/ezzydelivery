@@ -69,12 +69,10 @@
         <i class="fa-solid fa-location-dot"></i>
         <span>{% get_zone_display order %}</span>
       </div>
-      {% if order.cod_amount %}
       <div class="ocl__summary-item">
         <i class="fa-solid fa-money-bill-wave"></i>
-        <strong class="oal__cod-amount">Qr {{ order.cod_amount }}</strong>
+        <strong class="oal__cod-amount">Qr {{ order.cod_amount|default:0 }}</strong>
       </div>
-      {% endif %}
     </div>
 
     <!-- Order Card Body -->
@@ -194,17 +192,15 @@
         {% endwith %}
 
         <!-- COD Amount -->
-        {% if order.cod_amount %}
         <div class="ocl__row">
           <span class="ocl__label">COD Amount</span>
           <div class="ocl__value">
             <div class="ocl__cod">
               <i class="fa-solid fa-money-bill-wave"></i>
-              <span>Qr {{ order.cod_amount }}</span>
+              <span>Qr {{ order.cod_amount|default:0 }}</span>
             </div>
           </div>
         </div>
-        {% endif %}
 
         <!-- Comments Section (visible when published) -->
         {% if order.order_status == 'publish' %}

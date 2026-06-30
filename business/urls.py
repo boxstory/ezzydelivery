@@ -52,6 +52,8 @@ urlpatterns = [
           name='business_teams'),
      path('<int:business_id>/teams/add/', business_views.business_teams_add,
                name='business_teams_add'),
+     path('<int:business_id>/teams/lookup-user/', business_views.business_team_user_lookup,
+               name='business_team_user_lookup'),
      path('<int:business_id>/teams/<int:team_id>/update/', business_views.business_teams_update,
                name='business_teams_update'),
      path('<int:business_id>/teams/<int:team_id>/permissions/', business_views.business_team_permissions,
@@ -126,6 +128,7 @@ urlpatterns = [
 
     # Bulk Label Printing
     path('labels/bulk-print/', business_views.bulk_print_labels, name='bulk_print_labels'),
+    path('waybill/print/', business_views.print_waybill, name='print_waybill'),
 
     # Returns Management
     path('returns/', business_views.returns_list, name='returns_list'),

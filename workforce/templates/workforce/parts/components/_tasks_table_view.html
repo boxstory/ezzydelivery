@@ -172,6 +172,18 @@ Each task should have select_related: order, driver, business, pickup_location, 
                                 Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
                             </div>
                             {% endif %}
+                            {% if dl.order.coords_accuracy %}
+                            <div class="dl-table__accuracy dl-table__accuracy--{{ dl.order.coords_accuracy }}" title="Location accuracy">
+                                {% if dl.order.coords_accuracy == 'by_customer' %}<i class="fa-solid fa-user-check"></i>
+                                {% elif dl.order.coords_accuracy == 'exact' %}<i class="fa-solid fa-bullseye"></i>
+                                {% elif dl.order.coords_accuracy == 'street' %}<i class="fa-solid fa-road"></i>
+                                {% elif dl.order.coords_accuracy == 'landmark' %}<i class="fa-solid fa-map-marker-alt"></i>
+                                {% elif dl.order.coords_accuracy == 'zone_center' %}<i class="fa-solid fa-draw-polygon"></i>
+                                {% elif dl.order.coords_accuracy == 'ai_estimate' %}<i class="fa-solid fa-robot"></i>
+                                {% else %}<i class="fa-solid fa-location-crosshairs"></i>{% endif %}
+                                {{ dl.order.get_coords_accuracy_display }}
+                            </div>
+                            {% endif %}
                             <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
                                 {{ dl.order.customer_address|default:""|truncatechars:40 }}
                             </div>
@@ -180,11 +192,7 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <!-- COD / Verify -->
                     <td class="dl-table__td-cod">
                         <div class="dl-table__cod-stack">
-                            {% if dl.order.cod_amount and dl.order.cod_amount > 0 %}
-                                <span class="dl-table__cod-amount">{{ dl.order.cod_amount }} QR</span>
-                            {% else %}
-                                <span class="dl-table__cod-none">No COD</span>
-                            {% endif %}
+                                <span class="dl-table__cod-amount">{{ dl.order.cod_amount|default:0 }} QR</span>
                             {% if dl.order.cod_amount and dl.order.cod_amount > 0 and dl.order.cod_status_by_staff %}
                             <span class="dl-table__verify-status dl-table__verify-status--{{ dl.order.cod_status_by_staff }}">
                                 {% if dl.order.cod_status_by_staff == 'cod_with_driver' %}

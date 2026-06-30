@@ -1,0 +1,172 @@
+{% load static %}
+{# Purpose: Standalone printable waybill(s) for one or many orders, stuck on packages. #}
+{# Used by: business.views.print_waybill #}
+{# Notes: Renders from Order only — no DeliveryTask/status dependency. Auto-prints. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Waybill - {{ user_business.business_name }}</title>
+  <link rel="stylesheet" href="{% static 'business/css/business-waybill.css' %}?v=20260630i">
+</head>
+<body>
+  <div class="bwb__toolbar">
+    <div>
+      <div class="bwb__toolbar-title">Waybills — {{ user_business.business_name }}</div>
+      <div class="bwb__toolbar-count">{{ waybills|length }} waybill{{ waybills|length|pluralize }}</div>
+    </div>
+    {% if waybills %}
+    <div>
+      <button class="bwb__btn" onclick="window.print()">Print</button>
+      <button class="bwb__btn bwb__btn--ghost" onclick="window.close()">Close</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bwb__sheet">
+    {% if waybills %}
+      {% for w in waybills %}
+      {% with order=w.order %}
+      <div class="bwb__label">
+        <div class="bwb__head">
+          <div class="bwb__head-left">
+            <div class="bwb__head-title">Ezzy Delivery Qatar</div>
+            <div class="bwb__head-sub">Ecommerce Delivery Partner</div>
+          </div>
+          <img class="bwb__logo" src="{% static 'webpages/img/ezzy-logo-bw.png' %}" alt="EzzyDelivery">
+          <div class="bwb__head-right">
+            {% if order.delivery_speed == 'express' %}
+            <div class="bwb__speed">Express</div>
+            {% elif order.delivery_speed == 'same_day' %}
+            <div class="bwb__speed">Same Day</div>
+            {% else %}
+            <div class="bwb__speed">Standard</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="bwb__row">
+          <div class="bwb__box bwb__box--party">
+            <div class="bwb__box-label">From (Sender)</div>
+            {% with biz_logo=order.business.business_logo.first %}
+            <div class="bwb__sender-head">
+              {% if biz_logo and biz_logo.business_logo %}
+              <img class="bwb__sender-logo" src="{{ biz_logo.business_logo.url }}" alt="{{ order.business.business_name }}">
+              {% endif %}
+              <div class="bwb__name">{{ order.business.business_name }}</div>
+            </div>
+            {% endwith %}
+            <div class="bwb__text">
+              {% if order.pickup_location %}{{ order.pickup_location.pickup_location_title }} · {{ order.pickup_location.locality }}{% endif %}
+            </div>
+          </div>
+
+          <div class="bwb__box bwb__box--party">
+            <div class="bwb__box-label">To (Recipient)</div>
+            <div class="bwb__name">{{ order.customer_name }}</div>
+            <div class="bwb__text">{{ order.customer_phone }}</div>
+            <div class="bwb__addr">{{ order.customer_address }}</div>
+            <div class="bwb__zsb">
+              {% if order.dl_zone %}<span class="bwb__chip">Zone {{ order.dl_zone }}</span>{% endif %}
+              {% if order.dl_street %}<span class="bwb__chip">St {{ order.dl_street }}</span>{% endif %}
+              {% if order.dl_building %}<span class="bwb__chip">Bldg {{ order.dl_building }}</span>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="bwb__cod{% if not order.cod_amount or order.cod_amount <= 0 %} bwb__cod--paid{% endif %}">
+          <span class="bwb__cod-label">COD to collect</span>
+          <span class="bwb__cod-amt">QAR {{ order.cod_amount|default:0 }}</span>
+        </div>
+
+        <div class="bwb__items">
+          <div class="bwb__box-label">Items</div>
+          {% if order.order_items.all %}
+          <table class="bwb__items-table">
+            <thead>
+              <tr><th>Item</th><th class="bwb__qty">Qty</th></tr>
+            </thead>
+            <tbody>
+              {% for item in order.order_items.all %}
+              <tr>
+                <td>{{ item.display_name }}</td>
+                <td class="bwb__qty">{{ item.quantity }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% elif order.package_description %}
+          <div class="bwb__text">{{ order.package_description }}{% if order.package_qty %} (x{{ order.package_qty }}){% endif %}</div>
+          {% else %}
+          <div class="bwb__text bwb__text--muted">As per package contents</div>
+          {% endif %}
+        </div>
+
+        {% if order.order_notes %}
+        <div class="bwb__notes"><strong>Note:</strong> {{ order.order_notes }}</div>
+        {% endif %}
+
+        <div class="bwb__pod">
+          <div class="bwb__box-label">Proof of Delivery</div>
+          <label class="bwb__pod-check"><span class="bwb__pod-box"></span> Received in good condition</label>
+          <div class="bwb__pod-row">
+            <div class="bwb__pod-field">
+              <div class="bwb__pod-line"></div>
+              <div class="bwb__pod-cap">Received by (Name)</div>
+            </div>
+            <div class="bwb__pod-field">
+              <div class="bwb__pod-line"></div>
+              <div class="bwb__pod-cap">Signature</div>
+            </div>
+          </div>
+          <div class="bwb__pod-row">
+            <div class="bwb__pod-field">
+              <div class="bwb__pod-line"></div>
+              <div class="bwb__pod-cap">Date &amp; Time</div>
+            </div>
+            <div class="bwb__pod-field">
+              <div class="bwb__pod-line"></div>
+              <div class="bwb__pod-cap">Amount Collected (QAR)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bwb__footer">
+          <div class="bwb__footer-left">
+            {% if w.barcode_b64 %}
+            <img class="bwb__barcode-img" src="data:image/png;base64,{{ w.barcode_b64 }}" alt="{{ order.order_number }}">
+            {% endif %}
+            <div class="bwb__barcode-num">{{ order.order_number }}</div>
+          </div>
+          <div class="bwb__footer-right">
+            {% if order.client_order_code %}
+            <div class="bwb__detail"><span class="bwb__detail-cap">Ref</span>{{ order.client_order_code }}</div>
+            {% endif %}
+            <div class="bwb__detail"><span class="bwb__detail-cap">Date</span>{{ order.order_date|date:"d M Y" }}</div>
+            <div class="bwb__detail"><span class="bwb__detail-cap">Pieces</span>{{ order.package_qty|default:order.order_items.count|default:1 }}</div>
+            {% if order.cod_amount and order.cod_amount > 0 %}
+            <div class="bwb__detail"><span class="bwb__detail-cap">COD</span>QAR {{ order.cod_amount }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    {% else %}
+      <div class="bwb__empty">
+        <p>No orders found to print.</p>
+        <a href="javascript:window.close()">Close</a>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if waybills %}
+  <script>
+    if (window.opener || document.referrer) {
+      setTimeout(function () { window.print(); }, 400);
+    }
+  </script>
+  {% endif %}
+</body>
+</html>

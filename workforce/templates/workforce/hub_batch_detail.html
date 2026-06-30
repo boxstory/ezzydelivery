@@ -152,7 +152,7 @@
                                 <td><code>{{ order.order_number }}</code></td>
                                 <td>{{ order.business.business_name }}</td>
                                 <td>{{ order.customer_name }}</td>
-                                <td>{% if order.cod_amount %}{{ order.cod_amount }} QAR{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                <td>{{ order.cod_amount|default:0 }} QAR</td>
                                 <td>
                                     {% for task in order.delivery_task.filter %}
                                         {% if task.task_leg == 'hub_delivery' %}

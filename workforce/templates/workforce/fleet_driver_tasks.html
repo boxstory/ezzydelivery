@@ -255,8 +255,8 @@
             </td>
 
             <td class="fdt__td-cod">
-              {% if task.order and task.order.cod_amount %}
-              <span class="fdt__cod-amount">QAR {{ task.order.cod_amount }}</span>
+              <span class="fdt__cod-amount">QAR {{ task.order.cod_amount|default:0 }}</span>
+              {% if task.order.cod_amount %}
               {% if task.cod_collected %}
               <span class="fdt__cod-badge fdt__cod-badge--collected">
                 <i class="fa-solid fa-check"></i> Collected
@@ -264,8 +264,6 @@
               {% else %}
               <span class="fdt__cod-badge fdt__cod-badge--pending">Pending</span>
               {% endif %}
-              {% else %}
-              <span style="color:rgba(255,255,255,0.2);font-size:0.78rem">—</span>
               {% endif %}
             </td>
 

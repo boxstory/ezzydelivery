@@ -159,7 +159,7 @@
         <div class="pwa-detail-row">
           <span class="pwa-detail-row__label">COD Amount</span>
           <span class="pwa-detail-row__value pwa-detail-row__value--bold{% if order.cod_amount %} pwa-detail-row__value--danger{% endif %}">
-            {% if order.cod_amount %}QAR {{ order.cod_amount }}{% else %}-{% endif %}
+            QAR {{ order.cod_amount|default:0 }}
           </span>
         </div>
         <div class="pwa-detail-row">
@@ -638,7 +638,7 @@
                 <div class="d-flex align-items-center gap-2">
                   <i class="fa-solid fa-money-bill-wave text-success"></i>
                   <span class="text-muted small" style="min-width:50px;">COD</span>
-                  <span class="fw-semibold">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+                  <span class="fw-semibold">{{ order.cod_amount|default:0 }} QR</span>
                 </div>
               </div>
 
@@ -714,21 +714,19 @@
               <span>Payment</span>
             </div>
             <div class="odt__card__body">
-              {% if order.cod_amount %}
               <div class="odt__cod-hero">
                 <div class="odt__cod-hero__amount">
                   <span class="odt__cod-hero__currency">QAR</span>
-                  <span class="odt__cod-hero__value">{{ order.cod_amount }}</span>
+                  <span class="odt__cod-hero__value">{{ order.cod_amount|default:0 }}</span>
                 </div>
                 <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}collected{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
                   <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'cod_with_driver' %}fa-user-check{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}fa-building{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
                   {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}With Driver{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}With Ezzy{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
                 </span>
               </div>
-              {% endif %}
               <div class="odt__field">
                 <span class="odt__field__label">COD Amount</span>
-                <span class="odt__field__value odt__field__value--bold">{% if order.cod_amount %}QAR {{ order.cod_amount }}{% else %}-{% endif %}</span>
+                <span class="odt__field__value odt__field__value--bold">QAR {{ order.cod_amount|default:0 }}</span>
               </div>
               <div class="odt__field">
                 <span class="odt__field__label">Delivery Fee</span>

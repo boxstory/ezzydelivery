@@ -79,6 +79,7 @@ ORDER_TYPE_CHOICES = [
 DELIVERY_SPEED_CHOICES = [
     ('standard', 'Standard (48hr)'),
     ('same_day', 'Same Day'),
+    ('express', 'Express (2-4hr)'),
 ]
 
 class Order(models.Model):

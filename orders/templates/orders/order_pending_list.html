@@ -54,16 +54,10 @@
                 </span>
               </div>
               <div class="pwa-order-card-full__footer">
-                {% if order.cod_amount %}
                 <span class="pwa-order-card-full__cod">
-                  <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount }}
+                  <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount|default:0 }}
                 </span>
-                {% else %}
                 <span class="pwa-order-card-full__date">{{ order.order_date|date:"d M Y" }}</span>
-                {% endif %}
-                {% if order.cod_amount %}
-                <span class="pwa-order-card-full__date">{{ order.order_date|date:"d M" }}</span>
-                {% endif %}
               </div>
             </div>
             <div class="pwa-order-card-full__arrow">

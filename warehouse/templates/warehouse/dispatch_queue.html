@@ -50,7 +50,7 @@
           <div class="pkl-create__meta">
             <span><i class="fas fa-store"></i> {{ order.business.business_name|default:"-" }}</span>
             {% if order.customer_name %}<span><i class="fas fa-user"></i> {{ order.customer_name }}</span>{% endif %}
-            {% if order.cod_amount %}<span><i class="fas fa-coins"></i> QAR {{ order.cod_amount }}</span>{% endif %}
+            <span><i class="fas fa-coins"></i> QAR {{ order.cod_amount|default:0 }}</span>
           </div>
         </div>
         {% if order.cod_amount %}
@@ -83,7 +83,7 @@
           <span><i class="fas fa-warehouse"></i> {{ batch.warehouse.name }}</span>
           <span><i class="fas fa-file-invoice"></i> {{ batch.total_orders }} orders</span>
           {% if batch.driver %}<span><i class="fas fa-user"></i> {{ batch.driver.user.get_full_name|default:batch.driver.driver_code }}</span>{% endif %}
-          {% if batch.total_cod_amount %}<span><i class="fas fa-coins"></i> QAR {{ batch.total_cod_amount }}</span>{% endif %}
+          <span><i class="fas fa-coins"></i> QAR {{ batch.total_cod_amount|default:0 }}</span>
           <span><i class="fas fa-calendar"></i> {{ batch.created_at|date:"d M H:i" }}</span>
         </div>
       </div>

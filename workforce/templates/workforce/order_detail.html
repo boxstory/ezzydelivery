@@ -73,15 +73,15 @@
                onclick="return confirm('Create a new draft order copied from this one?');">
                 <i class="fa-solid fa-copy me-1"></i> Repeat Order
             </a>
-            {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
+            {% if order.order_status == 'to_review' or order.order_status == 'ready_to_pickup' %}
             <button type="button"
                     class="wod__btn wod__btn--info"
                     id="wod_btn_publish"
                     onclick="wodPublishOrder(this, '{% url 'workforce:publish_order_to_delivery' order.id %}')">
-                <i class="fa-solid fa-paper-plane me-1"></i> Publish
+                <i class="fa-solid fa-paper-plane me-1"></i> Publish to Task
             </button>
             {% endif %}
-            {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+            {% if order.order_status != 'cancelled' and order.order_status != 'publish' and order.order_status != 'delivered' %}
             <button type="button"
                     class="wod__btn wod__btn--danger"
                     id="wod_btn_cancel"
@@ -171,15 +171,17 @@
                             <label class="form-label text-muted small">Order Status</label>
                             <p class="mb-0">
                                 {% if order.order_status == 'to_review' %}
-                                <span class="badge bg-warning text-dark">To Review</span>
-                                {% elif order.order_status == 'to_publish' %}
-                                <span class="badge bg-info">To Publish</span>
-                                {% elif order.order_status == 'published' %}
+                                <span class="badge bg-warning text-dark">Hold for Review</span>
+                                {% elif order.order_status == 'ready_to_pickup' %}
+                                <span class="badge bg-info">Ready to pickup</span>
+                                {% elif order.order_status == 'publish' %}
                                 <span class="badge bg-success">Published</span>
+                                {% elif order.order_status == 'delivered' %}
+                                <span class="badge bg-success">Delivered</span>
                                 {% elif order.order_status == 'cancelled' %}
                                 <span class="badge bg-danger">Cancelled</span>
                                 {% else %}
-                                <span class="badge bg-secondary">{{ order.order_status }}</span>
+                                <span class="badge bg-secondary">{{ order.get_order_status_display }}</span>
                                 {% endif %}
                             </p>
                         </div>
@@ -201,75 +203,105 @@
             </div>
 
             <!-- Customer Info -->
-            <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-user me-2"></i>
-                        Customer Information
-                    </h5>
+            <div class="wod__card">
+                <div class="wod__card-header wod__card-header--primary">
+                    <i class="fa-solid fa-user me-2"></i>
+                    <span class="wod__section-label">Customer Information</span>
                 </div>
-                <div class="card-body">
+                <div class="wod__card-body">
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label text-muted small">Customer Name</label>
-                            <p class="fw-bold mb-0">{{ order.customer_name }}</p>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Phone</label>
-                            <p class="mb-0">
-                                <a href="tel:{{ order.customer_phone }}" class="text-decoration-none">
-                                    <i class="fa-solid fa-phone me-1"></i>{{ order.customer_phone }}
-                                </a>
-                            </p>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">WhatsApp</label>
-                            <p class="mb-0 d-flex align-items-center gap-2">
-                                {% if order.customer_whatsapp %}
-                                <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="text-decoration-none text-success">
-                                    <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}
-                                </a>
-                                <button type="button"
-                                        class="odp__btn-wa-send"
-                                        title="Send WhatsApp via Evolution API"
-                                        onclick="EzzyOrderDetail.openWhatsAppModal()">
-                                    <i class="fa-solid fa-paper-plane"></i>
-                                </button>
-                                {% else %}
-                                <span class="text-muted">Not provided</span>
-                                {% endif %}
-                            </p>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label text-muted small">Address</label>
-                            <div class="d-flex align-items-start gap-2 mb-0">
-                                <p class="mb-0">{{ order.customer_address }}</p>
-                                <button type="button" class="odp__btn-ai-parse" onclick="EzzyAIParse.parse({ address: '{{ order.customer_address|escapejs }}', zone: '{{ order.dl_zone|default:"" }}', street: '{{ order.dl_street|default:"" }}', building: '{{ order.dl_building|default:"" }}', orderId: '{{ order.id }}', orderNumber: '{{ order.order_number }}', showMap: true })" title="AI Parse Location">
-                                    <i class="fa-solid fa-robot"></i> AI Parse
-                                </button>
+                            <div class="wod__field">
+                                <span class="wod__field-label">Customer Name</span>
+                                <span class="wod__field-value fw-bold">{{ order.customer_name }}</span>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label text-muted small">Zone</label>
-                            <p class="mb-0">{{ order.dl_zone|default:"-" }}</p>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label text-muted small">Street</label>
-                            <p class="mb-0">{{ order.dl_street|default:"-" }}</p>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label text-muted small">Building</label>
-                            <p class="mb-0">{{ order.dl_building|default:"-" }}</p>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label text-muted small">QNAS Verification</label>
-                            <div>
-                                {% include "includes/components/_qnas_verify_button.html" with zone=order.dl_zone street=order.dl_street building=order.dl_building record_id=order.id order_id=order.id qnas_status=order.qnas_status show_inline="false" %}
+                        <div class="col-md-4">
+                            <div class="wod__field">
+                                <span class="wod__field-label">Phone</span>
+                                <span class="wod__field-value">
+                                    <a href="tel:{{ order.customer_phone }}" class="text-decoration-none">
+                                        <i class="fa-solid fa-phone me-1"></i>{{ order.customer_phone }}
+                                    </a>
+                                </span>
                             </div>
                         </div>
+                        <div class="col-md-4">
+                            <div class="wod__field">
+                                <span class="wod__field-label">WhatsApp</span>
+                                <span class="wod__field-value d-flex align-items-center gap-2">
+                                    {% if order.customer_whatsapp %}
+                                    <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="text-decoration-none text-success">
+                                        <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}
+                                    </a>
+                                    <button type="button"
+                                            class="odp__btn-wa-send"
+                                            title="Send WhatsApp via Evolution API"
+                                            onclick="EzzyOrderDetail.openWhatsAppModal()">
+                                        <i class="fa-solid fa-paper-plane"></i>
+                                    </button>
+                                    {% else %}
+                                    <span class="text-muted">Not provided</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delivery Address -->
+            <div class="wod__card">
+                <div class="wod__card-header wod__card-header--primary">
+                    <i class="fa-solid fa-location-dot me-2"></i>
+                    <span class="wod__section-label">Delivery Address</span>
+                </div>
+                <div class="wod__card-body">
+                    <div class="row g-3">
+                        {% if order.pickup_location %}
                         <div class="col-12">
-                            <label class="form-label text-muted small">Lat / Long</label>
-                            <div class="odp__latlong-row" id="orderLatLng{{ order.id }}">
+                            <div class="wod__pickup-box">
+                                <label class="form-label text-muted small mb-1">Pickup Location</label>
+                                <p class="mb-0 fw-semibold"><i class="fa-solid fa-store me-1 text-primary"></i>{{ order.pickup_location.pickup_location_title }}{% if order.pickup_location.locality %} <span class="text-muted fw-normal small">· {{ order.pickup_location.locality }}</span>{% endif %}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-12">
+                            <div class="wod__delivery-box">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small mb-1">Delivery Address</label>
+                                        <div class="d-flex align-items-start gap-2 mb-0">
+                                            <p class="mb-0">{{ order.customer_address }}</p>
+                                            <button type="button" class="odp__btn-ai-parse" onclick="EzzyAIParse.parse({ address: '{{ order.customer_address|escapejs }}', zone: '{{ order.dl_zone|default:"" }}', street: '{{ order.dl_street|default:"" }}', building: '{{ order.dl_building|default:"" }}', orderId: '{{ order.id }}', orderNumber: '{{ order.order_number }}', showMap: true })" title="AI Parse Location">
+                                                <i class="fa-solid fa-robot"></i> AI Parse
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label text-muted small">Zone</label>
+                                        <p class="mb-0">{{ order.dl_zone|default:"-" }}</p>
+                                        {% if order.dl_zone and dl_zone_name %}
+                                        <p class="mb-0 text-muted small">{{ dl_zone_name }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label text-muted small">Street</label>
+                                        <p class="mb-0">{{ order.dl_street|default:"-" }}</p>
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label text-muted small">Building</label>
+                                        <p class="mb-0">{{ order.dl_building|default:"-" }}</p>
+                                    </div>
+                                    <div class="col-3">
+                                        <label class="form-label text-muted small">QNAS Verification</label>
+                                        <div>
+                                            {% include "includes/components/_qnas_verify_button.html" with zone=order.dl_zone street=order.dl_street building=order.dl_building record_id=order.id order_id=order.id qnas_status=order.qnas_status show_inline="false" %}
+                                        </div>
+                                    </div>
+                                    <div class="col-9">
+                                        <label class="form-label text-muted small">Lat / Long</label>
+                                        <div class="odp__latlong-row" id="orderLatLng{{ order.id }}">
                                 {% if order.latitude and order.longitude %}
                                 <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odp__latlong-link">
                                     <i class="fa-solid fa-map-pin"></i> {{ order.latitude }}, {{ order.longitude }}
@@ -288,6 +320,9 @@
                                 </button>
                                 {% endif %}
                                 {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         {% if address_verify_job %}
@@ -386,7 +421,7 @@
                         <div class="d-flex align-items-center gap-2">
                             <i class="fa-solid fa-money-bill-wave text-success"></i>
                             <span class="text-muted" style="min-width:60px;">COD</span>
-                            <span class="fw-semibold">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+                            <span class="fw-semibold">{{ order.cod_amount|default:0 }} QR</span>
                         </div>
                     </div>
 
@@ -510,8 +545,33 @@
                     </p>
                     <p class="mb-2">
                         <strong>Status:</strong>
+                        {% if delivery_task.dl_task_status == 'delivered' %}
+                        <span class="badge bg-success">Delivered</span>
+                        {% elif delivery_task.dl_task_status == 'partial_delivery' %}
+                        <span class="badge bg-warning text-dark">Partial Delivery</span>
+                        {% elif delivery_task.dl_task_status == 'failed' %}
+                        <span class="badge bg-danger">Failed</span>
+                        {% else %}
                         <span class="badge bg-info">{{ delivery_task.get_dl_task_status_display }}</span>
+                        {% endif %}
                     </p>
+                    {% if delivery_task.dl_task_status == 'partial_delivery' %}
+                    {% with return_req=order.return_requests.first %}
+                    {% if return_req %}
+                    <div class="alert alert-warning p-2 mb-2" style="font-size:0.85rem;">
+                        <strong><i class="fa-solid fa-box-open me-1"></i>Partial Return</strong>
+                        {% if delivery_task.cod_collected_amount %}
+                        — COD collected: <strong>{{ delivery_task.cod_collected_amount }} QR</strong>
+                        (original: {{ order.cod_amount }} QR)
+                        {% endif %}
+                        <br>
+                        {% for ri in return_req.return_items.select_related %}
+                        <span class="badge bg-secondary me-1">{{ ri.order_item.display_name }} ×{{ ri.quantity_returned }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    {% endif %}
                     {% if delivery_task.driver %}
                     <p class="mb-2">
                         <strong>Driver:</strong> {{ delivery_task.driver.profile.first_name }}

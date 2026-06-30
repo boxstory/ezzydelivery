@@ -477,14 +477,14 @@
       if (!ids.length) return;
       var form = document.createElement('form');
       form.method = 'POST';
-      form.action = '{% url "business:bulk_print_labels" %}';
+      form.action = '{% url "business:print_waybill" %}';
       form.target = '_blank';
       var csrf = document.createElement('input');
       csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = '{{ csrf_token }}';
       form.appendChild(csrf);
-      ids.forEach(function(id) {
+      ids.forEach(function(cb) {
         var inp = document.createElement('input');
-        inp.type = 'hidden'; inp.name = 'order_ids'; inp.value = id;
+        inp.type = 'hidden'; inp.name = 'order_ids'; inp.value = cb.value;
         form.appendChild(inp);
       });
       document.body.appendChild(form);

@@ -199,6 +199,7 @@
   "qnas_status":"{{ card.order.qnas_status|default:'' }}"
 }{% endspaceless %}
 </script>
+<script type="application/json" class="task-items-data">[{% for item in card.order.order_items.all %}{"id":{{ item.id }},"name":"{{ item.display_name|escapejs }}","qty":{{ item.quantity }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
 {% endwith %}
 
     <!-- Card Header: Status + Order ID + Date -->
@@ -206,6 +207,8 @@
         <div class="task-card__header-left">
             {% if card.dl_task_status == 'delivered' %}
             <span class="fleet-badge fleet-badge--success">Delivered</span>
+            {% elif card.dl_task_status == 'partial_delivery' %}
+            <span class="fleet-badge fleet-badge--warning">Partial Delivery</span>
             {% elif card.dl_task_status == 'failed' %}
             <span class="fleet-badge fleet-badge--danger">Failed</span>
             {% elif card.dl_task_status == 'cancelled' %}
@@ -337,8 +340,8 @@
                 </div>
                 {% endif %}
             {% else %}
-            <div class="task-card__strip-item">
-                <span>No COD</span>
+            <div class="task-card__strip-item task-card__strip-item--cod">
+                <span>COD 0 QR</span>
             </div>
             {% endif %}
 
@@ -460,10 +463,29 @@
         {% endif %}
     </div>
     <div class="fleet-empty__title">
-        {% if current_tab == 'all' %}No Available Tasks{% elif current_tab == 'assigned' %}No Assigned Tasks{% elif current_tab == 'accepted' %}No Active Tasks{% else %}No History{% endif %}
+        {% if current_tab == 'all' and not driver_active %}
+            {% if driver.driver_status == 'suspended' %}Account Suspended
+            {% elif driver.driver_status == 'rejected' %}Account Rejected
+            {% elif driver.driver_status == 'blocked' %}Account Deactivated
+            {% else %}Account Not Active
+            {% endif %}
+        {% elif current_tab == 'all' %}No Available Tasks
+        {% elif current_tab == 'assigned' %}No Assigned Tasks
+        {% elif current_tab == 'accepted' %}No Active Tasks
+        {% else %}No History{% endif %}
     </div>
     <div class="fleet-empty__text">
-        {% if current_tab == 'all' %}
+        {% if current_tab == 'all' and not driver_active %}
+            {% if driver.driver_status == 'suspended' %}
+            Your account has been temporarily suspended. Please contact support.
+            {% elif driver.driver_status == 'rejected' %}
+            Your account application was not approved. Please contact support for details.
+            {% elif driver.driver_status == 'blocked' %}
+            Your account has been deactivated. Please contact support to restore access.
+            {% else %}
+            Your account is pending approval. New tasks will appear once your account is activated.
+            {% endif %}
+        {% elif current_tab == 'all' %}
         No tasks available in your area right now. Try changing the area filter.
         {% elif current_tab == 'assigned' %}
         No tasks have been assigned to you yet.

@@ -119,7 +119,7 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
                 'customer_name': instance.customer_name,
                 'customer_phone': instance.customer_phone,
                 'customer_address': instance.customer_address,
-                'cod_amount': instance.cod_amount,
+                'cod_amount': str(instance.cod_amount) if instance.cod_amount is not None else None,
                 'order_status': instance.order_status,
                 'created_at': timezone.now().isoformat(),
                 'business_id': instance.business.business_id,
@@ -572,8 +572,9 @@ def _create_delivery_task_from_order(order):
                     if order_dirty_fields:
                         order.save(update_fields=order_dirty_fields)
 
-        # Map delivery_speed → dl_speed (same_day overrides everything)
-        dl_speed = 'Same Day' if order.delivery_speed == 'same_day' else 'Normal'
+        # Map delivery_speed → dl_speed
+        _dl_speed_map = {'same_day': 'Same Day', 'express': 'On Demand'}
+        dl_speed = _dl_speed_map.get(order.delivery_speed, 'Normal')
 
         # Map Order.coords_accuracy → DeliveryTask.address_accuracy
         # Keys must match Order.COORDS_ACCURACY choices (orders/models.py)

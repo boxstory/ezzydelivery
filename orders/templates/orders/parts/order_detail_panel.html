@@ -142,7 +142,6 @@
   </div>
 
   <!-- COD Section -->
-  {% if order.cod_amount %}
   <div class="odp__section">
     <div class="odp__section-head">
       <i class="fa-solid fa-money-bill-wave"></i>
@@ -151,7 +150,7 @@
     <div class="odp__cod">
       <div class="odp__cod-amount">
         <span class="odp__cod-currency">QAR</span>
-        <span class="odp__cod-value">{{ order.cod_amount }}</span>
+        <span class="odp__cod-value">{{ order.cod_amount|default:0 }}</span>
       </div>
       <div class="odp__cod-status">
         <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'cod_with_driver' %}collected{% elif order.cod_status_by_staff == 'cod_with_ezzy' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
@@ -166,7 +165,6 @@
       </div>
     </div>
   </div>
-  {% endif %}
 
   <!-- Package Description -->
   {% if order.package_description or order_items or order.cod_amount %}
@@ -192,7 +190,7 @@
       <div class="d-flex align-items-center gap-2">
         <i class="fa-solid fa-money-bill-wave text-success" style="font-size:0.7rem;"></i>
         <span class="text-muted small" style="min-width:45px;">COD</span>
-        <span class="fw-semibold small">{% if order.cod_amount %}{{ order.cod_amount }} QR{% else %}—{% endif %}</span>
+        <span class="fw-semibold small">{{ order.cod_amount|default:0 }} QR</span>
       </div>
     </div>
     <!-- Product Items -->

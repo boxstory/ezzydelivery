@@ -565,6 +565,42 @@ def pickup_location_update(request, pickup_location_id):
 # frontend ---------------------------------------------------------------------------------------------------------------------
 
 
+def _business_profile_seo(request, business, business_profile, business_logo):
+    """Build dynamic SEO metadata for a business profile page.
+
+    The canonical URL always points at the public display route so search
+    engines consolidate ranking signals there (the owner /profile/ view is an
+    alias of the same content). Description is derived from the business's own
+    details (name, category, city) and closes with the EzzyDelivery service hook.
+    """
+    name = (business.business_name or "Business").strip()
+    city = (getattr(business_profile, 'business_city', '') or '').strip()
+    category = (
+        (getattr(business_profile, 'business_catagory_main', '') or '')
+        or (business.business_product_category or '')
+    ).strip()
+
+    where = f"in {city}, Qatar" if city else "in Qatar"
+    store = f"{category} store " if category else "store "
+    description = (
+        f"{name} on EzzyDelivery — {store}{where}. Browse products and order with "
+        f"same-day delivery, Cash on Delivery and live tracking by EzzyDelivery."
+    )[:155]
+
+    profile_url = request.build_absolute_uri(
+        reverse('business:business_profile_display', args=[business.business_id])
+    )
+    image = request.build_absolute_uri(business_logo) if business_logo else None
+
+    return SEOMetadata.get_page_meta(
+        title=f"{name} | Qatar Store",
+        description=description,
+        url=profile_url,
+        image=image,
+        page_type="profile",
+    )
+
+
 @login_required(login_url='/accounts/login/')
 @business_required
 def business_profile(request):
@@ -584,19 +620,26 @@ def business_profile(request):
     instakey = config("INSTAGRAM_TOKEN_FEEDS_KEY", default="")
     business_logo = business_logo_obj.business_logo.url if business_logo_obj.business_logo else None
 
+    # Showcase the business's latest products on the profile
+    products = business.product.select_related('color', 'unit').order_by('-created_at')[:12]
+
     context = {
         'profile': profile,
         'business': business,
+        'user_business': business,
         'location': location,
         'business_profile': business_profile,
         'business_logo_img': business_logo,
         'instakey': instakey,
+        'products': products,
+        'is_owner_view': True,
+        'seo': _business_profile_seo(request, business, business_profile, business_logo),
     }
     return render(request, 'business/frontend/business_profile.html', context)
 
-@login_required(login_url='/accounts/login/')
-@business_required
 def business_profile_display(request, business_id):
+    # Public page (no login) so search engines and AI crawlers can index the
+    # business profile + its Store/Service structured data. Listed in sitemap.xml.
     try:
         business = business_models.Business.objects.select_related('profile', 'business_profile').get(
             business_id=business_id)
@@ -608,15 +651,16 @@ def business_profile_display(request, business_id):
         
         business_profile = business.business_profile if hasattr(business, 'business_profile') else None
 
-        # Dynamic SEO for business profile
-        business_name = business.business_name or "Business"
-        meta = SEOMetadata.get_page_meta(
-            title=f"{business_name} | Qatar Store on EzzyDelivery",
-            description=(
-                f"View {business_name}'s profile on EzzyDelivery Qatar. "
-                f"E-commerce store with same-day delivery available in Doha."
-            )[:155],
-        )
+        # Detect whether the visitor is the owner of this business (drives the
+        # public-framing context bar's "manage your profile" shortcut)
+        viewer_business = get_cached_business(request)
+        viewer_is_owner = bool(viewer_business and viewer_business.business_id == business.business_id)
+
+        # Showcase the business's latest products on the public profile
+        products = business.product.select_related('color', 'unit').order_by('-created_at')[:12]
+
+        # Dynamic SEO for business profile (canonical -> this public display URL)
+        meta = _business_profile_seo(request, business, business_profile, business_logo)
 
         context = {
             'seo': meta,
@@ -624,6 +668,9 @@ def business_profile_display(request, business_id):
             'location': location,
             'business_logo_img': business_logo,
             'business_profile': business_profile,
+            'products': products,
+            'is_owner_view': False,
+            'viewer_is_owner': viewer_is_owner,
         }
         return render(request, 'business/frontend/business_profile.html', context)
     except business_models.Business.DoesNotExist:
@@ -1433,15 +1480,67 @@ def business_teams_add(request, business_id):
             logger.warning(f'Team profile form invalid: {form.errors}')
             messages.error(request, "Please correct the errors below.")
 
+    from business.permissions import ROLE_PERMISSIONS
     context = {
         'business': business,
         'form': form,
         'form_title': 'Add Team Member',
         'role_choices': TeamRoles.ROLE_CHOICES,
         'permission_groups': BusinessPermissions.PERMISSION_GROUPS,
+        'role_permissions': {role: list(perms) for role, perms in ROLE_PERMISSIONS.items()},
         'join_request': join_request,
     }
     return render(request, 'business/parts/business_teams_add.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@business_required
+@business_permission_required(BusinessPermissions.TEAM_MANAGE)
+def business_team_user_lookup(request, business_id):
+    """
+    Live lookup for the add-member form.
+
+    Given an identifier (email/username/mobile/EZZY ID/user ID), returns the
+    matched user's display name + email and whether they can be added, so the
+    form can auto-fill the name field and show a green tick.
+    """
+    business = request.current_business
+    if business.business_id != business_id:
+        return JsonResponse({'found': False, 'error': 'Access denied'}, status=403)
+
+    identifier = (request.GET.get('identifier') or '').strip()
+    if not identifier:
+        return JsonResponse({'found': False})
+
+    user, error = business_forms.resolve_user_identifier(identifier)
+    if user is None:
+        return JsonResponse({'found': False, 'error': error})
+
+    profile = getattr(user, 'profile', None)
+    first = getattr(profile, 'first_name', '') or ''
+    last = getattr(profile, 'last_name', '') or ''
+    name = f"{first} {last}".strip() or user.get_full_name() or user.username
+
+    can_add = True
+    reason = ''
+    if business_models.BusinessTeamProfile.objects.filter(business=business, user=user).exists():
+        can_add, reason = False, 'Already a team member of this business.'
+    elif business.user and business.user_id == user.id:
+        can_add, reason = False, 'This is the business owner.'
+    elif profile is None:
+        can_add, reason = False, 'User has no profile yet.'
+    else:
+        completion = profile.get_profile_completion_percentage()
+        if completion < 100:
+            can_add, reason = False, f'Profile only {completion}% complete (100% required).'
+
+    return JsonResponse({
+        'found': True,
+        'name': name,
+        'email': user.email or '',
+        'can_add': can_add,
+        'reason': reason,
+    })
 
 
 @login_required(login_url='/accounts/login/')
@@ -2981,17 +3080,16 @@ def bulk_print_labels(request):
     from delivery.models import ShippingLabel, DeliveryTask
     from delivery.label_utils import create_shipping_label
 
-    if request.method != 'POST':
+    # Accept ids from POST (bulk) or GET (single-order waybill link)
+    raw_ids = request.POST.getlist('order_ids') or request.GET.getlist('order_ids')
+    # Keep only valid integers so a malformed value can't 500 the page
+    order_ids = [int(v) for v in raw_ids if str(v).isdigit()]
+
+    if not order_ids:
         return render(request, 'business/bulk_print_labels.html', {
             'labels': [],
             'user_business': request.current_business,
         })
-
-    order_ids = request.POST.getlist('order_ids')
-    if not order_ids:
-        from django.contrib import messages
-        messages.warning(request, 'No orders selected for printing.')
-        return redirect('orders:orders_all_list')
 
     orders = Order.objects.filter(
         id__in=order_ids,
@@ -3016,6 +3114,41 @@ def bulk_print_labels(request):
 
     return render(request, 'business/bulk_print_labels.html', {
         'labels': labels,
+        'user_business': request.current_business,
+    })
+
+
+@login_required
+@business_required
+def print_waybill(request):
+    """Self-contained waybill(s) printable from the client dashboard.
+
+    Rendered directly from the Order — no DeliveryTask or order-status
+    dependency — so a label can be printed and stuck on the package at any
+    stage of the order lifecycle. Accepts one or many ids via GET/POST.
+    """
+    import base64
+    from orders.models import Order
+    from delivery.label_utils import generate_barcode_image
+
+    raw_ids = request.GET.getlist('order_ids') or request.POST.getlist('order_ids')
+    order_ids = [int(v) for v in raw_ids if str(v).isdigit()]
+
+    orders = Order.objects.filter(
+        id__in=order_ids,
+        business=request.current_business,
+    ).select_related('business', 'pickup_location').prefetch_related('order_items__product')
+
+    waybills = []
+    for order in orders:
+        barcode_b64 = ''
+        buf = generate_barcode_image(order.order_number)
+        if buf:
+            barcode_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+        waybills.append({'order': order, 'barcode_b64': barcode_b64})
+
+    return render(request, 'business/print_waybill.html', {
+        'waybills': waybills,
         'user_business': request.current_business,
     })
 

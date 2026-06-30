@@ -416,7 +416,7 @@
                                 {{ order.order_status|title }}
                             </span>
                         </td>
-                        <td>{% if order.cod_amount %}{{ order.cod_amount|floatformat:0 }} QAR{% else %}-{% endif %}</td>
+                        <td>{{ order.cod_amount|default:0|floatformat:0 }} QAR</td>
                         <td class="sld__date-cell">{{ order.created_at|date:"d M Y" }}</td>
                     </tr>
                     {% endfor %}
@@ -577,29 +577,200 @@
             <div>
                 <!-- Pickup Locations -->
                 <div class="sld__section">
-                    <h3 class="sld__section-title">
-                        <i class="fa-solid fa-map-location-dot sld__section-icon"></i> Pickup Locations
-                    </h3>
-                    {% if pickup_locations %}
-                    <ul class="sld__location-list">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h3 class="sld__section-title mb-0">
+                            <i class="fa-solid fa-map-location-dot sld__section-icon"></i> Pickup Locations
+                        </h3>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#pickupLocationModal">
+                            <i class="fa-solid fa-plus me-1"></i> Add Location
+                        </button>
+                    </div>
+                    <ul class="sld__location-list" id="sld-pickup-list">
                         {% for loc in pickup_locations %}
-                        <li class="sld__location-item">
+                        <li class="sld__location-item" id="sld-loc-{{ loc.id }}">
                             <span class="sld__location-icon"><i class="fa-solid fa-location-dot"></i></span>
                             <div class="sld__location-body">
-                                <div class="sld__location-title">{{ loc.pickup_location_title }}</div>
+                                <div class="sld__location-title">{{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}</div>
                                 <div class="sld__location-addr">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</div>
                             </div>
                             <span class="sld__badge {% if loc.pickup_status == 'active' %}sld__badge--success{% else %}sld__badge--warning{% endif %}">{{ loc.pickup_status|title }}</span>
+                            {% if loc.pickup_status != 'active' %}
+                            <button class="btn btn-sm btn-link text-danger p-0 ms-2 sld-del-loc-btn"
+                                    data-loc-id="{{ loc.id }}"
+                                    data-del-url="{% url 'workforce:wf_pickup_location_delete' business.business_id loc.id %}"
+                                    title="Delete location">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                            {% endif %}
+                        </li>
+                        {% empty %}
+                        <li class="sld__empty-msg" id="sld-loc-empty">
+                            <i class="fa-solid fa-map-marker-alt"></i>
+                            No pickup locations
                         </li>
                         {% endfor %}
                     </ul>
-                    {% else %}
-                    <div class="sld__empty-msg">
-                        <i class="fa-solid fa-map-marker-alt"></i>
-                        No pickup locations
-                    </div>
-                    {% endif %}
                 </div>
+
+                <!-- Add Pickup Location Modal -->
+                <div class="modal fade" id="pickupLocationModal" tabindex="-1" aria-labelledby="pickupLocationModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="pickupLocationModalLabel">
+                                    <i class="fa-solid fa-map-location-dot me-2"></i>Add Pickup Location
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form id="sld-pickup-form">
+                                {% csrf_token %}
+                                <div class="modal-body">
+                                    <div id="sld-pickup-alert" class="alert d-none"></div>
+                                    <div class="row g-3">
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label fw-semibold">Location Title <span class="text-danger">*</span></label>
+                                            <input type="text" name="pickup_location_title" class="form-control" placeholder="e.g. Main Warehouse" required>
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label fw-semibold">Locality / Area</label>
+                                            <input type="text" name="locality" class="form-control" placeholder="e.g. Al Sadd">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label fw-semibold">Zone No.</label>
+                                            <input type="number" name="pickup_zone_no" class="form-control" min="1" placeholder="e.g. 25">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label fw-semibold">Street No.</label>
+                                            <input type="number" name="pickup_street_no" class="form-control" min="1" placeholder="e.g. 8">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label fw-semibold">Building No.</label>
+                                            <input type="number" name="pickup_building_no" class="form-control" min="1" placeholder="e.g. 12">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label fw-semibold">Latitude</label>
+                                            <input type="text" name="pickup_lat" class="form-control" placeholder="e.g. 25.2854">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label fw-semibold">Longitude</label>
+                                            <input type="text" name="pickup_lon" class="form-control" placeholder="e.g. 51.5310">
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label fw-semibold">Status</label>
+                                            <select name="pickup_status" class="form-select">
+                                                <option value="active" selected>Active</option>
+                                                <option value="inactive">Inactive</option>
+                                                <option value="pending">Approval Pending</option>
+                                                <option value="suspended">Suspended</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-4 d-flex align-items-end">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" name="is_default" id="sldPickupIsDefault">
+                                                <label class="form-check-label" for="sldPickupIsDefault">Default pickup location</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-4 d-flex align-items-end">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" name="is_fulfilment_center" id="sldPickupIsFulfilment">
+                                                <label class="form-check-label" for="sldPickupIsFulfilment">Fulfilment center</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary" id="sld-pickup-submit">
+                                        <i class="fa-solid fa-floppy-disk me-1"></i> Save Location
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                (function () {
+                    var addUrl = "{% url 'workforce:wf_pickup_location_add' business.business_id %}";
+
+                    document.getElementById('sld-pickup-form').addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        var btn = document.getElementById('sld-pickup-submit');
+                        var alertEl = document.getElementById('sld-pickup-alert');
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+                        alertEl.className = 'alert d-none';
+
+                        var data = new FormData(this);
+                        fetch(addUrl, {method: 'POST', body: data, headers: {'X-CSRFToken': data.get('csrfmiddlewaretoken')}})
+                            .then(function (r) { return r.json(); })
+                            .then(function (json) {
+                                if (json.success) {
+                                    var loc = json.location;
+                                    var list = document.getElementById('sld-pickup-list');
+                                    var emptyEl = document.getElementById('sld-loc-empty');
+                                    if (emptyEl) emptyEl.remove();
+
+                                    var li = document.createElement('li');
+                                    li.className = 'sld__location-item';
+                                    li.id = 'sld-loc-' + loc.id;
+                                    li.innerHTML =
+                                        '<span class="sld__location-icon"><i class="fa-solid fa-location-dot"></i></span>' +
+                                        '<div class="sld__location-body">' +
+                                            '<div class="sld__location-title">' + loc.title + (loc.locality ? ' — ' + loc.locality : '') + '</div>' +
+                                            '<div class="sld__location-addr">Zone ' + (loc.zone || 'N/A') + ', St ' + (loc.street || 'N/A') + ', Bldg ' + (loc.building || 'N/A') + '</div>' +
+                                        '</div>' +
+                                        '<span class="sld__badge sld__badge--success">' + loc.status.charAt(0).toUpperCase() + loc.status.slice(1) + '</span>' +
+                                        '<button class="btn btn-sm btn-link text-danger p-0 ms-2 sld-del-loc-btn" data-loc-id="' + loc.id + '" data-del-url="/workforce/sellers/{{ business.business_id }}/pickup-location/' + loc.id + '/delete/" title="Delete location"><i class="fa-solid fa-trash-can"></i></button>';
+                                    list.appendChild(li);
+
+                                    bootstrap.Modal.getInstance(document.getElementById('pickupLocationModal')).hide();
+                                    document.getElementById('sld-pickup-form').reset();
+                                } else {
+                                    alertEl.className = 'alert alert-danger';
+                                    alertEl.textContent = json.error || 'Failed to save location.';
+                                }
+                            })
+                            .catch(function () {
+                                alertEl.className = 'alert alert-danger';
+                                alertEl.textContent = 'Network error. Please try again.';
+                            })
+                            .finally(function () {
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Location';
+                            });
+                    });
+
+                    document.getElementById('sld-pickup-list').addEventListener('click', function (e) {
+                        var btn = e.target.closest('.sld-del-loc-btn');
+                        if (!btn) return;
+                        if (!confirm('Delete this pickup location?')) return;
+                        var delUrl = btn.dataset.delUrl;
+                        var locId = btn.dataset.locId;
+                        var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                        fetch(delUrl, {method: 'POST', headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded'}, credentials: 'same-origin'})
+                            .then(function (r) { return r.json(); })
+                            .then(function (json) {
+                                if (json.success) {
+                                    var li = document.getElementById('sld-loc-' + locId);
+                                    if (li) li.remove();
+                                    if (!document.querySelector('#sld-pickup-list .sld__location-item')) {
+                                        var empty = document.createElement('li');
+                                        empty.className = 'sld__empty-msg';
+                                        empty.id = 'sld-loc-empty';
+                                        empty.innerHTML = '<i class="fa-solid fa-map-marker-alt"></i> No pickup locations';
+                                        document.getElementById('sld-pickup-list').appendChild(empty);
+                                    }
+                                } else {
+                                    alert(json.error || 'Failed to delete location.');
+                                }
+                            })
+                            .catch(function () {
+                                alert('Failed to delete location. Please try again.');
+                            });
+                    });
+                }());
+                </script>
             </div>
         </div>
     </div>

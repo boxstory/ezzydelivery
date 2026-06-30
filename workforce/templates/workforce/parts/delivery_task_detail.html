@@ -195,22 +195,42 @@
                                 </div>
                             </div>
 
+                            <!-- Paste / Drop shared (WhatsApp) location -->
+                            <div class="mt-2">
+                                <label class="dtd__field__label d-block mb-0" for="dtdLocPaste{{ task.id }}">
+                                    Paste / Drop Shared Location
+                                </label>
+                                <div id="dtdLocDrop{{ task.id }}" class="oap__loc-drop oap__loc-drop--sm"
+                                     ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                                     ondrop="locDropSave(event, {{ task.order.id }}, {latId:'dtdLatInput{{ task.id }}', lngId:'dtdLngInput{{ task.id }}', accuracyWrapId:'dtdAccuracyWrap{{ task.id }}', resultId:'dtdLocResult{{ task.id }}', inputId:'dtdLocPaste{{ task.id }}'})">
+                                    <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                                    <input type="text" id="dtdLocPaste{{ task.id }}" class="form-control form-control-sm oap__loc-drop__input"
+                                           placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here">
+                                    <button type="button" class="btn btn-sm btn-success flex-shrink-0"
+                                            onclick="whatsappLocationSave(document.getElementById('dtdLocPaste{{ task.id }}').value, {{ task.order.id }}, {latId:'dtdLatInput{{ task.id }}', lngId:'dtdLngInput{{ task.id }}', accuracyWrapId:'dtdAccuracyWrap{{ task.id }}', resultId:'dtdLocResult{{ task.id }}'})">
+                                        <i class="fa-solid fa-floppy-disk me-1"></i>Save
+                                    </button>
+                                </div>
+                                <div id="dtdLocResult{{ task.id }}" class="mt-1"></div>
+                            </div>
+
                             <!-- Lat / Long + Accuracy -->
                             <div class="row g-1 mt-1 mx-0">
                                 <div class="col-4 ps-0">
                                     <label class="dtd__field__label d-block mb-0">Latitude</label>
-                                    <input type="text" class="form-control form-control-sm dtd__latlon-input" disabled
+                                    <input type="text" id="dtdLatInput{{ task.id }}" class="form-control form-control-sm dtd__latlon-input" disabled
                                            value="{% if task.order.latitude %}{{ task.order.latitude|floatformat:6 }}{% elif task.dl_address_update.dl_latitude %}{{ task.dl_address_update.dl_latitude|floatformat:6 }}{% endif %}"
                                            placeholder="Not set">
                                 </div>
                                 <div class="col-4 px-1">
                                     <label class="dtd__field__label d-block mb-0">Longitude</label>
-                                    <input type="text" class="form-control form-control-sm dtd__latlon-input" disabled
+                                    <input type="text" id="dtdLngInput{{ task.id }}" class="form-control form-control-sm dtd__latlon-input" disabled
                                            value="{% if task.order.longitude %}{{ task.order.longitude|floatformat:6 }}{% elif task.dl_address_update.dl_longitude %}{{ task.dl_address_update.dl_longitude|floatformat:6 }}{% endif %}"
                                            placeholder="Not set">
                                 </div>
                                 <div class="col-4 pe-0">
                                     <label class="dtd__field__label d-block mb-0">Accuracy</label>
+                                    <div id="dtdAccuracyWrap{{ task.id }}">
                                     {% if task.order.coords_accuracy %}
                                     <span class="dtd__accuracy dtd__accuracy--{{ task.order.coords_accuracy }}">
                                         {% if task.order.coords_accuracy == 'by_customer' %}<i class="fa-solid fa-user-check"></i>
@@ -225,6 +245,7 @@
                                     {% else %}
                                     <span class="dtd__field__value" style="color:var(--dtd-label);">—</span>
                                     {% endif %}
+                                    </div>
                                 </div>
                             </div>
 
@@ -257,7 +278,7 @@
                         </div>
                         <div class="dtd__pkg-item">
                             <span class="dtd__pkg-item__label"><i class="fa-solid fa-money-bill-wave"></i> COD</span>
-                            <span class="dtd__pkg-item__val">{% if task.order.cod_amount %}{{ task.order.cod_amount }} QR{% else %}—{% endif %}</span>
+                            <span class="dtd__pkg-item__val">{{ task.order.cod_amount|default:0 }} QR</span>
                         </div>
                     </div>
 
@@ -793,12 +814,10 @@
                             <span class="dtd__field__value">{{ task.order.get_cod_status_by_client_display|default:task.order.cod_status_by_client }}</span>
                         </div>
                         {% endif %}
-                        {% if task.order.cod_amount is not None %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-money-bill-wave"></i> COD Amount (Order)</span>
                             <span class="dtd__field__value fw-semibold">{{ task.order.cod_amount|default:0 }} QAR</span>
                         </div>
-                        {% endif %}
                         {% if task.payment_method %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-wallet"></i> Method</span>
@@ -1206,8 +1225,8 @@
         if (street) msg += ', St ' + street;
         if (building) msg += ', Bldg ' + building;
         if (cod) msg += '\n\ud83d\udcb5 COD: ' + cod + ' QR';
-        if (verifyUrl) msg += '\n\n\ud83d\udccd Please verify your delivery address:\n' + verifyUrl;
-        msg += '\n\nYour delivery is on its way. Please be available. Thank you! \ud83d\ude9a';
+        if (verifyUrl) msg += '\n\n\ud83d\udccd Please verify your delivery address and available time:\n' + verifyUrl;
+        msg += '\n\nWill be notify the driver start ride to your location. Thank you! \ud83d\ude9a';
 
         waBtn.dataset.waUrl = 'https://wa.me/' + phoneClean + '?text=' + encodeURIComponent(msg);
     })();

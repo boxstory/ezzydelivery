@@ -201,7 +201,7 @@
                         <span class="badge bg-info text-dark" style="font-size:0.6rem;">Z{{ row.dl_zone }}{% if row.dl_street %}/S{{ row.dl_street }}{% endif %}{% if row.dl_building %}/B{{ row.dl_building }}{% endif %}</span>
                         {% else %}—{% endif %}
                     </td>
-                    <td>{% if row.cod_amount and row.cod_amount != '0' %}<span class="fw-semibold">{{ row.cod_amount }}</span>{% else %}—{% endif %}</td>
+                    <td><span class="fw-semibold">{{ row.cod_amount|default:0 }}</span></td>
                     <td>{{ row.package_desc|truncatechars:15|default:"—" }}</td>
                     <td>
                         {% if row.status == 'imported' %}

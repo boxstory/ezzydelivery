@@ -289,7 +289,7 @@
                         <span class="badge bg-info text-dark" style="font-size:0.6rem;">Z{{ row.dl_zone }}{% if row.dl_street %}/S{{ row.dl_street }}{% endif %}{% if row.dl_building %}/B{{ row.dl_building }}{% endif %}</span>
                         {% else %}—{% endif %}
                     </td>
-                    <td>{% if row.cod_amount and row.cod_amount != '0' %}<span class="fw-semibold">{{ row.cod_amount }}</span>{% else %}—{% endif %}</td>
+                    <td><span class="fw-semibold">{{ row.cod_amount|default:0 }}</span></td>
                     <td>{{ row.package_desc|truncatechars:15|default:"—" }}</td>
                     <td>
                         {% if row.status == 'imported' %}
@@ -906,8 +906,26 @@ async function runAutoImport() {
             }, 5000);
         }
 
+        // Keep the report open when there is anything to review — warnings, errors,
+        // failed rows, needs-review rows, or refetch errors — so it is not auto-closed
+        // before the user can read the notes.
+        const hasIssues = (result.needs_review || 0) > 0
+            || (result.failed || 0) > 0
+            || (result.rows || []).some(r => (r.warnings && r.warnings.length) || r.error)
+            || (result.refetch && result.refetch.errors && result.refetch.errors.length);
+
         const anyCreated = (result.fully_automated || 0) + (result.needs_review || 0);
-        if (anyCreated > 0) {
+        if (hasIssues) {
+            const note = document.createElement('div');
+            note.className = 'alert alert-warning py-2 px-3 mt-2 mb-0 small';
+            note.innerHTML = '<i class="fa-solid fa-circle-info me-1"></i>Auto-refresh paused — review the warnings/errors above, then close this report'
+                + (anyCreated > 0 ? ' to refresh the list.' : '.');
+            document.getElementById('autoImportModalBody').prepend(note);
+            if (anyCreated > 0) {
+                document.getElementById('autoImportModal')
+                    .addEventListener('hidden.bs.modal', () => window.location.reload(), { once: true });
+            }
+        } else if (anyCreated > 0) {
             setTimeout(() => {
                 modal.hide();
                 window.location.reload();

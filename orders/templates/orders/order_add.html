@@ -2,7 +2,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260423c">
+<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260630a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -188,6 +188,14 @@
           {% endfor %}
         </select>
       </div>
+      <div class="pwa-form-group">
+        <label class="pwa-form-group__label">Delivery Speed</label>
+        <select name="delivery_speed" id="mobile_delivery_speed" class="pwa-form-group__input">
+          <option value="standard">Standard (48hr)</option>
+          <option value="same_day">Same Day</option>
+          <option value="express">Express (2-4hr)</option>
+        </select>
+      </div>
       <div class="pwa-form-group" id="fg_order_notes">
         <label class="pwa-form-group__label">Notes</label>
         <textarea name="order_notes" id="mobile_order_notes"
@@ -299,6 +307,11 @@
                 <i class="fas fa-hashtag me-1 text-muted"></i>Your Order ID
               </label>
               {{ form.client_order_code }}
+              {% if form.client_order_code.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.client_order_code.errors %}{{ error }}{% endfor %}
+              </div>
+              {% endif %}
               <div class="form-text">Your internal order reference number</div>
             </div>
             <div class="col-md-6">
@@ -308,11 +321,12 @@
               {{ form.order_number_preview }}
               <div class="form-text">Auto-generated unique tracking number</div>
             </div>
+            {{ form.order_status.as_hidden }}
             <div class="col-md-6">
-              <label class="form-label" for="id_order_status">
-                <i class="fas fa-info-circle me-1 text-muted"></i>Initial Status
+              <label class="form-label" for="id_delivery_speed">
+                <i class="fas fa-bolt me-1 text-muted"></i>Delivery Speed
               </label>
-              {{ form.order_status }}
+              {{ form.delivery_speed }}
             </div>
             <div class="col-md-6">
               <label class="form-label" for="id_pickup_location">
@@ -404,6 +418,22 @@
                       onclick="qnasValidateAndFill({zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', zoneNameId:'id_zone_name_display', resultId:'addOrderQnasResult', btnId:'addOrderQnasBtn', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge'})">
                 <i class="fa-solid fa-satellite-dish me-1"></i>Validate
               </button>
+            </div>
+          </div>
+          <div class="row g-3 mt-0">
+            <div class="col-12">
+              <label class="form-label" for="addOrderLocPaste">
+                 Paste / Drop Shared Location
+              </label>
+              <div id="addOrderLocDrop" class="oap__loc-drop"
+                   ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                   ondrop="locDropHandle(event, {latId:'id_latitude', lngId:'id_longitude', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge', resultId:'addOrderLocResult', inputId:'addOrderLocPaste'})">
+                <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                <input type="text" id="addOrderLocPaste" class="form-control form-control-sm oap__loc-drop__input"
+                       placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here"
+                       oninput="whatsappLocationFill(this.value, {latId:'id_latitude', lngId:'id_longitude', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge', resultId:'addOrderLocResult'})">
+              </div>
+              <div id="addOrderLocResult" class="mt-1"></div>
             </div>
           </div>
           <div class="row g-3 mt-0">
@@ -646,16 +676,6 @@
       const aiText = $('#oap_ai_text_input').val().trim();
       const sourceField = document.getElementById('id_order_source_text');
       if (sourceField && aiText) sourceField.value = aiText;
-
-      // Warn if no GPS coordinates
-      const lat = document.getElementById('id_latitude')?.value;
-      const lng = document.getElementById('id_longitude')?.value;
-      if (!lat || !lng || lat === '0' || lng === '0') {
-        if (!confirm('No GPS coordinates set. Delivery tracking and distance calculation may not work. Continue anyway?')) {
-          e.preventDefault();
-          return false;
-        }
-      }
     });
 
     // ========== VIEW TOGGLE LOGIC ==========
@@ -1008,16 +1028,6 @@
         const pasteText = document.getElementById('ai_extract_textarea')?.value?.trim() || '';
         const srcField = document.getElementById('mobile_order_source_text');
         if (srcField && pasteText) srcField.value = pasteText;
-
-        // Warn if no GPS coordinates
-        const lat = document.getElementById('mobile_latitude')?.value;
-        const lng = document.getElementById('mobile_longitude')?.value;
-        if (!lat || !lng || lat === '0' || lng === '0') {
-          if (!confirm('No GPS coordinates set. Delivery tracking and distance calculation may not work. Continue anyway?')) {
-            e.preventDefault();
-            return false;
-          }
-        }
       });
     }
 

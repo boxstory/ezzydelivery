@@ -1,0 +1,405 @@
+/*
+Purpose: Printable shipping waybill rendered from an Order (stick on package).
+Used by: business/templates/business/print_waybill.html
+Notes: Standalone print page. One .bwb__label per order, A6-sized, page-break each.
+*/
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #111827;
+}
+
+.bwb__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.bwb__toolbar-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.bwb__toolbar-count {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.bwb__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bwb__btn--ghost {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.bwb__sheet {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.bwb__label {
+  width: 105mm;
+  min-height: 148mm;
+  background: #fff;
+  border: 1px solid #111827;
+  padding: 6mm;
+  display: flex;
+  flex-direction: column;
+}
+
+.bwb__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #111827;
+  padding-bottom: 6px;
+}
+
+.bwb__brand {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.bwb__head-left,
+.bwb__head-right {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.bwb__head-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.bwb__seller-name {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.bwb__head-title {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.bwb__head-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  margin-top: 2px;
+}
+
+.bwb__logo {
+  height: 72px;
+  width: auto;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.bwb__sender-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.bwb__sender-logo {
+  height: 24px;
+  width: 24px;
+  object-fit: contain;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+.bwb__speed {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid #111827;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.bwb__row {
+  display: flex;
+  gap: 8px;
+}
+
+.bwb__box {
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-top: 8px;
+}
+
+/* From / To shown side by side, capped to ~6 lines of height */
+.bwb__row { margin-top: 8px; }
+.bwb__row .bwb__box { margin-top: 0; }
+
+.bwb__box--party {
+  width: 50%;
+  min-width: 0;
+  max-height: calc(1.45em * 6 + 16px);
+  overflow: hidden;
+}
+
+.bwb__box--party .bwb__name,
+.bwb__box--party .bwb__text,
+.bwb__box--party .bwb__addr {
+  overflow-wrap: anywhere;
+}
+
+.bwb__box-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.bwb__name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.bwb__text {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bwb__addr {
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+.bwb__zsb {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.bwb__chip {
+  font-size: 11px;
+  font-weight: 700;
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.bwb__cod {
+  margin-top: 8px;
+  border: 2px solid #111827;
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bwb__cod-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.bwb__cod-amt {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.bwb__cod--paid {
+  border-style: dashed;
+}
+
+.bwb__items {
+  margin-top: 8px;
+  flex: 1;
+}
+
+.bwb__items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.bwb__items-table th,
+.bwb__items-table td {
+  border: 1px solid #d1d5db;
+  padding: 3px 6px;
+  text-align: left;
+}
+
+.bwb__items-table th {
+  background: #f3f4f6;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.bwb__items-table td.bwb__qty {
+  text-align: center;
+  width: 36px;
+}
+
+.bwb__text--muted { color: #9ca3af; }
+
+.bwb__notes {
+  margin-top: 8px;
+  font-size: 11px;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+/* Proof of delivery */
+.bwb__pod {
+  margin-top: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.bwb__pod-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 2px 0 8px;
+}
+
+.bwb__pod-box {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #111827;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.bwb__pod-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.bwb__pod-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.bwb__pod-line {
+  border-bottom: 1px solid #111827;
+  height: 16px;
+}
+
+.bwb__pod-cap {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.bwb__footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 2px solid #111827;
+  padding-top: 6px;
+}
+
+.bwb__footer-left {
+  flex: 2 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
+.bwb__footer-right {
+  flex: 1 1 0;
+  min-width: 0;
+  border-left: 1px solid #d1d5db;
+  padding-left: 10px;
+}
+
+.bwb__barcode-img {
+  width: 100%;
+  height: 80px;
+  object-fit: contain;
+}
+
+.bwb__barcode-num {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.bwb__detail {
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.bwb__detail-cap {
+  display: inline-block;
+  min-width: 44px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+}
+
+.bwb__empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+@page {
+  size: A6;
+  margin: 0;
+}
+
+@media print {
+  body { background: #fff; }
+  .bwb__toolbar { display: none; }
+  .bwb__sheet { padding: 0; gap: 0; }
+  .bwb__label {
+    border: none;
+    width: 100%;
+    min-height: 100vh;
+    page-break-after: always;
+  }
+}

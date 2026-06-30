@@ -119,14 +119,6 @@
         <div class="pwa-chart-card__header">Weekly Trend</div>
         <div id="mobileWeeklyOrdersChart" class="pwa-chart-container"></div>
       </div>
-      <div class="pwa-chart-card">
-        <div class="pwa-chart-card__header">Order Status</div>
-        <div id="mobileOrderStatusChart" class="pwa-chart-container"></div>
-      </div>
-      <div class="pwa-chart-card">
-        <div class="pwa-chart-card__header">COD Status</div>
-        <div id="mobileCodStatusChart" class="pwa-chart-container"></div>
-      </div>
     </div>
 
     <!-- AI Assistant Chat (mobile instance) -->
@@ -153,9 +145,7 @@
         <div class="pwa-dash-item__body">
           <div class="pwa-dash-item__top">
             <span class="pwa-dash-item__number">#{{ order.order_number|truncatechars:22 }}</span>
-            {% if order.cod_amount %}
-            <span class="pwa-dash-item__amount pwa-dash-item__amount--warning">{{ order.cod_amount }} QR</span>
-            {% endif %}
+            <span class="pwa-dash-item__amount pwa-dash-item__amount--warning">{{ order.cod_amount|default:0 }} QR</span>
           </div>
           <div class="pwa-dash-item__bottom">
             <span class="pwa-dash-item__customer">{{ order.customer_name|truncatechars:18 }}</span>
@@ -195,9 +185,7 @@
         <div class="pwa-dash-item__body">
           <div class="pwa-dash-item__top">
             <span class="pwa-dash-item__number">#{{ order.order_number|truncatechars:22 }}</span>
-            {% if order.cod_amount %}
-            <span class="pwa-dash-item__amount pwa-dash-item__amount--success">{{ order.cod_amount }} QR</span>
-            {% endif %}
+            <span class="pwa-dash-item__amount pwa-dash-item__amount--success">{{ order.cod_amount|default:0 }} QR</span>
           </div>
           <div class="pwa-dash-item__bottom">
             <span class="pwa-dash-item__customer">{{ order.customer_name|truncatechars:18 }}</span>
@@ -236,9 +224,7 @@
         <div class="pwa-dash-item__body">
           <div class="pwa-dash-item__top">
             <span class="pwa-dash-item__number">#{{ order.order_number|truncatechars:22 }}</span>
-            {% if order.cod_amount %}
-            <span class="pwa-dash-item__amount pwa-dash-item__amount--danger">{{ order.cod_amount }} QR</span>
-            {% endif %}
+            <span class="pwa-dash-item__amount pwa-dash-item__amount--danger">{{ order.cod_amount|default:0 }} QR</span>
           </div>
           <div class="pwa-dash-item__bottom">
             <span class="pwa-dash-item__customer">{{ order.customer_name|truncatechars:18 }}</span>
@@ -368,10 +354,9 @@
     <!-- AI Assistant Chat -->
     {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
 
-    <!-- Analytics Charts Row: Weekly Trend + COD -->
-    <div class="bdb__chart-grid">
-      <!-- Left Column: Weekly Orders Trend -->
-      <div class="bdb__chart-card bdb__chart-card--large">
+    <!-- Analytics Charts Row: Weekly Trend (full width) -->
+    <div class="bdb__chart-grid bdb__chart-grid--single">
+      <div class="bdb__chart-card bdb__chart-card--full">
         <div class="bdb__chart-header bdb__chart-header--primary">
           <h5 class="bdb__chart-title">
             <i class="fa-solid fa-chart-line"></i>Weekly Orders Trend
@@ -379,32 +364,6 @@
         </div>
         <div class="bdb__chart-body">
           <div id="weeklyOrdersChart"></div>
-        </div>
-      </div>
-
-      <!-- Right Column: COD Status -->
-      <div class="bdb__chart-card bdb__chart-card--small">
-        <div class="bdb__chart-header bdb__chart-header--warning">
-          <h5 class="bdb__chart-title">
-            <i class="fa-solid fa-money-bill-wave"></i>COD Status
-          </h5>
-        </div>
-        <div class="bdb__chart-body">
-          <div id="codStatusChart"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Order Status (Separate Section) -->
-    <div class="bdb__chart-grid bdb__chart-grid--single">
-      <div class="bdb__chart-card bdb__chart-card--full">
-        <div class="bdb__chart-header bdb__chart-header--navy">
-          <h5 class="bdb__chart-title">
-            <i class="fa-solid fa-chart-pie"></i>Order Status
-          </h5>
-        </div>
-        <div class="bdb__chart-body">
-          <div id="orderStatusChart"></div>
         </div>
       </div>
     </div>
@@ -432,7 +391,7 @@
               </div>
               <div class="bdb__list-card__item-right">
                 {% if order.dl_zone %}<span class="bdb__list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
-                {% if order.cod_amount %}<span class="bdb__list-card__item-amount bdb__list-card__item-amount--warning">{{ order.cod_amount }} QR</span>{% endif %}
+                <span class="bdb__list-card__item-amount bdb__list-card__item-amount--warning">{{ order.cod_amount|default:0 }} QR</span>
               </div>
             </a>
             {% empty %}
@@ -469,7 +428,7 @@
               </div>
               <div class="bdb__list-card__item-right">
                 {% if order.dl_zone %}<span class="bdb__list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
-                {% if order.cod_amount %}<span class="bdb__list-card__item-amount bdb__list-card__item-amount--success">{{ order.cod_amount }} QR</span>{% endif %}
+                <span class="bdb__list-card__item-amount bdb__list-card__item-amount--success">{{ order.cod_amount|default:0 }} QR</span>
               </div>
             </a>
             {% empty %}
@@ -506,7 +465,7 @@
               </div>
               <div class="bdb__list-card__item-right">
                 {% if order.dl_zone %}<span class="bdb__list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
-                {% if order.cod_amount %}<span class="bdb__list-card__item-amount bdb__list-card__item-amount--danger">{{ order.cod_amount }} QR</span>{% endif %}
+                <span class="bdb__list-card__item-amount bdb__list-card__item-amount--danger">{{ order.cod_amount|default:0 }} QR</span>
               </div>
             </a>
             {% empty %}
