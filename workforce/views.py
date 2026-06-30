@@ -9183,51 +9183,60 @@ def cod_business_settlement_report(request):
     date_to = request.GET.get('date_to', '')
     business_filter = request.GET.get('business_id', '')
 
-    # Candidates: COD collected, settled with EzzyDelivery (Leg 2 done), not yet
-    # paid to business. Gate on task-level cod_settled (cash physically with Ezzy).
-    tasks_qs = delivery_models.DeliveryTask.objects.filter(
+    # Base candidate filter: COD collected, settled with EzzyDelivery (Leg 2 done),
+    # not yet paid to business. Gate on task-level cod_settled (cash held by Ezzy).
+    base_qs = delivery_models.DeliveryTask.objects.filter(
         cod_collected=True,
         cod_settled=True,
         cod_client_settled=False,
         dl_task_status__in=['delivered', 'partial_delivery'],
-    ).select_related('order', 'order__business', 'driver').order_by('-completed_at')
+    )
 
-    # Date filter (default = ALL — no restriction on load)
-    if date_from:
-        tasks_qs = tasks_qs.filter(completed_at__date__gte=date_from)
-    if date_to:
-        tasks_qs = tasks_qs.filter(completed_at__date__lte=date_to)
-    if business_filter:
-        tasks_qs = tasks_qs.filter(order__business_id=business_filter)
-
-    # Group into per-business buckets for the template
-    groups = {}
-    for task in tasks_qs:
-        order = task.order
-        biz = order.business if order else None
-        if biz is None:
-            continue
-        g = groups.setdefault(biz.business_id, {
-            'business': biz,
-            'tasks': [],
-            'subtotal': Decimal('0'),
-            'fee_subtotal': Decimal('0'),
-        })
-        g['tasks'].append(task)
-        g['subtotal'] += (task.cod_collected_amount or Decimal('0'))
-        # Delivery fee is shown for context only — the COD payout stays GROSS.
-        # Read straight from the DB (dl_price defaults to 20 QR at the model level).
-        g['fee_subtotal'] += Decimal(str(task.dl_price or 0))
-
-    business_groups = sorted(groups.values(), key=lambda g: g['subtotal'], reverse=True)
-    grand_total = sum((g['subtotal'] for g in business_groups), Decimal('0'))
-    grand_total_fee = sum((g['fee_subtotal'] for g in business_groups), Decimal('0'))
-    task_count = sum(len(g['tasks']) for g in business_groups)
-
-    # Business dropdown for the filter
+    # Dropdown always lists every business that has pending COD payout candidates,
+    # regardless of the current selection, so staff can pick one.
+    candidate_biz_ids = base_qs.values_list('order__business_id', flat=True).distinct()
     all_businesses = business_models.Business.objects.filter(
-        business_id__in=[g['business'].business_id for g in business_groups]
-    ).order_by('business_name') if business_groups else business_models.Business.objects.none()
+        business_id__in=list(candidate_biz_ids)
+    ).order_by('business_name')
+
+    # Only build the per-task list once a business is chosen — the page shows nothing
+    # until then (avoids dumping every business's deliveries on load).
+    business_groups = []
+    grand_total = Decimal('0')
+    grand_total_fee = Decimal('0')
+    task_count = 0
+
+    if business_filter:
+        tasks_qs = base_qs.filter(
+            order__business_id=business_filter
+        ).select_related('order', 'order__business', 'driver').order_by('-completed_at')
+        if date_from:
+            tasks_qs = tasks_qs.filter(completed_at__date__gte=date_from)
+        if date_to:
+            tasks_qs = tasks_qs.filter(completed_at__date__lte=date_to)
+
+        groups = {}
+        for task in tasks_qs:
+            order = task.order
+            biz = order.business if order else None
+            if biz is None:
+                continue
+            g = groups.setdefault(biz.business_id, {
+                'business': biz,
+                'tasks': [],
+                'subtotal': Decimal('0'),
+                'fee_subtotal': Decimal('0'),
+            })
+            g['tasks'].append(task)
+            g['subtotal'] += (task.cod_collected_amount or Decimal('0'))
+            # Delivery fee is shown for context only — the COD payout stays GROSS.
+            # Read straight from the DB (dl_price defaults to 20 QR at the model level).
+            g['fee_subtotal'] += Decimal(str(task.dl_price or 0))
+
+        business_groups = sorted(groups.values(), key=lambda g: g['subtotal'], reverse=True)
+        grand_total = sum((g['subtotal'] for g in business_groups), Decimal('0'))
+        grand_total_fee = sum((g['fee_subtotal'] for g in business_groups), Decimal('0'))
+        task_count = sum(len(g['tasks']) for g in business_groups)
 
     context = {
         'page_title': 'Business COD Payout',
