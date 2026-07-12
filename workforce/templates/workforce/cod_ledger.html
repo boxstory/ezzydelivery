@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712k" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712l" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -140,7 +140,7 @@
           <th>Order #</th>
           <th>Customer / Mobile</th>
           <th>COD Status</th>
-          <th class="codl__num">COD in&nbsp;hand after</th>
+          <th class="codl__num codl__shrink">COD in hand<br>after</th>
           <th class="codl__num">Wallet after</th>
           <th>Submission</th>
           <th>Recorded by</th>
@@ -194,7 +194,7 @@
               {% endwith %}
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
-          <td class="codl__num">{{ t.cod_in_hand_after|floatformat:2 }}</td>
+          <td class="codl__num codl__shrink">{{ t.cod_in_hand_after|floatformat:2 }}</td>
           <td class="codl__num">{{ t.wallet_balance_after|floatformat:2 }}</td>
           <td class="codl__nowrap">
             {% if t.transaction_type == 'cod_deposit' or t.transaction_type == 'cod_driver_settle' %}
@@ -211,7 +211,7 @@
               {% endwith %}
             {% else %}<span class="codl__muted">system</span>{% endif %}
           </td>
-          <td class="codl__notes" title="{{ t.notes|default:'' }}">{{ t.notes|default:"—"|truncatechars:40 }}</td>
+          <td class="codl__notes" title="{{ t.notes|default:'' }}">{{ t.notes|default:"—"|truncatechars:80 }}</td>
         </tr>
         {% empty %}
         <tr>
