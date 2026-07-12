@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712i" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712j" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -53,65 +53,67 @@
 
   <!-- Filter card -->
   <div class="codl__filter-card">
-    <form method="GET" class="row g-3 align-items-end">
-      <div class="col-6 col-md-2">
-        <label class="codl__filter-label">From</label>
-        <input type="date" name="date_from" class="form-control codl__filter-input" value="{{ f_date_from }}">
+    <form method="GET">
+      <div class="codl__filters">
+        <div class="codl__field">
+          <label class="codl__filter-label">From</label>
+          <input type="date" name="date_from" class="form-control codl__filter-input" value="{{ f_date_from }}">
+        </div>
+        <div class="codl__field">
+          <label class="codl__filter-label">To</label>
+          <input type="date" name="date_to" class="form-control codl__filter-input" value="{{ f_date_to }}">
+        </div>
+        <div class="codl__field">
+          <label class="codl__filter-label">Type</label>
+          <select name="txn_type" class="form-select codl__filter-input">
+            <option value="">All COD types</option>
+            {% for val, label in type_choices %}
+            <option value="{{ val }}" {% if val == f_txn_type %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="codl__field">
+          <label class="codl__filter-label">Payment</label>
+          <select name="payment_method" class="form-select codl__filter-input">
+            <option value="">Any method</option>
+            {% for val, label in payment_choices %}
+            <option value="{{ val }}" {% if val == f_payment_method %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="codl__field">
+          <label class="codl__filter-label">Driver</label>
+          <select name="driver_id" class="form-select codl__filter-input">
+            <option value="">All drivers</option>
+            {% for d in drivers %}
+            <option value="{{ d.driver_id }}" {% if f_driver_id == d.driver_id|stringformat:'s' %}selected{% endif %}>
+              {{ d.driver_code }} — {{ d.user.get_full_name|default:d.driver_code }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="codl__field">
+          <label class="codl__filter-label">Business</label>
+          <select name="business_id" class="form-select codl__filter-input">
+            <option value="">All businesses</option>
+            {% for b in businesses %}
+            <option value="{{ b.business_id }}" {% if f_business_id == b.business_id|stringformat:'s' %}selected{% endif %}>
+              {{ b.business_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="codl__field">
+          <label class="codl__filter-label">COD Status</label>
+          <select name="cod_status" class="form-select codl__filter-input">
+            <option value="">Any status</option>
+            {% for val, label in cod_status_choices %}
+            <option value="{{ val }}" {% if val == f_cod_status %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="codl__filter-label">To</label>
-        <input type="date" name="date_to" class="form-control codl__filter-input" value="{{ f_date_to }}">
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="codl__filter-label">Type</label>
-        <select name="txn_type" class="form-select codl__filter-input">
-          <option value="">All COD types</option>
-          {% for val, label in type_choices %}
-          <option value="{{ val }}" {% if val == f_txn_type %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="codl__filter-label">Payment</label>
-        <select name="payment_method" class="form-select codl__filter-input">
-          <option value="">Any method</option>
-          {% for val, label in payment_choices %}
-          <option value="{{ val }}" {% if val == f_payment_method %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="codl__filter-label">Driver</label>
-        <select name="driver_id" class="form-select codl__filter-input">
-          <option value="">All drivers</option>
-          {% for d in drivers %}
-          <option value="{{ d.driver_id }}" {% if f_driver_id == d.driver_id|stringformat:'s' %}selected{% endif %}>
-            {{ d.driver_code }} — {{ d.user.get_full_name|default:d.driver_code }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="codl__filter-label">Business</label>
-        <select name="business_id" class="form-select codl__filter-input">
-          <option value="">All businesses</option>
-          {% for b in businesses %}
-          <option value="{{ b.business_id }}" {% if f_business_id == b.business_id|stringformat:'s' %}selected{% endif %}>
-            {{ b.business_name }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="codl__filter-label">COD Status</label>
-        <select name="cod_status" class="form-select codl__filter-input">
-          <option value="">Any status</option>
-          {% for val, label in cod_status_choices %}
-          <option value="{{ val }}" {% if val == f_cod_status %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12">
+      <div class="codl__searchrow">
         <label class="codl__filter-label">Search</label>
         <div class="d-flex flex-nowrap gap-2 align-items-center">
           <input type="text" name="q" class="form-control codl__filter-input flex-grow-1"
