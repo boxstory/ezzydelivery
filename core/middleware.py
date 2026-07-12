@@ -46,7 +46,10 @@ class CloudflareIPMiddleware:
 
 class SessionTimeoutMiddleware:
     """
-    Middleware to automatically logout users after 1 day of inactivity
+    Middleware to automatically logout STAFF users after 1 day of inactivity.
+
+    Drivers are exempt: they have no inactivity timeout and their session is
+    kept long-lived so Django's SESSION_COOKIE_AGE doesn't expire them either.
 
     How it works:
     1. Tracks last activity time in session
@@ -55,16 +58,40 @@ class SessionTimeoutMiddleware:
     4. If not expired, updates last activity time
     """
 
+    # Effectively "no timeout" for drivers (1 year). Refreshed on every request
+    # because SESSION_SAVE_EVERY_REQUEST is True.
+    DRIVER_SESSION_AGE = 60 * 60 * 24 * 365
+
     def __init__(self, get_response):
         self.get_response = get_response
         # Timeout duration: 1 day = 86400 seconds
         self.timeout_duration = timedelta(days=1)
+
+    def _is_driver(self, request):
+        """Return True if the authenticated user is a driver (cached on session)."""
+        cached = request.session.get('_is_driver')
+        if cached is not None:
+            return cached
+        is_driver = False
+        try:
+            profile = getattr(request.user, 'profile', None)
+            is_driver = bool(profile and profile.is_driver)
+        except Exception:
+            is_driver = False
+        request.session['_is_driver'] = is_driver
+        return is_driver
 
     def __call__(self, request):
         # Skip timeout check for anonymous users
         if not request.user.is_authenticated:
             response = self.get_response(request)
             return response
+
+        # Drivers have no inactivity timeout. Keep their session long-lived so
+        # Django's SESSION_COOKIE_AGE (1 day) doesn't log them out either.
+        if self._is_driver(request):
+            request.session.set_expiry(self.DRIVER_SESSION_AGE)
+            return self.get_response(request)
 
         # Skip timeout check for login/logout URLs to avoid redirect loops
         exempt_urls = [

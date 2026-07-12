@@ -454,20 +454,24 @@ Thank you for choosing EZZY Delivery! 🚚"""
         }
 
 
-def send_whatsapp_message_api(phone_number, message):
+def send_whatsapp_message_api(phone_number, message, instance_obj=None):
     """
     Send WhatsApp message via Evolution API
 
     Args:
         phone_number: Phone number with country code (e.g., 97466451589)
         message: Message text to send
+        instance_obj: optional WhatsAppInstance whose instance_name overrides
+            settings.EVOLUTION_INSTANCE (lets a trigger pick a specific number).
 
     Returns:
         dict: Response with success status
     """
-    api_url = getattr(settings, 'EVALUATION_URL', None)
-    api_key = getattr(settings, 'EVALUATION_API_KEY', None)
-    instance = getattr(settings, 'EVALUATION_INSTANCE', None)
+    api_url = getattr(settings, 'EVOLUTION_URL', None)
+    api_key = getattr(settings, 'EVOLUTION_API_KEY', None)
+    instance = getattr(settings, 'EVOLUTION_INSTANCE', None)
+    if instance_obj is not None and (getattr(instance_obj, 'instance_name', '') or '').strip():
+        instance = instance_obj.instance_name.strip()
 
     if not api_url or not api_key or not instance:
         return {

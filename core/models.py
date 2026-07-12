@@ -325,12 +325,30 @@ class AutoTriggerConfig(models.Model):
         ('system', 'System Auto-Action'),
     ]
 
+    WHATSAPP_CHANNEL_CHOICES = [
+        ('', 'Default (by config)'),
+        ('evolution', 'Evolution API'),
+        ('waha', 'WAHA'),
+    ]
+
     trigger_key = models.CharField(max_length=100, unique=True)
     label = models.CharField(max_length=200)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     is_enabled = models.BooleanField(default=True)
     description = models.TextField(blank=True, default='')
     action = models.CharField(max_length=255, blank=True, default='')
+    # Per-trigger WhatsApp sender override. Null = use the default WhatsApp
+    # instance / settings.EVOLUTION_INSTANCE. Only meaningful for whatsapp triggers.
+    whatsapp_instance = models.ForeignKey(
+        'core.WhatsAppInstance', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='triggers',
+        help_text='WhatsApp number this trigger sends from (blank = default).'
+    )
+    # Per-trigger delivery channel. Blank = decide by global config.
+    whatsapp_channel = models.CharField(
+        max_length=20, blank=True, default='', choices=WHATSAPP_CHANNEL_CHOICES,
+        help_text='Channel this trigger sends through (blank = by config).'
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -414,12 +432,16 @@ class AutoFlowLog(models.Model):
 
 
 class AutoFlowThrottle(models.Model):
-    """Per-flow rate-limit state for throttled AutoFlows.
+    """Per-flow debounce/aggregation state for throttled AutoFlows.
 
     When a flow's ``action_config`` carries ``throttle_minutes``, the executor
-    sends at most one message per window. Publishes inside the window are not
-    sent — they only bump ``pending_count``, which is folded into the count
-    reported by the next message once the window elapses.
+    no longer sends inline. Each trigger only bumps ``pending_count`` and, on
+    the first event of a batch, stamps ``pending_since``. Once
+    ``throttle_minutes`` have elapsed since ``pending_since``, the
+    ``flush_autoflow_digests`` management command (cron, every minute) sends a
+    single message whose ``{task_count}`` is the accumulated ``pending_count``,
+    then clears the batch. This trailing-edge aggregation means a burst of
+    publishes collapses into one accurately-counted message.
     """
 
     flow = models.OneToOneField(
@@ -428,7 +450,12 @@ class AutoFlowThrottle(models.Model):
     last_sent_at = models.DateTimeField(null=True, blank=True)
     pending_count = models.PositiveIntegerField(
         default=0,
-        help_text='Tasks published since the last message went out.'
+        help_text='Tasks accumulated since the last digest message went out.'
+    )
+    pending_since = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When the current pending batch started accumulating. '
+                  'The digest sends once throttle_minutes elapse from here.'
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -444,6 +471,7 @@ class WhatsAppInstance(models.Model):
 
     label = models.CharField(max_length=100, help_text="Friendly name (e.g. Main, Support, Sales)")
     instance_name = models.CharField(max_length=100, unique=True, help_text="Evolution API instance name")
+    waha_session = models.CharField(max_length=100, blank=True, default='', help_text="WAHA session name for this same number (blank = default WAHA session)")
     phone_number = models.CharField(max_length=30, blank=True, default='', help_text="WhatsApp number (e.g. +974 XXXX XXXX)")
     is_default = models.BooleanField(default=False, help_text="Use as default when no instance is specified")
     is_active = models.BooleanField(default=True)

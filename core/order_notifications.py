@@ -34,6 +34,37 @@ EVENT_LABELS = {
     'order_cancelled':   'Order Cancelled',
 }
 
+# Map lifecycle events to their AutoTriggerConfig key, so we can honour the
+# per-trigger "Send from WhatsApp number" choice set on /workforce/auto-triggers/.
+EVENT_TO_TRIGGER_KEY = {
+    'driver_assigned':  'wa_driver_assigned',
+    'out_for_delivery': 'wa_out_for_delivery',
+    'delivered':        'wa_delivered',
+    'delivery_failed':  'wa_delivery_failed',
+    'order_cancelled':  'wa_order_cancelled',
+}
+
+
+def _resolve_trigger_config(event):
+    """Return (WhatsAppInstance|None, channel_str) chosen for this event's trigger.
+
+    instance None = default number; channel '' = decide by global config.
+    """
+    try:
+        from core.models import AutoTriggerConfig
+        key = EVENT_TO_TRIGGER_KEY.get(event)
+        if not key:
+            return None, ''
+        cfg = (AutoTriggerConfig.objects
+               .filter(trigger_key=key)
+               .select_related('whatsapp_instance')
+               .first())
+        if not cfg:
+            return None, ''
+        return cfg.whatsapp_instance, (cfg.whatsapp_channel or '')
+    except Exception:
+        return None, ''
+
 
 def notify_order_event(event, task=None, order=None):
     """
@@ -110,7 +141,10 @@ def notify_order_event(event, task=None, order=None):
         if not message:
             return
 
-        _send_whatsapp(phone, message, event, _order)
+        # Per-trigger "Send from" number + "Send via" channel (from /workforce/auto-triggers/)
+        sender_instance, sender_channel = _resolve_trigger_config(event)
+
+        _send_whatsapp(phone, message, event, _order, instance=sender_instance, channel=sender_channel)
 
         # Also notify the business-configured extra phone for this trigger.
         # Falls back to the business's own WhatsApp number if no per-trigger override is set.
@@ -120,7 +154,7 @@ def notify_order_event(event, task=None, order=None):
             if not extra_phone:
                 extra_phone = (getattr(_order.business, 'business_whatsapp', '') or '').strip()
         if extra_phone and extra_phone != phone:
-            _send_whatsapp(extra_phone, message, event, _order)
+            _send_whatsapp(extra_phone, message, event, _order, instance=sender_instance, channel=sender_channel)
 
     except Exception as e:
         logger.exception(f"notify_order_event({event}) failed unexpectedly: {e}")
@@ -216,10 +250,22 @@ def _build_message(event, order, task):
 # Transport
 # ---------------------------------------------------------------------------
 
-def _send_whatsapp(phone, message, event, order):
-    """Send the message via n8n webhook (or WAHA when enabled). Logs but never raises."""
+def _send_whatsapp(phone, message, event, order, instance=None, channel=None):
+    """Send the message via the chosen channel. Logs but never raises.
+
+    instance: optional WhatsAppInstance chosen for this trigger ("Send from").
+    channel:  explicit per-trigger channel ('evolution' | 'waha' | '' for auto).
+              When blank, falls back to global config (WAHA if enabled, else n8n).
+    """
+    # Explicit per-trigger channel override
+    if channel == 'evolution':
+        return _send_whatsapp_via_evolution(phone, message, event, order, instance=instance)
+    if channel == 'waha':
+        return _send_whatsapp_via_waha(phone, message, event, order, instance=instance)
+
+    # Auto: follow global config
     if getattr(settings, 'WAHA_ENABLED', False):
-        return _send_whatsapp_via_waha(phone, message, event, order)
+        return _send_whatsapp_via_waha(phone, message, event, order, instance=instance)
 
     n8n_url = getattr(settings, 'N8N_WHATSAPP_WEBHOOK_URL', None)
     if not n8n_url:
@@ -234,6 +280,10 @@ def _send_whatsapp(phone, message, event, order):
         'order_number': order.order_number,
         'timestamp': timezone.now().isoformat(),
     }
+    # Tell n8n which WhatsApp number to send from, when a per-trigger choice is set.
+    if instance is not None:
+        payload['from_instance'] = instance.instance_name or ''
+        payload['from_number'] = instance.phone_number or ''
 
     headers = {'Content-Type': 'application/json', 'User-Agent': 'EZZY-Delivery/1.0'}
 
@@ -253,7 +303,20 @@ def _send_whatsapp(phone, message, event, order):
         logger.warning(f"WhatsApp notification failed (network): event={event} order={order.order_number}: {e}")
 
 
-def _send_whatsapp_via_waha(phone, message, event, order):
+def _send_whatsapp_via_evolution(phone, message, event, order, instance=None):
+    """Send via the Evolution API, optionally from a specific instance/number."""
+    try:
+        from core.whatsapp_utils import send_whatsapp_message_api
+        result = send_whatsapp_message_api(phone, message, instance_obj=instance)
+        if result.get('success'):
+            logger.info(f"Evolution notification sent: event={event} order={order.order_number} phone={phone[:6]}***")
+        else:
+            logger.warning(f"Evolution notification failed: event={event} order={order.order_number}: {result.get('error') or result.get('status_code')}")
+    except Exception as e:
+        logger.warning(f"Evolution notification error: event={event} order={order.order_number}: {e}")
+
+
+def _send_whatsapp_via_waha(phone, message, event, order, instance=None):
     """
     Send via the self-hosted WAHA bridge instead of n8n.
 
@@ -264,10 +327,21 @@ def _send_whatsapp_via_waha(phone, message, event, order):
     Why direct (not through /api/integrations/waha/send/): self-HTTP from
     a signal handler can deadlock if all gunicorn workers are already
     busy. The DB row + audit trail is preserved either way.
+
+    instance: optional WhatsAppInstance chosen for this trigger; its
+    instance_name is used as the WAHA session so the message goes out from
+    the selected number. None = the configured default session.
     """
     base_url = getattr(settings, 'WAHA_BASE_URL', '') or ''
     api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
     session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
+    # Same number serves both channels via different identifiers: use the
+    # instance's dedicated WAHA session if set; otherwise keep the global
+    # default session (the Evolution instance_name is NOT a WAHA session).
+    if instance is not None:
+        waha_sess = (getattr(instance, 'waha_session', '') or '').strip()
+        if waha_sess:
+            session = waha_sess
     if not base_url or not api_key:
         logger.debug(f"WAHA notification skipped ({event}): WAHA_BASE_URL or WAHA_API_KEY not configured")
         return

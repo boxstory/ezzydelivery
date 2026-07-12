@@ -71,8 +71,8 @@ def _check_trigger_conditions(flow, context, task=None):
 
 def _send_whatsapp(phone, message, is_group=False, instance_override=None):
     """Send WhatsApp message via Evolution API. Returns (success, detail)."""
-    evo_url = getattr(settings, 'EVALUATION_URL', '') or os.environ.get('EVALUATION_URL', '')
-    evo_key = getattr(settings, 'EVALUATION_API_KEY', '') or os.environ.get('EVALUATION_API_KEY', '')
+    evo_url = getattr(settings, 'EVOLUTION_URL', '') or os.environ.get('EVOLUTION_URL', '')
+    evo_key = getattr(settings, 'EVOLUTION_API_KEY', '') or os.environ.get('EVOLUTION_API_KEY', '')
 
     # Resolve instance: flow override > WhatsAppInstance default > settings
     evo_instance = instance_override
@@ -85,7 +85,7 @@ def _send_whatsapp(phone, message, is_group=False, instance_override=None):
         except Exception:
             pass
     if not evo_instance:
-        evo_instance = getattr(settings, 'EVALUATION_INSTANCE', '') or os.environ.get('EVALUATION_INSTANCE', '')
+        evo_instance = getattr(settings, 'EVOLUTION_INSTANCE', '') or os.environ.get('EVOLUTION_INSTANCE', '')
 
     if not evo_url or not evo_key or not evo_instance:
         return False, "Evolution API not configured"
@@ -227,6 +227,118 @@ def _resolve_recipient_phones(flow, task=None, order=None):
     return phones
 
 
+def flush_due_digests():
+    """Send trailing-edge digests for throttled flows whose window elapsed.
+
+    Called once a minute by the ``flush_autoflow_digests`` management command
+    (this server uses cron, not Celery beat). For each throttle carrying a
+    pending batch older than the flow's ``throttle_minutes``, renders ONE
+    message with ``{task_count}`` = the accumulated ``pending_count``, sends it
+    to the resolved (broadcast) recipients, logs to AutoFlowLog, then clears the
+    batch. This is what makes "5 new task(s) added" report 5, not 1.
+
+    Digests are inherently broadcast — recipient types that resolve per task
+    (customer/driver/zone/seller) cannot be aggregated into one message and
+    will resolve to no phones here; that is logged and the batch is cleared.
+    Returns a summary dict: ``{flushed, sent, skipped, errors}``.
+    """
+    from core.models import AutoFlowThrottle, AutoFlowLog
+    from django.utils import timezone
+    from datetime import timedelta
+
+    now = timezone.now()
+    summary = {'flushed': 0, 'sent': 0, 'skipped': 0, 'errors': []}
+
+    throttles = AutoFlowThrottle.objects.filter(
+        pending_count__gt=0, pending_since__isnull=False
+    ).select_related('flow', 'flow__trigger')
+
+    for throttle in throttles:
+        flow = throttle.flow
+        config = flow.action_config or {}
+        throttle_minutes = int(config.get('throttle_minutes') or 0)
+        if throttle_minutes <= 0:
+            continue
+        if (now - throttle.pending_since) < timedelta(minutes=throttle_minutes):
+            continue  # window not elapsed yet — keep accumulating
+
+        # Snapshot the count and clear the batch BEFORE sending, so concurrent
+        # publishes start a fresh batch and an overlapping cron run can't
+        # double-send this one.
+        count = throttle.pending_count
+        throttle.pending_count = 0
+        throttle.pending_since = None
+        throttle.last_sent_at = now
+        throttle.save(update_fields=[
+            'pending_count', 'pending_since', 'last_sent_at', 'updated_at'
+        ])
+
+        stages = []
+        status = 'success'
+        error_msg = ''
+        try:
+            if not flow.is_enabled:
+                summary['skipped'] += 1
+                continue
+
+            template = config.get('message_template', '')
+            if not template:
+                raise ValueError("Message template is empty")
+            message = _render_template(template, {'task_count': count})
+
+            phones = _resolve_recipient_phones(flow, task=None, order=None)
+            if not phones:
+                raise ValueError(
+                    f"No recipients resolved for '{config.get('recipient', 'customer')}' "
+                    f"— digests support broadcast recipients only "
+                    f"(all_active_drivers, available_drivers, zone_drivers, custom, custom_group)"
+                )
+
+            is_group = config.get('recipient') == 'custom_group'
+            instance_override = config.get('wa_instance', '') or None
+            sent = 0
+            errors = []
+            for phone in phones:
+                ok, detail = _send_whatsapp(
+                    phone, message, is_group=is_group, instance_override=instance_override
+                )
+                if ok:
+                    sent += 1
+                else:
+                    errors.append(f"{phone}: {detail}")
+
+            if errors and sent == 0:
+                raise ValueError(f"All sends failed: {'; '.join(errors)}")
+
+            stages.append(f"[OK] Digest: {count} task(s) → sent {sent}/{len(phones)} recipient(s)")
+            if errors:
+                stages.append(f"[OK] Partial errors: {'; '.join(errors)}")
+            summary['sent'] += sent
+            summary['flushed'] += 1
+        except Exception as e:
+            status = 'failed'
+            error_msg = str(e)
+            stages.append(f"[FAILED] {error_msg}")
+            summary['errors'].append(f"{flow.name}: {error_msg}")
+
+        AutoFlowLog.objects.create(
+            flow=flow,
+            status=status,
+            trigger_data={
+                'trigger_key': flow.trigger.trigger_key,
+                'flow_name': flow.name,
+                'action_type': flow.action_type,
+                'digest': True,
+                'task_count': count,
+            },
+            result='\n'.join(stages),
+            error=error_msg,
+            duration_ms=0,
+        )
+
+    return summary
+
+
 def execute_flows_for_trigger(trigger_key, task=None, order=None, extra_context=None):
     """Find and execute all enabled AutoFlows for the given trigger_key.
 
@@ -290,39 +402,40 @@ def _execute_single_flow(flow, context, task=None, order=None):
             # window are counted (not sent); the backlog is folded into the
             # next message via the {task_count} template variable.
             throttle_minutes = int(config.get('throttle_minutes') or 0)
-            throttle = None
             suppressed = False
             if throttle_minutes > 0:
+                # Trailing-edge digest: throttled flows NEVER send inline. Each
+                # publish only accumulates into the per-flow throttle; the
+                # flush_autoflow_digests cron command sends ONE message with an
+                # accurate {task_count} once throttle_minutes elapse from
+                # pending_since. (Sending inline here reported "1 new task(s)"
+                # on the first publish and stranded every publish after it —
+                # the bug this fixes.)
                 from core.models import AutoFlowThrottle
                 from django.utils import timezone
                 from django.db.models import F
-                from datetime import timedelta
 
                 stages.append(('Throttle Gate', 'running', ''))
                 throttle, _ = AutoFlowThrottle.objects.get_or_create(flow=flow)
                 now = timezone.now()
-                window_open = (
-                    throttle.last_sent_at is None
-                    or (now - throttle.last_sent_at) >= timedelta(minutes=throttle_minutes)
+                # Stamp the batch start only on the first publish of a new
+                # batch (atomic: skips rows that already have a batch in flight).
+                AutoFlowThrottle.objects.filter(
+                    pk=throttle.pk, pending_since__isnull=True
+                ).update(pending_since=now)
+                AutoFlowThrottle.objects.filter(pk=throttle.pk).update(
+                    pending_count=F('pending_count') + 1
                 )
-                if window_open:
-                    # Window elapsed — this message reports itself + the backlog.
-                    context = dict(context)
-                    context['task_count'] = throttle.pending_count + 1
-                    stages[-1] = ('Throttle Gate', 'ok',
-                                  f"Window elapsed — sending digest of {context['task_count']} task(s)")
-                else:
-                    # Inside the window — count this publish, send nothing.
-                    AutoFlowThrottle.objects.filter(pk=throttle.pk).update(
-                        pending_count=F('pending_count') + 1
-                    )
-                    throttle.refresh_from_db()
-                    mins_left = max(0, throttle_minutes - int((now - throttle.last_sent_at).total_seconds() // 60))
-                    stages[-1] = ('Throttle Gate', 'skipped',
-                                  f"Within {throttle_minutes}min window (~{mins_left}min left) — "
-                                  f"task counted ({throttle.pending_count} pending), no message sent")
-                    status = 'throttled'
-                    suppressed = True
+                throttle.refresh_from_db()
+                mins_left = max(
+                    0,
+                    throttle_minutes - int((now - throttle.pending_since).total_seconds() // 60)
+                )
+                stages[-1] = ('Throttle Gate', 'skipped',
+                              f"Accumulated into digest ({throttle.pending_count} pending) — "
+                              f"sends in ~{mins_left}min")
+                status = 'throttled'
+                suppressed = True
 
             if not suppressed:
                 # Stage: Resolve recipients
@@ -359,13 +472,6 @@ def _execute_single_flow(flow, context, task=None, order=None):
                     stages[-1] = ('Send WhatsApp', 'ok', f"Sent {sent}/{len(phones)} — errors: {'; '.join(errors)}")
                 else:
                     stages[-1] = ('Send WhatsApp', 'ok', f"Sent {sent}/{len(phones)} message(s)")
-
-                # Real send happened — open a fresh window and clear the backlog.
-                if throttle is not None and sent > 0:
-                    from django.utils import timezone
-                    throttle.last_sent_at = timezone.now()
-                    throttle.pending_count = 0
-                    throttle.save(update_fields=['last_sent_at', 'pending_count', 'updated_at'])
 
         elif flow.action_type == 'webhook_call':
             # Stage: Send webhook

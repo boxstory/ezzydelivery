@@ -747,6 +747,25 @@ def main_dashboard(request):
             messages.warning(request, "Please complete your profile to access the dashboard.")
             return redirect('core:profile_complete_update')
 
+        # Team members go straight to the business dashboard. Their personal
+        # verification_status stays 'incomplete' (they never apply as a
+        # business/driver), so this must run BEFORE the verification branching
+        # below — otherwise they get bounced to profile completion.
+        if not profile.is_business and not profile.is_driver:
+            from business.models import BusinessTeamProfile
+            memberships = BusinessTeamProfile.objects.select_related('business').filter(
+                user=request.user
+            )
+            active_member = memberships.filter(
+                team_status='active', team_verifed=True
+            ).first()
+            if active_member:
+                return redirect('business:business_dashboard')
+            pending_member = memberships.filter(team_status='pending').first()
+            if pending_member:
+                messages.info(request, "Your team membership is pending staff verification. Please wait for approval.")
+                return render(request, 'core/verification_pending.html', {'profile': profile, 'ob_role': ''})
+
         # Check verification status
         if profile.verification_status == VERIFICATION_STATUS_INCOMPLETE:
             if profile.is_business and not profile.is_business_profile_completed:
@@ -1528,29 +1547,19 @@ def check_phone_availability(request):
         except core_models.Profile.DoesNotExist:
             user_profile = None
 
-        # Check 1: Validate phone number format (Qatar: 974 + 8 digits OR local 8 digits, minimum 10 digits total if with 974)
+        # Check 1: Validate phone number format
+        # Accepts: 8-digit Qatar local (e.g. 30123456) OR any international number (10–15 digits with country code)
         digits_only = ''.join(filter(str.isdigit, str(phone)))
 
-        # Minimum 10 digits required
-        if len(digits_only) < 10 and not (len(digits_only) == 8 and not digits_only.startswith('974')):
-            return JsonResponse({
-                'available': False,
-                'message': f'Phone number must be at least 10 digits. You provided {len(digits_only)} digits'
-            })
-
-        # Accept either Qatar format (974XXXXXXXX) or local format (8 digits)
-        is_valid_format = False
-        if len(digits_only) == 11 and digits_only.startswith('974'):
-            # International format: 974XXXXXXXX
-            is_valid_format = True
-        elif len(digits_only) == 8:
-            # Local format: XXXXXXXX (e.g., 30330067)
-            is_valid_format = True
+        is_valid_format = (
+            len(digits_only) == 8  # Qatar local format
+            or (10 <= len(digits_only) <= 15)  # International: country code + local (E.164)
+        )
 
         if not is_valid_format:
             return JsonResponse({
                 'available': False,
-                'message': 'Phone must be 8 digits (30123456) or Qatar format (97430123456)'
+                'message': f'Phone number must be 8 digits (local) or 10–15 digits with country code. You provided {len(digits_only)} digits.'
             })
 
         # Check 2: Is this phone number already used by another user?
