@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712c" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -121,14 +121,12 @@
       <thead>
         <tr>
           <th>Date / Time</th>
-          <th>Code</th>
-          <th>Type</th>
-          <th class="codl__num">Amount</th>
-          <th>Method</th>
+          <th>Code / Type</th>
+          <th class="codl__num">Amount / Method</th>
           <th>Driver</th>
           <th>Business</th>
           <th>Order #</th>
-          <th>Customer</th>
+          <th>Customer / Mobile</th>
           <th>COD Status</th>
           <th class="codl__num">COD in&nbsp;hand after</th>
           <th class="codl__num">Wallet after</th>
@@ -142,20 +140,30 @@
         {% for t in transactions %}
         <tr>
           <td class="codl__nowrap">{{ t.created_at|date:"Y-m-d" }}<span class="codl__time">{{ t.created_at|date:"H:i" }}</span></td>
-          <td class="codl__code">{{ t.transaction_code|default:t.pk }}</td>
-          <td><span class="codl__badge codl__badge--{{ t.transaction_type }}">{{ t.get_transaction_type_display }}</span></td>
-          <td class="codl__num {% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">
-            {{ t.amount|floatformat:2 }}
+          <td class="codl__nowrap">
+            <div class="codl__code">{{ t.transaction_code|default:t.pk }}</div>
+            <span class="codl__badge codl__badge--{{ t.transaction_type }}">{{ t.get_transaction_type_display }}</span>
           </td>
-          <td>{{ t.get_payment_method_display|default:"—" }}</td>
-          <td>{% if t.driver %}{{ t.driver.driver_code }}{% else %}<span class="codl__muted">—</span>{% endif %}</td>
+          <td class="codl__num">
+            <div class="{% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">{{ t.amount|floatformat:2 }}</div>
+            <span class="codl__submeta">{{ t.get_payment_method_display|default:"—" }}</span>
+          </td>
+          <td>
+            {% if t.driver %}
+              <div>{{ t.driver.user.get_full_name|default:t.driver.driver_code }}</div>
+              <span class="codl__submeta">{{ t.driver.driver_code }}</span>
+            {% else %}<span class="codl__muted">—</span>{% endif %}
+          </td>
           <td>
             {% if t.business %}{{ t.business.business_name }}
             {% elif t.delivery_task.order.business %}{{ t.delivery_task.order.business.business_name }}
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
           <td class="codl__code">{{ t.delivery_task.order.order_number|default:"—" }}</td>
-          <td>{{ t.delivery_task.order.customer_name|default:"—"|truncatechars:22 }}</td>
+          <td>
+            <div>{{ t.delivery_task.order.customer_name|default:"—"|truncatechars:22 }}</div>
+            {% if t.delivery_task.order.customer_phone %}<span class="codl__submeta">{{ t.delivery_task.order.customer_phone }}</span>{% endif %}
+          </td>
           <td class="codl__nowrap">
             {% if t.delivery_task.order.cod_status_by_staff %}
               <span class="codl__cod-status codl__cod-status--{{ t.delivery_task.order.cod_status_by_staff }}">{{ t.delivery_task.order.get_cod_status_by_staff_display }}</span>
@@ -177,7 +185,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="16" class="codl__empty">
+          <td colspan="14" class="codl__empty">
             <i class="fa-solid fa-inbox"></i>
             <span>No COD transactions match these filters.</span>
           </td>
