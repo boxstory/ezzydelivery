@@ -103,6 +103,8 @@ urlpatterns = [
           fleet_views.fleet_start_ride, name='fleet_start_ride'),
      path('tasks/postpone/',
           fleet_views.fleet_postpone_task, name='fleet_postpone_task'),
+     path('tasks/<int:task_id>/partial-delivery/',
+          fleet_views.fleet_partial_delivery, name='fleet_partial_delivery'),
      path('tasks/<int:task_id>/timeline/',
           fleet_views.fleet_task_timeline, name='fleet_task_timeline'),
      path('tasks/<int:task_id>/navigate/',

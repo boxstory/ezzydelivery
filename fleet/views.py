@@ -50,7 +50,7 @@ Related:
 
 import json
 import logging
-from django.db import connection
+from django.db import connection, transaction
 from django.shortcuts import redirect, render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -526,24 +526,33 @@ def cod_collection(request):
             txn_qs = txn_qs.filter(created_at__gte=date_cutoff)
         cod_transactions = txn_qs.order_by('-created_at')[:50]
 
-        # Get COD currently in hand (unsettled) — filter by collection date
+        # Get COD currently in hand (unsettled) — filter by collection date.
+        # Include zero-COD delivered orders (order.cod_amount == 0, e.g. prepaid) as
+        # line items so the settlement report is a complete delivery manifest. These
+        # rows carry 0 QR so they never affect the total (sum of cod_collected_amount).
+        from django.db.models import Q
         cod_in_hand_qs = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
-            cod_collected=True,
             cod_settled=False,
             dl_task_status__in=['delivered', 'partial_delivery']
+        ).filter(
+            Q(cod_collected=True) | Q(order__cod_amount=0)
         ).select_related('order', 'order__business', 'dl_to_address')
         if date_cutoff:
             cod_in_hand_qs = cod_in_hand_qs.filter(completed_at__gte=date_cutoff)
         sort_field = '-order__created_at' if sort_by == 'order_date' else '-completed_at'
         cod_in_hand_list = cod_in_hand_qs.order_by(sort_field)
 
-        cod_in_hand_total = cod_in_hand_list.aggregate(total=Sum('cod_collected_amount'))['total'] or 0
+        # Total reflects real cash only — zero-COD rows sum to 0 so they are excluded.
+        cod_in_hand_total = cod_in_hand_qs.filter(cod_collected=True).aggregate(
+            total=Sum('cod_collected_amount')
+        )['total'] or 0
         cod_in_hand_count = cod_in_hand_list.count()
 
-        # Breakdown of unsettled COD in hand by payment method
+        # Breakdown of unsettled COD in hand by payment method (real cash only)
         payment_method_breakdown = (
             cod_in_hand_qs
+            .filter(cod_collected=True)
             .values('payment_method')
             .annotate(total=Sum('cod_collected_amount'))
             .order_by('-total')
@@ -827,25 +836,38 @@ def cod_export(request):
         else:
             delivery_ids = []
 
-        # Get deliveries with related transactions for transaction codes
+        # Get deliveries with related transactions for transaction codes.
+        # Include zero-COD delivered orders (order.cod_amount == 0) as line items so the
+        # report is a full delivery manifest; their 0 QR never affects the cash total.
+        from django.db.models import Q
+        deliveries = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            cod_settled=False,  # Only unsettled COD
+            dl_task_status__in=['delivered', 'partial_delivery']
+        ).filter(
+            Q(cod_collected=True) | Q(order__cod_amount=0)
+        )
         if delivery_ids:
-            deliveries = delivery_models.DeliveryTask.objects.filter(
-                driver=driver,
-                id__in=delivery_ids,
-                cod_collected=True,
-                cod_settled=False,  # Only unsettled COD
-                dl_task_status__in=['delivered', 'partial_delivery']
-            ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
+            deliveries = deliveries.filter(id__in=delivery_ids)
         else:
-            deliveries = delivery_models.DeliveryTask.objects.filter(
-                driver=driver,
-                cod_collected=True,
-                cod_settled=False,  # Only unsettled COD
-                dl_task_status__in=['delivered', 'partial_delivery']
-            ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
+            # Respect the same date window the COD list uses so the report matches.
+            filter_days = request.GET.get('days', '')
+            if filter_days and filter_days != 'all':
+                try:
+                    from datetime import timedelta
+                    deliveries = deliveries.filter(
+                        completed_at__gte=timezone.now() - timedelta(days=int(filter_days))
+                    )
+                except (ValueError, TypeError):
+                    pass
+        deliveries = deliveries.select_related(
+            'order', 'order__business', 'dl_to_address'
+        ).prefetch_related('transactions').order_by('-completed_at')
 
-        # Calculate total COD amount for selected deliveries
-        total_cod = sum(Decimal(str(d.cod_collected_amount or 0)) for d in deliveries)
+        # Calculate total COD amount — real cash only (zero rows contribute nothing)
+        total_cod = sum(
+            Decimal(str(d.cod_collected_amount or 0)) for d in deliveries if d.cod_collected
+        )
 
         # Process COD settlement if submit=1
         if submit_settlement and total_cod > 0:
@@ -853,15 +875,18 @@ def cod_export(request):
                 # Submit COD to admin using wallet service
                 from fleet.wallet_service import WalletService
 
+                # Only settle real-COD deliveries — never settle zero-COD/prepaid rows
+                settle_ids = [d.id for d in deliveries if d.cod_collected]
+
                 # Create COD deposit transaction
                 txn = WalletService.submit_cod_to_admin(
                     driver=driver,
                     amount=total_cod,
                     created_by=request.user,
                     reference_number=f"COD-SUBMIT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
-                    notes=f"COD submission for {deliveries.count()} deliveries",
+                    notes=f"COD submission for {len(settle_ids)} deliveries",
                     payment_method='cash',
-                    delivery_ids=list(deliveries.values_list('id', flat=True))
+                    delivery_ids=settle_ids
                 )
 
                 messages.success(request, f'COD settlement of {total_cod} QR submitted successfully! Transaction: {txn.transaction_code}')
@@ -2433,12 +2458,18 @@ def driver_tasks(request):
         'order__address_verifications',
     )
 
-    all_tasks = base_qs.filter(
-        dl_task_publish=True, driver__isnull=True,
-        dl_task_status__in=['pending', 'for_review'],
-    ).exclude(
-        dl_task_status__in=['delivered', 'cancelled', 'failed']
-    ).exclude(order__order_status='cancelled').order_by('-id')
+    driver_active = (driver.driver_status == 'approved')
+
+    if driver_active:
+        all_tasks = base_qs.filter(
+            dl_task_publish=True, driver__isnull=True,
+            dl_task_status__in=['pending', 'for_review'],
+        ).exclude(
+            dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed']
+        ).exclude(order__order_status='cancelled').order_by('-id')
+    else:
+        from delivery.models import DeliveryTask as _DT
+        all_tasks = _DT.objects.none()
 
     assigned_tasks = base_qs.filter(
         driver=driver, dl_task_status='assigned', dl_task_publish=True,
@@ -2558,10 +2589,7 @@ def driver_tasks(request):
         task_list = history_tasks
 
     paginator = Paginator(task_list, 20)
-    try:
-        cards = paginator.page(int(page))
-    except (paginator.PageNotAnInteger, paginator.EmptyPage):
-        cards = paginator.page(1)
+    cards = paginator.get_page(page)
 
     # Available zones dropdown
     zone_numbers = delivery_models.DeliveryTask.objects.filter(
@@ -2619,6 +2647,7 @@ def driver_tasks(request):
         'zone_group_map': zone_group_map,
         'zone_name_map': zone_name_map,
         'hub_batches': hub_batches,
+        'driver_active': driver_active,
     }
     return render(request, 'fleet/driver_tasks_pwa.html', context)
 
@@ -2801,6 +2830,188 @@ def fleet_start_ride(request):
         return JsonResponse({'success': False, 'error': 'Task not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+@transaction.atomic
+def fleet_partial_delivery(request, task_id):
+    """
+    AJAX: Record a partial delivery — driver delivered some items, customer returned others.
+    POST body (JSON):
+      items: [{order_item_id, qty_returned}]   — only items that were returned
+      actual_cod: <float>                       — COD actually collected
+    URL: /fleet/tasks/<task_id>/partial-delivery/
+    """
+    from delivery import models as delivery_models
+    from orders import models as orders_models
+    from decimal import Decimal
+    import json as _json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        body = _json.loads(request.body)
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    returned_items = body.get('items', [])   # [{order_item_id, qty_returned}]
+    actual_cod     = body.get('actual_cod')
+    payment_method = (body.get('payment_method') or '').strip().lower()
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        task   = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'order__business'
+        ).prefetch_related('order__order_items').get(id=task_id)
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Task not found'})
+
+    assigned = (
+        delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id, driver=driver).exists()
+        or task.driver_id == driver.pk
+    )
+    if not assigned:
+        return JsonResponse({'success': False, 'error': 'Task not assigned to you'})
+
+    if task.dl_task_status in ('delivered', 'partial_delivery', 'failed', 'cancelled'):
+        return JsonResponse({'success': False, 'error': 'Task already completed'})
+
+    if not returned_items:
+        return JsonResponse({'success': False, 'error': 'Select at least one returned item'})
+
+    order = task.order
+
+    # Build a map of returned quantities keyed by order_item_id
+    returned_map = {}
+    for entry in returned_items:
+        try:
+            oid = int(entry['order_item_id'])
+            qty = int(entry['qty_returned'])
+            if qty > 0:
+                returned_map[oid] = qty
+        except (KeyError, ValueError, TypeError):
+            continue
+
+    if not returned_map:
+        return JsonResponse({'success': False, 'error': 'No valid returned items'})
+
+    # Compute each item's delivered/returned split first (no writes yet) so we can
+    # validate before touching the DB. Any delivered quantity — including a partial
+    # quantity on a line that was also partly returned — counts as "something delivered".
+    all_items = list(order.order_items.all())
+    any_delivered = False
+    for item in all_items:
+        ret_qty = returned_map.get(item.id, 0)
+        if ret_qty > 0:
+            item.quantity_returned = min(ret_qty, item.quantity)
+            item.quantity_delivered = max(item.quantity - item.quantity_returned, 0)
+            item.delivery_status = 'returned' if item.quantity_delivered == 0 else 'partial'
+        else:
+            item.quantity_delivered = item.quantity
+            item.quantity_returned  = 0
+            item.delivery_status    = 'delivered'
+        if item.quantity_delivered > 0:
+            any_delivered = True
+
+    if not any_delivered:
+        # Everything returned — treat as failed, not partial. Reject before any
+        # write so the atomic transaction leaves no partial mutations behind.
+        return JsonResponse({'success': False, 'error': 'All items returned — use "Failed" instead'})
+
+    for item in all_items:
+        item.save(update_fields=['quantity_returned', 'quantity_delivered', 'delivery_status'])
+
+    # Update task
+    cod_val = Decimal('0')
+    if actual_cod is not None:
+        try:
+            cod_val = Decimal(str(actual_cod))
+        except Exception:
+            pass
+
+    task._status_actor         = 'driver'
+    task.dl_task_status        = 'partial_delivery'
+    task.completed_at          = timezone.now()
+    task.dl_task_status_client = '2'   # Delivered (client sees as delivered)
+    update_fields = [
+        'dl_task_status', 'dl_task_status_client', 'completed_at',
+        'cod_collected', 'cod_collected_amount', 'cod_collected_at',
+    ]
+    # Ensure the task is linked to the delivering driver so COD reports attribute it
+    if not task.driver_id:
+        task.driver_id = driver.pk
+        update_fields.append('driver')
+    if cod_val > 0:
+        task.cod_collected        = True
+        task.cod_collected_amount = cod_val
+        task.cod_collected_at     = timezone.now()
+        # Record how the COD was paid (cash / pos / fawran) so it shows on the order
+        if payment_method in ('cash', 'pos', 'fawran'):
+            task.payment_method = payment_method
+            task.payment_split  = {payment_method: float(cod_val)}
+            update_fields += ['payment_method', 'payment_split']
+    task.save(update_fields=update_fields)
+
+    # Record the collected COD in the driver wallet so it appears in the
+    # transactions + COD settlement reports (idempotent — once per task).
+    if cod_val > 0:
+        if order.cod_status_by_staff != 'cod_with_driver':
+            order.cod_status_by_staff = 'cod_with_driver'
+            order.save(update_fields=['cod_status_by_staff'])
+        already_recorded = fleet_models.DriverTransaction.objects.filter(
+            delivery_task=task, transaction_type='cod_collection'
+        ).exists()
+        if not already_recorded:
+            from fleet.wallet_service import WalletService
+            WalletService.record_transaction(
+                driver=driver,
+                transaction_type='cod_collection',
+                amount=cod_val,
+                description=f"COD collected for order {order.order_number} (partial delivery)",
+                delivery_task=task,
+                created_by=request.user,
+                payment_method=task.payment_method or None,
+            )
+
+    # Auto-create ReturnRequest for returned items
+    returned_order_items = [(item, returned_map[item.id]) for item in all_items if item.id in returned_map]
+    if returned_order_items:
+        import uuid as _uuid
+        rn = 'PDR-' + _uuid.uuid4().hex[:10].upper()
+        rr = orders_models.ReturnRequest.objects.create(
+            return_number=rn,
+            order=order,
+            business=order.business,
+            reason='other',
+            reason_notes='Partial delivery — items returned by customer at door',
+            status='pending',
+            cod_reversal_amount=max((order.cod_amount or 0) - cod_val, Decimal('0')),
+        )
+        for item, qty in returned_order_items:
+            orders_models.ReturnItem.objects.create(
+                return_request=rr,
+                order_item=item,
+                quantity_returned=qty,
+            )
+
+    # Log status change
+    try:
+        orders_models.OrderStatusHistory.objects.create(
+            order=order,
+            field_name='dl_task_status',
+            old_value='',
+            new_value='partial_delivery',
+            changed_by=request.user,
+            notes=f'Partial delivery: {len(returned_map)} item(s) returned. COD collected: {cod_val} QR',
+        )
+    except Exception:
+        pass
+
+    return JsonResponse({'success': True})
 
 
 @login_required(login_url='/accounts/login/')

@@ -203,11 +203,13 @@
 
                 {% if event.type == 'task' %}
                 {# ── Delivery Task Event ── #}
-                <div class="fleet-list-item__icon {% if event.obj.dl_task_status == 'delivered' %}fleet-stat__icon--success{% elif event.obj.dl_task_status == 'failed' %}fleet-stat__icon--danger{% elif event.obj.dl_task_status == 'accepted' %}fleet-stat__icon--info{% else %}fleet-stat__icon--warning{% endif %}">
+                <div class="fleet-list-item__icon {% if event.obj.dl_task_status == 'delivered' %}fleet-stat__icon--success{% elif event.obj.dl_task_status == 'failed' %}fleet-stat__icon--danger{% elif event.obj.dl_task_status == 'partial_delivery' %}fleet-stat__icon--warning{% elif event.obj.dl_task_status == 'accepted' %}fleet-stat__icon--info{% else %}fleet-stat__icon--warning{% endif %}">
                     {% if event.obj.dl_task_status == 'delivered' %}
                     <i class="fa-solid fa-circle-check"></i>
                     {% elif event.obj.dl_task_status == 'failed' %}
                     <i class="fa-solid fa-circle-xmark"></i>
+                    {% elif event.obj.dl_task_status == 'partial_delivery' %}
+                    <i class="fa-solid fa-circle-half-stroke"></i>
                     {% elif event.obj.dl_task_status == 'accepted' %}
                     <i class="fa-solid fa-clipboard-check"></i>
                     {% else %}
@@ -216,7 +218,7 @@
                 </div>
                 <div class="fleet-list-item__content">
                     <div class="fleet-list-item__title">
-                        {% if event.obj.dl_task_status == 'delivered' %}Delivered{% elif event.obj.dl_task_status == 'failed' %}Delivery Failed{% elif event.obj.dl_task_status == 'accepted' %}Task Accepted{% else %}Out for Delivery{% endif %}
+                        {% if event.obj.dl_task_status == 'delivered' %}Delivered{% elif event.obj.dl_task_status == 'failed' %}Delivery Failed{% elif event.obj.dl_task_status == 'partial_delivery' %}Partial Delivery{% elif event.obj.dl_task_status == 'accepted' %}Task Accepted{% else %}Out for Delivery{% endif %}
                         {% if event.obj.order %}<span class="fleet-timeline__ref">#{{ event.obj.order.order_number|default:event.obj.id }}</span>{% endif %}
                     </div>
                     <div class="fleet-list-item__subtitle">

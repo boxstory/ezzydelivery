@@ -5,9 +5,9 @@
 {% block page_title %}COD Collection{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'fleet:cod_export' %}" class="fleet-btn-icon">
-    <i class="fa-solid fa-download"></i>
-</a>
+<button type="button" class="fleet-btn-icon" id="cod_share_btn" onclick="shareCodReport(this)" title="Share COD report (PDF)">
+    <i class="fa-solid fa-share-nodes"></i>
+</button>
 <button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
     <i class="fa-solid fa-rotate-right"></i>
 </button>
@@ -117,7 +117,7 @@
                         <span class="ftd__cod-card__order">#{{ task.order.order_number|default:task.dl_task_number }}</span>
                         <span class="ftd__cod-card__name">{{ task.order.customer_name|default:"-" }}</span>
                     </div>
-                    <div class="ftd__cod-card__amount">{{ task.cod_collected_amount|floatformat:0 }} <small>QR</small></div>
+                    <div class="ftd__cod-card__amount {% if not task.cod_collected %}ftd__cod-card__amount--zero{% endif %}">{{ task.cod_collected_amount|floatformat:0 }} <small>QR</small></div>
                 </div>
                 <div class="ftd__cod-card__mid">
                     {% if task.order.customer_phone %}<a href="tel:{{ task.order.customer_phone }}" class="ftd__cod-card__phone"><i class="fa-solid fa-phone"></i> {{ task.order.customer_phone }}</a>{% endif %}
@@ -127,8 +127,12 @@
                 </div>
                 <div class="ftd__cod-card__tags">
                     <span class="ftd__tag ftd__tag--{{ task.dl_task_status }}">{{ task.get_dl_task_status_display }}</span>
+                    {% if task.cod_collected %}
                     <span class="ftd__tag ftd__tag--cod-collected"><i class="fa-solid fa-coins"></i> COD Collected</span>
                     {% if task.cod_settled %}<span class="ftd__tag ftd__tag--cod-settled"><i class="fa-solid fa-check-double"></i> Settled</span>{% else %}<span class="ftd__tag ftd__tag--cod-pending"><i class="fa-solid fa-hourglass-half"></i> Unsettled</span>{% endif %}
+                    {% else %}
+                    <span class="ftd__tag ftd__tag--cod-zero"><i class="fa-solid fa-circle-check"></i> No COD (Prepaid)</span>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -189,6 +193,55 @@
 {% endif %}
 
 <script>
+    // Generate the COD report PDF server-side and open the native share sheet.
+    // Works inside the standalone PWA where a plain <a download> silently fails.
+    async function shareCodReport(btn) {
+        haptic([10]);
+        const icon = btn.querySelector('i');
+        const prevClass = icon ? icon.className : '';
+        if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+        btn.disabled = true;
+
+        const days = '{{ filter_days|default:"7" }}';
+        const url = `{% url 'fleet:cod_export' %}?format=pdf&days=${encodeURIComponent(days)}`;
+        const fileName = `cod_report_${new Date().toISOString().slice(0,10)}.pdf`;
+
+        try {
+            const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!resp.ok) throw new Error('Failed to generate report');
+            const blob = await resp.blob();
+            const file = new File([blob], fileName, { type: 'application/pdf' });
+
+            // Preferred path: native share sheet with the PDF attached
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'COD Settlement Report',
+                    text: 'COD settlement report',
+                });
+            } else {
+                // Fallback: trigger a normal download / open in a new tab
+                const objUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(objUrl), 10000);
+                if (typeof showToast === 'function') showToast('Report downloaded', 'success');
+            }
+        } catch (err) {
+            // AbortError = user dismissed the share sheet; not an error worth showing
+            if (err && err.name !== 'AbortError' && typeof showToast === 'function') {
+                showToast('Could not share report. Please try again.', 'error');
+            }
+        } finally {
+            if (icon) icon.className = prevClass;
+            btn.disabled = false;
+        }
+    }
+
     function filterByDays(days) {
         haptic([10]);
         const url = new URL(window.location);

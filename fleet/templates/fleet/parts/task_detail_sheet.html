@@ -388,6 +388,42 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
     </div>
 </div>
 <!-- ─────────────────────────────────────────────────────── -->
+
+<!-- ── Partial Delivery Sub-Sheet ───────────────────────── -->
+<div id="tdPartialOverlay" class="td-overlay" onclick="closeTdPartial()"></div>
+<div id="tdPartialSheet" class="td-sub-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <strong style="color:var(--fleet-warning)"><i class="fa-solid fa-box-open me-2"></i>Partial Delivery</strong>
+        <button class="td-sheet__close" onclick="closeTdPartial()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="td-sub-sheet__body">
+        <p class="td-form-label" style="margin-bottom:0.75rem;">Mark items the customer <strong>returned</strong>. Leave qty 0 for items delivered.</p>
+        <div id="tdPartialItemList" style="margin-bottom:1rem;"></div>
+        <div class="td-form-group" id="tdPartialCodGroup" style="display:none;">
+            <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>Actual COD Collected <span style="color:var(--fleet-grey-400);font-weight:400">(reduced for returned items)</span></label>
+            <input type="number" id="tdPartialCodInput" class="td-form-input" step="0.01" min="0" placeholder="0.00">
+            <label class="td-form-label mt-2"><i class="fa-solid fa-credit-card me-1"></i>Payment Mode</label>
+            <div class="td-payment-methods">
+                <label class="td-payment-radio">
+                    <input type="radio" name="tdPartialPayMethod" value="cash" checked>
+                    <span class="td-payment-radio__label"><i class="fa-solid fa-money-bill"></i> Cash</span>
+                </label>
+                <label class="td-payment-radio">
+                    <input type="radio" name="tdPartialPayMethod" value="pos">
+                    <span class="td-payment-radio__label"><i class="fa-solid fa-credit-card"></i> POS</span>
+                </label>
+                <label class="td-payment-radio">
+                    <input type="radio" name="tdPartialPayMethod" value="fawran">
+                    <span class="td-payment-radio__label"><i class="fa-solid fa-mobile-screen"></i> Fawran</span>
+                </label>
+            </div>
+        </div>
+        <button id="tdPartialBtn" class="fleet-btn td-confirm-btn td-confirm-btn--warning" onclick="submitPartialDelivery()">
+            <i class="fa-solid fa-box-open me-2"></i>Confirm Partial Delivery
+        </button>
+    </div>
+</div>
 <!-- ─────────────────────────────────────────────────────── -->
 
 
@@ -398,10 +434,12 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         accepted: 'Accepted', picked_up: 'Picked Up', start_ride: 'In Transit',
         out_for_delivery: 'In Transit', in_transit: 'In Transit',
         contacted: 'Contacted', non_reachable: 'Non Reachable',
-        delivered: 'Delivered', failed: 'Failed', cancelled: 'Cancelled',
+        delivered: 'Delivered', partial_delivery: 'Partial Delivery',
+        failed: 'Failed', cancelled: 'Cancelled',
     };
     const STATUS_CLASS = {
-        delivered: 'fleet-badge--success', failed: 'fleet-badge--danger',
+        delivered: 'fleet-badge--success', partial_delivery: 'fleet-badge--warning',
+        failed: 'fleet-badge--danger',
         cancelled: 'fleet-badge--danger', accepted: 'fleet-badge--warning',
         assigned: 'fleet-badge--warning', out_for_delivery: 'fleet-badge--info',
         in_transit: 'fleet-badge--info', start_ride: 'fleet-badge--info',
@@ -731,6 +769,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
 
     // Statuses where actions are available
     const ACTIVE_STATUSES = ['accepted','picked_up','start_ride','out_for_delivery','in_transit','contacted','non_reachable'];
+    const DONE_STATUSES   = ['delivered','partial_delivery','failed','cancelled'];
 
     function _renderActionPanel(d) {
         const panel     = document.getElementById('tdActionPanel');
@@ -770,6 +809,9 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         outcomeBtns.innerHTML = `
             <button class="td-outcome-btn td-outcome-btn--delivered" onclick="openTdDelivered()">
                 <i class="fa-solid fa-circle-check"></i>Delivered
+            </button>
+            <button class="td-outcome-btn td-outcome-btn--partial" onclick="openTdPartial()">
+                <i class="fa-solid fa-box-open"></i>Partial
             </button>
             <button class="td-outcome-btn td-outcome-btn--failed" onclick="openTdFailed()">
                 <i class="fa-solid fa-circle-xmark"></i>Failed
@@ -1261,6 +1303,114 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             showToast('Network error', 'danger');
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-phone-slash me-2"></i>Confirm Non Reachable';
+        });
+    };
+
+    // ── Partial Delivery Sub-Sheet ─────────────────────────
+    let _tdPartialItems = [];   // [{id, name, qty}] from current card
+    let _tdPartialCod   = 0;
+
+    window.openTdPartial = function() {
+        // Read items from the current card's data
+        const card = document.querySelector('.task-card[data-id="' + _tdCurrentTaskId + '"]');
+        _tdPartialCod = card ? parseFloat(card.dataset.cod || '0') : 0;
+
+        // Parse items from card's task-items-data script tag
+        let items = [];
+        try {
+            const el = card && card.querySelector('.task-items-data');
+            if (el) items = JSON.parse(el.textContent) || [];
+        } catch(e) {}
+        _tdPartialItems = items;
+
+        // Build item rows
+        const list = document.getElementById('tdPartialItemList');
+        if (!items.length) {
+            list.innerHTML = '<p style="color:var(--fleet-grey-400);font-size:var(--font-size-sm);">No item details available — enter 0 to mark full return.</p>';
+        } else {
+            list.innerHTML = items.map(it => `
+                <div class="td-partial-item">
+                    <div class="td-partial-item__name">${it.name}</div>
+                    <div class="td-partial-item__qty-row">
+                        <span class="td-partial-item__label">Ordered: <strong>${it.qty}</strong></span>
+                        <label class="td-partial-item__label">Returned:</label>
+                        <input type="number" class="td-form-input td-partial-qty" min="0" max="${it.qty}" value="0"
+                               data-item-id="${it.id}" data-max="${it.qty}" style="width:80px;text-align:center;">
+                    </div>
+                </div>`).join('');
+        }
+
+        // COD section
+        const codGroup = document.getElementById('tdPartialCodGroup');
+        if (_tdPartialCod > 0) {
+            codGroup.style.display = '';
+            document.getElementById('tdPartialCodInput').value = _tdPartialCod.toFixed(2);
+        } else {
+            codGroup.style.display = 'none';
+        }
+
+        document.getElementById('tdPartialOverlay').classList.add('open');
+        document.getElementById('tdPartialSheet').classList.add('open');
+    };
+
+    window.closeTdPartial = function() {
+        document.getElementById('tdPartialOverlay').classList.remove('open');
+        document.getElementById('tdPartialSheet').classList.remove('open');
+    };
+
+    window.submitPartialDelivery = function() {
+        const btn = document.getElementById('tdPartialBtn');
+
+        // Collect returned items from inputs
+        const returnedItems = [];
+        document.querySelectorAll('.td-partial-qty').forEach(inp => {
+            const qty = parseInt(inp.value) || 0;
+            if (qty > 0) {
+                returnedItems.push({ order_item_id: parseInt(inp.dataset.itemId), qty_returned: qty });
+            }
+        });
+
+        if (!returnedItems.length) {
+            showToast('Enter a return quantity for at least one item', 'warning');
+            return;
+        }
+
+        const actualCod = _tdPartialCod > 0 ? (parseFloat(document.getElementById('tdPartialCodInput').value) || 0) : 0;
+        if (_tdPartialCod > 0 && actualCod > _tdPartialCod) {
+            showToast('COD collected cannot exceed original COD amount', 'warning');
+            return;
+        }
+
+        // Payment mode (cash / pos / fawran) — only relevant when COD is collected
+        const partialPayEl = document.querySelector('input[name="tdPartialPayMethod"]:checked');
+        const partialPayMethod = (actualCod > 0 && partialPayEl) ? partialPayEl.value : '';
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        fetch('/fleet/tasks/' + _tdCurrentTaskId + '/partial-delivery/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({ items: returnedItems, actual_cod: actualCod, payment_method: partialPayMethod })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                showToast(data.error, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-box-open me-2"></i>Confirm Partial Delivery';
+                return;
+            }
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            showToast('Partial delivery recorded!', 'success');
+            window.closeTdPartial();
+            setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
+        })
+        .catch(() => {
+            showToast('Network error', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-box-open me-2"></i>Confirm Partial Delivery';
         });
     };
 
