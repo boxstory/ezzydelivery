@@ -1001,6 +1001,21 @@ def driver_complete_task(request, task_id):
                 # Refresh the driver's cached cod_in_hand from the task truth.
                 WalletService.sync_cod_in_hand(task.driver)
 
+            # Electronic COD (Fawran/POS/bank/ATM) settles to Ezzy at collection —
+            # the driver never holds it. Mark it handed-to-Ezzy now so it never
+            # counts as the driver's cod-in-hand and flows straight to business payout.
+            if (task.order and status_value == 'delivered' and task.cod_collected
+                    and task.payment_method in ('pos', 'fawran', 'bank', 'atm')
+                    and not task.cod_settled):
+                task.cod_settled = True
+                task.cod_settled_at = timezone.now()
+                task.save(update_fields=['cod_settled', 'cod_settled_at'])
+                if task.order.cod_status_by_staff != 'cod_settled_with_business':
+                    task.order.cod_status_by_staff = 'cod_with_ezzy'
+                    task.order.save(update_fields=['cod_status_by_staff'])
+                from fleet.wallet_service import WalletService
+                WalletService.sync_cod_in_hand(task.driver)
+
             # Log COD amount mismatch warning
             if task.order and cod_amount_collected and task.order.cod_amount:
                 from decimal import Decimal

@@ -74,7 +74,10 @@ class WalletService:
                     driver.pending_earnings += amount
                     driver.total_earnings += amount
                 elif transaction_type == 'cod_collection':
-                    driver.wallet_balance -= abs(amount)
+                    # Only cash creates a driver liability; electronic COD goes
+                    # straight to Ezzy so it must not debit the driver's wallet.
+                    if payment_method not in WalletService.ELECTRONIC_METHODS:
+                        driver.wallet_balance -= abs(amount)
                 elif transaction_type in ['cod_deposit', 'cod_driver_settle']:
                     driver.wallet_balance += abs(amount)
                 elif transaction_type == 'cod_return':
@@ -698,15 +701,21 @@ class WalletService:
 
         return True, "OK"
 
+    # Payment methods that go straight to Ezzy's account at collection — the
+    # driver never physically holds this money, so it is never 'in hand'.
+    ELECTRONIC_METHODS = ['pos', 'fawran', 'bank', 'atm']
+
     @staticmethod
     def live_cod_in_hand(driver):
         """Single source of truth for a driver's COD-in-hand, derived from tasks.
 
-        COD is 'in hand' when it was collected but has NOT left the driver by
-        either route: submitted to admin (cod_settled=True) or reversed to the
-        customer (a cod_return transaction exists for the task). Everything that
-        reports or gates on cod_in_hand should go through this — the cached
-        Driver.cod_in_hand column is only a denormalization kept in sync with it.
+        COD is 'in hand' only when it was collected as CASH and has NOT left the
+        driver by either route: submitted to admin (cod_settled=True) or reversed
+        to the customer (a cod_return transaction exists). Electronic payments
+        (Fawran/POS/bank/ATM) land in Ezzy's account directly, so they never count
+        as the driver's in-hand liability. Everything that reports or gates on
+        cod_in_hand goes through this — the cached Driver.cod_in_hand column is
+        only a denormalization kept in sync with it.
         """
         returned_task_ids = fleet_models.DriverTransaction.objects.filter(
             driver=driver,
@@ -720,6 +729,8 @@ class WalletService:
             cod_settled=False,
         ).exclude(
             id__in=returned_task_ids
+        ).exclude(
+            payment_method__in=WalletService.ELECTRONIC_METHODS
         ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
 
     @staticmethod

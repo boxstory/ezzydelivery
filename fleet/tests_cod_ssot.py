@@ -19,7 +19,7 @@ from orders import models as orders_models
 User = get_user_model()
 
 
-def _fixtures(idx=9200, cod=Decimal('300.00'), credit_limit=Decimal('5000.00')):
+def _fixtures(idx=9200, cod=Decimal('300.00'), credit_limit=Decimal('5000.00'), payment_method='cash'):
     biz_user = User.objects.create_user(username=f'ssot_biz_{idx}', password='x')
     biz_profile = core_models.Profile.objects.create(
         user=biz_user, first_name='S', last_name='B', phone=31000000 + idx
@@ -48,7 +48,7 @@ def _fixtures(idx=9200, cod=Decimal('300.00'), credit_limit=Decimal('5000.00')):
         dl_task_number=f'SSOT-T-{idx}', order=order, business=business, driver=driver,
         dl_task_status='delivered', cod_collected=True, cod_settled=False,
         cod_collected_amount=cod, cod_collected_at=timezone.now(),
-        completed_at=timezone.now(),
+        completed_at=timezone.now(), payment_method=payment_method,
     )
     return driver, task, business, order
 
@@ -108,3 +108,20 @@ class CodInHandSSOTTest(TestCase):
         driver.refresh_from_db()
         status = WalletService.get_wallet_status(driver)
         self.assertEqual(status['cod_in_hand'], Decimal('300.00'))
+
+    def test_cash_collection_counts_as_in_hand(self):
+        driver, task, _, _ = _fixtures(cod=Decimal('220.00'), payment_method='cash')
+        self.assertEqual(WalletService.live_cod_in_hand(driver), Decimal('220.00'))
+
+    def test_fawran_collection_not_in_hand(self):
+        # Fawran goes straight to Ezzy's account — never the driver's liability.
+        driver, task, _, _ = _fixtures(cod=Decimal('220.00'), payment_method='fawran')
+        self.assertEqual(WalletService.live_cod_in_hand(driver), Decimal('0.00'))
+
+    def test_electronic_methods_all_excluded(self):
+        for i, method in enumerate(['pos', 'fawran', 'bank', 'atm']):
+            driver, _, _, _ = _fixtures(idx=9300 + i, cod=Decimal('100.00'), payment_method=method)
+            self.assertEqual(
+                WalletService.live_cod_in_hand(driver), Decimal('0.00'),
+                f'{method} should not count as in-hand',
+            )
