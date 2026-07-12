@@ -220,6 +220,13 @@ if DEBUG and not TESTING:
     INSTALLED_APPS += ['debug_toolbar']
     MIDDLEWARE.insert(2, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
+# The test client speaks plain HTTP; production .env flags would otherwise
+# 301-redirect every test request and reject its cookies.
+if TESTING:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
 ROOT_URLCONF = 'ezzydelivery.urls'
 
 TEMPLATES = [

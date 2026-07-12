@@ -58,7 +58,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Q
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from datetime import datetime, timedelta, timezone
 from django.utils import timezone as dj_timezone
 from django.forms import inlineformset_factory
@@ -839,7 +839,8 @@ def add_order(request):
                     business_id=business.business_id)
                 logger.debug(f"Order business_id: {order.business_id}")
                 try:
-                    order.save()
+                    with transaction.atomic():
+                        order.save()
                 except IntegrityError:
                     # Race / duplicate order number that slipped past form validation
                     form.add_error(
@@ -1439,13 +1440,14 @@ def delete_order(request, order_id):
             return redirect('orders:orders_all_list')
 
         # Clean up related records that use on_delete=DO_NOTHING
-        # These FK constraints would block order deletion in PostgreSQL
+        # These FK constraints would block order deletion in PostgreSQL.
+        # Atomic so a failed order delete doesn't strand already-deleted relations.
         from delivery import models as delivery_models
-        delivery_models.DeliveryTask.objects.filter(order=order).delete()
-        delivery_models.DlAddressUpdate.objects.filter(order=order).delete()
-        orders_models.OrderBarcode.objects.filter(order=order).delete()
-
-        order.delete()
+        with transaction.atomic():
+            delivery_models.DeliveryTask.objects.filter(order=order).delete()
+            delivery_models.DlAddressUpdate.objects.filter(order=order).delete()
+            orders_models.OrderBarcode.objects.filter(order=order).delete()
+            order.delete()
         logger.info(f"Order {order_id} deleted successfully")
         messages.success(request, "Order deleted successfully")
         return redirect('orders:orders_all_list')
@@ -1588,33 +1590,34 @@ def update_order_zone(request, order_id):
                 order.coords_accuracy = 'street'
             coords_saved = True
 
-        order.save()
+        with transaction.atomic():
+            order.save()
 
-        # Also update delivery task address for legacy compatibility
-        if latitude and longitude:
-            delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
-            if delivery_task and delivery_task.dl_to_address:
-                dl_address = delivery_task.dl_to_address
-                dl_address.dl_latitude = latitude
-                dl_address.dl_longitude = longitude
-                dl_address.dl_zone = zone_number
-                if street_number:
-                    dl_address.dl_street = str(street_number)
-                if building_number:
-                    dl_address.dl_building = str(building_number)
-                dl_address.save()
+            # Also update delivery task address for legacy compatibility
+            if latitude and longitude:
+                delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+                if delivery_task and delivery_task.dl_to_address:
+                    dl_address = delivery_task.dl_to_address
+                    dl_address.dl_latitude = latitude
+                    dl_address.dl_longitude = longitude
+                    dl_address.dl_zone = zone_number
+                    if street_number:
+                        dl_address.dl_street = str(street_number)
+                    if building_number:
+                        dl_address.dl_building = str(building_number)
+                    dl_address.save()
 
-        notes = f'Zone updated from AI parse: {zone_display}'
-        if coords_saved:
-            notes += f' | Coordinates saved: {latitude}, {longitude}'
-        orders_models.OrderVerificationLog.objects.create(
-            order=order,
-            verified_by=request.user,
-            action='zone_updated',
-            old_status=str(old_zone) if old_zone else 'None',
-            new_status=str(zone_number),
-            notes=notes
-        )
+            notes = f'Zone updated from AI parse: {zone_display}'
+            if coords_saved:
+                notes += f' | Coordinates saved: {latitude}, {longitude}'
+            orders_models.OrderVerificationLog.objects.create(
+                order=order,
+                verified_by=request.user,
+                action='zone_updated',
+                old_status=str(old_zone) if old_zone else 'None',
+                new_status=str(zone_number),
+                notes=notes
+            )
 
         return JsonResponse({
             'success': True,
@@ -1777,50 +1780,51 @@ def update_order_status(request, order_id=None):
         order.order_status = status
         # Attach the acting user so the post-save signal records it on OrderStatusHistory
         order._status_changed_by = request.user
-        order.save()
+        with transaction.atomic():
+            order.save()
 
-        # Save user-provided comment (e.g. reconfirmation note) as an OrderComment
-        # and ALSO attach it to the OrderStatusHistory entry the signal just created,
-        # so the workforce Status Timeline surfaces the note inline.
-        if comment:
-            try:
-                commenter = request.user.get_full_name() or request.user.username
-                orders_models.OrderComments.objects.create(
-                    order=order,
-                    name=f"Reconfirmed by {commenter}"[:255] if status == 'ready_to_pickup' else commenter[:255],
-                    body=comment,
+            # Save user-provided comment (e.g. reconfirmation note) as an OrderComment
+            # and ALSO attach it to the OrderStatusHistory entry the signal just created,
+            # so the workforce Status Timeline surfaces the note inline.
+            if comment:
+                try:
+                    commenter = request.user.get_full_name() or request.user.username
+                    orders_models.OrderComments.objects.create(
+                        order=order,
+                        name=f"Reconfirmed by {commenter}"[:255] if status == 'ready_to_pickup' else commenter[:255],
+                        body=comment,
+                    )
+                except Exception as e:
+                    logger.warning(f'Failed to save comment for order {order_id}: {e}')
+
+                try:
+                    hist = orders_models.OrderStatusHistory.objects.filter(
+                        order=order,
+                        field_name='order_status',
+                        old_value=old_status or '',
+                        new_value=status,
+                    ).order_by('-created_at').first()
+                    if hist and not hist.notes:
+                        hist.notes = comment[:255]
+                        hist.save(update_fields=['notes'])
+                except Exception as e:
+                    logger.warning(f'Failed to attach note to status history for order {order_id}: {e}')
+
+            # Reverse sync: cancel active delivery tasks when order is cancelled
+            if status == 'cancelled' and old_status != 'cancelled':
+                from delivery import models as delivery_models
+                delivery_models.DeliveryTask.objects.filter(
+                    order=order
+                ).exclude(
+                    dl_task_status__in=['delivered', 'cancelled', 'failed']
+                ).update(
+                    dl_task_status='cancelled'
                 )
-            except Exception as e:
-                logger.warning(f'Failed to save comment for order {order_id}: {e}')
-
-            try:
-                hist = orders_models.OrderStatusHistory.objects.filter(
-                    order=order,
-                    field_name='order_status',
-                    old_value=old_status or '',
-                    new_value=status,
-                ).order_by('-created_at').first()
-                if hist and not hist.notes:
-                    hist.notes = comment[:255]
-                    hist.save(update_fields=['notes'])
-            except Exception as e:
-                logger.warning(f'Failed to attach note to status history for order {order_id}: {e}')
-
-        # Reverse sync: cancel active delivery tasks when order is cancelled
-        if status == 'cancelled' and old_status != 'cancelled':
-            from delivery import models as delivery_models
-            delivery_models.DeliveryTask.objects.filter(
-                order=order
-            ).exclude(
-                dl_task_status__in=['delivered', 'cancelled', 'failed']
-            ).update(
-                dl_task_status='cancelled'
-            )
-            # Free up the client_order_code so the same order can be re-imported
-            if order.client_order_code and '_DEL' not in order.client_order_code:
-                orders_models.Order.objects.filter(pk=order.pk).update(
-                    client_order_code=f"{order.client_order_code}_DEL{order.pk}"
-                )
+                # Free up the client_order_code so the same order can be re-imported
+                if order.client_order_code and '_DEL' not in order.client_order_code:
+                    orders_models.Order.objects.filter(pk=order.pk).update(
+                        client_order_code=f"{order.client_order_code}_DEL{order.pk}"
+                    )
 
         logger.debug(f'Order {order_id} status updated from {old_status} to {status}')
 
@@ -1864,19 +1868,20 @@ def bulk_update_order_status(request):
             # Business users cannot change published, delivered, or cancelled orders
             orders_qs = orders_qs.exclude(order_status__in=['publish', 'delivered', 'cancelled'])
 
-        updated = orders_qs.update(order_status=status)
+        with transaction.atomic():
+            updated = orders_qs.update(order_status=status)
 
-        # Cancel active delivery tasks when bulk-cancelling
-        if status == 'cancelled':
-            from delivery import models as delivery_models
-            delivery_models.DeliveryTask.objects.filter(
-                order__in=order_ids,
-                order__business=user_business
-            ).exclude(
-                dl_task_status__in=['delivered', 'cancelled', 'failed']
-            ).update(
-                dl_task_status='cancelled'
-            )
+            # Cancel active delivery tasks when bulk-cancelling
+            if status == 'cancelled':
+                from delivery import models as delivery_models
+                delivery_models.DeliveryTask.objects.filter(
+                    order__in=order_ids,
+                    order__business=user_business
+                ).exclude(
+                    dl_task_status__in=['delivered', 'cancelled', 'failed']
+                ).update(
+                    dl_task_status='cancelled'
+                )
 
         logger.info(f'Bulk status update: {updated} orders set to {status} by user {request.user.id}')
         return JsonResponse({'success': True, 'updated': updated})
@@ -2976,114 +2981,116 @@ def update_location(request):
                         building_number = update_form.cleaned_data.get('building_number')
                         notes = update_form.cleaned_data.get('notes')
 
-                        # Update Order
-                        if zone_number is not None:
-                            order.dl_zone = zone_number
-                        if street_number is not None:
-                            order.dl_street = street_number
-                        if building_number is not None:
-                            order.dl_building = building_number
-                        if verified_address:
-                            order.customer_address = verified_address[:100]
-                        order.verification_status = 'address_verified'
-                        order.coords_accuracy = 'by_customer'
-                        order.address_verified = True
-                        order.address_verified_at = timezone.now()
-                        if latitude:
-                            order.latitude = latitude
-                        if longitude:
-                            order.longitude = longitude
-                        if notes:
-                            order.verification_notes = notes
-                        order.save()
+                        # Atomic: order, verification, address and task updates commit as one unit
+                        with transaction.atomic():
+                            # Update Order
+                            if zone_number is not None:
+                                order.dl_zone = zone_number
+                            if street_number is not None:
+                                order.dl_street = street_number
+                            if building_number is not None:
+                                order.dl_building = building_number
+                            if verified_address:
+                                order.customer_address = verified_address[:100]
+                            order.verification_status = 'address_verified'
+                            order.coords_accuracy = 'by_customer'
+                            order.address_verified = True
+                            order.address_verified_at = timezone.now()
+                            if latitude:
+                                order.latitude = latitude
+                            if longitude:
+                                order.longitude = longitude
+                            if notes:
+                                order.verification_notes = notes
+                            order.save()
 
-                        # Update or create AddressVerification
-                        addr_verify, _ = AddressVerification.objects.get_or_create(
-                            order=order,
-                            defaults={'original_address': order.customer_address or ''}
-                        )
-                        if latitude:
-                            addr_verify.latitude = latitude
-                        if longitude:
-                            addr_verify.longitude = longitude
-                        if zone_number is not None:
-                            addr_verify.zone_number = zone_number
-                        if street_number is not None:
-                            addr_verify.street_number = street_number
-                        if building_number is not None:
-                            addr_verify.building_number = building_number
-                        if verified_address:
-                            addr_verify.verified_address = verified_address
-                        if notes:
-                            addr_verify.notes = notes
-                        addr_verify.verification_result = 'address_verified'
-                        addr_verify.customer_verified_at = timezone.now()
-                        addr_verify.save()
+                            # Update or create AddressVerification
+                            addr_verify, _ = AddressVerification.objects.get_or_create(
+                                order=order,
+                                defaults={'original_address': order.customer_address or ''}
+                            )
+                            if latitude:
+                                addr_verify.latitude = latitude
+                            if longitude:
+                                addr_verify.longitude = longitude
+                            if zone_number is not None:
+                                addr_verify.zone_number = zone_number
+                            if street_number is not None:
+                                addr_verify.street_number = street_number
+                            if building_number is not None:
+                                addr_verify.building_number = building_number
+                            if verified_address:
+                                addr_verify.verified_address = verified_address
+                            if notes:
+                                addr_verify.notes = notes
+                            addr_verify.verification_result = 'address_verified'
+                            addr_verify.customer_verified_at = timezone.now()
+                            addr_verify.save()
 
-                        # Update DlAddressUpdate (always update, create if missing)
-                        dl_update_fields = {}
-                        if zone_number is not None:
-                            dl_update_fields['dl_zone'] = zone_number
-                        if street_number is not None:
-                            dl_update_fields['dl_street'] = street_number
-                        if building_number is not None:
-                            dl_update_fields['dl_building'] = building_number
-                        if latitude:
-                            dl_update_fields['dl_latitude'] = latitude
-                        if longitude:
-                            dl_update_fields['dl_longitude'] = longitude
-                        if verified_address:
-                            dl_update_fields['area_name'] = verified_address[:100]
+                            # Update DlAddressUpdate (always update, create if missing)
+                            dl_update_fields = {}
+                            if zone_number is not None:
+                                dl_update_fields['dl_zone'] = zone_number
+                            if street_number is not None:
+                                dl_update_fields['dl_street'] = street_number
+                            if building_number is not None:
+                                dl_update_fields['dl_building'] = building_number
+                            if latitude:
+                                dl_update_fields['dl_latitude'] = latitude
+                            if longitude:
+                                dl_update_fields['dl_longitude'] = longitude
+                            if verified_address:
+                                dl_update_fields['area_name'] = verified_address[:100]
 
-                        from decimal import Decimal as _D
-                        dl_addr, _ = DlAddressUpdate.objects.get_or_create(
-                            order=order,
-                            defaults={
-                                'full_name': order.customer_name or '',
-                                'mobile_no': order.customer_phone or '',
-                                'dl_task_number': order.order_number,
-                                'dl_latitude': _D('0'),
-                                'dl_longitude': _D('0'),
-                                'dl_unit': '0',
-                            }
-                        )
-                        for attr, val in dl_update_fields.items():
-                            setattr(dl_addr, attr, val)
-                        dl_addr.save()
-
-                        # Save preferred delivery time and payment method
-                        preferred_times = request.POST.getlist('preferred_time')
-                        payment_method = request.POST.get('payment_method', '')
-
-                        # Get or auto-create delivery task
-                        from delivery.models import DeliveryTask as _DlTask
-                        from orders.signals import _create_delivery_task_from_order
-                        delivery_task = order.delivery_task.first()
-                        if delivery_task is None:
-                            delivery_task = _create_delivery_task_from_order(order)
-                            if delivery_task:
-                                # Auto-publish so drivers can see it
-                                delivery_task.dl_task_publish = True
-                                delivery_task.save(update_fields=['dl_task_publish'])
-
-                        if delivery_task:
-                            # Mirror all address fields onto the task's DlAddressUpdate
-                            task_addr = delivery_task.dl_address_update or dl_addr
+                            from decimal import Decimal as _D
+                            dl_addr, _ = DlAddressUpdate.objects.get_or_create(
+                                order=order,
+                                defaults={
+                                    'full_name': order.customer_name or '',
+                                    'mobile_no': order.customer_phone or '',
+                                    'dl_task_number': order.order_number,
+                                    'dl_latitude': _D('0'),
+                                    'dl_longitude': _D('0'),
+                                    'dl_unit': '0',
+                                }
+                            )
                             for attr, val in dl_update_fields.items():
-                                setattr(task_addr, attr, val)
-                            task_addr.save()
+                                setattr(dl_addr, attr, val)
+                            dl_addr.save()
 
-                            # Update task itself
-                            task_fields_to_save = ['address_accuracy', 'dl_address_update']
-                            delivery_task.address_accuracy = 'by_customer'
-                            delivery_task.dl_address_update = task_addr
-                            if preferred_times:
-                                delivery_task.preferred_time = ','.join(preferred_times)
-                                task_fields_to_save.append('preferred_time')
-                            if payment_method:
-                                delivery_task.payment_method = payment_method
-                                task_fields_to_save.append('payment_method')
-                            delivery_task.save(update_fields=task_fields_to_save)
+                            # Save preferred delivery time and payment method
+                            preferred_times = request.POST.getlist('preferred_time')
+                            payment_method = request.POST.get('payment_method', '')
+
+                            # Get or auto-create delivery task
+                            from delivery.models import DeliveryTask as _DlTask
+                            from orders.signals import _create_delivery_task_from_order
+                            delivery_task = order.delivery_task.first()
+                            if delivery_task is None:
+                                delivery_task = _create_delivery_task_from_order(order)
+                                if delivery_task:
+                                    # Auto-publish so drivers can see it
+                                    delivery_task.dl_task_publish = True
+                                    delivery_task.save(update_fields=['dl_task_publish'])
+
+                            if delivery_task:
+                                # Mirror all address fields onto the task's DlAddressUpdate
+                                task_addr = delivery_task.dl_address_update or dl_addr
+                                for attr, val in dl_update_fields.items():
+                                    setattr(task_addr, attr, val)
+                                task_addr.save()
+
+                                # Update task itself
+                                task_fields_to_save = ['address_accuracy', 'dl_address_update']
+                                delivery_task.address_accuracy = 'by_customer'
+                                delivery_task.dl_address_update = task_addr
+                                if preferred_times:
+                                    delivery_task.preferred_time = ','.join(preferred_times)
+                                    task_fields_to_save.append('preferred_time')
+                                if payment_method:
+                                    delivery_task.payment_method = payment_method
+                                    task_fields_to_save.append('payment_method')
+                                delivery_task.save(update_fields=task_fields_to_save)
 
                         # Fix 5: Notify driver of address update
                         if order:
@@ -3739,111 +3746,113 @@ def bulk_import_save(request):
                 raw_cod_status = str(row.get('financial_status', '') or '').strip().lower()
             resolved_cod_status = _COD_STATUS_MAP.get(raw_cod_status) or None
 
-            # Create Order
-            order = orders_models.Order(
-                business=business,
-                client_order_code=client_order_code,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                customer_whatsapp=customer_whatsapp,
-                customer_address=customer_address,
-                dl_zone=safe_int_or_none(row.get('dl_zone')),
-                dl_street=safe_int_or_none(row.get('dl_street')),
-                dl_building=safe_int_or_none(row.get('dl_building')),
-                cod_amount=safe_int(row.get('cod_amount')),
-                dl_amount=safe_int(row.get('dl_amount')),
-                cod_status_by_client=resolved_cod_status,
-                order_notes=combined_notes[:100] if combined_notes else str(row.get('order_notes', ''))[:100],
-                deadline_date=str(row.get('deadline_date', '')),
-                order_status='to_review',
-                verification_status='pending',
-                original_order_data=original_data,
-            )
-            # Set pickup location if provided
-            if pickup_location_id:
-                try:
-                    pl = business_models.PickupLocation.objects.get(id=pickup_location_id, business=business)
-                    order.pickup_location = pl
-                except business_models.PickupLocation.DoesNotExist:
-                    pass
-            # Fallback: auto-assign fulfillment center
-            if not order.pickup_location_id:
-                order.pickup_location = business_models.PickupLocation.objects.filter(
-                    business=business, pickup_status='active', is_fulfilment_center=True
-                ).first() or business_models.PickupLocation.objects.filter(
-                    business=business, pickup_status='active'
-                ).first()
-            order.save()
+            # Atomic: order + items + verification + import log commit or roll back as one unit
+            with transaction.atomic():
+                # Create Order
+                order = orders_models.Order(
+                    business=business,
+                    client_order_code=client_order_code,
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
+                    customer_whatsapp=customer_whatsapp,
+                    customer_address=customer_address,
+                    dl_zone=safe_int_or_none(row.get('dl_zone')),
+                    dl_street=safe_int_or_none(row.get('dl_street')),
+                    dl_building=safe_int_or_none(row.get('dl_building')),
+                    cod_amount=safe_int(row.get('cod_amount')),
+                    dl_amount=safe_int(row.get('dl_amount')),
+                    cod_status_by_client=resolved_cod_status,
+                    order_notes=combined_notes[:100] if combined_notes else str(row.get('order_notes', ''))[:100],
+                    deadline_date=str(row.get('deadline_date', '')),
+                    order_status='to_review',
+                    verification_status='pending',
+                    original_order_data=original_data,
+                )
+                # Set pickup location if provided
+                if pickup_location_id:
+                    try:
+                        pl = business_models.PickupLocation.objects.get(id=pickup_location_id, business=business)
+                        order.pickup_location = pl
+                    except business_models.PickupLocation.DoesNotExist:
+                        pass
+                # Fallback: auto-assign fulfillment center
+                if not order.pickup_location_id:
+                    order.pickup_location = business_models.PickupLocation.objects.filter(
+                        business=business, pickup_status='active', is_fulfilment_center=True
+                    ).first() or business_models.PickupLocation.objects.filter(
+                        business=business, pickup_status='active'
+                    ).first()
+                order.save()
 
-            # Set package_description & package_qty
-            package_desc_val = str(row.get('package_desc', '')).strip()
-            if package_desc_val:
-                order.package_description = package_desc_val[:255]
-                order.package_qty = safe_int(row.get('package_qty')) or 1
-            else:
-                desc_parts = []
-                total_qty = 0
+                # Set package_description & package_qty
+                package_desc_val = str(row.get('package_desc', '')).strip()
+                if package_desc_val:
+                    order.package_description = package_desc_val[:255]
+                    order.package_qty = safe_int(row.get('package_qty')) or 1
+                else:
+                    desc_parts = []
+                    total_qty = 0
+                    for i in range(1, 6):
+                        pn = str(row.get(f'product_{i}', '')).strip()
+                        if pn:
+                            pc = safe_int(row.get(f'count_{i}')) or 1
+                            from workforce.views import _parse_coded_product_name
+                            clean_pn, _ = _parse_coded_product_name(pn)
+                            desc_parts.append(f"{clean_pn} x{pc}")
+                            total_qty += pc
+                    if desc_parts:
+                        order.package_description = ', '.join(desc_parts)[:255]
+                        order.package_qty = total_qty
+                order.save(update_fields=['package_description', 'package_qty'])
+
+                # Match product columns to actual Product records → create OrderItems
+                from product.models import Product as ProductModel
+                from workforce.views import _match_product_by_name
+                items_created = 0
+                product_names = []
+                if package_desc_val:
+                    product_names.append((package_desc_val, safe_int(row.get('package_qty')) or 1))
                 for i in range(1, 6):
                     pn = str(row.get(f'product_{i}', '')).strip()
                     if pn:
                         pc = safe_int(row.get(f'count_{i}')) or 1
-                        from workforce.views import _parse_coded_product_name
-                        clean_pn, _ = _parse_coded_product_name(pn)
-                        desc_parts.append(f"{clean_pn} x{pc}")
-                        total_qty += pc
-                if desc_parts:
-                    order.package_description = ', '.join(desc_parts)[:255]
-                    order.package_qty = total_qty
-            order.save(update_fields=['package_description', 'package_qty'])
+                        product_names.append((pn, pc))
+                for pname, pqty in product_names:
+                    matched = _match_product_by_name(pname, business)
+                    if matched:
+                        orders_models.OrderItem.objects.create(
+                            order=order, product=matched, quantity=pqty,
+                            unit_price=matched.item_price or 0,
+                            notes=matched.item_name
+                        )
+                        items_created += 1
 
-            # Match product columns to actual Product records → create OrderItems
-            from product.models import Product as ProductModel
-            from workforce.views import _match_product_by_name
-            items_created = 0
-            product_names = []
-            if package_desc_val:
-                product_names.append((package_desc_val, safe_int(row.get('package_qty')) or 1))
-            for i in range(1, 6):
-                pn = str(row.get(f'product_{i}', '')).strip()
-                if pn:
-                    pc = safe_int(row.get(f'count_{i}')) or 1
-                    product_names.append((pn, pc))
-            for pname, pqty in product_names:
-                matched = _match_product_by_name(pname, business)
-                if matched:
-                    orders_models.OrderItem.objects.create(
-                        order=order, product=matched, quantity=pqty,
-                        unit_price=matched.item_price or 0,
-                        notes=matched.item_name
+                # Create AddressVerification if lat/long provided
+                lat = safe_decimal(row.get('dl_latitude'))
+                lng = safe_decimal(row.get('dl_longitude'))
+                if lat and lng:
+                    orders_models.AddressVerification.objects.create(
+                        order=order,
+                        original_address=customer_address,
+                        latitude=lat,
+                        longitude=lng,
+                        zone_number=safe_int(row.get('dl_zone')) or None,
+                        street_number=safe_int(row.get('dl_street')) or None,
+                        building_number=safe_int(row.get('dl_building')) or None,
+                        notes=f"Landmark: {row.get('dl_landmark', '')} | Link: {row.get('location_link', '')}",
+                        verification_result='pending'
                     )
-                    items_created += 1
 
-            # Create AddressVerification if lat/long provided
-            lat = safe_decimal(row.get('dl_latitude'))
-            lng = safe_decimal(row.get('dl_longitude'))
-            if lat and lng:
-                orders_models.AddressVerification.objects.create(
-                    order=order,
-                    original_address=customer_address,
-                    latitude=lat,
-                    longitude=lng,
-                    zone_number=safe_int(row.get('dl_zone')) or None,
-                    street_number=safe_int(row.get('dl_street')) or None,
-                    building_number=safe_int(row.get('dl_building')) or None,
-                    notes=f"Landmark: {row.get('dl_landmark', '')} | Link: {row.get('location_link', '')}",
-                    verification_result='pending'
-                )
-
-            # Update ImportLog
-            if import_log_id:
-                try:
-                    il = orders_models.ImportLog.objects.get(id=import_log_id)
-                    il.orders.add(order)
-                    il.orders_created = (il.orders_created or 0) + 1
-                    il.status = 'processing'
-                    il.save(update_fields=['orders_created', 'status'])
-                except orders_models.ImportLog.DoesNotExist:
-                    pass
+                # Update ImportLog
+                if import_log_id:
+                    try:
+                        il = orders_models.ImportLog.objects.get(id=import_log_id)
+                        il.orders.add(order)
+                        il.orders_created = (il.orders_created or 0) + 1
+                        il.status = 'processing'
+                        il.save(update_fields=['orders_created', 'status'])
+                    except orders_models.ImportLog.DoesNotExist:
+                        pass
 
             return JsonResponse({
                 'success': True,

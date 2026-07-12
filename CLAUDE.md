@@ -113,6 +113,9 @@ celery -A ezzydelivery beat -l info
 
 # Reload production server (after code changes)
 kill -HUP $(pgrep -f "gunicorn.*ezzydelivery" | head -1)
+
+# Pre-deploy gate (before merging/releasing a batch of changes)
+bash scripts/predeploy.sh
 ```
 
 ## Production Server
