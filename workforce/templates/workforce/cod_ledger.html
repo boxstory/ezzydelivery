@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712d" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712e" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -120,6 +120,7 @@
     <table class="codl__table">
       <thead>
         <tr>
+          <th class="codl__num">#</th>
           <th>Date / Time</th>
           <th>Code / Type</th>
           <th class="codl__num">Amount / Method</th>
@@ -139,6 +140,7 @@
       <tbody>
         {% for t in transactions %}
         <tr>
+          <td class="codl__rownum">{{ page_obj.start_index|add:forloop.counter0 }}</td>
           <td class="codl__nowrap">
             <div>{{ t.created_at|date:"Y-m-d" }}</div>
             <span class="codl__submeta">{{ t.created_at|date:"H:i" }}</span>
@@ -192,7 +194,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="14" class="codl__empty">
+          <td colspan="15" class="codl__empty">
             <i class="fa-solid fa-inbox"></i>
             <span>No COD transactions match these filters.</span>
           </td>
