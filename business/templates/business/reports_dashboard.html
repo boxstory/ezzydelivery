@@ -11,18 +11,23 @@
 <div class="flex-fill p-3 p-md-4" id="business_reports_container_main">
 
   <!-- Page Header -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
-    <div>
-      <h4 class="fw-bold mb-1" style="color: var(--brand-primary);">
-        <i class="fa-solid fa-file-export me-2"></i>Reports & Export
-      </h4>
-      <p class="text-muted mb-0">Download CSV reports for orders, COD reconciliation, and delivery performance.</p>
+  <div class="bcon__header mb-4">
+    <div class="bcon__header-main">
+      <div class="bcon__eyebrow">
+        <span>{{ business.business_name|default:"Business"|truncatechars:22 }}</span>
+        <span class="bcon__eyebrow-sep"></span>
+        <span>Reports</span>
+        <span class="bcon__eyebrow-sep"></span>
+        <span class="bcon__eyebrow-live">CSV Export</span>
+      </div>
+      <h1 class="bcon__title"><i class="fa-solid fa-file-export"></i> Reports &amp; Export</h1>
+      <p class="bcon__subtitle">Download CSV reports for orders, COD reconciliation, and delivery performance.</p>
     </div>
   </div>
 
   <!-- Date Range Filter -->
-  <div class="card brp__filter-card mb-4">
-    <div class="card-body">
+  <div class="bcon__panel mb-4">
+    <div class="bcon__panel-body">
       <div class="row g-3 align-items-end">
         <div class="col-12 col-md-4">
           <label for="brp_date_from" class="form-label fw-semibold">
@@ -37,17 +42,17 @@
           <input type="date" class="form-control" id="brp_date_to" value="{{ default_to }}">
         </div>
         <div class="col-6 col-md-2">
-          <button type="button" class="btn btn-primary w-100"
+          <button type="button" class="bcon__btn bcon__btn--primary w-100 justify-content-center"
                   hx-get="{% url 'business:reports_stats_partial' %}"
                   hx-target="#brp_stats_container"
                   hx-include="#brp_date_from, #brp_date_to"
                   hx-indicator="#brp_stats_spinner">
-            <i class="fa-solid fa-magnifying-glass me-1"></i>Apply
+            <i class="fa-solid fa-magnifying-glass"></i>Apply
           </button>
         </div>
         <div class="col-6 col-md-3">
-          <button type="button" class="btn btn-outline-secondary w-100" onclick="brpResetDates()">
-            <i class="fa-solid fa-rotate-left me-1"></i>Reset
+          <button type="button" class="bcon__btn bcon__btn--secondary w-100 justify-content-center" onclick="brpResetDates()">
+            <i class="fa-solid fa-rotate-left"></i>Reset
           </button>
         </div>
       </div>

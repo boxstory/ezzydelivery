@@ -310,169 +310,143 @@
        ============================================ -->
   <div class="d-none d-md-block">
 
-    <!-- Dashboard Header - Navy Hero -->
-    <div class="bdb__header" id="client_dashboard_header_main">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="bdb__hero-badge">
-            <i class="fas fa-building"></i>
-            <span>Business Dashboard</span>
+    <!-- Cockpit Hero — identity + live gauge strip in one navy console -->
+    <div class="bcon__cockpit bcon__rise" id="client_dashboard_header_main">
+      <div class="bcon__cockpit-top">
+        <div class="bcon__cockpit-id">
+          <div class="bcon__eyebrow">
+            <span>Dispatch Console</span>
+            <span class="bcon__eyebrow-sep"></span>
+            <span class="bcon__eyebrow-live">{% now "D d M · H:i" %}</span>
           </div>
-          <h1 id="client_dashboard_title_business">{{ business.business_name }}</h1>
-          <p class="bdb__hero-subtitle">Overview &amp; Analytics</p>
+          <h1 class="bcon__cockpit-title" id="client_dashboard_title_business">{{ business.business_name }}</h1>
+          <p class="bcon__cockpit-sub">Live overview of orders, deliveries &amp; cash on delivery</p>
         </div>
-        <a href="{% url 'orders:add_order' %}" class="btn btn-sm d-flex align-items-center gap-1" style="background: rgba(247,192,0,0.15); color: var(--brand-primary); border: 1px solid rgba(247,192,0,0.3); border-radius: 2rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600;">
+        <a href="{% url 'orders:add_order' %}" class="bcon__cockpit-cta">
           <i class="fas fa-plus"></i> New Order
+        </a>
+      </div>
+      <div class="bcon__gauges">
+        <a class="bcon__gauge bcon__gauge--primary" href="{% url 'orders:orders_all_list' %}">
+          <p class="bcon__gauge-label"><i class="fa-solid fa-box"></i> Total Orders</p>
+          <p class="bcon__gauge-value">{{ total_orders|default:0 }}</p>
+        </a>
+        <a class="bcon__gauge bcon__gauge--success" href="{% url 'orders:orders_all_list' %}?cStatus=delivered">
+          <p class="bcon__gauge-label"><i class="fa-solid fa-check"></i> Delivered</p>
+          <p class="bcon__gauge-value">{{ delivered_count|default:0 }}</p>
+        </a>
+        <a class="bcon__gauge bcon__gauge--warning" href="{% url 'orders:orders_all_list' %}?cStatus=pending">
+          <p class="bcon__gauge-label"><i class="fa-solid fa-clock"></i> Pending</p>
+          <p class="bcon__gauge-value">{{ pending_count|default:0 }}</p>
+        </a>
+        <a class="bcon__gauge bcon__gauge--danger" href="{% url 'orders:orders_all_list' %}?dlStatus=failed">
+          <p class="bcon__gauge-label"><i class="fa-solid fa-triangle-exclamation"></i> Follow Up</p>
+          <p class="bcon__gauge-value">{{ followup_count|default:0 }}</p>
+        </a>
+        <a class="bcon__gauge bcon__gauge--money bcon__gauge--primary" href="{% url 'business:business_finance_dashboard' %}">
+          <p class="bcon__gauge-label"><i class="fa-solid fa-hand-holding-dollar"></i> COD Collected</p>
+          <p class="bcon__gauge-value">{{ cod_collected|default:0 }} <small>QAR</small></p>
         </a>
       </div>
     </div>
 
-    <!-- Stats -->
-    <div class="bdb__stats">
-      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}">
-        <div class="bdb__stat-icon bdb__stat-icon--primary"><i class="fa-solid fa-box"></i></div>
-        <p class="bdb__stat-value">{{ total_orders|default:0 }}</p>
-        <p class="bdb__stat-label">Total Orders</p>
-      </a>
-      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}?cStatus=delivered">
-        <div class="bdb__stat-icon bdb__stat-icon--success"><i class="fa-solid fa-check"></i></div>
-        <p class="bdb__stat-value">{{ delivered_count|default:0 }}</p>
-        <p class="bdb__stat-label">Delivered</p>
-      </a>
-      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}?cStatus=pending">
-        <div class="bdb__stat-icon bdb__stat-icon--warning"><i class="fa-solid fa-clock"></i></div>
-        <p class="bdb__stat-value">{{ pending_count|default:0 }}</p>
-        <p class="bdb__stat-label">Pending</p>
-      </a>
-      <a class="bdb__stat bdb__stat--link" href="{% url 'orders:orders_all_list' %}?dlStatus=failed">
-        <div class="bdb__stat-icon bdb__stat-icon--danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
-        <p class="bdb__stat-value">{{ followup_count|default:0 }}</p>
-        <p class="bdb__stat-label">Follow Up</p>
-      </a>
-    </div>
-
-    <!-- AI Assistant Chat -->
-    {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
-
-    <!-- Analytics Charts Row: Weekly Trend (full width) -->
-    <div class="bdb__chart-grid bdb__chart-grid--single">
-      <div class="bdb__chart-card bdb__chart-card--full">
-        <div class="bdb__chart-header bdb__chart-header--primary">
-          <h5 class="bdb__chart-title">
-            <i class="fa-solid fa-chart-line"></i>Weekly Orders Trend
-          </h5>
+    <!-- Weekly trend -->
+    <div class="px-2 mb-1 bcon__rise bcon__rise--1">
+      <div class="bcon__panel">
+        <div class="bcon__panel-head">
+          <h5 class="bcon__panel-title"><i class="fa-solid fa-chart-line"></i> Weekly Orders Trend</h5>
+          <span class="bcon__chip">Last 7 days</span>
         </div>
-        <div class="bdb__chart-body">
+        <div class="bcon__panel-body">
           <div id="weeklyOrdersChart"></div>
         </div>
       </div>
     </div>
 
-    <!-- Today's Orders Lists -->
-    <div class="row g-3 px-2 mt-2">
+    <!-- AI Assistant Chat -->
+    {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
+
+    <!-- Operations Queues -->
+    <div class="row g-3 px-2 mt-1 bcon__rise bcon__rise--2">
       <!-- Today's Pending Orders -->
       <div class="col-md-4">
-        <div class="bdb__list-card">
-          <div class="bdb__list-card__header bdb__list-card__header--warning">
-            <div class="bdb__list-card__header-left">
-              <div class="bdb__list-card__icon bdb__list-card__icon--warning">
-                <i class="fa-solid fa-clock"></i>
-              </div>
-              <span class="bdb__list-card__title">Today's Pending</span>
-            </div>
-            <span class="bdb__list-card__count bdb__list-card__count--warning">{{ todays_pending_orders|length }}</span>
+        <div class="bcon__panel bcon__panel--warn h-100">
+          <div class="bcon__panel-head">
+            <h5 class="bcon__panel-title"><i class="fa-solid fa-clock"></i> Today's Pending</h5>
+            <span class="bcon__badge bcon__badge--warning">{{ todays_pending_orders|length }}</span>
           </div>
-          <div class="bdb__list-card__body">
+          <div class="bcon__qlist">
             {% for order in todays_pending_orders %}
-            <a href="{% url 'orders:order_details' order.id %}" class="bdb__list-card__item">
-              <div class="bdb__list-card__item-main">
-                <span class="bdb__list-card__item-number">#{{ order.order_number }}</span>
-                <span class="bdb__list-card__item-customer">{{ order.customer_name|truncatechars:16 }}</span>
+            <a href="{% url 'orders:order_details' order.id %}" class="bcon__qitem">
+              <div class="bcon__qitem-main">
+                <span class="bcon__qitem-num">#{{ order.order_number }}</span>
+                <span class="bcon__qitem-cust">{{ order.customer_name|truncatechars:16 }}</span>
               </div>
-              <div class="bdb__list-card__item-right">
-                {% if order.dl_zone %}<span class="bdb__list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
-                <span class="bdb__list-card__item-amount bdb__list-card__item-amount--warning">{{ order.cod_amount|default:0 }} QR</span>
+              <div class="bcon__qitem-right">
+                {% if order.dl_zone %}<span class="bcon__chip">Z{{ order.dl_zone }}</span>{% endif %}
+                <span class="bcon__amount bcon__amount--warning">{{ order.cod_amount|default:0 }}</span>
               </div>
             </a>
             {% empty %}
-            <div class="bdb__list-card__empty">
-              <i class="fa-solid fa-circle-check"></i>
-              <span>All clear! No pending orders</span>
-            </div>
+            <div class="bcon__empty"><i class="fa-solid fa-circle-check"></i><p class="bcon__empty-text">All clear — no pending orders</p></div>
             {% endfor %}
           </div>
-          <a href="{% url 'orders:orders_all_list' %}?dateRange=today&cStatus=pending" class="bdb__list-card__footer">
-            View All Pending <i class="fas fa-arrow-right ms-1"></i>
+          <a href="{% url 'orders:orders_all_list' %}?dateRange=today&cStatus=pending" class="bcon__panel-foot">
+            View all pending <i class="fas fa-arrow-right"></i>
           </a>
         </div>
       </div>
 
       <!-- Today's Delivered Orders -->
       <div class="col-md-4">
-        <div class="bdb__list-card">
-          <div class="bdb__list-card__header bdb__list-card__header--success">
-            <div class="bdb__list-card__header-left">
-              <div class="bdb__list-card__icon bdb__list-card__icon--success">
-                <i class="fa-solid fa-check-circle"></i>
-              </div>
-              <span class="bdb__list-card__title">Today's Delivered</span>
-            </div>
-            <span class="bdb__list-card__count bdb__list-card__count--success">{{ todays_delivered_orders|length }}</span>
+        <div class="bcon__panel bcon__panel--ok h-100">
+          <div class="bcon__panel-head">
+            <h5 class="bcon__panel-title"><i class="fa-solid fa-check-circle"></i> Today's Delivered</h5>
+            <span class="bcon__badge bcon__badge--success">{{ todays_delivered_orders|length }}</span>
           </div>
-          <div class="bdb__list-card__body">
+          <div class="bcon__qlist">
             {% for order in todays_delivered_orders %}
-            <a href="{% url 'orders:order_details' order.id %}" class="bdb__list-card__item">
-              <div class="bdb__list-card__item-main">
-                <span class="bdb__list-card__item-number">#{{ order.order_number }}</span>
-                <span class="bdb__list-card__item-customer">{{ order.customer_name|truncatechars:16 }}</span>
+            <a href="{% url 'orders:order_details' order.id %}" class="bcon__qitem">
+              <div class="bcon__qitem-main">
+                <span class="bcon__qitem-num">#{{ order.order_number }}</span>
+                <span class="bcon__qitem-cust">{{ order.customer_name|truncatechars:16 }}</span>
               </div>
-              <div class="bdb__list-card__item-right">
-                {% if order.dl_zone %}<span class="bdb__list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
-                <span class="bdb__list-card__item-amount bdb__list-card__item-amount--success">{{ order.cod_amount|default:0 }} QR</span>
+              <div class="bcon__qitem-right">
+                {% if order.dl_zone %}<span class="bcon__chip">Z{{ order.dl_zone }}</span>{% endif %}
+                <span class="bcon__amount bcon__amount--success">{{ order.cod_amount|default:0 }}</span>
               </div>
             </a>
             {% empty %}
-            <div class="bdb__list-card__empty">
-              <i class="fa-solid fa-truck"></i>
-              <span>No deliveries today yet</span>
-            </div>
+            <div class="bcon__empty"><i class="fa-solid fa-truck"></i><p class="bcon__empty-text">No deliveries today yet</p></div>
             {% endfor %}
           </div>
-          <a href="{% url 'orders:orders_all_list' %}?dateRange=today&dlStatus=delivered" class="bdb__list-card__footer">
-            View All Delivered <i class="fas fa-arrow-right ms-1"></i>
+          <a href="{% url 'orders:orders_all_list' %}?dateRange=today&dlStatus=delivered" class="bcon__panel-foot">
+            View all delivered <i class="fas fa-arrow-right"></i>
           </a>
         </div>
       </div>
 
       <!-- Failed/Follow Up Orders -->
       <div class="col-md-4">
-        <div class="bdb__list-card">
-          <div class="bdb__list-card__header bdb__list-card__header--danger">
-            <div class="bdb__list-card__header-left">
-              <div class="bdb__list-card__icon bdb__list-card__icon--danger">
-                <i class="fa-solid fa-exclamation-triangle"></i>
-              </div>
-              <span class="bdb__list-card__title">Failed / Follow Up</span>
-            </div>
-            <span class="bdb__list-card__count bdb__list-card__count--danger">{{ followup_orders|length }}</span>
+        <div class="bcon__panel bcon__panel--alert h-100">
+          <div class="bcon__panel-head">
+            <h5 class="bcon__panel-title"><i class="fa-solid fa-exclamation-triangle"></i> Failed / Follow Up</h5>
+            <span class="bcon__badge bcon__badge--danger">{{ followup_orders|length }}</span>
           </div>
-          <div class="bdb__list-card__body">
+          <div class="bcon__qlist">
             {% for order in followup_orders %}
-            <a href="{% url 'orders:order_details' order.id %}" class="bdb__list-card__item bdb__list-card__item--alert">
-              <div class="bdb__list-card__item-main">
-                <span class="bdb__list-card__item-number">#{{ order.order_number }}</span>
-                <span class="bdb__list-card__item-customer">{{ order.customer_name|truncatechars:16 }}</span>
+            <a href="{% url 'orders:order_details' order.id %}" class="bcon__qitem bcon__qitem--alert">
+              <div class="bcon__qitem-main">
+                <span class="bcon__qitem-num">#{{ order.order_number }}</span>
+                <span class="bcon__qitem-cust">{{ order.customer_name|truncatechars:16 }}</span>
               </div>
-              <div class="bdb__list-card__item-right">
-                {% if order.dl_zone %}<span class="bdb__list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
-                <span class="bdb__list-card__item-amount bdb__list-card__item-amount--danger">{{ order.cod_amount|default:0 }} QR</span>
+              <div class="bcon__qitem-right">
+                {% if order.dl_zone %}<span class="bcon__chip">Z{{ order.dl_zone }}</span>{% endif %}
+                <span class="bcon__amount bcon__amount--danger">{{ order.cod_amount|default:0 }}</span>
               </div>
             </a>
             {% empty %}
-            <div class="bdb__list-card__empty">
-              <i class="fa-solid fa-shield"></i>
-              <span>No issues! All orders on track</span>
-            </div>
+            <div class="bcon__empty"><i class="fa-solid fa-shield-halved"></i><p class="bcon__empty-text">No issues — all orders on track</p></div>
             {% endfor %}
           </div>
         </div>
@@ -480,24 +454,19 @@
     </div>
 
     <!-- Team Members Section -->
-    <div class="row g-3 px-2 mt-3">
+    <div class="row g-3 px-2 mt-1 bcon__rise bcon__rise--3">
       <div class="col-12">
-        <div class="bdb__list-card">
-          <div class="bdb__list-card__header">
-            <div class="bdb__list-card__header-left">
-              <div class="bdb__list-card__icon bdb__list-card__icon--primary">
-                <i class="fa-solid fa-users"></i>
-              </div>
-              <span class="bdb__list-card__title">Team Members</span>
-            </div>
+        <div class="bcon__panel bcon__panel--edge">
+          <div class="bcon__panel-head">
+            <h5 class="bcon__panel-title"><i class="fa-solid fa-users"></i> Team Members</h5>
             <div class="d-flex align-items-center gap-2">
-              <span class="bdb__list-card__count bdb__list-card__count--success">{{ active_team_members }} Active</span>
+              <span class="bcon__badge bcon__badge--success">{{ active_team_members }} Active</span>
               {% if pending_team_members > 0 %}
-              <span class="bdb__list-card__count bdb__list-card__count--warning">{{ pending_team_members }} Pending</span>
+              <span class="bcon__badge bcon__badge--warning">{{ pending_team_members }} Pending</span>
               {% endif %}
             </div>
           </div>
-          <div class="bdb__list-card__body">
+          <div class="bcon__panel-body--flush">
             {% if recent_team_members %}
             <div class="bdb__team-grid">
               {% for member in recent_team_members %}
@@ -535,14 +504,11 @@
               {% endfor %}
             </div>
             {% else %}
-            <div class="bdb__list-card__empty">
-              <i class="fa-solid fa-user-plus"></i>
-              <span>No team members yet</span>
-            </div>
+            <div class="bcon__empty"><i class="fa-solid fa-user-plus"></i><p class="bcon__empty-text">No team members yet</p></div>
             {% endif %}
           </div>
-          <a href="{% url 'business:business_teams' business.business_id %}" class="bdb__list-card__footer">
-            Manage Team ({{ total_team_members }}) <i class="fas fa-arrow-right ms-1"></i>
+          <a href="{% url 'business:business_teams' business.business_id %}" class="bcon__panel-foot">
+            Manage team ({{ total_team_members }}) <i class="fas fa-arrow-right"></i>
           </a>
         </div>
       </div>

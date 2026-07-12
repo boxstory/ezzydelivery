@@ -7,15 +7,15 @@
 <div class="flex-fill p-3 p-md-4" id="business_return_create_container">
 
   <!-- Page Header -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
-    <div>
-      <a href="{% url 'orders:order_details' order.id %}" class="text-decoration-none text-muted mb-1 d-inline-block">
-        <i class="fa-solid fa-arrow-left me-1"></i> Back to Order #{{ order.order_number }}
-      </a>
-      <h4 class="fw-bold mb-1" style="color: var(--brand-primary);">
-        <i class="fa-solid fa-rotate-left me-2"></i>Request Return
-      </h4>
-      <p class="text-muted mb-0">Create a return request for order <strong>#{{ order.order_number }}</strong></p>
+  <div class="bcon__header mb-4">
+    <div class="bcon__header-main">
+      <div class="bcon__eyebrow">
+        <a href="{% url 'orders:order_details' order.id %}" class="text-decoration-none"><i class="fa-solid fa-arrow-left"></i> Order #{{ order.order_number }}</a>
+        <span class="bcon__eyebrow-sep"></span>
+        <span class="bcon__eyebrow-live">New Return</span>
+      </div>
+      <h1 class="bcon__title"><i class="fa-solid fa-rotate-left"></i> Request Return</h1>
+      <p class="bcon__subtitle">Create a return request for order <strong>#{{ order.order_number }}</strong></p>
     </div>
   </div>
 
@@ -25,28 +25,14 @@
 
       <!-- Left: Order Summary -->
       <div class="col-lg-5">
-        <div class="card mb-3">
-          <div class="card-header fw-semibold">
-            <i class="fa-solid fa-box me-1"></i> Order Summary
-          </div>
-          <div class="card-body">
-            <div class="row g-2 mb-3">
-              <div class="col-6">
-                <small class="text-muted">Order #</small>
-                <div class="fw-semibold">{{ order.order_number }}</div>
-              </div>
-              <div class="col-6">
-                <small class="text-muted">Customer</small>
-                <div>{{ order.customer_name|default:"-" }}</div>
-              </div>
-              <div class="col-6">
-                <small class="text-muted">Order Date</small>
-                <div>{{ order.order_date|date:"d M Y" }}</div>
-              </div>
-              <div class="col-6">
-                <small class="text-muted">COD Amount</small>
-                <div class="fw-semibold">{% if order.cod_amount %}QAR {{ order.cod_amount }}{% else %}-{% endif %}</div>
-              </div>
+        <div class="bcon__panel mb-3">
+          <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-box"></i> Order Summary</h5></div>
+          <div class="bcon__panel-body">
+            <div class="row g-3">
+              <div class="col-6"><p class="bcon__plate-label mb-1">Order #</p><div class="bcon__num">{{ order.order_number }}</div></div>
+              <div class="col-6"><p class="bcon__plate-label mb-1">Customer</p><div>{{ order.customer_name|default:"-" }}</div></div>
+              <div class="col-6"><p class="bcon__plate-label mb-1">Order Date</p><div class="bcon__num">{{ order.order_date|date:"d M Y" }}</div></div>
+              <div class="col-6"><p class="bcon__plate-label mb-1">COD Amount</p><div class="bcon__amount">{% if order.cod_amount %}{{ order.cod_amount }} <small>QAR</small>{% else %}-{% endif %}</div></div>
             </div>
           </div>
         </div>
@@ -56,13 +42,11 @@
       <div class="col-lg-7">
 
         <!-- Return Reason -->
-        <div class="card mb-3">
-          <div class="card-header fw-semibold">
-            <i class="fa-solid fa-comment-dots me-1"></i> Return Reason
-          </div>
-          <div class="card-body">
+        <div class="bcon__panel mb-3">
+          <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-comment-dots"></i> Return Reason</h5></div>
+          <div class="bcon__panel-body">
             <div class="mb-3">
-              <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
+              <label class="form-label fw-semibold small">Reason <span class="text-danger">*</span></label>
               <select name="reason" class="form-select" required id="brt_reason_select">
                 <option value="">-- Select Reason --</option>
                 {% for val, label in reason_choices %}
@@ -71,69 +55,53 @@
               </select>
             </div>
             <div class="mb-0">
-              <label class="form-label fw-semibold">Additional Notes</label>
+              <label class="form-label fw-semibold small">Additional Notes</label>
               <textarea name="reason_notes" class="form-control" rows="3" placeholder="Describe the issue in detail..."></textarea>
             </div>
           </div>
         </div>
 
         <!-- Select Items -->
-        <div class="card mb-3">
-          <div class="card-header fw-semibold">
-            <i class="fa-solid fa-list-check me-1"></i> Select Items to Return <span class="text-danger">*</span>
-          </div>
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table table-sm align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th class="ps-3" style="width: 40px;">
-                      <input type="checkbox" class="form-check-input" id="brt_select_all" title="Select all">
-                    </th>
-                    <th>Item</th>
-                    <th class="text-center">Ordered</th>
-                    <th class="text-center" style="width: 100px;">Return Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for item in order.order_items.all %}
-                  <tr>
-                    <td class="ps-3">
-                      <input type="checkbox" class="form-check-input brt__item-check" name="item_{{ item.id }}" value="1" id="brt_check_{{ item.id }}">
-                    </td>
-                    <td>
-                      <label for="brt_check_{{ item.id }}" class="mb-0 cursor-pointer">
-                        {{ item.display_name }}
-                        {% if item.unit_price %}
-                        <small class="text-muted">(QAR {{ item.unit_price }})</small>
-                        {% endif %}
-                      </label>
-                    </td>
-                    <td class="text-center">{{ item.quantity }}</td>
-                    <td class="text-center">
-                      <input type="number" name="qty_{{ item.id }}" class="form-control form-control-sm text-center brt__qty-input"
-                             value="{{ item.quantity }}" min="1" max="{{ item.quantity }}" style="width: 70px; margin: 0 auto;">
-                    </td>
-                  </tr>
-                  {% empty %}
-                  <tr>
-                    <td colspan="4" class="text-center text-muted py-3">No items found for this order.</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+        <div class="bcon__panel mb-3">
+          <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-list-check"></i> Select Items to Return <span class="text-danger">*</span></h5></div>
+          <div class="bcon__panel-body--flush bcon__ledger-wrap">
+            <table class="bcon__ledger">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" class="form-check-input" id="brt_select_all" title="Select all"></th>
+                  <th>Item</th>
+                  <th class="bcon__td--right">Ordered</th>
+                  <th class="bcon__td--right">Return Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in order.order_items.all %}
+                <tr>
+                  <td data-label="Select"><input type="checkbox" class="form-check-input brt__item-check" name="item_{{ item.id }}" value="1" id="brt_check_{{ item.id }}"></td>
+                  <td data-label="Item">
+                    <label for="brt_check_{{ item.id }}" class="mb-0">
+                      {{ item.display_name }}
+                      {% if item.unit_price %}<small class="text-muted">(QAR {{ item.unit_price }})</small>{% endif %}
+                    </label>
+                  </td>
+                  <td data-label="Ordered" class="bcon__td--right bcon__num">{{ item.quantity }}</td>
+                  <td data-label="Return Qty" class="bcon__td--right">
+                    <input type="number" name="qty_{{ item.id }}" class="form-control form-control-sm text-center brt__qty-input"
+                           value="{{ item.quantity }}" min="1" max="{{ item.quantity }}">
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4"><div class="bcon__empty py-3"><i class="fa-solid fa-box-open"></i><p class="bcon__empty-text">No items found for this order.</p></div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
 
         <!-- Submit -->
-        <div class="d-flex gap-2">
-          <button type="submit" class="btn btn-primary">
-            <i class="fa-solid fa-paper-plane me-1"></i> Submit Return Request
-          </button>
-          <a href="{% url 'orders:order_details' order.id %}" class="btn btn-outline-secondary">
-            Cancel
-          </a>
+        <div class="bcon__actions">
+          <button type="submit" class="bcon__btn bcon__btn--primary"><i class="fa-solid fa-paper-plane"></i> Submit Return Request</button>
+          <a href="{% url 'orders:order_details' order.id %}" class="bcon__btn bcon__btn--ghost">Cancel</a>
         </div>
 
       </div>

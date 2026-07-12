@@ -208,51 +208,7 @@
       {% endif %}
     </div>
 
-    {% if page_obj.has_other_pages %}
-    <div class="bir__card-footer">
-      <nav class="bir__pagination-nav">
-        <ul class="bir__pagination">
-          {% if page_obj.has_previous %}
-          <li class="bir__pagination-item">
-            <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="bir__pagination-link">
-              <i class="fa-solid fa-chevron-left"></i>
-              Previous
-            </a>
-          </li>
-          {% else %}
-          <li class="bir__pagination-item bir__pagination-item--disabled">
-            <span class="bir__pagination-link">
-              <i class="fa-solid fa-chevron-left"></i>
-              Previous
-            </span>
-          </li>
-          {% endif %}
-
-          <li class="bir__pagination-item bir__pagination-item--active">
-            <span class="bir__pagination-link">
-              Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-            </span>
-          </li>
-
-          {% if page_obj.has_next %}
-          <li class="bir__pagination-item">
-            <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="bir__pagination-link">
-              Next
-              <i class="fa-solid fa-chevron-right"></i>
-            </a>
-          </li>
-          {% else %}
-          <li class="bir__pagination-item bir__pagination-item--disabled">
-            <span class="bir__pagination-link">
-              Next
-              <i class="fa-solid fa-chevron-right"></i>
-            </span>
-          </li>
-          {% endif %}
-        </ul>
-      </nav>
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="bir" %}
   </div>
 </div>
 {% endblock %}

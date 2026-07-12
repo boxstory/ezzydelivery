@@ -1,13 +1,49 @@
 {% extends "base.html" %}
 {% load static %}
+{% load business_seo %}
 
 {% block title %}{{ business.business_name }} - Business Profile{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'business/css/business.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'business/css/business.css' %}?v=20260627e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
+<!-- Context bar: distinguishes the owner-managed view from the public display view -->
+{% if is_owner_view %}
+<div class="bpf__context-bar bpf__context-bar--owner">
+    <div class="bpf__context-inner">
+        <span class="bpf__context-label">
+            <i class="fa-solid fa-eye"></i>
+            This is your public profile — visitors see it exactly like this.
+        </span>
+        <div class="bpf__context-actions">
+            <a href="{% url 'business:business_dashboard' %}" class="bpf__context-link">
+                <i class="fa-solid fa-gauge-high"></i> Dashboard
+            </a>
+            <a href="{% url 'business:business_profile_info_update' business.business_id %}" class="bpf__context-link bpf__context-link--primary">
+                <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+            </a>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="bpf__context-bar bpf__context-bar--public">
+    <div class="bpf__context-inner">
+        <a href="{% url 'business:all_business' %}" class="bpf__context-crumb">
+            <i class="fa-solid fa-arrow-left"></i> All businesses
+        </a>
+        <span class="bpf__context-tag">
+            <i class="fa-solid fa-store"></i> Business profile on EzzyDelivery
+        </span>
+        {% if viewer_is_owner %}
+        <a href="{% url 'business:business_profile' %}" class="bpf__context-link bpf__context-link--primary">
+            <i class="fa-solid fa-pen-to-square"></i> Manage your profile
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 <!-- Hero Section -->
 <section class="bpf__hero">
     <div class="bpf__hero-grid"></div>
@@ -43,426 +79,255 @@
             {% endif %}
         </div>
 
-        {% if user_business.business_id == business.business_id %}
-        <a href="{% url 'business:business_profile_info_update' business.business_id %}" class="bpf__btn-edit">
-            <i class="fa-solid fa-pen-to-square"></i>
-            Edit Profile
-        </a>
-        {% endif %}
+        <div class="bpf__cta-group">
+            {% if is_owner_view %}
+            <a href="{% url 'business:business_profile_info_update' business.business_id %}" class="bpf__btn-edit">
+                <i class="fa-solid fa-pen-to-square"></i>
+                Edit Profile
+            </a>
+            {% endif %}
+        </div>
     </div>
 </section>
 
-<!-- Content Section -->
-<div class="bpf__content">
-    <div class="row g-4">
-        <!-- Business Information -->
-        <div class="col-lg-6">
-            <div class="bpf__card">
-                <div class="bpf__card-header">
-                    <div class="bpf__card-icon">
-                        <i class="fa-solid fa-briefcase"></i>
-                    </div>
-                    <h2 class="bpf__card-title">Business Information</h2>
-                </div>
-                <div class="bpf__card-body">
-                    {% if business_profile %}
-                        {% if business_profile.business_description %}
-                        <p class="bpf__desc-text">{{ business_profile.business_description }}</p>
-                        {% endif %}
+<main class="bpf__main">
 
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Founders</div>
-                            <div class="bpf__info-value">{{ business_profile.business_founters_name|default:"Not specified" }}</div>
+    <!-- ============ FEATURED PRODUCTS ============ -->
+    <section class="bpf__section bpf__section--products">
+        <div class="bpf__section-inner">
+            <div class="bpf__section-head">
+                <span class="bpf__eyebrow"><i class="fa-solid fa-bag-shopping"></i> What we offer</span>
+                <h2 class="bpf__section-title">Featured Products</h2>
+                {% if products %}
+                <p class="bpf__section-sub">A selection of what {{ business.business_name }} has to offer.</p>
+                {% endif %}
+            </div>
+
+            {% if products %}
+                <div class="bpf__products-grid">
+                    {% for product in products %}
+                    <article class="bpf__product-card">
+                        <div class="bpf__product-media">
+                            {% if product.product_image %}
+                                <img src="{{ product.product_image.url }}" loading="lazy"
+                                     alt="{{ product.brand_name }} {{ product.item_name }}"
+                                     class="bpf__product-img">
+                            {% else %}
+                                <div class="bpf__product-noimg">
+                                    <i class="fa-solid fa-box"></i>
+                                </div>
+                            {% endif %}
+                            {% if product.item_price %}
+                            <span class="bpf__product-price">
+                                {{ product.item_price }} <small>QAR</small>
+                            </span>
+                            {% endif %}
+                            <div class="bpf__product-shine"></div>
                         </div>
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Category</div>
-                            <div class="bpf__info-value">
-                                {% if business_profile.business_catagory_main %}
-                                    <span class="bpf__category-badge">{{ business_profile.business_catagory_main }}</span>
-                                {% else %}
-                                    Not specified
+                        <div class="bpf__product-body">
+                            {% if product.brand_name %}
+                            <span class="bpf__product-brand">{{ product.brand_name }}</span>
+                            {% endif %}
+                            <h3 class="bpf__product-name">{{ product.item_name }}</h3>
+                            {% if product.item_discription %}
+                            <p class="bpf__product-desc">{{ product.item_discription }}</p>
+                            {% endif %}
+                            <div class="bpf__product-tags">
+                                {% if product.size %}
+                                <span class="bpf__product-tag"><i class="fa-solid fa-ruler"></i> {{ product.size }}</span>
+                                {% endif %}
+                                {% if product.color %}
+                                <span class="bpf__product-tag"><i class="fa-solid fa-palette"></i> {{ product.color }}</span>
+                                {% endif %}
+                                {% if product.unit %}
+                                <span class="bpf__product-tag"><i class="fa-solid fa-scale-balanced"></i> {{ product.unit }}</span>
                                 {% endif %}
                             </div>
-                        </div>
-                        {% if business_profile.business_catagory_detailed %}
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Industry Details</div>
-                            <div class="bpf__info-value">{{ business_profile.business_catagory_detailed }}</div>
-                        </div>
-                        {% endif %}
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Mission</div>
-                            <div class="bpf__info-value">{{ business_profile.business_mision|default:"Not specified" }}</div>
-                        </div>
-                        {% if business_profile.business_start_date %}
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Established</div>
-                            <div class="bpf__info-value">{{ business_profile.business_start_date|date:"F d, Y" }}</div>
-                        </div>
-                        {% endif %}
-                        {% if business_profile.business_uniqueness_title %}
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">What Makes Us Unique</div>
-                            <div class="bpf__info-value">{{ business_profile.business_uniqueness_title }}</div>
-                        </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="bpf__empty-state">
-                            <div class="bpf__empty-icon">
-                                <i class="fa-solid fa-circle-info"></i>
-                            </div>
-                            <p class="bpf__empty-text">No detailed business information available</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- About & Details -->
-        <div class="col-lg-6">
-            <div class="bpf__card">
-                <div class="bpf__card-header">
-                    <div class="bpf__card-icon">
-                        <i class="fa-solid fa-circle-info"></i>
-                    </div>
-                    <h2 class="bpf__card-title">About Us</h2>
-                </div>
-                <div class="bpf__card-body">
-                    {% if business_profile %}
-                        {% if business_profile.business_about_part_1 %}
-                        <p class="bpf__desc-text">{{ business_profile.business_about_part_1 }}</p>
-                        {% endif %}
-
-                        {% if business_profile.business_about_part_2 %}
-                        <p class="bpf__desc-text">{{ business_profile.business_about_part_2 }}</p>
-                        {% endif %}
-
-                        {% if business_profile.business_mision_detailed %}
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Our Mission</div>
-                            <div class="bpf__info-value">{{ business_profile.business_mision_detailed }}</div>
-                        </div>
-                        {% endif %}
-
-                        {% if business_profile.business_uniqueness_description %}
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Why Choose Us</div>
-                            <div class="bpf__info-value">{{ business_profile.business_uniqueness_description }}</div>
-                        </div>
-                        {% endif %}
-
-                        {% if business_profile.business_founters_bio %}
-                        <div class="bpf__info-row">
-                            <div class="bpf__info-label">Founder's Story</div>
-                            <div class="bpf__info-value">{{ business_profile.business_founters_bio }}</div>
-                        </div>
-                        {% endif %}
-
-                        {% if not business_profile.business_about_part_1 and not business_profile.business_about_part_2 and not business_profile.business_mision_detailed and not business_profile.business_uniqueness_description and not business_profile.business_founters_bio %}
-                        <div class="bpf__empty-state">
-                            <div class="bpf__empty-icon">
-                                <i class="fa-solid fa-book-open"></i>
-                            </div>
-                            <p class="bpf__empty-text">No about information available</p>
-                        </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="bpf__empty-state">
-                            <div class="bpf__empty-icon">
-                                <i class="fa-solid fa-book-open"></i>
-                            </div>
-                            <p class="bpf__empty-text">No about information available</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Location Information -->
-        <div class="col-lg-6">
-            <div class="bpf__card">
-                <div class="bpf__card-header">
-                    <div class="bpf__card-icon">
-                        <i class="fa-solid fa-location-dot"></i>
-                    </div>
-                    <h2 class="bpf__card-title">Location</h2>
-                </div>
-                <div class="bpf__card-body">
-                    {% if business_profile.business_address or business_profile.business_city or business_profile.business_country %}
-                        <div class="bpf__location-address">
-                            <div class="bpf__location-icon">
-                                <i class="fa-solid fa-map-marker-alt"></i>
-                            </div>
-                            <div class="bpf__location-details">
-                                {% if business_profile.business_address %}
-                                <p>{{ business_profile.business_address }}</p>
-                                {% endif %}
-                                <p class="bpf__city-line">
-                                    {% if business_profile.business_city %}{{ business_profile.business_city }}{% endif %}{% if business_profile.business_state %}, {{ business_profile.business_state }}{% endif %}{% if business_profile.business_zip_code %} {{ business_profile.business_zip_code }}{% endif %}
-                                </p>
-                                {% if business_profile.business_country %}
-                                <p>{{ business_profile.business_country }}</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="bpf__empty-state">
-                            <div class="bpf__empty-icon">
-                                <i class="fa-solid fa-map-location-dot"></i>
-                            </div>
-                            <p class="bpf__empty-text">No location information available</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Contact Information -->
-        <div class="col-lg-6">
-            <div class="bpf__card">
-                <div class="bpf__card-header">
-                    <div class="bpf__card-icon">
-                        <i class="fa-solid fa-address-card"></i>
-                    </div>
-                    <h2 class="bpf__card-title">Contact Details</h2>
-                </div>
-                <div class="bpf__card-body">
-                    {% if business.business_phone or business.business_email or business.business_whatsapp or business_profile.business_phone or business_profile.business_email %}
-                        <div class="bpf__social-grid">
-                            {% if business.business_phone %}
-                            <a href="tel:{{ business.business_phone }}" class="bpf__social-card">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-solid fa-phone"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Phone</div>
-                                    <div class="bpf__social-value">{{ business.business_phone }}</div>
-                                </div>
-                            </a>
-                            {% elif business_profile.business_phone %}
-                            <a href="tel:{{ business_profile.business_phone }}" class="bpf__social-card">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-solid fa-phone"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Phone</div>
-                                    <div class="bpf__social-value">{{ business_profile.business_phone }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business.business_email %}
-                            <a href="mailto:{{ business.business_email }}" class="bpf__social-card">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-solid fa-envelope"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Email</div>
-                                    <div class="bpf__social-value">{{ business.business_email }}</div>
-                                </div>
-                            </a>
-                            {% elif business_profile.business_email %}
-                            <a href="mailto:{{ business_profile.business_email }}" class="bpf__social-card">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-solid fa-envelope"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Email</div>
-                                    <div class="bpf__social-value">{{ business_profile.business_email }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business.business_whatsapp %}
-                            <a href="https://wa.me/{{ business.business_whatsapp }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-whatsapp"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">WhatsApp</div>
-                                    <div class="bpf__social-value">{{ business.business_whatsapp }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-                        </div>
-                    {% else %}
-                        <div class="bpf__empty-state">
-                            <div class="bpf__empty-icon">
-                                <i class="fa-solid fa-phone-slash"></i>
-                            </div>
-                            <p class="bpf__empty-text">No contact details available</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Social Media Links -->
-        <div class="col-12">
-            <div class="bpf__card">
-                <div class="bpf__card-header">
-                    <div class="bpf__card-icon">
-                        <i class="fa-solid fa-share-nodes"></i>
-                    </div>
-                    <h2 class="bpf__card-title">Connect With Us</h2>
-                </div>
-                <div class="bpf__card-body">
-                    {% if business_profile.business_website or business_profile.business_instagram or business_profile.business_facebook_page or business_profile.business_tiktok or business_profile.business_youtube or business_profile.business_twitter or business_profile.business_linkedin or business_profile.business_snapchat or business.business_instagram or business.business_facebook_page %}
-                        <div class="bpf__social-grid">
                             {% if business_profile.business_website %}
-                            <a href="http://{{ business_profile.business_website }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-solid fa-globe"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Website</div>
-                                    <div class="bpf__social-value">{{ business_profile.business_website }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business_profile.business_instagram %}
-                            <a href="https://www.instagram.com/{{ business_profile.business_instagram }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-instagram"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Instagram</div>
-                                    <div class="bpf__social-value">@{{ business_profile.business_instagram }}</div>
-                                </div>
-                            </a>
-                            {% elif business.business_instagram %}
-                            <a href="https://www.instagram.com/{{ business.business_instagram }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-instagram"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Instagram</div>
-                                    <div class="bpf__social-value">@{{ business.business_instagram }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business_profile.business_facebook_page %}
-                            <a href="https://www.facebook.com/{{ business_profile.business_facebook_page }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-facebook"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Facebook</div>
-                                    <div class="bpf__social-value">{{ business_profile.business_facebook_page }}</div>
-                                </div>
-                            </a>
-                            {% elif business.business_facebook_page %}
-                            <a href="https://www.facebook.com/{{ business.business_facebook_page }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-facebook"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Facebook</div>
-                                    <div class="bpf__social-value">{{ business.business_facebook_page }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business_profile.business_tiktok %}
-                            <a href="https://www.tiktok.com/@{{ business_profile.business_tiktok }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-tiktok"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">TikTok</div>
-                                    <div class="bpf__social-value">@{{ business_profile.business_tiktok }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business_profile.business_youtube %}
-                            <a href="https://www.youtube.com/{{ business_profile.business_youtube }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-youtube"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">YouTube</div>
-                                    <div class="bpf__social-value">{{ business_profile.business_youtube }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business_profile.business_twitter %}
-                            <a href="https://www.twitter.com/{{ business_profile.business_twitter }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-x-twitter"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">X (Twitter)</div>
-                                    <div class="bpf__social-value">@{{ business_profile.business_twitter }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business_profile.business_linkedin %}
-                            <a href="https://www.linkedin.com/company/{{ business_profile.business_linkedin }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-linkedin"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">LinkedIn</div>
-                                    <div class="bpf__social-value">{{ business_profile.business_linkedin }}</div>
-                                </div>
-                            </a>
-                            {% endif %}
-
-                            {% if business_profile.business_snapchat %}
-                            <a href="https://www.snapchat.com/add/{{ business_profile.business_snapchat }}" class="bpf__social-card" target="_blank" rel="noopener">
-                                <div class="bpf__social-icon">
-                                    <i class="fa-brands fa-snapchat"></i>
-                                </div>
-                                <div class="bpf__social-info">
-                                    <div class="bpf__social-label">Snapchat</div>
-                                    <div class="bpf__social-value">{{ business_profile.business_snapchat }}</div>
-                                </div>
+                            <a href="http://{{ business_profile.business_website }}" target="_blank" rel="noopener" class="bpf__product-buy">
+                                <i class="fa-solid fa-cart-shopping"></i> Buy Now
                             </a>
                             {% endif %}
                         </div>
-                    {% else %}
-                        <div class="bpf__empty-state">
-                            <div class="bpf__empty-icon">
-                                <i class="fa-solid fa-link-slash"></i>
-                            </div>
-                            <p class="bpf__empty-text">No social media links available</p>
-                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="bpf__empty-state">
+                    <div class="bpf__empty-icon">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                    <p class="bpf__empty-text">No products to showcase yet</p>
+                    {% if is_owner_view %}
+                    <p class="bpf__empty-subtext">Add products from your dashboard to display them here</p>
+                    <a href="{% url 'product:product_single_add' %}" class="bpf__coming-soon-badge bpf__coming-soon-badge--link">
+                        <i class="fa-solid fa-plus"></i>
+                        Add Your First Product
+                    </a>
                     {% endif %}
                 </div>
-            </div>
+            {% endif %}
         </div>
+    </section>
 
-        <!-- Products/Services Section -->
-        <div class="col-12">
-            <div class="bpf__card">
-                <div class="bpf__card-header">
-                    <div class="bpf__card-icon">
-                        <i class="fa-solid fa-box-open"></i>
+    <!-- ============ OUR STORY ============ -->
+    {% if business_profile.business_description or business_profile.business_about_part_1 or business_profile.business_about_part_2 or business_profile.business_mision or business_profile.business_mision_detailed or business_profile.business_founters_bio or business_profile.business_uniqueness_description %}
+    <section class="bpf__section bpf__section--alt">
+        <div class="bpf__section-inner">
+            <div class="bpf__section-head">
+                <span class="bpf__eyebrow"><i class="fa-solid fa-feather"></i> Who we are</span>
+                <h2 class="bpf__section-title">Our Story</h2>
+            </div>
+
+            <div class="bpf__story">
+                <div class="bpf__story-text">
+                    {% if business_profile.business_description %}
+                    <p class="bpf__story-lead">{{ business_profile.business_description }}</p>
+                    {% endif %}
+                    {% if business_profile.business_about_part_1 %}<p>{{ business_profile.business_about_part_1 }}</p>{% endif %}
+                    {% if business_profile.business_about_part_2 %}<p>{{ business_profile.business_about_part_2 }}</p>{% endif %}
+
+                    {% if business_profile.business_mision_detailed or business_profile.business_mision %}
+                    <div class="bpf__story-note">
+                        <span class="bpf__story-note-label"><i class="fa-solid fa-bullseye"></i> Our Mission</span>
+                        <p>{{ business_profile.business_mision_detailed|default:business_profile.business_mision }}</p>
                     </div>
-                    <h2 class="bpf__card-title">Products & Services</h2>
-                </div>
-                <div class="bpf__card-body">
-                    <div class="bpf__empty-state">
-                        <div class="bpf__empty-icon">
-                            <i class="fa-solid fa-boxes-stacked"></i>
-                        </div>
-                        <p class="bpf__empty-text">Product showcase coming soon</p>
-                        {% if user_business.business_id == business.business_id %}
-                        <p class="bpf__empty-subtext">Add products from your dashboard to display them here</p>
-                        {% endif %}
-                        <span class="bpf__coming-soon-badge">
-                            <i class="fa-solid fa-rocket"></i>
-                            Coming Soon
-                        </span>
+                    {% endif %}
+
+                    {% if business_profile.business_uniqueness_description %}
+                    <div class="bpf__story-note">
+                        <span class="bpf__story-note-label"><i class="fa-solid fa-star"></i> {{ business_profile.business_uniqueness_title|default:"Why Choose Us" }}</span>
+                        <p>{{ business_profile.business_uniqueness_description }}</p>
                     </div>
+                    {% endif %}
+
+                    {% if business_profile.business_founters_bio %}
+                    <div class="bpf__story-note">
+                        <span class="bpf__story-note-label"><i class="fa-solid fa-user-tie"></i> Founder{% if business_profile.business_founters_name %} &middot; {{ business_profile.business_founters_name }}{% endif %}</span>
+                        <p>{{ business_profile.business_founters_bio }}</p>
+                    </div>
+                    {% endif %}
                 </div>
+
+                <aside class="bpf__stat-strip">
+                    {% if business.business_since %}
+                    <div class="bpf__stat">
+                        <span class="bpf__stat-num">{{ business.business_since|date:"Y" }}</span>
+                        <span class="bpf__stat-label">Established</span>
+                    </div>
+                    {% endif %}
+                    {% if products %}
+                    <div class="bpf__stat">
+                        <span class="bpf__stat-num">{{ products|length }}{% if products|length == 12 %}+{% endif %}</span>
+                        <span class="bpf__stat-label">Products</span>
+                    </div>
+                    {% endif %}
+                    {% if business_profile.business_catagory_main or business.business_product_category %}
+                    <div class="bpf__stat">
+                        <span class="bpf__stat-num bpf__stat-num--text">{{ business_profile.business_catagory_main|default:business.business_product_category }}</span>
+                        <span class="bpf__stat-label">Category</span>
+                    </div>
+                    {% endif %}
+                    {% if business_profile.business_city %}
+                    <div class="bpf__stat">
+                        <span class="bpf__stat-num bpf__stat-num--text">{{ business_profile.business_city }}</span>
+                        <span class="bpf__stat-label">Based in</span>
+                    </div>
+                    {% endif %}
+                </aside>
             </div>
         </div>
-    </div>
-</div>
+    </section>
+    {% endif %}
+
+    <!-- ============ VISIT / REACH US + CONNECT ============ -->
+    {% if business_profile.business_address or business_profile.business_city or business_profile.business_country or business_profile.business_website or business_profile.business_instagram or business_profile.business_facebook_page or business_profile.business_tiktok or business_profile.business_youtube or business_profile.business_twitter or business_profile.business_linkedin or business_profile.business_snapchat or business.business_instagram or business.business_facebook_page %}
+    <section class="bpf__section">
+        <div class="bpf__section-inner">
+            <div class="bpf__section-head">
+                <span class="bpf__eyebrow"><i class="fa-solid fa-handshake"></i> Get in touch</span>
+                <h2 class="bpf__section-title">Visit &amp; Reach Us</h2>
+            </div>
+
+            {% if business_profile.business_address or business_profile.business_city or business_profile.business_country or business_profile.business_website %}
+            <div class="bpf__visit">
+                {% if business_profile.business_address or business_profile.business_city or business_profile.business_country %}
+                <div class="bpf__visit-card bpf__visit-card--address">
+                    <div class="bpf__visit-icon"><i class="fa-solid fa-location-dot"></i></div>
+                    <div class="bpf__visit-body">
+                        <span class="bpf__visit-kicker">Our Location</span>
+                        {% if business_profile.business_address %}<p>{{ business_profile.business_address }}</p>{% endif %}
+                        <p class="bpf__visit-city">
+                            {% if business_profile.business_city %}{{ business_profile.business_city }}{% endif %}{% if business_profile.business_state %}, {{ business_profile.business_state }}{% endif %}{% if business_profile.business_zip_code %} {{ business_profile.business_zip_code }}{% endif %}
+                        </p>
+                        {% if business_profile.business_country %}<p>{{ business_profile.business_country }}</p>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if business_profile.business_website %}
+                <div class="bpf__visit-card bpf__visit-card--contact">
+                    <span class="bpf__visit-kicker">Reach Us Directly</span>
+                    <div class="bpf__contact-list">
+                        <a href="http://{{ business_profile.business_website }}" target="_blank" rel="noopener" class="bpf__contact-item">
+                            <span class="bpf__contact-ic"><i class="fa-solid fa-globe"></i></span>
+                            <span class="bpf__contact-meta"><b>Website</b>{{ business_profile.business_website }}</span>
+                            <i class="fa-solid fa-chevron-right bpf__contact-arrow"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if business_profile.business_instagram or business_profile.business_facebook_page or business_profile.business_tiktok or business_profile.business_youtube or business_profile.business_twitter or business_profile.business_linkedin or business_profile.business_snapchat or business.business_instagram or business.business_facebook_page %}
+            <div class="bpf__connect-block">
+                <span class="bpf__eyebrow"><i class="fa-solid fa-share-nodes"></i> Stay connected &middot; Follow {{ business.business_name }}</span>
+                <div class="bpf__social-bar">
+                {% if business_profile.business_instagram or business.business_instagram %}
+                <a href="https://www.instagram.com/{{ business_profile.business_instagram|default:business.business_instagram }}" target="_blank" rel="noopener" class="bpf__social-chip bpf__social-chip--ig" title="Instagram" aria-label="Instagram">
+                    <i class="fa-brands fa-instagram"></i>
+                </a>
+                {% endif %}
+                {% if business_profile.business_facebook_page or business.business_facebook_page %}
+                <a href="https://www.facebook.com/{{ business_profile.business_facebook_page|default:business.business_facebook_page }}" target="_blank" rel="noopener" class="bpf__social-chip bpf__social-chip--fb" title="Facebook" aria-label="Facebook">
+                    <i class="fa-brands fa-facebook-f"></i>
+                </a>
+                {% endif %}
+                {% if business_profile.business_tiktok %}
+                <a href="https://www.tiktok.com/@{{ business_profile.business_tiktok }}" target="_blank" rel="noopener" class="bpf__social-chip bpf__social-chip--tt" title="TikTok" aria-label="TikTok">
+                    <i class="fa-brands fa-tiktok"></i>
+                </a>
+                {% endif %}
+                {% if business_profile.business_youtube %}
+                <a href="https://www.youtube.com/{{ business_profile.business_youtube }}" target="_blank" rel="noopener" class="bpf__social-chip bpf__social-chip--yt" title="YouTube" aria-label="YouTube">
+                    <i class="fa-brands fa-youtube"></i>
+                </a>
+                {% endif %}
+                {% if business_profile.business_twitter %}
+                <a href="https://www.twitter.com/{{ business_profile.business_twitter }}" target="_blank" rel="noopener" class="bpf__social-chip bpf__social-chip--x" title="X (Twitter)" aria-label="X (Twitter)">
+                    <i class="fa-brands fa-x-twitter"></i>
+                </a>
+                {% endif %}
+                {% if business_profile.business_linkedin %}
+                <a href="https://www.linkedin.com/company/{{ business_profile.business_linkedin }}" target="_blank" rel="noopener" class="bpf__social-chip bpf__social-chip--in" title="LinkedIn" aria-label="LinkedIn">
+                    <i class="fa-brands fa-linkedin-in"></i>
+                </a>
+                {% endif %}
+                {% if business_profile.business_snapchat %}
+                <a href="https://www.snapchat.com/add/{{ business_profile.business_snapchat }}" target="_blank" rel="noopener" class="bpf__social-chip bpf__social-chip--sc" title="Snapchat" aria-label="Snapchat">
+                    <i class="fa-brands fa-snapchat"></i>
+                </a>
+                {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+</main>
+
+{# Dynamic structured data: Store + EzzyDelivery Service + Breadcrumb #}
+{% business_profile_schema %}
 {% endblock content %}

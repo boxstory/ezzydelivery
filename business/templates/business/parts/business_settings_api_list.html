@@ -262,14 +262,16 @@
             <div class="bapi__key-display">
               <div class="bapi__key-row">
                 <span class="label">API Key</span>
-                <span class="value">{{ key.api_key|slice:":28" }}...</span>
+                <span class="value">{{ key.key_prefix }}…••••••••</span>
               </div>
-              {% if key.api_secret %}
+              <div class="bapi__key-row">
+                <span class="label">Scope</span>
+                <span class="value">{{ key.get_scope_display }}</span>
+              </div>
               <div class="bapi__key-row">
                 <span class="label">API Secret</span>
-                <span class="value">{{ key.api_secret|slice:":28" }}...</span>
+                <span class="value">Shown once at creation</span>
               </div>
-              {% endif %}
             </div>
 
             <div class="bapi__key-meta">
@@ -289,10 +291,6 @@
           </div>
 
           <div class="bapi__card-actions">
-            <button class="bapi__action bapi__action--copy" onclick="copyToClipboard('{{ key.api_key }}')">
-              <i class="fa-solid fa-copy"></i>
-              Copy
-            </button>
             <button class="bapi__action bapi__action--edit" onclick="alert('Edit feature coming soon!')">
               <i class="fa-solid fa-pen"></i>
               Edit

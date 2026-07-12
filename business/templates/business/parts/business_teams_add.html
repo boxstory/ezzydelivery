@@ -51,7 +51,8 @@
             <i class="fa-solid fa-user-gear"></i>
             <h2>Member Details</h2>
         </div>
-        <form method="POST" id="client_teams_add_form_main" novalidate>
+        <form method="POST" id="client_teams_add_form_main" novalidate
+              data-lookup-url="{% url 'business:business_team_user_lookup' business.business_id %}">
             {% csrf_token %}
             {% if form.non_field_errors %}
             <div class="alert alert-danger" role="alert">
@@ -146,6 +147,8 @@
             <p class="mb-2"><strong>Step 1:</strong> Find the person you want to add using one of these:</p>
             <ul class="mb-2 ps-3">
                 <li><strong>Email</strong> — Their registered email (e.g. <code>john@example.com</code>)</li>
+                <li><strong>Username</strong> — Their account username</li>
+                <li><strong>Mobile</strong> — Their registered phone or WhatsApp number</li>
                 <li><strong>EZZY ID</strong> — Their unique code (e.g. <code>EZZY2026303473</code>), found on their profile</li>
                 <li><strong>User ID</strong> — Their numeric user ID</li>
             </ul>
@@ -172,4 +175,10 @@
         </div>
     </div>
 </div>
+{{ role_permissions|json_script:"role-permissions-data" }}
 {% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'business/js/business-teams-add.js' %}?v=3"></script>
+{% endblock extra_js %}

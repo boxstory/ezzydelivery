@@ -120,15 +120,23 @@
      Desktop View (visible >= 768px only)
      ========================================== -->
 <div class="d-none d-md-block" id="finance_desktop_view">
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col-12 d-flex justify-content-between align-items-center">
-      <div>
-        <h1 class="h3 mb-0">Finance Dashboard</h1>
-        <p class="text-muted mb-0">{{ business.business_name }} - Financial Overview</p>
+<div class="bcon__page pt-3">
+
+  <!-- Page header -->
+  <div class="bcon__header">
+    <div class="bcon__header-main">
+      <div class="bcon__eyebrow">
+        <span>{{ business.business_name|truncatechars:22 }}</span>
+        <span class="bcon__eyebrow-sep"></span>
+        <span>Finance</span>
+        <span class="bcon__eyebrow-sep"></span>
+        <span class="bcon__eyebrow-live">Last {{ selected_days }} days</span>
       </div>
-      <form method="GET" class="d-flex gap-2">
-        <select name="days" class="form-select" style="max-width: 160px;" onchange="this.form.submit()">
+      <h1 class="bcon__title"><i class="fa-solid fa-chart-pie"></i> Finance Overview</h1>
+    </div>
+    <div class="bcon__actions">
+      <form method="GET">
+        <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
           <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
           <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
@@ -137,182 +145,148 @@
       </form>
     </div>
   </div>
+</div>
 
-  <!-- Delivery Summary Cards -->
-  <div class="row mb-4">
-    <div class="col-xl-3 col-md-6 mb-3">
-      <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
-        <div class="card-body">
-          <div class="d-flex justify-content-between">
-            <h6 class="text-muted mb-2">Total Deliveries</h6>
-            <i class="fas fa-truck text-primary"></i>
-          </div>
-          <h3 class="mb-1">{{ delivery_stats.total_deliveries|default:0 }}</h3>
-          <small class="text-muted">Last {{ selected_days }} days</small>
-        </div>
-      </div>
+<!-- KPI Plates -->
+<div class="bcon__plates">
+  <div class="bcon__plate bcon__plate--info bcon__rise bcon__rise--1">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Total Deliveries</p>
+      <span class="bcon__plate-icon bcon__plate-icon--info"><i class="fa-solid fa-truck"></i></span>
     </div>
-    <div class="col-xl-3 col-md-6 mb-3">
-      <div class="card border-0 shadow-sm h-100 border-start border-4 border-info">
-        <div class="card-body">
-          <div class="d-flex justify-content-between">
-            <h6 class="text-muted mb-2">Delivery Charges</h6>
-            <i class="fas fa-file-invoice text-info"></i>
-          </div>
-          <h3 class="mb-1">{{ delivery_stats.total_delivery_charges|default:0|floatformat:2 }} QR</h3>
-          <small class="text-muted">Total billed</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-xl-3 col-md-6 mb-3">
-      <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
-        <div class="card-body">
-          <div class="d-flex justify-content-between">
-            <h6 class="text-muted mb-2">COD Collected</h6>
-            <i class="fas fa-hand-holding-dollar text-warning"></i>
-          </div>
-          <h3 class="mb-1">{{ cod_stats.total_cod|default:0|floatformat:2 }} QR</h3>
-          <small class="text-muted">{{ cod_stats.collected_count|default:0 }} of {{ cod_stats.total_count|default:0 }} orders</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-xl-3 col-md-6 mb-3">
-      <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
-        <div class="card-body">
-          <div class="d-flex justify-content-between">
-            <h6 class="text-muted mb-2">COD Settled to You</h6>
-            <i class="fas fa-handshake text-success"></i>
-          </div>
-          <h3 class="mb-1">{{ cod_client_settled|floatformat:2 }} QR</h3>
-          <small class="text-muted">{{ cod_stats.settled_count|default:0 }} orders settled</small>
-        </div>
-      </div>
-    </div>
+    <p class="bcon__plate-value">{{ delivery_stats.total_deliveries|default:0 }}</p>
+    <p class="bcon__plate-foot">Last {{ selected_days }} days</p>
   </div>
-
-  <!-- Charges & Bills -->
-  <div class="row mb-4">
-    <!-- Service Charges -->
-    <div class="col-md-6 mb-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white">
-          <h5 class="mb-0"><i class="fas fa-file-invoice me-2 text-info"></i>Service Charges</h5>
-        </div>
-        <div class="card-body">
-          <table class="table table-borderless mb-0">
-            <tbody>
-              {% for charge in charges %}
-              <tr>
-                <td>{{ charge.transaction_type|title }}</td>
-                <td class="text-end fw-bold">{{ charge.total|floatformat:2 }} QR</td>
-                <td class="text-end"><span class="badge bg-secondary">{{ charge.count }}</span></td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="3" class="text-center text-muted py-3">No service charges</td>
-              </tr>
-              {% endfor %}
-              {% if charges %}
-              <tr class="border-top">
-                <td class="fw-bold">Total Charges</td>
-                <td class="text-end fw-bold text-info">{{ total_charges|floatformat:2 }} QR</td>
-                <td></td>
-              </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
+  <div class="bcon__plate bcon__plate--navy bcon__rise bcon__rise--2">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Delivery Charges</p>
+      <span class="bcon__plate-icon bcon__plate-icon--info"><i class="fa-solid fa-file-invoice"></i></span>
     </div>
-
-    <!-- Bills -->
-    <div class="col-md-6 mb-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white">
-          <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2 text-dark"></i>Billing Summary</h5>
-        </div>
-        <div class="card-body">
-          <table class="table table-borderless mb-0">
-            <tbody>
-              <tr>
-                <td><i class="fas fa-arrow-right text-danger me-2"></i>Amount Owed (Payable)</td>
-                <td class="text-end fw-bold text-danger">{{ bills_payable|floatformat:2 }} QR</td>
-              </tr>
-              <tr>
-                <td><i class="fas fa-arrow-left text-success me-2"></i>Amount Due (Receivable)</td>
-                <td class="text-end fw-bold text-success">{{ bills_receivable|floatformat:2 }} QR</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <p class="bcon__plate-value">{{ delivery_stats.total_delivery_charges|default:0|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">Total billed</p>
   </div>
+  <div class="bcon__plate bcon__plate--warning bcon__rise bcon__rise--3">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">COD Collected</p>
+      <span class="bcon__plate-icon bcon__plate-icon--warning"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ cod_stats.total_cod|default:0|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ cod_stats.collected_count|default:0 }} of {{ cod_stats.total_count|default:0 }} orders</p>
+  </div>
+  <div class="bcon__plate bcon__plate--success bcon__rise bcon__rise--4">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">COD Settled to You</p>
+      <span class="bcon__plate-icon bcon__plate-icon--success"><i class="fa-solid fa-handshake"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ cod_client_settled|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ cod_stats.settled_count|default:0 }} orders settled</p>
+  </div>
+</div>
 
-  <!-- Recent Transactions -->
-  <div class="row">
-    <div class="col-12">
-      <div class="listing-container">
-        <div class="listing-header">
-          <h6 class="listing-title"><i class="fas fa-list me-2 text-primary"></i>Recent Transactions</h6>
-          <a href="{% url 'business:business_transactions' %}" class="btn btn-sm btn-outline-primary">View All</a>
-        </div>
-        <table class="listing-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Code</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th class="text-end">Amount</th>
-            </tr>
-          </thead>
+<!-- Charges & Bills -->
+<div class="row g-3 px-2 mb-1 bcon__rise bcon__rise--4">
+  <!-- Service Charges -->
+  <div class="col-md-6">
+    <div class="bcon__panel h-100">
+      <div class="bcon__panel-head">
+        <h5 class="bcon__panel-title"><i class="fa-solid fa-file-invoice"></i> Service Charges</h5>
+      </div>
+      <div class="bcon__panel-body--flush bcon__ledger-wrap">
+        <table class="bcon__ledger">
           <tbody>
-            {% for txn in recent_transactions %}
+            {% for charge in charges %}
             <tr>
-              <td>{{ txn.created_at|date:"d M" }}<br><span class="text-muted" style="font-size: 0.65rem;">{{ txn.created_at|time:"H:i" }}</span></td>
-              <td><code>{{ txn.transaction_code|default:"-" }}</code></td>
-              <td>
-                <span class="listing-status
-                  {% if txn.transaction_type == 'cod_client_settle' %}success
-                  {% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}primary
-                  {% elif txn.transaction_type == 'bills_payable' %}danger
-                  {% elif txn.transaction_type == 'bills_receivable' %}success
-                  {% else %}{% endif %}">
-                  {% if txn.transaction_type == 'cod_client_settle' %}<i class="fas fa-handshake"></i>
-                  {% elif txn.transaction_type == 'delivery_charge' %}<i class="fas fa-truck"></i>
-                  {% elif txn.transaction_type == 'fulfillment_charge' %}<i class="fas fa-box"></i>
-                  {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
-                </span>
-                {{ txn.get_transaction_type_display }}
-              </td>
-              <td class="text-2line" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
-              <td class="text-end fw-bold {% if txn.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
-                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
-              </td>
+              <td data-label="Type">{{ charge.transaction_type|title }}</td>
+              <td data-label="Count" class="text-center"><span class="bcon__chip">{{ charge.count }}</span></td>
+              <td data-label="Amount" class="bcon__amount">{{ charge.total|floatformat:2 }} <small>QAR</small></td>
             </tr>
             {% empty %}
-            <tr>
-              <td colspan="5" class="listing-empty">
-                <i class="fas fa-receipt"></i>
-                No transactions found for this period
-              </td>
-            </tr>
+            <tr><td colspan="3"><div class="bcon__empty py-3"><i class="fa-solid fa-file-invoice"></i><p class="bcon__empty-text">No service charges</p></div></td></tr>
             {% endfor %}
+            {% if charges %}
+            <tr>
+              <td class="bcon__num">Total Charges</td>
+              <td></td>
+              <td class="bcon__amount bcon__amount--warning">{{ total_charges|floatformat:2 }} <small>QAR</small></td>
+            </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <!-- Quick Links -->
-  <div class="row mt-4">
-    <div class="col-12">
-      <div class="d-flex gap-2 flex-wrap">
-        <a href="{% url 'business:business_transactions' %}" class="btn btn-outline-primary"><i class="fas fa-list me-1"></i> All Transactions</a>
-        <a href="{% url 'business:business_cod_statement' %}" class="btn btn-outline-warning"><i class="fas fa-money-bill me-1"></i> COD Statement</a>
+  <!-- Bills -->
+  <div class="col-md-6">
+    <div class="bcon__panel h-100">
+      <div class="bcon__panel-head">
+        <h5 class="bcon__panel-title"><i class="fa-solid fa-file-invoice-dollar"></i> Billing Summary</h5>
+      </div>
+      <div class="bcon__panel-body--flush bcon__ledger-wrap">
+        <table class="bcon__ledger">
+          <tbody>
+            <tr>
+              <td data-label="Payable"><i class="fa-solid fa-arrow-right me-2 bcon__i-danger"></i>Amount Owed (Payable)</td>
+              <td data-label="Amount" class="bcon__amount bcon__amount--danger">{{ bills_payable|floatformat:2 }} <small>QAR</small></td>
+            </tr>
+            <tr>
+              <td data-label="Receivable"><i class="fa-solid fa-arrow-left me-2 bcon__i-success"></i>Amount Due (Receivable)</td>
+              <td data-label="Amount" class="bcon__amount bcon__amount--success">{{ bills_receivable|floatformat:2 }} <small>QAR</small></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="px-2 bcon__rise bcon__rise--5">
+  <div class="bcon__panel">
+    <div class="bcon__panel-head">
+      <h5 class="bcon__panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Transactions</h5>
+      <a href="{% url 'business:business_transactions' %}" class="bcon__panel-link">View all <i class="fas fa-arrow-right"></i></a>
+    </div>
+    <div class="bcon__panel-body--flush bcon__ledger-wrap">
+      <table class="bcon__ledger">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Code</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th class="bcon__td--right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for txn in recent_transactions %}
+          <tr>
+            <td data-label="Date" class="bcon__num">{{ txn.created_at|date:"d M" }} <small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
+            <td data-label="Code"><span class="bcon__chip">{{ txn.transaction_code|default:"-" }}</span></td>
+            <td data-label="Type">
+              {% if txn.transaction_type == 'cod_client_settle' %}<span class="bcon__badge bcon__badge--success"><i class="fas fa-handshake"></i> {{ txn.get_transaction_type_display }}</span>
+              {% elif txn.transaction_type == 'delivery_charge' %}<span class="bcon__badge bcon__badge--info"><i class="fas fa-truck"></i> {{ txn.get_transaction_type_display }}</span>
+              {% elif txn.transaction_type == 'fulfillment_charge' %}<span class="bcon__badge bcon__badge--info"><i class="fas fa-box"></i> {{ txn.get_transaction_type_display }}</span>
+              {% elif txn.transaction_type == 'bills_payable' %}<span class="bcon__badge bcon__badge--danger"><i class="fas fa-exchange-alt"></i> {{ txn.get_transaction_type_display }}</span>
+              {% else %}<span class="bcon__badge bcon__badge--muted"><i class="fas fa-exchange-alt"></i> {{ txn.get_transaction_type_display }}</span>{% endif %}
+            </td>
+            <td data-label="Description" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-"|truncatewords:8 }}</td>
+            <td data-label="Amount" class="bcon__amount {% if txn.amount >= 0 %}bcon__amount--success{% else %}bcon__amount--danger{% endif %}">
+              {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small>QAR</small>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5"><div class="bcon__empty"><i class="fa-solid fa-receipt"></i><p class="bcon__empty-title">No transactions</p><p class="bcon__empty-text">Nothing recorded for this period.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Quick Links -->
+  <div class="bcon__actions mt-3">
+    <a href="{% url 'business:business_transactions' %}" class="bcon__btn bcon__btn--secondary"><i class="fas fa-list"></i> All Transactions</a>
+    <a href="{% url 'business:business_cod_statement' %}" class="bcon__btn bcon__btn--secondary"><i class="fas fa-money-bill"></i> COD Statement</a>
   </div>
 </div>
 </div><!-- end desktop view -->

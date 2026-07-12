@@ -7,16 +7,18 @@
 <div class="flex-fill p-3 p-md-4" id="business_return_detail_container">
 
   <!-- Page Header -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
-    <div>
-      <a href="{% url 'business:returns_list' %}" class="text-decoration-none text-muted mb-1 d-inline-block">
-        <i class="fa-solid fa-arrow-left me-1"></i> Back to Returns
-      </a>
-      <h4 class="fw-bold mb-1" style="color: var(--brand-primary);">
-        <i class="fa-solid fa-rotate-left me-2"></i>RET-{{ ret.return_number }}
-      </h4>
+  <div class="bcon__header mb-4">
+    <div class="bcon__header-main">
+      <div class="bcon__eyebrow">
+        <a href="{% url 'business:returns_list' %}" class="text-decoration-none"><i class="fa-solid fa-arrow-left"></i> Returns</a>
+        <span class="bcon__eyebrow-sep"></span>
+        <span class="bcon__eyebrow-live">RET-{{ ret.return_number }}</span>
+      </div>
+      <h1 class="bcon__title"><i class="fa-solid fa-rotate-left"></i> RET-{{ ret.return_number }}</h1>
     </div>
-    <span class="badge brt__badge--{{ ret.status }} fs-6">{{ ret.get_status_display }}</span>
+    <div class="bcon__actions">
+      <span class="badge brt__badge--{{ ret.status }} fs-6">{{ ret.get_status_display }}</span>
+    </div>
   </div>
 
   <div class="row g-3">
@@ -24,72 +26,40 @@
     <!-- Left Column: Details -->
     <div class="col-lg-7">
 
-      <!-- Order Info Card -->
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-box me-1"></i> Order Information
-        </div>
-        <div class="card-body">
-          <div class="row g-2">
-            <div class="col-6">
-              <small class="text-muted">Order Number</small>
-              <div>
-                <a href="{% url 'orders:order_details' ret.order_id %}" class="fw-semibold text-decoration-none">
-                  #{{ ret.order.order_number }}
-                </a>
-              </div>
-            </div>
-            <div class="col-6">
-              <small class="text-muted">Customer</small>
-              <div class="fw-semibold">{{ ret.order.customer_name|default:"-" }}</div>
-            </div>
-            <div class="col-6">
-              <small class="text-muted">Phone</small>
-              <div>{{ ret.order.customer_phone|default:"-" }}</div>
-            </div>
-            <div class="col-6">
-              <small class="text-muted">COD Amount</small>
-              <div>{% if ret.order.cod_amount %}QAR {{ ret.order.cod_amount }}{% else %}-{% endif %}</div>
-            </div>
+      <!-- Order Info -->
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-box"></i> Order Information</h5></div>
+        <div class="bcon__panel-body">
+          <div class="row g-3">
+            <div class="col-6"><p class="bcon__plate-label mb-1">Order Number</p><a href="{% url 'orders:order_details' ret.order_id %}" class="bcon__num text-decoration-none">#{{ ret.order.order_number }}</a></div>
+            <div class="col-6"><p class="bcon__plate-label mb-1">Customer</p><div class="fw-semibold">{{ ret.order.customer_name|default:"-" }}</div></div>
+            <div class="col-6"><p class="bcon__plate-label mb-1">Phone</p><div class="bcon__num">{{ ret.order.customer_phone|default:"-" }}</div></div>
+            <div class="col-6"><p class="bcon__plate-label mb-1">COD Amount</p><div class="bcon__amount">{% if ret.order.cod_amount %}{{ ret.order.cod_amount }} <small>QAR</small>{% else %}-{% endif %}</div></div>
           </div>
         </div>
       </div>
 
-      <!-- Return Reason Card -->
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-comment-dots me-1"></i> Return Reason
-        </div>
-        <div class="card-body">
-          <div class="mb-2">
-            <span class="badge bg-secondary">{{ ret.get_reason_display }}</span>
-          </div>
-          {% if ret.reason_notes %}
-          <p class="mb-0 text-muted">{{ ret.reason_notes }}</p>
-          {% endif %}
+      <!-- Return Reason -->
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-comment-dots"></i> Return Reason</h5></div>
+        <div class="bcon__panel-body">
+          <span class="bcon__badge bcon__badge--muted">{{ ret.get_reason_display }}</span>
+          {% if ret.reason_notes %}<p class="mb-0 mt-2 text-muted">{{ ret.reason_notes }}</p>{% endif %}
         </div>
       </div>
 
-      <!-- Return Items Card -->
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-list me-1"></i> Return Items
-        </div>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th class="text-center">Ordered Qty</th>
-                <th class="text-center">Return Qty</th>
-              </tr>
-            </thead>
+      <!-- Return Items -->
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-list"></i> Return Items</h5></div>
+        <div class="bcon__panel-body--flush bcon__ledger-wrap">
+          <table class="bcon__ledger">
+            <thead><tr><th>Item</th><th class="bcon__td--right">Ordered Qty</th><th class="bcon__td--right">Return Qty</th></tr></thead>
             <tbody>
               {% for ri in ret.return_items.all %}
               <tr>
-                <td>{{ ri.order_item.display_name }}</td>
-                <td class="text-center">{{ ri.order_item.quantity }}</td>
-                <td class="text-center fw-semibold">{{ ri.quantity_returned }}</td>
+                <td data-label="Item">{{ ri.order_item.display_name }}</td>
+                <td data-label="Ordered" class="bcon__td--right bcon__num">{{ ri.order_item.quantity }}</td>
+                <td data-label="Return Qty" class="bcon__td--right bcon__num">{{ ri.quantity_returned }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -99,53 +69,29 @@
 
       <!-- COD Reversal -->
       {% if ret.cod_reversal_amount %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-money-bill-transfer me-1"></i> COD Reversal
-        </div>
-        <div class="card-body">
-          <div class="row g-2">
-            <div class="col-6">
-              <small class="text-muted">Reversal Amount</small>
-              <div class="fw-bold fs-5">QAR {{ ret.cod_reversal_amount }}</div>
-            </div>
-            <div class="col-6">
-              <small class="text-muted">Processed</small>
-              <div>
-                {% if ret.cod_reversal_processed %}
-                <span class="badge bg-success">Yes</span>
-                {% else %}
-                <span class="badge bg-warning">Pending</span>
-                {% endif %}
-              </div>
-            </div>
+      <div class="bcon__money mb-3">
+        <div class="row g-2 align-items-center">
+          <div class="col-6">
+            <p class="bcon__money-label"><i class="fa-solid fa-money-bill-transfer me-1"></i> COD Reversal</p>
+            <p class="bcon__money-value"><small>QAR</small>{{ ret.cod_reversal_amount }}</p>
+          </div>
+          <div class="col-6 text-end">
+            {% if ret.cod_reversal_processed %}<span class="bcon__badge bcon__badge--success"><i class="fas fa-check"></i> Processed</span>
+            {% else %}<span class="bcon__badge bcon__badge--warning"><i class="fas fa-clock"></i> Pending</span>{% endif %}
           </div>
         </div>
       </div>
       {% endif %}
 
-      <!-- Review Notes -->
+      <!-- Review -->
       {% if ret.reviewed_by %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-clipboard-check me-1"></i> Review
-        </div>
-        <div class="card-body">
-          <div class="row g-2">
-            <div class="col-6">
-              <small class="text-muted">Reviewed By</small>
-              <div>{{ ret.reviewed_by.get_full_name|default:ret.reviewed_by.username }}</div>
-            </div>
-            <div class="col-6">
-              <small class="text-muted">Reviewed At</small>
-              <div>{{ ret.reviewed_at|date:"d M Y H:i" }}</div>
-            </div>
-            {% if ret.review_notes %}
-            <div class="col-12">
-              <small class="text-muted">Notes</small>
-              <div>{{ ret.review_notes }}</div>
-            </div>
-            {% endif %}
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-clipboard-check"></i> Review</h5></div>
+        <div class="bcon__panel-body">
+          <div class="row g-3">
+            <div class="col-6"><p class="bcon__plate-label mb-1">Reviewed By</p><div>{{ ret.reviewed_by.get_full_name|default:ret.reviewed_by.username }}</div></div>
+            <div class="col-6"><p class="bcon__plate-label mb-1">Reviewed At</p><div class="bcon__num">{{ ret.reviewed_at|date:"d M Y H:i" }}</div></div>
+            {% if ret.review_notes %}<div class="col-12"><p class="bcon__plate-label mb-1">Notes</p><div>{{ ret.review_notes }}</div></div>{% endif %}
           </div>
         </div>
       </div>
@@ -157,40 +103,14 @@
     <div class="col-lg-5">
 
       <!-- Status Timeline -->
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-timeline me-1"></i> Status Timeline
-        </div>
-        <div class="card-body">
-          <div class="brt__timeline">
-            {% for step in timeline %}
-            {% with step_label=status_choices|dictsort:step %}
-            <div class="brt__timeline-step {% if step == ret.status %}brt__timeline-step--active{% elif forloop.counter < timeline|length %}{% for s in timeline %}{% if s == ret.status %}{% if forloop.parentloop.counter0 < forloop.counter0 %}{% else %}brt__timeline-step--done{% endif %}{% endif %}{% endfor %}{% endif %}">
-              <div class="brt__timeline-dot"></div>
-              <div class="brt__timeline-label">{{ status_choices|default_if_none:"" }}</div>
-            </div>
-            {% endwith %}
-            {% endfor %}
-          </div>
-
-          <!-- Simpler timeline rendering -->
-          <div class="list-group list-group-flush mt-2">
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-timeline"></i> Status Timeline</h5></div>
+        <div class="bcon__panel-body">
+          <div class="list-group list-group-flush">
             {% for step in timeline %}
             <div class="list-group-item d-flex align-items-center gap-2 px-0 border-0 py-1 {% if step == ret.status %}fw-bold{% endif %}">
-              {% if step == ret.status %}
-                <i class="fa-solid fa-circle-dot text-primary"></i>
-              {% elif forloop.counter0 < timeline|length %}
-                {% with current_found=False %}
-                {% for s in timeline %}
-                  {% if s == ret.status and forloop.counter0 > forloop.parentloop.counter0 %}
-                    <!-- This step is before current = done -->
-                  {% endif %}
-                {% endfor %}
-                {% endwith %}
-                <i class="fa-solid fa-circle-check text-success"></i>
-              {% else %}
-                <i class="fa-regular fa-circle text-muted"></i>
-              {% endif %}
+              {% if step == ret.status %}<i class="fa-solid fa-circle-dot bcon__i-warning"></i>
+              {% else %}<i class="fa-solid fa-circle-check bcon__i-success"></i>{% endif %}
               <span>{{ step|title }}</span>
             </div>
             {% endfor %}
@@ -198,65 +118,53 @@
         </div>
       </div>
 
-      <!-- Actions Card -->
+      <!-- Actions -->
       {% if ret.status == 'pending' %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-gavel me-1"></i> Actions
-        </div>
-        <div class="card-body">
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-gavel"></i> Actions</h5></div>
+        <div class="bcon__panel-body">
           <form method="post" action="{% url 'business:return_update_status' ret.id %}">
             {% csrf_token %}
             <div class="mb-3">
-              <label class="form-label fw-semibold">Review Notes</label>
+              <label class="form-label fw-semibold small">Review Notes</label>
               <textarea name="review_notes" class="form-control" rows="3" placeholder="Optional notes..."></textarea>
             </div>
             <div class="d-flex gap-2">
-              <button type="submit" name="status" value="approved" class="btn btn-success flex-fill">
-                <i class="fa-solid fa-check me-1"></i> Approve
-              </button>
-              <button type="submit" name="status" value="rejected" class="btn btn-danger flex-fill">
-                <i class="fa-solid fa-times me-1"></i> Reject
-              </button>
+              <button type="submit" name="status" value="approved" class="bcon__btn bcon__btn--primary flex-fill justify-content-center"><i class="fa-solid fa-check"></i> Approve</button>
+              <button type="submit" name="status" value="rejected" class="bcon__btn bcon__btn--secondary flex-fill justify-content-center"><i class="fa-solid fa-times"></i> Reject</button>
             </div>
           </form>
         </div>
       </div>
       {% elif ret.status not in 'rejected,closed' %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">
-          <i class="fa-solid fa-forward me-1"></i> Advance Status
-        </div>
-        <div class="card-body">
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-forward"></i> Advance Status</h5></div>
+        <div class="bcon__panel-body">
           <form method="post" action="{% url 'business:return_update_status' ret.id %}">
             {% csrf_token %}
             <div class="mb-3">
-              <label class="form-label fw-semibold">Next Status</label>
+              <label class="form-label fw-semibold small">Next Status</label>
               <select name="status" class="form-select">
-                {% for val, label in ret.RETURN_STATUS_CHOICES %}
-                {% if val != 'pending' and val != 'rejected' %}
+                {% for val, label in ret.RETURN_STATUS_CHOICES %}{% if val != 'pending' and val != 'rejected' %}
                 <option value="{{ val }}" {% if val == ret.status %}selected{% endif %}>{{ label }}</option>
-                {% endif %}
-                {% endfor %}
+                {% endif %}{% endfor %}
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label fw-semibold">Notes</label>
+              <label class="form-label fw-semibold small">Notes</label>
               <textarea name="review_notes" class="form-control" rows="2" placeholder="Optional notes...">{{ ret.review_notes }}</textarea>
             </div>
-            <button type="submit" class="btn btn-primary w-100">
-              <i class="fa-solid fa-save me-1"></i> Update Status
-            </button>
+            <button type="submit" class="bcon__btn bcon__btn--primary w-100 justify-content-center"><i class="fa-solid fa-save"></i> Update Status</button>
           </form>
         </div>
       </div>
       {% endif %}
 
-      <!-- Meta Info -->
-      <div class="card">
-        <div class="card-body">
-          <small class="text-muted d-block">Created: {{ ret.created_at|date:"d M Y H:i" }}</small>
-          <small class="text-muted d-block">Updated: {{ ret.updated_at|date:"d M Y H:i" }}</small>
+      <!-- Meta -->
+      <div class="bcon__panel">
+        <div class="bcon__panel-body">
+          <p class="bcon__plate-label mb-1">Created</p><div class="bcon__num mb-2">{{ ret.created_at|date:"d M Y H:i" }}</div>
+          <p class="bcon__plate-label mb-1">Updated</p><div class="bcon__num">{{ ret.updated_at|date:"d M Y H:i" }}</div>
         </div>
       </div>
 

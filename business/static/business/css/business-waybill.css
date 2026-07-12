@@ -71,6 +71,8 @@ body {
   padding: 6mm;
   display: flex;
   flex-direction: column;
+  /* Lets the From/To row react to the real label width (narrow thermal paper) */
+  container-type: inline-size;
 }
 
 .bwb__head {
@@ -120,7 +122,7 @@ body {
 }
 
 .bwb__logo {
-  height: 72px;
+  height: 56px;
   width: auto;
   object-fit: contain;
   flex: 0 0 auto;
@@ -180,6 +182,18 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Narrow paper (thermal / small labels): stack From over To full-width
+   instead of squeezing them side by side. Normal A6 (105mm) stays side by side. */
+@container (max-width: 92mm) {
+  .bwb__row {
+    flex-direction: column;
+  }
+  .bwb__box--party {
+    width: 100%;
+    max-height: none;
+  }
+}
+
 .bwb__box-label {
   font-size: 9px;
   font-weight: 700;
@@ -217,6 +231,16 @@ body {
   background: #f3f4f6;
   border-radius: 4px;
   padding: 2px 6px;
+}
+
+.bwb__writebox {
+  margin-top: 8px;
+}
+.bwb__writespace {
+  height: 46px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  margin-top: 2px;
 }
 
 .bwb__cod {
@@ -356,7 +380,7 @@ body {
 
 .bwb__barcode-img {
   width: 100%;
-  height: 80px;
+  height: 62px;
   object-fit: contain;
 }
 

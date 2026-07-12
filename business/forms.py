@@ -118,6 +118,10 @@ class businessRegisterForm(forms.ModelForm):
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+    business_since = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'type': 'month', 'class': 'form-control'}),
+    )
 
     class Meta:
         model = business_models.Business
@@ -156,7 +160,7 @@ class businessRegisterForm(forms.ModelForm):
                 attrs={'class': 'form-select'}),
             'business_status': forms.Select(
                 choices=business_STATUS_CHOICES),
-            'business_since': forms.TextInput(attrs={'type': 'month', 'class': 'form-control'}),
+            'business_since': forms.TextInput(attrs={'type': 'month', 'class': 'form-control'}),  # overridden by class-level CharField above
         }
         labels = {
             "business_name": "business Name",
@@ -665,6 +669,61 @@ class BusinessTeamProfileForm(forms.ModelForm):
         }
 
 
+def resolve_user_identifier(identifier):
+    """
+    Resolve a free-text identifier to a User.
+
+    Accepts an email, username, mobile number, EZZY ID, or numeric user ID.
+    Returns a tuple ``(user, error_message)`` — exactly one is non-None.
+    Shared by the add-member form validation and the live lookup endpoint.
+    """
+    identifier = (identifier or '').strip()
+    if not identifier:
+        return None, 'Please enter a user email, username, mobile, or ID.'
+
+    if '@' in identifier:
+        user = User.objects.filter(email__iexact=identifier).first()
+        if user is None:
+            return None, f'No user found with email "{identifier}".'
+        return user, None
+
+    if identifier.upper().startswith('EZZY'):
+        profile = core_models.Profile.objects.select_related('user').filter(
+            user_number__iexact=identifier
+        ).first()
+        if profile is None:
+            return None, f'No user found with EZZY ID "{identifier.upper()}".'
+        return profile.user, None
+
+    # Username first, then mobile number, then numeric user ID.
+    user = User.objects.filter(username__iexact=identifier).first()
+
+    # Mobile number lookup (matches Profile.phone or Profile.whatsapp). Numbers
+    # are stored inconsistently (with/without country code), so match on the
+    # cleaned digits and the local 8-digit part.
+    digits = ''.join(ch for ch in identifier if ch.isdigit())
+    if user is None and len(digits) >= 7:
+        from django.db.models import Q
+        candidates = {digits, digits[-8:]}  # full + Qatar local part
+        phone_q = Q()
+        for cand in candidates:
+            phone_q |= Q(phone__icontains=cand) | Q(whatsapp__icontains=cand)
+        profile = core_models.Profile.objects.select_related('user').filter(phone_q).first()
+        if profile is not None:
+            user = profile.user
+
+    if user is None:
+        try:
+            user = User.objects.get(id=int(identifier))
+        except (ValueError, User.DoesNotExist):
+            return None, (
+                f'No user found with "{identifier}". Enter a valid email, '
+                'username, mobile number, EZZY ID, or numeric user ID.'
+            )
+
+    return user, None
+
+
 class TeamMemberAddForm(forms.ModelForm):
     """
     Simplified form for adding new team members.
@@ -684,13 +743,13 @@ class TeamMemberAddForm(forms.ModelForm):
     # Replace user select with text input for email/ID/EZZY code lookup
     user_identifier = forms.CharField(
         max_length=150,
-        label='User Email, EZZY ID, or User ID',
+        label='User Email, Username, Mobile, EZZY ID, or User ID',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'e.g. user@email.com or EZZY2026XXXXXX',
+            'placeholder': 'e.g. user@email.com, username, 33XXXXXX, or EZZY2026XXXXXX',
             'autocomplete': 'off'
         }),
-        help_text='Enter the email address, EZZY ID (e.g. EZZY2026XXXXXX), or numeric user ID.'
+        help_text='Enter the email address, username, mobile number, EZZY ID (e.g. EZZY2026XXXXXX), or numeric user ID.'
     )
 
     permissions = forms.MultipleChoiceField(
@@ -730,46 +789,15 @@ class TeamMemberAddForm(forms.ModelForm):
         self.order_fields(field_order)
 
     def clean_user_identifier(self):
-        """Validate and look up user by email or ID."""
+        """Validate and look up user by email, username, mobile, EZZY ID, or ID."""
         identifier = self.cleaned_data.get('user_identifier', '').strip()
 
         if not identifier:
             raise forms.ValidationError('Please enter a user email or ID.')
 
-        # Try to find user by email, EZZY code, or numeric ID
-        user = None
-
-        if '@' in identifier:
-            # Lookup by email
-            try:
-                user = User.objects.get(email__iexact=identifier)
-            except User.DoesNotExist:
-                raise forms.ValidationError(
-                    f'No user found with email "{identifier}". '
-                    'Please check the email address and try again.'
-                )
-        elif identifier.upper().startswith('EZZY'):
-            # Lookup by EZZY user number
-            try:
-                profile = core_models.Profile.objects.select_related('user').get(
-                    user_number__iexact=identifier
-                )
-                user = profile.user
-            except core_models.Profile.DoesNotExist:
-                raise forms.ValidationError(
-                    f'No user found with EZZY ID "{identifier.upper()}". '
-                    'Please check the ID and try again.'
-                )
-        else:
-            # Try as numeric user ID
-            try:
-                user_id = int(identifier)
-                user = User.objects.get(id=user_id)
-            except (ValueError, User.DoesNotExist):
-                raise forms.ValidationError(
-                    f'No user found with "{identifier}". '
-                    'Please enter a valid email, EZZY ID, or numeric user ID.'
-                )
+        user, error = resolve_user_identifier(identifier)
+        if error:
+            raise forms.ValidationError(error)
 
         # Check if user is already a team member
         if self.business:

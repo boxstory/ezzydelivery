@@ -1,0 +1,1111 @@
+/*
+ * Purpose: Shared "Dispatch Manifest" design foundation for the client (business) dashboard — page headers, stat plates, panels, ledger tables, badges, empty states.
+ * Used by: templates/business_dashboard_base.html (loaded globally) + all business/ dashboard pages.
+ * Notes: BEM prefix `bcon__`. Pure visual layer on Brand Kit tokens; layout still uses Bootstrap utilities. Extends (does not replace) bdb__ in business-dashboard-pro.css.
+ */
+
+:root {
+  --bcon-mono: ui-monospace, "SF Mono", "Fira Code", "JetBrains Mono", "Cascadia Code", monospace;
+  --bcon-edge: 3px;
+}
+
+/* ============================================================================
+   PAGE HEADER — the top of a waybill: manifest eyebrow + indexed title + actions
+   ============================================================================ */
+.bcon__page {
+  padding: 0 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.bcon__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.25rem 0 0.875rem;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.bcon__header-main {
+  min-width: 0;
+}
+
+/* Manifest eyebrow — mono breadcrumb / context line */
+.bcon__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--bcon-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand-grey-450);
+  margin: 0 0 0.375rem;
+}
+
+.bcon__eyebrow span { white-space: nowrap; }
+
+.bcon__eyebrow-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--brand-grey-300);
+  flex-shrink: 0;
+}
+
+.bcon__eyebrow-live {
+  color: var(--brand-navy);
+  font-weight: 700;
+}
+
+/* Indexed title — bold with a yellow index tick before it */
+.bcon__title {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--brand-grey-800);
+  margin: 0;
+  line-height: 1.15;
+  padding-left: 0.75rem;
+}
+
+.bcon__title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  bottom: 0.15em;
+  width: var(--bcon-edge);
+  border-radius: 2px;
+  background: var(--brand-primary);
+}
+
+.bcon__title i { color: var(--brand-primary); font-size: 1.1rem; }
+
+.bcon__subtitle {
+  font-size: 0.8125rem;
+  color: var(--brand-grey-500);
+  margin: 0.375rem 0 0 0.75rem;
+}
+
+.bcon__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================================================
+   COMMAND BAND — the dispatch-console hero (navy field, yellow index glow)
+   ============================================================================ */
+.bcon__command {
+  position: relative;
+  background: var(--brand-gradient-navy);
+  border-radius: var(--brand-radius-md);
+  padding: 1.25rem 1.5rem;
+  margin: 0 0.5rem 1.25rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+.bcon__command::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 82% 20%, rgba(247,192,0,0.14) 0%, transparent 55%);
+  pointer-events: none;
+}
+/* faint manifest grid on the navy field */
+.bcon__command::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 1.5rem;
+  pointer-events: none;
+}
+.bcon__command-main { position: relative; min-width: 0; }
+.bcon__command .bcon__eyebrow { color: rgba(255,255,255,0.55); margin-bottom: 0.5rem; }
+.bcon__command .bcon__eyebrow-sep { background: rgba(247,192,0,0.6); }
+.bcon__command .bcon__eyebrow-live { color: var(--brand-primary); }
+
+.bcon__command-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.bcon__command-sub {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.6);
+  margin: 0.3rem 0 0;
+}
+.bcon__command-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+/* live readout inside the band */
+.bcon__command-readout { text-align: right; }
+.bcon__command-readout-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(247,192,0,0.9);
+  margin: 0 0 0.15rem;
+}
+.bcon__command-readout-value {
+  font-family: var(--bcon-mono);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.bcon__command-readout-value small { font-size: 0.7rem; color: rgba(255,255,255,0.55); font-weight: 600; }
+
+.bcon__command-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--brand-primary);
+  color: var(--brand-navy);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.55rem 1rem;
+  border-radius: var(--brand-radius-sm);
+  text-decoration: none;
+  border: 1px solid var(--brand-primary);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+.bcon__command-cta:hover {
+  background: var(--brand-primary-dark);
+  color: var(--brand-navy);
+  transform: translateY(-1px);
+  box-shadow: 0 0.35rem 0.75rem rgba(247,192,0,0.35);
+}
+@media (max-width: 768px) {
+  .bcon__command { padding: 1rem 1.125rem; }
+  .bcon__command-title { font-size: 1.15rem; }
+  .bcon__command-right { width: 100%; justify-content: space-between; }
+}
+
+/* ============================================================================
+   COCKPIT HERO — one navy panel: identity + CTA on top, live gauge strip below
+   ============================================================================ */
+.bcon__cockpit {
+  position: relative;
+  background: var(--brand-gradient-navy);
+  border-radius: var(--brand-radius-lg);
+  margin: 0 0.5rem 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 0.5rem 1.5rem rgba(0,31,63,0.18);
+}
+.bcon__cockpit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 88% 0%, rgba(247,192,0,0.16) 0%, transparent 45%);
+  pointer-events: none;
+}
+.bcon__cockpit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 100% 1.75rem;
+  pointer-events: none;
+}
+.bcon__cockpit-top {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem 1.125rem;
+}
+.bcon__cockpit-id { min-width: 0; }
+.bcon__cockpit .bcon__eyebrow { color: rgba(255,255,255,0.5); margin-bottom: 0.45rem; }
+.bcon__cockpit .bcon__eyebrow-sep { background: rgba(247,192,0,0.55); }
+.bcon__cockpit .bcon__eyebrow-live { color: var(--brand-primary); }
+.bcon__cockpit-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+}
+.bcon__cockpit-sub {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.55);
+  margin: 0.3rem 0 0;
+}
+.bcon__cockpit-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--brand-primary);
+  color: var(--brand-navy);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.55rem 1rem;
+  border-radius: var(--brand-radius-sm);
+  text-decoration: none;
+  border: 1px solid var(--brand-primary);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bcon__cockpit-cta:hover {
+  background: var(--brand-primary-dark);
+  color: var(--brand-navy);
+  transform: translateY(-1px);
+  box-shadow: 0 0.35rem 0.75rem rgba(247,192,0,0.4);
+}
+
+/* Gauge strip — segmented live readouts along the bottom of the cockpit */
+.bcon__gauges {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.bcon__gauge {
+  position: relative;
+  display: block;
+  padding: 0.875rem 1.25rem 1rem;
+  text-decoration: none;
+  border-left: 1px solid rgba(255,255,255,0.08);
+  transition: background 0.15s ease;
+}
+.bcon__gauge:first-child { border-left: none; }
+.bcon__gauge::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 2px;
+  background: var(--gauge-accent, transparent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+a.bcon__gauge:hover { background: rgba(255,255,255,0.04); }
+a.bcon__gauge:hover::before { opacity: 1; }
+.bcon__gauge--primary { --gauge-accent: var(--brand-primary); }
+.bcon__gauge--success { --gauge-accent: var(--brand-success-bright); }
+.bcon__gauge--warning { --gauge-accent: var(--brand-warning-alt); }
+.bcon__gauge--danger  { --gauge-accent: var(--brand-danger); }
+.bcon__gauge-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.55);
+  margin: 0 0 0.4rem;
+}
+.bcon__gauge-label i { color: var(--gauge-accent, var(--brand-primary)); font-size: 0.7rem; }
+.bcon__gauge-value {
+  font-family: var(--bcon-mono);
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.bcon__gauge-value small { font-size: 0.65rem; font-weight: 600; color: rgba(255,255,255,0.5); }
+@media (max-width: 768px) {
+  .bcon__cockpit-title { font-size: 1.2rem; }
+  .bcon__cockpit-cta { width: 100%; justify-content: center; }
+  .bcon__gauges { grid-template-columns: repeat(2, 1fr); }
+  .bcon__gauge:nth-child(odd) { border-left: none; }
+  .bcon__gauge:nth-child(n+3) { border-top: 1px solid rgba(255,255,255,0.08); }
+  .bcon__gauge-value { font-size: 1.4rem; }
+  .bcon__gauge--money { grid-column: 1 / -1; }
+}
+
+/* Panel left index-edge variants (for the operations queues) */
+.bcon__panel--edge { border-left: var(--bcon-edge) solid var(--brand-grey-300); }
+.bcon__panel--warn  { border-left: var(--bcon-edge) solid var(--brand-warning-alt); }
+.bcon__panel--ok    { border-left: var(--bcon-edge) solid var(--brand-success-bright); }
+.bcon__panel--alert { border-left: var(--bcon-edge) solid var(--brand-danger); }
+
+/* Queue rows — compact manifest lines inside a panel */
+.bcon__qlist { max-height: 340px; overflow-y: auto; }
+.bcon__qitem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--brand-grey-100);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+.bcon__qitem:last-child { border-bottom: none; }
+.bcon__qitem:hover { background: var(--brand-grey-100); color: inherit; }
+.bcon__qitem--alert { background: var(--brand-danger-bg); }
+.bcon__qitem--alert:hover { background: #fee2e2; }
+.bcon__qitem-main { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.bcon__qitem-num {
+  font-family: var(--bcon-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bcon__qitem-cust {
+  font-size: 0.7rem;
+  color: var(--brand-grey-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bcon__qitem-right { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+
+/* ============================================================================
+   ACTION BUTTONS — navy primary, paper secondary, yellow-on-hover
+   ============================================================================ */
+.bcon__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--brand-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.bcon__btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(247, 192, 0, 0.35);
+}
+.bcon__btn i { font-size: 0.8rem; }
+
+.bcon__btn--primary {
+  background: var(--brand-navy);
+  color: #fff;
+  border-color: var(--brand-navy);
+}
+.bcon__btn--primary:hover {
+  background: var(--brand-navy-light);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-md);
+}
+
+.bcon__btn--secondary {
+  background: var(--brand-grey-100);
+  color: var(--brand-grey-700);
+  border-color: var(--brand-grey-200);
+}
+.bcon__btn--secondary:hover {
+  background: var(--brand-secondary);
+  color: var(--brand-navy);
+  border-color: #fde68a;
+  transform: translateY(-1px);
+}
+
+.bcon__btn--ghost {
+  background: transparent;
+  color: var(--brand-grey-600);
+  border-color: var(--brand-grey-250);
+}
+.bcon__btn--ghost:hover {
+  color: var(--brand-navy);
+  border-color: var(--brand-grey-400);
+}
+
+/* ============================================================================
+   STAT PLATES — the dispatch board row
+   ============================================================================ */
+.bcon__plates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  padding: 0 0.5rem;
+}
+
+.bcon__plate {
+  position: relative;
+  display: block;
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-md);
+  padding: 0.875rem 1rem 0.875rem 1.125rem;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+}
+.bcon__plate::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: var(--bcon-edge);
+  background: var(--brand-grey-300);
+  transition: background 0.2s ease;
+}
+a.bcon__plate:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--brand-shadow-md);
+  border-color: var(--brand-grey-300);
+  color: inherit;
+}
+.bcon__plate--primary::before { background: var(--brand-primary); }
+.bcon__plate--success::before { background: var(--brand-success-light); }
+.bcon__plate--info::before    { background: var(--brand-info); }
+.bcon__plate--warning::before { background: var(--brand-warning-alt); }
+.bcon__plate--danger::before  { background: var(--brand-danger); }
+.bcon__plate--navy::before    { background: var(--brand-navy); }
+
+.bcon__plate-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.bcon__plate-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--brand-grey-500);
+  margin: 0;
+}
+
+.bcon__plate-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--brand-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.bcon__plate-icon--primary { background: linear-gradient(135deg, #fffbeb, #fef3c7); color: var(--brand-navy); border: 1px solid #fde68a; }
+.bcon__plate-icon--success { background: var(--brand-success-bg); color: var(--brand-success); border: 1px solid #bbf7d0; }
+.bcon__plate-icon--info    { background: var(--brand-info-bg); color: var(--brand-info); border: 1px solid #bfdbfe; }
+.bcon__plate-icon--warning { background: var(--brand-warning-bg); color: var(--brand-warning-text); border: 1px solid #fde68a; }
+.bcon__plate-icon--danger  { background: var(--brand-danger-bg); color: var(--brand-danger); border: 1px solid #fecaca; }
+
+.bcon__plate-value {
+  font-family: var(--bcon-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  line-height: 1;
+  margin: 0;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.bcon__plate-value small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand-grey-450);
+  letter-spacing: 0;
+}
+
+.bcon__plate-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--brand-grey-450);
+}
+.bcon__plate-foot--up { color: var(--brand-success); }
+.bcon__plate-foot--down { color: var(--brand-danger); }
+
+/* ============================================================================
+   PANELS — section cards with a manifest header strip
+   ============================================================================ */
+.bcon__panel {
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-md);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+.bcon__panel:hover { box-shadow: var(--brand-shadow-sm); }
+
+.bcon__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  background: var(--brand-grey-100);
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.bcon__panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+  margin: 0;
+}
+.bcon__panel-title i { color: var(--brand-primary); font-size: 0.8rem; }
+
+.bcon__panel-head--navy {
+  background: var(--brand-gradient-navy);
+  border-bottom-color: var(--brand-navy);
+}
+.bcon__panel-head--navy .bcon__panel-title { color: #fff; }
+
+.bcon__panel-link {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-navy);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: color 0.15s ease, gap 0.15s ease;
+}
+.bcon__panel-link:hover { color: var(--brand-primary-dark); gap: 0.5rem; }
+
+.bcon__panel-body { padding: 1rem; }
+.bcon__panel-body--flush { padding: 0; }
+
+/* Panel footer link (full-width, centered) */
+.bcon__panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  border-top: 1px solid var(--brand-grey-200);
+  background: var(--brand-grey-100);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-navy);
+  text-decoration: none;
+  transition: color 0.15s ease, background 0.15s ease, gap 0.15s ease;
+}
+.bcon__panel-foot:hover { color: var(--brand-primary-dark); background: var(--brand-grey-200); gap: 0.55rem; }
+
+/* ============================================================================
+   LEDGER TABLE — manifest rows, mono figures, sticky head, mobile stacked cards
+   ============================================================================ */
+.bcon__ledger-wrap { width: 100%; overflow-x: auto; }
+
+.bcon__ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.bcon__ledger thead th {
+  position: sticky;
+  top: 0;
+  background: var(--brand-grey-100);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+  text-align: left;
+  border-bottom: 1px solid var(--brand-grey-200);
+  white-space: nowrap;
+}
+.bcon__ledger td {
+  padding: 0.625rem 0.875rem;
+  color: var(--brand-grey-700);
+  border-bottom: 1px solid var(--brand-grey-100);
+  vertical-align: middle;
+}
+.bcon__ledger tbody tr { transition: background 0.15s ease; }
+.bcon__ledger tbody tr:hover { background: var(--brand-grey-100); }
+.bcon__ledger tbody tr:last-child td { border-bottom: none; }
+
+.bcon__num {
+  font-family: var(--bcon-mono);
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  font-variant-numeric: tabular-nums;
+}
+.bcon__amount {
+  font-family: var(--bcon-mono);
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bcon__amount--success { color: var(--brand-success); }
+.bcon__amount--warning { color: var(--brand-warning-text); }
+.bcon__amount--danger  { color: var(--brand-danger); }
+.bcon__td--right { text-align: right; }
+.bcon__ledger input[type="number"].form-control-sm { max-width: 5.5rem; display: inline-block; }
+.bcon__ledger td .form-check-input { margin: 0; }
+
+/* ============================================================================
+   BADGES — status pills (icon + color, never color alone)
+   ============================================================================ */
+.bcon__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.22rem 0.55rem;
+  border-radius: 2rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.bcon__badge i { font-size: 0.7em; }
+.bcon__badge--success { background: var(--brand-success-bg); color: var(--brand-success); }
+.bcon__badge--warning { background: var(--brand-warning-bg); color: var(--brand-warning-text); }
+.bcon__badge--danger  { background: var(--brand-danger-bg); color: var(--brand-danger); }
+.bcon__badge--info    { background: var(--brand-info-bg); color: var(--brand-info); }
+.bcon__badge--muted   { background: var(--brand-grey-200); color: var(--brand-grey-600); }
+.bcon__badge--navy    { background: rgba(0,31,63,0.08); color: var(--brand-navy); }
+
+/* Form helper bits */
+.bcon__switch { width: 3rem; height: 1.5rem; }
+.bcon__swatch { width: 3rem; height: 2.5rem; padding: 0.15rem; }
+.bcon__hex { max-width: 7rem; }
+.bcon__toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.bcon__toggle-row__title { font-size: 0.85rem; font-weight: 700; color: var(--brand-grey-800); margin: 0; }
+.bcon__toggle-row__sub { font-size: 0.75rem; color: var(--brand-grey-500); margin: 0.15rem 0 0; }
+
+/* Inline icon color helpers */
+.bcon__dot { font-size: 0.5em; vertical-align: middle; }
+.bcon__i-danger { color: var(--brand-danger); }
+.bcon__i-success { color: var(--brand-success); }
+.bcon__i-warning { color: var(--brand-warning-alt); }
+.bcon__i-info { color: var(--brand-info); }
+
+/* Zone / meta chip */
+.bcon__chip {
+  font-family: var(--bcon-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  background: var(--brand-grey-100);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--brand-grey-200);
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   COD / MONEY PLATE — amber manifest strip for cash figures
+   ============================================================================ */
+.bcon__money {
+  position: relative;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid #fde68a;
+  border-radius: var(--brand-radius-md);
+  padding: 1rem 1.125rem;
+  overflow: hidden;
+}
+.bcon__money-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--brand-warning-text);
+  margin: 0 0 0.35rem;
+}
+.bcon__money-value {
+  font-family: var(--bcon-mono);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--brand-navy);
+  line-height: 1;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.bcon__money-value small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand-warning-text);
+  margin-right: 0.25rem;
+}
+
+/* ============================================================================
+   EMPTY STATE
+   ============================================================================ */
+.bcon__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+}
+.bcon__empty i { font-size: 2.75rem; color: var(--brand-grey-300); }
+.bcon__empty-title { font-size: 0.95rem; font-weight: 700; color: var(--brand-grey-700); margin: 0.25rem 0 0; }
+.bcon__empty-text { font-size: 0.8125rem; color: var(--brand-grey-500); margin: 0; max-width: 22rem; }
+
+/* ============================================================================
+   ENTRANCE MOTION (staggered plates) — respects reduced motion
+   ============================================================================ */
+@keyframes bcon-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.bcon__rise { animation: bcon-rise 0.4s ease both; }
+.bcon__rise--1 { animation-delay: 0.04s; }
+.bcon__rise--2 { animation-delay: 0.08s; }
+.bcon__rise--3 { animation-delay: 0.12s; }
+.bcon__rise--4 { animation-delay: 0.16s; }
+.bcon__rise--5 { animation-delay: 0.20s; }
+.bcon__rise--6 { animation-delay: 0.24s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bcon__rise { animation: none; }
+  .bcon__btn:hover, a.bcon__plate:hover { transform: none; }
+}
+
+/* ============================================================================
+   RESPONSIVE — ledger collapses to stacked manifest cards
+   ============================================================================ */
+@media (max-width: 768px) {
+  .bcon__title { font-size: 1.15rem; }
+  .bcon__plate-value { font-size: 1.3rem; }
+  .bcon__header { align-items: flex-start; }
+  .bcon__actions { width: 100%; }
+  .bcon__actions .bcon__btn { flex: 1 1 auto; justify-content: center; }
+
+  .bcon__ledger thead { display: none; }
+  .bcon__ledger tbody tr {
+    display: block;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--brand-grey-200);
+    border-left: var(--bcon-edge) solid var(--brand-primary);
+    border-radius: var(--brand-radius-sm);
+    padding: 0.5rem 0.75rem;
+  }
+  .bcon__ledger td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: none;
+    padding: 0.3rem 0;
+  }
+  .bcon__ledger td::before {
+    content: attr(data-label);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--brand-grey-500);
+  }
+  .bcon__amount { text-align: right; }
+}
+
+/* ============================================================================
+   MOBILE PWA ELEVATION — bring the business PWA (.business-mobile) into the
+   Dispatch Manifest language. Scoped to .business-mobile so the FLEET driver
+   PWA (fleet-mobile) is never affected. Only pwa-* elements (rendered <768px).
+   ============================================================================ */
+@media (max-width: 767.98px) {
+
+  /* Monospace tabular figures for every value / amount */
+  .business-mobile .pwa-business-hero__stat-value,
+  .business-mobile .pwa-stat-card__value,
+  .business-mobile .pwa-finance-stat__value,
+  .business-mobile .pwa-cod-card__value,
+  .business-mobile .pwa-billing-card__value,
+  .business-mobile .pwa-txn-item__amount,
+  .business-mobile .pwa-dash-item__number,
+  .business-mobile .pwa-dash-item__amount {
+    font-family: var(--bcon-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* Hero → cockpit: faint manifest grid + yellow index bar */
+  .business-mobile .pwa-business-hero {
+    position: relative;
+    overflow: hidden;
+    border-top: 2px solid var(--brand-primary);
+  }
+  .business-mobile .pwa-business-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 100% 1.5rem;
+    pointer-events: none;
+  }
+  .business-mobile .pwa-business-hero__subtitle {
+    font-family: var(--bcon-mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Cards get a left index edge */
+  .business-mobile .pwa-finance-stat,
+  .business-mobile .pwa-stat-card {
+    border-left: 3px solid var(--brand-grey-300);
+    text-align: left;
+  }
+  .business-mobile .pwa-stats-grid .pwa-finance-stat:nth-child(1) { border-left-color: var(--brand-primary); }
+  .business-mobile .pwa-stats-grid .pwa-finance-stat:nth-child(2) { border-left-color: var(--brand-warning-alt); }
+  .business-mobile .pwa-stats-grid .pwa-finance-stat:nth-child(3) { border-left-color: var(--brand-success-bright); }
+  .business-mobile .pwa-stats-grid .pwa-finance-stat:nth-child(4) { border-left-color: var(--brand-danger); }
+  .business-mobile .pwa-finance-stat__label { text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+
+  /* Transaction rows → manifest lines with index edge */
+  .business-mobile .pwa-txn-item {
+    border-left: 3px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+  }
+  .business-mobile .pwa-txn-item__type { font-weight: 700; }
+
+  /* COD card → amber money plate */
+  .business-mobile .pwa-cod-card {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid #fde68a;
+    border-left: 3px solid var(--brand-primary);
+  }
+  .business-mobile .pwa-cod-card__label { font-weight: 600; color: var(--brand-warning-text); }
+
+  /* Billing card index edge */
+  .business-mobile .pwa-billing-card { border-left: 3px solid var(--brand-navy); }
+
+  /* Section headers get a yellow index tick */
+  .business-mobile .pwa-section-header__title {
+    position: relative;
+    padding-left: 0.6rem;
+  }
+  .business-mobile .pwa-section-header__title::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0.15em; bottom: 0.15em;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--brand-primary);
+  }
+}
+
+/* ============================================================================
+   ORDERS FILTER — clean, compact, restrained. Scoped to .business-dashboard
+   (orders.css classes kept for JS). Neutral palette, hairline borders, one
+   navy accent for the primary action; no mono/uppercase, no loud edges.
+   ============================================================================ */
+/* One bordered card: toolbar (.ofb) + body */
+.business-dashboard .ofb {
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm) var(--brand-radius-sm) 0 0;
+  padding: 0.45rem 0.7rem;
+}
+.business-dashboard .ofb__body {
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-top: none;
+  border-radius: 0 0 var(--brand-radius-sm) var(--brand-radius-sm);
+  padding: 0.75rem;
+}
+.business-dashboard .ofb__body .row {
+  --bs-gutter-y: 0.6rem;
+  --bs-gutter-x: 0.5rem;
+}
+/* One-line filter row — fields flex to fit, Customer gets extra width */
+.business-dashboard .ofb__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: flex-end;
+}
+.business-dashboard .ofb__filters__col {
+  flex: 1 1 0;
+  min-width: 4.75rem;
+}
+.business-dashboard .ofb__filters__col--wide {
+  flex: 1.9 1 0;
+  min-width: 8rem;
+}
+@media (min-width: 992px) {
+  .business-dashboard .ofb__filters { flex-wrap: nowrap; }
+}
+
+/* Toggle — quiet, borderless */
+.business-dashboard .ofb__toggle {
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand-grey-700);
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0 0.25rem;
+}
+.business-dashboard .ofb__toggle:hover { color: var(--brand-navy); background: transparent; }
+.business-dashboard .ofb__count {
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Labels — small and quiet */
+.business-dashboard .ofb__body .form-label {
+  display: block;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  margin-bottom: 0.2rem;
+  line-height: 1;
+}
+
+/* Inputs + selects — compact 30px, hairline border */
+.business-dashboard .ofb__body .form-control,
+.business-dashboard .ofb__body .form-select {
+  height: 1.9rem;
+  min-height: 1.9rem;
+  padding: 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.9rem;
+  color: var(--brand-grey-800);
+  background-color: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.375rem;
+  box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.business-dashboard .ofb__body .form-control::placeholder { color: var(--brand-grey-400); font-weight: 400; }
+/* Subtle grey caret */
+.business-dashboard .ofb__body .form-select {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 1.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%236c757d' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 0.5rem;
+}
+.business-dashboard .ofb__body .form-control:hover,
+.business-dashboard .ofb__body .form-select:hover { border-color: var(--brand-grey-400); }
+.business-dashboard .ofb__body .form-control:focus,
+.business-dashboard .ofb__body .form-select:focus {
+  border-color: var(--brand-navy);
+  box-shadow: 0 0 0 2px rgba(0, 31, 63, 0.08);
+  outline: none;
+}
+.business-dashboard .ofb__body input[type="date"] { font-size: 0.75rem; }
+
+/* Buttons — compact; search solid navy, the rest quiet ghost */
+.business-dashboard .oal__filter-btn {
+  height: 1.9rem;
+  padding: 0 0.65rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.business-dashboard .oal__filter-btn--clear,
+.business-dashboard .oal__filter-btn--save,
+.business-dashboard .oal__filter-btn--load {
+  background: transparent;
+  color: var(--brand-grey-600);
+  border-color: var(--brand-grey-200);
+}
+.business-dashboard .oal__filter-btn--clear:hover,
+.business-dashboard .oal__filter-btn--save:hover,
+.business-dashboard .oal__filter-btn--load:hover {
+  background: var(--brand-grey-100);
+  color: var(--brand-grey-800);
+  border-color: var(--brand-grey-300);
+}
+.business-dashboard .oal__filter-btn--search:hover { transform: none; box-shadow: none; }
+
+/* Quick pills — compact, quiet, squared */
+.business-dashboard .oal__quick-pill {
+  height: 1.75rem;
+  padding: 0 0.65rem;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-200);
+  color: var(--brand-grey-600);
+}
+.business-dashboard .oal__quick-pill:hover {
+  background: var(--brand-grey-200);
+  color: var(--brand-navy);
+  border-color: var(--brand-grey-300);
+}
+
+/* Active filter chips — quiet */
+.business-dashboard .ofb__tag {
+  font-family: inherit;
+  font-size: 0.7rem;
+}
+.business-dashboard .ofb__tags-label {
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+}

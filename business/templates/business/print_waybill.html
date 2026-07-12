@@ -8,7 +8,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Waybill - {{ user_business.business_name }}</title>
-  <link rel="stylesheet" href="{% static 'business/css/business-waybill.css' %}?v=20260630i">
+  <link rel="stylesheet" href="{% static 'business/css/business-waybill.css' %}?v=20260711b">
 </head>
 <body>
   <div class="bwb__toolbar">
@@ -30,10 +30,6 @@
       {% with order=w.order %}
       <div class="bwb__label">
         <div class="bwb__head">
-          <div class="bwb__head-left">
-            <div class="bwb__head-title">Ezzy Delivery Qatar</div>
-            <div class="bwb__head-sub">Ecommerce Delivery Partner</div>
-          </div>
           <img class="bwb__logo" src="{% static 'webpages/img/ezzy-logo-bw.png' %}" alt="EzzyDelivery">
           <div class="bwb__head-right">
             {% if order.delivery_speed == 'express' %}
@@ -60,6 +56,13 @@
             <div class="bwb__text">
               {% if order.pickup_location %}{{ order.pickup_location.pickup_location_title }} · {{ order.pickup_location.locality }}{% endif %}
             </div>
+            {% if order.pickup_location.pickup_zone_no %}
+            <div class="bwb__zsb">
+              <span class="bwb__chip">Zone {{ order.pickup_location.pickup_zone_no }}{% if w.from_zone_name %} · {{ w.from_zone_name }}{% endif %}</span>
+              {% if order.pickup_location.pickup_street_no %}<span class="bwb__chip">St {{ order.pickup_location.pickup_street_no }}</span>{% endif %}
+              {% if order.pickup_location.pickup_building_no %}<span class="bwb__chip">Bldg {{ order.pickup_location.pickup_building_no }}</span>{% endif %}
+            </div>
+            {% endif %}
           </div>
 
           <div class="bwb__box bwb__box--party">
@@ -68,11 +71,16 @@
             <div class="bwb__text">{{ order.customer_phone }}</div>
             <div class="bwb__addr">{{ order.customer_address }}</div>
             <div class="bwb__zsb">
-              {% if order.dl_zone %}<span class="bwb__chip">Zone {{ order.dl_zone }}</span>{% endif %}
+              {% if order.dl_zone %}<span class="bwb__chip">Zone {{ order.dl_zone }}{% if w.to_zone_name %} · {{ w.to_zone_name }}{% endif %}</span>{% endif %}
               {% if order.dl_street %}<span class="bwb__chip">St {{ order.dl_street }}</span>{% endif %}
               {% if order.dl_building %}<span class="bwb__chip">Bldg {{ order.dl_building }}</span>{% endif %}
             </div>
           </div>
+        </div>
+
+        <div class="bwb__writebox">
+          <div class="bwb__box-label">Delivery notes</div>
+          <div class="bwb__writespace"></div>
         </div>
 
         <div class="bwb__cod{% if not order.cod_amount or order.cod_amount <= 0 %} bwb__cod--paid{% endif %}">

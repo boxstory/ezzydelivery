@@ -158,21 +158,7 @@
       </table>
     </div>
 
-    {% if page_obj.has_other_pages %}
-    <div class="bor__pagination">
-      {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="bor__page-btn">
-        <i class="fa-solid fa-chevron-left"></i> Previous
-      </a>
-      {% endif %}
-      <span class="bor__page-info">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-      {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="bor__page-btn">
-        Next <i class="fa-solid fa-chevron-right"></i>
-      </a>
-      {% endif %}
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="bor" %}
   </div>
 </div>
 {% endblock %}

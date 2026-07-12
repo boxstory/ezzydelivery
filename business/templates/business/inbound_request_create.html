@@ -1,4 +1,5 @@
 {% extends "business_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}New Inbound Request{% endblock %}
@@ -43,8 +44,8 @@
                 <label for="business" class="bir__form-label">Business <span class="text-danger">*</span></label>
                 <select name="business" id="business" class="form-select" required>
                   <option value="">Select Business</option>
-                  {% for b in businesses %}
-                  <option value="{{ b.pk }}" {% if selected_business_id == b.pk|stringformat:"d" %}selected{% endif %}>{{ b.business_name }} ({{ b.business_code }})</option>
+                  {% for b in businesses|code_last %}
+                  <option value="{{ b.pk }}" {% if selected_business_id == b.pk|stringformat:"d" %}selected{% endif %}>{% if b.business_code %}{{ b.business_code }}{% else %}*{{ b.business_id }}{% endif %} - {{ b.business_name }}</option>
                   {% endfor %}
                 </select>
               </div>

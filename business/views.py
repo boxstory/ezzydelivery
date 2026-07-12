@@ -2245,6 +2245,20 @@ def business_cod_statement(request):
 # =============================================================================
 
 
+def _get_per_page(request, default=50):
+    """Validated per_page for brand pagination. Allowed: 10, 25, 50, 100."""
+    per_page = request.GET.get('per_page')
+    if per_page:
+        try:
+            if int(per_page) not in [10, 25, 50, 100]:
+                per_page = default
+        except (ValueError, TypeError):
+            per_page = default
+    else:
+        per_page = default
+    return str(per_page)
+
+
 @login_required(login_url='/accounts/login/')
 def inbound_requests_list(request):
     """
@@ -2291,9 +2305,12 @@ def inbound_requests_list(request):
     )
 
     # Pagination
-    paginator = Paginator(requests_qs, 20)
+    per_page = _get_per_page(request)
+    paginator = Paginator(requests_qs, int(per_page))
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
+
+    filter_params = f'status={status_filter}' if status_filter else ''
 
     context = {
         'page_title': 'Inbound Requests',
@@ -2301,6 +2318,8 @@ def inbound_requests_list(request):
         'page_obj': page_obj,
         'stats': stats,
         'status_filter': status_filter,
+        'per_page': per_page,
+        'filter_params': filter_params,
         'is_staff': is_staff,
     }
     return render(request, 'business/inbound_requests_list.html', context)
@@ -2511,9 +2530,12 @@ def outbound_requests_list(request):
     stats = stats_agg
 
     # Pagination
-    paginator = Paginator(requests_qs, 20)
+    per_page = _get_per_page(request)
+    paginator = Paginator(requests_qs, int(per_page))
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
+
+    filter_params = f'status={status_filter}' if status_filter else ''
 
     context = {
         'page_title': 'Outbound Requests',
@@ -2521,6 +2543,8 @@ def outbound_requests_list(request):
         'page_obj': page_obj,
         'stats': stats,
         'status_filter': status_filter,
+        'per_page': per_page,
+        'filter_params': filter_params,
     }
     return render(request, 'business/outbound_requests_list.html', context)
 
@@ -3140,6 +3164,7 @@ def print_waybill(request):
     """
     import base64
     from orders.models import Order
+    from delivery.models import ZoneName
     from delivery.label_utils import generate_barcode_image
 
     raw_ids = request.GET.getlist('order_ids') or request.POST.getlist('order_ids')
@@ -3150,13 +3175,37 @@ def print_waybill(request):
         business=request.current_business,
     ).select_related('business', 'pickup_location').prefetch_related('order_items__product')
 
+    # Resolve zone numbers -> English zone names for both sender (pickup) and
+    # recipient (delivery) in a single query.
+    zone_nums = set()
+    for order in orders:
+        if order.dl_zone and str(order.dl_zone).isdigit():
+            zone_nums.add(int(order.dl_zone))
+        if order.pickup_location and order.pickup_location.pickup_zone_no:
+            zone_nums.add(int(order.pickup_location.pickup_zone_no))
+    zone_names = dict(
+        ZoneName.objects.filter(zone_number__in=zone_nums)
+        .values_list('zone_number', 'zone_name')
+    )
+
+    def _zone_name(zone_no):
+        if zone_no and str(zone_no).isdigit():
+            return zone_names.get(int(zone_no), '')
+        return ''
+
     waybills = []
     for order in orders:
         barcode_b64 = ''
         buf = generate_barcode_image(order.order_number)
         if buf:
             barcode_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
-        waybills.append({'order': order, 'barcode_b64': barcode_b64})
+        pickup_zone = order.pickup_location.pickup_zone_no if order.pickup_location else None
+        waybills.append({
+            'order': order,
+            'barcode_b64': barcode_b64,
+            'from_zone_name': _zone_name(pickup_zone),
+            'to_zone_name': _zone_name(order.dl_zone),
+        })
 
     return render(request, 'business/print_waybill.html', {
         'waybills': waybills,

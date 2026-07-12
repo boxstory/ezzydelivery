@@ -81,104 +81,98 @@
      Desktop View (visible >= 768px only)
      ========================================== -->
 <div class="d-none d-md-block" id="transactions_desktop_view">
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col-12">
-      <h1 class="h3 mb-0">Transactions</h1>
-      <p class="text-muted">{{ business.business_name }} - Transaction History</p>
-    </div>
-  </div>
-
-  <!-- Filters -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <form method="GET" class="row g-3">
-            <div class="col-md-4">
-              <label for="type" class="form-label">Transaction Type</label>
-              <select name="type" id="type" class="form-select">
-                <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Types</option>
-                {% for type_val, type_label in transaction_types %}
-                <option value="{{ type_val }}" {% if selected_type == type_val %}selected{% endif %}>{{ type_label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label for="days" class="form-label">Time Period</label>
-              <select name="days" id="days" class="form-select">
-                <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
-                <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
-                <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
-                <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
-              </select>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary">Apply Filter</button>
-            </div>
-          </form>
-        </div>
+<div class="bcon__page pt-3">
+  <div class="bcon__header">
+    <div class="bcon__header-main">
+      <div class="bcon__eyebrow">
+        <span>{{ business.business_name|truncatechars:22 }}</span>
+        <span class="bcon__eyebrow-sep"></span>
+        <span>Finance</span>
+        <span class="bcon__eyebrow-sep"></span>
+        <span class="bcon__eyebrow-live">Ledger</span>
       </div>
+      <h1 class="bcon__title"><i class="fa-solid fa-clock-rotate-left"></i> Transactions</h1>
+    </div>
+    <div class="bcon__actions">
+      <a href="{% url 'business:business_finance_dashboard' %}" class="bcon__btn bcon__btn--ghost"><i class="fas fa-arrow-left"></i> Back to Finance</a>
     </div>
   </div>
+</div>
 
-  <!-- Transactions Table -->
-  <div class="row">
-    <div class="col-12">
-      <div class="listing-container">
-        <div class="listing-header">
-          <h6 class="listing-title"><i class="fas fa-receipt me-2 text-primary"></i>Transactions</h6>
-          <a href="{% url 'business:business_finance_dashboard' %}" class="btn btn-sm btn-outline-secondary">Back to Finance</a>
-        </div>
-        <table class="listing-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Code</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Driver</th>
-              <th>Task</th>
-              <th class="text-end">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for txn in transactions %}
-            <tr>
-              <td>{{ txn.created_at|date:"d M" }}<br><span class="text-muted" style="font-size: 0.65rem;">{{ txn.created_at|time:"H:i" }}</span></td>
-              <td><code>{{ txn.transaction_code|default:"-" }}</code></td>
-              <td>
-                <span class="listing-status
-                  {% if txn.transaction_type == 'cod_client_settle' %}success
-                  {% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}primary
-                  {% elif txn.transaction_type == 'bills_payable' %}danger
-                  {% elif txn.transaction_type == 'bills_receivable' %}success
-                  {% else %}{% endif %}">
-                  {% if txn.transaction_type == 'cod_client_settle' %}<i class="fas fa-handshake"></i>
-                  {% elif txn.transaction_type == 'delivery_charge' %}<i class="fas fa-truck"></i>
-                  {% elif txn.transaction_type == 'fulfillment_charge' %}<i class="fas fa-box"></i>
-                  {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
-                </span>
-                {{ txn.get_transaction_type_display }}
-              </td>
-              <td class="text-2line" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
-              <td>{% if txn.driver %}{{ txn.driver.user.first_name }}{% else %}-{% endif %}</td>
-              <td>{% if txn.delivery_task %}<code>#{{ txn.delivery_task.dl_task_number }}</code>{% else %}-{% endif %}</td>
-              <td class="text-end fw-bold {% if txn.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
-                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
-              </td>
-            </tr>
-            {% empty %}
-            <tr>
-              <td colspan="7" class="listing-empty">
-                <i class="fas fa-receipt"></i>
-                No transactions found for the selected filters
-              </td>
-            </tr>
+<!-- Filters -->
+<div class="px-2 mb-1">
+  <div class="bcon__panel">
+    <div class="bcon__panel-body">
+      <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label for="type" class="form-label fw-semibold small">Transaction Type</label>
+          <select name="type" id="type" class="form-select">
+            <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Types</option>
+            {% for type_val, type_label in transaction_types %}
+            <option value="{{ type_val }}" {% if selected_type == type_val %}selected{% endif %}>{{ type_label }}</option>
             {% endfor %}
-          </tbody>
-        </table>
-      </div>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="days" class="form-label fw-semibold small">Time Period</label>
+          <select name="days" id="days" class="form-select">
+            <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+            <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+            <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+            <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="bcon__btn bcon__btn--primary"><i class="fa-solid fa-magnifying-glass"></i> Apply Filter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="px-2 bcon__rise bcon__rise--1">
+  <div class="bcon__panel">
+    <div class="bcon__panel-head">
+      <h5 class="bcon__panel-title"><i class="fa-solid fa-receipt"></i> Transactions</h5>
+    </div>
+    <div class="bcon__panel-body--flush bcon__ledger-wrap">
+      <table class="bcon__ledger">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Code</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Driver</th>
+            <th>Task</th>
+            <th class="bcon__td--right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for txn in transactions %}
+          <tr>
+            <td data-label="Date" class="bcon__num">{{ txn.created_at|date:"d M" }} <small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
+            <td data-label="Code"><span class="bcon__chip">{{ txn.transaction_code|default:"-" }}</span></td>
+            <td data-label="Type">
+              {% if txn.transaction_type == 'cod_client_settle' %}<span class="bcon__badge bcon__badge--success"><i class="fas fa-handshake"></i> {{ txn.get_transaction_type_display }}</span>
+              {% elif txn.transaction_type == 'delivery_charge' %}<span class="bcon__badge bcon__badge--info"><i class="fas fa-truck"></i> {{ txn.get_transaction_type_display }}</span>
+              {% elif txn.transaction_type == 'fulfillment_charge' %}<span class="bcon__badge bcon__badge--info"><i class="fas fa-box"></i> {{ txn.get_transaction_type_display }}</span>
+              {% elif txn.transaction_type == 'bills_payable' %}<span class="bcon__badge bcon__badge--danger"><i class="fas fa-exchange-alt"></i> {{ txn.get_transaction_type_display }}</span>
+              {% else %}<span class="bcon__badge bcon__badge--muted"><i class="fas fa-exchange-alt"></i> {{ txn.get_transaction_type_display }}</span>{% endif %}
+            </td>
+            <td data-label="Description" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-"|truncatewords:8 }}</td>
+            <td data-label="Driver">{% if txn.driver %}{{ txn.driver.user.first_name }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+            <td data-label="Task">{% if txn.delivery_task %}<span class="bcon__chip">#{{ txn.delivery_task.dl_task_number }}</span>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+            <td data-label="Amount" class="bcon__amount {% if txn.amount >= 0 %}bcon__amount--success{% else %}bcon__amount--danger{% endif %}">
+              {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small>QAR</small>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7"><div class="bcon__empty"><i class="fa-solid fa-receipt"></i><p class="bcon__empty-title">No transactions</p><p class="bcon__empty-text">Nothing matches the selected filters.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
