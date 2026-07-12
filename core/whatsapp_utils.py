@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import requests
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 from .models import WhatsAppVerification
@@ -614,43 +615,54 @@ def verify_code(phone_number, code, verification_type):
                 'verification': None
             }
 
-        # Check if expired
-        if verification.is_expired():
-            return {
-                'success': False,
-                'error': 'Verification code expired',
-                'verification': verification
-            }
+        # Consume an attempt atomically: re-fetch the row under a lock so that
+        # concurrent verifications serialize on it. Without the lock, N parallel
+        # guesses all read the same `attempts` value and the lost-update leaves
+        # the counter far below N, bypassing the max_attempts brute-force cap.
+        with transaction.atomic():
+            verification = (
+                WhatsAppVerification.objects
+                .select_for_update()
+                .get(pk=verification.pk)
+            )
 
-        # Check if too many attempts
-        if not verification.can_attempt():
-            return {
-                'success': False,
-                'error': 'Too many verification attempts',
-                'verification': verification
-            }
+            # Check if expired
+            if verification.is_expired():
+                return {
+                    'success': False,
+                    'error': 'Verification code expired',
+                    'verification': verification
+                }
 
-        # Increment attempts
-        verification.attempts += 1
-        verification.save()
+            # Check if too many attempts
+            if not verification.can_attempt():
+                return {
+                    'success': False,
+                    'error': 'Too many verification attempts',
+                    'verification': verification
+                }
 
-        # Check code (constant-time to avoid a timing side-channel on the OTP)
-        if hmac.compare_digest(str(verification.verification_code), str(code)):
-            verification.is_verified = True
-            verification.verified_at = timezone.now()
+            # Increment attempts
+            verification.attempts += 1
             verification.save()
 
-            return {
-                'success': True,
-                'message': 'Code verified successfully',
-                'verification': verification
-            }
-        else:
-            return {
-                'success': False,
-                'error': 'Invalid verification code',
-                'verification': verification
-            }
+            # Check code (constant-time to avoid a timing side-channel on the OTP)
+            if hmac.compare_digest(str(verification.verification_code), str(code)):
+                verification.is_verified = True
+                verification.verified_at = timezone.now()
+                verification.save()
+
+                return {
+                    'success': True,
+                    'message': 'Code verified successfully',
+                    'verification': verification
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Invalid verification code',
+                    'verification': verification
+                }
 
     except Exception as e:
         return {

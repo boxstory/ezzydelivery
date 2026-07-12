@@ -9134,9 +9134,19 @@ def earnings_verification_action(request):
                 task.driver_earnings = final_earnings
                 task.save()
 
-                # Update driver's pending_earnings and create audit trail via WalletService
+                # Update driver's pending_earnings and create audit trail via WalletService.
+                # Idempotency guard: never credit earnings twice for the same task
+                # (e.g. publish -> verify -> publish would otherwise double-credit
+                # pending_earnings). Skip if an earning transaction already exists.
                 if task.driver:
                     from fleet.wallet_service import WalletService
+                    if fleet_models.DriverTransaction.objects.filter(
+                        delivery_task=task,
+                        transaction_type='earning',
+                    ).exists():
+                        errors.append(f"Task {task_id} earnings already published (skipped)")
+                        continue
+
                     WalletService.record_transaction(
                         driver=task.driver,
                         transaction_type='earning',
@@ -21906,17 +21916,40 @@ def process_cod_return(request, task_id):
                      'then process the return.'
         }, status=400)
 
+    from fleet.wallet_service import WalletService
+    from decimal import Decimal, InvalidOperation
+
+    # Idempotency guard: never process a return twice for the same task.
+    # A second return would credit wallet_balance and debit cod_in_hand again,
+    # driving cod_in_hand negative and reversing more cash than was collected.
+    if fleet_models.DriverTransaction.objects.filter(
+        delivery_task=task,
+        transaction_type='cod_return',
+    ).exists():
+        return JsonResponse({'error': 'COD return already processed for this task'}, status=400)
+
     data = json.loads(request.body) if request.content_type == 'application/json' else {}
-    amount = data.get('amount', task.cod_collected_amount)
     notes = data.get('notes', '')
 
-    from fleet.wallet_service import WalletService
-    from decimal import Decimal
+    # Validate the (caller-supplied) amount: must be a positive number and may
+    # not exceed the COD actually collected on this task.
+    try:
+        amount = Decimal(str(data.get('amount', task.cod_collected_amount)))
+    except (InvalidOperation, ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid amount'}, status=400)
+
+    collected = Decimal(str(task.cod_collected_amount or 0))
+    if amount <= 0:
+        return JsonResponse({'error': 'Return amount must be positive'}, status=400)
+    if amount > collected:
+        return JsonResponse({
+            'error': f'Return amount ({amount}) exceeds COD collected ({collected})'
+        }, status=400)
 
     WalletService.record_cod_return(
         driver=task.driver,
         delivery_task=task,
-        amount=Decimal(str(amount)),
+        amount=amount,
         created_by=request.user,
         notes=notes or f'COD return for order {task.order.order_number}',
     )

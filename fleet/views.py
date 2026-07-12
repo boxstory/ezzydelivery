@@ -874,23 +874,58 @@ def cod_export(request):
             try:
                 # Submit COD to admin using wallet service
                 from fleet.wallet_service import WalletService
+                from django.db import transaction as db_transaction
+                from django.db.models import Sum as _Sum
 
                 # Only settle real-COD deliveries — never settle zero-COD/prepaid rows
                 settle_ids = [d.id for d in deliveries if d.cod_collected]
 
-                # Create COD deposit transaction
-                txn = WalletService.submit_cod_to_admin(
-                    driver=driver,
-                    amount=total_cod,
-                    created_by=request.user,
-                    reference_number=f"COD-SUBMIT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
-                    notes=f"COD submission for {len(settle_ids)} deliveries",
-                    payment_method='cash',
-                    delivery_ids=settle_ids
-                )
+                # Guard the submission the same way the PWA caller does:
+                # lock the driver row, derive the amount server-side from the
+                # actual unsettled COD tasks under the lock, and re-sync
+                # cod_in_hand before submitting so concurrent/duplicate submits
+                # cannot double-settle or drive balances out of sync.
+                with db_transaction.atomic():
+                    driver = fleet_models.Driver.objects.select_for_update().get(user_id=request.user.id)
 
-                messages.success(request, f'COD settlement of {total_cod} QR submitted successfully! Transaction: {txn.transaction_code}')
-                logger.info(f"Driver {driver.driver_id} submitted COD: {total_cod} QR for {deliveries.count()} deliveries")
+                    # Re-derive the settlement amount under the lock from the
+                    # still-unsettled tasks (never trust the pre-lock total)
+                    amount = delivery_models.DeliveryTask.objects.filter(
+                        id__in=settle_ids,
+                        driver=driver,
+                        cod_collected=True,
+                        cod_settled=False,
+                        dl_task_status__in=['delivered', 'partial_delivery']
+                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
+
+                    if amount <= 0:
+                        messages.error(request, 'No valid COD amount to submit (already settled?).')
+                        return redirect('fleet:cod_collection')
+
+                    # Sync cod_in_hand if it's out of date
+                    actual_cod = delivery_models.DeliveryTask.objects.filter(
+                        driver=driver,
+                        cod_collected=True,
+                        cod_settled=False,
+                        dl_task_status__in=['delivered', 'partial_delivery']
+                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
+                    if driver.cod_in_hand != actual_cod:
+                        driver.cod_in_hand = actual_cod
+                        driver.save(update_fields=['cod_in_hand'])
+
+                    # Create COD deposit transaction
+                    txn = WalletService.submit_cod_to_admin(
+                        driver=driver,
+                        amount=amount,
+                        created_by=request.user,
+                        reference_number=f"COD-SUBMIT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                        notes=f"COD submission for {len(settle_ids)} deliveries",
+                        payment_method='cash',
+                        delivery_ids=settle_ids
+                    )
+
+                messages.success(request, f'COD settlement of {amount} QR submitted successfully! Transaction: {txn.transaction_code}')
+                logger.info(f"Driver {driver.driver_id} submitted COD: {amount} QR for {len(settle_ids)} deliveries")
 
                 # Redirect to show success message instead of returning PDF
                 return redirect('fleet:cod_collection')

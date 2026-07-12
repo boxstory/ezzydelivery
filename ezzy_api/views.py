@@ -964,7 +964,18 @@ def driver_complete_task(request, task_id):
                 from decimal import Decimal
                 additional = Decimal(str(cod_amount_collected))
                 expected = Decimal(str(task.order.cod_amount)) if task.order.cod_amount else Decimal('0')
-                new_total = task.cod_collected_amount + additional
+                previous_collected = task.cod_collected_amount or Decimal('0')
+                new_total = previous_collected + additional
+
+                # Fix 19: Cap COD inflation — additional collection may not push the
+                # running total above 110% of expected (mirrors first-collection cap).
+                if expected > 0 and new_total > expected * Decimal('1.1'):
+                    logger.warning(
+                        f"COD INFLATION: Driver additional {additional} would total {new_total}, "
+                        f"expected {expected} for order {task.order.order_number}"
+                    )
+                    new_total = expected  # Cap at expected amount
+                    additional = new_total - previous_collected  # Effective amount recorded
 
                 # Update task with new total
                 task.cod_collected_amount = new_total
@@ -4200,6 +4211,11 @@ def driver_cod_submit(request):
     try:
         from fleet.wallet_service import WalletService
         with transaction.atomic():
+            # Lock driver and task rows to prevent concurrent double-submission
+            driver = fleet_models.Driver.objects.select_for_update().get(pk=driver.pk)
+            task = delivery_models.DeliveryTask.objects.select_for_update().get(pk=task.pk)
+            if task.cod_settled:
+                return Response({'error': 'COD for this task has already been submitted'}, status=status.HTTP_400_BAD_REQUEST)
             txn = WalletService.submit_cod_to_admin(
                 driver=driver,
                 amount=cod_amount,
@@ -4729,22 +4745,32 @@ def driver_cod_submit_bulk(request):
     if tasks.count() != len(task_ids):
         return Response({'error': 'One or more task_ids are invalid, not assigned to you, or COD not yet collected'}, status=status.HTTP_400_BAD_REQUEST)
 
-    total_amount = sum(t.cod_collected_amount or 0 for t in tasks)
-    if total_amount <= 0:
-        return Response({'error': 'Total COD amount is zero'}, status=status.HTTP_400_BAD_REQUEST)
-
     from fleet.wallet_service import WalletService
     cod_in_hand_before = driver.cod_in_hand
 
     try:
         with transaction.atomic():
+            # Lock driver and re-fetch only still-unsettled tasks under the lock
+            # to prevent concurrent double-submission of already-settled COD.
+            driver = fleet_models.Driver.objects.select_for_update().get(pk=driver.pk)
+            locked_tasks = list(
+                delivery_models.DeliveryTask.objects.select_for_update().filter(
+                    id__in=task_ids, driver=driver, cod_collected=True, cod_settled=False,
+                )
+            )
+            if not locked_tasks:
+                return Response({'error': 'No unsettled COD tasks to submit (already submitted?)'}, status=status.HTTP_400_BAD_REQUEST)
+            locked_ids = [t.id for t in locked_tasks]
+            total_amount = sum(t.cod_collected_amount or 0 for t in locked_tasks)
+            if total_amount <= 0:
+                return Response({'error': 'Total COD amount is zero'}, status=status.HTTP_400_BAD_REQUEST)
             txn = WalletService.submit_cod_to_admin(
                 driver=driver,
                 amount=total_amount,
                 created_by=request.user,
                 payment_method=payment_method,
                 notes=notes,
-                delivery_ids=list(task_ids),
+                delivery_ids=list(locked_ids),
             )
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -4756,7 +4782,7 @@ def driver_cod_submit_bulk(request):
         'payment_method': payment_method,
         'cod_in_hand_before': str(cod_in_hand_before),
         'cod_in_hand_after': str(driver.cod_in_hand),
-        'tasks_settled': len(task_ids),
+        'tasks_settled': len(locked_ids),
         'submitted_at': txn.created_at.isoformat(),
     }, status=status.HTTP_201_CREATED)
 

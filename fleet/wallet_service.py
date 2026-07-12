@@ -230,10 +230,14 @@ class WalletService:
 
         Returns:
             DriverTransaction instance
-        """
-        if driver.cod_in_hand < amount:
-            raise ValueError(f"Driver only has {driver.cod_in_hand} QR in hand, cannot submit {amount} QR")
 
+        Concurrency: the whole check-and-act runs in one transaction with the
+        driver row and the candidate task rows locked (select_for_update). The
+        deposit amount is derived from the tasks that are ACTUALLY newly settled
+        inside the lock, so two concurrent submissions of the same cash cannot
+        both decrement cod_in_hand, and a duplicate submission is a no-op
+        (nothing left to settle -> ValueError, no money movement).
+        """
         # Get payment method display name for description
         payment_method_display = {
             'cash': 'Cash',
@@ -242,65 +246,83 @@ class WalletService:
             'fawran': 'Fawran'
         }.get(payment_method, 'Cash')
 
-        trans = WalletService.record_transaction(
-            driver=driver,
-            transaction_type='cod_deposit',
-            amount=amount,
-            description=f"COD deposit to admin - {amount} QR via {payment_method_display}",
-            created_by=created_by,
-            reference_number=reference_number,
-            notes=notes,
-            payment_method=payment_method
-        )
-
-        # Mark corresponding delivery tasks as COD settled
-        settled_task_ids = []
         now = timezone.now()
-        if delivery_ids:
-            # Settle specific deliveries
-            settled_task_ids = list(DeliveryTask.objects.filter(
-                id__in=delivery_ids,
-                driver=driver,
-                cod_collected=True,
-                cod_settled=False
-            ).values_list('id', flat=True))
-            DeliveryTask.objects.filter(id__in=settled_task_ids).update(
-                cod_settled=True, cod_settled_at=now, cod_submission_txn=trans
-            )
-        else:
-            # No specific IDs provided - settle oldest unsettled tasks up to the deposit amount
-            remaining = Decimal(str(amount))
-            unsettled_tasks = DeliveryTask.objects.filter(
-                driver=driver,
-                cod_collected=True,
-                cod_settled=False
-            ).order_by('completed_at')
 
-            for task in unsettled_tasks:
-                task_cod = task.cod_collected_amount or Decimal('0')
-                if task_cod <= Decimal('0'):
-                    continue
-                if remaining >= task_cod:
+        with transaction.atomic():
+            # Lock the driver row for the entire check-and-act so concurrent
+            # submissions serialize instead of both reading a stale cod_in_hand.
+            driver = Driver.objects.select_for_update().get(pk=driver.pk)
+
+            # Lock the candidate unsettled tasks so a concurrent submission cannot
+            # claim the same rows. Determine which to settle and their COD sum.
+            base_qs = DeliveryTask.objects.select_for_update().filter(
+                driver=driver, cod_collected=True, cod_settled=False
+            )
+            settled_task_ids = []
+            settled_amount = Decimal('0')
+
+            if delivery_ids:
+                # Itemized submission: settle exactly the requested tasks that are
+                # still unsettled, and deposit their actual COD sum. This makes a
+                # duplicate submission of the same tasks a no-op.
+                for task in base_qs.filter(id__in=delivery_ids):
+                    task_cod = task.cod_collected_amount or Decimal('0')
+                    if task_cod <= Decimal('0'):
+                        continue
                     settled_task_ids.append(task.id)
-                    remaining -= task_cod
-                if remaining <= Decimal('0'):
-                    break
+                    settled_amount += task_cod
+
+                # Idempotency: the specific tasks were already settled -> no money moves.
+                if not settled_task_ids:
+                    raise ValueError("No unsettled COD found for this submission (already submitted?)")
+                deposit_amount = settled_amount
+            else:
+                # Amount-based submission: settle oldest unsettled tasks up to the
+                # requested amount, and deposit the requested amount. cod_in_hand is
+                # re-read under the lock below, so this is race-safe.
+                remaining = Decimal(str(amount))
+                for task in base_qs.order_by('completed_at'):
+                    task_cod = task.cod_collected_amount or Decimal('0')
+                    if task_cod <= Decimal('0'):
+                        continue
+                    if remaining >= task_cod:
+                        settled_task_ids.append(task.id)
+                        remaining -= task_cod
+                    if remaining <= Decimal('0'):
+                        break
+                deposit_amount = Decimal(str(amount))
+
+            # Re-validate against the freshly-locked balance. A concurrent submission
+            # that already ran will have reduced cod_in_hand, so the loser fails here.
+            if driver.cod_in_hand < deposit_amount:
+                raise ValueError(
+                    f"Driver only has {driver.cod_in_hand} QR in hand, cannot submit {deposit_amount} QR"
+                )
+
+            trans = WalletService.record_transaction(
+                driver=driver,
+                transaction_type='cod_deposit',
+                amount=deposit_amount,
+                description=f"COD deposit to admin - {deposit_amount} QR via {payment_method_display}",
+                created_by=created_by,
+                reference_number=reference_number,
+                notes=notes,
+                payment_method=payment_method
+            )
 
             if settled_task_ids:
                 DeliveryTask.objects.filter(id__in=settled_task_ids).update(
                     cod_settled=True, cod_settled_at=now, cod_submission_txn=trans
                 )
-
-        # Update order COD status to 'cod_with_ezzy' for settled tasks
-        if settled_task_ids:
-            from orders.models import Order
-            order_ids = list(DeliveryTask.objects.filter(
-                id__in=settled_task_ids
-            ).values_list('order_id', flat=True))
-            if order_ids:
-                Order.objects.filter(id__in=order_ids).update(
-                    cod_status_by_staff='cod_with_ezzy'
-                )
+                # Update order COD status to 'cod_with_ezzy' for settled tasks
+                from orders.models import Order
+                order_ids = list(DeliveryTask.objects.filter(
+                    id__in=settled_task_ids
+                ).values_list('order_id', flat=True))
+                if order_ids:
+                    Order.objects.filter(id__in=order_ids).update(
+                        cod_status_by_staff='cod_with_ezzy'
+                    )
 
         return trans
 
@@ -520,17 +542,39 @@ class WalletService:
 
         Returns:
             DriverTransaction instance
+
+        Idempotent: a second return for the same task is rejected so repeated
+        calls cannot keep crediting the driver and drive cod_in_hand negative.
+        The amount is validated positive and capped at what was collected.
         """
-        trans = WalletService.record_transaction(
-            driver=driver,
-            transaction_type='cod_return',
-            amount=amount,
-            description=f"COD return for task {delivery_task.dl_task_number}",
-            delivery_task=delivery_task,
-            created_by=created_by,
-            reference_number=delivery_task.dl_task_number,
-            notes=notes
-        )
+        amount = Decimal(str(amount or '0'))
+        if amount <= Decimal('0'):
+            raise ValueError("COD return amount must be positive")
+
+        collected = delivery_task.cod_collected_amount or Decimal('0')
+        if collected and amount > collected:
+            raise ValueError(
+                f"COD return {amount} exceeds collected amount {collected} for this task"
+            )
+
+        with transaction.atomic():
+            # Guard against a duplicate return for the same task.
+            already_returned = DriverTransaction.objects.filter(
+                delivery_task=delivery_task, transaction_type='cod_return'
+            ).exists()
+            if already_returned:
+                raise ValueError("A COD return has already been recorded for this task")
+
+            trans = WalletService.record_transaction(
+                driver=driver,
+                transaction_type='cod_return',
+                amount=amount,
+                description=f"COD return for task {delivery_task.dl_task_number}",
+                delivery_task=delivery_task,
+                created_by=created_by,
+                reference_number=delivery_task.dl_task_number,
+                notes=notes
+            )
         return trans
 
     @staticmethod
