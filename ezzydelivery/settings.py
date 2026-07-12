@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.facebook',
 
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'crispy_forms',
     'crispy_bootstrap5',
     'django_recaptcha',
@@ -496,6 +497,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
+        'ezzy_api.permissions.ApiKeyScopePermission',
     ],
     # API Rate Limiting / Throttling
     'DEFAULT_THROTTLE_CLASSES': [
@@ -506,6 +508,7 @@ REST_FRAMEWORK = {
         'anon': '100/hour',      # Anonymous users: 100 requests per hour
         'user': '1000/hour',     # Authenticated users: 1000 requests per hour
         'burst': '60/minute',    # Burst rate for specific endpoints
+        'login': '10/min',       # Login attempts per (IP, username)
     },
     # API Versioning
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
@@ -819,12 +822,32 @@ try:
     GROQ_API_KEY = config('GROQ_API_KEY') or ''
 except Exception:
     GROQ_API_KEY = ''
+try:
+    GLM_API_KEY = config('GLM_API_KEY') or ''
+except Exception:
+    GLM_API_KEY = ''
 
 # Provider selection per use-case
-AI_CHAT_PROVIDER = config('AI_CHAT_PROVIDER', default='anthropic')  # business dashboard
-AI_CHAT_MODEL    = config('AI_CHAT_MODEL',    default='claude-sonnet-4-6')
-AI_WA_PROVIDER   = config('AI_WA_PROVIDER',   default='anthropic')  # WhatsApp reply
-AI_WA_MODEL      = config('AI_WA_MODEL',      default='claude-sonnet-4-6')
+AI_CHAT_PROVIDER          = config('AI_CHAT_PROVIDER', default='anthropic')
+AI_CHAT_MODEL             = config('AI_CHAT_MODEL',    default='claude-sonnet-4-6')
+AI_WA_PROVIDER            = config('AI_WA_PROVIDER',   default='anthropic')
+AI_WA_MODEL               = config('AI_WA_MODEL',      default='claude-sonnet-4-6')
+try:
+    AI_CHAT_FALLBACK_PROVIDER = config('AI_CHAT_FALLBACK_PROVIDER', default='') or ''
+except Exception:
+    AI_CHAT_FALLBACK_PROVIDER = ''
+try:
+    AI_CHAT_FALLBACK_MODEL = config('AI_CHAT_FALLBACK_MODEL', default='') or ''
+except Exception:
+    AI_CHAT_FALLBACK_MODEL = ''
+try:
+    AI_WA_FALLBACK_PROVIDER = config('AI_WA_FALLBACK_PROVIDER', default='') or ''
+except Exception:
+    AI_WA_FALLBACK_PROVIDER = ''
+try:
+    AI_WA_FALLBACK_MODEL = config('AI_WA_FALLBACK_MODEL', default='') or ''
+except Exception:
+    AI_WA_FALLBACK_MODEL = ''
 
 AI_AGENT_MODEL = config('AI_AGENT_MODEL', default='claude-sonnet-4-6')
 AI_AGENT_MAX_TOKENS = config('AI_AGENT_MAX_TOKENS', default=4096, cast=int)
@@ -849,9 +872,9 @@ N8N_WHATSAPP_WEBHOOK_URL = config('N8N_WHATSAPP_WEBHOOK_URL', default='')
 N8N_WEBHOOK_SECRET_KEY = config('N8N_WEBHOOK_SECRET_KEY', default='')
 
 # Evolution API (WhatsApp)
-EVALUATION_URL = config('EVALUATION_URL', default='')
-EVALUATION_API_KEY = config('EVALUATION_API_KEY', default='')
-EVALUATION_INSTANCE = config('EVALUATION_INSTANCE', default='')
+EVOLUTION_URL = config('EVOLUTION_URL', default='')
+EVOLUTION_API_KEY = config('EVOLUTION_API_KEY', default='')
+EVOLUTION_INSTANCE = config('EVOLUTION_INSTANCE', default='')
 
 # ==========================================
 # END AI AGENT CONFIGURATION

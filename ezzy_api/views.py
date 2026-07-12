@@ -5,7 +5,9 @@ from django.contrib.auth.decorators import login_required
 import requests
 from rest_framework import permissions, status, viewsets
 from rest_framework import generics
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
+from ezzy_api.throttles import LoginRateThrottle
+from ezzy_api.permissions import require_admin_scope
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.authentication import TokenAuthentication
@@ -39,10 +41,14 @@ def get_api_user_business(request):
         return business
     # For DRF requests that might not have the cache attribute, query directly
     if hasattr(request, 'user') and request.user.is_authenticated:
-        try:
-            return business_models.Business.objects.get(user_id=request.user.id)
-        except business_models.Business.DoesNotExist:
-            return None
+        # Use filter().first() rather than get() so a user owning more than one
+        # business does not raise MultipleObjectsReturned (500).
+        return (
+            business_models.Business.objects
+            .filter(user_id=request.user.id)
+            .order_by('id')
+            .first()
+        )
     return None
 
 # Local aliases for commonly used models
@@ -75,6 +81,16 @@ class OrderList(generics.ListCreateAPIView):
         if business:
             return orders_models.Order.objects.filter(business=business)
         return orders_models.Order.objects.none()
+
+    def perform_create(self, serializer):
+        """Force the order onto the caller's own business — never trust a
+        `business` value from the request body (prevents creating orders under
+        another tenant)."""
+        from rest_framework.exceptions import PermissionDenied
+        business = get_api_user_business(self.request)
+        if not business:
+            raise PermissionDenied('No business is associated with this account')
+        serializer.save(business=business)
 
 
 
@@ -119,6 +135,7 @@ class TookanAPI:
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def driver_login(request):
     """Driver login API - returns authentication token"""
     username = request.data.get('username')
@@ -1173,6 +1190,10 @@ def driver_task_documents(request, task_id):
 @permission_classes([IsAuthenticated])
 def create_api_key(request):
     """Create a new API key for a client"""
+    # Managing keys requires the admin scope when called via an API key.
+    scope_err = require_admin_scope(request)
+    if scope_err:
+        return Response({'error': scope_err}, status=status.HTTP_403_FORBIDDEN)
     try:
         serializer = ezzy_api_serializers.ClientApiKeyCreateSerializer(data=request.data)
 
@@ -1182,6 +1203,7 @@ def create_api_key(request):
 
         business_id = serializer.validated_data['business_id']
         key_name = serializer.validated_data.get('key_name', '')
+        key_scope = serializer.validated_data.get('scope', ezzy_api_models.ClientApiKey.SCOPE_WRITE)
         expires_at = serializer.validated_data.get('expires_at')
 
         try:
@@ -1198,14 +1220,16 @@ def create_api_key(request):
             api_key = ezzy_api_models.ClientApiKey.objects.create(
                 business=business,
                 key_name=key_name,
+                scope=key_scope,
                 expires_at=expires_at,
                 created_by=request.user
             )
 
             logger.info(f"API key created successfully for business {business_id} by user {request.user.id}")
-            serializer = ezzy_api_serializers.ClientApiKeySerializer(api_key)
+            # Reveal the full key + secret ONCE, only in the creation response.
+            serializer = ezzy_api_serializers.ClientApiKeyRevealSerializer(api_key)
             return Response({
-                'message': 'API key created successfully',
+                'message': 'API key created successfully. Store the secret now — it will not be shown again.',
                 'api_key': serializer.data
             }, status=status.HTTP_201_CREATED)
 
@@ -1228,6 +1252,9 @@ def create_api_key(request):
 @permission_classes([IsAuthenticated])
 def list_api_keys(request):
     """List all API keys for a business"""
+    scope_err = require_admin_scope(request)
+    if scope_err:
+        return Response({'error': scope_err}, status=status.HTTP_403_FORBIDDEN)
     business_id = request.query_params.get('business_id', None)
     
     if business_id:
@@ -1261,6 +1288,9 @@ def list_api_keys(request):
 @permission_classes([IsAuthenticated])
 def manage_api_key(request, api_key_id):
     """Update or delete an API key"""
+    scope_err = require_admin_scope(request)
+    if scope_err:
+        return Response({'error': scope_err}, status=status.HTTP_403_FORBIDDEN)
     try:
         api_key = ezzy_api_models.ClientApiKey.objects.get(id=api_key_id)
         
@@ -1978,14 +2008,18 @@ def _trigger_webhook(webhook, event_type, payload):
 
 def _send_webhook_event(event_type, payload, business=None):
     """Send webhook event to all active webhooks subscribed to the event"""
+    # Defense in depth: never broadcast an event to every tenant's webhooks.
+    # A business must always be supplied so dispatch stays scoped to its owner.
+    if business is None:
+        logger.warning(f"_send_webhook_event('{event_type}') called without a business; skipping dispatch")
+        return []
+
     webhooks = ezzy_api_models.WebhookEndpoint.objects.filter(
         is_active=True,
-        events__contains=[event_type]
+        events__contains=[event_type],
+        business=business,
     )
-    
-    if business:
-        webhooks = webhooks.filter(business=business)
-    
+
     deliveries = []
     for webhook in webhooks:
         delivery = _trigger_webhook(webhook, event_type, payload)
@@ -2010,11 +2044,19 @@ def webhook_receive_task_status_update(request):
     
     try:
         # Verify API key
-        client_api_key = ezzy_api_models.ClientApiKey.objects.get(api_key=api_key, is_active=True)
+        client_api_key = ezzy_api_models.ClientApiKey.objects.get(
+            key_hash=ezzy_api_models.ClientApiKey.hash_key(api_key), is_active=True
+        )
         if not client_api_key.is_valid():
             return Response(
                 {'error': 'Invalid or expired API key'},
                 status=status.HTTP_401_UNAUTHORIZED
+            )
+        # These webhooks mutate task/COD state — require the 'write' scope.
+        if not client_api_key.has_scope('write'):
+            return Response(
+                {'error': 'API key lacks write scope'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         # Update last used
@@ -2031,9 +2073,21 @@ def webhook_receive_task_status_update(request):
         notes = serializer.validated_data.get('notes', '')
         driver_id = serializer.validated_data.get('driver_id')
         
-        # Update task
+        # Update task — SCOPED to the API key's own business (prevents
+        # cross-tenant task takeover via task_id enumeration).
         try:
-            task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+            task = delivery_models.DeliveryTask.objects.select_related('order').get(
+                id=task_id, business=client_api_key.business
+            )
+
+            # Enforce the delivery state machine — reject illegal jumps
+            # (e.g. delivered -> pending) even if the value is a valid choice.
+            allowed, reason = task_can_transition(task.dl_task_status, new_status, actor='driver')
+            if not allowed:
+                return Response(
+                    {'error': reason or 'Illegal status transition'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             # Lock check: Order must be published before task status can change
             if task.order and task.order.order_status in ('to_review', 'to_publish'):
@@ -2115,11 +2169,19 @@ def webhook_receive_task_completion(request):
         )
     
     try:
-        client_api_key = ezzy_api_models.ClientApiKey.objects.get(api_key=api_key, is_active=True)
+        client_api_key = ezzy_api_models.ClientApiKey.objects.get(
+            key_hash=ezzy_api_models.ClientApiKey.hash_key(api_key), is_active=True
+        )
         if not client_api_key.is_valid():
             return Response(
                 {'error': 'Invalid or expired API key'},
                 status=status.HTTP_401_UNAUTHORIZED
+            )
+        # These webhooks mutate task/COD state — require the 'write' scope.
+        if not client_api_key.has_scope('write'):
+            return Response(
+                {'error': 'API key lacks write scope'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         client_api_key.last_used = timezone.now()
@@ -2138,7 +2200,11 @@ def webhook_receive_task_completion(request):
         
         try:
             with transaction.atomic():
-                task = delivery_models.DeliveryTask.objects.select_related('order', 'order__business').select_for_update().get(id=task_id)
+                # SCOPED to the API key's own business — prevents a client from
+                # completing another tenant's task or writing COD into any driver's wallet.
+                task = delivery_models.DeliveryTask.objects.select_related(
+                    'order', 'order__business'
+                ).select_for_update().get(id=task_id, business=client_api_key.business)
 
                 # Lock check: Order must be published before task status can change
                 if task.order and task.order.order_status in ('to_review', 'to_publish'):
@@ -2274,11 +2340,19 @@ def webhook_receive_driver_location(request):
         )
     
     try:
-        client_api_key = ezzy_api_models.ClientApiKey.objects.get(api_key=api_key, is_active=True)
+        client_api_key = ezzy_api_models.ClientApiKey.objects.get(
+            key_hash=ezzy_api_models.ClientApiKey.hash_key(api_key), is_active=True
+        )
         if not client_api_key.is_valid():
             return Response(
                 {'error': 'Invalid or expired API key'},
                 status=status.HTTP_401_UNAUTHORIZED
+            )
+        # These webhooks mutate task/COD state — require the 'write' scope.
+        if not client_api_key.has_scope('write'):
+            return Response(
+                {'error': 'API key lacks write scope'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         client_api_key.last_used = timezone.now()
@@ -2308,8 +2382,10 @@ def webhook_receive_driver_location(request):
                 'accuracy': serializer.validated_data.get('accuracy'),
                 'speed': serializer.validated_data.get('speed')
             }
-            _send_webhook_event('driver_location_update', webhook_payload, business=None)
-            
+            # Dispatch only to the submitting business's own webhooks — never
+            # broadcast driver GPS to every tenant's webhook endpoints.
+            _send_webhook_event('driver_location_update', webhook_payload, business=client_api_key.business)
+
             return Response({
                 'message': 'Location updated successfully',
                 'driver_id': driver_id
@@ -2329,31 +2405,79 @@ def webhook_receive_driver_location(request):
 
 
 # Webhook Management APIs
+def _validate_webhook_url(url):
+    """
+    Guard against SSRF: only allow http/https to public hosts.
+    Rejects loopback, private, link-local, reserved and multicast targets.
+    Returns (ok: bool, reason: str).
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False, 'Invalid URL'
+
+    if parsed.scheme not in ('http', 'https'):
+        return False, 'Only http/https webhook URLs are allowed'
+
+    host = parsed.hostname
+    if not host:
+        return False, 'Webhook URL must include a host'
+
+    try:
+        # Resolve every address the host maps to and reject internal ranges.
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        return False, 'Webhook host could not be resolved'
+
+    for info in infos:
+        ip_str = info[4][0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False, 'Webhook host resolved to an invalid address'
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            return False, 'Webhook URL resolves to a non-public address'
+
+    return True, ''
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_webhook_endpoint(request):
     """Create a new webhook endpoint"""
     serializer = ezzy_api_serializers.WebhookEndpointSerializer(data=request.data)
-    
+
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    business_id = request.data.get('business')
-    if business_id:
+
+    # Resolve the owning business from the authenticated caller — never trust
+    # a business id from the request body (prevented cross-tenant webhook
+    # registration and driver-location leakage).
+    if request.user.is_staff and request.data.get('business'):
         try:
-            business = business_models.Business.objects.get(business_id=business_id)
-            if not request.user.is_staff and business.user != request.user:
-                return Response(
-                    {'error': 'Permission denied'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+            business = business_models.Business.objects.get(business_id=request.data.get('business'))
         except business_models.Business.DoesNotExist:
-            return Response(
-                {'error': 'Business not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-    
-    webhook = serializer.save()
+            return Response({'error': 'Business not found'}, status=status.HTTP_404_NOT_FOUND)
+    else:
+        business = get_api_user_business(request)
+
+    if not business:
+        return Response(
+            {'error': 'No business is associated with this account'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # SSRF guard on the destination URL.
+    ok, reason = _validate_webhook_url(serializer.validated_data.get('url', ''))
+    if not ok:
+        return Response({'error': reason}, status=status.HTTP_400_BAD_REQUEST)
+
+    webhook = serializer.save(business=business)
     return Response({
         'message': 'Webhook endpoint created successfully',
         'webhook': ezzy_api_serializers.WebhookEndpointSerializer(webhook).data
@@ -2425,13 +2549,18 @@ def orders_pending_verification(request):
     business_id = request.query_params.get('business_id', None)
     
     orders = orders_models.Order.objects.filter(verification_status=verification_status)
-    
-    if business_id:
-        orders = orders.filter(business_id=business_id)
-    elif not request.user.is_staff:
+
+    # Non-staff callers are ALWAYS constrained to their own businesses, even if
+    # they pass ?business_id=<someone else> (previously an IDOR that leaked
+    # another tenant's pending orders + customer PII).
+    if not request.user.is_staff:
         businesses = business_models.Business.objects.filter(user=request.user)
         orders = orders.filter(business__in=businesses)
-    
+
+    # business_id only narrows further (safe for staff; already scoped for others).
+    if business_id:
+        orders = orders.filter(business_id=business_id)
+
     orders = orders.order_by('-created_at')
     serializer = ezzy_api_serializers.OrderListSerializer(orders, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -2801,9 +2930,9 @@ def business_orders_api(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Verify business belongs to business
+            # Verify the client belongs to the caller's business.
             try:
-                business = business_models.Client.objects.get(
+                client = business_models.Client.objects.get(
                     id=client_id, business=business
                 )
             except business_models.Client.DoesNotExist:
@@ -2812,12 +2941,26 @@ def business_orders_api(request):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
+            # Verify the pickup location (if supplied) belongs to the caller's
+            # business — prevents attaching another tenant's pickup location.
+            pickup_location = None
+            if pickup_location_id:
+                try:
+                    pickup_location = business_models.PickupLocation.objects.get(
+                        id=pickup_location_id, business=business
+                    )
+                except business_models.PickupLocation.DoesNotExist:
+                    return Response(
+                        {'error': 'Pickup location not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
             # Create order
             order = orders_models.Order.objects.create(
                 business=business,
                 client=client,
                 delivery_address=delivery_address,
-                pickup_location_id=pickup_location_id,
+                pickup_location=pickup_location,
                 order_status='pending',
                 created_by=request.user
             )
@@ -2985,7 +3128,7 @@ def business_clients_api(request):
             clients = clients.order_by('-created_at')[offset:offset + limit]
 
             data = []
-            for business in clients:
+            for client in clients:
                 data.append({
                     'id': client.id,
                     'name': client.client_name,

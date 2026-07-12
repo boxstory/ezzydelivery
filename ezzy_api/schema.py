@@ -20,12 +20,9 @@ class UserTypeFilteredSchema(AutoSchema):
     Used to filter schema generation by user role.
     """
 
-    def get_operation_id(self, path, method):
-        operation_id = super().get_operation_id(path, method)
-        return operation_id
-
-    def get_tags(self, path, method, view):
-        tags = super().get_tags(path, method, view) or []
+    def get_tags(self):
+        tags = super().get_tags() or []
+        path = self.path
 
         # Tag endpoints by user type requirement
         if path.startswith('/api/business/'):

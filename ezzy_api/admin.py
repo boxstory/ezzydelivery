@@ -4,10 +4,10 @@ from ezzy_api import models as ezzy_api_models
 
 @admin.register(ezzy_api_models.ClientApiKey)
 class ClientApiKeyAdmin(admin.ModelAdmin):
-    list_display = ['api_key', 'business', 'key_name', 'is_active', 'last_used', 'expires_at', 'created_at']
-    list_filter = ['is_active', 'created_at', 'expires_at']
-    search_fields = ['api_key', 'business__business_name', 'key_name']
-    readonly_fields = ['api_key', 'api_secret', 'created_at', 'updated_at']
+    list_display = ['key_prefix', 'business', 'scope', 'key_name', 'is_active', 'last_used', 'expires_at', 'created_at']
+    list_filter = ['scope', 'is_active', 'created_at', 'expires_at']
+    search_fields = ['key_prefix', 'business__business_name', 'key_name']
+    readonly_fields = ['key_prefix', 'key_hash', 'api_secret', 'created_at', 'updated_at']
     date_hierarchy = 'created_at'
 
 

@@ -29,7 +29,7 @@ class ClientApiKeyAuthentication(BaseAuthentication):
             api_key = (
                 ClientApiKey.objects
                 .select_related('business', 'business__user')
-                .get(api_key=key)
+                .get(key_hash=ClientApiKey.hash_key(key))
             )
         except ClientApiKey.DoesNotExist:
             raise AuthenticationFailed('Invalid API key')

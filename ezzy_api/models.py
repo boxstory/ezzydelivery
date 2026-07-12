@@ -74,13 +74,33 @@ def order_document_upload_path(instance, filename):
 
 
 class ClientApiKey(models.Model):
-    """API Key model for business authentication"""
+    """API Key model for business authentication.
+
+    The raw key is never stored: only its SHA-256 hash (``key_hash``) is kept,
+    plus a short non-sensitive ``key_prefix`` for display. The full key is
+    returned to the owner exactly once, at creation time.
+    """
+    SCOPE_READ = 'read'
+    SCOPE_WRITE = 'write'
+    SCOPE_ADMIN = 'admin'
+    SCOPE_CHOICES = [
+        (SCOPE_READ, 'Read only'),
+        (SCOPE_WRITE, 'Read & write'),
+        (SCOPE_ADMIN, 'Full access (manage keys)'),
+    ]
+    # Ordered least → most privileged; higher index implies all lower scopes.
+    _SCOPE_ORDER = [SCOPE_READ, SCOPE_WRITE, SCOPE_ADMIN]
+
     business = models.ForeignKey(
         business_models.Business,
         on_delete=models.CASCADE,
         related_name='api_keys'
     )
-    api_key = models.CharField(max_length=64, unique=True, db_index=True)
+    # Legacy plaintext column — no longer populated (nulled by migration).
+    api_key = models.CharField(max_length=64, unique=True, db_index=True, null=True, blank=True)
+    key_hash = models.CharField(max_length=64, unique=True, null=True, blank=True, db_index=True)
+    key_prefix = models.CharField(max_length=20, blank=True, default='')
+    scope = models.CharField(max_length=10, choices=SCOPE_CHOICES, default=SCOPE_WRITE)
     api_secret = models.CharField(max_length=64, blank=True, null=True)
     key_name = models.CharField(max_length=100, blank=True, null=True)
     is_active = models.BooleanField(default=True)
@@ -101,14 +121,34 @@ class ClientApiKey(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.business.business_name} - {self.api_key[:8]}..."
+        return f"{self.business.business_name} - {self.key_prefix or 'key'}..."
+
+    @staticmethod
+    def hash_key(raw):
+        """SHA-256 hex digest of a raw key. Keys are high-entropy random
+        strings, so an unsalted digest is not brute-forceable."""
+        import hashlib
+        return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+    def has_scope(self, required):
+        """True if this key's scope covers ``required`` (hierarchical)."""
+        try:
+            return self._SCOPE_ORDER.index(self.scope) >= self._SCOPE_ORDER.index(required)
+        except ValueError:
+            return False
 
     def save(self, *args, **kwargs):
-        if not self.api_key:
+        # Generate + hash the key on first creation. The plaintext is exposed
+        # only transiently via ``self._plaintext_key`` for the creation response.
+        if not self.key_hash:
             while True:
-                key = f"ezz_key_{get_random_string(32)}"
-                if not ClientApiKey.objects.filter(api_key=key).exists():
-                    self.api_key = key
+                raw = f"ezz_key_{get_random_string(32)}"
+                h = ClientApiKey.hash_key(raw)
+                if not ClientApiKey.objects.filter(key_hash=h).exists():
+                    self.key_hash = h
+                    self.key_prefix = raw[:16]
+                    self._plaintext_key = raw
+                    self.api_key = None  # never persist plaintext
                     break
         if not self.api_secret:
             self.api_secret = f"ezz_sec_{get_random_string(32)}"

@@ -189,21 +189,63 @@ class OrderDocumentSerializer(serializers.ModelSerializer):
 
 # API Key Serializers
 class ClientApiKeySerializer(serializers.ModelSerializer):
+    """
+    Default (list/manage) serializer. Never returns the full secret; the
+    api_key is masked to a short prefix so a leaked list response cannot be
+    used to authenticate. The full key + secret are only returned once, at
+    creation time, via ClientApiKeyRevealSerializer.
+    """
     business_name = serializers.CharField(source='business.business_name', read_only=True)
-    
+    api_key = serializers.SerializerMethodField()
+    api_secret = serializers.SerializerMethodField()
+
     class Meta:
         model = ezzy_api_models.ClientApiKey
         fields = [
             'id', 'business', 'business_name', 'api_key', 'api_secret',
-            'key_name', 'is_active', 'last_used', 'expires_at',
+            'key_prefix', 'scope', 'key_name', 'is_active', 'last_used', 'expires_at',
             'created_at', 'updated_at', 'created_by'
         ]
-        read_only_fields = ['api_key', 'api_secret', 'created_at', 'updated_at', 'created_by']
+        read_only_fields = ['api_key', 'api_secret', 'key_prefix', 'created_at', 'updated_at', 'created_by']
+
+    def get_api_key(self, obj):
+        # Only the non-sensitive prefix is ever shown after creation.
+        return f"{obj.key_prefix}…" if obj.key_prefix else None
+
+    def get_api_secret(self, obj):
+        # Never expose the secret after creation.
+        return '••••••••'
+
+
+class ClientApiKeyRevealSerializer(serializers.ModelSerializer):
+    """One-time serializer used only in the create response to reveal the
+    full api_key and api_secret to the owner. The full key is available only
+    transiently on the freshly-created instance (obj._plaintext_key)."""
+    business_name = serializers.CharField(source='business.business_name', read_only=True)
+    api_key = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ezzy_api_models.ClientApiKey
+        fields = [
+            'id', 'business', 'business_name', 'api_key', 'api_secret',
+            'key_prefix', 'scope', 'key_name', 'is_active', 'last_used', 'expires_at',
+            'created_at', 'updated_at', 'created_by'
+        ]
+        read_only_fields = ['api_secret', 'key_prefix', 'created_at', 'updated_at', 'created_by']
+
+    def get_api_key(self, obj):
+        # Full plaintext, exposed exactly once at creation.
+        return getattr(obj, '_plaintext_key', None) or (f"{obj.key_prefix}…" if obj.key_prefix else None)
 
 
 class ClientApiKeyCreateSerializer(serializers.Serializer):
     business_id = serializers.IntegerField()
     key_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    scope = serializers.ChoiceField(
+        choices=ezzy_api_models.ClientApiKey.SCOPE_CHOICES,
+        required=False,
+        default=ezzy_api_models.ClientApiKey.SCOPE_WRITE,
+    )
     expires_at = serializers.DateTimeField(required=False, allow_null=True)
 
 
@@ -277,7 +319,7 @@ class WebhookEndpointSerializer(serializers.ModelSerializer):
             'id', 'business', 'url', 'events', 'secret', 'is_active',
             'description', 'created_at', 'updated_at', 'last_triggered'
         ]
-        read_only_fields = ['secret', 'created_at', 'updated_at', 'last_triggered']
+        read_only_fields = ['business', 'secret', 'created_at', 'updated_at', 'last_triggered']
 
 
 class WebhookDeliverySerializer(serializers.ModelSerializer):
