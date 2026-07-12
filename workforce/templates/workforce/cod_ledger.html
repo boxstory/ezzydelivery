@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712e" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712f" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -154,7 +154,9 @@
           </td>
           <td>
             {% if t.driver %}
-              <div>{{ t.driver.user.get_full_name|default:t.driver.driver_code }}</div>
+              {% with dn=t.driver.user.get_full_name|default:t.driver.driver_code %}
+              <div class="codl__truncate" title="{{ dn }}">{{ dn }}</div>
+              {% endwith %}
               <span class="codl__submeta">{{ t.driver.driver_code }}</span>
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
