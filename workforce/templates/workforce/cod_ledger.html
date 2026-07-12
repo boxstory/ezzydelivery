@@ -175,7 +175,9 @@
           </td>
           <td>
             {% if t.delivery_task.order.cod_status_by_staff %}
-              <span class="codl__cod-status codl__cod-status--{{ t.delivery_task.order.cod_status_by_staff }}">{{ t.delivery_task.order.get_cod_status_by_staff_display }}</span>
+              {% with s=t.delivery_task.order.cod_status_by_staff %}
+              <span class="codl__cod-status codl__cod-status--{{ s }}">{% if s == 'cod_with_driver' %}With Driver{% elif s == 'cod_with_ezzy' %}With Ezzy{% elif s == 'partially_collected' %}Partial{% elif s == 'cod_settled_with_business' %}Settled{% elif s == 'fully_paid' %}Collected{% elif s == 'not_collected' %}Not Collected{% else %}{{ t.delivery_task.order.get_cod_status_by_staff_display }}{% endif %}</span>
+              {% endwith %}
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
           <td class="codl__num">{{ t.cod_in_hand_after|floatformat:2 }}</td>
