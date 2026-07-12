@@ -9306,7 +9306,10 @@ def cod_ledger(request):
     driver_id = request.GET.get('driver_id', '').strip()
     business_id = request.GET.get('business_id', '').strip()
     payment_method = request.GET.get('payment_method', '').strip()
+    cod_status = request.GET.get('cod_status', '').strip()
     search = request.GET.get('q', '').strip()
+
+    cod_status_valid = {c[0] for c in orders_models.COD_STATUS_BY_STAFF}
 
     if date_from:
         txns = txns.filter(created_at__date__gte=date_from)
@@ -9320,6 +9323,8 @@ def cod_ledger(request):
         txns = txns.filter(business__business_id=business_id)
     if payment_method:
         txns = txns.filter(payment_method=payment_method)
+    if cod_status and cod_status in cod_status_valid:
+        txns = txns.filter(delivery_task__order__cod_status_by_staff=cod_status)
     if search:
         txns = txns.filter(
             Q(transaction_code__icontains=search) |
@@ -9358,7 +9363,7 @@ def cod_ledger(request):
     filter_dict = {k: v for k, v in {
         'date_from': date_from, 'date_to': date_to, 'txn_type': txn_type,
         'driver_id': driver_id, 'business_id': business_id,
-        'payment_method': payment_method, 'q': search,
+        'payment_method': payment_method, 'cod_status': cod_status, 'q': search,
     }.items() if v}
     filter_params = urlencode(filter_dict)
 
@@ -9375,12 +9380,13 @@ def cod_ledger(request):
             for t in COD_LEDGER_TYPES
         ],
         'payment_choices': fleet_models.DriverTransaction.PAYMENT_METHOD_CHOICES,
+        'cod_status_choices': orders_models.COD_STATUS_BY_STAFF,
         'drivers': fleet_models.Driver.objects.select_related('user').order_by('driver_code'),
         'businesses': business_models.Business.objects.order_by('business_name'),
         # Current filter values (to repopulate the form)
         'f_date_from': date_from, 'f_date_to': date_to, 'f_txn_type': txn_type,
         'f_driver_id': driver_id, 'f_business_id': business_id,
-        'f_payment_method': payment_method, 'f_q': search,
+        'f_payment_method': payment_method, 'f_cod_status': cod_status, 'f_q': search,
     }
     return render(request, 'workforce/cod_ledger.html', context)
 
