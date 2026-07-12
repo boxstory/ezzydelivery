@@ -141,8 +141,7 @@
           <th class="codl__num">Wallet after</th>
           <th>Order #</th>
           <th>Customer / Mobile</th>
-          <th>COD Status</th>
-          <th>Submission</th>
+          <th>COD Status<br>Submission</th>
           <th>Recorded by</th>
           <th>Notes</th>
         </tr>
@@ -195,14 +194,14 @@
               <span class="codl__cod-status codl__cod-status--{{ s }}">{% if s == 'cod_with_driver' %}With Driver{% elif s == 'cod_with_ezzy' %}With Ezzy{% elif s == 'partially_collected' %}Partial{% elif s == 'cod_settled_with_business' %}Settled{% elif s == 'fully_paid' %}Collected{% elif s == 'not_collected' %}Not Collected{% else %}{{ t.delivery_task.order.get_cod_status_by_staff_display }}{% endif %}</span>
               {% endwith %}
             {% else %}<span class="codl__muted">—</span>{% endif %}
-          </td>
-          <td class="codl__nowrap">
             {% if t.transaction_type == 'cod_deposit' or t.transaction_type == 'cod_driver_settle' %}
-              {% if t.is_approved %}<span class="codl__flag codl__flag--ok">Approved</span>
-              {% elif t.is_verified %}<span class="codl__flag codl__flag--verify">Verified</span>
-              {% elif t.is_received %}<span class="codl__flag codl__flag--verify">Received</span>
-              {% else %}<span class="codl__flag codl__flag--pending">Pending</span>{% endif %}
-            {% else %}<span class="codl__muted">—</span>{% endif %}
+              <div class="codl__submeta">
+                {% if t.is_approved %}<span class="codl__flag codl__flag--ok">Approved</span>
+                {% elif t.is_verified %}<span class="codl__flag codl__flag--verify">Verified</span>
+                {% elif t.is_received %}<span class="codl__flag codl__flag--verify">Received</span>
+                {% else %}<span class="codl__flag codl__flag--pending">Pending</span>{% endif %}
+              </div>
+            {% endif %}
           </td>
           <td>
             {% if t.created_by %}
@@ -215,7 +214,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="14" class="codl__empty">
+          <td colspan="13" class="codl__empty">
             <i class="fa-solid fa-inbox"></i>
             <span>No COD transactions match these filters.</span>
           </td>
