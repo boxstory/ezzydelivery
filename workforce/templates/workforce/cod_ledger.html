@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712b" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -129,10 +129,11 @@
           <th>Business</th>
           <th>Order #</th>
           <th>Customer</th>
+          <th>COD Status</th>
           <th class="codl__num">COD in&nbsp;hand after</th>
           <th class="codl__num">Wallet after</th>
           <th>Reference</th>
-          <th>Status</th>
+          <th>Submission</th>
           <th>Recorded by</th>
           <th>Notes</th>
         </tr>
@@ -155,6 +156,11 @@
           </td>
           <td class="codl__code">{{ t.delivery_task.order.order_number|default:"—" }}</td>
           <td>{{ t.delivery_task.order.customer_name|default:"—"|truncatechars:22 }}</td>
+          <td class="codl__nowrap">
+            {% if t.delivery_task.order.cod_status_by_staff %}
+              <span class="codl__cod-status codl__cod-status--{{ t.delivery_task.order.cod_status_by_staff }}">{{ t.delivery_task.order.get_cod_status_by_staff_display }}</span>
+            {% else %}<span class="codl__muted">—</span>{% endif %}
+          </td>
           <td class="codl__num">{{ t.cod_in_hand_after|floatformat:2 }}</td>
           <td class="codl__num">{{ t.wallet_balance_after|floatformat:2 }}</td>
           <td class="codl__nowrap">{{ t.reference_number|default:"—" }}</td>
@@ -171,7 +177,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="15" class="codl__empty">
+          <td colspan="16" class="codl__empty">
             <i class="fa-solid fa-inbox"></i>
             <span>No COD transactions match these filters.</span>
           </td>
