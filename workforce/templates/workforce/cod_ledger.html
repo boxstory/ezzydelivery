@@ -1,0 +1,187 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{# COD bookkeeping ledger — all COD transactions with filters. View: workforce.views.cod_ledger #}
+
+{% block title %}COD Ledger{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712a" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <!-- Hero Header -->
+  <div class="wfd__hero">
+    <div class="wfd__hero-content">
+      <h1 class="wfd__hero-title"><i class="fa-solid fa-book"></i>COD Ledger</h1>
+      <p class="wfd__hero-subtitle">Append-only log of every COD cash movement — customer → driver → Ezzy → business</p>
+    </div>
+    <div class="wfd__hero-actions">
+      <a href="{% url 'workforce:cod_settlement_report' %}" class="btn btn-sm btn-outline-light">
+        <i class="fa-solid fa-hand-holding-dollar me-1"></i> Driver Settlement
+      </a>
+      <a href="{% url 'workforce:cod_business_settlement_report' %}" class="btn btn-sm btn-outline-light">
+        <i class="fa-solid fa-building-columns me-1"></i> Business Payout
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary tiles (reflect the current filter) -->
+  <div class="codl__summary">
+    <div class="codl__tile">
+      <span class="codl__tile-label">Collected</span>
+      <span class="codl__tile-value">{{ totals.collected|floatformat:2 }} <small>QR</small></span>
+    </div>
+    <div class="codl__tile">
+      <span class="codl__tile-label">Handed to Ezzy</span>
+      <span class="codl__tile-value">{{ totals.to_ezzy|floatformat:2 }} <small>QR</small></span>
+    </div>
+    <div class="codl__tile">
+      <span class="codl__tile-label">Paid to Business</span>
+      <span class="codl__tile-value">{{ totals.to_business|floatformat:2 }} <small>QR</small></span>
+    </div>
+    <div class="codl__tile">
+      <span class="codl__tile-label">Returned</span>
+      <span class="codl__tile-value">{{ totals.returned|floatformat:2 }} <small>QR</small></span>
+    </div>
+    <div class="codl__tile codl__tile--accent">
+      <span class="codl__tile-label">Rows</span>
+      <span class="codl__tile-value">{{ totals.count }}</span>
+    </div>
+  </div>
+
+  <!-- Filter card -->
+  <div class="codl__filter-card">
+    <form method="GET" class="row g-3 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="codl__filter-label">From</label>
+        <input type="date" name="date_from" class="form-control codl__filter-input" value="{{ f_date_from }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="codl__filter-label">To</label>
+        <input type="date" name="date_to" class="form-control codl__filter-input" value="{{ f_date_to }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="codl__filter-label">Type</label>
+        <select name="txn_type" class="form-select codl__filter-input">
+          <option value="">All COD types</option>
+          {% for val, label in type_choices %}
+          <option value="{{ val }}" {% if val == f_txn_type %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="codl__filter-label">Payment</label>
+        <select name="payment_method" class="form-select codl__filter-input">
+          <option value="">Any method</option>
+          {% for val, label in payment_choices %}
+          <option value="{{ val }}" {% if val == f_payment_method %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="codl__filter-label">Driver</label>
+        <select name="driver_id" class="form-select codl__filter-input">
+          <option value="">All drivers</option>
+          {% for d in drivers %}
+          <option value="{{ d.driver_id }}" {% if f_driver_id == d.driver_id|stringformat:'s' %}selected{% endif %}>
+            {{ d.driver_code }} — {{ d.user.get_full_name|default:d.driver_code }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="codl__filter-label">Business</label>
+        <select name="business_id" class="form-select codl__filter-input">
+          <option value="">All businesses</option>
+          {% for b in businesses %}
+          <option value="{{ b.business_id }}" {% if f_business_id == b.business_id|stringformat:'s' %}selected{% endif %}>
+            {{ b.business_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-8">
+        <label class="codl__filter-label">Search</label>
+        <input type="text" name="q" class="form-control codl__filter-input"
+               placeholder="Transaction code, order #, customer, driver, business, reference, notes…"
+               value="{{ f_q }}">
+      </div>
+      <div class="col-12 col-md-4 d-flex gap-2">
+        <button type="submit" class="codl__filter-btn"><i class="fa-solid fa-filter me-1"></i> Filter</button>
+        <a href="{% url 'workforce:cod_ledger' %}" class="codl__filter-btn codl__filter-btn--ghost">Reset</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Ledger table -->
+  <div class="codl__table-wrap">
+    <table class="codl__table">
+      <thead>
+        <tr>
+          <th>Date / Time</th>
+          <th>Code</th>
+          <th>Type</th>
+          <th class="codl__num">Amount</th>
+          <th>Method</th>
+          <th>Driver</th>
+          <th>Business</th>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th class="codl__num">COD in&nbsp;hand after</th>
+          <th class="codl__num">Wallet after</th>
+          <th>Reference</th>
+          <th>Status</th>
+          <th>Recorded by</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td class="codl__nowrap">{{ t.created_at|date:"Y-m-d" }}<span class="codl__time">{{ t.created_at|date:"H:i" }}</span></td>
+          <td class="codl__code">{{ t.transaction_code|default:t.pk }}</td>
+          <td><span class="codl__badge codl__badge--{{ t.transaction_type }}">{{ t.get_transaction_type_display }}</span></td>
+          <td class="codl__num {% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">
+            {{ t.amount|floatformat:2 }}
+          </td>
+          <td>{{ t.get_payment_method_display|default:"—" }}</td>
+          <td>{% if t.driver %}{{ t.driver.driver_code }}{% else %}<span class="codl__muted">—</span>{% endif %}</td>
+          <td>
+            {% if t.business %}{{ t.business.business_name }}
+            {% elif t.delivery_task.order.business %}{{ t.delivery_task.order.business.business_name }}
+            {% else %}<span class="codl__muted">—</span>{% endif %}
+          </td>
+          <td class="codl__code">{{ t.delivery_task.order.order_number|default:"—" }}</td>
+          <td>{{ t.delivery_task.order.customer_name|default:"—"|truncatechars:22 }}</td>
+          <td class="codl__num">{{ t.cod_in_hand_after|floatformat:2 }}</td>
+          <td class="codl__num">{{ t.wallet_balance_after|floatformat:2 }}</td>
+          <td class="codl__nowrap">{{ t.reference_number|default:"—" }}</td>
+          <td class="codl__nowrap">
+            {% if t.transaction_type == 'cod_deposit' or t.transaction_type == 'cod_driver_settle' %}
+              {% if t.is_approved %}<span class="codl__flag codl__flag--ok">Approved</span>
+              {% elif t.is_verified %}<span class="codl__flag codl__flag--verify">Verified</span>
+              {% elif t.is_received %}<span class="codl__flag codl__flag--verify">Received</span>
+              {% else %}<span class="codl__flag codl__flag--pending">Pending</span>{% endif %}
+            {% else %}<span class="codl__muted">—</span>{% endif %}
+          </td>
+          <td>{% if t.created_by %}{{ t.created_by.get_full_name|default:t.created_by.username }}{% else %}<span class="codl__muted">system</span>{% endif %}</td>
+          <td class="codl__notes" title="{{ t.notes|default:'' }}">{{ t.notes|default:"—"|truncatechars:40 }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="15" class="codl__empty">
+            <i class="fa-solid fa-inbox"></i>
+            <span>No COD transactions match these filters.</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page %}
+
+</div>
+{% endblock %}

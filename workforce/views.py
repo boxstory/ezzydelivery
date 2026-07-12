@@ -9268,6 +9268,123 @@ def cod_settlement_report(request):
     return render(request, 'workforce/cod_settlement_report.html', context)
 
 
+# COD transaction types, in lifecycle order, used by the COD ledger.
+COD_LEDGER_TYPES = [
+    'cod_collection',
+    'cod_deposit',
+    'cod_driver_settle',
+    'cod_return',
+    'cod_client_settle',
+    'cod_client_settle_reversal',
+]
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def cod_ledger(request):
+    """Standalone COD bookkeeping ledger: every COD transaction with filters.
+
+    Read-only append-only log of all COD cash movements (collection -> driver ->
+    Ezzy -> business, plus returns/reversals) with rich columns and filtering by
+    date, type, driver, business, payment method, and free-text search.
+    """
+    from django.db.models import Sum, Q
+    from django.core.paginator import Paginator
+    from urllib.parse import urlencode
+
+    txns = fleet_models.DriverTransaction.objects.filter(
+        transaction_type__in=COD_LEDGER_TYPES
+    ).select_related(
+        'driver', 'driver__user', 'business',
+        'delivery_task', 'delivery_task__order', 'created_by',
+    )
+
+    # --- Filters ---
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    txn_type = request.GET.get('txn_type', '').strip()
+    driver_id = request.GET.get('driver_id', '').strip()
+    business_id = request.GET.get('business_id', '').strip()
+    payment_method = request.GET.get('payment_method', '').strip()
+    search = request.GET.get('q', '').strip()
+
+    if date_from:
+        txns = txns.filter(created_at__date__gte=date_from)
+    if date_to:
+        txns = txns.filter(created_at__date__lte=date_to)
+    if txn_type and txn_type in COD_LEDGER_TYPES:
+        txns = txns.filter(transaction_type=txn_type)
+    if driver_id.isdigit():
+        txns = txns.filter(driver_id=driver_id)
+    if business_id.isdigit():
+        txns = txns.filter(business__business_id=business_id)
+    if payment_method:
+        txns = txns.filter(payment_method=payment_method)
+    if search:
+        txns = txns.filter(
+            Q(transaction_code__icontains=search) |
+            Q(reference_number__icontains=search) |
+            Q(delivery_task__order__order_number__icontains=search) |
+            Q(delivery_task__order__customer_name__icontains=search) |
+            Q(driver__user__first_name__icontains=search) |
+            Q(business__business_name__icontains=search) |
+            Q(notes__icontains=search)
+        )
+
+    txns = txns.order_by('-created_at')
+
+    # --- Totals for the filtered set (before pagination) ---
+    totals = {
+        'count': txns.count(),
+        'net': txns.aggregate(t=Sum('amount'))['t'] or 0,
+        'collected': txns.filter(transaction_type='cod_collection').aggregate(t=Sum('amount'))['t'] or 0,
+        'to_ezzy': txns.filter(
+            transaction_type__in=['cod_deposit', 'cod_driver_settle']
+        ).aggregate(t=Sum('amount'))['t'] or 0,
+        'to_business': txns.filter(transaction_type='cod_client_settle').aggregate(t=Sum('amount'))['t'] or 0,
+        'returned': txns.filter(transaction_type='cod_return').aggregate(t=Sum('amount'))['t'] or 0,
+    }
+
+    # --- Pagination ---
+    try:
+        per_page = int(request.GET.get('per_page', 50))
+    except (TypeError, ValueError):
+        per_page = 50
+    per_page = min(max(per_page, 10), 200)
+    paginator = Paginator(txns, per_page)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # Preserve active filters across pagination links.
+    filter_dict = {k: v for k, v in {
+        'date_from': date_from, 'date_to': date_to, 'txn_type': txn_type,
+        'driver_id': driver_id, 'business_id': business_id,
+        'payment_method': payment_method, 'q': search,
+    }.items() if v}
+    filter_params = urlencode(filter_dict)
+
+    context = {
+        'page_title': 'COD Ledger',
+        'page_obj': page_obj,
+        'transactions': page_obj.object_list,
+        'totals': totals,
+        'per_page': str(per_page),
+        'filter_params': filter_params,
+        # Filter option data
+        'type_choices': [
+            (t, dict(fleet_models.DriverTransaction.TRANSACTION_TYPES).get(t, t))
+            for t in COD_LEDGER_TYPES
+        ],
+        'payment_choices': fleet_models.DriverTransaction.PAYMENT_METHOD_CHOICES,
+        'drivers': fleet_models.Driver.objects.select_related('user').order_by('driver_code'),
+        'businesses': business_models.Business.objects.order_by('business_name'),
+        # Current filter values (to repopulate the form)
+        'f_date_from': date_from, 'f_date_to': date_to, 'f_txn_type': txn_type,
+        'f_driver_id': driver_id, 'f_business_id': business_id,
+        'f_payment_method': payment_method, 'f_q': search,
+    }
+    return render(request, 'workforce/cod_ledger.html', context)
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def cod_settlement_action(request):

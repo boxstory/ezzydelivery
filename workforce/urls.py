@@ -185,6 +185,9 @@ urlpatterns = [
     path('fleet/transactions/<int:txn_id>/update-status/', workforce_views.fleet_transaction_update_status, name='fleet_transaction_update_status'),
     path('fleet/tasks/<int:task_id>/cod-correct/', workforce_views.fleet_task_cod_correct, name='fleet_task_cod_correct'),
 
+    # COD bookkeeping ledger (all COD transactions, filterable)
+    path('fleet/cod-ledger/', workforce_views.cod_ledger, name='cod_ledger'),
+
     # COD Settlement Report URLs
     path('fleet/cod-settlement/', workforce_views.cod_settlement_report, name='cod_settlement_report'),
     path('fleet/cod-settlement/action/', workforce_views.cod_settlement_action, name='cod_settlement_action'),
