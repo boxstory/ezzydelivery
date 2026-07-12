@@ -83,6 +83,19 @@
             class="pwa-form-group__input" placeholder="0" value="0">
         </div>
       </div>
+      <!-- Paste WhatsApp / Google Maps shared location -->
+      <div class="pwa-form-group mb-2" id="fg_mobile_loc_paste">
+        <label class="pwa-form-group__label"><i class="fa-brands fa-whatsapp text-success me-1"></i>Paste WhatsApp Location</label>
+        <div id="mobileLocDrop" class="pwa-loc-paste"
+             ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+             ondrop="locDropHandle(event, {latId:'mobile_latitude', lngId:'mobile_longitude', mapId:'mobileMapLink', resultId:'mobileLocResult', inputId:'mobileLocPaste'})">
+          <i class="fa-solid fa-location-dot pwa-loc-paste__icon"></i>
+          <input type="text" id="mobileLocPaste" class="pwa-form-group__input pwa-loc-paste__input" inputmode="url"
+                 placeholder="Paste WhatsApp / Google Maps link"
+                 oninput="whatsappLocationFill(this.value, {latId:'mobile_latitude', lngId:'mobile_longitude', mapId:'mobileMapLink', resultId:'mobileLocResult'})">
+        </div>
+        <div id="mobileLocResult" class="mt-1"></div>
+      </div>
       <div class="pwa-form-group mb-2">
         <button type="button" class="btn btn-sm btn-outline-warning w-100" id="mobileQnasBtn"
                 onclick="qnasValidateAndFill({zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', zoneNameId:'mobile_zone_name_display', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'})">

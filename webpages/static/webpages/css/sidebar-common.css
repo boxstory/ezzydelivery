@@ -5,8 +5,18 @@
 
 /* ---------- SIDEBAR BASE ---------- */
 .dashboard-sidebar {
-    background: #fff;
-    border-right: 1px solid var(--brand-grey-200, #f0f0f0);
+    /* Scoped palette — the "dispatch console" identity */
+    --sb-paper: #fffdf7;        /* warm paper surface */
+    --sb-line: #ece7d8;         /* warm route line / hairlines */
+    --sb-ink: #001f3f;          /* navy — active label + header */
+    --sb-yellow: #f7c000;       /* live / active signal */
+    --sb-yellow-soft: rgba(247, 192, 0, 0.12);
+    --sb-text: #5b5648;         /* warm grey, resting label */
+    --sb-text-strong: #1f1f1f;
+    --sb-muted: #a59e8b;        /* section labels + resting icons */
+
+    background: var(--sb-paper);
+    border-right: 1px solid var(--sb-line);
     align-self: stretch;
     flex-shrink: 0 !important;
     min-width: 0;
@@ -79,6 +89,25 @@
     font-size: 0.8125rem;
     font-weight: 700;
     letter-spacing: 0.01em;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* "Live" operations dot — signals the console is active */
+.dashboard-sidebar .sidebar-header .nav-link.dashboard-title span:last-child::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 0.45rem;
+    background: var(--sb-yellow);
+    box-shadow: 0 0 7px var(--sb-yellow);
+    animation: sbLivePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes sbLivePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
 
 /* ---------- SECTION DIVIDERS ---------- */
@@ -87,15 +116,27 @@
     display: none;
 }
 
-/* Section labels (replacement for <hr>) */
+/* Section labels — manifest leg headers with a leading tick */
 .dsb-section {
-    font-size: 0.65rem;
-    font-weight: 600;
+    position: relative;
+    font-size: 0.62rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--brand-grey-400, #b0b0b0);
-    padding: 0.75rem 0.625rem 0.3rem;
-    margin-top: 0.125rem;
+    letter-spacing: 0.13em;
+    color: var(--sb-muted);
+    padding: 0.85rem 0.625rem 0.35rem 1.15rem;
+    margin-top: 0.25rem;
+}
+
+.dsb-section::before {
+    content: "";
+    position: absolute;
+    left: 0.625rem;
+    top: calc(0.85rem + 0.33em);
+    width: 7px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--sb-yellow);
 }
 
 /* ---------- NAV ITEMS ---------- */
@@ -107,43 +148,71 @@
     background: transparent;
     border: none;
     border-left: 2px solid transparent;
-    color: var(--brand-grey-600, #555);
+    color: var(--sb-text);
     font-weight: 500;
-    padding: 0.4375rem 0.625rem;
-    border-radius: 0 0.375rem 0.375rem 0;
-    transition: all 0.15s ease;
+    padding: 0.4375rem 0.625rem 0.4375rem 0.75rem;
+    border-radius: 0 0.4rem 0.4rem 0;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     text-align: left;
     font-size: 0.8125rem;
     width: 100%;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     text-decoration: none;
     cursor: pointer;
+    position: relative;
 }
 
 .dashboard-sidebar .nav-link:hover {
-    background: var(--brand-grey-100, #fafafa);
-    color: var(--brand-grey-800, #1f1f1f);
-    border-left-color: var(--brand-grey-300, #dcdcdc);
+    background: rgba(0, 31, 63, 0.04);
+    color: var(--sb-text-strong);
+    border-left-color: var(--sb-line);
     transform: none;
     box-shadow: none;
 }
 
-/* Active state — subtle accent, not screaming yellow */
+/* Route node — hollow on hover (a stop you could move to) */
+.dashboard-sidebar .nav-link:hover::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--sb-paper);
+    border: 2px solid var(--sb-muted);
+    box-shadow: 0 0 0 2px var(--sb-paper);
+}
+
+/* Active state — illuminated node + soft pill + navy label (the signature) */
 .dashboard-sidebar .nav-link.active,
 .dashboard-sidebar .nav-item.active > .nav-link,
 .dashboard-sidebar .nav-item.active > div.nav-link {
-    background: rgba(247, 192, 0, 0.08);
-    border-left-color: var(--brand-primary, #f7c000);
-    color: var(--brand-grey-800, #1f1f1f);
-    font-weight: 600;
+    background: linear-gradient(90deg, var(--sb-yellow-soft) 0%, rgba(247, 192, 0, 0.03) 100%);
+    border-left-color: var(--sb-yellow);
+    color: var(--sb-ink);
+    font-weight: 650;
     box-shadow: none;
 }
 
-/* Remove old active indicator bars */
+/* Filled, glowing node sitting on the route line */
+.dashboard-sidebar .nav-link.active::before,
 .dashboard-sidebar .nav-item.active > .nav-link::before,
 .dashboard-sidebar .nav-item.active > div.nav-link::before {
-    display: none;
+    content: "";
+    display: block;
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sb-yellow);
+    box-shadow: 0 0 0 2px var(--sb-paper), 0 0 7px rgba(247, 192, 0, 0.65);
 }
 
 .dashboard-sidebar .nav-item > .nav-link,
@@ -168,7 +237,7 @@
 
 /* ---------- ICONS ---------- */
 .dashboard-sidebar .nav-link i {
-    color: var(--brand-grey-400, #b0b0b0);
+    color: var(--sb-muted);
     transition: color 0.15s ease;
     width: 1.125rem;
     text-align: center;
@@ -176,13 +245,13 @@
 }
 
 .dashboard-sidebar .nav-link:hover i {
-    color: var(--brand-primary, #f7c000);
+    color: var(--sb-ink);
 }
 
 .dashboard-sidebar .nav-link.active i,
 .dashboard-sidebar .nav-item.active .nav-link i,
 .dashboard-sidebar .nav-item.active > div.nav-link i {
-    color: var(--brand-primary, #f7c000);
+    color: var(--sb-ink);
 }
 
 /* Caret icon — stays grey */
@@ -201,8 +270,8 @@
     border: none;
     padding: 0.125rem 0 0.125rem;
     margin-top: 0.125rem;
-    margin-left: 0;
-    border-left: 1px solid var(--brand-grey-200, #f0f0f0);
+    margin-left: 0.55rem;
+    border-left: 1px solid var(--sb-line);
     border-radius: 0;
 }
 
@@ -225,27 +294,37 @@
     border: none;
     border-left: 2px solid transparent;
     border-radius: 0 0.25rem 0.25rem 0;
-    color: var(--brand-grey-500, #6c757d);
+    color: var(--sb-text);
     text-align: left;
     justify-content: flex-start;
 }
 
 .dashboard-sidebar .multi-level .nav-link:hover,
 .dashboard-sidebar .submenu .nav-link:hover {
-    background: var(--brand-grey-100, #fafafa);
-    color: var(--brand-grey-800, #1f1f1f);
-    border-left-color: var(--brand-grey-300, #dcdcdc);
+    background: rgba(0, 31, 63, 0.04);
+    color: var(--sb-text-strong);
+    border-left-color: var(--sb-line);
     transform: none;
+}
+
+/* Smaller route node for nested stops */
+.dashboard-sidebar .multi-level .nav-link:hover::before,
+.dashboard-sidebar .submenu .nav-link:hover::before,
+.dashboard-sidebar .multi-level .nav-link.active::before,
+.dashboard-sidebar .submenu .nav-link.active::before {
+    width: 6px;
+    height: 6px;
+    left: -4px;
 }
 
 .dashboard-sidebar .multi-level .nav-link.active,
 .dashboard-sidebar .submenu .nav-link.active,
 .dashboard-sidebar .multi-level .nav-item.active .nav-link,
 .dashboard-sidebar .submenu .nav-item.active .nav-link {
-    background: rgba(247, 192, 0, 0.08);
-    border-left-color: var(--brand-primary, #f7c000);
-    color: var(--brand-grey-800, #1f1f1f);
-    font-weight: 600;
+    background: var(--sb-yellow-soft);
+    border-left-color: var(--sb-yellow);
+    color: var(--sb-ink);
+    font-weight: 650;
     box-shadow: none;
 }
 
@@ -314,6 +393,13 @@
 
 .dashboard-sidebar .nav-link:focus-visible {
     box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.4);
+}
+
+/* Respect reduced-motion: stop the live dot pulse */
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-sidebar .sidebar-header .nav-link.dashboard-title span:last-child::before {
+        animation: none;
+    }
 }
 
 /* ---------- SIDEBAR TOGGLE BUTTON ---------- */
@@ -389,7 +475,18 @@
 .dashboard-sidebar.collapsed .nav-link {
     justify-content: center;
     padding: 0.5rem;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
+    border-left: none;
+}
+
+/* No route node in the collapsed rail — icons only */
+.dashboard-sidebar.collapsed .nav-link::before {
+    display: none !important;
+}
+
+.dashboard-sidebar.collapsed .nav-link.active,
+.dashboard-sidebar.collapsed .nav-item.active > .nav-link {
+    background: var(--sb-yellow-soft);
     border-left: none;
 }
 
@@ -598,10 +695,10 @@
 .mobile-sidebar-nav .nav-link.active,
 .mobile-sidebar-nav .nav-item.active > .nav-link,
 .mobile-sidebar-nav .nav-item.active > div.nav-link {
-    background: rgba(247, 192, 0, 0.08);
+    background: var(--sb-yellow-soft, rgba(247, 192, 0, 0.12));
     border-left-color: var(--brand-primary, #f7c000);
-    color: var(--brand-grey-800, #1f1f1f);
-    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+    font-weight: 650;
     box-shadow: none;
 }
 
@@ -614,7 +711,7 @@
 
 .mobile-sidebar-nav .nav-link:hover i,
 .mobile-sidebar-nav .nav-link.active i {
-    color: var(--brand-primary, #f7c000);
+    color: var(--brand-navy, #001f3f);
 }
 
 /* Mobile submenu styling */

@@ -1,4 +1,5 @@
 {% extends 'wh_dashboard_base.html' %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Seller-Warehouse Links{% endblock %}
@@ -47,8 +48,8 @@
                 <label class="wh__filter-label"><i class="fa-solid fa-store"></i> Seller</label>
                 <select name="business" class="wh__filter-select">
                     <option value="">All Sellers</option>
-                    {% for business in all_businesses %}
-                    <option value="{{ business.id }}" {% if business_filter == business.id|stringformat:"s" %}selected{% endif %}>{{ business.business_name }}</option>
+                    {% for business in all_businesses|code_last %}
+                    <option value="{{ business.id }}" {% if business_filter == business.id|stringformat:"s" %}selected{% endif %}>{% if business.business_code %}{{ business.business_code }}{% else %}*{{ business.business_id }}{% endif %} - {{ business.business_name }}</option>
                     {% endfor %}
                 </select>
             </div>

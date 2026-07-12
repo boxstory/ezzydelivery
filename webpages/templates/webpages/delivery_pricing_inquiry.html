@@ -11,7 +11,7 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260301a" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260627a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -121,6 +121,12 @@
           </div>
         </div>
 
+        {% if inquiry_error %}
+        <div class="alert alert-danger" role="alert" id="wppi_step1_error">
+          <i class="fa-solid fa-circle-exclamation"></i> {{ inquiry_error }}
+        </div>
+        {% endif %}
+
         <!-- Contact Info Group -->
         <div class="wppi__field-group" id="wppi_step1_contact_group">
           <div class="wppi__field-group-label">
@@ -147,15 +153,23 @@
               <input type="tel" class="form-control" id="operation_team_contact_number" name="operation_team_contact_number"
                      value="{{ saved_data.operation_team_contact_number }}" placeholder="+974 …">
             </div>
+            <div class="col-12">
+              <p class="wppi__field-hint mb-0"><i class="fa-solid fa-circle-info"></i> Provide at least one of the following: Website, Instagram, or Facebook <span class="wppi__req">*</span></p>
+            </div>
             <div class="col-md-6">
               <label class="form-label" for="website_url">Website URL</label>
               <input type="url" class="form-control" id="website_url" name="website_url"
                      value="{{ saved_data.website_url }}" placeholder="https://yourstore.qa">
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="social_profile">Social Media Profile</label>
-              <input type="url" class="form-control" id="social_profile" name="social_profile"
-                     value="{{ saved_data.social_profile }}" placeholder="Instagram / Facebook URL">
+              <label class="form-label" for="instagram_profile"><i class="fa-brands fa-instagram"></i> Instagram</label>
+              <input type="text" class="form-control" id="instagram_profile" name="instagram_profile"
+                     value="{{ saved_data.instagram_profile }}" placeholder="username or profile URL">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="facebook_profile"><i class="fa-brands fa-facebook"></i> Facebook</label>
+              <input type="text" class="form-control" id="facebook_profile" name="facebook_profile"
+                     value="{{ saved_data.facebook_profile }}" placeholder="username or page URL">
             </div>
           </div>
         </div>
@@ -967,6 +981,13 @@ function validateStep(step) {
     if (!document.getElementById('business_operating_age').value) {
       showBubbleError('business_operating_age', 'Please select how long you have been operating.');
       errors.push('business_operating_age');
+    }
+    var websiteVal = (document.getElementById('website_url').value || '').trim();
+    var instagramVal = (document.getElementById('instagram_profile').value || '').trim();
+    var facebookVal = (document.getElementById('facebook_profile').value || '').trim();
+    if (!websiteVal && !instagramVal && !facebookVal) {
+      showBubbleError('website_url', 'Please provide at least one: Website URL, Instagram, or Facebook.');
+      errors.push('website_url');
     }
   } else if (step === 2) {
     if (!document.getElementById('avarage_number_of_order_last_week').value) {

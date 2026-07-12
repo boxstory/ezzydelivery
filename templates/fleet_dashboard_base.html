@@ -5,6 +5,7 @@
 
 <head>
   {% include "includes/head.html" %}
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
 
@@ -26,7 +27,7 @@
   <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
   <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260514a" type="text/css" />
   <link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260514a" type="text/css" />
-  <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}?v=20260318a" type="text/css" />
+  <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}?v=20260627a" type="text/css" />
   <!-- Mobile PWA CSS -->
   <link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}?v=20260208b" type="text/css" />
 
@@ -123,8 +124,7 @@
           language="JavaScript"
           charset="UTF-8"
           src="{%static 'delivery/js/delivery.js' %}"></script>
-  <!-- Session timeout monitor -->
-  <script src="{% static 'webpages/js/session-monitor.js' %}"></script>
+  <!-- No session timeout monitor for drivers (drivers have no inactivity timeout) -->
   <!-- AI Chat Widget JS -->
   <script src="{% static 'ai_agent/js/chat-widget.js' %}?v=20260614c"></script>
   {% block extra_js %}

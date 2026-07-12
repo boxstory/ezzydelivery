@@ -1,6 +1,7 @@
 /**
  * Session Timeout Monitor
- * Automatically logs out users after 1 hour of inactivity
+ * Automatically logs out staff users after 1 day of inactivity.
+ * (Not loaded on the driver/fleet dashboard — drivers have no timeout.)
  * Shows warning modal 5 minutes before logout
  */
 
@@ -8,13 +9,49 @@
     'use strict';
 
     // Configuration
-    var SESSION_TIMEOUT = window.SESSION_TIMEOUT || 3600; // 1 hour in seconds
+    var SESSION_TIMEOUT = window.SESSION_TIMEOUT || 86400; // 1 day in seconds
     var WARNING_TIME = window.SESSION_WARNING_TIME || 300; // 5 minutes before timeout
     var CHECK_INTERVAL = 10000; // Check every 10 seconds
 
     var warningShown = false;
     var countdownInterval = null;
     var timeRemaining = SESSION_TIMEOUT;
+    var loggingOut = false;
+
+    // Perform a real logout. allauth requires a POST (ACCOUNT_LOGOUT_ON_GET=False),
+    // so a plain GET redirect only renders the confirmation page and waits for a
+    // click. Build and submit a hidden POST form with the CSRF token, then land
+    // the user on the login page.
+    function doLogout() {
+        if (loggingOut) {
+            return;
+        }
+        loggingOut = true;
+
+        var tokenMeta = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = tokenMeta ? tokenMeta.getAttribute('content') : '';
+
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/accounts/logout/';
+        form.style.display = 'none';
+
+        var csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+
+        // Send the user to the login page after logout.
+        var nextInput = document.createElement('input');
+        nextInput.type = 'hidden';
+        nextInput.name = 'next';
+        nextInput.value = '/accounts/login/';
+        form.appendChild(nextInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
 
     // Create warning modal HTML
     function createWarningModal() {
@@ -37,7 +74,7 @@
         });
 
         document.getElementById('logoutNowBtn').addEventListener('click', function() {
-            window.location.href = '/accounts/logout/';
+            doLogout();
         });
     }
 
@@ -78,8 +115,7 @@
 
             if (secondsLeft <= 0) {
                 clearInterval(countdownInterval);
-                // Redirect to logout
-                window.location.href = '/accounts/logout/';
+                doLogout();
                 return;
             }
 
@@ -119,7 +155,7 @@
 
             // Auto logout when time is up
             if (timeRemaining <= 0) {
-                window.location.href = '/accounts/logout/';
+                doLogout();
             }
         }, CHECK_INTERVAL);
     }

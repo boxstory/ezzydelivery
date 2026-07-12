@@ -151,7 +151,9 @@ class PricingEnquiry(models.Model):
 
     # Contact Information
     website_url = models.CharField(max_length=200, blank=True, null=True)
-    social_profile = models.CharField(max_length=200, blank=True, null=True)
+    instagram_profile = models.CharField(max_length=200, blank=True, null=True)
+    facebook_profile = models.CharField(max_length=200, blank=True, null=True)
+    social_profile = models.CharField(max_length=200, blank=True, null=True)  # legacy
 
     # Product Information
     product_category = models.CharField(max_length=200)

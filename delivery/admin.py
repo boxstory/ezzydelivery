@@ -87,6 +87,14 @@ class ZoneGroupAdmin(admin.ModelAdmin):
 class DeliveryTaskAdmin(admin.ModelAdmin):
     list_display = ('dl_task_number', 'dl_price', 'dl_task_status', 'driver', 'completed_at')
     list_filter = ('dl_task_status', 'dl_task_date')
+    search_fields = (
+        'dl_task_number',
+        'order__order_number',
+        'driver__driver_code',
+        'driver__user__first_name',
+        'driver__user__last_name',
+        'business__business_name',
+    )
     readonly_fields = ('completion_latitude', 'completion_longitude', 'completed_at')
 
 

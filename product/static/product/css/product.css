@@ -3049,3 +3049,352 @@ select.txl__select:focus {
         width: 100%;
     }
 }
+
+/* =============================================================================
+   CSV PRODUCT IMPORT — "Intake Manifest" (pci__)
+   Purpose: Bulk product-import page styled as a warehouse goods manifest.
+   Used by: product/templates/product/product_csv_import.html
+   Notes:  Navy/gold Brand Kit + monospace ledger. One accent (gold), one
+           flourish (dock corner tab). All colors are Brand Kit tokens.
+============================================================================= */
+.pci {
+  --pci-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+  --pci-ink: var(--brand-navy, #001f3f);
+  --pci-hair: var(--brand-grey-250, #dee2e6);
+  --pci-mute: var(--brand-grey-550, #6b7280);
+  --pci-paper: var(--brand-white, #fff);
+  --pci-dock: var(--brand-grey-50, #f8f9fa);
+  --pci-gold: var(--brand-primary, #f7c000);
+  max-width: 58rem;
+  margin: 0 auto;
+  padding: 0.5rem 0 3rem;
+}
+
+/* --- Header band ---------------------------------------------------------- */
+.pci__band {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 1.4rem 1.5rem;
+  border-radius: var(--brand-radius-lg, 1.125rem);
+  background: var(--brand-gradient-navy, linear-gradient(135deg, #001f3f, #003366));
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+/* faint mono grid — a nod to the spreadsheet the file came from */
+.pci__band::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 1.4rem 1.4rem;
+  pointer-events: none;
+}
+.pci__back {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-decoration: none;
+  transition: background 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+.pci__back:hover { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.pci__band-body { position: relative; z-index: 1; min-width: 0; }
+.pci__eyebrow {
+  font-family: var(--pci-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--pci-gold);
+  margin-bottom: 0.35rem;
+}
+.pci__title {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+  color: #fff;
+}
+.pci__meta {
+  font-family: var(--pci-mono);
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.72);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.pci__meta-key { color: rgba(255, 255, 255, 0.45); }
+.pci__meta-sep { color: rgba(255, 255, 255, 0.3); }
+.pci__meta-arrow { color: var(--pci-gold); font-weight: 700; }
+.pci__meta-target { color: #fff; font-weight: 700; }
+.pci__meta-id {
+  color: var(--brand-navy, #001f3f);
+  background: var(--pci-gold);
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.25rem;
+  font-weight: 700;
+}
+
+/* --- Outcome messages ----------------------------------------------------- */
+.pci__messages { margin-top: 1rem; display: grid; gap: 0.5rem; }
+.pci__alert {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  font-size: 0.85rem;
+  border-left: 3px solid transparent;
+}
+.pci__alert--success { background: var(--brand-success-bg, #dcfce7); color: var(--brand-success-dark, #065f46); border-color: var(--brand-success, #15803d); }
+.pci__alert--warning { background: var(--brand-warning-bg, #fef3c7); color: var(--brand-warning-text, #92400e); border-color: var(--brand-warning, #d97706); }
+.pci__alert--error,
+.pci__alert--danger  { background: var(--brand-danger-bg, #fef2f2); color: var(--brand-danger-dark, #991b1b); border-color: var(--brand-danger, #dc2626); }
+.pci__alert--info    { background: var(--brand-info-bg, #eff6ff); color: var(--brand-info-dark, #1e40af); border-color: var(--brand-info, #2563eb); }
+
+/* --- Rejected rows -------------------------------------------------------- */
+.pci__rejects {
+  margin-top: 1rem;
+  border: 1px solid var(--brand-danger, #dc2626);
+  border-radius: var(--brand-radius-md, 0.75rem);
+  overflow: hidden;
+}
+.pci__rejects-head {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-danger, #dc2626);
+}
+.pci__rejects-list {
+  margin: 0;
+  padding: 0.6rem 0.9rem 0.7rem 1.9rem;
+  font-family: var(--pci-mono);
+  font-size: 0.74rem;
+  color: var(--brand-danger-dark, #991b1b);
+  background: var(--brand-danger-bg, #fef2f2);
+}
+.pci__rejects-list li { margin-bottom: 0.2rem; }
+
+/* --- Intake dock (hero) --------------------------------------------------- */
+.pci__dock-form { margin-top: 1.25rem; }
+.pci__dock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 13rem;
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  background:
+    repeating-linear-gradient(45deg, transparent, transparent 11px, rgba(0, 31, 63, 0.015) 11px, rgba(0, 31, 63, 0.015) 22px),
+    var(--pci-dock);
+  border: 2px dashed var(--pci-hair);
+  border-radius: var(--brand-radius-lg, 1.125rem);
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+.pci__dock:hover { border-color: var(--pci-gold); }
+.pci__dock--active {
+  border-color: var(--pci-gold);
+  border-style: solid;
+  background-color: var(--brand-accent, #fef9e6);
+  transform: translateY(-1px);
+}
+.pci__dock--loaded {
+  border-color: var(--pci-ink);
+  border-style: solid;
+  background-color: var(--pci-paper);
+}
+/* the one flourish: a gold "stamp" corner tab like a waybill's */
+.pci__dock-tab {
+  position: absolute;
+  top: -0.7rem;
+  right: 1.25rem;
+  font-family: var(--pci-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-navy, #001f3f);
+  background: var(--pci-gold);
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.3rem;
+  box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+.pci__dock-icon {
+  font-size: 2.25rem;
+  color: var(--pci-ink);
+  opacity: 0.9;
+}
+.pci__dock--loaded .pci__dock-icon { color: var(--brand-success, #15803d); }
+.pci__dock-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--pci-ink);
+  font-family: var(--pci-mono);
+  word-break: break-all;
+  max-width: 100%;
+}
+.pci__dock-hint { font-size: 0.8rem; color: var(--pci-mute); }
+.pci__file-input {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+/* keyboard focus visibility */
+.pci__file-input:focus-visible + .pci__dock,
+.pci__dock:focus-within {
+  outline: 3px solid var(--pci-gold);
+  outline-offset: 2px;
+}
+
+/* --- Actions -------------------------------------------------------------- */
+.pci__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.pci__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  text-decoration: none;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.pci__btn--go {
+  color: var(--brand-navy, #001f3f);
+  background: var(--pci-gold);
+  box-shadow: 0 2px 10px rgba(247, 192, 0, 0.35);
+}
+.pci__btn--go:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(247, 192, 0, 0.45); }
+.pci__btn--ghost {
+  color: var(--pci-ink);
+  background: var(--pci-paper);
+  border-color: var(--pci-hair);
+}
+.pci__btn--ghost:hover { border-color: var(--pci-ink); color: var(--pci-ink); }
+
+/* --- Column schema ledger (signature) ------------------------------------ */
+.pci__schema {
+  margin-top: 1.75rem;
+  border: 1px solid var(--pci-hair);
+  border-radius: var(--brand-radius-md, 0.75rem);
+  background: var(--pci-paper);
+  overflow: hidden;
+}
+.pci__schema-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--pci-hair);
+  background: var(--pci-dock);
+}
+.pci__schema-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--pci-ink);
+  margin: 0;
+}
+.pci__schema-sub {
+  font-family: var(--pci-mono);
+  font-size: 0.72rem;
+  color: var(--pci-mute);
+}
+.pci__schema-sub code,
+.pci__footnote code {
+  font-family: var(--pci-mono);
+  color: var(--pci-ink);
+  background: var(--brand-accent, #fef9e6);
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.25rem;
+}
+.pci__ledger-scroll { overflow-x: auto; }
+.pci__ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--pci-mono);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.pci__ledger thead th {
+  text-align: left;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pci-mute);
+  padding: 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--pci-hair);
+}
+.pci__ledger tbody td {
+  padding: 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--brand-grey-150, #e9ecef);
+  color: var(--pci-ink);
+}
+.pci__ledger tbody td:nth-child(2) { color: var(--pci-mute); }
+.pci__ledger tbody td:nth-child(3) { color: var(--brand-grey-650, #374151); }
+.pci__ledger tbody tr:last-child td { border-bottom: 0; }
+.pci__ledger tbody tr:hover td { background: var(--brand-grey-50, #f8f9fa); }
+.pci__ledger-row--req td:first-child { font-weight: 700; }
+.pci__stamp {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-navy, #001f3f);
+  background: var(--pci-gold);
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.25rem;
+}
+.pci__footnote {
+  display: flex;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.75rem 1.1rem;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--pci-mute);
+  border-top: 1px solid var(--pci-hair);
+  background: var(--pci-dock);
+}
+.pci__footnote i { color: var(--pci-gold); margin-top: 0.15rem; }
+
+/* --- Responsive ----------------------------------------------------------- */
+@media (max-width: 575.98px) {
+  .pci__title { font-size: 1.35rem; }
+  .pci__band { padding: 1.1rem 1.1rem; }
+  .pci__dock { min-height: 11rem; padding: 1.75rem 1rem; }
+  .pci__actions .pci__btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* --- Reduced motion ------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .pci__dock, .pci__btn, .pci__back { transition: none; }
+  .pci__dock--active, .pci__btn--go:hover { transform: none; }
+}

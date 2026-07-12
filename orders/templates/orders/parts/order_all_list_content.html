@@ -244,26 +244,30 @@
     <section class="d-block" id="orders_all_list_section_main">
       <div class="col-12 pb-2">
         <div class="px-2 px-md-3">
-          <div class="oal__header" id="orders_all_list_header">
-            <div class="oal__header-left">
-              <h1 class="oal__header-title" id="orders_all_list_title">
-                <i class="fa-solid fa-basket-shopping"></i>
-                Orders
-                <span class="oal__header-count">{{ len }}</span>
+          <div class="bcon__header mb-3" id="orders_all_list_header">
+            <div class="bcon__header-main">
+              <div class="bcon__eyebrow">
+                <span>Orders</span>
+                <span class="bcon__eyebrow-sep"></span>
+                <span class="bcon__eyebrow-live">Manifest</span>
+              </div>
+              <h1 class="bcon__title" id="orders_all_list_title">
+                <i class="fa-solid fa-basket-shopping"></i> Orders
+                <span class="bcon__badge bcon__badge--navy">{{ len }}</span>
               </h1>
             </div>
-            <div class="oal__header-actions" id="orders_all_list_nav_actions">
-              <a class="oal__btn oal__btn--outline"
+            <div class="bcon__actions" id="orders_all_list_nav_actions">
+              <a class="bcon__btn bcon__btn--secondary"
                  href="{% url 'orders:get_order_by_api' %}"
                  id="orders_all_list_btn_api_upload">
                 <i class="fa-solid fa-code"></i> API
               </a>
-              <a class="oal__btn oal__btn--outline"
+              <a class="bcon__btn bcon__btn--secondary"
                  href="{% url 'orders:order_upload_file' %}"
                  id="orders_all_list_btn_upload_bulk">
                 <i class="fa-solid fa-file-import"></i> Bulk
               </a>
-              <a class="oal__btn oal__btn--primary"
+              <a class="bcon__btn bcon__btn--primary"
                  href="{% url 'orders:add_order' %}"
                  id="orders_all_list_btn_add_orders">
                 <i class="fa-solid fa-plus"></i> Add Order
@@ -313,28 +317,28 @@
               <!-- Search Filters -->
               <div class="collapse{% if filters.orderNumber or filters.mobile or filters.customerName or filters.zone or filters.cStatus or filters.dateRange or filters.codStatus or filters.dlStatus or filters.deliveredRange %} show{% endif %}" id="filterCollapse">
                 <div class="ofb__body">
-                  <div class="row g-2">
-                    <div class="col-6 col-md-4 col-lg-2">
+                  <div class="ofb__filters">
+                    <div class="ofb__filters__col">
                       <label for="orderNumber" class="form-label mb-0">Order #</label>
                       <input type="text" class="form-control form-control-sm" name="orderNumber" id="orderNumber"
                              placeholder="Order #" value="{{ filters.orderNumber }}">
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="ofb__filters__col">
                       <label for="mobile" class="form-label mb-0">Mobile</label>
                       <input type="text" class="form-control form-control-sm" name="mobile" id="mobile"
                              placeholder="Mobile" value="{{ filters.mobile }}">
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="ofb__filters__col ofb__filters__col--wide">
                       <label for="customerName" class="form-label mb-0">Customer</label>
                       <input type="text" class="form-control form-control-sm" name="customerName" id="customerName"
                              placeholder="Name" value="{{ filters.customerName }}">
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="ofb__filters__col">
                       <label for="zone" class="form-label mb-0">Zone</label>
                       <input type="text" class="form-control form-control-sm" name="zone" id="zone"
                              placeholder="Zone" value="{{ filters.zone }}">
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="ofb__filters__col">
                       <label for="cStatus" class="form-label mb-0">Status</label>
                       <select class="form-select form-select-sm" name="cStatus" id="cStatus">
                         <option value="">All</option>
@@ -344,7 +348,7 @@
                         <option value="cancelled" {% if filters.cStatus == 'cancelled' %}selected{% endif %}>Cancel</option>
                       </select>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="ofb__filters__col">
                       <label for="codStatus" class="form-label mb-0">COD</label>
                       <select class="form-select form-select-sm" name="codStatus" id="codStatus">
                         <option value="">All</option>
@@ -352,7 +356,7 @@
                         <option value="no_cod" {% if filters.codStatus == 'no_cod' %}selected{% endif %}>No COD</option>
                       </select>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="ofb__filters__col">
                       <label for="dlStatus" class="form-label mb-0">Delivery</label>
                       <select class="form-select form-select-sm" name="dlStatus" id="dlStatus">
                         <option value="">All</option>
@@ -365,7 +369,7 @@
                         <option value="no_task" {% if filters.dlStatus == 'no_task' %}selected{% endif %}>No Task</option>
                       </select>
                     </div>
-                    <div class="col-6 col-md-3 col-lg-2">
+                    <div class="ofb__filters__col">
                       <label for="dateRange" class="form-label mb-0">Order Date</label>
                       <select class="form-select form-select-sm" name="dateRange" id="dateRange" onchange="handleDateRange(this)">
                         <option value="">All Time</option>
@@ -377,17 +381,17 @@
                         <option value="custom" {% if filters.dateRange == 'custom' %}selected{% endif %}>Custom</option>
                       </select>
                     </div>
-                    <div class="col-6 col-md-3 col-lg-2" id="customDateFrom" style="{% if filters.dateRange != 'custom' %}display: none;{% endif %}">
+                    <div class="ofb__filters__col" id="customDateFrom" style="{% if filters.dateRange != 'custom' %}display: none;{% endif %}">
                       <label for="dateFrom" class="form-label mb-0">From</label>
                       <input type="date" class="form-control form-control-sm" name="dateFrom" id="dateFrom"
                              value="{{ filters.dateFrom }}">
                     </div>
-                    <div class="col-6 col-md-3 col-lg-2" id="customDateTo" style="{% if filters.dateRange != 'custom' %}display: none;{% endif %}">
+                    <div class="ofb__filters__col" id="customDateTo" style="{% if filters.dateRange != 'custom' %}display: none;{% endif %}">
                       <label for="dateTo" class="form-label mb-0">To</label>
                       <input type="date" class="form-control form-control-sm" name="dateTo" id="dateTo"
                              value="{{ filters.dateTo }}">
                     </div>
-                    <div class="col-6 col-md-3 col-lg-2">
+                    <div class="ofb__filters__col">
                       <label for="deliveredRange" class="form-label mb-0">Delivered</label>
                       <select class="form-select form-select-sm" name="deliveredRange" id="deliveredRange" onchange="handleDeliveredRange(this)">
                         <option value="">All Time</option>
@@ -399,12 +403,12 @@
                         <option value="custom" {% if filters.deliveredRange == 'custom' %}selected{% endif %}>Custom</option>
                       </select>
                     </div>
-                    <div class="col-6 col-md-3 col-lg-2" id="customDeliveredFrom" style="{% if filters.deliveredRange != 'custom' %}display: none;{% endif %}">
+                    <div class="ofb__filters__col" id="customDeliveredFrom" style="{% if filters.deliveredRange != 'custom' %}display: none;{% endif %}">
                       <label for="deliveredFrom" class="form-label mb-0">From</label>
                       <input type="date" class="form-control form-control-sm" name="deliveredFrom" id="deliveredFrom"
                              value="{{ filters.deliveredFrom }}">
                     </div>
-                    <div class="col-6 col-md-3 col-lg-2" id="customDeliveredTo" style="{% if filters.deliveredRange != 'custom' %}display: none;{% endif %}">
+                    <div class="ofb__filters__col" id="customDeliveredTo" style="{% if filters.deliveredRange != 'custom' %}display: none;{% endif %}">
                       <label for="deliveredTo" class="form-label mb-0">To</label>
                       <input type="date" class="form-control form-control-sm" name="deliveredTo" id="deliveredTo"
                              value="{{ filters.deliveredTo }}">

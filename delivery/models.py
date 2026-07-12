@@ -205,6 +205,7 @@ class DeliveryTask(models.Model):
         ('contacted', 'Contacted & Confirmed'),
         ('non_reachable', 'Non Reachable'),
         ('delivered', 'Delivered'),
+        ('partial_delivery', 'Partial Delivery'),
         ('failed', 'Failed'),
         ('rejected', 'Rejected'),
         ('cancelled', 'Cancelled'),

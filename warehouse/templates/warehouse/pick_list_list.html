@@ -1,4 +1,5 @@
 {% extends 'wh_dashboard_base.html' %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Pick Lists{% endblock %}
@@ -40,8 +41,8 @@
         <label class="wh__filter-label">Business</label>
         <select name="business" class="wh__filter-select">
           <option value="">All Businesses</option>
-          {% for biz in businesses %}
-          <option value="{{ biz.pk }}" {% if selected_business == biz.pk|stringformat:"d" %}selected{% endif %}>{{ biz.business_name }}</option>
+          {% for biz in businesses|code_last %}
+          <option value="{{ biz.pk }}" {% if selected_business == biz.pk|stringformat:"d" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
           {% endfor %}
         </select>
       </div>

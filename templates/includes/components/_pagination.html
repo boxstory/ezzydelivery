@@ -8,15 +8,15 @@ Parameters:
 - filter_params: URL query string to preserve filters (optional, without leading &)
 - show_per_page: Show per-page selector (default: true)
 - show_goto: Show go-to-page input (default: true)
-- per_page: Current items per page (optional, defaults to 25)
+- per_page: Current items per page (optional, defaults to 50)
 - variant: 'default', 'compact', or 'minimal' (optional)
 {% endcomment %}
 
 {% load static %}
 <link href="{% static 'webpages/css/pagination.css' %}" rel="stylesheet" type="text/css" />
 
-{% comment %}Determine current per_page value - use passed variable or default to 25{% endcomment %}
-{% with current_per_page=per_page|default:"25" %}
+{% comment %}Determine current per_page value - use passed variable or default to 50{% endcomment %}
+{% with current_per_page=per_page|default:"50" %}
 
 {% if page_obj.has_other_pages or page_obj.paginator.count > 0 %}
 <nav aria-label="Page navigation" class="pgn {% if variant %}pgn--{{ variant }}{% endif %}">

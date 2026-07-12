@@ -178,7 +178,9 @@ def _save_step1_to_db(inquiry, data):
     inquiry.business_contact_number = data.get('business_contact_number', '')
     inquiry.operation_team_contact_number = data.get('operation_team_contact_number', '')
     inquiry.website_url = data.get('website_url', '')
-    inquiry.social_profile = data.get('social_profile', '')
+    inquiry.instagram_profile = data.get('instagram_profile', '')
+    inquiry.facebook_profile = data.get('facebook_profile', '')
+    inquiry.social_profile = data.get('social_profile', '')  # legacy
     inquiry.product_category = data.get('product_category', '')
     inquiry.is_personalized_product = data.get('is_personalized_product', 'False') == 'True'
     inquiry.is_located_in_qatar = data.get('is_located_in_qatar', 'False') == 'True'
@@ -294,6 +296,26 @@ def delivery_inquiry(request):
         # Handle navigation
         if 'next_step' in request.POST:
             if current_step == 1:
+                # At least one online presence (website / Instagram / Facebook) is required
+                has_online_presence = any(
+                    (all_data.get(field) or '').strip()
+                    for field in ('website_url', 'instagram_profile', 'facebook_profile')
+                )
+                if not has_online_presence:
+                    data = {
+                        'seo': SEOMetadata.get_page_meta(
+                            title="Get Delivery Quote Qatar | 3PL Pricing Inquiry",
+                            description=(
+                                "Request a customized delivery quote for your Qatar business. Fill out our 3PL pricing "
+                                "inquiry form. Fast response, competitive rates, no obligation."
+                            ),
+                        ),
+                        'current_step': 1,
+                        'saved_data': all_data,
+                        'total_steps': 3,
+                        'inquiry_error': 'Please provide at least one: Website URL, Instagram, or Facebook.',
+                    }
+                    return render(request, 'webpages/delivery_pricing_inquiry.html', data)
                 if inquiry is None:
                     # Create new partial record
                     inquiry = PricingEnquiry(is_complete=False)

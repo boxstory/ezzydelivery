@@ -1,4 +1,5 @@
 {% extends 'wh_dashboard_base.html' %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}{% if is_create %}Add New Link{% else %}Edit Link{% endif %}{% endblock %}
@@ -109,8 +110,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <label for="business" class="wha__label">Seller (Business) <span class="wha__required">*</span></label>
                         <select name="business" id="business" class="wha__select" required>
                             <option value="">-- Select Seller --</option>
-                            {% for business in businesses %}
-                            <option value="{{ business.id }}">{{ business.business_name }}</option>
+                            {% for business in businesses|code_last %}
+                            <option value="{{ business.id }}">{% if business.business_code %}{{ business.business_code }}{% else %}*{{ business.business_id }}{% endif %} - {{ business.business_name }}</option>
                             {% endfor %}
                         </select>
                         <span class="wha__hint">Choose the seller to link to a warehouse</span>

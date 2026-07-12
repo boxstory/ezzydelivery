@@ -1,72 +1,131 @@
 {% extends "account/base.html" %}
-
 {% load i18n %}
+{% load static %}
 
 {% block head_title %}{% trans "E-mail Addresses" %}{% endblock %}
 
-{% block account_content %}
-<div class="row mt-5 justify-content-center">
-  <div class="col-10 col-md-12" id="account_email_section_main">
-    <h1 id="account_email_title_main">{% trans "E-mail Addresses" %}</h1>
-    {% if user.emailaddress_set.all %}
-    <p id="account_email_message_intro">{% trans 'The following e-mail addresses are associated with your account:' %}</p>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'account/css/auth-common.css' %}?v=20260702001">
+<link rel="stylesheet" href="{% static 'account/css/account-manage.css' %}?v=20260702001">
+{% endblock %}
 
-    <form id="account_email_form_list" action="{% url 'account_email' %}" class="email_list" method="post" novalidate>
-      {% csrf_token %}
-      <fieldset class="blockLabels">
+{% block content %}
+<div class="auth__container" id="account_email_container_main">
+    <div class="auth__card" id="account_email_card_main">
+        <div class="auth__header" id="account_email_header">
+            <div class="auth__logo">
+                <i class="fa-solid fa-envelope"></i>
+            </div>
+            <h1 id="account_email_title_main">{% trans "Email Addresses" %}</h1>
+            <p id="account_email_subtitle">{% trans "Manage the email addresses linked to your account" %}</p>
+        </div>
 
-        {% for emailaddress in user.emailaddress_set.all %}
-        <div class="ctrlHolder">
-          <label for="email_radio_{{forloop.counter}}" class="{% if emailaddress.primary %}primary_email{%endif%}">
-
-            <input id="email_radio_{{forloop.counter}}" type="radio" name="email" {% if emailaddress.primary or
-              user.emailaddress_set.count==1 %}checked="checked" {%endif %} value="{{emailaddress.email}}" />
-
-            {{ emailaddress.email }}
-            {% if emailaddress.verified %}
-            <span class="verified">{% trans "Verified" %}</span>
-            {% else %}
-            <span class="unverified">{% trans "Unverified" %}</span>
+        <div class="auth__body" id="account_email_section_body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="auth__alert auth__alert--{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
             {% endif %}
-            {% if emailaddress.primary %}<span class="primary">{% trans "Primary" %}</span>{% endif %}
-          </label>
+
+            {% if user.emailaddress_set.all %}
+            <form id="account_email_form_list" action="{% url 'account_email' %}" method="post" novalidate>
+                {% csrf_token %}
+
+                <div class="auth__email-list">
+                    {% for emailaddress in user.emailaddress_set.all %}
+                    <label class="auth__email-item d-flex align-items-center gap-2 flex-wrap mb-0 {% if emailaddress.primary %}auth__email-item--primary{% endif %}"
+                           for="email_radio_{{ forloop.counter }}">
+                        <input id="email_radio_{{ forloop.counter }}" class="auth__email-radio" type="radio" name="email"
+                               {% if emailaddress.primary or user.emailaddress_set.count == 1 %}checked="checked"{% endif %}
+                               value="{{ emailaddress.email }}" />
+                        <span class="auth__email-address flex-grow-1">{{ emailaddress.email }}</span>
+                        {% if emailaddress.verified %}
+                        <span class="auth__badge auth__badge--verified"><i class="fa-solid fa-circle-check"></i>{% trans "Verified" %}</span>
+                        {% else %}
+                        <span class="auth__badge auth__badge--unverified"><i class="fa-solid fa-clock"></i>{% trans "Unverified" %}</span>
+                        {% endif %}
+                        {% if emailaddress.primary %}
+                        <span class="auth__badge auth__badge--primary"><i class="fa-solid fa-star"></i>{% trans "Primary" %}</span>
+                        {% endif %}
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="d-flex flex-column flex-sm-row flex-wrap gap-2">
+                    <button id="account_email_btn_make_primary" class="auth__btn--secondary" type="submit" name="action_primary">
+                        <i class="fa-solid fa-star"></i>{% trans "Make Primary" %}
+                    </button>
+                    <button id="account_email_btn_resend" class="auth__btn--secondary" type="submit" name="action_send">
+                        <i class="fa-solid fa-paper-plane"></i>{% trans "Re-send Verification" %}
+                    </button>
+                    <button id="account_email_btn_remove" class="auth__btn--danger" type="submit" name="action_remove">
+                        <i class="fa-solid fa-trash-can"></i>{% trans "Remove" %}
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <p id="account_email_message_warning" class="auth__empty-note">
+                <strong>{% trans 'Warning:' %}</strong>
+                {% trans "You currently do not have any email address set up. You should add one so you can receive notifications, reset your password, etc." %}
+            </p>
+            {% endif %}
+
+            {% if can_add_email %}
+            <hr class="auth__section-divider" />
+            <h2 class="auth__section-title" id="account_email_title_add">
+                <i class="fa-solid fa-circle-plus me-1"></i>{% trans "Add Email Address" %}
+            </h2>
+
+            <form id="account_email_form_add" method="post" action="{% url 'account_email' %}" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <ul class="auth__errorlist">
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                {% for field in form %}
+                    <div class="auth__form-group" id="account_email_group_{{ field.name }}">
+                        <label for="{{ field.id_for_label }}">
+                            <i class="fa-solid fa-envelope me-1"></i>
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <ul class="auth__errorlist">
+                                {% for error in field.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <button id="account_email_btn_add" name="action_add" type="submit" class="auth__btn--login">
+                    <i class="fa-solid fa-plus me-2"></i>{% trans "Add Email" %}
+                </button>
+            </form>
+            {% endif %}
         </div>
-        {% endfor %}
 
-        <div class="buttonHolder">
-          <button id="account_email_btn_make_primary" class="secondaryAction" type="submit" name="action_primary">{% trans 'Make Primary' %}</button>
-          <button id="account_email_btn_resend" class="secondaryAction" type="submit" name="action_send">{% trans 'Re-send Verification' %}</button>
-          <button id="account_email_btn_remove" class="primaryAction" type="submit" name="action_remove">{% trans 'Remove' %}</button>
+        <div class="auth__footer" id="account_email_footer">
+            <p>
+                <a id="account_email_link_back" href="{% url 'core:profile_view' %}">
+                    <i class="fa-solid fa-arrow-left me-1"></i>{% trans "Back to Profile" %}
+                </a>
+            </p>
         </div>
-
-      </fieldset>
-    </form>
-
-    {% else %}
-    <p id="account_email_message_warning"><strong>{% trans 'Warning:'%}</strong> {% trans "You currently do not have any e-mail address set up. You should
-      really add an e-mail address so you can receive notifications, reset your password, etc." %}</p>
-
-    {% endif %}
-
-    {% if can_add_email %}
-    <h2 id="account_email_title_add">{% trans "Add E-mail Address" %}</h2>
-
-    <form id="account_email_form_add" method="post" action="{% url 'account_email' %}" class="add_email" novalidate>
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button id="account_email_btn_add" name="action_add" type="submit">{% trans "Add E-mail" %}</button>
-    </form>
-    {% endif %}
-
-  </div>
+    </div>
 </div>
 {% endblock %}
 
-
-{% block extra_body %}
-<script type="text/javascript">
+{% block extra_js %}
+<script>
   (function () {
-    var message = "{% trans 'Do you really want to remove the selected e-mail address?' %}";
+    var message = "{% trans 'Do you really want to remove the selected email address?' %}";
     var actions = document.getElementsByName('action_remove');
     if (actions.length) {
       actions[0].addEventListener("click", function (e) {

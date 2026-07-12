@@ -236,7 +236,7 @@ def _sync_all_onedrive(source_id=None):
             total_c += c
             total_u += u
         except Exception as exc:
-            logger.exception("OneDrive sync error for source %s", source.id)
+            logger.warning("OneDrive sync error for source %s: %s", source.id, exc, exc_info=True)
             errors.append(f"OneDrive {source.label}: {exc}")
     return total_c, total_u, errors
 
@@ -322,7 +322,7 @@ def _sync_onedrive_source(source):
                 f"required headers changed — {missing_required}. "
                 f"Please update the import mapping in Mapping Manager."
             )
-            logger.error(msg)
+            logger.warning(msg)
             raise RuntimeError(msg)
         else:
             logger.warning(
@@ -351,6 +351,11 @@ def _sync_onedrive_source(source):
         if idx is not None and idx < len(row_data):
             return row_data[idx]
         return ''
+
+    def _is_placeholder(val):
+        """True for empty cells or "0"/"0.0" placeholder values used in pre-numbered
+        empty template rows."""
+        return (not val) or val.strip() in ('0', '0.0')
 
     existing = {
         to.row_num: to
@@ -389,7 +394,12 @@ def _sync_onedrive_source(source):
 
         customer_name = get_cell(row_data, 'customer_name')
         customer_phone = get_cell(row_data, 'customer_phone')
-        if not customer_name and not customer_phone:
+        # Treat placeholder/template rows as blank. Sellers pre-number empty slots
+        # below the last real order and leave "0" in the cells; these must not become
+        # junk temp orders, and — critically — must not be counted toward the
+        # "10 consecutive imported" early-break, or the scan stops before reaching the
+        # genuinely new rows that sit just above the placeholder block.
+        if _is_placeholder(customer_name) and _is_placeholder(customer_phone):
             continue
 
         # Check if already imported in temp_orders table
@@ -481,7 +491,7 @@ def _sync_all_google_sheets(api_settings_id=None):
             total_c += c
             total_u += u
         except Exception as exc:
-            logger.exception("Google Sheet sync error for %s", api_settings.business)
+            logger.warning("Google Sheet sync error for %s: %s", api_settings.business, exc, exc_info=True)
             errors.append(f"Google Sheet {api_settings.business.business_name}: {exc}")
     return total_c, total_u, errors
 
@@ -631,7 +641,7 @@ def _sync_google_sheet_source(api_settings):
             f"required column headers changed — {list(missing_required.keys())}. "
             f"Please update the import mapping in Mapping Manager."
         )
-        logger.error(msg)
+        logger.warning(msg)
         raise RuntimeError(msg)
 
     def cell(row, idx):
@@ -774,7 +784,7 @@ def _sync_all_api(api_type, api_settings_id=None):
             total_c += c
             total_u += u
         except Exception as exc:
-            logger.exception("API sync error for %s (%s)", api_settings.business, api_type)
+            logger.warning("API sync error for %s (%s): %s", api_settings.business, api_type, exc, exc_info=True)
             errors.append(f"{api_type} {api_settings.business.business_name}: {exc}")
     return total_c, total_u, errors
 
@@ -1055,14 +1065,19 @@ def _sync_all_public_links(source_id=None):
     if source_id:
         sources = sources.filter(id=source_id)
 
+    import requests as _req
     total_c, total_u, errors = 0, 0, []
     for source in sources:
         try:
             c, u = _sync_public_link_source(source)
             total_c += c
             total_u += u
+        except (_req.exceptions.ConnectionError, _req.exceptions.Timeout) as exc:
+            # Network/DNS failure for merchant URL — not a Django error, don't alert
+            logger.warning("Public link sync network error for source %s: %s", source.id, exc)
+            errors.append(f"PublicLink {source.label}: {exc}")
         except Exception as exc:
-            logger.exception("Public link sync error for source %s", source.id)
+            logger.warning("Public link sync error for source %s: %s", source.id, exc, exc_info=True)
             errors.append(f"PublicLink {source.label}: {exc}")
     return total_c, total_u, errors
 
@@ -1242,7 +1257,7 @@ def _sync_public_link_source(source):
             f"required columns not mapped — {list(missing_required)}. "
             f"Please update the import mapping in Mapping Manager."
         )
-        logger.error(msg)
+        logger.warning(msg)
         raise RuntimeError(msg)
 
     def get_cell(row_data, field_name):

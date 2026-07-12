@@ -224,6 +224,34 @@ _DASHBOARD_HTML = r"""<!doctype html>
     qrEl.style.display = 'flex';
   }
 
+  // Recover a session by stopping then starting it. A FAILED session is still
+  // considered "started" by WAHA, so calling start alone returns 422
+  // ("already started") and nothing happens — the stop first is required.
+  async function restartSession() {
+    try {
+      await fetch('/waha/api/sessions/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ name: SESSION })
+      });
+    } catch (e) {
+      // best-effort; a not-yet-started session has nothing to stop
+    }
+    // small gap so WAHA settles into STOPPED before we start again
+    await new Promise(function (r) { setTimeout(r, 1500); });
+    try {
+      await fetch('/waha/api/sessions/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ name: SESSION })
+      });
+    } catch (e) {
+      // best-effort; status poll will reflect outcome
+    }
+  }
+
   function hideQr() {
     qrEl.style.display = 'none';
     qrImgEl.removeAttribute('src');
@@ -307,20 +335,12 @@ _DASHBOARD_HTML = r"""<!doctype html>
       btn.disabled = true;
       const originalLabel = btn.textContent;
       btn.textContent = 'Restarting…';
-      try {
-        await fetch('/waha/api/sessions/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ name: SESSION })
-        });
-      } catch (e) {
-        // best-effort; status poll will reflect outcome
-      }
+      await restartSession();
       setTimeout(function () {
         showQr();
         btn.disabled = false;
         btn.textContent = originalLabel;
+        fetchStatus();
       }, 3000);
     });
     actionsEl.appendChild(btn);
@@ -346,18 +366,12 @@ _DASHBOARD_HTML = r"""<!doctype html>
     btn.addEventListener('click', async function () {
       btn.disabled = true;
       btn.textContent = 'Restarting…';
-      try {
-        await fetch('/waha/api/sessions/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ name: SESSION })
-        });
-      } catch (e) {}
+      await restartSession();
       setTimeout(function () {
         showQr();
         btn.disabled = false;
         btn.textContent = 'Restart + show QR';
+        fetchStatus();
       }, 3000);
     });
     actionsEl.appendChild(btn);

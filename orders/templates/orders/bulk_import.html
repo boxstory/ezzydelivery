@@ -1,4 +1,5 @@
 {% extends "business_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Bulk Import Orders - Client Dashboard{% endblock title %}
@@ -76,10 +77,8 @@
                             </label>
                             <select id="businessSelect" name="business" class="form-select" required onchange="bimLoadPickupLocations(this.value)">
                                 <option value="">-- Select a Seller --</option>
-                                {% for biz in businesses %}
-                                    <option value="{{ biz.business_id }}">
-                                        {{ biz.business_name }} ({{ biz.business_code }})
-                                    </option>
+                                {% for biz in businesses|code_last %}
+                                    <option value="{{ biz.business_id }}">{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
                                 {% endfor %}
                             </select>
                         </div>

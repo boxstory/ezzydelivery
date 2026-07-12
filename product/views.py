@@ -36,10 +36,12 @@ Related:
 
 import logging
 import json
+import csv
+import io
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 
 
@@ -1141,3 +1143,237 @@ def combo_delete(request, combo_id):
     combo.delete()
     messages.success(request, f'Combo "{name}" deleted.')
     return redirect('product:combo_list')
+
+
+# =============================================================================
+# CSV PRODUCT IMPORT
+# =============================================================================
+
+# Columns accepted in the upload. Only `item_name` is required; the rest are
+# optional. Header matching is case-insensitive and ignores surrounding spaces.
+CSV_IMPORT_COLUMNS = [
+    'item_name', 'brand_name', 'item_sku', 'barcode', 'item_price',
+    'size', 'category', 'color', 'unit', 'item_discription', 'client_names',
+]
+
+
+# -----------------------------------------------------------------------------
+# product_staff_delete: Staff-only delete of a product from a seller's catalog.
+# Unlike product_single_delete (scoped to the logged-in user's own business),
+# staff have no business of their own, so this deletes by product id after a
+# staff check and redirects back to that seller's detail page.
+# POST only. Template: none (redirect).
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+@require_http_methods(["POST"])
+def product_staff_delete(request, product_id):
+    """Delete a product on behalf of staff, returning to the seller page."""
+    if not is_staff_user(request):
+        messages.error(request, "You don't have permission to delete this product.")
+        return redirect('business:business_dashboard')
+
+    product = get_object_or_404(Product, id=product_id)
+    biz = product.business
+    name = product.item_name
+    logger.info(f"Staff {request.user.id} deleting product {product_id} ('{name}') from business {biz.business_id if biz else 'none'}")
+    product.delete()
+    messages.success(request, f'Deleted "{name}".')
+
+    if biz:
+        return redirect('workforce:seller_detail', business_id=biz.business_id)
+    return redirect('product:product_all_list_table')
+
+
+# -----------------------------------------------------------------------------
+# product_csv_sample: Download a ready-to-fill sample CSV with the correct
+# headers and one example row. Served inline so users see the exact format.
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+def product_csv_sample(request):
+    """Return a sample product-import CSV (headers + one example row)."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="product_import_sample.csv"'
+    # utf-8-sig BOM so Excel opens Arabic / special characters correctly
+    response.write('﻿')
+    writer = csv.writer(response)
+    writer.writerow(CSV_IMPORT_COLUMNS)
+    writer.writerow([
+        'Oud Royal 50ml', 'Ezzy Perfumes', 'OUD-50-001', '6291000000017',
+        '120', '50ml', 'Perfumes', 'Gold', 'piece',
+        'Premium oud fragrance', 'royal oud, special oud',
+    ])
+    return response
+
+
+# -----------------------------------------------------------------------------
+# product_csv_import: Upload a CSV and bulk-create products for the business.
+# GET  -> render the upload page (with sample-file link and column guide).
+# POST -> parse the CSV, create products, report imported/skipped/errors.
+# Duplicate SKUs (per business) and rows without item_name are skipped.
+# Template: product/product_csv_import.html
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+def product_csv_import(request):
+    """Bulk-import products from an uploaded CSV file.
+
+    Two contexts:
+      - Client dashboard: imports into the logged-in user's own business.
+      - Staff dashboard (seller section): staff pass ?business_id=<pk> to import
+        into that seller's catalog. Redirects back to the seller detail page.
+    """
+    # Staff may target a specific seller's business via business_id.
+    biz_id = request.POST.get('business_id') or request.GET.get('business_id')
+    staff_mode = bool(biz_id) and is_staff_user(request)
+
+    if staff_mode:
+        business = get_object_or_404(Business, pk=biz_id)
+    else:
+        business = get_cached_business(request)
+        if not business:
+            messages.error(request, "No business associated with your account")
+            return redirect('business:business_dashboard')
+
+    context = {
+        'business': business,
+        'csv_columns': CSV_IMPORT_COLUMNS,
+        'staff_mode': staff_mode,
+        'base_template': 'wf_dashboard_base.html' if staff_mode else 'business_dashboard_base.html',
+    }
+
+    if request.method != 'POST':
+        return render(request, 'product/product_csv_import.html', context)
+
+    upload = request.FILES.get('csv_file')
+    if not upload:
+        messages.error(request, "Please choose a CSV file to upload.")
+        return render(request, 'product/product_csv_import.html', context)
+
+    if not upload.name.lower().endswith('.csv'):
+        messages.error(request, "Unsupported file type. Please upload a .csv file.")
+        return render(request, 'product/product_csv_import.html', context)
+
+    # Decode with utf-8-sig to transparently strip Excel's BOM.
+    try:
+        raw = upload.read().decode('utf-8-sig')
+    except UnicodeDecodeError:
+        try:
+            raw = upload.read().decode('latin-1')
+        except Exception:
+            messages.error(request, "Could not read the file. Please save it as UTF-8 CSV and retry.")
+            return render(request, 'product/product_csv_import.html', context)
+
+    reader = csv.DictReader(io.StringIO(raw))
+    if not reader.fieldnames:
+        messages.error(request, "The CSV appears to be empty.")
+        return render(request, 'product/product_csv_import.html', context)
+
+    # Normalise headers -> lowercase/stripped so mapping is forgiving.
+    header_map = {(h or '').strip().lower(): h for h in reader.fieldnames}
+    if 'item_name' not in header_map:
+        messages.error(request, "CSV must include an 'item_name' column. Download the sample file for the correct format.")
+        return render(request, 'product/product_csv_import.html', context)
+
+    def cell(row, key):
+        source = header_map.get(key)
+        return (row.get(source) or '').strip() if source else ''
+
+    # Pre-load existing SKUs for this business to skip duplicates cheaply.
+    existing_skus = set(
+        Product.objects.filter(business=business)
+        .exclude(item_sku='')
+        .values_list('item_sku', flat=True)
+    )
+
+    imported = 0
+    skipped = 0
+    errors = []
+    seen_skus = set()
+
+    # DictReader row numbering: row 1 is the header, data starts at 2.
+    for idx, row in enumerate(reader, start=2):
+        item_name = cell(row, 'item_name')[:100]
+        if not item_name:
+            skipped += 1
+            continue
+
+        sku = cell(row, 'item_sku')[:100]
+        if sku and (sku in existing_skus or sku in seen_skus):
+            skipped += 1
+            errors.append(f"Row {idx}: skipped — SKU '{sku}' already exists.")
+            continue
+
+        price_raw = cell(row, 'item_price')
+        try:
+            price_val = int(float(price_raw)) if price_raw else 0
+            if price_val < 0:
+                price_val = 0
+        except (ValueError, TypeError):
+            price_val = 0
+
+        # Optional related lookups — matched by name, never auto-created blindly
+        # except category which is safe to get-or-create per business need.
+        category = None
+        cat_name = cell(row, 'category')
+        if cat_name:
+            category = ProductCategory.objects.filter(category_name__iexact=cat_name).first()
+            if not category:
+                category = ProductCategory.objects.create(
+                    category_name=cat_name[:100], discription=cat_name[:100]
+                )
+
+        color = None
+        color_name = cell(row, 'color')
+        if color_name:
+            color = ColorVariant.objects.filter(color_variant__iexact=color_name).first()
+
+        unit = None
+        unit_name = cell(row, 'unit')
+        if unit_name:
+            unit = UnitVariant.objects.filter(unit_variant__iexact=unit_name).first()
+
+        try:
+            Product.objects.create(
+                business=business,
+                item_name=item_name,
+                brand_name=cell(row, 'brand_name')[:100],
+                item_sku=sku,
+                barcode=cell(row, 'barcode')[:100] or None,
+                item_price=price_val,
+                size=cell(row, 'size')[:100] or None,
+                item_discription=cell(row, 'item_discription')[:100] or None,
+                client_names=cell(row, 'client_names') or None,
+                product_category=category,
+                color=color,
+                unit=unit,
+            )
+        except Exception as exc:
+            skipped += 1
+            errors.append(f"Row {idx}: {exc}")
+            logger.warning(f"CSV import row {idx} failed for business {business.business_id}: {exc}")
+            continue
+
+        if sku:
+            seen_skus.add(sku)
+        imported += 1
+
+    logger.info(
+        f"User {request.user.id} CSV-imported {imported} products "
+        f"({skipped} skipped) for business {business.business_id}"
+    )
+
+    if imported:
+        messages.success(request, f"Imported {imported} product{'s' if imported != 1 else ''}.")
+    if skipped:
+        messages.warning(request, f"Skipped {skipped} row{'s' if skipped != 1 else ''} (duplicates or empty name).")
+    if not imported and not skipped:
+        messages.info(request, "No data rows found in the file.")
+
+    # Show up to 15 row-level errors back on the page for troubleshooting.
+    context['import_errors'] = errors[:15]
+    context['imported'] = imported
+    context['skipped'] = skipped
+    if imported and not errors:
+        if staff_mode:
+            return redirect('workforce:seller_detail', business_id=business.business_id)
+        return redirect('product:product_all_list_table')
+    return render(request, 'product/product_csv_import.html', context)
