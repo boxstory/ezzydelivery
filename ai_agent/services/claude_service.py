@@ -53,9 +53,9 @@ def send_whatsapp_alert(message: str) -> bool:
         logger.warning("No valid phone numbers in AI_AGENT_ALERT_PHONES")
         return False
 
-    evo_url = getattr(settings, 'EVALUATION_URL', '') or os.environ.get('EVALUATION_URL', '')
-    evo_key = getattr(settings, 'EVALUATION_API_KEY', '') or os.environ.get('EVALUATION_API_KEY', '')
-    evo_instance = getattr(settings, 'EVALUATION_INSTANCE', '') or os.environ.get('EVALUATION_INSTANCE', '')
+    evo_url = getattr(settings, 'EVOLUTION_URL', '') or os.environ.get('EVOLUTION_URL', '')
+    evo_key = getattr(settings, 'EVOLUTION_API_KEY', '') or os.environ.get('EVOLUTION_API_KEY', '')
+    evo_instance = getattr(settings, 'EVOLUTION_INSTANCE', '') or os.environ.get('EVOLUTION_INSTANCE', '')
 
     if not evo_url or not evo_key or not evo_instance:
         logger.warning("Evolution API not configured for budget alerts")
@@ -605,6 +605,7 @@ class ClaudeService:
         full_content = ''
         tool_calls = []
         current_tool = None
+        usage_logged = False
 
         try:
             with self.client.messages.stream(**request_params) as stream:
@@ -648,7 +649,7 @@ class ClaudeService:
                     elif event.type == 'message_stop':
                         yield {'type': 'stop', 'tokens_output': tokens_output}
 
-            # Log usage
+            # Log usage once — flag prevents a second log if post-stream work fails
             latency_ms = int((time.time() - start_time) * 1000)
             self._log_usage(
                 conversation=conversation,
@@ -660,6 +661,7 @@ class ClaudeService:
                 user_id=user_id,
                 business_id=business_id
             )
+            usage_logged = True
 
             # Update conversation
             if conversation:
@@ -683,18 +685,19 @@ class ClaudeService:
 
         except Exception as e:
             logger.error(f"Streaming error: {e}")
-            latency_ms = int((time.time() - start_time) * 1000)
-            self._log_usage(
-                conversation=conversation,
-                api_call_type='chat',
-                tokens_input=0,
-                tokens_output=0,
-                latency_ms=latency_ms,
-                success=False,
-                error_message=str(e),
-                user_id=user_id,
-                business_id=business_id
-            )
+            if not usage_logged:
+                latency_ms = int((time.time() - start_time) * 1000)
+                self._log_usage(
+                    conversation=conversation,
+                    api_call_type='chat',
+                    tokens_input=0,
+                    tokens_output=0,
+                    latency_ms=latency_ms,
+                    success=False,
+                    error_message=str(e),
+                    user_id=user_id,
+                    business_id=business_id
+                )
             yield {'type': 'error', 'error': True, 'message': str(e)}
 
 

@@ -24,11 +24,13 @@ class OpenAICompatService:
         'openai': 'https://api.openai.com/v1/chat/completions',
         'xai':    'https://api.x.ai/v1/chat/completions',
         'groq':   'https://api.groq.com/openai/v1/chat/completions',
+        'zhipu':  'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     }
     KEY_SETTINGS = {
         'openai': ('OPENAI_API_KEY',  'gpt-4o'),
         'xai':    ('XAI_API_KEY',     'grok-3'),
         'groq':   ('GROQ_API_KEY',    'llama-3.3-70b-versatile'),
+        'zhipu':  ('GLM_API_KEY',     'glm-4.7-flash'),
     }
 
     def __init__(self, provider: str, model: str = ''):
@@ -37,7 +39,7 @@ class OpenAICompatService:
         self.endpoint   = self.ENDPOINTS[provider]
         key_setting, default_model = self.KEY_SETTINGS[provider]
         self.api_key = getattr(settings, key_setting, '') or ''
-        self.model   = model or getattr(settings, 'AI_CHAT_MODEL', default_model)
+        self.model   = model or default_model
 
     # Keywords that map to tool names — used to pick the smallest relevant tool set
     # so a single request stays well under tight provider TPM limits.
@@ -272,7 +274,7 @@ class OpenAICompatService:
                     err_body = {'error': {'message': resp.text, 'code': ''}}
                 err_code = (err_body.get('error') or {}).get('code', '')
                 err_msg  = f"API error {resp.status_code}: {err_body}"
-                logger.error("[%s] %s", self.provider, err_msg)
+                logger.warning("[%s] %s", self.provider, err_msg)
 
                 # 429 rate limit — retry once after the provider's suggested wait
                 if resp.status_code == 429:
@@ -362,7 +364,7 @@ class OpenAICompatService:
             }
 
         except Exception as e:
-            logger.exception("[%s] chat error", self.provider)
+            logger.warning("[%s] chat error", self.provider, exc_info=True)
             return {'error': True, 'message': str(e), 'content': None, 'tool_calls': []}
 
     def chat_stream(self, messages, system=None, tools=None, conversation=None,
@@ -459,7 +461,7 @@ class GeminiService:
 
             if resp.status_code != 200:
                 msg = f"Gemini API error {resp.status_code}: {resp.text}"
-                logger.error("[gemini] %s", msg)
+                logger.warning("[gemini] %s", msg)
                 return {'error': True, 'message': msg, 'content': None, 'tool_calls': []}
 
             data = resp.json()
@@ -478,7 +480,7 @@ class GeminiService:
             }
 
         except Exception as e:
-            logger.exception("[gemini] chat error")
+            logger.warning("[gemini] chat error", exc_info=True)
             return {'error': True, 'message': str(e), 'content': None, 'tool_calls': []}
 
     def chat_stream(self, messages, system=None, tools=None, conversation=None,
@@ -494,28 +496,111 @@ class GeminiService:
             yield {'type': 'text', 'text': content}
 
 
+def _build_service(provider: str, model: str):
+    """Instantiate a single provider service. Returns None for unknown providers."""
+    from ai_agent.services.claude_service import get_claude_service
+    if provider == 'anthropic':
+        return get_claude_service()
+    elif provider in ('openai', 'xai', 'groq', 'zhipu'):
+        return OpenAICompatService(provider, model)
+    elif provider == 'gemini':
+        return GeminiService(model)
+    return None
+
+
+class FallbackService:
+    """
+    Wraps a primary + fallback service.
+    On 429 rate-limit or timeout from primary, transparently retries with fallback.
+    """
+
+    _RATE_LIMIT_SIGNALS = ('429', 'rate limit', 'rate_limit', 'too many requests',
+                           'quota', 'timed out', 'timeout', 'read timed out')
+
+    def __init__(self, primary, fallback):
+        self.primary  = primary
+        self.fallback = fallback
+        self.provider = primary.provider
+        self.model    = primary.model
+
+    def is_available(self) -> tuple[bool, str]:
+        ok, msg = self.primary.is_available()
+        if ok:
+            return True, msg
+        ok2, msg2 = self.fallback.is_available()
+        if ok2:
+            return True, f"Primary unavailable ({msg}); fallback {self.fallback.provider} available"
+        return False, f"Both primary ({msg}) and fallback ({msg2}) unavailable"
+
+    def _is_rate_limit_error(self, result: dict) -> bool:
+        msg = (result.get('message') or '').lower()
+        return any(sig in msg for sig in self._RATE_LIMIT_SIGNALS)
+
+    def chat(self, **kwargs) -> dict:
+        result = self.primary.chat(**kwargs)
+        if result.get('error') and self._is_rate_limit_error(result):
+            logger.warning(
+                "[fallback] %s rate-limited/timed out — switching to %s",
+                self.primary.provider, self.fallback.provider,
+            )
+            return self.fallback.chat(**kwargs)
+        return result
+
+    def chat_stream(self, **kwargs):
+        result = self.primary.chat(**kwargs)
+        if result.get('error') and self._is_rate_limit_error(result):
+            logger.warning(
+                "[fallback] %s rate-limited/timed out — switching to %s (stream)",
+                self.primary.provider, self.fallback.provider,
+            )
+            result = self.fallback.chat(**kwargs)
+        if result.get('error'):
+            yield {'type': 'error', 'message': result.get('message', 'API error')}
+            return
+        content    = result.get('content') or ''
+        tool_calls = result.get('tool_calls') or []
+        if content:
+            yield {'type': 'text', 'text': content}
+        for tc in tool_calls:
+            yield {'type': 'tool_start', 'tool_name': tc['name']}
+            yield {'type': 'tool_end', 'tool': tc}
+
+    # Proxy budget_tracker if primary has it
+    @property
+    def budget_tracker(self):
+        return getattr(self.primary, 'budget_tracker', None)
+
+
 def get_chat_service(purpose: str = 'chat'):
     """
     Factory: returns the AI service for the given purpose.
-      purpose='chat' → AI_CHAT_PROVIDER / AI_CHAT_MODEL  (business dashboard)
+      purpose='chat' → AI_CHAT_PROVIDER / AI_CHAT_MODEL  (dashboard, order extract, address lookup)
       purpose='wa'   → AI_WA_PROVIDER  / AI_WA_MODEL     (WhatsApp reply)
-    Falls back to Claude if provider is unknown or key is missing.
+
+    If a fallback provider is configured (AI_CHAT_FALLBACK_PROVIDER / AI_WA_FALLBACK_PROVIDER),
+    returns a FallbackService that auto-switches on 429 / timeout from the primary.
     """
     from ai_agent.services.claude_service import get_claude_service
 
     if purpose == 'wa':
-        provider = getattr(settings, 'AI_WA_PROVIDER', 'anthropic') or 'anthropic'
-        model    = getattr(settings, 'AI_WA_MODEL', '') or ''
+        provider          = getattr(settings, 'AI_WA_PROVIDER', 'anthropic') or 'anthropic'
+        model             = getattr(settings, 'AI_WA_MODEL', '') or ''
+        fallback_provider = getattr(settings, 'AI_WA_FALLBACK_PROVIDER', '') or ''
+        fallback_model    = getattr(settings, 'AI_WA_FALLBACK_MODEL', '') or ''
     else:
-        provider = getattr(settings, 'AI_CHAT_PROVIDER', 'anthropic') or 'anthropic'
-        model    = getattr(settings, 'AI_CHAT_MODEL', '') or ''
+        provider          = getattr(settings, 'AI_CHAT_PROVIDER', 'anthropic') or 'anthropic'
+        model             = getattr(settings, 'AI_CHAT_MODEL', '') or ''
+        fallback_provider = getattr(settings, 'AI_CHAT_FALLBACK_PROVIDER', '') or ''
+        fallback_model    = getattr(settings, 'AI_CHAT_FALLBACK_MODEL', '') or ''
 
-    if provider == 'anthropic':
-        return get_claude_service()
-    elif provider in ('openai', 'xai', 'groq'):
-        return OpenAICompatService(provider, model)
-    elif provider == 'gemini':
-        return GeminiService(model)
-    else:
-        logger.warning("Unknown AI_CHAT_PROVIDER=%s, falling back to Anthropic", provider)
-        return get_claude_service()
+    primary = _build_service(provider, model)
+    if primary is None:
+        logger.warning("Unknown AI provider=%s, falling back to Anthropic", provider)
+        primary = get_claude_service()
+
+    if fallback_provider and fallback_provider != provider:
+        fallback = _build_service(fallback_provider, fallback_model)
+        if fallback is not None:
+            return FallbackService(primary, fallback)
+
+    return primary

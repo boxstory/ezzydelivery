@@ -289,10 +289,10 @@ class ExtractOrderAPIView(APIView):
 
         raw_text = serializer.validated_data['text']
 
-        from ai_agent.services.claude_service import get_claude_service
-        claude = get_claude_service()
+        from ai_agent.services.unified_service import get_chat_service
+        ai = get_chat_service(purpose='chat')
 
-        available, _ = claude.is_available()
+        available, _ = ai.is_available()
 
         if available:
             system_prompt = (
@@ -308,7 +308,7 @@ class ExtractOrderAPIView(APIView):
                 "If a field is not found, use empty string. Return ONLY the JSON object, nothing else."
             )
 
-            result = claude.chat(
+            result = ai.chat(
                 messages=[{'role': 'user', 'content': f"Extract order fields from this text:\n\n{raw_text}"}],
                 system=system_prompt,
                 user_id=request.user.id,
@@ -460,19 +460,22 @@ class AgentStatusAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from ai_agent.services.claude_service import get_claude_service
+        from ai_agent.services.unified_service import get_chat_service
         from ai_agent.models import UsageLog, Conversation
         from django.db.models import Sum, Count
         from django.utils import timezone
         from datetime import timedelta
 
-        claude_service = get_claude_service()
+        chat_service = get_chat_service(purpose='chat')
 
         # Check availability
-        available, msg = claude_service.is_available()
+        available, msg = chat_service.is_available()
 
-        # Get budget usage
-        budget_usage = claude_service.budget_tracker.get_usage()
+        # Budget tracking only available on Claude service
+        budget_usage = {}
+        _bt = getattr(chat_service, 'budget_tracker', None)
+        if _bt is not None:
+            budget_usage = _bt.get_usage()
 
         # Get usage stats for today
         today = timezone.now().date()
@@ -494,7 +497,7 @@ class AgentStatusAPIView(APIView):
         return Response({
             'available': available,
             'status_message': msg,
-            'model': claude_service.model,
+            'model': chat_service.model,
             'budget': budget_usage,
             'today_usage': {
                 'api_calls': today_stats['total_calls'] or 0,

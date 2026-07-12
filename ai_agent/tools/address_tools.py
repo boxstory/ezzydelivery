@@ -830,8 +830,8 @@ class ParseAddressTool(BaseTool):
         import json
 
         try:
-            from ai_agent.services.claude_service import get_claude_service
-            claude = get_claude_service()
+            from ai_agent.services.unified_service import get_chat_service
+            claude = get_chat_service(purpose='chat')
 
             # Check if service is available
             available, msg = claude.is_available()
