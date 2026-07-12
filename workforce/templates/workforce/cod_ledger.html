@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712h" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712i" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -159,7 +159,9 @@
           </td>
           <td class="codl__num">
             <div class="{% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">{{ t.amount|floatformat:2 }}</div>
-            <span class="codl__submeta">{{ t.get_payment_method_display|default:"—" }}</span>
+            {% if t.payment_method %}
+              <span class="codl__pay codl__pay--{{ t.payment_method }}">{{ t.get_payment_method_display }}</span>
+            {% else %}<span class="codl__submeta">—</span>{% endif %}
           </td>
           <td>
             {% if t.driver %}
