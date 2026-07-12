@@ -13,6 +13,7 @@ from django.views.static import serve as static_serve
 from django.http import FileResponse, HttpResponseNotFound
 from django.contrib.staticfiles import finders
 from ezzy_api.schema_views import AuthenticatedSchemaView, AuthenticatedSwaggerView, AuthenticatedRedocView
+from core.media_views import serve_protected_media
 import os
 
 
@@ -58,6 +59,16 @@ admin.site.site_header = 'Ezzy Delivery Admin'
 
 urlpatterns = [
     path('dj-admin/', admin.site.urls),
+
+    # Sensitive uploaded media (shipping labels, PODs, driver/task/order documents)
+    # is authorized here and then streamed by nginx via X-Accel-Redirect. In production
+    # nginx routes only the sensitive /media/ prefixes to this view; this pattern also
+    # covers the DEBUG runserver path. Must precede the static() media fallback below.
+    re_path(
+        r'^media/(?P<filepath>(?:shipping_labels|delivery_proofs|tasks|orders|api_keys|core/driver)/.*)$',
+        serve_protected_media,
+        name='protected_media',
+    ),
 
     #seo sitemap, robots.txt, security.txt, humans.txt - Qatar delivery SEO optimization
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
