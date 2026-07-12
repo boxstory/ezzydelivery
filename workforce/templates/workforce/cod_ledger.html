@@ -139,7 +139,10 @@
       <tbody>
         {% for t in transactions %}
         <tr>
-          <td class="codl__nowrap">{{ t.created_at|date:"Y-m-d" }}<span class="codl__time">{{ t.created_at|date:"H:i" }}</span></td>
+          <td class="codl__nowrap">
+            <div>{{ t.created_at|date:"Y-m-d" }}</div>
+            <span class="codl__submeta">{{ t.created_at|date:"H:i" }}</span>
+          </td>
           <td class="codl__nowrap">
             <div class="codl__code">{{ t.transaction_code|default:t.pk }}</div>
             <span class="codl__badge codl__badge--{{ t.transaction_type }}">{{ t.get_transaction_type_display }}</span>
