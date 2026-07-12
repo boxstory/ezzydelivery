@@ -654,11 +654,12 @@ def join_us(request):
                 driver = driverjoinform.save(commit=False)
                 driver.user = request.user
                 driver.driver_id = request.user.id
-                driver.driver_status = DRIVER_STATUS_APPROVED
+                # Must go through staff review, like join_driver — never self-approve.
+                driver.driver_status = DRIVER_STATUS_PROCESSING
                 driver.save()
 
                 logger.info(f"Driver join completed for user {request.user.id}")
-                messages.success(request, 'Your driver account has been created!')
+                messages.success(request, 'Your driver account has been submitted for review!')
 
             if businessjoinform.is_valid():
                 logger.info(f"Processing business join for user {request.user.id}")

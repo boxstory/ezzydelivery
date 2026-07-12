@@ -279,7 +279,9 @@ class TaskCompletionSerializer(serializers.Serializer):
     failure_reason = serializers.CharField(required=False, allow_blank=True, max_length=50)
     failure_notes = serializers.CharField(required=False, allow_blank=True)
     cod_collected = serializers.BooleanField(required=False, default=False)
-    cod_amount_collected = serializers.IntegerField(required=False, allow_null=True)
+    # min_value=0: a negative amount would SUBTRACT from the driver's live COD-in-hand
+    # sum, letting a driver zero out real cash liability and pocket collected money.
+    cod_amount_collected = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     completion_latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
     completion_longitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
 
@@ -352,7 +354,9 @@ class WebhookTaskCompletionSerializer(serializers.Serializer):
     task_id = serializers.IntegerField()
     status = serializers.ChoiceField(choices=['delivered', 'cancelled', 'rejected', 'failed'])
     cod_collected = serializers.BooleanField(required=False, default=False)
-    cod_amount_collected = serializers.IntegerField(required=False, allow_null=True)
+    # min_value=0: a negative amount would SUBTRACT from the driver's live COD-in-hand
+    # sum, letting a driver zero out real cash liability and pocket collected money.
+    cod_amount_collected = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     notes = serializers.CharField(required=False, allow_blank=True)
     timestamp = serializers.DateTimeField(required=False)
     driver_id = serializers.IntegerField(required=False)

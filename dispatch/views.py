@@ -29,6 +29,36 @@ from .serializers import (
 logger = logging.getLogger('dispatch')
 
 
+def _accessible_locations(request):
+    """Active pickup locations the caller may see: their own business's, or all for staff."""
+    from business.models import PickupLocation
+    from core.context_processors import get_cached_business
+
+    qs = PickupLocation.objects.filter(pickup_status='active')
+    user = request.user
+    is_staff = user.is_staff or getattr(getattr(user, 'profile', None), 'is_staff', False) \
+        or getattr(getattr(user, 'profile', None), 'is_superadmin', False)
+    if is_staff:
+        return qs
+    business = get_cached_business(request)
+    if not business:
+        return qs.none()
+    return qs.filter(business=business)
+
+
+def _resolve_current_location(request):
+    """Return the requested (?location=) or first accessible location, scoped to the caller.
+
+    Returns None when the caller has no accessible location. A ?location=<id> that the
+    caller may not access 404s (via the scoped queryset) rather than leaking another tenant.
+    """
+    locations = _accessible_locations(request)
+    location_id = request.GET.get('location')
+    if location_id:
+        return get_object_or_404(locations, id=location_id)
+    return locations.first()
+
+
 # ========================================
 # RIDER API ENDPOINTS
 # ========================================
@@ -355,24 +385,13 @@ def rider_clock_out(request, shift_id):
 @login_required(login_url='/accounts/login/')
 def store_dashboard(request):
     """Store manager dashboard - overview of batch activity."""
-    # Get user's associated pickup location(s)
-    from business.models import PickupLocation
-
-    # For now, get all active pickup locations
-    # In production, filter by user's business
-    user_locations = PickupLocation.objects.filter(
-        pickup_status='active'
-    )
+    # Pickup locations the caller may access (own business, or all for staff).
+    user_locations = _accessible_locations(request)
 
     if not user_locations.exists():
         return render(request, 'dispatch/store/no_location.html')
 
-    # Get first location for demo (or use query param)
-    location_id = request.GET.get('location')
-    if location_id:
-        current_location = get_object_or_404(PickupLocation, id=location_id)
-    else:
-        current_location = user_locations.first()
+    current_location = _resolve_current_location(request)
 
     # Get batch stats
     now = timezone.now()
@@ -421,11 +440,7 @@ def store_prep_queue(request):
     """Orders to prepare, grouped by batch."""
     from business.models import PickupLocation
 
-    location_id = request.GET.get('location')
-    if location_id:
-        current_location = get_object_or_404(PickupLocation, id=location_id)
-    else:
-        current_location = PickupLocation.objects.filter(pickup_status='active').first()
+    current_location = _resolve_current_location(request)
 
     if not current_location:
         return render(request, 'dispatch/store/no_location.html')
@@ -451,11 +466,7 @@ def store_riders(request):
     """Riders assigned to this store."""
     from business.models import PickupLocation
 
-    location_id = request.GET.get('location')
-    if location_id:
-        current_location = get_object_or_404(PickupLocation, id=location_id)
-    else:
-        current_location = PickupLocation.objects.filter(pickup_status='active').first()
+    current_location = _resolve_current_location(request)
 
     if not current_location:
         return render(request, 'dispatch/store/no_location.html')
@@ -480,11 +491,7 @@ def store_batches(request):
     """All batches for this store."""
     from business.models import PickupLocation
 
-    location_id = request.GET.get('location')
-    if location_id:
-        current_location = get_object_or_404(PickupLocation, id=location_id)
-    else:
-        current_location = PickupLocation.objects.filter(pickup_status='active').first()
+    current_location = _resolve_current_location(request)
 
     if not current_location:
         return render(request, 'dispatch/store/no_location.html')
@@ -529,11 +536,7 @@ def store_batch_list_partial(request):
     """HTMX partial for batch list refresh."""
     from business.models import PickupLocation
 
-    location_id = request.GET.get('location')
-    if location_id:
-        current_location = get_object_or_404(PickupLocation, id=location_id)
-    else:
-        current_location = PickupLocation.objects.filter(pickup_status='active').first()
+    current_location = _resolve_current_location(request)
 
     active_batches = OrderBatch.objects.filter(
         pickup_location=current_location,
@@ -552,11 +555,7 @@ def store_prep_queue_partial(request):
     """HTMX partial for prep queue refresh."""
     from business.models import PickupLocation
 
-    location_id = request.GET.get('location')
-    if location_id:
-        current_location = get_object_or_404(PickupLocation, id=location_id)
-    else:
-        current_location = PickupLocation.objects.filter(pickup_status='active').first()
+    current_location = _resolve_current_location(request)
 
     prep_batches = OrderBatch.objects.filter(
         pickup_location=current_location,

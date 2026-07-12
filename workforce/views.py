@@ -8226,6 +8226,8 @@ def check_business_code_unique(request):
     return JsonResponse({'available': not qs.exists(), 'code': code})
 
 
+@login_required(login_url='/accounts/login/')
+@api_staff_required
 def update_verification_status(request, profile_id):
     """AJAX endpoint to update user verification status"""
     from core import models as core_models
@@ -13817,6 +13819,8 @@ def driver_set_status(request, driver_id):
     return JsonResponse({'success': True, 'status': new_status})
 
 
+@login_required(login_url='/accounts/login/')
+@api_staff_required
 def driver_toggle_status(request, driver_id):
     """Toggle driver availability (available ↔ offline) without changing driver_status."""
     if request.method != 'POST':
