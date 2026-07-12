@@ -7,7 +7,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework import generics
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
 from ezzy_api.throttles import LoginRateThrottle
-from ezzy_api.permissions import require_admin_scope
+from ezzy_api.permissions import ApiKeyScopePermission, require_admin_scope
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.authentication import TokenAuthentication
@@ -15,7 +15,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from decouple import config
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Sum
 from datetime import datetime, timedelta
 
@@ -72,7 +72,7 @@ logger = logging.getLogger('ezzy_api')
 
 class OrderList(generics.ListCreateAPIView):
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, ApiKeyScopePermission]
     serializer_class = ezzy_api_serializers.OrderSerializer
 
     def get_queryset(self):
@@ -181,7 +181,7 @@ def driver_login(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_profile(request):
     """Get driver profile"""
     try:
@@ -196,7 +196,7 @@ def driver_profile(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_tasks(request):
     """Get all tasks assigned to the driver"""
     try:
@@ -246,7 +246,7 @@ def driver_tasks(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_task_detail(request, task_id):
     """Get detailed information about a specific task"""
     try:
@@ -279,7 +279,7 @@ def driver_task_detail(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_accept_task(request, task_id):
     """Driver accepts a task"""
     try:
@@ -346,7 +346,7 @@ def driver_accept_task(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_reject_task(request, task_id):
     """Driver rejects a task"""
     try:
@@ -415,7 +415,7 @@ def driver_reject_task(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_update_task_status(request, task_id):
     """Driver updates task status"""
     VALID_DRIVER_STATUSES = [
@@ -505,7 +505,7 @@ def driver_update_task_status(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_update_location(request):
     """Save a GPS ping from the driver PWA."""
     try:
@@ -546,7 +546,7 @@ def driver_update_location(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_latest_location(request, driver_id):
     """Get the latest GPS location for a driver (admin/workforce use)."""
     if not request.user.is_staff:
@@ -581,7 +581,7 @@ def driver_latest_location(request, driver_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_statistics(request):
     """Get driver statistics (completed tasks, earnings, ratings, etc.)"""
     try:
@@ -637,7 +637,7 @@ def driver_statistics(request):
 # ==================== HUB PICKUP BATCH APIs ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_hub_batches(request):
     """List active hub pickup batches assigned to the requesting driver."""
     try:
@@ -678,7 +678,7 @@ def driver_hub_batches(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_hub_batch_detail(request, batch_id):
     """Get detail for a single hub pickup batch."""
     try:
@@ -722,7 +722,7 @@ def driver_hub_batch_detail(request, batch_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_hub_batch_accept(request, batch_id):
     """Driver accepts a hub pickup batch."""
     try:
@@ -745,7 +745,7 @@ def driver_hub_batch_accept(request, batch_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_hub_batch_status(request, batch_id):
     """Driver updates hub pickup batch status."""
     DRIVER_ALLOWED_TRANSITIONS = {
@@ -785,7 +785,7 @@ def driver_hub_batch_status(request, batch_id):
 # ==================== ENHANCED DRIVER APP TASK APIs ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_complete_task(request, task_id):
     """Driver completes a task with delivery proof, signature, and photos"""
     try:
@@ -1099,7 +1099,7 @@ def driver_complete_task(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_upload_task_document(request, task_id):
     """Driver uploads a document for a task"""
     try:
@@ -1163,7 +1163,7 @@ def driver_upload_task_document(request, task_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_task_documents(request, task_id):
     """Get all documents for a task"""
     try:
@@ -1187,7 +1187,7 @@ def driver_task_documents(request, task_id):
 # ==================== API KEY MANAGEMENT APIs ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def create_api_key(request):
     """Create a new API key for a client"""
     # Managing keys requires the admin scope when called via an API key.
@@ -1249,7 +1249,7 @@ def create_api_key(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def list_api_keys(request):
     """List all API keys for a business"""
     scope_err = require_admin_scope(request)
@@ -1285,7 +1285,7 @@ def list_api_keys(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def manage_api_key(request, api_key_id):
     """Update or delete an API key"""
     scope_err = require_admin_scope(request)
@@ -1329,7 +1329,7 @@ def manage_api_key(request, api_key_id):
 # ==================== E-COMMERCE INTEGRATION APIs ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def import_shopify_orders(request):
     """Import orders from Shopify"""
     serializer = ezzy_api_serializers.ShopifyOrderImportSerializer(data=request.data)
@@ -1432,7 +1432,7 @@ def import_shopify_orders(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def import_woocommerce_orders(request):
     """Import orders from WooCommerce"""
     serializer = ezzy_api_serializers.WooCommerceOrderImportSerializer(data=request.data)
@@ -1546,7 +1546,7 @@ def import_woocommerce_orders(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def list_integrations(request):
     """List all e-commerce integrations"""
     business_id = request.query_params.get('business_id', None)
@@ -1574,7 +1574,7 @@ def list_integrations(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def import_tiktokshop_orders(request):
     """
     Import orders from TikTok Shop.
@@ -1706,7 +1706,7 @@ def import_tiktokshop_orders(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def test_tiktokshop_connection(request):
     """
     Test TikTok Shop API connection.
@@ -2447,7 +2447,7 @@ def _validate_webhook_url(url):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def create_webhook_endpoint(request):
     """Create a new webhook endpoint"""
     serializer = ezzy_api_serializers.WebhookEndpointSerializer(data=request.data)
@@ -2485,7 +2485,7 @@ def create_webhook_endpoint(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def list_webhook_endpoints(request):
     """List all webhook endpoints"""
     business_id = request.query_params.get('business_id', None)
@@ -2516,7 +2516,7 @@ def list_webhook_endpoints(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def list_webhook_deliveries(request):
     """List webhook delivery history"""
     webhook_id = request.query_params.get('webhook_id', None)
@@ -2542,7 +2542,7 @@ def list_webhook_deliveries(request):
 # ==================== ORDER VERIFICATION APIs ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def orders_pending_verification(request):
     """Get orders pending verification"""
     verification_status = request.query_params.get('verification_status', 'pending')
@@ -2567,7 +2567,7 @@ def orders_pending_verification(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def verify_order_address(request, order_id):
     """Verify order address"""
     try:
@@ -2670,7 +2670,7 @@ def verify_order_address(request, order_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def verify_order(request, order_id):
     """Verify order and create delivery task"""
     try:
@@ -2721,7 +2721,7 @@ def verify_order(request, order_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def reject_order(request, order_id):
     """Reject order"""
     try:
@@ -2767,7 +2767,7 @@ def reject_order(request, order_id):
 # ==================== BUSINESS APIs ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def business_dashboard_stats(request):
     """Get dashboard statistics for business"""
     business = get_api_user_business(request)
@@ -2858,7 +2858,7 @@ def api_tester_view(request):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def business_orders_api(request):
     """
     GET: List all orders for business
@@ -2891,7 +2891,7 @@ def business_orders_api(request):
             if search:
                 orders = orders.filter(
                     Q(order_number__icontains=search) |
-                    Q(client__client_name__icontains=search)
+                    Q(customer_name__icontains=search)
                 )
 
             orders = orders.order_by('-created_at')[offset:offset + limit]
@@ -2901,13 +2901,14 @@ def business_orders_api(request):
                 data.append({
                     'id': order.id,
                     'order_number': order.order_number,
-                    'client_name': order.client.client_name if order.client else None,
-                    'client_phone': order.client.client_phone if order.client else None,
-                    'delivery_address': order.delivery_address,
+                    'client_order_code': order.client_order_code,
+                    'customer_name': order.customer_name,
+                    'customer_phone': order.customer_phone,
+                    'customer_address': order.customer_address,
                     'order_status': order.order_status,
-                    'order_date': order.order_date,
+                    'cod_amount': str(order.cod_amount) if order.cod_amount is not None else None,
+                    'dl_amount': str(order.dl_amount) if order.dl_amount is not None else None,
                     'created_at': order.created_at,
-                    'total_amount': str(order.total_amount) if hasattr(order, 'total_amount') else None
                 })
 
             logger.info(f"Returned {len(data)} orders for business {business.business_id}")
@@ -2920,25 +2921,15 @@ def business_orders_api(request):
             logger.info(f"Creating new order for business {business.business_id}")
 
             # Required fields
-            client_id = request.data.get('client_id')
-            delivery_address = request.data.get('delivery_address')
+            customer_name = (request.data.get('customer_name') or '').strip()
+            customer_phone = (request.data.get('customer_phone') or '').strip()
+            customer_address = (request.data.get('customer_address') or '').strip()
             pickup_location_id = request.data.get('pickup_location_id')
 
-            if not all([client_id, delivery_address]):
+            if not all([customer_name, customer_phone, customer_address]):
                 return Response(
-                    {'error': 'client_id and delivery_address are required'},
+                    {'error': 'customer_name, customer_phone and customer_address are required'},
                     status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Verify the client belongs to the caller's business.
-            try:
-                client = business_models.Client.objects.get(
-                    id=client_id, business=business
-                )
-            except business_models.Client.DoesNotExist:
-                return Response(
-                    {'error': 'Client not found'},
-                    status=status.HTTP_404_NOT_FOUND
                 )
 
             # Verify the pickup location (if supplied) belongs to the caller's
@@ -2955,15 +2946,37 @@ def business_orders_api(request):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
-            # Create order
-            order = orders_models.Order.objects.create(
-                business=business,
-                client=client,
-                delivery_address=delivery_address,
-                pickup_location=pickup_location,
-                order_status='pending',
-                created_by=request.user
-            )
+            def _safe_int(val):
+                try:
+                    return int(float(val)) if val not in (None, '') else 0
+                except (ValueError, TypeError):
+                    return 0
+
+            # client_order_code is unique per business; generate one when absent
+            client_order_code = (request.data.get('client_order_code') or '').strip()
+            if not client_order_code:
+                import uuid
+                client_order_code = f"API-{uuid.uuid4().hex[:12].upper()}"
+
+            # Create order (lands in review queue like other imports)
+            try:
+                with transaction.atomic():
+                    order = orders_models.Order.objects.create(
+                        business=business,
+                        client_order_code=client_order_code,
+                        customer_name=customer_name,
+                        customer_phone=customer_phone,
+                        customer_address=customer_address,
+                        cod_amount=_safe_int(request.data.get('cod_amount')),
+                        dl_amount=_safe_int(request.data.get('dl_amount')),
+                        pickup_location=pickup_location,
+                        order_status='to_review',
+                    )
+            except IntegrityError:
+                return Response(
+                    {'error': 'An order with this client_order_code already exists for your business.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             logger.info(f"Order {order.order_number} created successfully")
 
@@ -2994,7 +3007,7 @@ def api_tester_view(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def business_order_detail_api(request, order_id):
     """
     GET: Get order details
@@ -3095,7 +3108,7 @@ def api_tester_view(request):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def business_clients_api(request):
     """
     GET: List all clients for business
@@ -3192,7 +3205,7 @@ def api_tester_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def business_tasks_api(request):
     """Get all delivery tasks for business"""
     business = get_api_user_business(request)
@@ -3264,7 +3277,7 @@ def api_tester_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def business_pickup_locations_api(request):
     """Get all pickup locations for business"""
     business = get_api_user_business(request)
@@ -4145,7 +4158,7 @@ def webhook_inbound_order(request, webhook_key):
 # ==================== COD APIs ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_cod_submit(request):
     """Driver submits collected COD cash to admin for a specific task."""
     try:
@@ -4213,7 +4226,7 @@ def driver_cod_submit(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_cod_pending(request):
     """List tasks where COD was collected but not yet submitted to admin."""
     try:
@@ -4248,7 +4261,7 @@ def driver_cod_pending(request):
 # ==================== DRIVER TRANSACTION APIs ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_transactions(request):
     """List all financial transactions for the authenticated driver."""
     try:
@@ -4300,7 +4313,7 @@ def driver_transactions(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_transaction_detail(request, code):
     """Get details of a single transaction by its code."""
     try:
@@ -4337,7 +4350,7 @@ def driver_transaction_detail(request, code):
 # ==================== DRIVER SETTLEMENT APIs ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_settlements(request):
     """List all earnings settlements for the authenticated driver."""
     try:
@@ -4377,7 +4390,7 @@ def driver_settlements(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_settlement_detail(request, code):
     """Get full details of a single settlement including its transactions."""
     try:
@@ -4428,7 +4441,7 @@ def driver_settlement_detail(request, code):
 # ==================== DRIVER NOTIFICATION APIs ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_notifications(request):
     """List notifications for the authenticated driver."""
     try:
@@ -4471,7 +4484,7 @@ def driver_notifications(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_notifications_mark_read(request):
     """Mark one or more notifications as read.
 
@@ -4498,7 +4511,7 @@ def driver_notifications_mark_read(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_device_token(request):
     """Store or update the FCM/APNs push notification device token for the driver.
 
@@ -4537,7 +4550,7 @@ def driver_device_token(request):
 # ==================== DRIVER AUTH / STATUS / DASHBOARD APIs ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_logout(request):
     """Invalidate the driver's auth token and set availability to offline."""
     try:
@@ -4556,7 +4569,7 @@ def driver_logout(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_set_status(request):
     """Update driver availability status.
 
@@ -4586,7 +4599,7 @@ def driver_set_status(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_dashboard(request):
     """Aggregated dashboard data for the driver app home screen.
 
@@ -4685,7 +4698,7 @@ def driver_dashboard(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_cod_submit_bulk(request):
     """Bulk COD submission — submit multiple tasks at once.
 
@@ -4749,7 +4762,7 @@ def driver_cod_submit_bulk(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_order_lookup(request):
     """Look up an order by order_number or client_order_code (barcode scan at pickup).
 
@@ -4793,7 +4806,7 @@ def driver_order_lookup(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_report_task_issue(request, task_id):
     """Driver reports a problem with a delivery task.
 
@@ -4855,7 +4868,7 @@ def driver_report_task_issue(request, task_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_pickup_locations(request):
     """List active pickup locations for tasks currently assigned to this driver."""
     try:
@@ -4893,7 +4906,7 @@ def driver_pickup_locations(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_task_items(request, task_id):
     """Get package contents (order items) for a delivery task."""
     try:
@@ -4942,7 +4955,7 @@ def driver_task_items(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_document_upload(request):
     """Driver uploads or updates their own identity document.
 
@@ -4996,7 +5009,7 @@ def driver_document_upload(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_performance_metrics(request):
     """Driver performance metrics — success rate, earnings, rating.
 
