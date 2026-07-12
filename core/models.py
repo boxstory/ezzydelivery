@@ -174,7 +174,7 @@ class Profile(models.Model):
                              'business_email', 'business_product_category', 'business_qid']
             completed = sum(1 for field in required_fields if getattr(business, field, None))
             return int((completed / len(required_fields)) * 100)
-        except:
+        except Exception:
             return 0
 
     def get_driver_profile_completion_percentage(self):
@@ -188,7 +188,7 @@ class Profile(models.Model):
                              'driver_license_number', 'driver_bio']
             completed = sum(1 for field in required_fields if getattr(driver, field, None))
             return int((completed / len(required_fields)) * 100)
-        except:
+        except Exception:
             return 0
 
     def can_apply_for_verification(self):

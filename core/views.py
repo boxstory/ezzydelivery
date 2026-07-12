@@ -340,7 +340,7 @@ def join_business(request):
         return render(request, 'core/join_us_business.html', context)
 
     except core_models.Profile.DoesNotExist:
-        logger.error(f"Profile does not exist for user {request.user.id}")
+        logger.info(f"Profile does not exist yet for user {request.user.id} (normal onboarding path)")
         messages.error(request, "Please create your profile first.")
         return redirect('core:profile_add')
 
@@ -430,7 +430,7 @@ def join_driver(request):
         }
         return render(request, 'core/join_us_driver.html', context)
     except core_models.Profile.DoesNotExist:
-        logger.error(f"Profile does not exist for user {request.user.id}")
+        logger.info(f"Profile does not exist yet for user {request.user.id} (normal onboarding path)")
         messages.error(request, "Please create your profile first.")
         return redirect('core:profile_add')
 

@@ -837,7 +837,7 @@ def _get_related_pages_with_urls(current_url_name):
     for page in related:
         try:
             page['url'] = reverse(page['url'])
-        except:
+        except Exception:
             page['url'] = '/'
     return related
 

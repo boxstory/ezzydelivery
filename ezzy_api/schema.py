@@ -12,6 +12,23 @@ API Schema behavior:
 
 from drf_spectacular.openapi import AutoSchema
 from drf_spectacular.generators import SchemaGenerator
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
+
+
+class ClientApiKeyScheme(OpenApiAuthenticationExtension):
+    """Teaches drf-spectacular how to document ClientApiKeyAuthentication,
+    silencing the W001 'could not resolve authenticator' warnings and
+    rendering an API-key security scheme in the OpenAPI docs."""
+    target_class = 'ezzy_api.authentication.ClientApiKeyAuthentication'
+    name = 'ClientApiKey'
+
+    def get_security_definition(self, auto_schema):
+        return {
+            'type': 'apiKey',
+            'in': 'header',
+            'name': 'Authorization',
+            'description': 'Client API key as "Bearer <key>" or via the X-API-Key header.',
+        }
 
 
 class UserTypeFilteredSchema(AutoSchema):
