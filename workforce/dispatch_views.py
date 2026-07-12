@@ -115,7 +115,7 @@ def batch_list(request):
         batches = batches.filter(created_at__date=date_filter)
 
     # Pagination
-    paginator = Paginator(batches, 25)
+    paginator = Paginator(batches, 50)
     page = request.GET.get('page', 1)
     batches = paginator.get_page(page)
 
@@ -272,7 +272,7 @@ def shift_list(request):
         shifts = shifts.filter(scheduled_start__date__gte=today)
 
     # Pagination
-    paginator = Paginator(shifts, 25)
+    paginator = Paginator(shifts, 50)
     page = request.GET.get('page', 1)
     shifts = paginator.get_page(page)
 

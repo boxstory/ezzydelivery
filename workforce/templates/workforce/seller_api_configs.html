@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Seller API Configs — Staff Dashboard{% endblock %}
@@ -82,12 +83,12 @@
                         <label class="form-label small mb-1">Business</label>
                         <select class="form-select form-select-sm" id="gs_business_id">
                             <option value="">— Select business —</option>
-                            {% for biz in businesses_with_api %}
-                            <option value="{{ biz.business_id }}">{{ biz.business_name }}</option>
+                            {% for biz in businesses_with_api|code_last %}
+                            <option value="{{ biz.business_id }}">{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
                             {% endfor %}
-                            {% for api in api_configs %}
+                            {% for api in api_configs|code_last %}
                             {% if api.business not in businesses_with_api %}
-                            <option value="{{ api.business.business_id }}">{{ api.business.business_name }}</option>
+                            <option value="{{ api.business.business_id }}">{% if api.business.business_code %}{{ api.business.business_code }}{% else %}*{{ api.business.business_id }}{% endif %} - {{ api.business.business_name }}</option>
                             {% endif %}
                             {% endfor %}
                         </select>

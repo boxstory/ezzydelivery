@@ -9,79 +9,94 @@
         <i class="fa-solid fa-arrow-left"></i> Back to Sellers
     </a>
 
-    <!-- Hero Header -->
-    <div class="sld__hero">
-        <div class="sld__hero-inner">
-            <div class="sld__hero-left">
-                <h1 class="sld__hero-title">
-                    <i class="fa-solid fa-store"></i>
-                    {{ business.business_name|default:"Unknown Business" }}
-                </h1>
-                <div class="sld__hero-id">{{ business.business_code|default:"N/A" }} &bull; ID #{{ business.business_id }}</div>
-                <div class="sld__hero-contacts">
-                    {% if business.business_phone %}
-                    <span class="sld__hero-contact">
-                        <i class="fa-solid fa-phone"></i> {{ business.business_phone }}
+    <!-- Merchant Dossier Header -->
+    <div class="sld__dossier">
+        <div class="sld__dossier-top">
+            <!-- Monogram seal -->
+            <div class="sld__seal" aria-hidden="true">
+                <span class="sld__seal-mono">{{ business.business_name|first|upper|default:"?" }}</span>
+            </div>
+
+            <!-- Record identity -->
+            <div class="sld__rec">
+                <h1 class="sld__rec-name">{{ business.business_name|default:"Unknown Business" }}</h1>
+                <div class="sld__rec-line">
+                    <span class="sld__rec-tag">REC #{{ business.business_id }}</span>
+                    <span class="sld__rec-dot">·</span>
+                    <span>{{ business.business_code|default:"NO-CODE" }}</span>
+                    {% if business.business_since %}
+                    <span class="sld__rec-dot">·</span>
+                    <span>since {{ business.business_since|date:"M Y" }}</span>
+                    {% endif %}
+                </div>
+                <div class="sld__rec-line sld__rec-line--status">
+                    <span class="sld__rec-status sld__rec-status--{% if business.business_status == 'active' %}active{% elif business.business_status == 'pending' %}pending{% elif business.business_status == 'suspended' %}suspended{% else %}inactive{% endif %}">
+                        <span class="sld__rec-status-dot"></span>{{ business.business_status|default:"unknown"|title }}
                     </span>
+                    {% if business.fulfillment_service_enabled %}
+                    <span class="sld__rec-flag"><i class="fa-solid fa-warehouse"></i> Fulfillment</span>
+                    {% endif %}
+                </div>
+                <div class="sld__rec-contacts">
+                    {% if business.business_phone %}
+                    <a href="tel:{{ business.business_phone }}" class="sld__rec-contact"><i class="fa-solid fa-phone"></i> {{ business.business_phone }}</a>
                     {% endif %}
                     {% if business.business_email %}
-                    <span class="sld__hero-contact">
-                        <i class="fa-solid fa-envelope"></i> {{ business.business_email }}
-                    </span>
-                    {% endif %}
-                    {% if business.business_since %}
-                    <span class="sld__hero-contact">
-                        <i class="fa-solid fa-calendar"></i> Since {{ business.business_since|date:"M Y" }}
-                    </span>
+                    <a href="mailto:{{ business.business_email }}" class="sld__rec-contact"><i class="fa-solid fa-envelope"></i> {{ business.business_email }}</a>
                     {% endif %}
                 </div>
             </div>
-            <div class="sld__hero-badges">
-                <span class="sld__pill sld__pill--{% if business.business_status == 'active' %}active{% elif business.business_status == 'pending' %}pending{% elif business.business_status == 'suspended' %}suspended{% else %}inactive{% endif %}">
-                    {{ business.business_status|title }}
-                </span>
+
+            <!-- Verification stamp (the signature) -->
+            <div class="sld__stamp-wrap" aria-hidden="true">
                 {% if business.profile.verification_status == 'verified' %}
-                <span class="sld__pill sld__pill--verified">
-                    <i class="fa-solid fa-check"></i> Verified
-                </span>
-                {% endif %}
-                {% if business.fulfillment_service_enabled %}
-                <span class="sld__pill sld__pill--fulfillment">
-                    <i class="fa-solid fa-warehouse"></i> Fulfillment
-                </span>
+                <div class="sld__stamp sld__stamp--verified">
+                    <i class="fa-solid fa-certificate sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Verified</span>
+                    <span class="sld__stamp-sub">merchant on file</span>
+                </div>
+                {% elif business.profile.verification_status == 'pending' %}
+                <div class="sld__stamp sld__stamp--pending">
+                    <i class="fa-solid fa-hourglass-half sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Pending</span>
+                    <span class="sld__stamp-sub">review required</span>
+                </div>
+                {% else %}
+                <div class="sld__stamp sld__stamp--none">
+                    <i class="fa-regular fa-circle-question sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Unverified</span>
+                    <span class="sld__stamp-sub">no record</span>
+                </div>
                 {% endif %}
             </div>
         </div>
-    </div>
 
-    <!-- Stats Row -->
-    <div class="sld__stats">
-        <div class="sld__stat-box">
-            <div class="sld__stat-box-val">{{ order_stats.total_orders|default:0 }}</div>
-            <div class="sld__stat-box-lbl">Total Orders</div>
-            {% if last_7_days_orders > 0 %}
-            <div class="sld__stat-box-trend">+{{ last_7_days_orders }} this week</div>
-            {% endif %}
-        </div>
-        <div class="sld__stat-box">
-            <div class="sld__stat-box-val">{{ delivery_success_rate }}%</div>
-            <div class="sld__stat-box-lbl">Success Rate</div>
-        </div>
-        <div class="sld__stat-box">
-            <div class="sld__stat-box-val">{{ recent_orders_count|default:0 }}</div>
-            <div class="sld__stat-box-lbl">Last 30 Days</div>
-        </div>
-        <div class="sld__stat-box">
-            <div class="sld__stat-box-val">{{ cod_stats.total_cod_orders|default:0 }}</div>
-            <div class="sld__stat-box-lbl">COD Orders</div>
-        </div>
-        <div class="sld__stat-box">
-            <div class="sld__stat-box-val">{{ team_members.count|default:0 }}</div>
-            <div class="sld__stat-box-lbl">Team Members</div>
-        </div>
-        <div class="sld__stat-box">
-            <div class="sld__stat-box-val">{{ pickup_locations.count|default:0 }}</div>
-            <div class="sld__stat-box-lbl">Locations</div>
+        <!-- Ledger strip: the figures as one data record -->
+        <div class="sld__ledger-strip">
+            <div class="sld__figure sld__figure--lead">
+                <div class="sld__figure-val">{{ order_stats.total_orders|default:0 }}</div>
+                <div class="sld__figure-lbl">Total Orders{% if last_7_days_orders > 0 %} <span class="sld__figure-trend">+{{ last_7_days_orders }}/wk</span>{% endif %}</div>
+            </div>
+            <div class="sld__figure">
+                <div class="sld__figure-val">{{ delivery_success_rate }}<span class="sld__figure-unit">%</span></div>
+                <div class="sld__figure-lbl">Success Rate</div>
+            </div>
+            <div class="sld__figure">
+                <div class="sld__figure-val">{{ recent_orders_count|default:0 }}</div>
+                <div class="sld__figure-lbl">Last 30 Days</div>
+            </div>
+            <div class="sld__figure">
+                <div class="sld__figure-val">{{ cod_stats.total_cod_orders|default:0 }}</div>
+                <div class="sld__figure-lbl">COD Orders</div>
+            </div>
+            <div class="sld__figure">
+                <div class="sld__figure-val">{{ team_members.count|default:0 }}</div>
+                <div class="sld__figure-lbl">Team</div>
+            </div>
+            <div class="sld__figure">
+                <div class="sld__figure-val">{{ pickup_locations.count|default:0 }}</div>
+                <div class="sld__figure-lbl">Locations</div>
+            </div>
         </div>
     </div>
 
@@ -399,6 +414,7 @@
                         <th>Status</th>
                         <th>COD</th>
                         <th>Date</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -418,6 +434,22 @@
                         </td>
                         <td>{{ order.cod_amount|default:0|floatformat:0 }} QAR</td>
                         <td class="sld__date-cell">{{ order.created_at|date:"d M Y" }}</td>
+                        <td class="text-end">
+                            <div class="sld__row-actions">
+                                <a href="{% url 'workforce:order_detail' order.id %}" class="sld__row-btn" title="View order" aria-label="View order">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                {% if user.profile.is_superadmin %}
+                                <button type="button" class="sld__row-btn sld__row-btn--danger" title="Delete order" aria-label="Delete order"
+                                        hx-post="{% url 'workforce:delete_order' order.id %}"
+                                        hx-target="closest tr"
+                                        hx-swap="outerHTML swap:200ms"
+                                        hx-confirm="Permanently delete order {{ order.order_number|default:order.client_order_code }}? This cannot be undone.">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -909,6 +941,7 @@
                         <th>Status</th>
                         <th>Email</th>
                         <th>Phone</th>
+                        <th class="text-end">Change Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -926,12 +959,25 @@
                             </span>
                         </td>
                         <td>
-                            <span class="sld__badge {% if member.team_status == 'active' %}sld__badge--success{% elif member.team_status == 'pending' %}sld__badge--warning{% else %}sld__badge--muted{% endif %}">
+                            <span class="sld__badge {% if member.team_status == 'active' %}sld__badge--success{% elif member.team_status == 'pending' %}sld__badge--warning{% elif member.team_status == 'suspended' or member.team_status == 'rejected' %}sld__badge--danger{% else %}sld__badge--muted{% endif %}"
+                                  id="team_status_badge_{{ member.id }}">
                                 {{ member.team_status|title }}
                             </span>
                         </td>
                         <td class="sld__text-muted">{{ member.team_email|default:member.user.email|default:"N/A" }}</td>
                         <td class="sld__text-muted">{{ member.team_phone|default:"N/A" }}</td>
+                        <td class="text-end">
+                            <select class="form-select form-select-sm w-auto d-inline-block sld__status-select"
+                                    id="team_status_select_{{ member.id }}"
+                                    data-member-id="{{ member.id }}"
+                                    data-url="{% url 'workforce:update_team_status' member.id %}"
+                                    data-current="{{ member.team_status }}"
+                                    aria-label="Change status for {{ member.team_name|default:member.user.username }}">
+                                {% for value, label in team_status_choices %}
+                                <option value="{{ value }}" {% if member.team_status == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -1160,9 +1206,15 @@
 
     <!-- Tab: Products -->
     <div id="panel-products" class="sld__panel">
-        <h3 class="sld__section-title">
-            <i class="fa-solid fa-boxes-stacked sld__section-icon"></i> Products
-        </h3>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h3 class="sld__section-title mb-0">
+                <i class="fa-solid fa-boxes-stacked sld__section-icon"></i> Products
+            </h3>
+            <a href="{% url 'product:product_csv_import' %}?business_id={{ business.business_id }}"
+               class="btn btn-sm btn-warning fw-semibold" id="seller_detail_btn_csv_import">
+                <i class="fa-solid fa-file-csv me-1"></i> Import CSV
+            </a>
+        </div>
 
         <!-- Local Products Table -->
         {% if products_list %}
@@ -1184,6 +1236,7 @@
                         <th class="text-end">Price</th>
                         <th>Image</th>
                         <th>Created</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1202,6 +1255,17 @@
                         <td class="text-end">{{ product.item_price|default:"0" }} QAR</td>
                         <td>{% if product.product_image %}<img src="{{ product.product_image.url }}" alt="" style="max-height:28px;border-radius:3px;cursor:pointer;" onclick="document.getElementById('sldProductImgOverlay').style.display='flex';document.getElementById('sldProductImgFull').src=this.src;">{% else %}-{% endif %}</td>
                         <td class="small text-muted">{{ product.created_at|date:"d M Y" }}</td>
+                        <td class="text-end">
+                            <form method="POST" action="{% url 'product:product_staff_delete' product.id %}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Delete &quot;{{ product.item_name|escapejs }}&quot;? This cannot be undone.');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        id="seller_detail_btn_del_product_{{ product.id }}" title="Delete product">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -1823,5 +1887,71 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         }
     });
 })();
+</script>
+
+<!-- Team member status change (reuses workforce:update_team_status) -->
+<script>
+(function () {
+    var selects = document.querySelectorAll('.sld__status-select');
+    if (!selects.length) return;
+
+    var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+    var csrf = csrfEl ? csrfEl.value : '';
+
+    // status -> badge modifier class
+    var badgeClass = {
+        active: 'sld__badge--success',
+        pending: 'sld__badge--warning',
+        suspended: 'sld__badge--danger',
+        rejected: 'sld__badge--danger',
+        inactive: 'sld__badge--muted'
+    };
+
+    selects.forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            var memberId = sel.getAttribute('data-member-id');
+            var url = sel.getAttribute('data-url');
+            var prev = sel.getAttribute('data-current');
+            var next = sel.value;
+            if (next === prev) return;
+
+            sel.disabled = true;
+            fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: next })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data && data.success) {
+                    sel.setAttribute('data-current', next);
+                    var badge = document.getElementById('team_status_badge_' + memberId);
+                    if (badge) {
+                        badge.className = 'sld__badge ' + (badgeClass[next] || 'sld__badge--muted');
+                        badge.textContent = next.charAt(0).toUpperCase() + next.slice(1);
+                    }
+                } else {
+                    sel.value = prev;
+                    alert((data && data.error) || 'Could not update status.');
+                }
+            })
+            .catch(function () { sel.value = prev; alert('Network error. Status not changed.'); })
+            .finally(function () { sel.disabled = false; });
+        });
+    });
+})();
+</script>
+
+<!-- Surface blocked-action errors (e.g. order delete guarded by task status) -->
+<script>
+document.body.addEventListener('htmx:responseError', function (e) {
+    var xhr = e.detail && e.detail.xhr;
+    var msg = 'Action could not be completed.';
+    if (xhr) {
+        try { var d = JSON.parse(xhr.responseText); if (d && d.error) msg = d.error; } catch (_) {}
+    }
+    alert(msg);
+});
 </script>
 {% endblock extra_js %}

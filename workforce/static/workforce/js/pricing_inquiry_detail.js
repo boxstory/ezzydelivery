@@ -100,10 +100,11 @@ function initPricingDetail() {
       saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
       if (errorEl) errorEl.classList.add('d-none');
 
+      var notesEl = qs('#staff-notes-input');
       var statusData = {
         crm_status: getSelectedStatus() || '',
         assigned_to: (qs('#assigned-to-select') || {}).value || '',
-        staff_notes: '',
+        staff_notes: notesEl ? notesEl.value.trim() : '',
       };
 
       var activityBody = bodyEl ? bodyEl.value.trim() : '';

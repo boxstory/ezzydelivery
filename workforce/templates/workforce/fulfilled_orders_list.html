@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Purchase Orders - Fulfilled{% endblock title %}
@@ -65,9 +66,9 @@
                 </label>
                 <select id="business" name="business" class="fol__input">
                     <option value="">All Suppliers</option>
-                    {% for supplier in suppliers %}
+                    {% for supplier in suppliers|code_last %}
                     <option value="{{ supplier.business_id }}" {% if filters.business == supplier.business_id|stringformat:"s" %}selected{% endif %}>
-                        {{ supplier.business_name }} ({{ supplier.business_code|default:supplier.business_id }})
+                        {% if supplier.business_code %}{{ supplier.business_code }}{% else %}*{{ supplier.business_id }}{% endif %} - {{ supplier.business_name }}
                     </option>
                     {% endfor %}
                 </select>

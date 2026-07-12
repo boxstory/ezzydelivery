@@ -1,0 +1,31 @@
+{# Purpose: Reusable multi-select checkbox dropdown for filter sections in staff lists.
+   Used by: any staff dashboard list filter (include with the params below).
+   Params:
+     field_name : GET param name (e.g. "status", "task_status")
+     label      : visible label / dropdown title (e.g. "Delivery Status")
+     icon       : Font Awesome name without prefix (optional, e.g. "truck")
+     choices    : iterable of (value, label) tuples
+     selected   : list of currently-selected string values
+     all_text   : text shown when nothing selected (optional, default "All") #}
+<div class="msf" data-msf>
+    <button class="msf__toggle" type="button" data-bs-toggle="dropdown"
+            data-bs-auto-close="outside" aria-expanded="false"
+            aria-label="Filter by {{ label }}" data-msf-all="{{ all_text|default:'All' }}">
+        <span class="msf__toggle-text">{% if selected %}{{ selected|length }} selected{% else %}{{ all_text|default:"All" }}{% endif %}</span>
+        <span class="msf__count" {% if not selected %}hidden{% endif %}>{{ selected|length }}</span>
+        <i class="fa-solid fa-chevron-down msf__caret"></i>
+    </button>
+    <div class="dropdown-menu msf__menu">
+        <div class="msf__menu-head">
+            <span class="msf__menu-title">{% if icon %}<i class="fa-solid fa-{{ icon }}"></i> {% endif %}{{ label }}</span>
+            <button type="button" class="msf__clear" data-msf-clear>Clear</button>
+        </div>
+        {% for val, opt_label in choices %}
+        <label class="msf__item">
+            <input type="checkbox" name="{{ field_name }}" value="{{ val }}"
+                   {% if val|stringformat:"s" in selected %}checked{% endif %}>
+            <span>{{ opt_label }}</span>
+        </label>
+        {% endfor %}
+    </div>
+</div>

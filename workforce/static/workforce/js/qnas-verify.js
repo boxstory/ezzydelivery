@@ -439,6 +439,192 @@ function _applyCoords(opts, lat, lng, info) {
 
 
 /* ============================================================
+ * WhatsApp / Google Maps shared-location paste & drop
+ * ============================================================ */
+
+/**
+ * Extract [lat, lng] from a Google Maps / WhatsApp shared-location link
+ * or plain "lat, lng" text. Returns null if nothing valid is found.
+ * Handles:
+ *   ?q=25.24,51.42  ?q=loc:25.24,51.42  &ll=25.24,51.42  ?query=25.24,51.42
+ *   /@25.24,51.42,17z   !3d25.24!4d51.42   plain "25.24, 51.42"
+ */
+function parseLatLngFromText(text) {
+    if (!text) return null;
+    var s = String(text).trim();
+    var m;
+
+    // ?q= / ?query= / &ll= / &sll= / &center= , optional "loc:" prefix, comma/%2C/space separated
+    m = s.match(/[?&](?:q|query|ll|sll|center)=(?:loc:)?(-?\d{1,3}\.\d+)(?:,|%2C|\s)+(-?\d{1,3}\.\d+)/i);
+    if (m) return _validLatLng(m[1], m[2]);
+
+    // Google Maps path: /@25.24,51.42,17z
+    m = s.match(/[@/](-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    if (m) return _validLatLng(m[1], m[2]);
+
+    // Google place encoding: !3d25.24!4d51.42
+    m = s.match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/);
+    if (m) return _validLatLng(m[1], m[2]);
+
+    // Plain "25.24, 51.42"
+    m = s.match(/(-?\d{1,3}\.\d+)\s*[,\s]\s*(-?\d{1,3}\.\d+)/);
+    if (m) return _validLatLng(m[1], m[2]);
+
+    return null;
+}
+
+function _validLatLng(latStr, lngStr) {
+    var lat = parseFloat(latStr), lng = parseFloat(lngStr);
+    if (isNaN(lat) || isNaN(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return [lat, lng];
+}
+
+/**
+ * Parse a shared-location link/text and fill the coordinate fields.
+ * A pin shared by the customer is the most accurate source we get, so it
+ * is recorded as accuracy "by_customer".
+ * @param {string} text - pasted link or "lat,lng"
+ * @param {object} opts - { latId, lngId, mapId, accuracyId, accuracyBadgeId, resultId }
+ * @returns {boolean} true if coordinates were applied
+ */
+function whatsappLocationFill(text, opts) {
+    opts = opts || {};
+    var resultDiv = opts.resultId ? document.getElementById(opts.resultId) : null;
+    var coords = parseLatLngFromText(text);
+
+    if (!coords) {
+        if (resultDiv && String(text).trim()) {
+            if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
+                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>Short link — open it once, then paste the full https://maps.google.com/?q=... link</span>';
+            } else {
+                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
+            }
+        } else if (resultDiv) {
+            resultDiv.innerHTML = '';
+        }
+        return false;
+    }
+
+    var lat = coords[0], lng = coords[1];
+    _applyCoords(opts, lat, lng, {
+        accuracy: 'by_customer',
+        badgeClass: 'bg-success',
+        badgeStyle: '',
+        label: 'By Customer (GPS Pin)',
+        mapBtnClass: 'btn-success'
+    });
+
+    if (resultDiv) {
+        resultDiv.innerHTML = '<span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Pin set: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</span>';
+    }
+    return true;
+}
+
+/** Drag-over visual state for the location drop zone */
+function locDropOver(ev) {
+    ev.preventDefault();
+    if (ev.currentTarget) ev.currentTarget.classList.add('oap__loc-drop--over');
+}
+function locDropLeave(ev) {
+    if (ev.currentTarget) ev.currentTarget.classList.remove('oap__loc-drop--over');
+}
+/**
+ * Handle a dropped WhatsApp/Maps location (text, url, or uri-list).
+ * @param {DragEvent} ev
+ * @param {object} opts - same opts as whatsappLocationFill, plus optional inputId
+ */
+function locDropHandle(ev, opts) {
+    ev.preventDefault();
+    if (ev.currentTarget) ev.currentTarget.classList.remove('oap__loc-drop--over');
+    var dt = ev.dataTransfer;
+    if (!dt) return;
+    var text = (dt.getData('text/uri-list') || dt.getData('text/plain') || dt.getData('text') || '').trim();
+    var input = opts && opts.inputId ? document.getElementById(opts.inputId) : null;
+    if (input) input.value = text;
+    whatsappLocationFill(text, opts);
+}
+
+/**
+ * Parse a shared-location link/text and SAVE it straight to the order
+ * (used on read-only pages like the delivery task detail, which has no form).
+ * Records accuracy as "by_customer" (customer-shared GPS pin).
+ * @param {string} text    - pasted link or "lat,lng"
+ * @param {number} orderId - order to update
+ * @param {object} opts    - { resultId, latId, lngId, accuracyWrapId } element IDs to refresh on success
+ * @returns {boolean} true if a save request was sent
+ */
+function whatsappLocationSave(text, orderId, opts) {
+    opts = opts || {};
+    var resultDiv = opts.resultId ? document.getElementById(opts.resultId) : null;
+    var coords = parseLatLngFromText(text);
+
+    if (!coords) {
+        if (resultDiv && String(text).trim()) {
+            if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
+                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>Short link — open it once, then paste the full https://maps.google.com/?q=... link</span>';
+            } else {
+                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
+            }
+        } else if (resultDiv) {
+            resultDiv.innerHTML = '';
+        }
+        return false;
+    }
+
+    var lat = coords[0], lng = coords[1];
+    if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-secondary"><i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...</span>';
+
+    fetch(window.location.origin + '/workforce/orders/' + orderId + '/update-coords/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrfToken() },
+        body: JSON.stringify({ latitude: lat, longitude: lng, coords_accuracy: 'by_customer' })
+    }).then(function(resp) {
+        return resp.json();
+    }).then(function(d) {
+        if (!d.success) {
+            if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>' + (d.error || 'Save failed') + '</span>';
+            return;
+        }
+        var la = (typeof d.latitude === 'number' ? d.latitude : lat).toFixed(6);
+        var lo = (typeof d.longitude === 'number' ? d.longitude : lng).toFixed(6);
+        var latEl = opts.latId ? document.getElementById(opts.latId) : null;
+        var lngEl = opts.lngId ? document.getElementById(opts.lngId) : null;
+        var accEl = opts.accuracyWrapId ? document.getElementById(opts.accuracyWrapId) : null;
+        if (latEl) latEl.value = la;
+        if (lngEl) lngEl.value = lo;
+        if (accEl) accEl.innerHTML = '<span class="dtd__accuracy dtd__accuracy--by_customer"><i class="fa-solid fa-user-check"></i> By Customer</span>';
+        if (resultDiv) {
+            resultDiv.innerHTML = '<span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Saved: ' + la + ', ' + lo + '</span> ' +
+                '<a href="https://www.google.com/maps?q=' + la + ',' + lo + '" target="_blank" class="ms-1 text-decoration-none"><i class="fa-solid fa-map-location-dot"></i> Map</a>';
+        }
+    }).catch(function(err) {
+        console.error('[LOC] save error:', err);
+        if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Network error</span>';
+    });
+    return true;
+}
+
+/**
+ * Drop handler that SAVES the dropped location to the order.
+ * @param {DragEvent} ev
+ * @param {number} orderId
+ * @param {object} opts - same opts as whatsappLocationSave, plus optional inputId
+ */
+function locDropSave(ev, orderId, opts) {
+    ev.preventDefault();
+    if (ev.currentTarget) ev.currentTarget.classList.remove('oap__loc-drop--over');
+    var dt = ev.dataTransfer;
+    if (!dt) return;
+    var text = (dt.getData('text/uri-list') || dt.getData('text/plain') || dt.getData('text') || '').trim();
+    var input = opts && opts.inputId ? document.getElementById(opts.inputId) : null;
+    if (input) input.value = text;
+    whatsappLocationSave(text, orderId, opts);
+}
+
+
+/* ============================================================
  * AI Parse Address — Step-by-step flow
  * ============================================================ */
 

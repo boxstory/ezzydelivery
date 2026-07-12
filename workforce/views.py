@@ -408,7 +408,7 @@ WOO_DEFAULT_MAPPING = {
 # =============================================================================
 
 
-def get_per_page(request, default=10):
+def get_per_page(request, default=50):
     """
     Get the validated per_page value from request.
     Valid per_page values: 10, 25, 50, 100 (defaults to provided default if invalid)
@@ -427,7 +427,7 @@ def get_per_page(request, default=10):
     return str(per_page)
 
 
-def paginate_queryset(request, queryset, items_per_page=25):
+def paginate_queryset(request, queryset, items_per_page=50):
     """
     A helper function to handle pagination for a given queryset.
     Reads 'per_page' from request.GET to allow users to change page size.
@@ -700,11 +700,111 @@ def all_orders(request):
         },
         'filter_params': filter_params,
         'sort': sort,
-        'per_page': request.GET.get('per_page', '25'),
+        'per_page': request.GET.get('per_page', '50'),
         'wa_instances': wa_data['instances'],
         'wa_instances_error': wa_data['error'],
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def print_labels(request):
+    """Staff page to browse orders and print shipping waybills/labels.
+
+    Defaults to the last 3 days of orders so staff land on the most recent
+    packages to label. Supports business + name/mobile search and a manual
+    date range. Each row has a single-print icon and rows can be bulk-selected
+    to print many waybills at once (POSTed to wf_print_waybill).
+    """
+    orders = orders_models.Order.objects.select_related(
+        'business', 'pickup_location'
+    ).prefetch_related('order_items').order_by('-created_at')
+
+    search = request.GET.get('search', '').strip()
+    business_id = request.GET.get('business', '').strip()
+    date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
+    date_to = _parse_date_param(request.GET.get('dateTo', '').strip())
+
+    # Default to the last 3 days when the user hasn't picked a range
+    default_applied = False
+    if not date_from and not date_to:
+        date_from = (timezone.now() - timedelta(days=3)).date()
+        default_applied = True
+
+    if business_id:
+        orders = orders.filter(business_id=business_id)
+    if search:
+        orders = orders.filter(
+            Q(customer_name__icontains=search)
+            | Q(customer_phone__icontains=search)
+            | Q(order_number__icontains=search)
+        )
+    if date_from:
+        orders = orders.filter(created_at__date__gte=date_from)
+    if date_to:
+        orders = orders.filter(created_at__date__lte=date_to)
+
+    orders = paginate_queryset(request, orders)
+
+    all_businesses = business_models.Business.objects.all().order_by('business_name')
+
+    filter_params_list = []
+    if search:
+        filter_params_list.append(f'search={search}')
+    if business_id:
+        filter_params_list.append(f'business={business_id}')
+    if request.GET.get('dateFrom', '').strip():
+        filter_params_list.append(f"dateFrom={request.GET.get('dateFrom').strip()}")
+    if request.GET.get('dateTo', '').strip():
+        filter_params_list.append(f"dateTo={request.GET.get('dateTo').strip()}")
+    filter_params = '&'.join(filter_params_list)
+
+    data = {
+        'orders': orders,
+        'all_businesses': all_businesses,
+        'filters': {
+            'search': search,
+            'business': business_id,
+            'dateFrom': date_from if isinstance(date_from, str) else (date_from.isoformat() if date_from else ''),
+            'dateTo': date_to if isinstance(date_to, str) else (date_to.isoformat() if date_to else ''),
+        },
+        'default_applied': default_applied,
+        'filter_params': filter_params,
+        'per_page': request.GET.get('per_page', '50'),
+    }
+    return render(request, 'workforce/parts/lists/print_labels_view.html', data)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_print_waybill(request):
+    """Staff-facing waybill print — same layout as the business waybill but not
+    scoped to a single business, so staff can print labels for orders across
+    any seller. Accepts one or many order ids via GET/POST.
+    """
+    import base64
+    from delivery.label_utils import generate_barcode_image
+
+    raw_ids = request.GET.getlist('order_ids') or request.POST.getlist('order_ids')
+    order_ids = [int(v) for v in raw_ids if str(v).isdigit()]
+
+    orders = orders_models.Order.objects.filter(
+        id__in=order_ids,
+    ).select_related('business', 'pickup_location').prefetch_related('order_items__product')
+
+    waybills = []
+    for order in orders:
+        barcode_b64 = ''
+        buf = generate_barcode_image(order.order_number)
+        if buf:
+            barcode_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+        waybills.append({'order': order, 'barcode_b64': barcode_b64})
+
+    return render(request, 'business/print_waybill.html', {
+        'waybills': waybills,
+        'user_business': {'business_name': 'Ezzy Delivery'},
+    })
 
 
 @login_required(login_url='/accounts/login/')
@@ -777,7 +877,7 @@ def fulfilled_clients_orders(request):
             'business': business_id,
         },
         'filter_params': filter_params,
-        'per_page': request.GET.get('per_page', '25'),
+        'per_page': request.GET.get('per_page', '50'),
         'page_title': 'Fulfilled Clients Orders',
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -853,7 +953,7 @@ def non_fulfilled_clients_orders(request):
             'business': business_id,
         },
         'filter_params': filter_params,
-        'per_page': request.GET.get('per_page', '25'),
+        'per_page': request.GET.get('per_page', '50'),
         'page_title': 'Non-Fulfilled Clients Orders',
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -1052,7 +1152,7 @@ def orders_by_seller(request):
 
     businesses = businesses.order_by('-total_orders', 'business_name')
 
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
     context = {
         'page_title': 'Orders by Seller',
@@ -1072,7 +1172,9 @@ def orders_by_seller(request):
 def orders_to_publish(request):
     orders = orders_models.Order.objects.select_related(
         'business'
-    ).prefetch_related('order_comments', 'delivery_task').filter(task_created=False).order_by('-created_at')
+    ).prefetch_related('order_comments', 'delivery_task').filter(
+        task_created=False
+    ).exclude(order_status='cancelled').order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     tasks_to_fleet_count = delivery_models.DeliveryTask.objects.filter(
@@ -4783,9 +4885,12 @@ def wf_mapping_manager_test(request):
     except business_models.Business.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
 
-    api_cfg = business.business_settings_api.filter(is_verify_api=True, api_type=platform).first()
-    if not api_cfg:
-        return JsonResponse({'success': False, 'error': f'No active {platform} API config found'}, status=400)
+    # OneDrive uses OneDriveSource (not business_settings_api); skip the API config check.
+    api_cfg = None
+    if platform != 'onedrive':
+        api_cfg = business.business_settings_api.filter(is_verify_api=True, api_type=platform).first()
+        if not api_cfg:
+            return JsonResponse({'success': False, 'error': f'No active {platform} API config found'}, status=400)
 
     # Load current platform mapping
     raw_mapping = business.import_mapping or {}
@@ -4936,6 +5041,73 @@ def wf_mapping_manager_test(request):
                 'name': col_values.get(platform_mapping.get('customer_name', ''), '') if platform_mapping else '',
                 'date': col_values.get(platform_mapping.get('order_date', ''), '') if platform_mapping else '',
                 'source': 'google_sheet',
+            }
+
+        elif platform == 'onedrive':
+            source_id = request.GET.get('source_id', '').strip()
+            if source_id:
+                source = orders_models.OneDriveSource.objects.filter(
+                    id=source_id, business__business_id=business_id, is_active=True
+                ).first()
+            else:
+                source = orders_models.OneDriveSource.objects.filter(
+                    business__business_id=business_id, is_active=True, is_default_mapping=True
+                ).first()
+                if not source:
+                    source = orders_models.OneDriveSource.objects.filter(
+                        business__business_id=business_id, is_active=True
+                    ).exclude(last_sheet_name='').first()
+                if not source:
+                    source = orders_models.OneDriveSource.objects.filter(
+                        business__business_id=business_id, is_active=True
+                    ).first()
+            if not source:
+                return JsonResponse({'success': False, 'error': 'No active OneDrive source for this business'})
+
+            file_bytes, err = _onedrive_download_file(source)
+            if err:
+                return JsonResponse({'success': False, 'error': err})
+
+            wb = _safe_load_workbook(file_bytes)
+            sheet_name = source.last_sheet_name
+            if not sheet_name or sheet_name not in wb.sheetnames:
+                sheet_name = wb.sheetnames[0]
+            ws = wb[sheet_name]
+            all_rows = list(ws.iter_rows(values_only=True))
+            wb.close()
+
+            if not all_rows or len(all_rows) <= 1:
+                return JsonResponse({'success': False, 'error': 'No data rows in this OneDrive file.'})
+
+            headers = [str(c).strip() if c is not None else '' for c in all_rows[0]]
+            # Latest order = last non-empty data row
+            latest_row = None
+            latest_row_num = None
+            for i in range(len(all_rows) - 1, 0, -1):
+                row = all_rows[i]
+                if any((str(c).strip() if c is not None else '') for c in row):
+                    latest_row = row
+                    latest_row_num = i + 1  # 1-based row
+                    break
+            if latest_row is None:
+                return JsonResponse({'success': False, 'error': 'No data rows in this OneDrive file.'})
+
+            col_values = {}
+            for j, h in enumerate(headers):
+                key = (h or '').strip()
+                if not key:
+                    continue
+                val = latest_row[j] if j < len(latest_row) else ''
+                col_values[key] = str(val).strip() if val is not None else ''
+            raw_order = dict(col_values)
+            raw_order['_row_number'] = latest_row_num
+            raw_order['_sheet_tab'] = sheet_name
+
+            order_info = {
+                'id':   col_values.get(platform_mapping.get('client_order_code', ''), '') if platform_mapping else '',
+                'name': col_values.get(platform_mapping.get('customer_name', ''), '') if platform_mapping else '',
+                'date': col_values.get(platform_mapping.get('order_date', ''), '') if platform_mapping else '',
+                'source': 'onedrive',
             }
 
         else:
@@ -5288,7 +5460,7 @@ def wf_api_orders(request):
     # Paginate live_orders (list, not queryset)
     from django.core.paginator import Paginator
     try:
-        per_page = max(1, min(200, int(request.GET.get('per_page', 25))))
+        per_page = max(1, min(200, int(request.GET.get('per_page', 50))))
     except (ValueError, TypeError):
         per_page = 25
     paginator = Paginator(live_orders, per_page)
@@ -5567,7 +5739,7 @@ def dl_list_all(request):
         'default_sort': 'updated',
         'default_order': 'desc',
         'filter_params': filter_params,
-        'per_page': request.GET.get('per_page', '25'),
+        'per_page': request.GET.get('per_page', '50'),
         'filters': {
             'dlCode': dl_code,
             'cCode': c_code,
@@ -6112,9 +6284,22 @@ def order_detail(request, order_id):
     except Exception:
         address_verify_job = None
 
+    # Resolve the human-readable zone name for the delivery zone number, if any.
+    dl_zone_name = None
+    if order.dl_zone:
+        try:
+            zone_obj = delivery_models.ZoneName.objects.filter(
+                zone_number=order.dl_zone
+            ).first()
+            if zone_obj:
+                dl_zone_name = zone_obj.zone_name
+        except Exception:
+            dl_zone_name = None
+
     context = {
         'order': order,
         'order_items': order_items,
+        'dl_zone_name': dl_zone_name,
         'order_comments': order_comments,
         'verification_logs': verification_logs,
         'delivery_task': delivery_task,
@@ -6210,9 +6395,9 @@ def _fetch_whatsapp_instances():
     if cached is not None:
         return cached
 
-    api_url = getattr(dj_settings, 'EVALUATION_URL', '')
-    api_key = getattr(dj_settings, 'EVALUATION_API_KEY', '')
-    default_instance = getattr(dj_settings, 'EVALUATION_INSTANCE', '')
+    api_url = getattr(dj_settings, 'EVOLUTION_URL', '')
+    api_key = getattr(dj_settings, 'EVOLUTION_API_KEY', '')
+    default_instance = getattr(dj_settings, 'EVOLUTION_INSTANCE', '')
 
     result = {'instances': [], 'default': default_instance, 'error': None}
 
@@ -6286,7 +6471,7 @@ def _send_order_whatsapp_internal(order, message=None, instance=None, to=None):
     from django.conf import settings as dj_settings
     from core.templatetags.custom_filters import whatsapp_number
 
-    instance = (instance or '').strip() or getattr(dj_settings, 'EVALUATION_INSTANCE', '')
+    instance = (instance or '').strip() or getattr(dj_settings, 'EVOLUTION_INSTANCE', '')
     to_raw = (to or '').strip() or order.customer_whatsapp or order.customer_phone
     phone = whatsapp_number(to_raw)
     if not phone:
@@ -6294,8 +6479,8 @@ def _send_order_whatsapp_internal(order, message=None, instance=None, to=None):
 
     msg = (message or '').strip() or _build_order_whatsapp_message(order)
 
-    api_url = getattr(dj_settings, 'EVALUATION_URL', '')
-    api_key = getattr(dj_settings, 'EVALUATION_API_KEY', '')
+    api_url = getattr(dj_settings, 'EVOLUTION_URL', '')
+    api_key = getattr(dj_settings, 'EVOLUTION_API_KEY', '')
     if not api_url or not api_key or not instance:
         return False, {'error': 'Evolution API not configured (missing url/key/instance)'}
 
@@ -6734,6 +6919,17 @@ def delete_order(request, order_id):
                 'error': 'Cannot delete — COD has been collected for this order. Cancel it instead.'
             }, status=400)
 
+        # Only allow deletion while the delivery task is still in its initial
+        # state (no fleet action yet). Once the status has been updated
+        # (assigned/accepted/picked up/…), it must be cancelled, not deleted.
+        INITIAL_TASK_STATUSES = {'', 'for_review', 'pending'}
+        if delivery_task and (delivery_task.dl_task_status or '') not in INITIAL_TASK_STATUSES:
+            status_label = delivery_task.get_dl_task_status_display() or delivery_task.dl_task_status
+            return JsonResponse({
+                'success': False,
+                'error': f'Cannot delete — the delivery task has already been updated (status: {status_label}). Cancel it instead.'
+            }, status=400)
+
         order_number = order.order_number or order.client_order_code or str(order.id)
         logger.info("Order %s (ID %s) deleted by %s", order_number, order.id, request.user.username)
 
@@ -6926,6 +7122,8 @@ def publish_order_to_delivery(request, order_id):
             id=order_id
         )
 
+        previous_status = order.order_status
+
         # Update order status to publish (triggers auto delivery task creation signal)
         order.order_status = 'publish'
         order.task_status = 'dl_task_listed'
@@ -6939,8 +7137,8 @@ def publish_order_to_delivery(request, order_id):
             order=order,
             verified_by=request.user,
             action='order_published',
-            old_status='to_publish',
-            new_status='published',
+            old_status=previous_status,
+            new_status='publish',
             notes=f'Order published to delivery by {request.user.username}'
         )
 
@@ -7187,6 +7385,7 @@ def update_order_coords(request, order_id):
         latitude = data.get('latitude')
         longitude = data.get('longitude')
         qnas_status = data.get('qnas_status')
+        coords_accuracy = data.get('coords_accuracy')
 
         update_fields = []
 
@@ -7194,6 +7393,9 @@ def update_order_coords(request, order_id):
             order.latitude = latitude
             order.longitude = longitude
             update_fields.extend(['latitude', 'longitude'])
+            if coords_accuracy and coords_accuracy in dict(orders_models.Order.COORDS_ACCURACY):
+                order.coords_accuracy = coords_accuracy
+                update_fields.append('coords_accuracy')
 
         if qnas_status and qnas_status in dict(orders_models.Order.QNAS_STATUS):
             order.qnas_status = qnas_status
@@ -7736,6 +7938,7 @@ def business_verification_list(request):
     # Get filter
     verification_filter = request.GET.get('status', 'all')
     search = request.GET.get('search', '').strip()
+    sort = request.GET.get('sort', 'applied')
 
     # Base queryset — only businesses that have a profile (inner join via select_related)
     businesses = business_models.Business.objects.select_related(
@@ -7760,10 +7963,24 @@ def business_verification_list(request):
             Q(profile__user__email__icontains=search)
         )
 
-    businesses = businesses.order_by('-profile__verification_applied_at', '-business_id')
+    sort_options = {
+        'applied':       ('-profile__verification_applied_at', '-business_id'),
+        'joined_newest': ('-profile__created_at', '-business_id'),
+        'joined_oldest': ('profile__created_at', 'business_id'),
+    }
+    businesses = businesses.order_by(*sort_options.get(sort, sort_options['applied']))
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
+
+    filter_parts = []
+    if verification_filter and verification_filter != 'all':
+        filter_parts.append(f'status={verification_filter}')
+    if search:
+        filter_parts.append(f'search={search}')
+    if sort:
+        filter_parts.append(f'sort={sort}')
+    filter_params = '&'.join(filter_parts)
 
     context = {
         'page_title': 'Business Verification',
@@ -7771,6 +7988,9 @@ def business_verification_list(request):
         'status_counts': status_counts,
         'current_filter': verification_filter,
         'search': search,
+        'sort': sort,
+        'per_page': get_per_page(request),
+        'filter_params': filter_params,
         'total_count': sum(status_counts.values()),
     }
     return render(request, 'workforce/business_verification_list.html', context)
@@ -7812,7 +8032,14 @@ def driver_verification_list(request):
 
     drivers = drivers.order_by('-profile__verification_applied_at', '-driver_id')
 
-    page_obj = paginate_queryset(request, drivers, items_per_page=25)
+    page_obj = paginate_queryset(request, drivers, items_per_page=50)
+
+    filter_parts = []
+    if verification_filter and verification_filter != 'all':
+        filter_parts.append(f'status={verification_filter}')
+    if search:
+        filter_parts.append(f'search={search}')
+    filter_params = '&'.join(filter_parts)
 
     context = {
         'page_title': 'Driver Verification',
@@ -7820,6 +8047,8 @@ def driver_verification_list(request):
         'status_counts': status_counts,
         'current_filter': verification_filter,
         'search': search,
+        'per_page': get_per_page(request),
+        'filter_params': filter_params,
         'total_count': sum(status_counts.values()),
     }
     return render(request, 'workforce/driver_verification_list.html', context)
@@ -7892,11 +8121,11 @@ def user_verification_list(request):
             | Q(user_number__icontains=search_query)
         )
 
-    # Order by application date (most recent first)
-    profiles = profiles.order_by('-verification_applied_at', '-created_at')
+    # Order by registration time (most recent first)
+    profiles = profiles.order_by('-user__date_joined')
 
     # Paginate
-    page_obj = paginate_queryset(request, profiles, items_per_page=25)
+    page_obj = paginate_queryset(request, profiles, items_per_page=50)
     profile_list = list(page_obj.object_list)
     user_ids = [p.user_id for p in profile_list]
 
@@ -7969,15 +8198,12 @@ def user_verification_list(request):
         'role_filter': role_filter,
         'date_from': date_from,
         'date_to': date_to,
-        'per_page': request.GET.get('per_page', '25'),
+        'per_page': request.GET.get('per_page', '50'),
     }
 
     return render(request, 'workforce/user_verification_list.html', context)
 
 
-@require_http_methods(["POST"])
-@login_required(login_url='/accounts/login/')
-@staff_required
 @require_http_methods(["GET"])
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -8162,7 +8388,7 @@ def orders_reported(request):
         order_status='reported'
     ).order_by('-created_at')
 
-    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=25)
+    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=50)
 
     context = {
         'orders': orders_with_pagination,
@@ -8238,7 +8464,7 @@ def tasks_followup_list(request):
         driver_status='approved'
     ).select_related('user').order_by('user__first_name')
 
-    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=30)
+    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=50)
 
     # Build filter params for pagination
     filter_params_nosort = ''
@@ -8283,7 +8509,7 @@ def tasks_reported(request):
         dl_task_status__in=['rejected', 'cancelled'],
     ).order_by('-created_at')
 
-    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=25)
+    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=50)
 
     context = {
         'dl_tasks': tasks_with_pagination,
@@ -8524,7 +8750,7 @@ def fleet_cod_in_hand(request):
     # If date filter is applied, calculate COD collected in that period per driver
     if date_from or date_to:
         # Get drivers with COD collected in the date range
-        from django.db.models import OuterRef, Subquery
+        from django.db.models import OuterRef, Subquery, Count, IntegerField, Q
 
         # Build subquery with date filter - use cod_collected_at for filtering
         cod_subquery = delivery_models.DeliveryTask.objects.filter(
@@ -8542,17 +8768,36 @@ def fleet_cod_in_hand(request):
             total=Sum('cod_collected_amount')
         ).values('total')
 
+        # Count of delivered tasks in the period — includes prepaid/zero-COD
+        # orders (order.cod_amount == 0) so the manifest count is complete.
+        orders_subquery = delivery_models.DeliveryTask.objects.filter(
+            driver_id=OuterRef('driver_id'),
+            dl_task_status__in=['delivered', 'partial_delivery'],
+        ).filter(Q(cod_collected=True) | Q(order__cod_amount=0))
+        if date_from:
+            orders_subquery = orders_subquery.filter(completed_at__date__gte=date_from)
+        if date_to:
+            orders_subquery = orders_subquery.filter(completed_at__date__lte=date_to)
+        orders_subquery = orders_subquery.values('driver').annotate(
+            c=Count('id')
+        ).values('c')
+
         # Show only approved drivers for COD tracking
         drivers = fleet_models.Driver.objects.filter(driver_status='approved').select_related('user').annotate(
             period_cod=Coalesce(
                 Subquery(cod_subquery),
                 Value(0),
                 output_field=DecimalField()
+            ),
+            period_orders=Coalesce(
+                Subquery(orders_subquery),
+                Value(0),
+                output_field=IntegerField()
             )
         )
     else:
         # No date filter - calculate actual COD from DeliveryTask (collected but not settled)
-        from django.db.models import OuterRef, Subquery
+        from django.db.models import OuterRef, Subquery, Count, IntegerField, Q
 
         cod_subquery = delivery_models.DeliveryTask.objects.filter(
             driver_id=OuterRef('driver_id'),
@@ -8562,12 +8807,29 @@ def fleet_cod_in_hand(request):
             total=Sum('cod_collected_amount')
         ).values('total')
 
+        # Count of unsettled in-hand tasks — includes prepaid/zero-COD orders
+        # (order.cod_amount == 0) so the manifest count is complete.
+        orders_subquery = delivery_models.DeliveryTask.objects.filter(
+            driver_id=OuterRef('driver_id'),
+            cod_settled=False,
+            dl_task_status__in=['delivered', 'partial_delivery'],
+        ).filter(
+            Q(cod_collected=True) | Q(order__cod_amount=0)
+        ).values('driver').annotate(
+            c=Count('id')
+        ).values('c')
+
         # Show only approved drivers for COD tracking
         drivers = fleet_models.Driver.objects.filter(driver_status='approved').select_related('user').annotate(
             period_cod=Coalesce(
                 Subquery(cod_subquery),
                 Value(0),
                 output_field=DecimalField()
+            ),
+            period_orders=Coalesce(
+                Subquery(orders_subquery),
+                Value(0),
+                output_field=IntegerField()
             )
         )
 
@@ -8632,7 +8894,7 @@ def fleet_cod_in_hand(request):
     if 'per_page' in filter_params:
         del filter_params['per_page']
 
-    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=25)
+    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=50)
 
     context = {
         'drivers': drivers_with_pagination,
@@ -8644,7 +8906,7 @@ def fleet_cod_in_hand(request):
         'cod_ranges': cod_ranges,
         'total_drivers': total_drivers,
         'filter_params': filter_params.urlencode(),
-        'per_page': get_per_page(request, default=25),
+        'per_page': get_per_page(request, default=50),
         'date_preset': date_preset,
         'date_from': date_from or '',
         'date_to': date_to or '',
@@ -8703,7 +8965,7 @@ def fleet_drivers_earnings(request):
         total_deliveries=Sum('deliveries_after_settlement'),
     )
 
-    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=25)
+    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=50)
 
     context = {
         'drivers': drivers_with_pagination,
@@ -8942,9 +9204,10 @@ def cod_settlement_report(request):
     ).select_related('user').order_by('-cod_in_hand')
 
     # Get unsettled COD deliveries grouped by driver
+    # (partial deliveries collect COD too — include them)
     unsettled_tasks = delivery_models.DeliveryTask.objects.filter(
         cod_collected=True,
-        dl_task_status='delivered',
+        dl_task_status__in=['delivered', 'partial_delivery'],
         order__cod_status_by_staff='cod_with_driver'
     ).select_related('driver', 'driver__user', 'order').order_by('-completed_at')
 
@@ -9769,7 +10032,7 @@ def fleet_transactions(request):
         resp['Content-Disposition'] = f'attachment; filename="{filename}"'
         return resp
 
-    transactions_paginated = paginate_queryset(request, transactions, items_per_page=25)
+    transactions_paginated = paginate_queryset(request, transactions, items_per_page=50)
 
     # Calculate payment method breakdown for each settlement transaction
     if selected_driver and transactions_paginated:
@@ -9834,9 +10097,33 @@ def fleet_transactions(request):
             .order_by('-completed_at', '-id')[:50]
         )
 
+    # Zero-COD (prepaid) deliveries for this driver — these never create a
+    # DriverTransaction (no COD collected), so they are invisible in the COD tab.
+    # Surface them as their own list so staff see the full delivery manifest,
+    # mirroring the driver app's COD list. They carry no cash, so totals are
+    # unaffected.
+    zero_cod_tasks = []
+    if selected_driver and view_type == 'cod' and not task_search:
+        zct_qs = delivery_models.DeliveryTask.objects.filter(
+            driver=selected_driver,
+            order__cod_amount=0,
+            cod_collected=False,
+            dl_task_status__in=['delivered', 'partial_delivery'],
+        ).select_related('order', 'business', 'order__business')
+        if date_from:
+            zct_qs = zct_qs.filter(completed_at__date__gte=date_from)
+        if date_to:
+            zct_qs = zct_qs.filter(completed_at__date__lte=date_to)
+        if business_filter:
+            zct_qs = zct_qs.filter(
+                Q(business_id=business_filter) | Q(order__business_id=business_filter)
+            )
+        zero_cod_tasks = list(zct_qs.order_by('-completed_at', '-id')[:100])
+
     context = {
         'page_title': 'Fleet Transactions',
         'transactions': transactions_paginated,
+        'zero_cod_tasks': zero_cod_tasks,
         'all_drivers': all_drivers,
         'selected_driver': selected_driver,
         'total_cod': total_cod,
@@ -9848,7 +10135,7 @@ def fleet_transactions(request):
         'current_cod_by_method': current_cod_by_method,
         'deposited_refs': deposited_refs,
         'filter_params': filter_params.urlencode(),
-        'per_page': get_per_page(request, default=25),
+        'per_page': get_per_page(request, default=50),
         # Filter values for form
         'date_preset': date_preset,
         'date_from': date_from or '',
@@ -9869,6 +10156,120 @@ def fleet_transactions(request):
         'unmatched_tasks': unmatched_tasks,
     }
     return render(request, 'workforce/fleet_transactions.html', context)
+
+
+def _format_pickup_location(pickup_location):
+    """Build a human-readable 'from' address string from a PickupLocation."""
+    if not pickup_location:
+        return '-'
+    parts = [pickup_location.pickup_location_title or '']
+    detail = []
+    if pickup_location.pickup_zone_no:
+        detail.append(f"Zone {pickup_location.pickup_zone_no}")
+    if pickup_location.pickup_street_no:
+        detail.append(f"St {pickup_location.pickup_street_no}")
+    if pickup_location.pickup_building_no:
+        detail.append(f"Bldg {pickup_location.pickup_building_no}")
+    if pickup_location.locality:
+        detail.append(pickup_location.locality)
+    if detail:
+        parts.append(", ".join(detail))
+    return " — ".join(p for p in parts if p) or '-'
+
+
+_SELLER_EXPORT_HEADERS = ['Order Code', 'Client Code', 'Order Date', 'Customer',
+                          'From / To Location', 'COD Amount (QAR)', 'Status', 'Order Status']
+_SELLER_COD_STATUS_LABELS = {
+    'cod_settled_with_business': 'Settled',
+    'fully_paid': 'Collected',
+    'cod_with_ezzy': 'With Ezzy',
+    'cod_with_driver': 'With Driver',
+}
+
+
+def _seller_transactions_export_rows(orders):
+    """Shared row data for the CSV and XLSX exports.
+
+    'From / To Location' is a single value with two lines:
+    line 1 = pickup (from) location, line 2 = delivery (to) address.
+    """
+    rows = []
+    for order in orders:
+        from_loc = _format_pickup_location(order.pickup_location)
+        to_loc = order.customer_address or '-'
+        rows.append([
+            order.order_number or '-',
+            order.client_order_code or '-',
+            order.order_date.strftime('%d %b %Y') if order.order_date else '-',
+            order.customer_name or '-',
+            f"From: {from_loc}\nTo: {to_loc}",
+            float(order.cod_amount or 0),
+            _SELLER_COD_STATUS_LABELS.get(order.cod_status_by_staff, 'Pending'),
+            (order.order_status or '').replace('_', ' ').title() or '-',
+        ])
+    return rows
+
+
+def _seller_transactions_csv(orders, selected_seller):
+    """Generate a .csv export of seller COD transactions (all filtered rows)."""
+    import csv
+
+    filename = "seller_cod_transactions_%s_%s.csv" % (
+        selected_seller.business_id, timezone.now().strftime('%Y-%m-%d'))
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="%s"' % filename
+    response.write('﻿')  # BOM so Excel opens UTF-8 correctly
+    writer = csv.writer(response)
+    writer.writerow(_SELLER_EXPORT_HEADERS)
+    for row in _seller_transactions_export_rows(orders):
+        writer.writerow(row)
+    return response
+
+
+def _seller_transactions_xlsx(orders, selected_seller):
+    """Generate an .xlsx export of seller COD transactions.
+
+    The 'From / To Location' is a single column with two lines per cell:
+    line 1 = pickup (from) location, line 2 = delivery (to) address.
+    """
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Seller Transactions'
+
+    ws.append(_SELLER_EXPORT_HEADERS)
+
+    header_fill = PatternFill(start_color='1F2A44', end_color='1F2A44', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF')
+    for col_idx in range(1, len(_SELLER_EXPORT_HEADERS) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(vertical='center', horizontal='left')
+
+    wrap = Alignment(wrap_text=True, vertical='top')
+    for row in _seller_transactions_export_rows(orders):
+        ws.append(row)
+        row_idx = ws.max_row
+        ws.cell(row=row_idx, column=5).alignment = wrap
+        ws.cell(row=row_idx, column=6).number_format = '#,##0.00'
+
+    # Column widths
+    widths = [16, 14, 14, 22, 48, 16, 14, 16]
+    for i, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+    ws.freeze_panes = 'A2'
+
+    filename = "seller_cod_transactions_%s_%s.xlsx" % (
+        selected_seller.business_id, timezone.now().strftime('%Y-%m-%d'))
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="%s"' % filename
+    wb.save(response)
+    return response
 
 
 @login_required(login_url='/accounts/login/')
@@ -9892,12 +10293,12 @@ def seller_transactions(request):
     if seller_id:
         try:
             selected_seller = business_models.Business.objects.select_related('user').get(business_id=seller_id)
-            # Only delivered / partial-delivery orders carry settleable COD — undelivered
-            # orders never had cash collected, so they must not inflate the COD figures.
+            # Show ALL of the seller's transactions — including zero-COD orders and
+            # undelivered ones. The COD *totals* below are still computed only from
+            # delivered / partial-delivery orders so undelivered orders never inflate them.
             orders = Order.objects.filter(
                 business=selected_seller,
-                delivery_task__dl_task_status__in=['delivered', 'partial_delivery'],
-            ).select_related('business').distinct()
+            ).select_related('business', 'pickup_location').distinct()
         except business_models.Business.DoesNotExist:
             selected_seller = None
 
@@ -9928,6 +10329,7 @@ def seller_transactions(request):
 
     # Filter status
     status = request.GET.get('status', '')
+    task_statuses = request.GET.getlist('task_status')  # multi-select delivery task status
     min_amount = request.GET.get('min_amount', '')
     max_amount = request.GET.get('max_amount', '')
 
@@ -9941,6 +10343,10 @@ def seller_transactions(request):
         elif status == 'pending':
             orders = orders.filter(cod_status_by_staff__in=['not_collected', 'partially_collected', 'fully_paid', 'cod_with_driver', 'cod_with_ezzy'])
 
+        # Delivery task status (multi-select)
+        if task_statuses:
+            orders = orders.filter(delivery_task__dl_task_status__in=task_statuses).distinct()
+
         # Date filters
         if date_from:
             orders = orders.filter(order_date__gte=date_from)
@@ -9953,12 +10359,16 @@ def seller_transactions(request):
         if max_amount:
             orders = orders.filter(cod_amount__lte=max_amount)
 
-        # Calculate totals
-        total_cod = orders.filter(
+        # Calculate totals — only delivered / partial-delivery orders carry settleable
+        # COD (cash was actually collected), so undelivered orders never inflate them.
+        settleable = orders.filter(
+            delivery_task__dl_task_status__in=['delivered', 'partial_delivery'],
+        )
+        total_cod = settleable.filter(
             cod_amount__gt=0
         ).aggregate(total=Sum('cod_amount'))['total'] or Decimal('0.00')
 
-        cod_unsettled = orders.filter(
+        cod_unsettled = settleable.filter(
             cod_amount__gt=0,
             cod_status_by_staff__in=['pending', 'to_review', 'accepted']
         ).aggregate(total=Sum('cod_amount'))['total'] or Decimal('0.00')
@@ -9975,6 +10385,13 @@ def seller_transactions(request):
     }
     orders = orders.order_by(sort_options.get(sort_by, '-order_date'))
 
+    # Export — returns ALL filtered orders (not just the current page)
+    export_fmt = request.GET.get('export')
+    if selected_seller and export_fmt in ('xlsx', 'csv'):
+        if export_fmt == 'csv':
+            return _seller_transactions_csv(orders, selected_seller)
+        return _seller_transactions_xlsx(orders, selected_seller)
+
     # Build filter params for pagination
     filter_params = request.GET.copy()
     if 'page' in filter_params:
@@ -9982,7 +10399,7 @@ def seller_transactions(request):
     if 'per_page' in filter_params:
         del filter_params['per_page']
 
-    orders_paginated = paginate_queryset(request, orders, items_per_page=25)
+    orders_paginated = paginate_queryset(request, orders, items_per_page=50)
 
     context = {
         'page_title': 'Seller Transactions',
@@ -9992,12 +10409,14 @@ def seller_transactions(request):
         'total_cod': total_cod,
         'cod_unsettled': cod_unsettled,
         'filter_params': filter_params.urlencode(),
-        'per_page': get_per_page(request, default=25),
+        'per_page': get_per_page(request, default=50),
         # Filter values for form
         'date_preset': date_preset,
         'date_from': date_from or '',
         'date_to': date_to or '',
         'status': status or '',
+        'task_status_choices': delivery_models.DeliveryTask.DL_TASK_STATUS_CHOICES,
+        'selected_task_statuses': task_statuses,
         'min_amount': min_amount or '',
         'max_amount': max_amount or '',
         'sort_by': sort_by,
@@ -10170,7 +10589,7 @@ def fleet_task_cod_correct(request, task_id):
             # Update task
             task.cod_collected = cod_collected
             task.cod_collected_amount = amount if cod_collected else Decimal('0')
-            task.payment_method = payment_method if cod_collected else None
+            task.payment_method = (payment_method or '') if cod_collected else ''
             if cod_collected and not task.cod_collected_at:
                 task.cod_collected_at = timezone.now()
             if not cod_collected:
@@ -10824,7 +11243,7 @@ def driver_documents_list(request):
     documents = documents.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, documents, items_per_page=25)
+    page_obj = paginate_queryset(request, documents, items_per_page=50)
 
     context = {
         'page_title': 'Driver ID Documents',
@@ -10923,7 +11342,7 @@ def vehicle_documents_list(request):
     vehicles = vehicles.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, vehicles, items_per_page=25)
+    page_obj = paginate_queryset(request, vehicles, items_per_page=50)
 
     context = {
         'page_title': 'Vehicle Documents',
@@ -11002,7 +11421,7 @@ def store_documents_list(request):
     businesses = businesses.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
     context = {
         'page_title': 'Store Documents',
@@ -11120,7 +11539,7 @@ def business_licenses_list(request):
     businesses = businesses.order_by('-created_at')
 
     # Paginate results
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
     context = {
         'page_title': 'Business Licenses',
@@ -11955,8 +12374,8 @@ def sellers_list(request):
 
     # Apply filters
     search = request.GET.get('search', '').strip()
-    status = request.GET.get('status', '').strip()
-    verification_status = request.GET.get('verification', '').strip()
+    statuses = request.GET.getlist('status')  # multi-select
+    verification_statuses = request.GET.getlist('verification')  # multi-select
 
     if search:
         businesses = businesses.filter(
@@ -11966,14 +12385,18 @@ def sellers_list(request):
             Q(profile__user__email__icontains=search)
         )
 
-    if status:
-        businesses = businesses.filter(business_status=status)
+    if statuses:
+        businesses = businesses.filter(business_status__in=statuses)
 
-    if verification_status == 'not_applied':
-        # Businesses with no linked profile (never started verification)
-        businesses = businesses.filter(profile__isnull=True)
-    elif verification_status:
-        businesses = businesses.filter(profile__verification_status=verification_status)
+    if verification_statuses:
+        vq = Q()
+        if 'not_applied' in verification_statuses:
+            # Businesses with no linked profile (never started verification)
+            vq |= Q(profile__isnull=True)
+        other_verif = [v for v in verification_statuses if v != 'not_applied']
+        if other_verif:
+            vq |= Q(profile__verification_status__in=other_verif)
+        businesses = businesses.filter(vq)
 
     # Newest first — use business_id DESC so null-date businesses don't sink to bottom
     businesses = businesses.order_by('-business_id')
@@ -11989,7 +12412,7 @@ def sellers_list(request):
     )
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
     context = {
         'page_title': 'All Sellers',
@@ -12001,8 +12424,17 @@ def sellers_list(request):
         'not_applied_sellers': stats['not_applied'],
         'biz_pending_sellers': stats['biz_pending'],
         'search': search,
-        'status': status,
-        'verification': verification_status,
+        'selected_statuses': statuses,
+        'selected_verifications': verification_statuses,
+        'status_choices': [
+            ('active', 'Active'), ('pending', 'Pending (New)'),
+            ('inactive', 'Inactive'), ('suspended', 'Suspended'),
+        ],
+        'verification_choices': [
+            ('not_applied', 'Not Applied'), ('pending', 'Pending'),
+            ('under_review', 'Under Review'), ('incomplete', 'Incomplete'),
+            ('verified', 'Verified'), ('rejected', 'Rejected'),
+        ],
     }
 
     return render(request, 'workforce/sellers_list.html', context)
@@ -12032,7 +12464,7 @@ def sellers_pending(request):
         )
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
     context = {
         'page_title': 'Pending Sellers',
@@ -12071,7 +12503,7 @@ def sellers_active(request):
         )
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
     context = {
         'page_title': 'Active Sellers',
@@ -12106,7 +12538,7 @@ def sellers_inactive(request):
         )
 
     # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=25)
+    page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
     context = {
         'page_title': 'Inactive Sellers',
@@ -12376,6 +12808,7 @@ def seller_detail(request, business_id):
         'api_products': api_products,
         'api_products_error': api_products_error,
         'api_products_platform': api_products_platform,
+        'team_status_choices': business_models.BusinessTeamProfile.STATUS_CHOICES,
         'now': timezone.now(),
         'completion_percentage': completion_percentage,
         'user_profile': user_profile,
@@ -12901,6 +13334,97 @@ def seller_doc_field_update(request, business_id):
         return JsonResponse({'success': False, 'error': 'Update failed'}, status=500)
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def wf_pickup_location_add(request, business_id):
+    """Staff: add a pickup location for any seller."""
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+
+    title = request.POST.get('pickup_location_title', '').strip()
+    locality = request.POST.get('locality', '').strip()
+    if not title:
+        return JsonResponse({'success': False, 'error': 'Location title is required'}, status=400)
+
+    def _int_or_none(val):
+        try:
+            return int(val) if val and val.strip() else None
+        except (ValueError, TypeError):
+            return None
+
+    def _dec_or_none(val):
+        try:
+            from decimal import Decimal
+            return Decimal(val) if val and val.strip() else None
+        except Exception:
+            return None
+
+    pickup_status = request.POST.get('pickup_status', 'active')
+    if pickup_status not in ('active', 'inactive', 'pending', 'suspended'):
+        pickup_status = 'active'
+
+    is_default = request.POST.get('is_default') == 'on'
+    if is_default:
+        business_models.PickupLocation.objects.filter(
+            business=business, is_default=True
+        ).update(is_default=False)
+
+    loc = business_models.PickupLocation.objects.create(
+        business=business,
+        pickup_location_title=title,
+        locality=locality,
+        pickup_zone_no=_int_or_none(request.POST.get('pickup_zone_no')),
+        pickup_street_no=_int_or_none(request.POST.get('pickup_street_no')),
+        pickup_building_no=_int_or_none(request.POST.get('pickup_building_no')),
+        pickup_lat=_dec_or_none(request.POST.get('pickup_lat')),
+        pickup_lon=_dec_or_none(request.POST.get('pickup_lon')),
+        pickup_status=pickup_status,
+        is_fulfilment_center=request.POST.get('is_fulfilment_center') == 'on',
+        is_default=is_default,
+    )
+    logger.info("Staff %s added pickup location %s for business %s", request.user.id, loc.id, business_id)
+    return JsonResponse({
+        'success': True,
+        'message': 'Pickup location added successfully',
+        'location': {
+            'id': loc.id,
+            'title': loc.pickup_location_title,
+            'locality': loc.locality,
+            'zone': loc.pickup_zone_no,
+            'street': loc.pickup_street_no,
+            'building': loc.pickup_building_no,
+            'status': loc.pickup_status,
+        }
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def wf_pickup_location_delete(request, business_id, location_id):
+    """Staff: delete a pickup location for any seller. Only inactive locations may be deleted."""
+    from django.db import IntegrityError
+    from delivery import models as delivery_models
+
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+    loc = get_object_or_404(business_models.PickupLocation, id=location_id, business=business)
+
+    if loc.pickup_status == 'active':
+        return JsonResponse({'success': False, 'error': 'Cannot delete an active pickup location. Set it to inactive first.'}, status=400)
+
+    task_count = delivery_models.DeliveryTask.objects.filter(pickup_location=loc).count()
+    if task_count:
+        return JsonResponse({'success': False, 'error': f'Cannot delete: {task_count} delivery task(s) reference this location.'}, status=400)
+
+    try:
+        loc.delete()
+    except IntegrityError:
+        return JsonResponse({'success': False, 'error': 'Cannot delete: this location is still referenced by other records.'}, status=400)
+
+    logger.info("Staff %s deleted pickup location %s for business %s", request.user.id, location_id, business_id)
+    return JsonResponse({'success': True, 'message': 'Location deleted'})
+
+
 # =============================================================================
 # DRIVER MANAGEMENT VIEWS
 # =============================================================================
@@ -12929,13 +13453,13 @@ def drivers_list(request):
             Q(driver_phone__icontains=search)
         )
 
-    # Apply status filter
-    status_filter = request.GET.get('status', '')
-    if status_filter:
-        drivers = drivers.filter(driver_status=status_filter)
+    # Apply status filter (multi-select)
+    status_filters = request.GET.getlist('status')
+    if status_filters:
+        drivers = drivers.filter(driver_status__in=status_filters)
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=25)
+    page_obj = paginate_queryset(request, drivers, items_per_page=50)
 
     # Get counts for stats
     total_count = fleet_models.Driver.objects.count()
@@ -12947,7 +13471,11 @@ def drivers_list(request):
         'page_title': 'All Drivers',
         'page_obj': page_obj,
         'search': search,
-        'status_filter': status_filter,
+        'selected_statuses': status_filters,
+        'status_choices': [
+            ('approved', 'Approved'), ('pending', 'Pending'), ('processing', 'Processing'),
+            ('rejected', 'Rejected'), ('blocked', 'Blocked'), ('suspended', 'Suspended'),
+        ],
         'total_count': total_count,
         'active_count': active_count,
         'pending_count': pending_count,
@@ -12983,7 +13511,7 @@ def drivers_pending(request):
         )
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=25)
+    page_obj = paginate_queryset(request, drivers, items_per_page=50)
 
     context = {
         'page_title': 'Pending Drivers',
@@ -13021,7 +13549,7 @@ def drivers_active(request):
         )
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=25)
+    page_obj = paginate_queryset(request, drivers, items_per_page=50)
 
     context = {
         'page_title': 'Active Drivers',
@@ -13059,7 +13587,7 @@ def drivers_inactive(request):
         )
 
     # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=25)
+    page_obj = paginate_queryset(request, drivers, items_per_page=50)
 
     context = {
         'page_title': 'Inactive Drivers',
@@ -13268,19 +13796,36 @@ def driver_detail(request, driver_id):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_set_status(request, driver_id):
+    """Set driver account status (approved/blocked/suspended/rejected) via POST."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    new_status = body.get('status')
+    if new_status not in ('approved', 'blocked', 'suspended', 'rejected'):
+        return JsonResponse({'success': False, 'error': 'Invalid status'}, status=400)
+    driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
+    driver.driver_status = new_status
+    driver.save(update_fields=['driver_status'])
+    return JsonResponse({'success': True, 'status': new_status})
+
+
 def driver_toggle_status(request, driver_id):
-    """Toggle driver active/suspended status via POST."""
+    """Toggle driver availability (available ↔ offline) without changing driver_status."""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
     driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
-    if driver.driver_status == 'approved':
-        driver.driver_status = 'suspended'
-    elif driver.driver_status == 'suspended':
-        driver.driver_status = 'approved'
-    else:
-        return JsonResponse({'success': False, 'error': 'Only approved/suspended drivers can be toggled'}, status=400)
-    driver.save(update_fields=['driver_status'])
-    return JsonResponse({'success': True, 'status': driver.driver_status})
+    if driver.driver_status != 'approved':
+        return JsonResponse({'success': False, 'error': 'Only approved drivers can be toggled'}, status=400)
+    driver.driver_availability = 'offline' if driver.driver_availability == 'available' else 'available'
+    driver.save(update_fields=['driver_availability'])
+    return JsonResponse({'success': True, 'availability': driver.driver_availability})
 
 
 @login_required(login_url='/accounts/login/')
@@ -13487,7 +14032,7 @@ def fulfilled_orders_list(request):
     ).aggregate(total=Sum('cod_amount'))['total'] or 0
 
     # Paginate
-    page_obj = paginate_queryset(request, orders, items_per_page=25)
+    page_obj = paginate_queryset(request, orders, items_per_page=50)
 
     context = {
         'page_title': 'Purchase Orders (Fulfilled)',
@@ -14165,6 +14710,10 @@ def order_edit(request, order_id):
             if task_updates:
                 order.delivery_task.all().update(**task_updates)
 
+            # Keep the delivery task snapshot (description / qty / price) in sync
+            # with the saved order so it never goes stale after an edit.
+            _push_order_package_to_tasks(order)
+
             # Build change summary
             new_vals = {
                 'customer_name': order.customer_name or '',
@@ -14271,6 +14820,39 @@ def order_edit(request, order_id):
 
 # --- Order Item AJAX endpoints -----------------------------------------------
 
+# Task statuses where the driver has finished — don't rewrite their snapshot.
+_TASK_TERMINAL_STATUSES = ['delivered', 'partial_delivery', 'cancelled', 'rejected', 'dropsownlost']
+
+
+def _push_order_package_to_tasks(order):
+    """Push the order's current package + delivery amount onto its active tasks.
+
+    Keeps the denormalized DeliveryTask snapshot (dl_task_description / dl_waight /
+    dl_price) in sync with the order after edits. Terminal tasks are left untouched.
+    """
+    order.delivery_task.exclude(
+        dl_task_status__in=_TASK_TERMINAL_STATUSES
+    ).update(
+        dl_task_description=(order.package_description or f"Delivery for {order.order_number}")[:100],
+        dl_waight=order.package_qty or 1,
+        dl_price=order.dl_amount or 0,
+    )
+
+
+def _rebuild_order_package_from_items(order):
+    """Rebuild package_description + package_qty from the order's items, then sync tasks.
+
+    Mirrors the import format ("Name xQty, Name xQty"). Called whenever product
+    items change so the order summary and its delivery task stay accurate.
+    """
+    items = list(order.order_items.all())
+    parts = [f"{it.display_name} x{it.quantity}" for it in items]
+    order.package_description = ', '.join(parts)[:255]
+    order.package_qty = sum(it.quantity for it in items)
+    order.save(update_fields=['package_description', 'package_qty'])
+    _push_order_package_to_tasks(order)
+
+
 @login_required
 @staff_required
 @require_http_methods(["POST"])
@@ -14299,6 +14881,9 @@ def order_item_add(request, order_id):
         quantity=quantity,
         unit_price=price,
     )
+
+    # Keep order summary + delivery task in sync with the item list
+    _rebuild_order_package_from_items(order)
 
     return JsonResponse({
         'success': True,
@@ -14338,6 +14923,9 @@ def order_item_update(request, order_id, item_id):
 
     item.save()
 
+    # Keep order summary + delivery task in sync with the item list
+    _rebuild_order_package_from_items(item.order)
+
     return JsonResponse({
         'success': True,
         'item': {
@@ -14357,10 +14945,15 @@ def order_item_update(request, order_id, item_id):
 @require_http_methods(["POST"])
 def order_item_delete(request, order_id, item_id):
     """Delete an order item via AJAX."""
-    item = get_object_or_404(orders_models.OrderItem, id=item_id, order_id=order_id)
+    item = get_object_or_404(
+        orders_models.OrderItem.objects.select_related('order'), id=item_id, order_id=order_id)
+    order = item.order
     item_name = item.product.item_name if item.product else (item.notes or 'Item')
     item_qty = item.quantity
     item.delete()
+
+    # Keep order summary + delivery task in sync with the item list
+    _rebuild_order_package_from_items(order)
 
     # Log to timeline
     orders_models.OrderStatusHistory.objects.create(
@@ -14512,12 +15105,12 @@ def product_requests_list(request):
 
     # Apply filters
     request_type = request.GET.get('type', 'all')  # all, inbound, outbound
-    status_filter = request.GET.get('status', '')
+    status_filters = request.GET.getlist('status')  # multi-select
     business_id = request.GET.get('business', '')
 
-    if status_filter:
-        inbound_qs = inbound_qs.filter(status=status_filter)
-        outbound_qs = outbound_qs.filter(status=status_filter)
+    if status_filters:
+        inbound_qs = inbound_qs.filter(status__in=status_filters)
+        outbound_qs = outbound_qs.filter(status__in=status_filters)
 
     if business_id:
         try:
@@ -14550,7 +15143,8 @@ def product_requests_list(request):
     }
 
     # Manual pagination since we combined querysets
-    paginator = Paginator(requests_list, 20)
+    per_page = get_per_page(request)
+    paginator = Paginator(requests_list, int(per_page))
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
@@ -14559,14 +15153,29 @@ def product_requests_list(request):
         fulfillment_service_enabled=True
     ).order_by('business_name')
 
+    filter_parts = []
+    if request_type and request_type != 'all':
+        filter_parts.append(f'type={request_type}')
+    for s in status_filters:
+        filter_parts.append(f'status={s}')
+    if business_id:
+        filter_parts.append(f'business={business_id}')
+    filter_params = '&'.join(filter_parts)
+
     context = {
         'page_title': 'Product Requests',
         'page_obj': page_obj,
         'stats': stats,
         'request_type': request_type,
-        'status_filter': status_filter,
+        'selected_statuses': status_filters,
+        'status_choices': [
+            ('pending', 'Pending'), ('approved', 'Approved'),
+            ('completed', 'Completed'), ('cancelled', 'Cancelled'),
+        ],
         'business_id': business_id,
         'businesses': businesses,
+        'per_page': per_page,
+        'filter_params': filter_params,
     }
     return render(request, 'workforce/product_requests_list.html', context)
 
@@ -14703,7 +15312,7 @@ def pricing_inquiries_list(request):
         Q(is_required_fulfillment_service_for_make_hub_in_doha=True)
     ).count()
 
-    page_obj = paginate_queryset(request, inquiries, items_per_page=25)
+    page_obj = paginate_queryset(request, inquiries, items_per_page=50)
 
     context = {
         'page_title': 'Pricing Inquiries',
@@ -14735,7 +15344,7 @@ def whatsapp_inquiries_list(request):
         )
 
     total_count = webpages_models.WhatsAppInquiry.objects.count()
-    page_obj = paginate_queryset(request, inquiries, items_per_page=25)
+    page_obj = paginate_queryset(request, inquiries, items_per_page=50)
 
     context = {
         'page_title': 'WhatsApp Inquiries',
@@ -14832,7 +15441,7 @@ def pricing_inquiry_edit(request, inquiry_id):
     # Editable fields (all model fields except CRM/meta)
     EDITABLE_FIELDS = {
         'full_name', 'business_name', 'business_contact_number', 'operation_team_contact_number',
-        'website_url', 'social_profile', 'product_category', 'average_order_value_qar',
+        'website_url', 'instagram_profile', 'facebook_profile', 'social_profile', 'product_category', 'average_order_value_qar', 'staff_notes',
         'business_operating_age', 'business_location_country',
         'avarage_number_of_order_last_week', 'avarage_number_of_order_done_last_month',
         'avarage_number_of_order_expect_next_month', 'orders_expected_in_next_3_months_milestone',
@@ -15691,7 +16300,7 @@ def temp_orders_by_date(request):
     qs = qs.order_by('-order_date')
 
     # Paginate
-    paginator = Paginator(qs, 100)
+    paginator = Paginator(qs, 50)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
@@ -15819,6 +16428,49 @@ def temp_orders_delete(request):
         'deleted': deleted,
         'skipped_imported': skipped_imported,
         'message': f'{deleted} deleted' + (f', {skipped_imported} skipped (already imported)' if skipped_imported else ''),
+    })
+
+
+@csrf_exempt
+@login_required(login_url='/accounts/login/')
+def temp_orders_mark_imported(request):
+    """Manually mark selected TempOrder rows as imported (no Order created).
+
+    Accepts JSON body: { "ids": [1, 2, 3] }
+    Useful when the staff has already handled these orders elsewhere and just
+    wants them out of the "New" queue without going through transfer/auto-import.
+    Rows already 'imported' are left untouched. This does NOT create real Order
+    records and does NOT set imported_order.
+    """
+    import json as json_lib
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    ids = body.get('ids', [])
+    if not ids:
+        return JsonResponse({'success': False, 'error': 'No IDs provided'}, status=400)
+
+    try:
+        ids = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'IDs must be integers'}, status=400)
+
+    qs = orders_models.TempOrder.objects.filter(id__in=ids)
+    already_imported = qs.filter(status='imported').count()
+    updatable = qs.exclude(status='imported')
+    marked = updatable.update(status='imported')
+
+    return JsonResponse({
+        'success': True,
+        'marked': marked,
+        'already_imported': already_imported,
+        'message': f'{marked} marked as imported' + (f', {already_imported} already imported' if already_imported else ''),
     })
 
 
@@ -16254,6 +16906,7 @@ def temp_orders_browse(request):
     status_filter = request.GET.get('status', '').strip()
     source_type_filter = request.GET.get('source_type', '').strip()
     q_search = request.GET.get('q', '').strip()
+    sort_by = request.GET.get('sort', '').strip()
     page_num = request.GET.get('page', '1').strip()
     try:
         per_page = int(request.GET.get('per_page', '50'))
@@ -16307,7 +16960,14 @@ def temp_orders_browse(request):
             biz_qs_unfiltered.values_list('source_type').annotate(Count('id')).order_by()
         )
 
-        qs = qs.order_by('-id')
+        sort_map = {
+            'row_asc': ('row_num', 'id'),
+            'row_desc': ('-row_num', '-id'),
+            'id_asc': ('id',),
+            'id_desc': ('-id',),
+        }
+        order_fields = sort_map.get(sort_by, ('-id',))
+        qs = qs.order_by(*order_fields)
         paginator = Paginator(qs, per_page)
         try:
             rows_page = paginator.page(page_num)
@@ -16324,6 +16984,8 @@ def temp_orders_browse(request):
         filter_pairs.append(('source_type', source_type_filter))
     if q_search:
         filter_pairs.append(('q', q_search))
+    if sort_by:
+        filter_pairs.append(('sort', sort_by))
     filter_params = urlencode(filter_pairs)
 
     context = {
@@ -16340,6 +17002,7 @@ def temp_orders_browse(request):
             'status': status_filter,
             'source_type': source_type_filter,
             'q': q_search,
+            'sort': sort_by,
         },
     }
     return render(request, 'workforce/temp_orders_browse.html', context)
@@ -17859,7 +18522,8 @@ def temp_verify_queue(request):
 
     # Pagination
     from django.core.paginator import Paginator
-    paginator = Paginator(qs, 50)
+    per_page = get_per_page(request)
+    paginator = Paginator(qs, int(per_page))
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
     # Status badge classes (Bootstrap)
@@ -17886,9 +18550,20 @@ def temp_verify_queue(request):
     # Runtime kill-switch (DB-backed). True = drain worker is allowed to send.
     waha_status['messaging_enabled'] = WahaConfig.get_solo().verify_messaging_enabled
 
+    filter_parts = []
+    for key, val in (
+        ('status', status_filter), ('kind', kind_filter), ('business', business_id),
+        ('q', search), ('date_from', date_from), ('date_to', date_to),
+    ):
+        if val:
+            filter_parts.append(f'{key}={val}')
+    filter_params = '&'.join(filter_parts)
+
     context = {
         'jobs': page_obj,
         'paginator': paginator,
+        'per_page': per_page,
+        'filter_params': filter_params,
         'status_counts': status_counts,
         'total_count': total_count,
         'status_badge': status_badge,
@@ -19122,15 +19797,93 @@ def onedrive_import_trigger(request, source_id):
 @superuser_required
 def auto_triggers_list(request):
     """List all automatic triggers: WhatsApp notifications, webhooks, signals."""
-    from core.models import AutoTriggerConfig
-    triggers = AutoTriggerConfig.objects.all()
-    wa_triggers = triggers.filter(category='whatsapp')
+    from core.models import AutoTriggerConfig, WhatsAppInstance
+    triggers = AutoTriggerConfig.objects.select_related('whatsapp_instance').all()
+    wa_triggers = list(triggers.filter(category='whatsapp'))
     wh_triggers = triggers.filter(category='webhook')
     sys_triggers = triggers.filter(category='system')
+
+    # Resolve the REAL delivery channel each WhatsApp trigger sends through, so
+    # the table reflects actual config (not just the "via Evolution API" badge).
+    # Order-lifecycle triggers go through core.order_notifications (WAHA -> n8n);
+    # location verification goes through the Evolution sender.
+    waha_enabled = bool(getattr(settings, 'WAHA_ENABLED', False))
+    waha_ready = bool(getattr(settings, 'WAHA_BASE_URL', '')) and bool(getattr(settings, 'WAHA_API_KEY', ''))
+    n8n_url = getattr(settings, 'N8N_WHATSAPP_WEBHOOK_URL', '') or ''
+    evo_ready = all([
+        getattr(settings, 'EVOLUTION_URL', ''),
+        getattr(settings, 'EVOLUTION_API_KEY', ''),
+        getattr(settings, 'EVOLUTION_INSTANCE', ''),
+    ])
+
+    if waha_enabled:
+        order_channel = {'name': 'WAHA', 'active': waha_ready}
+    elif n8n_url:
+        order_channel = {'name': 'n8n', 'active': True}
+    else:
+        order_channel = {'name': 'Not configured', 'active': False}
+
+    # Triggers that use the Evolution sender instead of the order-notifications path
+    evolution_trigger_keys = {'wa_location_verification'}
+
+    for t in wa_triggers:
+        if t.whatsapp_channel == 'evolution':
+            # Explicit per-trigger choice
+            t.channel_name = 'Evolution API'
+            t.channel_active = bool(evo_ready)
+        elif t.whatsapp_channel == 'waha':
+            t.channel_name = 'WAHA'
+            t.channel_active = bool(waha_enabled and waha_ready)
+        elif t.trigger_key in evolution_trigger_keys:
+            t.channel_name = 'Evolution API'
+            t.channel_active = bool(evo_ready)
+        else:
+            t.channel_name = order_channel['name']
+            t.channel_active = order_channel['active']
+
+    # Default WhatsApp sender (when a trigger has no per-trigger override). The
+    # page sends "via Evolution API" (settings.EVOLUTION_INSTANCE), so prefer
+    # the WhatsAppInstance whose instance_name matches that, then the default
+    # instance, then the raw instance name from settings.
+    evo_instance_name = getattr(settings, 'EVOLUTION_INSTANCE', '') or ''
+    sender_inst = None
+    if evo_instance_name:
+        sender_inst = WhatsAppInstance.objects.filter(
+            is_active=True, instance_name=evo_instance_name).first()
+    if not sender_inst:
+        sender_inst = WhatsAppInstance.objects.filter(
+            is_active=True, is_default=True).first()
+    if sender_inst:
+        wa_sender = {
+            'number': sender_inst.phone_number,
+            'label': sender_inst.label,
+            'instance': sender_inst.instance_name,
+            'source': 'instance',
+        }
+    else:
+        wa_sender = {
+            'number': '',
+            'label': '',
+            'instance': evo_instance_name,
+            'source': 'settings',
+        }
+
+    # Active instances to populate the "Send from" dropdown in the Edit modal.
+    wa_instances = WhatsAppInstance.objects.filter(is_active=True)
+
     return render(request, 'workforce/auto_triggers_list.html', {
         'wa_triggers': wa_triggers,
         'wh_triggers': wh_triggers,
         'sys_triggers': sys_triggers,
+        'wa_sender': wa_sender,
+        'wa_instances': wa_instances,
+        'wa_channel_choices': AutoTriggerConfig.WHATSAPP_CHANNEL_CHOICES,
+        'wa_channel_state': {
+            'evolution': bool(evo_ready),
+            'waha': bool(waha_enabled and waha_ready),
+            'default_name': order_channel['name'],
+            'default_active': bool(order_channel['active']),
+        },
     })
 
 
@@ -19593,9 +20346,9 @@ def auto_flow_test(request):
             # Stage 3: Check Evolution API config
             stages.append(('Evolution API Config', 'running', ''))
             from django.conf import settings as django_settings
-            evo_url = getattr(django_settings, 'EVALUATION_URL', '') or os.environ.get('EVALUATION_URL', '')
-            evo_key = getattr(django_settings, 'EVALUATION_API_KEY', '') or os.environ.get('EVALUATION_API_KEY', '')
-            evo_instance = getattr(django_settings, 'EVALUATION_INSTANCE', '') or os.environ.get('EVALUATION_INSTANCE', '')
+            evo_url = getattr(django_settings, 'EVOLUTION_URL', '') or os.environ.get('EVOLUTION_URL', '')
+            evo_key = getattr(django_settings, 'EVOLUTION_API_KEY', '') or os.environ.get('EVOLUTION_API_KEY', '')
+            evo_instance = getattr(django_settings, 'EVOLUTION_INSTANCE', '') or os.environ.get('EVOLUTION_INSTANCE', '')
 
             if not evo_url or not evo_key or not evo_instance:
                 raise ValueError(f"Evolution API not configured. URL={'set' if evo_url else 'missing'}, Key={'set' if evo_key else 'missing'}, Instance={'set' if evo_instance else 'missing'}")
@@ -19787,7 +20540,7 @@ def auto_trigger_update(request):
     if not trigger_key:
         return JsonResponse({'success': False, 'error': 'Missing trigger_key'}, status=400)
 
-    from core.models import AutoTriggerConfig
+    from core.models import AutoTriggerConfig, WhatsAppInstance
     try:
         trigger = AutoTriggerConfig.objects.get(trigger_key=trigger_key)
         label = body.get('label', '').strip()
@@ -19798,13 +20551,40 @@ def auto_trigger_update(request):
         if description:
             trigger.description = description
         trigger.action = action
-        trigger.save(update_fields=['label', 'description', 'action', 'updated_at'])
+
+        update_fields = ['label', 'description', 'action', 'updated_at']
+        # WhatsApp sender override: '' / null clears it (use default)
+        if 'whatsapp_instance_id' in body:
+            wa_id = body.get('whatsapp_instance_id')
+            if wa_id:
+                trigger.whatsapp_instance = WhatsAppInstance.objects.filter(
+                    id=wa_id, is_active=True).first()
+            else:
+                trigger.whatsapp_instance = None
+            update_fields.append('whatsapp_instance')
+
+        # Per-trigger channel override ('', 'evolution', 'waha')
+        if 'whatsapp_channel' in body:
+            ch = (body.get('whatsapp_channel') or '').strip()
+            valid = dict(AutoTriggerConfig.WHATSAPP_CHANNEL_CHOICES)
+            trigger.whatsapp_channel = ch if ch in valid else ''
+            update_fields.append('whatsapp_channel')
+
+        trigger.save(update_fields=update_fields)
+
+        inst = trigger.whatsapp_instance
         return JsonResponse({
             'success': True,
             'trigger_key': trigger.trigger_key,
             'label': trigger.label,
             'description': trigger.description,
             'action': trigger.action,
+            'whatsapp_instance_id': inst.id if inst else '',
+            'whatsapp_number': (inst.phone_number or inst.instance_name) if inst else '',
+            'whatsapp_label': inst.label if inst else '',
+            'whatsapp_instance_name': inst.instance_name if inst else '',
+            'whatsapp_channel': trigger.whatsapp_channel,
+            'channel_label': dict(AutoTriggerConfig.WHATSAPP_CHANNEL_CHOICES).get(trigger.whatsapp_channel, ''),
         })
     except AutoTriggerConfig.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Trigger not found'}, status=404)
@@ -19822,6 +20602,7 @@ def whatsapp_instances_list(request):
             core_models.WhatsAppInstance.objects.create(
                 label=request.POST.get('label', '').strip(),
                 instance_name=request.POST.get('instance_name', '').strip(),
+                waha_session=request.POST.get('waha_session', '').strip(),
                 phone_number=request.POST.get('phone_number', '').strip(),
                 is_default=bool(request.POST.get('is_default')),
                 is_active=True,
@@ -19831,6 +20612,7 @@ def whatsapp_instances_list(request):
                 inst = core_models.WhatsAppInstance.objects.get(id=instance_id)
                 inst.label = request.POST.get('label', '').strip()
                 inst.instance_name = request.POST.get('instance_name', '').strip()
+                inst.waha_session = request.POST.get('waha_session', '').strip()
                 inst.phone_number = request.POST.get('phone_number', '').strip()
                 inst.is_default = bool(request.POST.get('is_default'))
                 inst.is_active = bool(request.POST.get('is_active', True))
@@ -19867,9 +20649,9 @@ def whatsapp_last_message(request):
             return JsonResponse({'success': False, 'error': 'Phone number required'})
 
         # Get Evolution API config
-        evolution_url = getattr(settings, 'EVALUATION_URL', '')
-        evolution_api_key = getattr(settings, 'EVALUATION_API_KEY', '')
-        evolution_instance = getattr(settings, 'EVALUATION_INSTANCE', '')
+        evolution_url = getattr(settings, 'EVOLUTION_URL', '')
+        evolution_api_key = getattr(settings, 'EVOLUTION_API_KEY', '')
+        evolution_instance = getattr(settings, 'EVOLUTION_INSTANCE', '')
 
         if not all([evolution_url, evolution_api_key, evolution_instance]):
             return JsonResponse({'success': False, 'error': 'Evolution API not configured'})
@@ -19973,8 +20755,8 @@ def whatsapp_send_message(request):
             return JsonResponse({'success': False, 'error': 'Phone, message, and instance required'})
 
         # Get Evolution API config
-        evolution_url = getattr(settings, 'EVALUATION_URL', '')
-        evolution_api_key = getattr(settings, 'EVALUATION_API_KEY', '')
+        evolution_url = getattr(settings, 'EVOLUTION_URL', '')
+        evolution_api_key = getattr(settings, 'EVOLUTION_API_KEY', '')
 
         if not all([evolution_url, evolution_api_key]):
             return JsonResponse({'success': False, 'error': 'Evolution API not configured'})
@@ -20460,13 +21242,23 @@ def wf_export_page(request):
         return _export_platform_orders_file(orders, platform, export_format)
 
     page_obj = None
+    per_page = get_per_page(request)
     if orders is not None:
-        paginator = Paginator(orders, 50)
+        paginator = Paginator(orders, int(per_page))
         page_num = request.GET.get('page', 1)
         try:
             page_obj = paginator.page(page_num)
         except (PageNotAnInteger, EmptyPage):
             page_obj = paginator.page(1)
+
+    filter_parts = [f'business={business_id}', f'source={source}', f'platform={platform}']
+    if date_from:
+        filter_parts.append(f'dateFrom={date_from}')
+    if date_to:
+        filter_parts.append(f'dateTo={date_to}')
+    if c_status:
+        filter_parts.append(f'cStatus={c_status}')
+    filter_params = '&'.join(filter_parts)
 
     return render(request, 'workforce/export_page.html', {
         **base_ctx,
@@ -20476,6 +21268,8 @@ def wf_export_page(request):
         'selected_business': selected_business,
         'business_id': business_id,
         'page_obj': page_obj,
+        'per_page': per_page,
+        'filter_params': filter_params,
         'total_count': total_count,
         'filters': filters,
     })
@@ -21234,23 +22028,29 @@ def wf_ai_config(request):
         'GOOGLE_AI_API_KEY',
         'XAI_API_KEY',
         'GROQ_API_KEY',
+        'GLM_API_KEY',
         # Business dashboard AI
         'AI_CHAT_PROVIDER',
         'AI_CHAT_MODEL',
+        'AI_CHAT_FALLBACK_PROVIDER',
+        'AI_CHAT_FALLBACK_MODEL',
         # WhatsApp reply AI
         'AI_WA_PROVIDER',
         'AI_WA_MODEL',
+        'AI_WA_FALLBACK_PROVIDER',
+        'AI_WA_FALLBACK_MODEL',
         # Shared agent settings
         'AI_AGENT_MAX_TOKENS',
         'AI_AGENT_DAILY_BUDGET',
         'AI_AGENT_MONTHLY_BUDGET',
         'AI_AGENT_RATE_LIMIT_USER',
         'AI_AGENT_RATE_LIMIT_BUSINESS',
+        'AI_AGENT_RATE_LIMIT_GLOBAL',
         'AI_AGENT_ALERT_PHONES',
         'AI_AGENT_ENABLED',
         'AI_AGENT_WHATSAPP_ENABLED',
     ]
-    BLANK_SKIP_KEYS = {'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_AI_API_KEY', 'XAI_API_KEY', 'GROQ_API_KEY'}
+    BLANK_SKIP_KEYS = {'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_AI_API_KEY', 'XAI_API_KEY', 'GROQ_API_KEY', 'GLM_API_KEY'}
 
     def read_env():
         env = {}
@@ -21310,30 +22110,32 @@ def wf_ai_config(request):
 
     env = read_env()
 
-    # Live status from claude_service
+    # Live status from the active chat service
     agent_status = {}
     budget_usage = {}
     today_usage = {}
     try:
-        from ai_agent.services.claude_service import get_claude_service, PRICING
+        from ai_agent.services.unified_service import get_chat_service
+        from ai_agent.services.claude_service import PRICING
         from ai_agent.models import UsageLog, Conversation
         from django.db.models import Sum, Count
         from datetime import timedelta
 
-        svc = get_claude_service()
+        svc = get_chat_service(purpose='chat')
         available, status_msg = svc.is_available()
         agent_status = {'available': available, 'message': status_msg, 'model': svc.model}
-        budget_usage = svc.budget_tracker.get_usage()
+        _bt = getattr(svc, 'budget_tracker', None)
+        budget_usage = _bt.get_usage() if _bt is not None else {}
 
         today = timezone.now().date()
-        today_stats = UsageLog.objects.filter(created_at__date=today).aggregate(
+        today_stats = UsageLog.objects.filter(created_at__date=today, success=True).aggregate(
             calls=Count('id'),
             tokens_in=Sum('tokens_input'),
             tokens_out=Sum('tokens_output'),
             cost=Sum('estimated_cost'),
         )
         month_start = today.replace(day=1)
-        month_stats = UsageLog.objects.filter(created_at__date__gte=month_start).aggregate(
+        month_stats = UsageLog.objects.filter(created_at__date__gte=month_start, success=True).aggregate(
             calls=Count('id'),
             cost=Sum('estimated_cost'),
         )
@@ -21390,6 +22192,15 @@ def wf_ai_config(request):
             {'id': 'gemma2-9b-it',            'label': 'Gemma 2 9B'},
             {'id': 'qwen/qwen3-32b',          'label': 'Qwen 3 32B (Free tier: 6K TPM — too low for tools)'},
         ],
+        'zhipu': [
+            {'id': 'glm-4.7-flash', 'label': 'GLM-4.7 Flash (Free tier)'},
+            {'id': 'glm-5',         'label': 'GLM-5'},
+            {'id': 'glm-5-turbo',   'label': 'GLM-5 Turbo (Fast)'},
+            {'id': 'glm-4.7',       'label': 'GLM-4.7'},
+            {'id': 'glm-4.6',       'label': 'GLM-4.6'},
+            {'id': 'glm-4.5',       'label': 'GLM-4.5'},
+            {'id': 'glm-4.5-air',   'label': 'GLM-4.5 Air (Fast)'},
+        ],
     }
 
     def _mask(key):
@@ -21397,13 +22208,16 @@ def wf_ai_config(request):
 
     return render(request, 'workforce/ai_config.html', {
         'env': env,
-        'chat_provider':  env.get('AI_CHAT_PROVIDER', 'anthropic') or 'anthropic',
-        'wa_provider':    env.get('AI_WA_PROVIDER',   'anthropic') or 'anthropic',
+        'chat_provider':          env.get('AI_CHAT_PROVIDER', 'anthropic') or 'anthropic',
+        'chat_fallback_provider': env.get('AI_CHAT_FALLBACK_PROVIDER', '') or '',
+        'wa_provider':            env.get('AI_WA_PROVIDER',   'anthropic') or 'anthropic',
+        'wa_fallback_provider':   env.get('AI_WA_FALLBACK_PROVIDER', '') or '',
         'masked_anthropic_key': _mask(env.get('ANTHROPIC_API_KEY', '')),
         'masked_openai_key':    _mask(env.get('OPENAI_API_KEY', '')),
         'masked_gemini_key':    _mask(env.get('GOOGLE_AI_API_KEY', '')),
         'masked_xai_key':       _mask(env.get('XAI_API_KEY', '')),
         'masked_groq_key':      _mask(env.get('GROQ_API_KEY', '')),
+        'masked_glm_key':       _mask(env.get('GLM_API_KEY', '')),
         'models_by_provider_json': _json.dumps(models_by_provider),
         'agent_status': agent_status,
         'budget_usage': budget_usage,
@@ -21454,6 +22268,34 @@ def wf_ai_models_api(request):
                     for m in data
                     if 'claude' in m['id']
                 ]
+
+            elif provider == 'zhipu':
+                key = getattr(dj_settings, 'GLM_API_KEY', '')
+                if not key:
+                    return None, 'GLM API key not configured'
+                # glm-4.7-flash is a free-tier model not listed in the /models API — always pin it first
+                free_models = [{'id': 'glm-4.7-flash', 'label': 'GLM-4.7 Flash (Free tier)'}]
+                skip_keywords = ('embedding', 'cogvideo', 'cogview', 'emohaa', 'charglm', 'codegeex')
+                try:
+                    r = http.get(
+                        'https://open.bigmodel.cn/api/paas/v4/models',
+                        headers={'Authorization': f'Bearer {key}'},
+                        timeout=timeout,
+                    )
+                    if r.status_code == 200:
+                        live = sorted(
+                            [
+                                {'id': m['id'], 'label': m['id']}
+                                for m in r.json().get('data', [])
+                                if not any(kw in m['id'] for kw in skip_keywords)
+                            ],
+                            key=lambda x: x['id'], reverse=True,
+                        )
+                        models = free_models + live
+                    else:
+                        models = free_models
+                except Exception:
+                    models = free_models
 
             elif provider in ('openai', 'xai', 'groq'):
                 key_map = {
@@ -21541,7 +22383,7 @@ def wf_ai_models_api(request):
 
     models, err = _fetch()
     if err:
-        return JsonResponse({'error': err}, status=502)
+        return JsonResponse({'error': err}, status=200)
 
     cache.set(cache_key, models, timeout=3600)
     return JsonResponse({'models': models, 'cached': False})

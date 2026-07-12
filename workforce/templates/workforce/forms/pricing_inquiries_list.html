@@ -1,213 +1,322 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
+{# Purpose: Pricing Inquiries triage console — scan, filter and expand inbound 3PL leads. #}
+{# Used by: workforce.views.pricing_inquiries_list #}
+{# Notes: pil__ namespace; expandable rows reveal a requirements drawer per lead. #}
+
 {% block extra_css %}
 {# workforce.css already loaded in wf_dashboard_base.html #}
-<link href="{% static 'workforce/css/pricing_inquiry_detail.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260711e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3">
+<div class="pil col-12 p-3">
+  <div class="pil__console">
 
-  <!-- PAGE HEADER -->
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <div>
-      <h2 class="mb-0"><i class="fa-solid fa-file-alt me-2 text-primary"></i>Pricing Inquiries</h2>
-      <p class="text-muted small mb-0">3PL inquiry form submissions from potential business clients</p>
-    </div>
-    <div class="text-end">
-      <div class="fs-3 fw-bold text-primary">{{ total_count }}</div>
-      <div class="text-muted small">Total Inquiries</div>
-    </div>
-  </div>
-
-  <!-- STAT CARDS -->
-  <div class="row g-3 mb-3">
-    <div class="col-6 col-md-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="rounded-circle bg-primary bg-opacity-10 p-3">
-            <i class="fa-solid fa-file-alt text-primary fa-lg"></i>
-          </div>
-          <div>
-            <div class="fs-4 fw-bold">{{ total_count }}</div>
-            <div class="text-muted small">Total</div>
-          </div>
+    <!-- HEADER BAR -->
+    <div class="pil__head">
+      <div class="pil__head-title">
+        <div class="pil__eyebrow">Sales Pipeline</div>
+        <h1 class="pil__title">Pricing Inquiries</h1>
+        <p class="pil__subtitle">Inbound 3PL quote requests from prospective business clients</p>
+      </div>
+      <div class="pil__metrics">
+        <div class="pil__metric">
+          <span class="pil__metric-label">Total Leads</span>
+          <span class="pil__metric-value">{{ total_count }}</span>
+        </div>
+        <div class="pil__metric">
+          <span class="pil__metric-label">Need COD</span>
+          <span class="pil__metric-value">{{ cod_count }}</span>
+        </div>
+        <div class="pil__metric">
+          <span class="pil__metric-label">Need Fulfillment</span>
+          <span class="pil__metric-value">{{ fulfillment_count }}</span>
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="rounded-circle bg-success bg-opacity-10 p-3">
-            <i class="fa-solid fa-money-bill-wave text-success fa-lg"></i>
-          </div>
-          <div>
-            <div class="fs-4 fw-bold">{{ cod_count }}</div>
-            <div class="text-muted small">Need COD</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="rounded-circle bg-warning bg-opacity-10 p-3">
-            <i class="fa-solid fa-warehouse text-warning fa-lg"></i>
-          </div>
-          <div>
-            <div class="fs-4 fw-bold">{{ fulfillment_count }}</div>
-            <div class="text-muted small">Need Fulfillment</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- FILTER -->
-  <div class="card border-0 shadow-sm mb-3">
-    <div class="card-body">
+    <!-- TOOLBAR / FACETED SEARCH -->
+    <div class="pil__toolbar">
       <form method="get"
             hx-get=""
             hx-target="#main-content"
             hx-select="#main-content"
             hx-swap="outerHTML"
             hx-push-url="true"
-            id="workforce_forms_pricing_form_filter">
-        <div class="row g-2 align-items-end">
-          <div class="col-12 col-md-4">
-            <label class="form-label small fw-semibold">Search</label>
-            <input type="text" name="search" value="{{ search }}" class="form-control form-control-sm"
-                   placeholder="Name, business, phone, category…">
-          </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label small fw-semibold">COD</label>
-            <select name="cod" class="form-select form-select-sm">
-              <option value="">All</option>
-              <option value="1" {% if cod_filter == '1' %}selected{% endif %}>Required</option>
-              <option value="0" {% if cod_filter == '0' %}selected{% endif %}>Not Required</option>
+            id="workforce_forms_pricing_form_filter"
+            class="pil__filters">
+
+        <!-- search field (hero) -->
+        <div class="pil__search {% if search %}is-filled{% endif %}">
+          <i class="fa-solid fa-magnifying-glass pil__search-icon"></i>
+          <input type="text" name="search" value="{{ search }}" id="pil-search"
+                 class="pil__search-input" autocomplete="off"
+                 placeholder="Search business, contact, phone or category…"
+                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 hx-swap="outerHTML" hx-push-url="true"
+                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-include="#workforce_forms_pricing_form_filter">
+          <button type="button" class="pil__search-clear" data-pil-clear="pil-search"
+                  aria-label="Clear search"{% if not search %} hidden{% endif %}>
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- facets — self-describing selects, auto-apply on change -->
+        <div class="pil__facets">
+          <div class="pil__facet {% if cod_filter %}is-active{% endif %}">
+            <select name="cod" class="pil__facet-select" aria-label="Filter by COD"
+                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                    hx-include="#workforce_forms_pricing_form_filter">
+              <option value="">All COD</option>
+              <option value="1" {% if cod_filter == '1' %}selected{% endif %}>Needs COD</option>
+              <option value="0" {% if cod_filter == '0' %}selected{% endif %}>No COD</option>
             </select>
           </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label small fw-semibold">Fulfillment</label>
-            <select name="fulfillment" class="form-select form-select-sm">
-              <option value="">All</option>
-              <option value="1" {% if fulfillment_filter == '1' %}selected{% endif %}>Required</option>
+
+          <div class="pil__facet {% if fulfillment_filter %}is-active{% endif %}">
+            <select name="fulfillment" class="pil__facet-select" aria-label="Filter by fulfillment"
+                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                    hx-include="#workforce_forms_pricing_form_filter">
+              <option value="">All fulfillment</option>
+              <option value="1" {% if fulfillment_filter == '1' %}selected{% endif %}>Needs fulfillment</option>
             </select>
           </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label small fw-semibold">Pipeline Status</label>
-            <select name="status" class="form-select form-select-sm">
-              <option value="">All</option>
+
+          <div class="pil__facet {% if status_filter %}is-active{% endif %}">
+            <select name="status" class="pil__facet-select" aria-label="Filter by pipeline stage"
+                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                    hx-include="#workforce_forms_pricing_form_filter">
+              <option value="">All stages</option>
               <option value="new" {% if status_filter == 'new' %}selected{% endif %}>New</option>
               <option value="contacted" {% if status_filter == 'contacted' %}selected{% endif %}>Contacted</option>
               <option value="quoted" {% if status_filter == 'quoted' %}selected{% endif %}>Quoted</option>
               <option value="negotiating" {% if status_filter == 'negotiating' %}selected{% endif %}>Negotiating</option>
               <option value="converted" {% if status_filter == 'converted' %}selected{% endif %}>Converted</option>
               <option value="lost" {% if status_filter == 'lost' %}selected{% endif %}>Lost</option>
-              <option value="on_hold" {% if status_filter == 'on_hold' %}selected{% endif %}>On Hold</option>
+              <option value="on_hold" {% if status_filter == 'on_hold' %}selected{% endif %}>On hold</option>
             </select>
           </div>
-          <div class="col-12 col-md-4 d-flex gap-2">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="fa-solid fa-search me-1"></i>Filter
-            </button>
-            <a href="{% url 'workforce:pricing_inquiries_list' %}"
-               class="btn btn-outline-secondary btn-sm">Clear</a>
-          </div>
         </div>
+
+        <button type="submit" class="pil__btn pil__btn--primary">Search</button>
+
+        {% if search or cod_filter or fulfillment_filter or status_filter %}
+        <a href="{% url 'workforce:pricing_inquiries_list' %}" class="pil__clear-all"
+           hx-get="{% url 'workforce:pricing_inquiries_list' %}"
+           hx-target="#main-content" hx-select="#main-content"
+           hx-swap="outerHTML" hx-push-url="true">Reset</a>
+        {% endif %}
       </form>
     </div>
-  </div>
 
-  <!-- RESULTS COUNT -->
-  <div class="d-flex align-items-center justify-content-between mb-2">
-    <div class="text-muted small">
+    <!-- RESULT META -->
+    <div class="pil__resultbar">
       Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} inquiries
+      <span class="text-muted">· click a row to expand its requirements</span>
     </div>
-  </div>
 
-  <!-- TABLE -->
-  <div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0 w-100" style="table-layout:auto" id="workforce_forms_pricing_table_list">
-        <thead class="table-light">
+    <!-- TABLE -->
+    <div class="pil__scroll">
+      <table class="pil__table" id="workforce_forms_pricing_table_list">
+        <thead>
           <tr>
-            <th class="small text-nowrap" style="width:1%">#</th>
-            <th class="small">Business</th>
-            <th class="small" style="width:12%">Contact</th>
-            <th class="small" style="width:18%">Category</th>
-            <th class="small text-center text-nowrap" style="width:1%">Orders/Mo</th>
-            <th class="small text-center text-nowrap" style="width:1%">COD</th>
-            <th class="small text-center text-nowrap" style="width:1%">Fulfillment</th>
-            <th class="small text-nowrap" style="width:1%">Pipeline</th>
-            <th class="small text-nowrap" style="width:1%">Date</th>
-            <th style="width:1%"></th>
+            <th style="width:2.5rem"></th>
+            <th style="width:3rem">#</th>
+            <th>Business</th>
+            <th>Contact</th>
+            <th>Category</th>
+            <th class="pil__col-center">Orders/Mo</th>
+            <th class="pil__col-center">Needs</th>
+            <th>Pipeline</th>
+            <th>Received</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for inq in page_obj %}
-          <tr style="cursor:pointer;"
-              hx-get="{% url 'workforce:pricing_inquiry_detail' inq.pk %}"
-              hx-target="#main-content"
-              hx-select="#main-content"
-              hx-swap="outerHTML"
-              hx-push-url="true">
-            <td class="small text-muted">{{ inq.pk }}</td>
+          <tr class="pil__row" data-pil-row>
+            <td class="pil__col-center">
+              <span class="pil__toggle" aria-label="Expand inquiry">
+                <i class="fa-solid fa-chevron-right"></i>
+              </span>
+            </td>
+            <td class="pil__id">{{ inq.pk }}</td>
             <td>
-              <div class="fw-semibold small">{{ inq.business_name }}</div>
-              <div class="text-muted" style="font-size:0.75rem;">{{ inq.full_name }}</div>
+              <div class="pil__biz-name">{{ inq.business_name }}</div>
+              <div class="pil__biz-person">{{ inq.full_name }}</div>
               {% if inq.website_url %}
-              <a href="{{ inq.website_url }}" target="_blank" class="text-primary" style="font-size:0.75rem;">
-                <i class="fa-solid fa-link me-1"></i>Website
+              <a href="{{ inq.website_url }}" target="_blank" rel="noopener" class="pil__biz-link"
+                 onclick="event.stopPropagation()">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Website
               </a>
               {% endif %}
             </td>
             <td>
-              <div class="small">{{ inq.business_contact_number }}</div>
+              <div class="pil__contact">{{ inq.business_contact_number }}</div>
               {% if inq.operation_team_contact_number %}
-              <div class="text-muted" style="font-size:0.75rem;">{{ inq.operation_team_contact_number }}</div>
+              <div class="pil__contact-alt">{{ inq.operation_team_contact_number }}</div>
               {% endif %}
             </td>
-            <td class="small">{{ inq.product_category }}</td>
-            <td class="small text-center">{{ inq.avarage_number_of_order_done_last_month|default:"—" }}</td>
-            <td class="text-center">
-              {% if inq.is_required_COD_service %}
-              <span class="badge badge-success">Yes</span>
-              {% else %}
-              <span class="badge bg-light text-muted">No</span>
-              {% endif %}
+            <td class="pil__category">{{ inq.product_category }}</td>
+            <td class="pil__col-center pil__num">{{ inq.avarage_number_of_order_done_last_month|default:"—" }}</td>
+            <td>
+              <div class="pil__needs">
+                {% if inq.is_required_COD_service %}<span class="pil__tag">COD</span>{% endif %}
+                {% if inq.is_required_fulfillment_service_for_operate_from_outside_qatar or inq.is_required_fulfillment_service_for_make_hub_in_doha %}<span class="pil__tag">FUL</span>{% endif %}
+                {% if inq.is_frequent_same_day_pick_and_delivery_required %}<span class="pil__tag">SDD</span>{% endif %}
+                {% if not inq.is_required_COD_service and not inq.is_required_fulfillment_service_for_operate_from_outside_qatar and not inq.is_required_fulfillment_service_for_make_hub_in_doha and not inq.is_frequent_same_day_pick_and_delivery_required %}<span class="pil__tag pil__tag--none">—</span>{% endif %}
+              </div>
             </td>
-            <td class="text-center">
-              {% if inq.is_required_fulfillment_service_for_operate_from_outside_qatar or inq.is_required_fulfillment_service_for_make_hub_in_doha %}
-              <span class="badge badge-warning">Yes</span>
-              {% else %}
-              <span class="badge bg-light text-muted">No</span>
-              {% endif %}
+            <td>
+              <span class="pil__pill pil__pill--{{ inq.crm_status }}">{{ inq.get_crm_status_display }}</span>
             </td>
-            <td class="text-center">
-              <span class="pid__crm-pill pid__crm-pill--{{ inq.crm_status }}" style="font-size:0.7rem;padding:2px 8px;">
-                {{ inq.get_crm_status_display }}
-              </span>
-            </td>
-            <td class="small text-muted text-nowrap">{{ inq.date_created|date:"d M Y" }}</td>
-            <td class="text-nowrap" onclick="event.stopPropagation()">
+            <td class="pil__date">{{ inq.date_created|date:"d M Y" }}</td>
+            <td onclick="event.stopPropagation()">
               <a href="{% url 'workforce:pricing_inquiry_detail' inq.pk %}"
-                 class="btn btn-sm btn-outline-primary py-0 px-2"
+                 class="pil__view"
                  hx-get="{% url 'workforce:pricing_inquiry_detail' inq.pk %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
                  hx-push-url="true">
-                <i class="fa-solid fa-eye me-1"></i>View
+                <i class="fa-solid fa-arrow-right"></i> Open
               </a>
+            </td>
+          </tr>
+
+          <!-- EXPANDED DRAWER -->
+          <tr class="pil__drawer-row">
+            <td colspan="10">
+              <div class="pil__drawer">
+
+                <!-- Service requirements -->
+                <div class="pil__panel">
+                  <div class="pil__panel-title">Service Requirements</div>
+                  <div class="pil__chips">
+                    {% if inq.is_required_COD_service %}<span class="pil__chip">Cash on delivery</span>{% endif %}
+                    {% if inq.is_required_fulfillment_service_for_operate_from_outside_qatar %}<span class="pil__chip">Fulfillment (from abroad)</span>{% endif %}
+                    {% if inq.is_required_fulfillment_service_for_make_hub_in_doha %}<span class="pil__chip">Hub in Doha</span>{% endif %}
+                    {% if inq.is_frequent_same_day_pick_and_delivery_required %}<span class="pil__chip">Same-day delivery</span>{% endif %}
+                    {% if inq.is_return_logistics_required %}<span class="pil__chip">Returns logistics</span>{% endif %}
+                    {% if inq.is_special_handling_required %}<span class="pil__chip">Special handling</span>{% endif %}
+                    {% if inq.is_personalized_product %}<span class="pil__chip">Personalized products</span>{% endif %}
+                    {% if not inq.is_required_COD_service and not inq.is_required_fulfillment_service_for_operate_from_outside_qatar and not inq.is_required_fulfillment_service_for_make_hub_in_doha and not inq.is_frequent_same_day_pick_and_delivery_required and not inq.is_return_logistics_required and not inq.is_special_handling_required and not inq.is_personalized_product %}
+                    <span class="pil__chip pil__chip--empty">No special services requested</span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Order volume -->
+                <div class="pil__panel">
+                  <div class="pil__panel-title">Order Volume</div>
+                  <div class="pil__flow">
+                    <div class="pil__flow-step">
+                      <span class="pil__flow-num">{{ inq.avarage_number_of_order_last_week|default:"—" }}</span>
+                      <span class="pil__flow-cap">Last<br>week</span>
+                    </div>
+                    <span class="pil__flow-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                    <div class="pil__flow-step">
+                      <span class="pil__flow-num">{{ inq.avarage_number_of_order_done_last_month|default:"—" }}</span>
+                      <span class="pil__flow-cap">Last<br>month</span>
+                    </div>
+                    <span class="pil__flow-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                    <div class="pil__flow-step">
+                      <span class="pil__flow-num">{{ inq.avarage_number_of_order_expect_next_month|default:"—" }}</span>
+                      <span class="pil__flow-cap">Next<br>month</span>
+                    </div>
+                    <span class="pil__flow-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                    <div class="pil__flow-step">
+                      <span class="pil__flow-num">{{ inq.orders_expected_in_next_3_months_milestone|default:"—" }}</span>
+                      <span class="pil__flow-cap">3-mo<br>goal</span>
+                    </div>
+                  </div>
+                  <div class="pil__dl" style="margin-top:0.9rem">
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Avg order value</span>
+                      <span class="pil__dt-value {% if not inq.average_order_value_qar %}pil__dt-value--muted{% endif %}">{{ inq.average_order_value_qar|default:"—" }}{% if inq.average_order_value_qar %} QAR{% endif %}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Current courier</span>
+                      <span class="pil__dt-value {% if not inq.current_courier_provider %}pil__dt-value--muted{% endif %}">{{ inq.current_courier_provider|default:"—" }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Delivery & pickup -->
+                <div class="pil__panel">
+                  <div class="pil__panel-title">Delivery &amp; Pickup</div>
+                  <div class="pil__dl">
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Coverage</span>
+                      <span class="pil__dt-value {% if not inq.delivery_coverage %}pil__dt-value--muted{% endif %}">{{ inq.delivery_coverage|default:"—" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Speed offered</span>
+                      <span class="pil__dt-value {% if not inq.speed_delivery_offer_to_customers %}pil__dt-value--muted{% endif %}">{{ inq.speed_delivery_offer_to_customers|default:"—" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Package size</span>
+                      <span class="pil__dt-value {% if not inq.typical_package_size %}pil__dt-value--muted{% endif %}">{{ inq.typical_package_size|default:"—" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Pickup type</span>
+                      <span class="pil__dt-value {% if not inq.type_of_pickup_location %}pil__dt-value--muted{% endif %}">{{ inq.type_of_pickup_location|default:"—" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Pickup area</span>
+                      <span class="pil__dt-value {% if not inq.pickup_Location_area_name %}pil__dt-value--muted{% endif %}">{{ inq.pickup_Location_area_name|default:"—" }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Business profile -->
+                <div class="pil__panel">
+                  <div class="pil__panel-title">Business Profile</div>
+                  <div class="pil__chips" style="margin-bottom:0.9rem">
+                    {% if inq.is_registered_company_in_qatar %}<span class="pil__chip">Registered in Qatar</span>{% endif %}
+                    {% if inq.is_located_in_qatar %}<span class="pil__chip">Located in Qatar</span>{% endif %}
+                    {% if inq.is_team_available_in_qatar %}<span class="pil__chip">Team in Qatar</span>{% endif %}
+                  </div>
+                  <div class="pil__dl">
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Operating age</span>
+                      <span class="pil__dt-value {% if not inq.business_operating_age %}pil__dt-value--muted{% endif %}">{{ inq.business_operating_age|default:"—" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Country</span>
+                      <span class="pil__dt-value {% if not inq.business_location_country %}pil__dt-value--muted{% endif %}">{{ inq.business_location_country|default:"Qatar" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Order system</span>
+                      <span class="pil__dt-value {% if not inq.order_management_system %}pil__dt-value--muted{% endif %}">{{ inq.order_management_system|default:"—" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Preferred channel</span>
+                      <span class="pil__dt-value {% if not inq.preferred_communication_channel %}pil__dt-value--muted{% endif %}">{{ inq.preferred_communication_channel|default:"—" }}</span>
+                    </div>
+                    <div class="pil__dt">
+                      <span class="pil__dt-label">Wants to start</span>
+                      <span class="pil__dt-value {% if not inq.preferred_start_date %}pil__dt-value--muted{% endif %}">{{ inq.preferred_start_date|default:"—" }}</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="10" class="text-center text-muted py-4">
-              <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
-              No pricing inquiries found.
+            <td colspan="10">
+              <div class="pil__empty">
+                <i class="fa-solid fa-inbox"></i>
+                No pricing inquiries match your filters yet.
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -217,32 +326,22 @@
 
     <!-- PAGINATION -->
     {% if page_obj.has_other_pages %}
-    <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
-      <div class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+    <div class="pil__foot">
+      <div class="pil__foot-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
       <nav>
-        <ul class="pagination pagination-sm mb-0">
+        <ul class="pil__pager">
           {% if page_obj.has_previous %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">
-              <i class="fa-solid fa-chevron-left"></i>
-            </a>
-          </li>
+          <li><a href="?page={{ page_obj.previous_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}"><i class="fa-solid fa-chevron-left"></i></a></li>
           {% endif %}
           {% for num in page_obj.paginator.page_range %}
             {% if page_obj.number == num %}
-            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            <li class="is-active"><span>{{ num }}</span></li>
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-            <li class="page-item">
-              <a class="page-link" href="?page={{ num }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">{{ num }}</a>
-            </li>
+            <li><a href="?page={{ num }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">{{ num }}</a></li>
             {% endif %}
           {% endfor %}
           {% if page_obj.has_next %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">
-              <i class="fa-solid fa-chevron-right"></i>
-            </a>
-          </li>
+          <li><a href="?page={{ page_obj.next_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}"><i class="fa-solid fa-chevron-right"></i></a></li>
           {% endif %}
         </ul>
       </nav>
@@ -250,6 +349,39 @@
     {% endif %}
 
   </div>
-
 </div>
+
+<script>
+  (function () {
+    // Delegated row expand — bound once, survives HTMX swaps of #main-content.
+    if (window.__pilInit) return;
+    window.__pilInit = true;
+    document.addEventListener('click', function (e) {
+      // clear-search button: empty the field and refetch
+      var clr = e.target.closest('[data-pil-clear]');
+      if (clr) {
+        var input = document.getElementById(clr.getAttribute('data-pil-clear'));
+        if (input) {
+          input.value = '';
+          clr.setAttribute('hidden', '');
+          input.dispatchEvent(new Event('search'));
+          input.focus();
+        }
+        return;
+      }
+      var row = e.target.closest('[data-pil-row]');
+      if (!row) return;
+      // ignore clicks on links / buttons inside the row
+      if (e.target.closest('a, button, .pil__view')) return;
+      row.classList.toggle('is-open');
+    });
+    // reveal the clear button as soon as the user types
+    document.addEventListener('input', function (e) {
+      if (e.target && e.target.id === 'pil-search') {
+        var btn = e.target.parentElement.querySelector('[data-pil-clear]');
+        if (btn) { e.target.value ? btn.removeAttribute('hidden') : btn.setAttribute('hidden', ''); }
+      }
+    });
+  })();
+</script>
 {% endblock %}

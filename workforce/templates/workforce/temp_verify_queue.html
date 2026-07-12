@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static custom_filters %}
 
 {% block extra_css %}
@@ -137,8 +138,8 @@
             <label class="vfq__filter-label">Business</label>
             <select name="business" class="vfq__filter-select">
                 <option value="">All businesses</option>
-                {% for b in all_businesses %}
-                <option value="{{ b.business_id }}" {% if filters.business == b.business_id|stringformat:"s" %}selected{% endif %}>{{ b.business_name }}</option>
+                {% for b in all_businesses|code_last %}
+                <option value="{{ b.business_id }}" {% if filters.business == b.business_id|stringformat:"s" %}selected{% endif %}>{% if b.business_code %}{{ b.business_code }}{% else %}*{{ b.business_id }}{% endif %} - {{ b.business_name }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -304,21 +305,7 @@
         </div>
     </div>
 
-    {% if jobs.has_other_pages %}
-    <div class="vfq__pager">
-        {% if jobs.has_previous %}
-        <a class="vfq__pager-link" href="?page={{ jobs.previous_page_number }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">
-            <i class="fa-solid fa-chevron-left"></i> Prev
-        </a>
-        {% endif %}
-        <span class="vfq__pager-current">{{ jobs.number }} / {{ jobs.paginator.num_pages }}</span>
-        {% if jobs.has_next %}
-        <a class="vfq__pager-link" href="?page={{ jobs.next_page_number }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">
-            Next <i class="fa-solid fa-chevron-right"></i>
-        </a>
-        {% endif %}
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=jobs filter_params=filter_params per_page=per_page pagination_id="vfq" %}
 
     {% else %}
     <div class="vfq__empty">

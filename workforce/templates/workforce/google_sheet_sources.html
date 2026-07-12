@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Google Sheet Import Sources{% endblock title %}
@@ -118,8 +119,8 @@
                     <label class="form-label fw-semibold">Business</label>
                     <select id="addBusiness" class="form-select form-select-sm">
                         <option value="">Select Business…</option>
-                        {% for biz in businesses %}
-                        <option value="{{ biz.business_id }}">{{ biz.business_name }}{% if biz.business_code %} ({{ biz.business_code }}){% endif %}</option>
+                        {% for biz in businesses|code_last %}
+                        <option value="{{ biz.business_id }}">{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
                         {% endfor %}
                     </select>
                 </div>

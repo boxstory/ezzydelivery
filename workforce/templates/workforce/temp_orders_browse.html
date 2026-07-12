@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block extra_css %}
@@ -46,10 +47,8 @@
                     <label class="form-label small text-muted mb-1">Business</label>
                     <select name="business" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">— Select a business —</option>
-                        {% for biz in all_businesses %}
-                        <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>
-                            {{ biz.business_name }}
-                        </option>
+                        {% for biz in all_businesses|code_last %}
+                        <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -73,7 +72,16 @@
                         <option value="public_link" {% if filters.source_type == "public_link" %}selected{% endif %}>Public Link ({{ source_counts.public_link|default:0 }})</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3">
+                <div class="col-6 col-md-2">
+                    <label class="form-label small text-muted mb-1">Sort</label>
+                    <select name="sort" class="form-select form-select-sm">
+                        <option value="" {% if not filters.sort %}selected{% endif %}>Newest first</option>
+                        <option value="id_asc" {% if filters.sort == "id_asc" %}selected{% endif %}>Oldest first</option>
+                        <option value="row_asc" {% if filters.sort == "row_asc" %}selected{% endif %}>Row ↑ (low→high)</option>
+                        <option value="row_desc" {% if filters.sort == "row_desc" %}selected{% endif %}>Row ↓ (high→low)</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
                     <label class="form-label small text-muted mb-1">Search</label>
                     <input type="text" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Order code, name, phone…">
                 </div>
@@ -132,8 +140,8 @@
                             <td><span class="text-muted small">#{{ to.id }}</span></td>
                             <td><span class="badge bg-light text-dark border">{{ to.source_label }}</span></td>
                             <td class="small text-muted">
-                                {% if to.sheet_name %}{{ to.sheet_name|truncatechars:18 }}{% endif %}
-                                {% if to.row_num %} · row {{ to.row_num }}{% endif %}
+                                {% if to.sheet_name %}<div>{{ to.sheet_name|truncatechars:18 }}</div>{% endif %}
+                                {% if to.row_num %}<div class="fw-semibold text-dark">row {{ to.row_num }}</div>{% endif %}
                                 {% if to.platform_id %}<div>id {{ to.platform_id|truncatechars:14 }}</div>{% endif %}
                             </td>
                             <td class="small">{{ to.client_order_code|default:"—" }}</td>
@@ -172,6 +180,10 @@
             <button type="button" class="btn btn-info btn-sm text-white" onclick="resyncSelected()" id="resyncBtn"
                     title="Re-fetch selected rows from their upstream source (Shopify/Woo/OneDrive/Google Sheet/Public Link), refresh raw_row, and re-apply the current column mapping.">
                 <i class="fa-solid fa-rotate me-1"></i>Resync
+            </button>
+            <button type="button" class="btn btn-success btn-sm" onclick="markSelectedImported()" id="markImportedBtn"
+                    title="Mark selected rows as imported without creating real orders. Use when these orders were already handled elsewhere.">
+                <i class="fa-solid fa-check me-1"></i>Mark Imported
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSelection()">
                 <i class="fa-solid fa-times me-1"></i>Clear
@@ -301,6 +313,38 @@ async function resyncSelected() {
         alert(msg);
     } catch(e) {
         alert('Resync error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+    }
+}
+
+async function markSelectedImported() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (!checked.length) { alert('Select rows first'); return; }
+    const ids = [...checked].map(c => parseInt(c.dataset.tempId));
+    if (!confirm(`Mark ${ids.length} row(s) as imported? This does NOT create real orders — it just removes them from the New queue. Use only if these orders were already handled.`)) return;
+
+    const btn = document.getElementById('markImportedBtn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Marking...';
+
+    try {
+        const resp = await fetch('{% url "workforce:temp_orders_mark_imported" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ ids })
+        });
+        const result = await resp.json();
+        if (!result.success) {
+            alert('Failed: ' + (result.error || 'unknown error'));
+            return;
+        }
+        alert(result.message || 'Done');
+        window.location.reload();
+    } catch(e) {
+        alert('Error: ' + e.message);
     } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
@@ -535,8 +579,27 @@ async function openAutoImport() {
             }, 5000);
         }
 
+        // Keep the report open when there is anything to review — warnings, errors,
+        // failed rows, needs-review rows, or refetch errors — so it is not auto-closed
+        // by the page reload before the user can read the notes.
+        const hasIssues = (result.needs_review || 0) > 0
+            || (result.failed || 0) > 0
+            || (result.rows || []).some(r => (r.warnings && r.warnings.length) || r.error)
+            || (result.refetch && result.refetch.errors && result.refetch.errors.length);
+
         const anyCreated = (result.fully_automated || 0) + (result.needs_review || 0);
-        if (anyCreated > 0) {
+        if (hasIssues) {
+            const note = document.createElement('div');
+            note.className = 'alert alert-warning py-2 px-3 mt-2 mb-0 small';
+            note.innerHTML = '<i class="fa-solid fa-circle-info me-1"></i>Auto-refresh paused — review the warnings/errors above, then close this report'
+                + (anyCreated > 0 ? ' to refresh the list.' : '.');
+            document.getElementById('autoImportModalBody').prepend(note);
+            // Refresh the list when the user closes the held report (only if orders were created).
+            if (anyCreated > 0) {
+                document.getElementById('autoImportModal')
+                    .addEventListener('hidden.bs.modal', () => window.location.reload(), { once: true });
+            }
+        } else if (anyCreated > 0) {
             setTimeout(() => window.location.reload(), 12000);
         }
     } catch(e) {

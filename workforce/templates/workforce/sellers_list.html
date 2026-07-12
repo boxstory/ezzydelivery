@@ -89,27 +89,13 @@
                 <label for="statusFilter" class="sll__filter-label">
                     <i class="fa-solid fa-filter"></i> Business Status
                 </label>
-                <select id="statusFilter" name="status" class="sll__filter-input">
-                    <option value="">All Status</option>
-                    <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending (New)</option>
-                    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option>
-                    <option value="suspended" {% if status == 'suspended' %}selected{% endif %}>Suspended</option>
-                </select>
+                {% include "workforce/parts/components/_multiselect_filter.html" with field_name="status" label="Business Status" icon="filter" choices=status_choices selected=selected_statuses all_text="All Status" %}
             </div>
             <div class="sll__filter-group">
                 <label for="verificationFilter" class="sll__filter-label">
                     <i class="fa-solid fa-user-check"></i> Verification
                 </label>
-                <select id="verificationFilter" name="verification" class="sll__filter-input">
-                    <option value="">All</option>
-                    <option value="not_applied" {% if verification == 'not_applied' %}selected{% endif %}>Not Applied</option>
-                    <option value="pending" {% if verification == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="under_review" {% if verification == 'under_review' %}selected{% endif %}>Under Review</option>
-                    <option value="incomplete" {% if verification == 'incomplete' %}selected{% endif %}>Incomplete</option>
-                    <option value="verified" {% if verification == 'verified' %}selected{% endif %}>Verified</option>
-                    <option value="rejected" {% if verification == 'rejected' %}selected{% endif %}>Rejected</option>
-                </select>
+                {% include "workforce/parts/components/_multiselect_filter.html" with field_name="verification" label="Verification" icon="user-check" choices=verification_choices selected=selected_verifications all_text="All" %}
             </div>
             <div class="sll__filter-actions">
                 <button type="submit" class="sll__btn sll__btn--primary">

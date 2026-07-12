@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Bulk Import Orders - Staff Dashboard{% endblock title %}
@@ -67,10 +68,8 @@
                             </label>
                             <select id="businessSelect" name="business" class="form-input" required>
                                 <option value="">-- Select a Seller --</option>
-                                {% for business in businesses %}
-                                    <option value="{{ business.business_id }}">
-                                        {{ business.business_name }} ({{ business.business_code }})
-                                    </option>
+                                {% for business in businesses|code_last %}
+                                    <option value="{{ business.business_id }}">{% if business.business_code %}{{ business.business_code }}{% else %}*{{ business.business_id }}{% endif %} - {{ business.business_name }}</option>
                                 {% endfor %}
                             </select>
                         </div>

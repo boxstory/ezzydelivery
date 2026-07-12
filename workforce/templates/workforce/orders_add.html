@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Add Order - Staff Dashboard{% endblock title %}
@@ -39,10 +40,8 @@
                             </label>
                             <select id="businessSelect" name="business" class="woa__form-input" onchange="this.form.submit()">
                                 <option value="">-- Select a Seller --</option>
-                                {% for business in businesses %}
-                                    <option value="{{ business.business_id }}" {% if selected_business_id == business.business_id|stringformat:"s" %}selected{% endif %}>
-                                        {{ business.business_name }} ({{ business.business_code }})
-                                    </option>
+                                {% for business in businesses|code_last %}
+                                    <option value="{{ business.business_id }}" {% if selected_business_id == business.business_id|stringformat:"s" %}selected{% endif %}>{% if business.business_code %}{{ business.business_code }}{% else %}*{{ business.business_id }}{% endif %} - {{ business.business_name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -117,6 +116,27 @@
                         <h6 class="woa__form-section-title">
                             <i class="fa-solid fa-location-dot me-2 woa__icon-accent"></i>Delivery Address
                         </h6>
+                        <!-- Signature: Qatar national address code — live mirror of Zone/Street/Building -->
+                        <div class="qnas-plate" role="group" aria-label="Qatar national address code">
+                            <div class="qnas-plate__cell">
+                                <span class="qnas-plate__tag">Zone</span>
+                                <span class="qnas-plate__num qnas-plate__num--empty" id="woaPlateZone">—</span>
+                            </div>
+                            <span class="qnas-plate__div">/</span>
+                            <div class="qnas-plate__cell">
+                                <span class="qnas-plate__tag">Street</span>
+                                <span class="qnas-plate__num qnas-plate__num--empty" id="woaPlateStreet">—</span>
+                            </div>
+                            <span class="qnas-plate__div">/</span>
+                            <div class="qnas-plate__cell">
+                                <span class="qnas-plate__tag">Building</span>
+                                <span class="qnas-plate__num qnas-plate__num--empty" id="woaPlateBldg">—</span>
+                            </div>
+                            <div class="qnas-plate__name qnas-plate__name--empty" id="woaPlateZoneWrap">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <span id="woaPlateZoneName">Zone name not resolved</span>
+                            </div>
+                        </div>
                         <div class="row mb-3">
                             <div class="col-12 mb-3">
                                 <label class="woa__form-label" for="customer_address">Full Address <span class="text-danger">*</span></label>
@@ -148,6 +168,22 @@
                                         onclick="qnasValidateAndFill({zoneId:'dl_zone', streetId:'dl_street', buildingId:'dl_building', latId:'wf_latitude', lngId:'wf_longitude', zoneNameId:'wf_zone_name_display', resultId:'wfAddOrderQnasResult', btnId:'wfAddOrderQnasBtn', mapId:'wfAddOrderMapLink', accuracyId:'wf_coords_accuracy', accuracyBadgeId:'wfAddOrderAccuracyBadge'})">
                                     <i class="fa-solid fa-satellite-dish me-1"></i>Validate
                                 </button>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label class="woa__form-label" for="wfAddOrderLocPaste">
+                                    Paste / Drop Shared Location
+                                </label>
+                                <div id="wfAddOrderLocDrop" class="oap__loc-drop"
+                                     ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                                     ondrop="locDropHandle(event, {latId:'wf_latitude', lngId:'wf_longitude', mapId:'wfAddOrderMapLink', accuracyId:'wf_coords_accuracy', accuracyBadgeId:'wfAddOrderAccuracyBadge', resultId:'wfAddOrderLocResult', inputId:'wfAddOrderLocPaste'})">
+                                    <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                                    <input type="text" id="wfAddOrderLocPaste" class="form-control form-control-sm oap__loc-drop__input"
+                                           placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here"
+                                           oninput="whatsappLocationFill(this.value, {latId:'wf_latitude', lngId:'wf_longitude', mapId:'wfAddOrderMapLink', accuracyId:'wf_coords_accuracy', accuracyBadgeId:'wfAddOrderAccuracyBadge', resultId:'wfAddOrderLocResult'})">
+                                </div>
+                                <div id="wfAddOrderLocResult" class="mt-1"></div>
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -612,6 +648,44 @@ function _initInlineProducts() {
     } else {
         setTimeout(_waitForSelect2, 50);
     }
+})();
+</script>
+
+<script>
+// ---- Qatar Address Plate: live mirror of Zone / Street / Building ----
+(function() {
+    function setCell(id, value) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var v = (value || '').toString().trim();
+        el.textContent = v || '—';
+        el.classList.toggle('qnas-plate__num--empty', !v);
+    }
+    function setZoneName(name) {
+        var wrap = document.getElementById('woaPlateZoneWrap');
+        var el = document.getElementById('woaPlateZoneName');
+        if (!el || !wrap) return;
+        var n = (name || '').trim();
+        el.textContent = n || 'Zone name not resolved';
+        wrap.classList.toggle('qnas-plate__name--empty', !n);
+    }
+    function sync() {
+        setCell('woaPlateZone', (document.getElementById('dl_zone') || {}).value);
+        setCell('woaPlateStreet', (document.getElementById('dl_street') || {}).value);
+        setCell('woaPlateBldg', (document.getElementById('dl_building') || {}).value);
+    }
+    ['dl_zone', 'dl_street', 'dl_building'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', sync);
+    });
+    // AI parse / QNAS validate set fields programmatically (no input event) —
+    // reconcile the plate + zone name from the live field values every second.
+    setInterval(function() {
+        sync();
+        var zn = document.getElementById('wf_zone_name_display');
+        if (zn) setZoneName(zn.value);
+    }, 1000);
+    sync();
 })();
 </script>
 {% endblock extra_js %}

@@ -22,41 +22,58 @@
     </div>
 </div>
 
-<!-- Search -->
-<form method="get" class="d-flex gap-2 mb-3">
+<!-- Search + Sort -->
+<form method="get" class="d-flex gap-2 mb-3 flex-wrap">
     {% if current_filter and current_filter != 'all' %}
     <input type="hidden" name="status" value="{{ current_filter }}">
     {% endif %}
+    <input type="hidden" name="sort" value="{{ sort }}">
     <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search business name, email, phone...">
     <button type="submit" class="btn btn-outline-secondary"><i class="fa-solid fa-magnifying-glass"></i></button>
     {% if search %}
-    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}{% endif %}" class="btn btn-outline-danger"><i class="fa-solid fa-xmark"></i></a>
+    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}sort={{ sort }}" class="btn btn-outline-danger"><i class="fa-solid fa-xmark"></i></a>
     {% endif %}
 </form>
+<!-- Sort Pills -->
+<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+    <span class="text-muted small"><i class="fa-solid fa-arrow-up-wide-short"></i> Sort:</span>
+    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}{% if search %}search={{ search }}&{% endif %}sort=applied"
+       class="btn btn-sm {% if sort == 'applied' or not sort %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Applied Date
+    </a>
+    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}{% if search %}search={{ search }}&{% endif %}sort=joined_newest"
+       class="btn btn-sm {% if sort == 'joined_newest' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        <i class="fa-solid fa-arrow-down-1-9"></i> Joined: Newest
+    </a>
+    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}{% if search %}search={{ search }}&{% endif %}sort=joined_oldest"
+       class="btn btn-sm {% if sort == 'joined_oldest' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        <i class="fa-solid fa-arrow-up-1-9"></i> Joined: Oldest
+    </a>
+</div>
 
 <!-- Filter Pills -->
 <div class="uvl__filters">
-    <a href="?{% if search %}search={{ search }}&{% endif %}status=all" class="uvl__pill {% if current_filter == 'all' %}uvl__pill--active{% endif %}">
+    <a href="?{% if search %}search={{ search }}&{% endif %}{% if sort %}sort={{ sort }}&{% endif %}status=all" class="uvl__pill {% if current_filter == 'all' %}uvl__pill--active{% endif %}">
         <i class="fa-solid fa-layer-group"></i> All
         <span class="uvl__pill__count">{{ total_count }}</span>
     </a>
-    <a href="?{% if search %}search={{ search }}&{% endif %}status=pending" class="uvl__pill {% if current_filter == 'pending' %}uvl__pill--active{% endif %}">
+    <a href="?{% if search %}search={{ search }}&{% endif %}{% if sort %}sort={{ sort }}&{% endif %}status=pending" class="uvl__pill {% if current_filter == 'pending' %}uvl__pill--active{% endif %}">
         <i class="fa-solid fa-clock"></i> Pending
         <span class="uvl__pill__count">{{ status_counts.pending|default:"0" }}</span>
     </a>
-    <a href="?{% if search %}search={{ search }}&{% endif %}status=under_review" class="uvl__pill {% if current_filter == 'under_review' %}uvl__pill--active{% endif %}">
+    <a href="?{% if search %}search={{ search }}&{% endif %}{% if sort %}sort={{ sort }}&{% endif %}status=under_review" class="uvl__pill {% if current_filter == 'under_review' %}uvl__pill--active{% endif %}">
         <i class="fa-solid fa-eye"></i> Under Review
         <span class="uvl__pill__count">{{ status_counts.under_review|default:"0" }}</span>
     </a>
-    <a href="?{% if search %}search={{ search }}&{% endif %}status=verified" class="uvl__pill {% if current_filter == 'verified' %}uvl__pill--active{% endif %}">
+    <a href="?{% if search %}search={{ search }}&{% endif %}{% if sort %}sort={{ sort }}&{% endif %}status=verified" class="uvl__pill {% if current_filter == 'verified' %}uvl__pill--active{% endif %}">
         <i class="fa-solid fa-circle-check"></i> Verified
         <span class="uvl__pill__count">{{ status_counts.verified|default:"0" }}</span>
     </a>
-    <a href="?{% if search %}search={{ search }}&{% endif %}status=rejected" class="uvl__pill {% if current_filter == 'rejected' %}uvl__pill--active{% endif %}">
+    <a href="?{% if search %}search={{ search }}&{% endif %}{% if sort %}sort={{ sort }}&{% endif %}status=rejected" class="uvl__pill {% if current_filter == 'rejected' %}uvl__pill--active{% endif %}">
         <i class="fa-solid fa-circle-xmark"></i> Rejected
         <span class="uvl__pill__count">{{ status_counts.rejected|default:"0" }}</span>
     </a>
-    <a href="?{% if search %}search={{ search }}&{% endif %}status=incomplete" class="uvl__pill {% if current_filter == 'incomplete' %}uvl__pill--active{% endif %}">
+    <a href="?{% if search %}search={{ search }}&{% endif %}{% if sort %}sort={{ sort }}&{% endif %}status=incomplete" class="uvl__pill {% if current_filter == 'incomplete' %}uvl__pill--active{% endif %}">
         <i class="fa-solid fa-triangle-exclamation"></i> Incomplete
         <span class="uvl__pill__count">{{ status_counts.incomplete|default:"0" }}</span>
     </a>
@@ -312,23 +329,7 @@
     {% endfor %}
 
     <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="d-flex justify-content-center gap-2 mt-3 mb-2">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if current_filter and current_filter != 'all' %}&status={{ current_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}" class="uvl__btn uvl__btn--review">
-            <i class="fa-solid fa-chevron-left"></i> Prev
-        </a>
-        {% endif %}
-        <span class="uvl__btn uvl__btn--detail" style="cursor:default;">
-            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-        </span>
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if current_filter and current_filter != 'all' %}&status={{ current_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}" class="uvl__btn uvl__btn--review">
-            Next <i class="fa-solid fa-chevron-right"></i>
-        </a>
-        {% endif %}
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="bvl" %}
 
 {% else %}
     <div class="uvl__empty">

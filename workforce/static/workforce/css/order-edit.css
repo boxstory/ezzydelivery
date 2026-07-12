@@ -1,0 +1,108 @@
+/* Purpose: woe-only tweaks for the Order Edit console (order_edit.html).
+   Used by: workforce/templates/workforce/order_edit.html (loaded via {% block extra_css %}).
+   Notes: Base chrome (hero, cards, headers, fields, inputs, buttons, QNAS plate)
+          lives in the shared "Batch-2 redesign" block in workforce.css. This file
+          only carries what is unique to the edit page, at the same tight scale. */
+
+.woe {
+    --woe-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    background: #f5f6f8;
+    min-height: 100%;
+}
+
+/* Hero action buttons: quiet outline chips (shared block leaves these alone) */
+.woe .woe__btn--outline-light {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+}
+.woe .woe__btn--outline-light:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #f7c000;
+    color: #fff;
+}
+
+/* The Delivery Address sheet is the hero: yellow spine + faint accent header */
+.woe .woe__card--focus { border-left: 3px solid #f7c000; }
+.woe .woe__card--focus .woe__card-header {
+    border-bottom-color: #f0e2ab;
+    background: linear-gradient(180deg, #fffdf4 0%, #fff 100%);
+}
+
+/* Dashed read-only fields */
+.woe .woe__form-input[readonly],
+.woe .woe__form-input.bg-light {
+    background: #fafafa !important;
+    color: #555;
+    border-style: dashed;
+}
+
+/* Package box — replaces the old inline-styled amber block */
+.woe__pkg-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.55rem 0.7rem;
+    background: #fffdf4;
+    border: 1px solid #f0e2ab;
+    border-left: 3px solid #f7c000;
+    border-radius: 0.4rem;
+}
+.woe__pkg-row { display: flex; align-items: center; gap: 0.55rem; }
+.woe__pkg-row > i { color: #8a6d00; width: 1rem; text-align: center; }
+.woe__pkg-tag {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6b7280;
+    min-width: 3.2rem;
+}
+.woe__pkg-box .form-control { font-family: var(--woe-mono); font-size: 0.8rem; }
+.woe__pkg-box input[name="package_description"] { font-family: var(--brand-font-primary); }
+.woe__pkg-box #woe_pkg_qty { max-width: 100px; }
+.woe__pkg-box .input-group { max-width: 180px; }
+
+/* Payment total row — mono figure */
+.woe .woe__total-row {
+    margin-top: 0.65rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed #eef1f5;
+}
+.woe .woe__total-label {
+    font-size: 0.63rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6b7280;
+}
+.woe .woe__total-value {
+    font-family: var(--woe-mono);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #001f3f;
+}
+
+/* Product items — mono figures */
+.woe .woe__item-row { padding: 0.45rem 0.7rem; }
+.woe .woe__item-row-num,
+.woe .woe__item-qty,
+.woe .woe__item-price { font-family: var(--woe-mono); }
+.woe .woe__item-line-total { font-family: var(--woe-mono); font-weight: 700; color: #001f3f; }
+.woe #woe_grand_total { font-family: var(--woe-mono); color: #001f3f; }
+.woe #woe_items_badge {
+    font-family: var(--woe-mono);
+    background: #eef1f5 !important;
+    color: #001f3f !important;
+    font-weight: 600;
+}
+
+/* Sticky save card on desktop */
+.woe .woe__card--sticky { position: sticky; top: 0.75rem; }
+.woe .woe__btn--primary:hover { background: #002a52; color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+    .woe .woe__form-input, .woe .woe__btn { transition: none; }
+}

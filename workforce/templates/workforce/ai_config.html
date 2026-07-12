@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/ai-config.css' %}?v=5" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/ai-config.css' %}?v=6" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -98,6 +98,17 @@
   </div>
   {% endif %}
 
+  <!-- AI Usages Reference -->
+  <div class="card mb-3 border-0 bg-light">
+    <div class="card-body py-2 px-3">
+      <p class="mb-2 fw-semibold small"><i class="fa-solid fa-circle-info me-1 text-primary"></i>AI Usages — what each provider controls</p>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge bg-white border text-dark fw-normal py-1 px-2"><i class="fa-solid fa-robot me-1 text-primary"></i><strong>Chat AI:</strong> Dashboard chat · Extract order text · Address zone lookup</span>
+        <span class="badge bg-white border text-dark fw-normal py-1 px-2"><i class="fa-brands fa-whatsapp me-1 text-success"></i><strong>WhatsApp AI:</strong> Auto-reply to inbound messages via n8n</span>
+      </div>
+    </div>
+  </div>
+
   <form method="post">
     {% csrf_token %}
     <div class="row g-3">
@@ -109,8 +120,8 @@
         <div class="card mb-3">
           <div class="card-header d-flex align-items-center gap-2">
             <i class="fa-solid fa-robot text-primary"></i>
-            <strong>Business Dashboard AI</strong>
-            <span class="badge bg-light text-dark border ms-auto">Chat Assistant</span>
+            <strong>Chat AI Provider</strong>
+            <span class="badge bg-light text-dark border ms-auto">Dashboard · Order Extract · Address Lookup</span>
           </div>
           <div class="card-body">
             <p class="aic__section-title">Provider</p>
@@ -160,11 +171,41 @@
                 </span>
                 <span class="aic__provider-check"></span>
               </label>
+              <label class="aic__provider-row {% if chat_provider == 'zhipu' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_CHAT_PROVIDER" value="zhipu" {% if chat_provider == 'zhipu' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--zhipu">ZP</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Zhipu AI</span>
+                  <span class="aic__provider-sub d-block">GLM-4.7 Flash (Free tier)</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
             </div>
             <label class="form-label small fw-semibold" for="AI_CHAT_MODEL">Model</label>
             <select class="form-select form-select-sm" id="AI_CHAT_MODEL" name="AI_CHAT_MODEL"
                     data-current="{{ env.AI_CHAT_MODEL|default:'' }}">
             </select>
+            <hr class="my-3">
+            <p class="aic__section-title">Fallback provider <span class="text-muted fw-normal">(auto-switch on rate limit / timeout)</span></p>
+            <div class="d-flex gap-2 align-items-end">
+              <div class="flex-grow-1">
+                <label class="form-label small fw-semibold mb-1" for="AI_CHAT_FALLBACK_PROVIDER">Provider</label>
+                <select class="form-select form-select-sm" id="AI_CHAT_FALLBACK_PROVIDER" name="AI_CHAT_FALLBACK_PROVIDER">
+                  <option value="">— None —</option>
+                  <option value="anthropic" {% if chat_fallback_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
+                  <option value="openai"    {% if chat_fallback_provider == 'openai'    %}selected{% endif %}>OpenAI</option>
+                  <option value="gemini"    {% if chat_fallback_provider == 'gemini'    %}selected{% endif %}>Google Gemini</option>
+                  <option value="groq"      {% if chat_fallback_provider == 'groq'      %}selected{% endif %}>Groq</option>
+                  <option value="xai"       {% if chat_fallback_provider == 'xai'       %}selected{% endif %}>xAI</option>
+                  <option value="zhipu"     {% if chat_fallback_provider == 'zhipu'     %}selected{% endif %}>Zhipu AI</option>
+                </select>
+              </div>
+              <div class="flex-grow-1">
+                <label class="form-label small fw-semibold mb-1" for="AI_CHAT_FALLBACK_MODEL">Model <span class="text-muted fw-normal">(optional)</span></label>
+                <input type="text" class="form-control form-control-sm font-monospace" id="AI_CHAT_FALLBACK_MODEL" name="AI_CHAT_FALLBACK_MODEL"
+                       value="{{ env.AI_CHAT_FALLBACK_MODEL|default:'' }}" placeholder="leave blank for default">
+              </div>
+            </div>
           </div>
         </div>
 
@@ -223,11 +264,41 @@
                 </span>
                 <span class="aic__provider-check"></span>
               </label>
+              <label class="aic__provider-row {% if wa_provider == 'zhipu' %}aic__provider-row--active{% endif %}">
+                <input type="radio" name="AI_WA_PROVIDER" value="zhipu" {% if wa_provider == 'zhipu' %}checked{% endif %} hidden>
+                <span class="aic__provider-dot aic__provider-dot--zhipu">ZP</span>
+                <span class="aic__provider-info">
+                  <span class="aic__provider-name">Zhipu AI</span>
+                  <span class="aic__provider-sub d-block">GLM-4.7 Flash (Free tier)</span>
+                </span>
+                <span class="aic__provider-check"></span>
+              </label>
             </div>
             <label class="form-label small fw-semibold" for="AI_WA_MODEL">Model</label>
             <select class="form-select form-select-sm" id="AI_WA_MODEL" name="AI_WA_MODEL"
                     data-current="{{ env.AI_WA_MODEL|default:'' }}">
             </select>
+            <hr class="my-3">
+            <p class="aic__section-title">Fallback provider <span class="text-muted fw-normal">(auto-switch on rate limit / timeout)</span></p>
+            <div class="d-flex gap-2 align-items-end">
+              <div class="flex-grow-1">
+                <label class="form-label small fw-semibold mb-1" for="AI_WA_FALLBACK_PROVIDER">Provider</label>
+                <select class="form-select form-select-sm" id="AI_WA_FALLBACK_PROVIDER" name="AI_WA_FALLBACK_PROVIDER">
+                  <option value="">— None —</option>
+                  <option value="anthropic" {% if wa_fallback_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
+                  <option value="openai"    {% if wa_fallback_provider == 'openai'    %}selected{% endif %}>OpenAI</option>
+                  <option value="gemini"    {% if wa_fallback_provider == 'gemini'    %}selected{% endif %}>Google Gemini</option>
+                  <option value="groq"      {% if wa_fallback_provider == 'groq'      %}selected{% endif %}>Groq</option>
+                  <option value="xai"       {% if wa_fallback_provider == 'xai'       %}selected{% endif %}>xAI</option>
+                  <option value="zhipu"     {% if wa_fallback_provider == 'zhipu'     %}selected{% endif %}>Zhipu AI</option>
+                </select>
+              </div>
+              <div class="flex-grow-1">
+                <label class="form-label small fw-semibold mb-1" for="AI_WA_FALLBACK_MODEL">Model <span class="text-muted fw-normal">(optional)</span></label>
+                <input type="text" class="form-control form-control-sm font-monospace" id="AI_WA_FALLBACK_MODEL" name="AI_WA_FALLBACK_MODEL"
+                       value="{{ env.AI_WA_FALLBACK_MODEL|default:'' }}" placeholder="leave blank for default">
+              </div>
+            </div>
           </div>
         </div>
 
@@ -352,6 +423,22 @@
               <div class="form-text">console.x.ai → API Keys</div>
             </div>
 
+            <div data-key-provider="zhipu">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="aic__provider-pill aic__provider-pill--zhipu">Zhipu</span>
+                {% if masked_glm_key %}
+                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
+                  <span class="aic__key-mask">{{ masked_glm_key }}</span>
+                {% else %}
+                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
+                  <span class="text-muted small">Not set</span>
+                {% endif %}
+              </div>
+              <input type="password" class="form-control form-control-sm font-monospace" name="GLM_API_KEY"
+                     autocomplete="off" placeholder="xxxxxxxx.xxxxxxxxxxxxxxxx">
+              <div class="form-text">bigmodel.cn → API Keys (format: id.secret)</div>
+            </div>
+
           </div>
         </div>
 
@@ -401,6 +488,11 @@
                 <label class="form-label small fw-semibold" for="AI_AGENT_RATE_LIMIT_BUSINESS">Per business</label>
                 <input type="number" class="form-control form-control-sm" id="AI_AGENT_RATE_LIMIT_BUSINESS" name="AI_AGENT_RATE_LIMIT_BUSINESS"
                        value="{{ env.AI_AGENT_RATE_LIMIT_BUSINESS|default:'200' }}" min="1" max="10000">
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold" for="AI_AGENT_RATE_LIMIT_GLOBAL">Global (all users)</label>
+                <input type="number" class="form-control form-control-sm" id="AI_AGENT_RATE_LIMIT_GLOBAL" name="AI_AGENT_RATE_LIMIT_GLOBAL"
+                       value="{{ env.AI_AGENT_RATE_LIMIT_GLOBAL|default:'1000' }}" min="1" max="100000">
               </div>
             </div>
           </div>

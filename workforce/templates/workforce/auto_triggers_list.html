@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'orders/css/orders.css' %}?v=20260630c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -18,10 +18,10 @@
 
     <!-- WhatsApp Notifications Section -->
     <div class="card mb-4">
-        <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-brands fa-whatsapp text-success fs-5"></i>
+        <div class="card-header d-flex align-items-center gap-2 wa-notif__header">
+            <i class="fa-brands fa-whatsapp wa-notif__icon fs-5"></i>
             <strong>WhatsApp Notifications</strong>
-            <span class="badge bg-success ms-auto">via Evolution API</span>
+            <span class="badge wa-notif__channel-badge ms-auto">via Evolution API</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -29,13 +29,14 @@
                     <thead class="table-light">
                         <tr>
                             <th style="width:4%">#</th>
-                            <th style="width:10%">Code</th>
-                            <th style="width:12%">Trigger</th>
-                            <th style="width:22%">Description</th>
-                            <th style="width:22%">Action</th>
-                            <th style="width:8%">Status</th>
-                            <th style="width:10%" class="text-center">Enabled</th>
-                            <th style="width:12%" class="text-center">Edit</th>
+                            <th style="width:9%">Code</th>
+                            <th style="width:11%">Trigger</th>
+                            <th style="width:18%">Description</th>
+                            <th style="width:17%">Action</th>
+                            <th style="width:14%">From WhatsApp</th>
+                            <th style="width:7%">Status</th>
+                            <th style="width:9%" class="text-center">Enabled</th>
+                            <th style="width:10%" class="text-center">Edit</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -46,6 +47,36 @@
                             <td><strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong></td>
                             <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
                             <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
+                            <td>
+                                <div id="fromcell-{{ t.trigger_key }}" data-instance-id="{{ t.whatsapp_instance_id|default:'' }}" data-channel="{{ t.whatsapp_channel }}">
+                                    {% if t.whatsapp_instance %}
+                                        <span class="badge wa-notif__from-badge" title="Override · {{ t.whatsapp_instance.label }} · {{ t.whatsapp_instance.instance_name }}">
+                                            <i class="fa-brands fa-whatsapp me-1"></i>{{ t.whatsapp_instance.phone_number|default:t.whatsapp_instance.instance_name }}
+                                        </span>
+                                    {% elif wa_sender.number %}
+                                        <span class="badge wa-notif__from-badge wa-notif__from-badge--default" title="Default sender · {{ wa_sender.label }}{% if wa_sender.instance %} · {{ wa_sender.instance }}{% endif %}">
+                                            <i class="fa-brands fa-whatsapp me-1"></i>{{ wa_sender.number }}
+                                        </span>
+                                    {% elif wa_sender.instance %}
+                                        <span class="badge bg-secondary-subtle text-secondary border" title="No phone number set on this instance">
+                                            <i class="fa-brands fa-whatsapp me-1"></i>{{ wa_sender.instance }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted small">Not configured</span>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-1" id="viacell-{{ t.trigger_key }}">
+                                    {% if t.channel_active %}
+                                        <span class="badge wa-notif__via-badge" title="Delivery channel for this trigger">
+                                            <i class="fa-solid fa-paper-plane me-1"></i>via {{ t.channel_name }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border" title="This channel is not active / not configured">
+                                            <i class="fa-solid fa-paper-plane me-1"></i>via {{ t.channel_name }} (off)
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
                             <td>
                                 <span class="badge {% if t.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="badge-{{ t.trigger_key }}">
                                     {% if t.is_enabled %}Active{% else %}Disabled{% endif %}
@@ -60,13 +91,13 @@
                                 </div>
                             </td>
                             <td class="text-center">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}')" title="Edit trigger">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}', '{{ t.category }}')" title="Edit trigger">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="8" class="text-center text-muted py-3">No WhatsApp triggers configured</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted py-3">No WhatsApp triggers configured</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -118,7 +149,7 @@
                                 </div>
                             </td>
                             <td class="text-center">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}')" title="Edit trigger">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}', '{{ t.category }}')" title="Edit trigger">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                             </td>
@@ -176,7 +207,7 @@
                                 </div>
                             </td>
                             <td class="text-center">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}')" title="Edit trigger">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}', '{{ t.category }}')" title="Edit trigger">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                             </td>
@@ -202,6 +233,30 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editTriggerKey">
+                <!-- WhatsApp sender selector (shown only for WhatsApp triggers) -->
+                <div class="mb-3 d-none" id="editWaSenderBlock">
+                    <label class="form-label fw-bold" for="editWaInstance"><i class="fa-brands fa-whatsapp wa-notif__icon me-1"></i>Send from WhatsApp number</label>
+                    <select class="form-select" id="editWaInstance">
+                        <option value="">Default ({{ wa_sender.number|default:wa_sender.instance|default:"not set" }})</option>
+                        {% for inst in wa_instances %}
+                        <option value="{{ inst.id }}">{{ inst.phone_number|default:inst.instance_name }}{% if inst.label %} — {{ inst.label }}{% endif %}{% if inst.is_default %} (default){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Pick which number this trigger sends from, or leave as Default.
+                        <a href="{% url 'workforce:whatsapp_instances_list' %}">Manage WhatsApp numbers</a>
+                    </div>
+                </div>
+                <!-- WhatsApp channel selector (separate from the number) -->
+                <div class="mb-3 d-none" id="editWaChannelBlock">
+                    <label class="form-label fw-bold" for="editWaChannel"><i class="fa-solid fa-paper-plane wa-notif__icon me-1"></i>Send via channel</label>
+                    <select class="form-select" id="editWaChannel">
+                        {% for val, lbl in wa_channel_choices %}
+                        <option value="{{ val }}">{{ lbl }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Force this trigger through Evolution API or WAHA, or leave Default to follow the server config.</div>
+                </div>
                 <div class="mb-3">
                     <label for="editTriggerLabel" class="form-label fw-bold">Label</label>
                     <input type="text" class="form-control" id="editTriggerLabel">
@@ -268,11 +323,73 @@ function toggleTrigger(key, checkbox) {
     });
 }
 
-function openEditModal(key) {
+var WA_SENDER_DEFAULT = {
+    number: "{{ wa_sender.number|escapejs }}",
+    instance: "{{ wa_sender.instance|escapejs }}",
+    label: "{{ wa_sender.label|escapejs }}"
+};
+
+// Channel display state for the "via X" line (active = configured/usable)
+var WA_CHANNEL_STATE = {
+    evolution: {name: 'Evolution API', active: {{ wa_channel_state.evolution|yesno:'true,false' }}},
+    waha:      {name: 'WAHA',          active: {{ wa_channel_state.waha|yesno:'true,false' }}},
+    'default': {name: "{{ wa_channel_state.default_name|escapejs }}", active: {{ wa_channel_state.default_active|yesno:'true,false' }}}
+};
+
+// Rebuild a trigger's "via {channel}" line after save
+function updateViaCell(key, channel) {
+    var cell = document.getElementById('viacell-' + key);
+    if (!cell) return;
+    var st = WA_CHANNEL_STATE[channel] || WA_CHANNEL_STATE['default'];
+    var html;
+    if (st.active) {
+        html = '<span class="badge wa-notif__via-badge" title="Delivery channel for this trigger"><i class="fa-solid fa-paper-plane me-1"></i>via ' + st.name + '</span>';
+    } else {
+        html = '<span class="badge bg-secondary-subtle text-secondary border" title="This channel is not active / not configured"><i class="fa-solid fa-paper-plane me-1"></i>via ' + st.name + ' (off)</span>';
+    }
+    cell.innerHTML = html;
+}
+
+// Rebuild a trigger's "From WhatsApp" cell after save
+function updateFromCell(key, data) {
+    var cell = document.getElementById('fromcell-' + key);
+    if (!cell) return;
+    var instId = data.whatsapp_instance_id || '';
+    cell.dataset.instanceId = instId;
+    var html;
+    if (instId) {
+        var t = 'Override · ' + (data.whatsapp_label || '') + ' · ' + (data.whatsapp_instance_name || '');
+        html = '<span class="badge wa-notif__from-badge" title="' + t + '"><i class="fa-brands fa-whatsapp me-1"></i>' + (data.whatsapp_number || '') + '</span>';
+    } else if (WA_SENDER_DEFAULT.number) {
+        html = '<span class="badge wa-notif__from-badge wa-notif__from-badge--default" title="Default sender · ' + WA_SENDER_DEFAULT.label + '"><i class="fa-brands fa-whatsapp me-1"></i>' + WA_SENDER_DEFAULT.number + '</span>';
+    } else if (WA_SENDER_DEFAULT.instance) {
+        html = '<span class="badge bg-secondary-subtle text-secondary border"><i class="fa-brands fa-whatsapp me-1"></i>' + WA_SENDER_DEFAULT.instance + '</span>';
+    } else {
+        html = '<span class="text-muted small">Not configured</span>';
+    }
+    cell.innerHTML = html;
+}
+
+function openEditModal(key, category) {
     document.getElementById('editTriggerKey').value = key;
     document.getElementById('editTriggerLabel').value = (document.getElementById('label-' + key) || {}).textContent?.trim() || '';
     document.getElementById('editTriggerDesc').value = (document.getElementById('desc-' + key) || {}).textContent?.trim() || '';
     document.getElementById('editTriggerAction').value = (document.getElementById('action-' + key) || {}).textContent?.trim() || '';
+
+    // WhatsApp sender + channel selectors — only for WhatsApp triggers
+    var waBlock = document.getElementById('editWaSenderBlock');
+    var chBlock = document.getElementById('editWaChannelBlock');
+    if (category === 'whatsapp') {
+        var cell = document.getElementById('fromcell-' + key);
+        document.getElementById('editWaInstance').value = (cell && cell.dataset.instanceId) ? cell.dataset.instanceId : '';
+        document.getElementById('editWaChannel').value = (cell && cell.dataset.channel) ? cell.dataset.channel : '';
+        waBlock.classList.remove('d-none');
+        chBlock.classList.remove('d-none');
+    } else {
+        waBlock.classList.add('d-none');
+        chBlock.classList.add('d-none');
+    }
+
     new bootstrap.Modal(document.getElementById('editTriggerModal')).show();
 }
 
@@ -285,10 +402,18 @@ function saveTrigger() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...';
 
+    const payload = {trigger_key: key, label: label, description: desc, action: action};
+    // Only send the WhatsApp sender + channel when visible (WhatsApp triggers)
+    const waBlock = document.getElementById('editWaSenderBlock');
+    if (waBlock && !waBlock.classList.contains('d-none')) {
+        payload.whatsapp_instance_id = document.getElementById('editWaInstance').value;
+        payload.whatsapp_channel = document.getElementById('editWaChannel').value;
+    }
+
     fetch("{% url 'workforce:auto_trigger_update' %}", {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-        body: JSON.stringify({trigger_key: key, label: label, description: desc, action: action})
+        body: JSON.stringify(payload)
     })
     .then(r => r.json())
     .then(data => {
@@ -301,6 +426,12 @@ function saveTrigger() {
             if (labelEl) labelEl.textContent = data.label;
             if (descEl) descEl.textContent = data.description;
             if (actionEl) actionEl.textContent = data.action;
+            updateFromCell(key, data);
+            if ('whatsapp_channel' in data) {
+                var cell = document.getElementById('fromcell-' + key);
+                if (cell) cell.dataset.channel = data.whatsapp_channel || '';
+                updateViaCell(key, data.whatsapp_channel || 'default');
+            }
             bootstrap.Modal.getInstance(document.getElementById('editTriggerModal')).hide();
             if (typeof showToast === 'function') showToast('Trigger updated', 'success');
         } else {

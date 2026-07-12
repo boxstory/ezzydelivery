@@ -102,21 +102,7 @@
                 <label for="statusFilter" class="drl__filter-label">
                     <i class="fa-solid fa-filter"></i> Driver Status
                 </label>
-                <select id="statusFilter" name="status" class="drl__filter-input"
-                        hx-get="{% url 'workforce:drivers_list' %}"
-                        hx-target="#main-content"
-                        hx-select="#main-content"
-                        hx-swap="outerHTML"
-                        hx-push-url="true"
-                        hx-trigger="change">
-                    <option value="">All Status</option>
-                    <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
-                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="processing" {% if status_filter == 'processing' %}selected{% endif %}>Processing</option>
-                    <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
-                    <option value="blocked" {% if status_filter == 'blocked' %}selected{% endif %}>Blocked</option>
-                    <option value="suspended" {% if status_filter == 'suspended' %}selected{% endif %}>Suspended</option>
-                </select>
+                {% include "workforce/parts/components/_multiselect_filter.html" with field_name="status" label="Driver Status" icon="filter" choices=status_choices selected=selected_statuses all_text="All Status" %}
             </div>
             <div class="drl__filter-actions">
                 <button type="button" class="drl__btn drl__btn--primary"
@@ -125,7 +111,7 @@
                         hx-select="#main-content"
                         hx-swap="outerHTML"
                         hx-push-url="true"
-                        hx-include="#searchInput,#statusFilter">
+                        hx-include="closest form">
                     <i class="fa-solid fa-search"></i> Filter
                 </button>
                 <a href="{% url 'workforce:export_drivers_csv' %}?{{ request.GET.urlencode }}"
@@ -146,6 +132,7 @@
                     <th>Driver</th>
                     <th>Contact</th>
                     <th>Status</th>
+                    <th>Availability</th>
                     <th>Vehicle</th>
                     <th>Rating</th>
                     <th>Actions</th>
@@ -180,6 +167,16 @@
                     <td>
                         <span class="drl__badge {% if driver.driver_status == 'approved' %}drl__badge--success{% elif driver.driver_status == 'pending' or driver.driver_status == 'processing' %}drl__badge--warning{% else %}drl__badge--danger{% endif %}">
                             {{ driver.driver_status }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
+                            {% if driver.driver_availability == 'available' %}<i class="fa-solid fa-circle-check"></i> Available
+                            {% elif driver.driver_availability == 'on_delivery' %}<i class="fa-solid fa-truck"></i> On Delivery
+                            {% elif driver.driver_availability == 'on_break' %}<i class="fa-solid fa-mug-hot"></i> On Break
+                            {% elif driver.driver_availability == 'returning' %}<i class="fa-solid fa-rotate-left"></i> Returning
+                            {% else %}<i class="fa-solid fa-circle-xmark"></i> Offline
+                            {% endif %}
                         </span>
                     </td>
                     <td>

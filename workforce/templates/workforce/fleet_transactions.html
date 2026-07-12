@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Fleet Transactions - Ezzy Delivery{% endblock title %}
@@ -125,8 +126,8 @@
                         <label class="ftr__filter-label"><i class="fa-solid fa-building me-1"></i>Business</label>
                         <select name="business" class="ftr__filter-select">
                             <option value="">All Businesses</option>
-                            {% for biz in driver_businesses %}
-                            <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
+                            {% for biz in driver_businesses|code_last %}
+                            <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -485,6 +486,56 @@
                                         onclick="openCodCorrectModal({{ t.id }}, '{{ t.dl_task_number|escapejs }}', {{ t.cod_collected|yesno:'true,false' }}, '{{ t.cod_collected_amount|default:'0' }}', '{{ t.payment_method|default:'' }}')">
                                     <i class="fa-solid fa-pen-to-square"></i> Edit COD
                                 </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if view_type == 'cod' and zero_cod_tasks %}
+    <div class="ftr__card mt-3">
+        <div class="ftr__card-header">
+            <i class="fa-solid fa-box-open ftr__card-icon"></i>
+            <span class="ftr__card-title">PREPAID / ZERO-COD DELIVERIES</span>
+            <span class="ftr__toolbar-count ms-2">{{ zero_cod_tasks|length }} task{{ zero_cod_tasks|length|pluralize }}</span>
+        </div>
+        <div class="ftr__card-body">
+            <p class="text-muted small mb-2">
+                <i class="fa-solid fa-circle-info me-1"></i>
+                Delivered orders with no COD to collect (prepaid). They carry no cash so they do not affect COD totals.
+            </p>
+            <div class="ftr__table-wrap">
+                <table class="ftr__table">
+                    <thead>
+                        <tr>
+                            <th>Task #</th>
+                            <th>Order</th>
+                            <th>Business</th>
+                            <th>Status</th>
+                            <th>COD</th>
+                            <th>Completed</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in zero_cod_tasks %}
+                        <tr>
+                            <td><code class="ftr__code">{{ t.dl_task_number }}</code></td>
+                            <td>{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}-{% endif %}</td>
+                            <td>{% if t.business %}{{ t.business.business_name }}{% elif t.order.business %}{{ t.order.business.business_name }}{% else %}-{% endif %}</td>
+                            <td>
+                                <span class="ftr__txn-type">{{ t.get_dl_task_status_display|default:t.dl_task_status }}</span>
+                            </td>
+                            <td><span class="text-muted">No COD (Prepaid)</span></td>
+                            <td>{% if t.completed_at %}{{ t.completed_at|date:"d M Y, h:i A" }}{% else %}-{% endif %}</td>
+                            <td>
+                                <a href="{% url 'workforce:delivery_task_detail' t.id %}" class="ftr__ref-link">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> View
+                                </a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -1122,7 +1173,7 @@ function approveCodSubmission(txnId, txnCode) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
+            'X-CSRFToken': '{{ csrf_token }}'
         },
         body: JSON.stringify({
             action: 'approve_cod',
@@ -1153,7 +1204,7 @@ function rejectCodSubmission(txnId, txnCode) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
+            'X-CSRFToken': '{{ csrf_token }}'
         },
         body: JSON.stringify({
             action: 'reject_cod',
@@ -1180,7 +1231,7 @@ function recalculateBalances() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Recalculating...';
     fetch('{% url "workforce:recalculate_cod_balances" %}', {
         method: 'POST',
-        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+        headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
         body: JSON.stringify({ driver_id: '{{ selected_driver.driver_id }}' })
     })
     .then(r => r.json())
@@ -1258,7 +1309,7 @@ function submitCodCorrection() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
+            'X-CSRFToken': '{{ csrf_token }}',
         },
         body: JSON.stringify({
             cod_collected: collected,

@@ -1,0 +1,142 @@
+/* Purpose: Redesign of the STAFF/WORKFORCE desktop sidebar only.
+   Used by: templates/wf_dashboard_base.html (loaded after sidebar-common.css).
+   Notes: Scoped to #workforce_sidebar_main so business/fleet/warehouse sidebars
+          (which share sidebar-common.css + .dashboard-sidebar) are untouched.
+          Links and their order live in the templates and are NOT changed here —
+          this file only restyles. Brings the sidebar into the same cool-paper
+          navy-ink + single-yellow-accent + monospace-figures "ops console" system
+          as the redesigned order/delivery pages. */
+
+/* ---- Retint the scoped palette: warm cream -> cool ledger paper ---- */
+#workforce_sidebar_main.dashboard-sidebar {
+    --sb-paper: #fbfcfd;         /* cool near-white surface */
+    --sb-line: #e7ebf0;          /* cool hairline */
+    --sb-ink: #001f3f;           /* navy ink */
+    --sb-yellow: #f7c000;
+    --sb-yellow-soft: rgba(247, 192, 0, 0.13);
+    --sb-text: #5b6472;          /* cool resting label */
+    --sb-text-strong: #1f2937;
+    --sb-muted: #96a1b2;         /* section labels + resting icons */
+    --sb-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+
+    background: var(--sb-paper);
+    border-right: 1px solid var(--sb-line);
+}
+
+/* ---- Header: solid navy console plate with a yellow base rule ---- */
+#workforce_sidebar_main .sidebar-header .nav-link.dashboard-title {
+    background: var(--sb-ink);
+    border-bottom: 2px solid var(--sb-yellow);
+    border-radius: 0.45rem;
+    padding: 0.55rem 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 31, 63, 0.18);
+}
+#workforce_sidebar_main .sidebar-header .nav-link.dashboard-title:hover {
+    background: #002a54;
+}
+#workforce_sidebar_main .sidebar-header .nav-link.dashboard-title span:first-child {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    opacity: 0.6;
+}
+#workforce_sidebar_main .sidebar-header .nav-link.dashboard-title span:last-child {
+    font-size: 0.82rem;
+    letter-spacing: 0.01em;
+}
+
+/* ---- Section labels: tracked, cool-muted, yellow tick (kept) ---- */
+#workforce_sidebar_main .dsb-section {
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    color: var(--sb-muted);
+    padding: 0.7rem 0.6rem 0.28rem 1.1rem;
+}
+
+/* ---- Nav items: tighter, calmer ---- */
+#workforce_sidebar_main .nav-link {
+    padding: 0.4rem 0.6rem 0.4rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+#workforce_sidebar_main .nav-link:hover {
+    background: rgba(0, 31, 63, 0.045);
+    color: var(--sb-text-strong);
+    border-left-color: var(--sb-line);
+}
+/* Remove the busy hover route-node — keep only the active signal (restraint) */
+#workforce_sidebar_main .nav-link:hover::before {
+    display: none;
+}
+
+/* ---- Active state: yellow bar + soft tint + navy label + illuminated node ---- */
+#workforce_sidebar_main .nav-link.active,
+#workforce_sidebar_main .nav-item.active > .nav-link,
+#workforce_sidebar_main .nav-item.active > div.nav-link {
+    background: linear-gradient(90deg, var(--sb-yellow-soft) 0%, rgba(247, 192, 0, 0.02) 100%);
+    border-left-color: var(--sb-yellow);
+    color: var(--sb-ink);
+    font-weight: 650;
+}
+#workforce_sidebar_main .nav-link.active::before,
+#workforce_sidebar_main .nav-item.active > .nav-link::before,
+#workforce_sidebar_main .nav-item.active > div.nav-link::before {
+    box-shadow: 0 0 0 2px var(--sb-paper), 0 0 6px rgba(247, 192, 0, 0.6);
+}
+
+/* ---- Icons ---- */
+#workforce_sidebar_main .nav-link i {
+    font-size: 0.8rem;
+    width: 1.1rem;
+}
+
+/* ---- Submenus: cool guide line, tighter leaf rows ---- */
+#workforce_sidebar_main .multi-level,
+#workforce_sidebar_main .submenu {
+    border-left: 1px solid var(--sb-line);
+    margin-left: 0.55rem;
+}
+#workforce_sidebar_main .multi-level .nav-link,
+#workforce_sidebar_main .submenu .nav-link {
+    padding: 0.28rem 0.5rem;
+    font-size: 0.735rem;
+}
+
+/* ---- Count badges: monospace ledger chips (ties to logistics-data type) ---- */
+#workforce_sidebar_main .wf-sidebar__badge {
+    font-family: var(--sb-mono);
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    background: #eef1f5;
+    color: var(--sb-ink);
+    border-radius: 0.3rem;
+    padding: 0.16rem 0.34rem;
+    min-width: 1.15rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+/* Active parent keeps its number legible on the yellow tint */
+#workforce_sidebar_main .nav-item.active > .nav-link .wf-sidebar__badge {
+    background: #fff;
+    color: var(--sb-ink);
+}
+/* Warning pill stays semantic red */
+#workforce_sidebar_main .wf-sidebar__badge--danger {
+    background: #fef2f2;
+    color: #dc2626;
+    font-family: inherit;
+}
+
+/* ---- Keyboard focus: visible yellow ring ---- */
+#workforce_sidebar_main .nav-link:focus-visible {
+    outline: 2px solid var(--sb-yellow);
+    outline-offset: -2px;
+    box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #workforce_sidebar_main .sidebar-header .nav-link.dashboard-title span:last-child::before {
+        animation: none;
+    }
+}

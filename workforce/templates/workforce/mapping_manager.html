@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Mapping Manager — Import Wizard{% endblock %}
@@ -39,11 +40,9 @@
         <form method="get" style="display:contents">
             <select name="business" class="mmap__selector-select" onchange="this.form.submit()">
                 <option value="">— select a business —</option>
-                {% for b in businesses %}
+                {% for b in businesses|code_last %}
                 <option value="{{ b.business_id }}"
-                    {% if selected_business and b.business_id == selected_business.business_id %}selected{% endif %}>
-                    {{ b.business_name }}
-                </option>
+                    {% if selected_business and b.business_id == selected_business.business_id %}selected{% endif %}>{% if b.business_code %}{{ b.business_code }}{% else %}*{{ b.business_id }}{% endif %} - {{ b.business_name }}</option>
                 {% endfor %}
             </select>
         </form>
@@ -891,8 +890,8 @@ function testLatestOrder() {
     const result  = document.getElementById('mmap_test_result');
 
     if (!activePlatform) { showToast('Select a platform first', 'error'); return; }
-    if (!['shopify','woocommerce','google_sheet'].includes(activePlatform)) {
-        showToast('Test is only available for Shopify, WooCommerce and Google Sheet', 'error');
+    if (!['shopify','woocommerce','google_sheet','onedrive'].includes(activePlatform)) {
+        showToast('Test is only available for Shopify, WooCommerce, Google Sheet and OneDrive', 'error');
         return;
     }
 
@@ -900,7 +899,10 @@ function testLatestOrder() {
     btn.innerHTML = '<span class="mmap__spin"></span> Fetching…';
     result.innerHTML = '<div class="mmap__test-loading"><span class="mmap__spin mmap__spin--lg"></span><span>Loading latest order…</span></div>';
 
-    const url = `${TEST_URL}?business_id=${encodeURIComponent(BIZ_ID)}&platform=${encodeURIComponent(activePlatform)}`;
+    let url = `${TEST_URL}?business_id=${encodeURIComponent(BIZ_ID)}&platform=${encodeURIComponent(activePlatform)}`;
+    if (activePlatform === 'onedrive' && selectedSources.onedrive) {
+        url += `&source_id=${encodeURIComponent(selectedSources.onedrive)}`;
+    }
     fetch(url)
         .then(r => r.json())
         .then(data => {
@@ -922,8 +924,8 @@ function testLatestOrder() {
 
 function showRawData() {
     if (!activePlatform) { showToast('Select a platform first', 'error'); return; }
-    if (!['shopify','woocommerce','google_sheet'].includes(activePlatform)) {
-        showToast('Raw data only available for Shopify, WooCommerce and Google Sheet', 'error');
+    if (!['shopify','woocommerce','google_sheet','onedrive'].includes(activePlatform)) {
+        showToast('Raw data only available for Shopify, WooCommerce, Google Sheet and OneDrive', 'error');
         return;
     }
 
@@ -950,7 +952,10 @@ function showRawData() {
     rawBtn.innerHTML = '<span class="mmap__spin"></span>';
     result.innerHTML = '<div class="mmap__test-loading"><span class="mmap__spin mmap__spin--lg"></span><span>Fetching raw data…</span></div>';
 
-    const url = `${TEST_URL}?business_id=${encodeURIComponent(BIZ_ID)}&platform=${encodeURIComponent(activePlatform)}`;
+    let url = `${TEST_URL}?business_id=${encodeURIComponent(BIZ_ID)}&platform=${encodeURIComponent(activePlatform)}`;
+    if (activePlatform === 'onedrive' && selectedSources.onedrive) {
+        url += `&source_id=${encodeURIComponent(selectedSources.onedrive)}`;
+    }
     fetch(url)
         .then(r => r.json())
         .then(data => {

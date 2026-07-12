@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block content %}
@@ -32,8 +33,8 @@
                         <label class="form-label mb-1">Business</label>
                         <select name="business_id" class="form-select form-select-sm" required>
                             <option value="">— select —</option>
-                            {% for b in businesses %}
-                            <option value="{{ b.business_id }}">{{ b.business_name }}</option>
+                            {% for b in businesses|code_last %}
+                            <option value="{{ b.business_id }}">{% if b.business_code %}{{ b.business_code }}{% else %}*{{ b.business_id }}{% endif %} - {{ b.business_name }}</option>
                             {% endfor %}
                         </select>
                     </div>

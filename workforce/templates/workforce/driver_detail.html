@@ -51,18 +51,47 @@
         </div>
     </div>
     <div class="wdd__hero__right">
-        <span id="wdd_status_badge" class="wdd__hero__status wdd__hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}rejected{% else %}pending{% endif %}">
-            <i class="fa-solid fa-circle"></i>
-            <span id="wdd_status_text">{{ driver.driver_status }}</span>
-        </span>
-        {% if driver.driver_status == 'approved' or driver.driver_status == 'suspended' %}
-        <button id="wdd_toggle_btn" class="btn btn-sm wdd__hero__toggle {% if driver.driver_status == 'approved' %}wdd__hero__toggle--deactivate{% else %}wdd__hero__toggle--activate{% endif %}"
-            data-url="{% url 'workforce:driver_toggle_status' driver.driver_id %}"
-            data-current="{{ driver.driver_status }}">
-            <i class="fa-solid {% if driver.driver_status == 'approved' %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
-            <span id="wdd_toggle_label">{% if driver.driver_status == 'approved' %}Deactivate{% else %}Activate{% endif %}</span>
-        </button>
-        {% endif %}
+
+        <!-- Account Status -->
+        <div class="wdd__status-row">
+            <span class="wdd__status-row__label">Account</span>
+            <div class="dropdown">
+                <span id="wdd_status_badge" role="button" data-bs-toggle="dropdown"
+                      class="wdd__hero__status wdd__hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'pending' or driver.driver_status == 'processing' %}pending{% else %}rejected{% endif %} wdd__hero__status--clickable">
+                    <i class="fa-solid fa-circle"></i>
+                    <span id="wdd_status_text">{% if driver.driver_status == 'approved' %}Active{% elif driver.driver_status == 'blocked' %}Deactivated{% else %}{{ driver.driver_status|title }}{% endif %}</span>
+                    <i class="fa-solid fa-chevron-down ms-1" style="font-size:0.6rem"></i>
+                </span>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Change Account Status</h6></li>
+                    <li><a class="dropdown-item wdd__status-opt" data-status="approved" data-label="Active" data-cls="approved" href="#"><i class="fa-solid fa-circle-check text-success me-2"></i>Active</a></li>
+                    <li><a class="dropdown-item wdd__status-opt" data-status="blocked" data-label="Deactivated" data-cls="rejected" href="#"><i class="fa-solid fa-circle-minus text-secondary me-2"></i>Deactivated</a></li>
+                    <li><a class="dropdown-item wdd__status-opt" data-status="suspended" data-label="Suspended" data-cls="rejected" href="#"><i class="fa-solid fa-circle-pause text-warning me-2"></i>Suspended</a></li>
+                    <li><a class="dropdown-item wdd__status-opt" data-status="rejected" data-label="Rejected" data-cls="rejected" href="#"><i class="fa-solid fa-circle-xmark text-danger me-2"></i>Rejected</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Working Status (online/offline) -->
+        <div class="wdd__status-row">
+            <span class="wdd__status-row__label">Working</span>
+            <span id="wdd_avail_badge" class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
+                {% if driver.driver_availability == 'available' %}<i class="fa-solid fa-circle-check"></i> Online
+                {% elif driver.driver_availability == 'on_delivery' %}<i class="fa-solid fa-truck"></i> On Delivery
+                {% elif driver.driver_availability == 'on_break' %}<i class="fa-solid fa-mug-hot"></i> On Break
+                {% elif driver.driver_availability == 'returning' %}<i class="fa-solid fa-rotate-left"></i> Returning
+                {% else %}<i class="fa-solid fa-circle-xmark"></i> Offline{% endif %}
+            </span>
+            {% if driver.driver_status == 'approved' %}
+            <button id="wdd_toggle_btn" class="btn btn-sm wdd__hero__toggle {% if driver.driver_availability == 'available' %}wdd__hero__toggle--deactivate{% else %}wdd__hero__toggle--activate{% endif %}"
+                data-url="{% url 'workforce:driver_toggle_status' driver.driver_id %}"
+                data-csrf="{{ csrf_token }}">
+                <i class="fa-solid {% if driver.driver_availability == 'available' %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
+                <span id="wdd_toggle_label">{% if driver.driver_availability == 'available' %}Go Offline{% else %}Go Online{% endif %}</span>
+            </button>
+            {% endif %}
+        </div>
+
         {% if driver.driver_rating > 0 %}
         <span class="wdd__hero__rating">
             <i class="fa-solid fa-star"></i> {{ driver.driver_rating }}/5
@@ -937,45 +966,64 @@
 
 {% block extra_js %}
 <script>
-// Driver active/suspend toggle
+// Working status toggle (online / offline)
 (function() {
     var btn = document.getElementById('wdd_toggle_btn');
     if (!btn) return;
     btn.addEventListener('click', function() {
         btn.disabled = true;
-        var csrfToken = document.cookie.match(/csrftoken=([^;]+)/);
-        csrfToken = csrfToken ? csrfToken[1] : '';
         fetch(btn.dataset.url, {
             method: 'POST',
-            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+            headers: {'X-CSRFToken': btn.dataset.csrf, 'Content-Type': 'application/json'},
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.success) { btn.disabled = false; return; }
-            var newStatus = data.status;
-            var badge = document.getElementById('wdd_status_badge');
-            var statusText = document.getElementById('wdd_status_text');
+            var avail = data.availability;
+            var availBadge = document.getElementById('wdd_avail_badge');
             var label = document.getElementById('wdd_toggle_label');
             var icon = btn.querySelector('i');
-            badge.classList.remove('wdd__hero__status--approved', 'wdd__hero__status--rejected');
-            if (newStatus === 'approved') {
-                badge.classList.add('wdd__hero__status--approved');
-                statusText.textContent = 'approved';
-                btn.classList.remove('wdd__hero__toggle--activate');
-                btn.classList.add('wdd__hero__toggle--deactivate');
-                icon.classList.replace('fa-toggle-off', 'fa-toggle-on');
-                label.textContent = 'Deactivate';
+            availBadge.className = 'dra__avail-badge dra__avail-badge--' + avail;
+            if (avail === 'available') {
+                availBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Online';
+                btn.classList.replace('wdd__hero__toggle--activate', 'wdd__hero__toggle--deactivate');
+                icon.className = 'fa-solid fa-toggle-on';
+                label.textContent = 'Go Offline';
             } else {
-                badge.classList.add('wdd__hero__status--rejected');
-                statusText.textContent = 'suspended';
-                btn.classList.remove('wdd__hero__toggle--deactivate');
-                btn.classList.add('wdd__hero__toggle--activate');
-                icon.classList.replace('fa-toggle-on', 'fa-toggle-off');
-                label.textContent = 'Activate';
+                availBadge.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Offline';
+                btn.classList.replace('wdd__hero__toggle--deactivate', 'wdd__hero__toggle--activate');
+                icon.className = 'fa-solid fa-toggle-off';
+                label.textContent = 'Go Online';
             }
             btn.disabled = false;
         })
         .catch(function() { btn.disabled = false; });
+    });
+})();
+
+// Account status dropdown
+(function() {
+    var csrf = '{{ csrf_token }}';
+    document.querySelectorAll('.wdd__status-opt').forEach(function(item) {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            var newStatus = this.dataset.status;
+            var newLabel  = this.dataset.label;
+            var newCls    = this.dataset.cls;
+            fetch('{% url "workforce:driver_set_status" driver.driver_id %}', {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+                body: JSON.stringify({status: newStatus}),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) return;
+                var badge = document.getElementById('wdd_status_badge');
+                var text  = document.getElementById('wdd_status_text');
+                badge.className = badge.className.replace(/wdd__hero__status--(approved|rejected|pending)/g, 'wdd__hero__status--' + newCls);
+                text.textContent = newLabel;
+            });
+        });
     });
 })();
 

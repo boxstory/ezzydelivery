@@ -43,6 +43,7 @@
             <thead>
                 <tr>
                     <th>Driver</th>
+                    <th>Status</th>
                     <th>Contact</th>
                     <th>Vehicle</th>
                     <th>Rating</th>
@@ -63,6 +64,16 @@
                                 <div class="dra__driver-code">{{ driver.driver_code|default:"N/A" }}</div>
                             </div>
                         </div>
+                    </td>
+                    <td>
+                        <span class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
+                            {% if driver.driver_availability == 'available' %}<i class="fa-solid fa-circle-check"></i> Available
+                            {% elif driver.driver_availability == 'on_delivery' %}<i class="fa-solid fa-truck"></i> On Delivery
+                            {% elif driver.driver_availability == 'on_break' %}<i class="fa-solid fa-mug-hot"></i> On Break
+                            {% elif driver.driver_availability == 'returning' %}<i class="fa-solid fa-rotate-left"></i> Returning
+                            {% else %}<i class="fa-solid fa-circle-xmark"></i> Offline
+                            {% endif %}
+                        </span>
                     </td>
                     <td>
                         {% if driver.driver_phone %}

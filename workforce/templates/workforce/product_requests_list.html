@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load static %}
 
 {% block title %}Product Requests{% endblock %}
@@ -66,20 +67,14 @@
     </div>
     <div class="prl__filter-group">
       <label class="prl__filter-label">Status</label>
-      <select name="status" class="form-select form-select-sm">
-        <option value="">All</option>
-        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
-        <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
-        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
-        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
-      </select>
+      {% include "workforce/parts/components/_multiselect_filter.html" with field_name="status" label="Status" icon="circle-check" choices=status_choices selected=selected_statuses all_text="All" %}
     </div>
     <div class="prl__filter-group prl__filter-group--wide">
       <label class="prl__filter-label">Business</label>
       <select name="business" class="form-select form-select-sm">
         <option value="">All Businesses</option>
-        {% for biz in businesses %}
-        <option value="{{ biz.business_id }}" {% if business_id == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
+        {% for biz in businesses|code_last %}
+        <option value="{{ biz.business_id }}" {% if business_id == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -168,21 +163,7 @@
       </table>
     </div>
 
-    {% if page_obj.has_other_pages %}
-    <div class="prl__pagination">
-      {% if page_obj.has_previous %}
-      <a class="prl__page-btn" href="?page={{ page_obj.previous_page_number }}{% if request_type != 'all' %}&type={{ request_type }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if business_id %}&business={{ business_id }}{% endif %}">
-        <i class="fa-solid fa-chevron-left"></i> Prev
-      </a>
-      {% endif %}
-      <span class="prl__page-info">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-      {% if page_obj.has_next %}
-      <a class="prl__page-btn" href="?page={{ page_obj.next_page_number }}{% if request_type != 'all' %}&type={{ request_type }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if business_id %}&business={{ business_id }}{% endif %}">
-        Next <i class="fa-solid fa-chevron-right"></i>
-      </a>
-      {% endif %}
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="prl" %}
   </div>
 </div>
 {% endblock %}

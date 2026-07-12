@@ -76,11 +76,11 @@ def workforce_sidebar_counts(request):
         # Sync errors from last auto-sync (mapping mismatch, etc.)
         'temp_orders_sync_errors': sync_errors,
 
-        # Orders verified but not yet published to task
+        # Orders not yet published to task (mirrors the /orders/to_publish/ list:
+        # no delivery task created and not cancelled).
         'pending_publish_count': Order.objects.filter(
-            verification_status='verified',
             task_created=False
-        ).count(),
+        ).exclude(order_status='cancelled').count(),
 
         # Tasks created but not yet published to fleet drivers
         'unpublished_tasks_count': DeliveryTask.objects.filter(

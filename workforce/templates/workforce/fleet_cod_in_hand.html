@@ -225,6 +225,10 @@
                     <span class="fch__detail-label">{% if is_filtered_by_date %}COD Collected{% else %}COD In Hand{% endif %}</span>
                     <span class="fch__detail-value {% if driver.period_cod > 0 %}fch__detail-value--positive{% else %}fch__detail-value--zero{% endif %}">QAR {{ driver.period_cod|floatformat:2|default:"0.00" }}</span>
                 </div>
+                <div class="fch__detail">
+                    <span class="fch__detail-label">Deliveries</span>
+                    <span class="fch__detail-value">{{ driver.period_orders|default:0 }}</span>
+                </div>
                 <div class="fch__detail fch__detail--last">
                     <span class="fch__detail-label">Last Settled</span>
                     <span class="fch__detail-value">{{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}</span>
@@ -254,6 +258,7 @@
                             {% elif sort_by == 'amount_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
                             {% else %}<i class="fa-solid fa-sort ms-1 fch__sort-muted"></i>{% endif %}
                         </th>
+                        <th>Deliveries</th>
                         <th>Wallet Balance</th>
                         <th class="fch__th--sort" onclick="updateSort('{% if sort_by == 'date_asc' %}date_desc{% else %}date_asc{% endif %}')">
                             Last Settlement
@@ -280,6 +285,7 @@
                         <td class="{% if driver.period_cod > 0 %}fch__amount--positive{% else %}fch__amount--zero{% endif %}">
                             QAR {{ driver.period_cod|floatformat:2|default:"0.00" }}
                         </td>
+                        <td>{{ driver.period_orders|default:0 }}</td>
                         <td>QAR {{ driver.wallet_balance|floatformat:2|default:"0.00" }}</td>
                         <td>{{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}</td>
                         <td>

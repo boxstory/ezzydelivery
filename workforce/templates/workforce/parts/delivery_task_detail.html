@@ -97,6 +97,17 @@
                                     <span class="dtd__cod__currency">QAR</span>
                                 </div>
                             </div>
+                            {% if task.cod_collected and task.dl_task_status != 'delivered' and not task.cod_settled %}
+                            <div class="alert alert-warning d-flex align-items-start gap-2 mt-2 mb-0 py-2 px-3" role="alert" style="font-size:0.75rem;">
+                                <i class="fa-solid fa-triangle-exclamation mt-1"></i>
+                                <div>
+                                    COD is still marked <strong>Collected (QAR {{ task.cod_collected_amount|default:0 }})</strong>
+                                    but this task is <strong>{{ task.get_dl_task_status_display|default:task.dl_task_status }}</strong>, not Delivered.
+                                    It will keep showing in COD Collection until corrected in
+                                    <strong>Fleet → Transactions → Correct COD</strong>.
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -151,26 +162,27 @@
                             </div>
 
                             <!-- Zone / Street / Building / QNAS row -->
-                            <div class="row g-0 mt-0">
-                                <div class="col-3">
-                                    <div class="dtd__field flex-column align-items-start">
-                                        <span class="dtd__field__label">Zone</span>
-                                        <span class="dtd__field__value" style="font-family:var(--dtd-font-mono);font-size:0.8rem;">{{ task.order.dl_zone|default:"-" }}</span>
+                            <div class="row g-2 mt-0 align-items-center">
+                                <div class="col-12 col-md-8">
+                                    <!-- Signature: Qatar national address code -->
+                                    <div class="qnas-plate" role="group" aria-label="Qatar national address code">
+                                        <div class="qnas-plate__cell">
+                                            <span class="qnas-plate__tag">Zone</span>
+                                            <span class="qnas-plate__num{% if not task.order.dl_zone %} qnas-plate__num--empty{% endif %}">{{ task.order.dl_zone|default:'—' }}</span>
+                                        </div>
+                                        <span class="qnas-plate__div">/</span>
+                                        <div class="qnas-plate__cell">
+                                            <span class="qnas-plate__tag">Street</span>
+                                            <span class="qnas-plate__num{% if not task.order.dl_street %} qnas-plate__num--empty{% endif %}">{{ task.order.dl_street|default:'—' }}</span>
+                                        </div>
+                                        <span class="qnas-plate__div">/</span>
+                                        <div class="qnas-plate__cell">
+                                            <span class="qnas-plate__tag">Building</span>
+                                            <span class="qnas-plate__num{% if not task.order.dl_building %} qnas-plate__num--empty{% endif %}">{{ task.order.dl_building|default:'—' }}</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-3">
-                                    <div class="dtd__field flex-column align-items-start">
-                                        <span class="dtd__field__label">Street</span>
-                                        <span class="dtd__field__value">{{ task.order.dl_street|default:"-" }}</span>
-                                    </div>
-                                </div>
-                                <div class="col-3">
-                                    <div class="dtd__field flex-column align-items-start">
-                                        <span class="dtd__field__label">Building</span>
-                                        <span class="dtd__field__value">{{ task.order.dl_building|default:"-" }}</span>
-                                    </div>
-                                </div>
-                                <div class="col-3">
+                                <div class="col-12 col-md-4">
                                     <div class="dtd__field flex-column align-items-start">
                                         <span class="dtd__field__label">QNAS</span>
                                         <div class="dtd__field__value d-flex flex-column gap-1">
@@ -1153,6 +1165,24 @@
         hideStatusAlerts();
         const status = document.getElementById('statusSelect').value;
         if (!status) { showStatusError('Please select a status'); return; }
+
+        // Warn if COD is still marked collected but the task is being moved off "delivered".
+        // Changing status does NOT clear the COD, so it keeps showing in COD Collection and
+        // the driver wallet until it is corrected in Fleet → Transactions ("Correct COD").
+        const codCollected = {{ task.cod_collected|yesno:'true,false' }};
+        const codAmount = '{{ task.cod_collected_amount|default:"0" }}';
+        if (codCollected && status !== 'delivered') {
+            const proceed = confirm(
+                '⚠️ This task still has COD marked as COLLECTED (QAR ' + codAmount + ').\n\n' +
+                'Changing the status to "' + status + '" will NOT clear the COD, so it will keep ' +
+                'showing in COD Collection and the driver’s wallet.\n\n' +
+                'If the item was returned / not paid, after this you must go to ' +
+                'Fleet → Transactions and use "Correct COD" to mark it as Not Collected.\n\n' +
+                'Continue with the status change?'
+            );
+            if (!proceed) { return; }
+        }
+
         const btn = document.querySelector('#updateStatusModal .dtd__btn--primary');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';

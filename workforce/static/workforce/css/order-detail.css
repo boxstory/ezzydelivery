@@ -1,0 +1,53 @@
+/* Purpose: wod-only tweaks for the Order Detail page (order_detail.html).
+   Used by: workforce/templates/workforce/order_detail.html (loaded via {% block extra_css %}).
+   Notes: Base chrome + QNAS plate come from the shared "Batch-2 redesign" block in
+          workforce.css. This file only quiets the leftover Bootstrap rainbow sidebar
+          cards into the same navy/yellow ledger system, and sets logistics data mono. */
+
+.wod { background: #f5f6f8; min-height: 100%; }
+.wod {
+    --wod-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+}
+
+/* Sidebar cards still using Bootstrap .card → align to hairline sheets */
+.wod .card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+/* Neutralise the coloured Bootstrap card headers (green/warning/default) */
+.wod .card > .card-header {
+    background: #fff !important;
+    color: #001f3f !important;
+    border-bottom: 1px solid #eef1f5;
+    padding: 0.5rem 0.8rem;
+}
+.wod .card > .card-header h5 {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: #001f3f;
+}
+/* Header icon becomes a small tinted tile, coloured by section intent */
+.wod .card > .card-header h5 > i:first-child {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 0.35rem;
+    font-size: 0.68rem;
+    margin-right: 0.5rem !important;
+    background: #eef1f5;
+    color: #001f3f;
+}
+.wod .card > .card-header.bg-success h5 > i:first-child { background: #dcfce7; color: #15803d; }
+.wod .card > .card-header.bg-warning h5 > i:first-child { background: #fef3c7; color: #92400e; }
+
+/* Payment / COD figures in mono for a consistent logistics-data read */
+.wod .card-body strong,
+.wod .card-body .fs-5 { font-family: var(--wod-mono); }
+
+/* Total line: navy, not green, to match the single-accent system */
+.wod .card-header.bg-success ~ .card-body .text-success { color: #001f3f !important; }

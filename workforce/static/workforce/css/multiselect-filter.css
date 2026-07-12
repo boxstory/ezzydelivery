@@ -1,0 +1,139 @@
+/* Purpose: Reusable multi-select checkbox dropdown filter (msf) for staff list filters.
+   Used by: workforce/parts/components/_multiselect_filter.html across staff dashboard lists.
+   Notes: Brand-token styled; delegated JS lives in workforce/js/multiselect-filter.js. */
+
+.msf {
+    position: relative;
+    width: 100%;
+    min-width: 140px;
+}
+
+/* Toggle button — mirrors native select control styling */
+.msf__toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 38px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--brand-grey-700, #333);
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.msf__toggle:hover {
+    border-color: var(--brand-grey-400, #bcbcbc);
+    background: var(--brand-grey-100, #fafafa);
+}
+.msf__toggle:focus-visible,
+.msf__toggle[aria-expanded="true"] {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.15);
+}
+.msf__toggle-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.msf__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+    background: rgba(247, 192, 0, 0.9);
+    border-radius: 999px;
+}
+.msf__count[hidden] { display: none; }
+.msf__caret {
+    font-size: 0.65rem;
+    color: var(--brand-grey-400, #9ca3af);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+.msf__toggle[aria-expanded="true"] .msf__caret { transform: rotate(180deg); }
+
+/* Menu */
+.msf__menu {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 0.375rem;
+    min-width: 240px;
+    border: 1px solid var(--brand-grey-200, #eee);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    box-shadow: 0 12px 28px -8px rgba(0, 31, 63, 0.18);
+}
+.msf__menu.show { z-index: 1080; }
+.msf__menu-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.25rem 0.5rem 0.5rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--brand-grey-100, #f0f0f0);
+}
+.msf__menu-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+.msf__menu-title i { color: var(--brand-primary, #f7c000); }
+.msf__clear {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--brand-grey-500, #6c757d);
+    background: none;
+    border: none;
+    padding: 0.1rem 0.25rem;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+.msf__clear:hover { color: var(--brand-navy, #001f3f); }
+.msf__item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    font-size: 0.8125rem;
+    color: var(--brand-grey-700, #333);
+    cursor: pointer;
+    margin: 0;
+    transition: background 0.12s ease;
+}
+.msf__item:hover { background: var(--brand-grey-100, #f5f5f5); }
+.msf__item input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--brand-navy, #001f3f);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.msf__item:has(input:checked) {
+    background: rgba(247, 192, 0, 0.1);
+    color: var(--brand-navy, #001f3f);
+    font-weight: 600;
+}
+
+/* Prevent common filter containers from clipping the popped menu.
+   :has() lets us open overflow only while a menu is actually shown. */
+.filter-bar:has(.msf__menu.show),
+.filters:has(.msf__menu.show),
+.wfd__filters:has(.msf__menu.show),
+form:has(.msf__menu.show) {
+    overflow: visible !important;
+}

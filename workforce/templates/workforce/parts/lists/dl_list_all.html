@@ -1,4 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
 {% load crispy_forms_tags %}
 {% load static %}
 {% block extra_css %}
@@ -94,8 +95,8 @@
                         <label class="pgf__label" for="business"><i class="fa-solid fa-store"></i> CLIENT / BUSINESS</label>
                         <select class="pgf__select" name="business" id="business">
                             <option value="">All Clients</option>
-                            {% for biz in businesses %}
-                            <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>{{ biz.business_name }}</option>
+                            {% for biz in businesses|code_last %}
+                            <option value="{{ biz.business_id }}" {% if filters.business == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
                             {% endfor %}
                         </select>
                     </div>

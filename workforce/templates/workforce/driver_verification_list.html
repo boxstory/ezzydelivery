@@ -309,23 +309,7 @@
     {% endfor %}
 
     <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="d-flex justify-content-center gap-2 mt-3 mb-2">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if current_filter and current_filter != 'all' %}&status={{ current_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}" class="uvl__btn uvl__btn--review">
-            <i class="fa-solid fa-chevron-left"></i> Prev
-        </a>
-        {% endif %}
-        <span class="uvl__btn uvl__btn--detail" style="cursor:default;">
-            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-        </span>
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if current_filter and current_filter != 'all' %}&status={{ current_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}" class="uvl__btn uvl__btn--review">
-            Next <i class="fa-solid fa-chevron-right"></i>
-        </a>
-        {% endif %}
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="dvl" %}
 
 {% else %}
     <div class="uvl__empty">

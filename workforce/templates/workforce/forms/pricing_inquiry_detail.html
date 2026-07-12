@@ -6,7 +6,7 @@
 {% endblock extra_css %}
 
 {% block content %}
-<link href="{% static 'workforce/css/pricing_inquiry_detail.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiry_detail.css' %}?v=20260621d" rel="stylesheet" type="text/css" />
 <div class="pid col-12 p-3" id="pricing-inquiry-detail">
 
   <!-- ══════════════════════════════════════
@@ -130,13 +130,13 @@
     <!-- Edit form wrapper -->
     <form id="pid-edit-form" class="d-none">
 
-      <!-- Save bar (sticky at top in edit mode) -->
-      <div class="pid__edit-bar alert alert-info d-flex align-items-center gap-2 mb-3 py-2 px-3">
-        <i class="fa-solid fa-pen-to-square"></i>
-        <span class="fw-semibold">Edit Mode</span>
-        <button type="submit" class="btn btn-success btn-sm ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleEditMode()">Cancel</button>
-        <span id="pid-edit-feedback" class="small ms-2"></span>
+      <!-- Save bar -->
+      <div class="pid__edit-bar d-flex align-items-center gap-2">
+        <i class="fa-solid fa-pen-to-square pid__edit-bar__icon"></i>
+        <span class="pid__edit-bar__label">Editing</span>
+        <span id="pid-edit-feedback" class="small ms-1" style="font-size:0.75rem;color:rgba(255,255,255,0.5)"></span>
+        <button type="submit" class="pid__btn-save ms-auto"><i class="fa-solid fa-floppy-disk"></i>Save changes</button>
+        <button type="button" class="pid__btn-discard" onclick="toggleEditMode()">Discard</button>
       </div>
 
       <!-- CONTACT & BUSINESS -->
@@ -172,10 +172,21 @@
             <input class="form-control form-control-sm pid-edit d-none" name="website_url" value="{{ inquiry.website_url|default:'' }}">
           </div>
           <div class="pid__field">
-            <span class="pid__field__lbl">Social Media Profile</span>
-            <span class="pid__field__val pid-view">{% if inquiry.social_profile %}<a href="{% if inquiry.social_profile|slice:':4' == 'http' %}{{ inquiry.social_profile }}{% else %}https://{{ inquiry.social_profile }}{% endif %}" target="_blank" rel="noopener">{{ inquiry.social_profile }}</a>{% else %}—{% endif %}</span>
-            <input class="form-control form-control-sm pid-edit d-none" name="social_profile" value="{{ inquiry.social_profile|default:'' }}">
+            <span class="pid__field__lbl"><i class="fa-brands fa-instagram"></i> Instagram</span>
+            <span class="pid__field__val pid-view">{% if inquiry.instagram_profile %}<a href="{% if inquiry.instagram_profile|slice:':4' == 'http' %}{{ inquiry.instagram_profile }}{% else %}https://instagram.com/{{ inquiry.instagram_profile }}{% endif %}" target="_blank" rel="noopener">{{ inquiry.instagram_profile }}</a>{% else %}—{% endif %}</span>
+            <input class="form-control form-control-sm pid-edit d-none" name="instagram_profile" value="{{ inquiry.instagram_profile|default:'' }}" placeholder="username or URL">
           </div>
+          <div class="pid__field">
+            <span class="pid__field__lbl"><i class="fa-brands fa-facebook"></i> Facebook</span>
+            <span class="pid__field__val pid-view">{% if inquiry.facebook_profile %}<a href="{% if inquiry.facebook_profile|slice:':4' == 'http' %}{{ inquiry.facebook_profile }}{% else %}https://facebook.com/{{ inquiry.facebook_profile }}{% endif %}" target="_blank" rel="noopener">{{ inquiry.facebook_profile }}</a>{% else %}—{% endif %}</span>
+            <input class="form-control form-control-sm pid-edit d-none" name="facebook_profile" value="{{ inquiry.facebook_profile|default:'' }}" placeholder="username or page URL">
+          </div>
+          {% if inquiry.social_profile and not inquiry.instagram_profile and not inquiry.facebook_profile %}
+          <div class="pid__field">
+            <span class="pid__field__lbl">Social Media (legacy)</span>
+            <span class="pid__field__val pid-view"><a href="{% if inquiry.social_profile|slice:':4' == 'http' %}{{ inquiry.social_profile }}{% else %}https://{{ inquiry.social_profile }}{% endif %}" target="_blank" rel="noopener">{{ inquiry.social_profile }}</a></span>
+          </div>
+          {% endif %}
 
           <div class="pid__divider"></div>
 
@@ -213,6 +224,26 @@
             <span class="pid__field__val pid-view">{{ inquiry.business_location_country|default:"—" }}</span>
             <input class="form-control form-control-sm pid-edit d-none" name="business_location_country" value="{{ inquiry.business_location_country|default:'' }}">
           </div>
+        </div>
+      </div>
+
+      <!-- STAFF NOTES -->
+      <div class="pid__panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-note-sticky"></i>
+          <h3>Staff Notes</h3>
+        </div>
+        <div class="pid__panel__body">
+          {% if inquiry.staff_notes %}
+          <div class="pid__notes-block pid-view">
+            <div class="pid__notes-label">Internal note</div>
+            <p class="pid__notes-text">{{ inquiry.staff_notes }}</p>
+          </div>
+          {% else %}
+          <p class="pid__muted pid-view" style="font-size:0.875rem">No staff notes yet.</p>
+          {% endif %}
+          <textarea class="form-control pid-edit d-none" name="staff_notes" rows="4"
+                    placeholder="Internal notes about this lead…">{{ inquiry.staff_notes|default:'' }}</textarea>
         </div>
       </div>
 
@@ -467,9 +498,9 @@
       </div>
 
       <!-- Bottom save bar -->
-      <div class="pid__edit-bar alert alert-info d-flex align-items-center gap-2 mb-3 py-2 px-3">
-        <button type="submit" class="btn btn-success btn-sm"><i class="fa-solid fa-floppy-disk me-1"></i>Save Changes</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleEditMode()">Cancel</button>
+      <div class="pid__edit-bar d-flex align-items-center gap-2">
+        <button type="submit" class="pid__btn-save"><i class="fa-solid fa-floppy-disk"></i>Save changes</button>
+        <button type="button" class="pid__btn-discard" onclick="toggleEditMode()">Discard</button>
       </div>
 
     </form>
@@ -500,6 +531,14 @@
                 <div class="pid__contact__val">{{ inquiry.operation_team_contact_number }}</div>
               </div>
             </a>
+            {% else %}
+            <div class="pid__contact__item pid__contact__item--empty">
+              <i class="fa-solid fa-headset"></i>
+              <div>
+                <div class="pid__contact__label">Operations Team Contact</div>
+                <div class="pid__contact__val">—</div>
+              </div>
+            </div>
             {% endif %}
             {% if inquiry.website_url %}
             <a href="{% if inquiry.website_url|slice:':4' == 'http' %}{{ inquiry.website_url }}{% else %}https://{{ inquiry.website_url }}{% endif %}" target="_blank" rel="noopener" class="pid__contact__item">
@@ -509,14 +548,58 @@
                 <div class="pid__contact__val">{{ inquiry.website_url|truncatechars:45 }}</div>
               </div>
             </a>
-            {% endif %}
-            <a href="{% if inquiry.social_profile %}{% if inquiry.social_profile|slice:':4' == 'http' %}{{ inquiry.social_profile }}{% else %}https://{{ inquiry.social_profile }}{% endif %}{% else %}#{% endif %}" {% if inquiry.social_profile %}target="_blank" rel="noopener"{% endif %} class="pid__contact__item{% if not inquiry.social_profile %} opacity-50{% endif %}">
-              <i class="fa-solid fa-share-nodes"></i>
+            {% else %}
+            <div class="pid__contact__item pid__contact__item--empty">
+              <i class="fa-solid fa-globe"></i>
               <div>
-                <div class="pid__contact__label">Social Media Profile</div>
-                <div class="pid__contact__val">{{ inquiry.social_profile|default:"—"|truncatechars:45 }}</div>
+                <div class="pid__contact__label">Website URL</div>
+                <div class="pid__contact__val">—</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if inquiry.instagram_profile %}
+            <a href="{% if inquiry.instagram_profile|slice:':4' == 'http' %}{{ inquiry.instagram_profile }}{% else %}https://instagram.com/{{ inquiry.instagram_profile }}{% endif %}" target="_blank" rel="noopener" class="pid__contact__item">
+              <i class="fa-brands fa-instagram"></i>
+              <div>
+                <div class="pid__contact__label">Instagram</div>
+                <div class="pid__contact__val">{{ inquiry.instagram_profile|truncatechars:45 }}</div>
               </div>
             </a>
+            {% else %}
+            <div class="pid__contact__item pid__contact__item--empty">
+              <i class="fa-brands fa-instagram"></i>
+              <div>
+                <div class="pid__contact__label">Instagram</div>
+                <div class="pid__contact__val">—</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if inquiry.facebook_profile %}
+            <a href="{% if inquiry.facebook_profile|slice:':4' == 'http' %}{{ inquiry.facebook_profile }}{% else %}https://facebook.com/{{ inquiry.facebook_profile }}{% endif %}" target="_blank" rel="noopener" class="pid__contact__item">
+              <i class="fa-brands fa-facebook"></i>
+              <div>
+                <div class="pid__contact__label">Facebook</div>
+                <div class="pid__contact__val">{{ inquiry.facebook_profile|truncatechars:45 }}</div>
+              </div>
+            </a>
+            {% else %}
+            <div class="pid__contact__item pid__contact__item--empty">
+              <i class="fa-brands fa-facebook"></i>
+              <div>
+                <div class="pid__contact__label">Facebook</div>
+                <div class="pid__contact__val">—</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if inquiry.social_profile and not inquiry.instagram_profile and not inquiry.facebook_profile %}
+            <a href="{% if inquiry.social_profile|slice:':4' == 'http' %}{{ inquiry.social_profile }}{% else %}https://{{ inquiry.social_profile }}{% endif %}" target="_blank" rel="noopener" class="pid__contact__item">
+              <i class="fa-solid fa-share-nodes"></i>
+              <div>
+                <div class="pid__contact__label">Social Media</div>
+                <div class="pid__contact__val">{{ inquiry.social_profile|truncatechars:45 }}</div>
+              </div>
+            </a>
+            {% endif %}
           </div>
 
           <div class="pid__divider"></div>
@@ -537,12 +620,10 @@
             <span class="pid__field__lbl">Do you have a team available in Qatar?</span>
             <span class="pid__field__val">{% if inquiry.is_team_available_in_qatar %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
           </div>
-          {% if inquiry.business_location_country %}
           <div class="pid__field">
             <span class="pid__field__lbl">Where is your business located?</span>
-            <span class="pid__field__val">{{ inquiry.business_location_country }}</span>
+            <span class="pid__field__val">{{ inquiry.business_location_country|default:"—" }}</span>
           </div>
-          {% endif %}
         </div>
       </div>
 
@@ -566,36 +647,30 @@
             <span class="pid__field__val">{% if inquiry.is_personalized_product %}<span class="pid__chip pid__chip--yes">Yes</span>{% else %}<span class="pid__chip pid__chip--no">No</span>{% endif %}</span>
           </div>
           <div class="pid__divider"></div>
-          <div class="pid__services">
-            <div class="pid__service {% if inquiry.is_required_COD_service %}pid__service--on{% endif %}">
-              <div class="pid__service__icon"><i class="fa-solid fa-money-bill-wave"></i></div>
-              <span>Do you require COD (Cash on Delivery)?</span>
-              <i class="fa-solid {% if inquiry.is_required_COD_service %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+          <div class="pid__svc-grid">
+            <div class="pid__svc {% if inquiry.is_required_COD_service %}pid__svc--on{% endif %}">
+              <i class="fa-solid fa-money-bill-wave"></i>
+              <span>COD</span>
             </div>
-            <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}pid__service--on{% endif %}">
-              <div class="pid__service__icon"><i class="fa-solid fa-plane-departure"></i></div>
-              <span>Fulfillment to operate from outside Qatar?</span>
-              <i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            <div class="pid__svc {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}pid__svc--on{% endif %}">
+              <i class="fa-solid fa-plane-departure"></i>
+              <span>Fulfillment (Outside QA)</span>
             </div>
-            <div class="pid__service {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}pid__service--on{% endif %}">
-              <div class="pid__service__icon"><i class="fa-solid fa-warehouse"></i></div>
-              <span>Fulfillment hub in Doha?</span>
-              <i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            <div class="pid__svc {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}pid__svc--on{% endif %}">
+              <i class="fa-solid fa-warehouse"></i>
+              <span>Hub in Doha</span>
             </div>
-            <div class="pid__service {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}pid__service--on{% endif %}">
-              <div class="pid__service__icon"><i class="fa-solid fa-bolt"></i></div>
-              <span>Frequent same-day pick & delivery required?</span>
-              <i class="fa-solid {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            <div class="pid__svc {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}pid__svc--on{% endif %}">
+              <i class="fa-solid fa-bolt"></i>
+              <span>Same-Day</span>
             </div>
-            <div class="pid__service {% if inquiry.is_special_handling_required %}pid__service--on{% endif %}">
-              <div class="pid__service__icon"><i class="fa-solid fa-hand-holding-box"></i></div>
-              <span>Special handling required?</span>
-              <i class="fa-solid {% if inquiry.is_special_handling_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            <div class="pid__svc {% if inquiry.is_special_handling_required %}pid__svc--on{% endif %}">
+              <i class="fa-solid fa-hand-holding-box"></i>
+              <span>Special Handling</span>
             </div>
-            <div class="pid__service {% if inquiry.is_return_logistics_required %}pid__service--on{% endif %}">
-              <div class="pid__service__icon"><i class="fa-solid fa-rotate-left"></i></div>
-              <span>Return / reverse logistics required?</span>
-              <i class="fa-solid {% if inquiry.is_return_logistics_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check ms-auto"></i>
+            <div class="pid__svc {% if inquiry.is_return_logistics_required %}pid__svc--on{% endif %}">
+              <i class="fa-solid fa-rotate-left"></i>
+              <span>Returns</span>
             </div>
           </div>
         </div>
@@ -770,6 +845,12 @@
           </div>
 
           <div class="pid__canvas-section">
+            <div class="pid__canvas-label"><i class="fa-solid fa-note-sticky me-1" style="color:var(--brand-primary)"></i>Staff Notes</div>
+            <textarea class="pid__textarea" id="staff-notes-input" rows="2"
+                      placeholder="Internal notes about this lead…">{{ inquiry.staff_notes|default:'' }}</textarea>
+          </div>
+
+          <div class="pid__canvas-section">
             <div class="pid__canvas-label">Activity Log</div>
             <div class="pid__type-toggle mb-2">
               <label class="pid__type-btn">
@@ -859,10 +940,14 @@
       form.classList.remove('d-none');
       view.classList.add('d-none');
       btn.innerHTML = '<i class="fa-solid fa-eye"></i>View';
+      form.querySelectorAll('.pid-edit').forEach(function(el) { el.classList.remove('d-none'); });
+      form.querySelectorAll('.pid-view').forEach(function(el) { el.classList.add('d-none'); });
     } else {
       form.classList.add('d-none');
       view.classList.remove('d-none');
       btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>Edit';
+      form.querySelectorAll('.pid-edit').forEach(function(el) { el.classList.add('d-none'); });
+      form.querySelectorAll('.pid-view').forEach(function(el) { el.classList.remove('d-none'); });
     }
   }
 
@@ -872,12 +957,12 @@
     fd.append('csrfmiddlewaretoken', PID_CONFIG.csrfToken);
     var btn = this.querySelector('button[type="submit"]');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>Saving…';
     fetch(PID_CONFIG.urlEdit, { method: 'POST', body: fd })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i>Save';
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save changes';
         if (data.success) {
           if (data.changes > 0) {
             location.reload();
@@ -892,7 +977,7 @@
       })
       .catch(function(err) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i>Save';
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save changes';
         alert('Error: ' + err.message);
       });
   });

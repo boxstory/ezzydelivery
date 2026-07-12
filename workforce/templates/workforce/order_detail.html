@@ -4,6 +4,10 @@
 
 {% block title %}Order {{ order.order_number }} - Workforce{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/order-detail.css' %}?v=20260701a" type="text/css" />
+{% endblock extra_css %}
+
 {% block content %}
 {% csrf_token %}
 <div class="wod">
@@ -257,6 +261,27 @@
                     <span class="wod__section-label">Delivery Address</span>
                 </div>
                 <div class="wod__card-body">
+                    <!-- Signature: Qatar national address code (Zone / Street / Building) -->
+                    <div class="qnas-plate" role="group" aria-label="Qatar national address code">
+                        <div class="qnas-plate__cell">
+                            <span class="qnas-plate__tag">Zone</span>
+                            <span class="qnas-plate__num{% if not order.dl_zone %} qnas-plate__num--empty{% endif %}">{{ order.dl_zone|default:'—' }}</span>
+                        </div>
+                        <span class="qnas-plate__div">/</span>
+                        <div class="qnas-plate__cell">
+                            <span class="qnas-plate__tag">Street</span>
+                            <span class="qnas-plate__num{% if not order.dl_street %} qnas-plate__num--empty{% endif %}">{{ order.dl_street|default:'—' }}</span>
+                        </div>
+                        <span class="qnas-plate__div">/</span>
+                        <div class="qnas-plate__cell">
+                            <span class="qnas-plate__tag">Building</span>
+                            <span class="qnas-plate__num{% if not order.dl_building %} qnas-plate__num--empty{% endif %}">{{ order.dl_building|default:'—' }}</span>
+                        </div>
+                        <div class="qnas-plate__name{% if not dl_zone_name %} qnas-plate__name--empty{% endif %}">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span>{{ dl_zone_name|default:'Zone name not resolved' }}</span>
+                        </div>
+                    </div>
                     <div class="row g-3">
                         {% if order.pickup_location %}
                         <div class="col-12">
@@ -321,6 +346,25 @@
                                 {% endif %}
                                 {% endif %}
                                         </div>
+                                    </div>
+                                    <!-- Paste / Drop shared (WhatsApp) location -->
+                                    <div class="col-12">
+                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-1">
+                                            <label class="form-label text-muted small mb-0" for="wodLocPaste{{ order.id }}"><i class="fa-brands fa-whatsapp text-success me-1"></i>Paste / Drop Shared Location</label>
+                                            <span class="oap__loc-drop__hint"><i class="fa-solid fa-hand-pointer me-1"></i>Drop the shared pin here or paste a link</span>
+                                        </div>
+                                        <div id="wodLocDrop{{ order.id }}" class="oap__loc-drop oap__loc-drop--sm"
+                                             ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                                             ondrop="wodLocDrop(event, {{ order.id }})">
+                                            <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                                            <input type="text" id="wodLocPaste{{ order.id }}" class="form-control form-control-sm oap__loc-drop__input"
+                                                   placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here">
+                                            <button type="button" class="btn btn-sm btn-success flex-shrink-0"
+                                                    onclick="wodLocSave(document.getElementById('wodLocPaste{{ order.id }}').value, {{ order.id }})">
+                                                <i class="fa-solid fa-floppy-disk me-1"></i>Save
+                                            </button>
+                                        </div>
+                                        <div id="wodLocResult{{ order.id }}" class="mt-1"></div>
                                     </div>
                                 </div>
                             </div>
@@ -797,6 +841,70 @@ function wodShowToast(message, type) {
         toast.style.transform = 'translateX(1rem)';
         setTimeout(function() { toast.remove(); }, 300);
     }, 4000);
+}
+
+// ===== Shared-location save (rebuilds Lat/Long block in place) =====
+function wodRenderLatLng(orderId, lat, lng) {
+    var box = document.getElementById('orderLatLng' + orderId);
+    if (!box) return;
+    var la = Number(lat).toFixed(6), lo = Number(lng).toFixed(6);
+    box.innerHTML =
+        '<a href="https://www.google.com/maps?q=' + la + ',' + lo + '" target="_blank" class="odp__latlong-link">' +
+            '<i class="fa-solid fa-map-pin"></i> ' + la + ', ' + lo +
+        '</a>' +
+        '<span class="odp__loc-acc odp__loc-acc--by_customer">' +
+            '<i class="fa-solid fa-location-crosshairs"></i> By Customer' +
+        '</span>';
+}
+
+function wodLocSave(text, orderId) {
+    var resultDiv = document.getElementById('wodLocResult' + orderId);
+    var coords = parseLatLngFromText(text);
+    if (!coords) {
+        if (resultDiv && String(text).trim()) {
+            if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
+                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>Short link — open it once, then paste the full https://maps.google.com/?q=... link</span>';
+            } else {
+                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
+            }
+        } else if (resultDiv) {
+            resultDiv.innerHTML = '';
+        }
+        return;
+    }
+    var lat = coords[0], lng = coords[1];
+    if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-secondary"><i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...</span>';
+    fetch(window.location.origin + '/workforce/orders/' + orderId + '/update-coords/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrfToken() },
+        body: JSON.stringify({ latitude: lat, longitude: lng, coords_accuracy: 'by_customer' })
+    }).then(function(resp) { return resp.json(); }).then(function(d) {
+        if (!d.success) {
+            if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>' + (d.error || 'Save failed') + '</span>';
+            return;
+        }
+        var la = (typeof d.latitude === 'number' ? d.latitude : lat);
+        var lo = (typeof d.longitude === 'number' ? d.longitude : lng);
+        wodRenderLatLng(orderId, la, lo);
+        if (resultDiv) {
+            resultDiv.innerHTML = '<span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Saved: ' + Number(la).toFixed(6) + ', ' + Number(lo).toFixed(6) + '</span>';
+        }
+    }).catch(function(err) {
+        console.error('[LOC] save error:', err);
+        if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Network error</span>';
+    });
+}
+
+function wodLocDrop(ev, orderId) {
+    ev.preventDefault();
+    if (ev.currentTarget) ev.currentTarget.classList.remove('oap__loc-drop--over');
+    var dt = ev.dataTransfer;
+    if (!dt) return;
+    var text = (dt.getData('text/uri-list') || dt.getData('text/plain') || dt.getData('text') || '').trim();
+    var input = document.getElementById('wodLocPaste' + orderId);
+    if (input) input.value = text;
+    wodLocSave(text, orderId);
 }
 
 function wodPostAction(btn, url, confirmMsg, successMsg) {

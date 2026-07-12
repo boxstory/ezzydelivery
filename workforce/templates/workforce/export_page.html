@@ -351,13 +351,7 @@
       </tbody>
     </table>
   </div>
-  {% if page_obj.has_other_pages %}
-  <div class="d-flex justify-content-center align-items-center gap-2 py-3" style="font-size:.82rem;">
-    {% if page_obj.has_previous %}<a href="?business={{ business_id }}&source={{ source }}&platform={{ platform }}{% if filters.dateFrom %}&dateFrom={{ filters.dateFrom }}{% endif %}{% if filters.dateTo %}&dateTo={{ filters.dateTo }}{% endif %}{% if filters.cStatus %}&cStatus={{ filters.cStatus }}{% endif %}&page={{ page_obj.previous_page_number }}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-chevron-left"></i></a>{% endif %}
-    <span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}<a href="?business={{ business_id }}&source={{ source }}&platform={{ platform }}{% if filters.dateFrom %}&dateFrom={{ filters.dateFrom }}{% endif %}{% if filters.dateTo %}&dateTo={{ filters.dateTo }}{% endif %}{% if filters.cStatus %}&cStatus={{ filters.cStatus }}{% endif %}&page={{ page_obj.next_page_number }}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-chevron-right"></i></a>{% endif %}
-  </div>
-  {% endif %}
+  {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="wexp" %}
 
   {% else %}
   <div class="wexp__empty py-5">

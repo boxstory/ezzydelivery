@@ -1,217 +1,198 @@
-{# Purpose: Leg-3 Business COD Payout — staff select & settle COD held by EzzyDelivery to each business #}
+{# Purpose: Leg-3 Business COD Payout — "Teller's Tape" cash-settlement window #}
 {# Used by: workforce.views.cod_business_settlement_report (URL workforce:cod_business_settlement_report) #}
-{# Notes: Per-task checkboxes grouped by business; live selected total; settle + reverse actions via fetch #}
+{# Notes: Subject = counting out collected COD to a business. Signature = sticky tape + receipt modal. #}
 {% extends "wf_dashboard_base.html" %}
-{% load static %}
+{% load business_dropdown %}
+{% load static humanize %}
 
 {% block title %}Business COD Payout{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260630b" type="text/css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260630d" type="text/css" />
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-3">
-  <div class="wfd__hero">
-    <div class="wfd__hero-content">
-      <h1 class="wfd__hero-title"><i class="fa-solid fa-building-columns"></i> Business COD Payout</h1>
-      <p class="wfd__hero-subtitle">Pay collected COD held by EzzyDelivery out to each business</p>
-    </div>
-    <div class="wfd__hero-actions d-flex gap-2">
-      <a href="{% url 'workforce:cod_settlement_report' %}" class="btn btn-sm btn-outline-light">
-        <i class="fa-solid fa-arrow-left me-1"></i> Driver Settlement
-      </a>
-      <a href="{% url 'workforce:cod_business_settlement_pdf' %}{% if business_filter %}?business_id={{ business_filter }}{% endif %}"
-         class="btn btn-sm btn-outline-light" target="_blank" rel="noopener">
-        <i class="fa-solid fa-file-pdf me-1"></i> PDF
-      </a>
-    </div>
-  </div>
+<div class="bcp">
+  <div class="bcp__wrap">
 
-  <!-- Summary (only once a business is selected) -->
-  {% if business_filter %}
-  <div class="row g-3 mb-3">
-    <div class="col-12 col-md-4">
-      <div class="bcp__stat">
-        <span class="bcp__stat-label">Total Owed to Businesses</span>
-        <span class="bcp__stat-value">QAR {{ grand_total|floatformat:2 }}</span>
+    <!-- Masthead -->
+    <header class="bcp__masthead">
+      <div class="bcp__masthead-row">
+        <div>
+          <p class="bcp__eyebrow">Leg 3 · Ezzy ▸ Business</p>
+          <h1 class="bcp__title">Business COD Payout</h1>
+        </div>
+        <div class="bcp__masthead-actions">
+          <a href="{% url 'workforce:cod_business_settlement_pdf' %}{% if business_filter %}?business_id={{ business_filter }}{% endif %}"
+             class="bcp__ghost" target="_blank" rel="noopener">Statement PDF</a>
+          <a href="#bcp-void" class="bcp__ghost bcp__ghost--void">Void a payout</a>
+        </div>
       </div>
-    </div>
-    <div class="col-6 col-md-2">
-      <div class="bcp__stat">
-        <span class="bcp__stat-label">Businesses</span>
-        <span class="bcp__stat-value">{{ business_count }}</span>
-      </div>
-    </div>
-    <div class="col-6 col-md-2">
-      <div class="bcp__stat">
-        <span class="bcp__stat-label">Deliveries</span>
-        <span class="bcp__stat-value">{{ task_count }}</span>
-      </div>
-    </div>
-    <div class="col-12 col-md-4">
-      <div class="bcp__stat">
-        <span class="bcp__stat-label">Delivery Fees (info only)</span>
-        <span class="bcp__stat-value bcp__stat-value--muted">QAR {{ grand_total_fee|floatformat:2 }}</span>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+    </header>
 
-  <!-- Filter -->
-  <div class="bcp__card mb-3">
-    <form method="GET" class="row g-3 align-items-end">
-      <div class="col-6 col-md-3">
-        <label class="bcp__label">From Date</label>
-        <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
-      </div>
-      <div class="col-6 col-md-3">
-        <label class="bcp__label">To Date</label>
-        <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="bcp__label">Business</label>
-        <select name="business_id" class="form-select">
-          <option value="">All businesses</option>
-          {% for biz in all_businesses %}
-          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{{ biz.business_name }}</option>
+    <!-- Teller window: pick an account -->
+    <form method="GET" class="bcp__window">
+      <div class="bcp__field bcp__field--account">
+        <label class="bcp__field-label">Account</label>
+        <select name="business_id" class="bcp__select">
+          <option value="">Choose a business…</option>
+          {% for biz in all_businesses|code_last %}
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-12 col-md-3 d-flex gap-2">
-        <button type="submit" class="btn bcp__btn-primary"><i class="fa-solid fa-filter me-1"></i> Filter</button>
-        <a href="{% url 'workforce:cod_business_settlement_report' %}" class="btn btn-outline-secondary">Reset</a>
+      <div class="bcp__field">
+        <label class="bcp__field-label">From</label>
+        <input type="date" name="date_from" class="bcp__input" value="{{ date_from }}">
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label">To</label>
+        <input type="date" name="date_to" class="bcp__input" value="{{ date_to }}">
+      </div>
+      <div class="bcp__window-actions">
+        <button type="submit" class="bcp__primary">Open</button>
+        <a href="{% url 'workforce:cod_business_settlement_report' %}" class="bcp__ghost">Clear</a>
       </div>
     </form>
+
+    {% if business_groups %}
+    {% for g in business_groups %}
+    <section class="bcp__statement-block">
+      <div class="bcp__statement">
+        <h2 class="bcp__statement-name">{{ g.business.business_name }}</h2>
+        <p class="bcp__statement-meta">
+          Holding <strong>QAR {{ g.subtotal|floatformat:2|intcomma }}</strong>
+          · {{ g.tasks|length }} deliver{{ g.tasks|length|pluralize:"y,ies" }}
+          · <span class="bcp__fee-note">fees QAR {{ g.fee_subtotal|floatformat:2|intcomma }} (info)</span>
+        </p>
+      </div>
+
+      <div class="bcp__toolbar">
+        <label class="bcp__checkall">
+          <input type="checkbox" id="bcp_select_all" class="bcp__biz-check" data-business="{{ g.business.business_id }}">
+          Count all
+        </label>
+      </div>
+
+      <div class="bcp__ledger">
+        <table class="bcp__table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Order</th>
+              <th>Customer</th>
+              <th>Delivered</th>
+              <th>Received</th>
+              <th class="bcp__num">Del. fee</th>
+              <th class="bcp__num">COD</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in g.tasks %}
+            <tr>
+              <td>
+                <input type="checkbox" class="bcp__task-check" data-business="{{ g.business.business_id }}"
+                       value="{{ t.id }}" data-amount="{{ t.cod_collected_amount|floatformat:2 }}"
+                       data-order="{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}{{ t.id }}{% endif %}">
+              </td>
+              <td class="bcp__order">{% if t.order %}#{{ t.order.order_number|default:t.order_id }}{% else %}—{% endif %}</td>
+              <td>{% if t.order %}{{ t.order.customer_name|default:"—" }}{% else %}—{% endif %}</td>
+              <td class="bcp__date">{{ t.completed_at|date:"d M Y"|default:"—" }}</td>
+              <td class="bcp__date">{{ t.cod_settled_at|date:"d M Y"|default:"—" }}</td>
+              <td class="bcp__num bcp__num--fee">{{ t.dl_price|default:0|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--cod">{{ t.cod_collected_amount|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endfor %}
+
+    {% elif business_filter %}
+    <div class="bcp__empty">
+      <div class="bcp__empty-mark">✓ Squared up</div>
+      <p class="bcp__empty-text">Nothing to settle — this account has no COD held by EzzyDelivery.</p>
+    </div>
+    {% else %}
+    <div class="bcp__empty">
+      <div class="bcp__empty-mark">▸</div>
+      <p class="bcp__empty-text">Choose an account above to begin the count.</p>
+    </div>
+    {% endif %}
+
+    <!-- Void a payout -->
+    <section class="bcp__void" id="bcp-void">
+      <h2 class="bcp__void-title">Void a payout</h2>
+      <p class="bcp__void-hint">Use when a settled order is returned and the COD must be clawed back from the business.</p>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="bcp__field-label">Settlement code</label>
+          <input type="text" id="bcp_reverse_code" class="bcp__input" placeholder="CODCS-…">
+        </div>
+        <div class="col-12 col-md-5">
+          <label class="bcp__field-label">Reason</label>
+          <input type="text" id="bcp_reverse_notes" class="bcp__input" placeholder="Order returned by customer">
+        </div>
+        <div class="col-12 col-md-3">
+          <button type="button" class="bcp__void-btn" id="bcp_reverse_btn">Void payout</button>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   {% if business_groups %}
-  <div class="bcp__toolbar mb-2">
-    <label class="bcp__checkall"><input type="checkbox" id="bcp_select_all"> Select all</label>
-  </div>
-
-  {% for g in business_groups %}
-  <div class="bcp__card mb-3" data-business="{{ g.business.business_id }}">
-    <div class="bcp__biz-header">
-      <label class="bcp__checkall">
-        <input type="checkbox" class="bcp__biz-check" data-business="{{ g.business.business_id }}">
-        <span class="bcp__biz-name">{{ g.business.business_name }}</span>
-      </label>
-      <span class="bcp__biz-subtotal">
-        COD QAR {{ g.subtotal|floatformat:2 }}
-        <span class="bcp__biz-fee">· fees QAR {{ g.fee_subtotal|floatformat:2 }}</span>
-        · {{ g.tasks|length }} deliver{{ g.tasks|length|pluralize:"y,ies" }}
-      </span>
+  <!-- Sticky teller tape -->
+  <div class="bcp__tape" id="bcp_actionbar">
+    <div class="bcp__tape-inner">
+      <div class="bcp__tape-readout">
+        <span class="bcp__tape-count">Counted <strong id="bcp_sel_count">0</strong></span>
+        <span class="bcp__tape-total">
+          <span class="bcp__tape-total-label">Pay out</span>
+          <span class="bcp__tape-total-value" id="bcp_tape_value"><span id="bcp_sel_total">0.00</span><span class="bcp__qr">QAR</span></span>
+        </span>
+      </div>
+      <button type="button" class="bcp__primary" id="bcp_settle_btn" disabled>Hand over ▸</button>
     </div>
-    <div class="table-responsive">
-      <table class="table table-sm bcp__table mb-0">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Order</th>
-            <th>Customer</th>
-            <th>Delivered</th>
-            <th>Recv'd (Ezzy)</th>
-            <th class="text-end">Delivery Fee</th>
-            <th class="text-end">COD (QR)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in g.tasks %}
-          <tr>
-            <td>
-              <input type="checkbox" class="bcp__task-check" data-business="{{ g.business.business_id }}"
-                     value="{{ t.id }}" data-amount="{{ t.cod_collected_amount|floatformat:2 }}">
-            </td>
-            <td>{% if t.order %}#{{ t.order.order_number|default:t.order_id }}{% else %}-{% endif %}</td>
-            <td>{% if t.order %}{{ t.order.customer_name|default:"-" }}{% else %}-{% endif %}</td>
-            <td>{{ t.completed_at|date:"d M Y"|default:"-" }}</td>
-            <td>{{ t.cod_settled_at|date:"d M Y"|default:"-" }}</td>
-            <td class="text-end bcp__fee-cell">{{ t.dl_price|default:0|floatformat:2 }}</td>
-            <td class="text-end">{{ t.cod_collected_amount|floatformat:2 }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endfor %}
-
-  <!-- Sticky action bar -->
-  <div class="bcp__actionbar" id="bcp_actionbar">
-    <div class="bcp__actionbar-info">
-      <span id="bcp_sel_count">0</span> selected ·
-      <strong>QAR <span id="bcp_sel_total">0.00</span></strong>
-    </div>
-    <button type="button" class="btn bcp__btn-primary" id="bcp_settle_btn" disabled>
-      <i class="fa-solid fa-money-bill-transfer me-1"></i> Settle Selected
-    </button>
-  </div>
-
-  {% elif business_filter %}
-  <div class="bcp__empty">
-    <i class="fa-solid fa-circle-check"></i>
-    <p>No pending COD payout for this business. All collected COD held by EzzyDelivery has been settled.</p>
-  </div>
-  {% else %}
-  <div class="bcp__empty">
-    <i class="fa-solid fa-building-columns"></i>
-    <p>Select a business above to view its pending COD payout.</p>
   </div>
   {% endif %}
-
-  <!-- Reverse a payout -->
-  <div class="bcp__card mt-4">
-    <div class="bcp__biz-header">
-      <span class="bcp__biz-name"><i class="fa-solid fa-rotate-left me-1"></i> Reverse a payout</span>
-    </div>
-    <div class="p-3">
-      <p class="text-muted small mb-2">Use when a settled order is returned and COD must be clawed back from the business.</p>
-      <div class="row g-2 align-items-end">
-        <div class="col-12 col-md-4">
-          <label class="bcp__label">Settlement Txn Code</label>
-          <input type="text" id="bcp_reverse_code" class="form-control" placeholder="CODCS-...">
-        </div>
-        <div class="col-12 col-md-5">
-          <label class="bcp__label">Reason / Notes</label>
-          <input type="text" id="bcp_reverse_notes" class="form-control" placeholder="Order returned by customer">
-        </div>
-        <div class="col-12 col-md-3">
-          <button type="button" class="btn btn-outline-danger w-100" id="bcp_reverse_btn">
-            <i class="fa-solid fa-rotate-left me-1"></i> Reverse Payout
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
-<!-- Settle confirm modal -->
+<!-- Receipt: confirm payout -->
 <div class="modal fade" id="bcpSettleModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
+    <div class="modal-content bcp__receipt">
       <div class="modal-header">
-        <h5 class="modal-title">Confirm Business COD Payout</h5>
+        <h5 class="modal-title bcp__receipt-title">Count out &amp; hand over</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p>Pay out <strong>QAR <span id="bcp_modal_total">0.00</span></strong> across <span id="bcp_modal_count">0</span> deliver(ies).</p>
+        <div class="bcp__receipt-lines" id="bcp_receipt_lines"></div>
+        <div class="bcp__receipt-total">
+          <span>Total · <span id="bcp_modal_count">0</span> deliveries</span>
+          <span><span class="bcp__brass">QAR <span id="bcp_modal_total">0.00</span></span></span>
+        </div>
+        <hr>
         <div class="mb-2">
-          <label class="bcp__label">Payment Method</label>
-          <select id="bcp_payment_method" class="form-select">
-            <option value="bank">Bank Transfer</option>
+          <label class="bcp__field-label">Paid by</label>
+          <select id="bcp_payment_method" class="bcp__select">
+            <option value="bank">Bank transfer</option>
             <option value="cash">Cash</option>
             <option value="fawran">Fawran</option>
           </select>
         </div>
         <div>
-          <label class="bcp__label">Reference (optional)</label>
-          <input type="text" id="bcp_reference" class="form-control" placeholder="Transfer ref / cheque no.">
+          <label class="bcp__field-label">Reference</label>
+          <input type="text" id="bcp_reference" class="bcp__input" placeholder="Transfer ref / cheque no.">
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn bcp__btn-primary" id="bcp_confirm_settle">Confirm Payout</button>
+        <button type="button" class="bcp__ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="bcp__primary" id="bcp_confirm_settle">Confirm handover</button>
       </div>
     </div>
   </div>
@@ -232,11 +213,14 @@
     });
     document.getElementById('bcp_sel_count').textContent = count;
     document.getElementById('bcp_sel_total').textContent = fmt(total);
-    document.getElementById('bcp_settle_btn').disabled = count === 0;
+    const btn = document.getElementById('bcp_settle_btn');
+    if (btn) btn.disabled = count === 0;
+    const val = document.getElementById('bcp_tape_value');
+    if (val) { val.classList.remove('bcp__tick'); void val.offsetWidth; val.classList.add('bcp__tick'); }
     return { count, total };
   }
 
-  // Per-business "select all"
+  // Per-business "count all"
   document.querySelectorAll('.bcp__biz-check').forEach(bc => {
     bc.addEventListener('change', () => {
       const biz = bc.dataset.business;
@@ -245,21 +229,21 @@
     });
   });
 
-  // Global "select all"
-  const selAll = document.getElementById('bcp_select_all');
-  if (selAll) selAll.addEventListener('change', () => {
-    taskChecks().forEach(c => { c.checked = selAll.checked; });
-    document.querySelectorAll('.bcp__biz-check').forEach(bc => { bc.checked = selAll.checked; });
-    recompute();
-  });
-
   taskChecks().forEach(c => c.addEventListener('change', recompute));
 
-  // Settle flow
+  // Hand over → build the receipt
   const settleBtn = document.getElementById('bcp_settle_btn');
   if (settleBtn) settleBtn.addEventListener('click', () => {
     const { count, total } = recompute();
     if (!count) return;
+    const lines = document.getElementById('bcp_receipt_lines');
+    lines.innerHTML = '';
+    taskChecks().filter(c => c.checked).forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'bcp__receipt-line';
+      row.innerHTML = `<span>#${c.dataset.order}</span><span>${fmt(parseFloat(c.dataset.amount || '0'))}</span>`;
+      lines.appendChild(row);
+    });
     document.getElementById('bcp_modal_total').textContent = fmt(total);
     document.getElementById('bcp_modal_count').textContent = count;
     new bootstrap.Modal(document.getElementById('bcpSettleModal')).show();
@@ -280,15 +264,15 @@
       });
       const data = await resp.json();
       if (data.success) { window.location.reload(); }
-      else { alert(data.error || 'Settlement failed'); this.disabled = false; }
+      else { alert(data.error || 'Handover failed'); this.disabled = false; }
     } catch (e) { alert('Network error'); this.disabled = false; }
   });
 
-  // Reverse flow
+  // Void a payout
   document.getElementById('bcp_reverse_btn')?.addEventListener('click', async function () {
     const code = document.getElementById('bcp_reverse_code').value.trim();
-    if (!code) { alert('Enter the settlement transaction code'); return; }
-    if (!confirm('Reverse payout ' + code + '? This claws COD back from the business.')) return;
+    if (!code) { alert('Enter the settlement code'); return; }
+    if (!confirm('Void payout ' + code + '? This claws the COD back from the business.')) return;
     this.disabled = true;
     const body = new URLSearchParams();
     body.append('txn_code', code);
@@ -300,8 +284,8 @@
         body: body.toString(),
       });
       const data = await resp.json();
-      if (data.success) { alert('Reversed ' + data.reversed_tasks + ' deliveries (' + data.reversal_code + ')'); window.location.reload(); }
-      else { alert(data.error || 'Reversal failed'); this.disabled = false; }
+      if (data.success) { alert('Voided ' + data.reversed_tasks + ' deliveries (' + data.reversal_code + ')'); window.location.reload(); }
+      else { alert(data.error || 'Void failed'); this.disabled = false; }
     } catch (e) { alert('Network error'); this.disabled = false; }
   });
 

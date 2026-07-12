@@ -21,6 +21,7 @@
                 <tr>
                     <th>Label</th>
                     <th>Instance Name</th>
+                    <th>WAHA Session</th>
                     <th>Phone Number</th>
                     <th>Default</th>
                     <th>Status</th>
@@ -32,6 +33,7 @@
                 <tr>
                     <td class="fw-bold">{{ inst.label }}</td>
                     <td><code>{{ inst.instance_name }}</code></td>
+                    <td>{% if inst.waha_session %}<code>{{ inst.waha_session }}</code>{% else %}<span class="text-muted">default</span>{% endif %}</td>
                     <td>{{ inst.phone_number|default:"-" }}</td>
                     <td>
                         {% if inst.is_default %}
@@ -48,7 +50,7 @@
                         {% endif %}
                     </td>
                     <td class="text-end">
-                        <button class="btn btn-outline-primary btn-sm" onclick="editInstance({{ inst.id }}, '{{ inst.label|escapejs }}', '{{ inst.instance_name|escapejs }}', '{{ inst.phone_number|escapejs }}', {{ inst.is_default|yesno:'true,false' }}, {{ inst.is_active|yesno:'true,false' }})">
+                        <button class="btn btn-outline-primary btn-sm" onclick="editInstance({{ inst.id }}, '{{ inst.label|escapejs }}', '{{ inst.instance_name|escapejs }}', '{{ inst.waha_session|escapejs }}', '{{ inst.phone_number|escapejs }}', {{ inst.is_default|yesno:'true,false' }}, {{ inst.is_active|yesno:'true,false' }})">
                             <i class="fa-solid fa-pen"></i>
                         </button>
                         <form method="post" class="d-inline" onsubmit="return confirm('Delete this instance?')">
@@ -63,7 +65,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
+                    <td colspan="7" class="text-center text-muted py-4">
                         <i class="fa-brands fa-whatsapp fa-2x mb-2 d-block opacity-50"></i>
                         No instances configured. Add one to get started.
                     </td>
@@ -94,6 +96,11 @@
                         <label class="form-label fw-bold">Instance Name</label>
                         <input type="text" class="form-control" name="instance_name" placeholder="Evolution API instance name" required>
                         <small class="text-muted">Must match the instance name in Evolution API</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">WAHA Session</label>
+                        <input type="text" class="form-control" name="waha_session" placeholder="e.g. default">
+                        <small class="text-muted">WAHA session for this same number (blank = default session)</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Phone Number</label>
@@ -135,6 +142,11 @@
                         <input type="text" class="form-control" name="instance_name" id="editInstanceName" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label fw-bold">WAHA Session</label>
+                        <input type="text" class="form-control" name="waha_session" id="editWahaSession" placeholder="e.g. default">
+                        <small class="text-muted">WAHA session for this same number (blank = default session)</small>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-bold">Phone Number</label>
                         <input type="text" class="form-control" name="phone_number" id="editPhone">
                     </div>
@@ -157,10 +169,11 @@
 </div>
 
 <script>
-function editInstance(id, label, instanceName, phone, isDefault, isActive) {
+function editInstance(id, label, instanceName, wahaSession, phone, isDefault, isActive) {
     document.getElementById('editId').value = id;
     document.getElementById('editLabel').value = label;
     document.getElementById('editInstanceName').value = instanceName;
+    document.getElementById('editWahaSession').value = wahaSession;
     document.getElementById('editPhone').value = phone;
     document.getElementById('editDefault').checked = isDefault;
     document.getElementById('editActive').checked = isActive;

@@ -3,6 +3,10 @@
 
 {% block title %}Edit Order {{ order.order_number }} - Workforce{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/order-edit.css' %}?v=20260701b" type="text/css" />
+{% endblock extra_css %}
+
 {% block content %}
 <div class="woe">
     <!-- Hero Header -->
@@ -126,12 +130,34 @@
                 </div>
 
                 <!-- Delivery Address (Editable) -->
-                <div class="woe__card">
+                <div class="woe__card woe__card--focus">
                     <div class="woe__card-header woe__card-header--primary">
                         <i class="fa-solid fa-location-dot me-2"></i>
                         <span class="woe__section-label">Delivery Address</span>
                     </div>
                     <div class="woe__card-body">
+
+                        <!-- Signature: Qatar address plate — live mirror of Zone/Street/Building -->
+                        <div class="qnas-plate" role="group" aria-label="Qatar national address code">
+                            <div class="qnas-plate__cell">
+                                <span class="qnas-plate__tag">Zone</span>
+                                <span class="qnas-plate__num{% if not order.dl_zone %} qnas-plate__num--empty{% endif %}" id="woePlateZone">{{ order.dl_zone|default:'—' }}</span>
+                            </div>
+                            <span class="qnas-plate__div">/</span>
+                            <div class="qnas-plate__cell">
+                                <span class="qnas-plate__tag">Street</span>
+                                <span class="qnas-plate__num{% if not order.dl_street %} qnas-plate__num--empty{% endif %}" id="woePlateStreet">{{ order.dl_street|default:'—' }}</span>
+                            </div>
+                            <span class="qnas-plate__div">/</span>
+                            <div class="qnas-plate__cell">
+                                <span class="qnas-plate__tag">Building</span>
+                                <span class="qnas-plate__num{% if not order.dl_building %} qnas-plate__num--empty{% endif %}" id="woePlateBldg">{{ order.dl_building|default:'—' }}</span>
+                            </div>
+                            <div class="qnas-plate__name{% if not zone_name %} qnas-plate__name--empty{% endif %}" id="woePlateZoneWrap">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <span id="woePlateZoneName">{{ zone_name|default:'Zone name not resolved' }}</span>
+                            </div>
+                        </div>
 
                         <!-- Row 1: Full Address + AI Parse -->
                         <div class="mb-3">
@@ -239,30 +265,29 @@
 
                 <!-- Package Description (Editable) -->
                 <div class="woe__card">
-                    <div class="woe__card-header" style="background:#fff8e1;border-left:3px solid #f5c542;">
-                        <i class="fa-solid fa-box-open me-2" style="color:#c49000;"></i>
+                    <div class="woe__card-header woe__card-header--primary">
+                        <i class="fa-solid fa-box-open me-2"></i>
                         <span class="woe__section-label">Package Description</span>
                     </div>
                     <div class="woe__card-body">
-                        <div class="d-flex flex-column gap-2 p-2 rounded" style="background:#fff8e1;border:1px solid #f5c542;">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="fa-solid fa-box-open" style="color:#c49000;"></i>
-                                <label class="text-muted small mb-0" style="min-width:50px;">Package</label>
-                                <input type="text" class="form-control form-control-sm" name="package_description"
+                        <div class="woe__pkg-box">
+                            <div class="woe__pkg-row">
+                                <i class="fa-solid fa-box-open"></i>
+                                <label class="woe__pkg-tag mb-0" for="woe_pkg_desc">Package</label>
+                                <input type="text" class="form-control form-control-sm" id="woe_pkg_desc" name="package_description"
                                        value="{{ order.package_description|default:'' }}" placeholder="Package description">
                             </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="fa-solid fa-cubes" style="color:#c49000;"></i>
-                                <label class="text-muted small mb-0" style="min-width:50px;">Qty</label>
-                                <input type="number" class="form-control form-control-sm" name="package_qty"
-                                       value="{{ order.package_qty|default:0 }}"
-                                       min="0" style="max-width:100px;">
+                            <div class="woe__pkg-row">
+                                <i class="fa-solid fa-cubes"></i>
+                                <label class="woe__pkg-tag mb-0" for="woe_pkg_qty">Qty</label>
+                                <input type="number" class="form-control form-control-sm" id="woe_pkg_qty" name="package_qty"
+                                       value="{{ order.package_qty|default:0 }}" min="0">
                             </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="fa-solid fa-money-bill-wave text-success"></i>
-                                <label class="text-muted small mb-0" style="min-width:50px;">COD</label>
-                                <div class="input-group input-group-sm" style="max-width:180px;">
-                                    <input type="number" class="form-control form-control-sm" name="cod_amount"
+                            <div class="woe__pkg-row">
+                                <i class="fa-solid fa-money-bill-wave"></i>
+                                <label class="woe__pkg-tag mb-0" for="woe_pkg_cod">COD</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control form-control-sm" id="woe_pkg_cod" name="cod_amount"
                                            value="{{ order.cod_amount|default:'' }}" step="0.01" min="0" placeholder="0.00">
                                     <span class="input-group-text">QR</span>
                                 </div>
@@ -416,7 +441,7 @@
                 </div>
 
                 <!-- Submit Button -->
-                <div class="woe__card">
+                <div class="woe__card woe__card--sticky">
                     <div class="woe__card-body">
                         <button type="submit" class="woe__btn woe__btn--primary w-100 mb-2">
                             <i class="fa-solid fa-save me-2"></i> Save Changes
@@ -461,22 +486,57 @@ if (codStatusEl && codAmountEl) {
     });
 }
 
+// ---- Qatar Address Plate: live mirror of Zone / Street / Building ----
+function woeSetPlateCell(id, value) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var v = (value || '').toString().trim();
+    el.textContent = v || '—';
+    el.classList.toggle('qnas-plate__num--empty', !v);
+}
+function woeSetPlateZoneName(name) {
+    var wrap = document.getElementById('woePlateZoneWrap');
+    var el = document.getElementById('woePlateZoneName');
+    if (!el || !wrap) return;
+    var n = (name || '').trim();
+    el.textContent = n || 'Zone name not resolved';
+    wrap.classList.toggle('qnas-plate__name--empty', !n);
+}
+function woeSyncPlate() {
+    woeSetPlateCell('woePlateZone', document.getElementById('dl_zone').value);
+    woeSetPlateCell('woePlateStreet', document.getElementById('dl_street').value);
+    woeSetPlateCell('woePlateBldg', document.getElementById('dl_building').value);
+}
+['dl_street', 'dl_building'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', woeSyncPlate);
+});
+// QNAS verify / AI parse set these fields programmatically (no input event) —
+// reconcile the plate + zone name from the live field values every second.
+setInterval(function() {
+    woeSyncPlate();
+    var zn = document.getElementById('woe_zone_name');
+    if (zn) woeSetPlateZoneName(zn.value);
+}, 1000);
+
 // Zone name lookup
 var _zoneCache = {};
 function updateZoneName(zoneNum) {
+    woeSyncPlate();
     var el = document.getElementById('woe_zone_name');
     if (!el) return;
     zoneNum = parseInt(zoneNum);
-    if (!zoneNum) { el.value = ''; return; }
-    if (_zoneCache[zoneNum] !== undefined) { el.value = _zoneCache[zoneNum]; return; }
+    if (!zoneNum) { el.value = ''; woeSetPlateZoneName(''); return; }
+    if (_zoneCache[zoneNum] !== undefined) { el.value = _zoneCache[zoneNum]; woeSetPlateZoneName(_zoneCache[zoneNum]); return; }
     fetch('{% url "workforce:ajax_zone_name" %}?zone=' + zoneNum)
         .then(function(r) { return r.json(); })
         .then(function(d) {
             var name = d.zone_name || '';
             _zoneCache[zoneNum] = name;
             el.value = name;
+            woeSetPlateZoneName(name);
         })
-        .catch(function() { el.value = ''; });
+        .catch(function() { el.value = ''; woeSetPlateZoneName(''); });
 }
 </script>
 

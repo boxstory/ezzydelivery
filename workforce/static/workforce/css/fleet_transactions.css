@@ -110,6 +110,11 @@
 /* Filter Panel Card - Full Width */
 .ftr__card--filter {
     width: 100%;
+    /* Let the Delivery Status dropdown menu escape the card instead of being clipped */
+    overflow: visible;
+}
+.ftr__card--filter .ftr__card-body {
+    overflow: visible;
 }
 
 /* Profile Card - Horizontal Flex Layout */
@@ -601,6 +606,177 @@ input.ftr__filter-input:focus {
     padding: 0.125rem 0.375rem;
     border-radius: 0.25rem;
     border: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+
+/* Multi-select checkbox dropdown (Delivery Status filter) */
+.ftr__ms {
+    width: 100%;
+    position: relative;
+}
+.ftr__ms-menu.show {
+    z-index: 1080;
+}
+/* Toggle button — visually identical to the sibling filter selects */
+.ftr__ms-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 36px;
+    max-height: 36px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--brand-grey-700, #333);
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.ftr__ms-toggle:hover {
+    border-color: var(--brand-grey-400, #bcbcbc);
+    background: var(--brand-grey-100, #fafafa);
+}
+.ftr__ms-toggle:focus-visible,
+.ftr__ms-toggle[aria-expanded="true"] {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.15);
+}
+.ftr__ms-toggle-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Selected-count pill inside the toggle */
+.ftr__ms-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+    background: rgba(247, 192, 0, 0.9);
+    border-radius: 999px;
+}
+.ftr__ms-caret {
+    font-size: 0.65rem;
+    color: var(--brand-grey-400, #9ca3af);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+.ftr__ms-toggle[aria-expanded="true"] .ftr__ms-caret {
+    transform: rotate(180deg);
+}
+
+/* Menu */
+.ftr__ms-menu {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 0.375rem;
+    min-width: 240px;
+    border: 1px solid var(--brand-grey-200, #eee);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    box-shadow: 0 12px 28px -8px rgba(0, 31, 63, 0.18);
+}
+.ftr__ms-menu-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.25rem 0.5rem 0.5rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--brand-grey-100, #f0f0f0);
+}
+.ftr__ms-menu-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+.ftr__ms-clear {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--brand-grey-500, #6c757d);
+    background: none;
+    border: none;
+    padding: 0.1rem 0.25rem;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+.ftr__ms-clear:hover {
+    color: var(--brand-navy, #001f3f);
+}
+.ftr__ms-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    font-size: 0.8125rem;
+    color: var(--brand-grey-700, #333);
+    cursor: pointer;
+    margin: 0;
+    transition: background 0.12s ease;
+}
+.ftr__ms-item:hover {
+    background: var(--brand-grey-100, #f5f5f5);
+}
+.ftr__ms-item input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--brand-navy, #001f3f);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+/* Emphasise the row when its checkbox is checked */
+.ftr__ms-item:has(input:checked) {
+    background: rgba(247, 192, 0, 0.1);
+    color: var(--brand-navy, #001f3f);
+    font-weight: 600;
+}
+
+/* Client code shown under the order code */
+.ftr__code-sub {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.7rem;
+    color: var(--brand-grey-600, #555);
+}
+
+/* From / To Location cell — two stacked lines in one column */
+.ftr__loc-cell {
+    min-width: 200px;
+    max-width: 320px;
+}
+.ftr__loc-line {
+    display: block;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    white-space: normal;
+    word-break: break-word;
+}
+.ftr__loc-line i {
+    width: 1rem;
+    text-align: center;
+    margin-right: 0.25rem;
+}
+.ftr__loc-line--from {
+    color: var(--brand-primary, #1F2A44);
+    font-weight: 600;
+}
+.ftr__loc-line--to {
+    color: var(--brand-grey-600, #555);
+    margin-top: 0.15rem;
 }
 
 /* Transaction Type Badges */
