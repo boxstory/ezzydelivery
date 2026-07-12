@@ -155,9 +155,12 @@
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
           <td>
-            {% if t.business %}{{ t.business.business_name }}
-            {% elif t.delivery_task.order.business %}{{ t.delivery_task.order.business.business_name }}
-            {% else %}<span class="codl__muted">—</span>{% endif %}
+            {% with biz=t.business|default:t.delivery_task.order.business %}
+              {% if biz %}
+                <div>{{ biz.business_name }}</div>
+                <span class="codl__submeta">{{ biz.business_code }}</span>
+              {% else %}<span class="codl__muted">—</span>{% endif %}
+            {% endwith %}
           </td>
           <td class="codl__code">{{ t.delivery_task.order.order_number|default:"—" }}</td>
           <td>
