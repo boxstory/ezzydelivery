@@ -204,7 +204,13 @@
               {% else %}<span class="codl__flag codl__flag--pending">Pending</span>{% endif %}
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
-          <td>{% if t.created_by %}{{ t.created_by.get_full_name|default:t.created_by.username }}{% else %}<span class="codl__muted">system</span>{% endif %}</td>
+          <td>
+            {% if t.created_by %}
+              {% with rb=t.created_by.get_full_name|default:t.created_by.username %}
+              <div class="codl__truncate" title="{{ rb }}">{{ rb }}</div>
+              {% endwith %}
+            {% else %}<span class="codl__muted">system</span>{% endif %}
+          </td>
           <td class="codl__notes" title="{{ t.notes|default:'' }}">{{ t.notes|default:"—"|truncatechars:40 }}</td>
         </tr>
         {% empty %}
