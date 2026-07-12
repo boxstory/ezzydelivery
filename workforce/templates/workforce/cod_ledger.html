@@ -134,9 +134,9 @@
           <th class="codl__num">#</th>
           <th>Date / Time</th>
           <th>Code / Type</th>
-          <th class="codl__num codl__amt">Amount<br>Method</th>
-          <th>Driver</th>
           <th>Business</th>
+          <th>Driver</th>
+          <th class="codl__num codl__amt">Amount<br>Method</th>
           <th class="codl__num codl__shrink">COD in hand<br>after</th>
           <th class="codl__num">Wallet after</th>
           <th>Order #</th>
@@ -159,11 +159,14 @@
             <div class="codl__code">{{ t.transaction_code|default:t.pk }}</div>
             <span class="codl__badge codl__badge--{{ t.transaction_type }}">{{ t.get_transaction_type_display }}</span>
           </td>
-          <td class="codl__num codl__amt">
-            <div class="{% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">{{ t.amount|floatformat:2 }}</div>
-            {% if t.payment_method %}
-              <span class="codl__pay codl__pay--{{ t.payment_method }}">{% if t.payment_method == 'pos' %}POS{% elif t.payment_method == 'bank' %}Bank{% elif t.payment_method == 'atm' %}ATM{% elif t.payment_method == 'fawran' %}Fawran{% else %}Cash{% endif %}</span>
-            {% else %}<span class="codl__submeta">—</span>{% endif %}
+          <td>
+            {% if t.business %}
+              <div>{{ t.business.business_name }}</div>
+              <span class="codl__submeta">{{ t.business.business_code }}</span>
+            {% elif t.delivery_task.order.business %}
+              <div>{{ t.delivery_task.order.business.business_name }}</div>
+              <span class="codl__submeta">{{ t.delivery_task.order.business.business_code }}</span>
+            {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
           <td>
             {% if t.driver %}
@@ -173,14 +176,11 @@
               <span class="codl__submeta">{{ t.driver.driver_code }}</span>
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
-          <td>
-            {% if t.business %}
-              <div>{{ t.business.business_name }}</div>
-              <span class="codl__submeta">{{ t.business.business_code }}</span>
-            {% elif t.delivery_task.order.business %}
-              <div>{{ t.delivery_task.order.business.business_name }}</div>
-              <span class="codl__submeta">{{ t.delivery_task.order.business.business_code }}</span>
-            {% else %}<span class="codl__muted">—</span>{% endif %}
+          <td class="codl__num codl__amt">
+            <div class="{% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">{{ t.amount|floatformat:2 }}</div>
+            {% if t.payment_method %}
+              <span class="codl__pay codl__pay--{{ t.payment_method }}">{% if t.payment_method == 'pos' %}POS{% elif t.payment_method == 'bank' %}Bank{% elif t.payment_method == 'atm' %}ATM{% elif t.payment_method == 'fawran' %}Fawran{% else %}Cash{% endif %}</span>
+            {% else %}<span class="codl__submeta">—</span>{% endif %}
           </td>
           <td class="codl__num codl__shrink">{{ t.cod_in_hand_after|floatformat:2 }}</td>
           <td class="codl__num">{{ t.wallet_balance_after|floatformat:2 }}</td>
