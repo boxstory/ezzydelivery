@@ -4240,7 +4240,7 @@ def driver_cod_submit(request):
         'task_id': task.id,
         'task_number': task.dl_task_number,
         'cod_amount': str(cod_amount),
-        'cod_in_hand': str(driver.cod_in_hand),
+        'cod_in_hand': str(WalletService.live_cod_in_hand(driver)),
         'submitted_at': task.cod_settled_at.isoformat() if task.cod_settled_at else timezone.now().isoformat(),
     }, status=status.HTTP_200_OK)
 
@@ -4271,9 +4271,10 @@ def driver_cod_pending(request):
             'cod_collected_at': task.cod_collected_at.isoformat() if task.cod_collected_at else None,
         })
 
+    from fleet.wallet_service import WalletService
     return Response({
         'count': len(data),
-        'total_pending_cod': str(driver.cod_in_hand),
+        'total_pending_cod': str(WalletService.live_cod_in_hand(driver)),
         'tasks': data,
     }, status=status.HTTP_200_OK)
 
@@ -4684,6 +4685,11 @@ def driver_dashboard(request):
         driver=driver, is_read=False
     ).count()
 
+    # Wallet snapshot from the single source of truth (cod_in_hand and everything
+    # derived from it are computed live from task state, not the cached column).
+    from fleet.wallet_service import WalletService
+    wallet = WalletService.get_wallet_status(driver)
+
     return Response({
         'driver': {
             'driver_id': driver.driver_id,
@@ -4694,13 +4700,13 @@ def driver_dashboard(request):
             'driver_rating': driver.driver_rating,
         },
         'wallet': {
-            'cod_in_hand': str(driver.cod_in_hand),
-            'credit_limit': str(driver.credit_limit),
-            'available_credit': str(driver.available_credit),
-            'pending_earnings': str(driver.pending_earnings),
-            'wallet_usage_pct': round(float(driver.wallet_usage_percentage), 1),
-            'is_wallet_warning': driver.is_wallet_warning,
-            'is_wallet_blocked': driver.is_wallet_blocked,
+            'cod_in_hand': str(wallet['cod_in_hand']),
+            'credit_limit': str(wallet['credit_limit']),
+            'available_credit': str(wallet['available_credit']),
+            'pending_earnings': str(wallet['pending_earnings']),
+            'wallet_usage_pct': round(float(wallet['usage_percentage']), 1),
+            'is_wallet_warning': wallet['is_warning'],
+            'is_wallet_blocked': wallet['is_blocked'],
         },
         'today_stats': {
             'total': total_today,
@@ -4750,7 +4756,7 @@ def driver_cod_submit_bulk(request):
         return Response({'error': 'One or more task_ids are invalid, not assigned to you, or COD not yet collected'}, status=status.HTTP_400_BAD_REQUEST)
 
     from fleet.wallet_service import WalletService
-    cod_in_hand_before = driver.cod_in_hand
+    cod_in_hand_before = WalletService.live_cod_in_hand(driver)
 
     try:
         with transaction.atomic():
@@ -4785,7 +4791,7 @@ def driver_cod_submit_bulk(request):
         'submitted_amount': str(total_amount),
         'payment_method': payment_method,
         'cod_in_hand_before': str(cod_in_hand_before),
-        'cod_in_hand_after': str(driver.cod_in_hand),
+        'cod_in_hand_after': str(WalletService.live_cod_in_hand(driver)),
         'tasks_settled': len(locked_ids),
         'submitted_at': txn.created_at.isoformat(),
     }, status=status.HTTP_201_CREATED)
