@@ -956,6 +956,8 @@ def driver_complete_task(request, task_id):
                     created_by=request.user,
                     payment_method=task.payment_method or None,
                 )
+                # Refresh the driver's cached cod_in_hand from the task truth.
+                WalletService.sync_cod_in_hand(task.driver)
 
             # Fix 14: Allow additional COD collection on partially collected orders
             elif (task.order and status_value == 'delivered' and cod_collected and cod_amount_collected
@@ -996,6 +998,8 @@ def driver_complete_task(request, task_id):
                     delivery_task=task,
                     created_by=request.user,
                 )
+                # Refresh the driver's cached cod_in_hand from the task truth.
+                WalletService.sync_cod_in_hand(task.driver)
 
             # Log COD amount mismatch warning
             if task.order and cod_amount_collected and task.order.cod_amount:

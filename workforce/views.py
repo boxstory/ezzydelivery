@@ -9299,7 +9299,9 @@ def cod_settlement_action(request):
             # Use transaction.atomic and select_for_update to prevent race conditions
             with transaction.atomic():
                 driver = fleet_models.Driver.objects.select_for_update().get(driver_id=driver_id)
-                cod_amount = driver.cod_in_hand
+                # Settle against the single source of truth (derived from tasks),
+                # not the cached column which may drift.
+                cod_amount = WalletService.live_cod_in_hand(driver)
 
                 if cod_amount > 0:
                     # Record COD deposit transaction with payment method

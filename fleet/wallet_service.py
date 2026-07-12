@@ -64,19 +64,21 @@ class WalletService:
             if driver and transaction_type in DRIVER_WALLET_TYPES:
                 driver = Driver.objects.select_for_update().get(pk=driver.pk)
 
-                # Update driver balances based on transaction type
+                # Update driver balances based on transaction type.
+                # NOTE: cod_in_hand is NOT mutated here. It is a denormalization of
+                # the task truth (see WalletService.live_cod_in_hand) and is refreshed
+                # via sync_cod_in_hand() at the point the task COD state actually
+                # changes (collection / submission / return). Mutating it here too
+                # would double-count. wallet_balance remains a transaction-log ledger.
                 if transaction_type == 'earning':
                     driver.pending_earnings += amount
                     driver.total_earnings += amount
                 elif transaction_type == 'cod_collection':
                     driver.wallet_balance -= abs(amount)
-                    driver.cod_in_hand += abs(amount)
                 elif transaction_type in ['cod_deposit', 'cod_driver_settle']:
                     driver.wallet_balance += abs(amount)
-                    driver.cod_in_hand -= abs(amount)
                 elif transaction_type == 'cod_return':
                     driver.wallet_balance += abs(amount)
-                    driver.cod_in_hand -= abs(amount)
                 elif transaction_type == 'settlement':
                     driver.pending_earnings -= abs(amount)
                     driver.last_settlement_date = timezone.now()
@@ -292,12 +294,22 @@ class WalletService:
                         break
                 deposit_amount = Decimal(str(amount))
 
-            # Re-validate against the freshly-locked balance. A concurrent submission
-            # that already ran will have reduced cod_in_hand, so the loser fails here.
-            if driver.cod_in_hand < deposit_amount:
+            # Re-validate against the single source of truth (derived from tasks).
+            # A concurrent submission that already ran will have settled the tasks,
+            # so the loser sees a reduced live balance and fails here.
+            live_before = WalletService.live_cod_in_hand(driver)
+            if live_before < deposit_amount:
                 raise ValueError(
-                    f"Driver only has {driver.cod_in_hand} QR in hand, cannot submit {deposit_amount} QR"
+                    f"Driver only has {live_before} QR in hand, cannot submit {deposit_amount} QR"
                 )
+
+            # Settle the tasks FIRST so cod_in_hand derives to its post-submit value,
+            # then refresh the cached denormalization before snapshotting it.
+            if settled_task_ids:
+                DeliveryTask.objects.filter(id__in=settled_task_ids).update(
+                    cod_settled=True, cod_settled_at=now
+                )
+            WalletService.sync_cod_in_hand(driver)
 
             trans = WalletService.record_transaction(
                 driver=driver,
@@ -312,7 +324,7 @@ class WalletService:
 
             if settled_task_ids:
                 DeliveryTask.objects.filter(id__in=settled_task_ids).update(
-                    cod_settled=True, cod_settled_at=now, cod_submission_txn=trans
+                    cod_submission_txn=trans
                 )
                 # Update order COD status to 'cod_with_ezzy' for settled tasks
                 from orders.models import Order
@@ -558,6 +570,10 @@ class WalletService:
             )
 
         with transaction.atomic():
+            # Lock the driver row for the whole check-and-act (consistent driver->task
+            # lock order with the rest of the COD paths, so no deadlock).
+            driver = Driver.objects.select_for_update().get(pk=driver.pk)
+
             # Guard against a duplicate return for the same task.
             already_returned = DriverTransaction.objects.filter(
                 delivery_task=delivery_task, transaction_type='cod_return'
@@ -575,6 +591,9 @@ class WalletService:
                 reference_number=delivery_task.dl_task_number,
                 notes=notes
             )
+            # The return txn now excludes this task from live_cod_in_hand; refresh
+            # the cached denormalization to match.
+            WalletService.sync_cod_in_hand(driver)
         return trans
 
     @staticmethod
@@ -665,14 +684,59 @@ class WalletService:
         Returns:
             tuple (bool, str): (can_accept, reason)
         """
-        if driver.is_wallet_blocked:
+        # Gate on the single source of truth, not the cached column, so a stale
+        # denormalization can never wrongly block or admit a COD order.
+        live_cod = WalletService.live_cod_in_hand(driver)
+        credit_limit = driver.credit_limit or Decimal('0')
+        available_credit = max(credit_limit - live_cod, Decimal('0'))
+
+        if credit_limit and live_cod >= credit_limit:
             return False, "Wallet balance exhausted. Please submit COD to admin."
 
-        available_credit = driver.available_credit  # credit_limit - cod_in_hand
         if cod_amount > available_credit:
             return False, f"Insufficient credit. Available: {available_credit} QR, Required: {cod_amount} QR"
 
         return True, "OK"
+
+    @staticmethod
+    def live_cod_in_hand(driver):
+        """Single source of truth for a driver's COD-in-hand, derived from tasks.
+
+        COD is 'in hand' when it was collected but has NOT left the driver by
+        either route: submitted to admin (cod_settled=True) or reversed to the
+        customer (a cod_return transaction exists for the task). Everything that
+        reports or gates on cod_in_hand should go through this — the cached
+        Driver.cod_in_hand column is only a denormalization kept in sync with it.
+        """
+        returned_task_ids = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type='cod_return',
+            delivery_task__isnull=False,
+        ).values_list('delivery_task_id', flat=True)
+
+        return delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            cod_collected=True,
+            cod_settled=False,
+        ).exclude(
+            id__in=returned_task_ids
+        ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+
+    @staticmethod
+    def sync_cod_in_hand(driver, save=True):
+        """Recompute the cached Driver.cod_in_hand from the task truth and persist it.
+
+        Call this inside the same locked transaction as any change to a driver's
+        COD task state (collection, submission, return). Callers should already
+        hold a select_for_update lock on the driver row. Returns the live value.
+        """
+        live = WalletService.live_cod_in_hand(driver)
+        if save and driver.cod_in_hand != live:
+            driver.cod_in_hand = live
+            driver.save(update_fields=['cod_in_hand'])
+        else:
+            driver.cod_in_hand = live
+        return live
 
     @staticmethod
     def get_wallet_status(driver):
@@ -681,12 +745,8 @@ class WalletService:
         COD in hand and wallet balance are computed live from DeliveryTask
         to avoid stale cached field values.
         """
-        # Live COD: collected but not yet settled
-        live_cod = delivery_models.DeliveryTask.objects.filter(
-            driver=driver,
-            cod_collected=True,
-            cod_settled=False,
-        ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+        # Live COD: single source of truth (collected, not submitted, not returned)
+        live_cod = WalletService.live_cod_in_hand(driver)
 
         # Live wallet balance from transactions
         txn_balance = fleet_models.DriverTransaction.objects.filter(

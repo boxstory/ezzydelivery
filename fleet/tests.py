@@ -440,7 +440,9 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         )
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.wallet_balance, Decimal('4900.00'))
-        self.assertEqual(self.driver.cod_in_hand, Decimal('100.00'))
+        # cod_in_hand is now derived from tasks (see WalletService.live_cod_in_hand),
+        # so record_transaction no longer mutates it — it stays at its prior value.
+        self.assertEqual(self.driver.cod_in_hand, Decimal('0.00'))
 
     def test_cod_deposit_transaction(self):
         # Set up driver with COD in hand
@@ -456,7 +458,9 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         )
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.wallet_balance, Decimal('0.00'))
-        self.assertEqual(self.driver.cod_in_hand, Decimal('0.00'))
+        # record_transaction moves wallet_balance only; cod_in_hand is synced from
+        # task state by submit_cod_to_admin, not here, so it is unchanged.
+        self.assertEqual(self.driver.cod_in_hand, Decimal('100.00'))
 
     def test_settlement_transaction(self):
         self.driver.pending_earnings = Decimal('500.00')
@@ -518,7 +522,9 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
             description='COD collected',
         )
         self.assertEqual(trans.wallet_balance_after, Decimal('900.00'))
-        self.assertEqual(trans.cod_in_hand_after, Decimal('300.00'))
+        # cod_in_hand is no longer incremented by record_transaction, so the
+        # snapshot reflects the value at call time (unchanged), not 200+100.
+        self.assertEqual(trans.cod_in_hand_after, Decimal('200.00'))
 
     def test_multiple_sequential_transactions(self):
         # Simulate a day: earn, collect COD, collect more COD, deposit COD
@@ -539,24 +545,46 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
 
 
 class WalletServiceSubmitCODTest(DriverTestMixin, TransactionTestCase):
-    """Test WalletService.submit_cod_to_admin."""
+    """Test WalletService.submit_cod_to_admin.
+
+    cod_in_hand is now the single source of truth derived from DeliveryTask, so
+    these fixtures back the 200 QR in hand with two 100 QR collected tasks
+    (whole tasks are the settlement unit).
+    """
 
     def setUp(self):
         self.user, self.profile = self.create_driver_user()
         self.driver = self.create_driver(self.user, self.profile,
                                          wallet_balance=Decimal('-200.00'),
                                          cod_in_hand=Decimal('200.00'))
+        self.business, self.pickup, self.order = self.create_business_and_order(
+            self.user, self.profile)
+        self.task_a = self.create_delivery_task(
+            self.order, self.business, pickup=self.pickup, driver=self.driver,
+            task_number='COD-A', status='delivered',
+            cod_collected=True, cod_settled=False,
+            cod_collected_amount=Decimal('100.00'), completed_at=timezone.now())
+        self.task_b = self.create_delivery_task(
+            self.order, self.business, pickup=self.pickup, driver=self.driver,
+            task_number='COD-B', status='delivered',
+            cod_collected=True, cod_settled=False,
+            cod_collected_amount=Decimal('100.00'), completed_at=timezone.now())
 
     def test_submit_cod_success(self):
-        trans = WalletService.submit_cod_to_admin(
+        WalletService.submit_cod_to_admin(
             driver=self.driver, amount=Decimal('200.00'),
             created_by=self.user, reference_number='REF001')
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.cod_in_hand, Decimal('0.00'))
         self.assertEqual(self.driver.wallet_balance, Decimal('0.00'))
+        self.task_a.refresh_from_db()
+        self.task_b.refresh_from_db()
+        self.assertTrue(self.task_a.cod_settled)
+        self.assertTrue(self.task_b.cod_settled)
 
     def test_submit_cod_partial(self):
-        trans = WalletService.submit_cod_to_admin(
+        # Submitting 100 settles exactly one whole 100 QR task; one remains in hand.
+        WalletService.submit_cod_to_admin(
             driver=self.driver, amount=Decimal('100.00'),
             created_by=self.user)
         self.driver.refresh_from_db()
@@ -585,8 +613,14 @@ class WalletServiceCanAcceptCODTest(DriverTestMixin, TestCase):
         self.assertEqual(reason, 'OK')
 
     def test_cannot_accept_wallet_blocked(self):
-        # Blocked when cod_in_hand >= credit_limit
-        self.driver.cod_in_hand = Decimal('5000.00')  # At credit limit (5000)
+        # Blocked when live cod_in_hand >= credit_limit. cod_in_hand is derived from
+        # tasks, so back the 5000 at-limit balance with a real collected task.
+        business, pickup, order = self.create_business_and_order(self.user, self.profile)
+        self.create_delivery_task(
+            order, business, pickup=pickup, driver=self.driver,
+            task_number='LIMIT-1', status='delivered',
+            cod_collected=True, cod_settled=False,
+            cod_collected_amount=Decimal('5000.00'), completed_at=timezone.now())
         can, reason = WalletService.can_accept_cod_order(self.driver, Decimal('100.00'))
         self.assertFalse(can)
         self.assertIn('exhausted', reason.lower())
