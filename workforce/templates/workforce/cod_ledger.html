@@ -5,7 +5,7 @@
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712j" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712k" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -134,7 +134,7 @@
           <th class="codl__num">#</th>
           <th>Date / Time</th>
           <th>Code / Type</th>
-          <th class="codl__num">Amount / Method</th>
+          <th class="codl__num codl__amt">Amount<br>Method</th>
           <th>Driver</th>
           <th>Business</th>
           <th>Order #</th>
@@ -159,7 +159,7 @@
             <div class="codl__code">{{ t.transaction_code|default:t.pk }}</div>
             <span class="codl__badge codl__badge--{{ t.transaction_type }}">{{ t.get_transaction_type_display }}</span>
           </td>
-          <td class="codl__num">
+          <td class="codl__num codl__amt">
             <div class="{% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">{{ t.amount|floatformat:2 }}</div>
             {% if t.payment_method %}
               <span class="codl__pay codl__pay--{{ t.payment_method }}">{{ t.get_payment_method_display }}</span>
