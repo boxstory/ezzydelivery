@@ -15,8 +15,13 @@ from .models import WhatsAppVerification
 
 
 def generate_verification_code(length=6):
-    """Generate a random numeric verification code"""
-    return ''.join(random.choices(string.digits, k=length))
+    """Generate a cryptographically secure numeric verification code.
+
+    Uses `secrets` (not `random`) because this code gates password resets —
+    a predictable Mersenne-Twister sequence would let an attacker predict a
+    victim's OTP from their own observed codes.
+    """
+    return ''.join(secrets.choice(string.digits) for _ in range(length))
 
 
 def generate_secure_token():
@@ -629,8 +634,8 @@ def verify_code(phone_number, code, verification_type):
         verification.attempts += 1
         verification.save()
 
-        # Check code
-        if verification.verification_code == code:
+        # Check code (constant-time to avoid a timing side-channel on the OTP)
+        if hmac.compare_digest(str(verification.verification_code), str(code)):
             verification.is_verified = True
             verification.verified_at = timezone.now()
             verification.save()

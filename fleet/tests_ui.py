@@ -16,6 +16,7 @@ Run:
 """
 
 import time
+import unittest
 from decimal import Decimal
 
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
@@ -29,7 +30,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
-    TimeoutException, NoSuchElementException, ElementNotInteractableException
+    TimeoutException, NoSuchElementException, ElementNotInteractableException,
+    WebDriverException,
 )
 
 from core import models as core_models
@@ -55,12 +57,20 @@ class DriverUITestBase(StaticLiveServerTestCase):
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--window-size=430,932')  # iPhone 14 Pro Max
         chrome_options.add_argument('--disable-gpu')
-        cls.browser = webdriver.Chrome(options=chrome_options)
+        try:
+            cls.browser = webdriver.Chrome(options=chrome_options)
+        except WebDriverException as exc:
+            # No Chrome/driver on this host (e.g. headless CI/prod server).
+            # Skip the whole Selenium suite instead of erroring the run.
+            super().tearDownClass()
+            raise unittest.SkipTest(f"Chrome WebDriver unavailable: {exc}")
         cls.browser.implicitly_wait(5)
 
     @classmethod
     def tearDownClass(cls):
-        cls.browser.quit()
+        browser = getattr(cls, 'browser', None)
+        if browser is not None:
+            browser.quit()
         super().tearDownClass()
 
     def setUp(self):

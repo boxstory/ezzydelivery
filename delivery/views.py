@@ -42,6 +42,7 @@ import logging
 from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from core.decorators import api_staff_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db import transaction, IntegrityError
@@ -1020,6 +1021,7 @@ def get_street_polygon(request, zone_number, street_number):
 
 
 @login_required(login_url='account_login')
+@api_staff_required
 def edit_zone_polygon(request, zone_number):
     """
     Edit zone polygon with interactive map editor.
@@ -1059,6 +1061,7 @@ def edit_zone_polygon(request, zone_number):
 
 
 @login_required(login_url='account_login')
+@api_staff_required
 def save_zone_polygon(request, zone_number):
     """
     Save edited polygon for a zone.
@@ -1212,6 +1215,7 @@ def zone_areas(request):
 
 
 @login_required(login_url='account_login')
+@api_staff_required
 def update_area_pin(request):
     """AJAX endpoint to update ZoneArea latitude/longitude."""
     if request.method != 'POST':

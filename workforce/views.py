@@ -61,7 +61,7 @@ from datetime import timedelta
 import csv
 import os
 from django.contrib.auth.decorators import login_required
-from core.decorators import staff_required, superuser_required
+from core.decorators import staff_required, superuser_required, api_staff_required
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 import json
@@ -7376,6 +7376,7 @@ def ajax_zone_name(request):
 
 
 @login_required(login_url='account_login')
+@api_staff_required
 @require_POST
 def update_order_coords(request, order_id):
     """AJAX endpoint to update order latitude/longitude and/or qnas_status from QNAS verification"""
@@ -16244,6 +16245,7 @@ def temp_orders(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def temp_orders_by_date(request):
     """Fetch orders from all import sources (OneDrive, Google Sheets, APIs)
     then display results filtered by date range.
@@ -16364,6 +16366,7 @@ def temp_orders_by_date(request):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def temp_orders_sync(request):
     """Manual trigger to sync all external sources into TempOrder table."""
     if request.method != 'POST':
@@ -16390,6 +16393,7 @@ def temp_orders_sync(request):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def temp_orders_delete(request):
     """Delete selected TempOrder rows.
 
@@ -16433,6 +16437,7 @@ def temp_orders_delete(request):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def temp_orders_mark_imported(request):
     """Manually mark selected TempOrder rows as imported (no Order created).
 
@@ -16802,6 +16807,7 @@ def order_autoflow_status(request, order_id):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def temp_orders_resync(request):
     """Refresh selected TempOrder rows from their upstream source.
 
@@ -16891,6 +16897,7 @@ def temp_orders_resync(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def temp_orders_browse(request):
     """Full paginated list of TempOrders, scoped by business filter.
 
@@ -17010,6 +17017,7 @@ def temp_orders_browse(request):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def temp_orders_preview(request):
     """Return JSON detail for selected TempOrder IDs for the preview modal."""
     if request.method != 'POST':
@@ -17392,6 +17400,7 @@ def _extract_products_from_raw_row(temp_order):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def temp_orders_transfer(request):
     """Transfer selected TempOrder rows into real Order records.
 
@@ -17659,6 +17668,7 @@ def temp_orders_transfer(request):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def temp_orders_auto_import(request):
     """Automated pipeline: import selected TempOrder rows into Orders,
     auto-assign pickup location, QNAS geocode, and publish to fleet
@@ -18906,6 +18916,7 @@ def public_link_source_delete(request, source_id):
 
 @csrf_exempt
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def public_link_save_mapping(request, source_id):
     """Save column mapping for a public link source and re-sync."""
     import json as json_lib
@@ -20631,6 +20642,7 @@ def whatsapp_instances_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def whatsapp_last_message(request):
     """Fetch the last message from a WhatsApp number via Evolution API."""
     import json
@@ -20713,6 +20725,7 @@ def whatsapp_last_message(request):
 
 
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def whatsapp_get_instances(request):
     """Get available WhatsApp instances."""
     from django.http import JsonResponse
@@ -20735,6 +20748,7 @@ def whatsapp_get_instances(request):
 
 
 @login_required(login_url='/accounts/login/')
+@api_staff_required
 def whatsapp_send_message(request):
     """Send a WhatsApp message via Evolution API."""
     import json
@@ -21573,6 +21587,7 @@ def _build_export_row(order):
 # =============================================================================
 
 @login_required
+@staff_required
 def dl_tasks_export_page(request):
     """Export delivery tasks — 2-step flow: pick business → filter & view tasks."""
     from datetime import timedelta

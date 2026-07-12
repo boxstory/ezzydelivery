@@ -223,12 +223,15 @@ class WhatsAppWebhookAPIView(APIView):
     permission_classes = [AllowAny]  # Authenticated via webhook secret
 
     def post(self, request):
-        # Verify webhook secret (should be configured in n8n)
+        # Verify webhook secret (configured in n8n). Fail CLOSED: if no secret is
+        # configured server-side, reject — an unset secret must never mean "open",
+        # since this endpoint drives the LLM agent and its tools.
+        import hmac
         webhook_secret = request.headers.get('X-Webhook-Secret', '')
         expected_secret = getattr(settings, 'AI_AGENT_WEBHOOK_SECRET', '')
 
-        if expected_secret and webhook_secret != expected_secret:
-            logger.warning("Invalid webhook secret")
+        if not expected_secret or not hmac.compare_digest(webhook_secret, expected_secret):
+            logger.warning("Invalid or missing AI agent webhook secret")
             return Response(
                 {'error': 'Unauthorized'},
                 status=status.HTTP_401_UNAUTHORIZED
