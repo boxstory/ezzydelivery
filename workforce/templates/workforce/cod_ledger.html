@@ -137,11 +137,11 @@
           <th class="codl__num codl__amt">Amount<br>Method</th>
           <th>Driver</th>
           <th>Business</th>
+          <th class="codl__num codl__shrink">COD in hand<br>after</th>
+          <th class="codl__num">Wallet after</th>
           <th>Order #</th>
           <th>Customer / Mobile</th>
           <th>COD Status</th>
-          <th class="codl__num codl__shrink">COD in hand<br>after</th>
-          <th class="codl__num">Wallet after</th>
           <th>Submission</th>
           <th>Recorded by</th>
           <th>Notes</th>
@@ -182,6 +182,8 @@
               <span class="codl__submeta">{{ t.delivery_task.order.business.business_code }}</span>
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
+          <td class="codl__num codl__shrink">{{ t.cod_in_hand_after|floatformat:2 }}</td>
+          <td class="codl__num">{{ t.wallet_balance_after|floatformat:2 }}</td>
           <td class="codl__code">{{ t.delivery_task.order.order_number|default:"—" }}</td>
           <td>
             <div>{{ t.delivery_task.order.customer_name|default:"—"|truncatechars:22 }}</div>
@@ -194,8 +196,6 @@
               {% endwith %}
             {% else %}<span class="codl__muted">—</span>{% endif %}
           </td>
-          <td class="codl__num codl__shrink">{{ t.cod_in_hand_after|floatformat:2 }}</td>
-          <td class="codl__num">{{ t.wallet_balance_after|floatformat:2 }}</td>
           <td class="codl__nowrap">
             {% if t.transaction_type == 'cod_deposit' or t.transaction_type == 'cod_driver_settle' %}
               {% if t.is_approved %}<span class="codl__flag codl__flag--ok">Approved</span>
