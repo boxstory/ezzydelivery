@@ -78,7 +78,7 @@ local_settings.py
 .env.development
 .env.staging
 *.env
-envsample
+# envsample is the tracked template (see CLAUDE.md) — do not ignore it
 settings_local.py
 
 # Django cache
@@ -209,6 +209,8 @@ site/
 .github/workflows/secrets/
 deploy_keys/
 *.deploy
+# Generated staging copies of server configs (review artifacts, never canonical)
+deploy/*.staged.conf
 
 # ===== TEMPORARY FILES =====
 *.tmp
@@ -219,7 +221,8 @@ tmp/
 cache/
 
 # ===== AI ASSISTANTS & TOOLS =====
-# Claude Code (tracked in git)
+# Claude Code (.claude/ is tracked; machine-local settings are not)
+.claude/settings.local.json
 .claude_history/
 claude_output/
 tmpclaude-*

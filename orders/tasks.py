@@ -514,7 +514,7 @@ def _sync_google_sheet_source(api_settings):
         django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
     )
     if not token_path.exists():
-        raise RuntimeError('Google Sheets not authorized. Run: python google_sheets_auth.py')
+        raise RuntimeError('Google Sheets not authorized. Run: python scripts/google_sheets_auth.py')
 
     import json as _json
     _td = _json.loads(token_path.read_text())

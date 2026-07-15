@@ -464,7 +464,7 @@ CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000  # Restart worker after 1000 tasks
 # ==========================================
 # GOOGLE SHEETS OAUTH2
 # ==========================================
-# Run google_sheets_auth.py once to generate the token file.
+# Run scripts/google_sheets_auth.py once to generate the token file.
 # After that the server auto-refreshes it — no browser needed again.
 GOOGLE_SHEETS_CLIENT_ID     = config('GOOGLE_SHEETS_CLIENT_ID', default='')
 GOOGLE_SHEETS_CLIENT_SECRET = config('GOOGLE_SHEETS_CLIENT_SECRET', default='')

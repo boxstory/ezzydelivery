@@ -4969,7 +4969,7 @@ def wf_mapping_manager_test(request):
                 django_settings, 'GOOGLE_SHEETS_TOKEN_FILE', 'google_sheets_token.json'
             )
             if not token_path.exists():
-                return JsonResponse({'success': False, 'error': 'Google Sheets not authorized. Run: python google_sheets_auth.py'})
+                return JsonResponse({'success': False, 'error': 'Google Sheets not authorized. Run: python scripts/google_sheets_auth.py'})
 
             _td = _json.loads(token_path.read_text())
             creds = Credentials(
@@ -5275,7 +5275,7 @@ def wf_api_orders(request):
                 if not token_path.exists():
                     raise Exception(
                         'Google Sheets not authorized yet. '
-                        'Run: python google_sheets_auth.py (one-time setup)'
+                        'Run: python scripts/google_sheets_auth.py (one-time setup)'
                     )
 
                 import json as _json
@@ -12412,7 +12412,7 @@ def wf_test_api_config_result(request, api_id):
             if not token_path.exists():
                 raise Exception(
                     'Google Sheets not authorized yet. '
-                    'Run: python google_sheets_auth.py (one-time setup)'
+                    'Run: python scripts/google_sheets_auth.py (one-time setup)'
                 )
 
             _td = _json.loads(token_path.read_text())
