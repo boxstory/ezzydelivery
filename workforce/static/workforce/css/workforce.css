@@ -2196,9 +2196,8 @@ textarea.uvl__modal__textarea:focus {
 
 /* ---- Expanded Form ---- */
 .pgf__form {
-    background: linear-gradient(180deg, #fefefe 0%, #fafbfc 100%);
-    border-top: 3px solid #f7c000;
-    padding: 1.1rem 1.25rem 0.95rem;
+    background: #fff;
+    padding: 1rem 1.25rem;
 }
 
 /* Quick Presets */
@@ -2223,32 +2222,30 @@ textarea.uvl__modal__textarea:focus {
 .pgf__preset {
     font-size: 0.72rem;
     font-weight: 600;
-    padding: 0.32rem 0.85rem;
-    border-radius: 999px;
+    padding: 0.32rem 0.75rem;
+    border-radius: 6px;
     border: 1px solid #e2e8f0;
     background: #fff;
     color: #475569;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     white-space: nowrap;
     line-height: 1.2;
 }
 .pgf__preset:hover {
-    background: #fffbeb;
-    border-color: #f7c000;
-    color: #1e293b;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(247, 192, 0, 0.18);
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
 }
 .pgf__preset--active {
-    background: linear-gradient(135deg, #f7c000 0%, #f5b400 100%);
-    border-color: #f5b400;
-    color: #1e293b;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 2px rgba(245, 180, 0, 0.35);
+    background: #1e293b;
+    border-color: #1e293b;
+    color: #fff;
 }
 .pgf__preset--active:hover {
-    background: linear-gradient(135deg, #f5b400 0%, #e6a900 100%);
-    transform: translateY(-1px);
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #fff;
 }
 .pgf__preset:focus-visible {
     outline: none;
@@ -2258,41 +2255,50 @@ textarea.uvl__modal__textarea:focus {
 /* Field Grid — true CSS grid; columns chosen so daterange (span 2) fits cleanly per breakpoint */
 .pgf__grid {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.85rem 0.85rem;
     margin-bottom: 0.75rem;
     align-items: end;
 }
 .pgf__grid--selects {
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    margin-bottom: 0;
 }
 /* Daterange: spans 2 columns at all desktop sizes so the two date inputs stay readable */
 .pgf__field--daterange { grid-column: span 2; }
 .pgf__field--wide { grid-column: span 2; }
+/* In the selects row the wide field gets its width from the 2fr track — spanning 2 would
+   eat the buttons' track and push them to a new line */
+.pgf__grid--selects .pgf__field--wide { grid-column: span 1; }
 
-/* Large desktop ≥1400: keep 6 cols */
+/* Large desktop ≥1400: keep 5 cols */
 /* Standard desktop / laptop 1200-1399 */
 @media (max-width: 1399.98px) {
-    .pgf__grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .pgf__grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
-/* Smaller laptop 992-1199 — drop to 4 cols so each field has room to breathe */
+/* Smaller laptop 992-1199 — keep 5 cols with tighter gap + compact buttons so the two rows never wrap */
 @media (max-width: 1199.98px) {
-    .pgf__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .pgf__grid--selects { grid-template-columns: 2fr 1fr 1fr; }
+    .pgf__grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.6rem; }
+    .pgf__grid--selects { grid-template-columns: 2fr 1fr 1fr auto; }
+    .pgf__btn { padding: 0 0.8rem; }
+    .pgf__btn--apply { min-width: 0; }
 }
-/* Tablet 768-991 — 4 cols, selects collapse to 2 */
+/* Tablet 768-991 — hold the 2-line group: tighter gaps, compact inline buttons */
 @media (max-width: 991.98px) {
-    .pgf__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .pgf__grid--selects { grid-template-columns: 1fr 1fr; }
-    .pgf__field--wide { grid-column: span 2; }
-    .pgf__field--daterange { grid-column: span 2; }
+    .pgf__grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; }
+    .pgf__grid--selects { grid-template-columns: 1.6fr 1fr 1fr auto; }
+    .pgf__btn { padding: 0 0.65rem; font-size: 0.72rem; gap: 0.3rem; }
+    .pgf__actions { padding-left: 0.6rem; }
 }
-/* Small tablet / large phone 576-767 — 2 cols */
+/* Small tablet / large phone 576-767 — 2 cols, actions get their own full row */
 @media (max-width: 767.98px) {
     .pgf__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .pgf__grid--selects { grid-template-columns: 1fr 1fr; }
     .pgf__field--wide { grid-column: span 2; }
     .pgf__field--daterange { grid-column: span 2; }
+    .pgf__actions { grid-column: 1 / -1; border-left: none; padding-left: 0; height: auto; }
+    .pgf__actions .pgf__btn { flex: 1 1 50%; }
+    .pgf__grid--selects .pgf__field--wide { grid-column: 1 / -1; }
 }
 /* Mobile ≤575 — single column */
 @media (max-width: 575.98px) {
@@ -2323,7 +2329,7 @@ textarea.uvl__modal__textarea:focus {
 }
 .pgf__label i {
     font-size: 0.6rem;
-    color: #f7c000;
+    color: #94a3b8;
     width: 12px;
     text-align: center;
 }
@@ -2413,57 +2419,60 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     min-width: 0;
 }
 
-/* Actions row */
+/* Actions — inline cell at the end of the dropdowns row, separated by a hairline */
 .pgf__actions {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding-top: 0.875rem;
-    border-top: 1px solid #f1f5f9;
+    align-self: end;
+    gap: 0.5rem;
+    height: 38px;               /* match input height so the row reads as one line */
+    padding-left: 0.9rem;
+    border-left: 1px solid #eef2f6;
 }
 .pgf__btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.45rem;
-    font-size: 0.8rem;
-    font-weight: 700;
-    padding: 0.5rem 1.15rem;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    height: 38px;
+    padding: 0 1rem;
     border-radius: 8px;
     border: 1px solid transparent;
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    letter-spacing: 0.02em;
-    line-height: 1.2;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    white-space: nowrap;
 }
 .pgf__btn:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.35);
 }
 .pgf__btn--apply {
-    background: linear-gradient(135deg, #f7c000 0%, #f5b400 100%);
-    color: #1e293b;
-    box-shadow: 0 1px 2px rgba(245, 180, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    min-width: 140px;
+    background: #1e293b;
+    color: #fff;
+    min-width: 100px;
 }
 .pgf__btn--apply:hover {
-    background: linear-gradient(135deg, #f5b400 0%, #e6a900 100%);
+    background: #0f172a;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(245, 180, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.22);
 }
 .pgf__btn--apply:active {
     transform: translateY(0);
-    box-shadow: 0 1px 2px rgba(245, 180, 0, 0.4);
+    box-shadow: none;
 }
 .pgf__btn--clear {
-    background: #fff;
+    background: transparent;
     border-color: #e2e8f0;
     color: #64748b;
 }
 .pgf__btn--clear:hover {
-    border-color: #ef4444;
-    color: #ef4444;
-    background: #fef2f2;
+    border-color: #cbd5e1;
+    color: #0f172a;
+    background: #f8fafc;
 }
 
 /* ---- PGF Mobile polish (≤575px) ----

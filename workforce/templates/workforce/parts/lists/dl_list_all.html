@@ -64,16 +64,12 @@
                 <!-- Text Search Row -->
                 <div class="pgf__grid">
                     <div class="pgf__field">
-                        <label class="pgf__label" for="dlCode"><i class="fa-solid fa-hashtag"></i> DL CODE</label>
-                        <input type="text" class="pgf__input" name="dlCode" id="dlCode" placeholder="e.g. DL-0001" value="{{ filters.dlCode }}" autocomplete="off">
+                        <label class="pgf__label" for="code"><i class="fa-solid fa-hashtag"></i> CODE</label>
+                        <input type="text" class="pgf__input" name="code" id="code" placeholder="DL / order / ref code" value="{{ filters.code }}" autocomplete="off">
                     </div>
                     <div class="pgf__field">
-                        <label class="pgf__label" for="cCode"><i class="fa-solid fa-barcode"></i> CLIENT CODE</label>
-                        <input type="text" class="pgf__input" name="cCode" id="cCode" placeholder="Order / ref code" value="{{ filters.cCode }}" autocomplete="off">
-                    </div>
-                    <div class="pgf__field">
-                        <label class="pgf__label" for="mobile"><i class="fa-solid fa-mobile-screen"></i> MOBILE</label>
-                        <input type="text" class="pgf__input" name="mobile" id="mobile" placeholder="+974 …" value="{{ filters.mobile }}" autocomplete="off">
+                        <label class="pgf__label" for="customer"><i class="fa-solid fa-user"></i> CUSTOMER</label>
+                        <input type="text" class="pgf__input" name="customer" id="customer" placeholder="Name or mobile" value="{{ filters.customer }}" autocomplete="off">
                     </div>
                     <div class="pgf__field">
                         <label class="pgf__label" for="driverName"><i class="fa-solid fa-user-tie"></i> DRIVER</label>
@@ -121,16 +117,16 @@
                             {% endfor %}
                         </select>
                     </div>
-                </div>
 
-                <!-- Actions -->
-                <div class="pgf__actions">
-                    <button type="submit" class="pgf__btn pgf__btn--apply">
-                        <i class="fa-solid fa-magnifying-glass"></i> Apply Filters
-                    </button>
-                    <button type="button" class="pgf__btn pgf__btn--clear" id="clearFilter">
-                        <i class="fa-solid fa-xmark"></i> Clear All
-                    </button>
+                    <!-- Actions (inline, end of dropdowns row) -->
+                    <div class="pgf__actions">
+                        <button type="submit" class="pgf__btn pgf__btn--apply">
+                            <i class="fa-solid fa-magnifying-glass"></i> Apply
+                        </button>
+                        <button type="button" class="pgf__btn pgf__btn--clear" id="clearFilter">
+                            <i class="fa-solid fa-rotate-left"></i> Reset
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -180,7 +176,7 @@
 // ---- PGF Filter Panel ----
 (function() {
     var FIELD_LABELS = {
-        dlCode: 'DL Code', cCode: 'Client Code', mobile: 'Mobile',
+        code: 'Code', customer: 'Customer',
         driverName: 'Driver', dateFrom: 'From', dateTo: 'To',
         business: 'Client', cStatus: 'Client Status', dlStatus: 'DL Status'
     };
@@ -189,7 +185,7 @@
         var form = document.getElementById('filterForm');
         if (!form) return {};
         var vals = {};
-        ['dlCode','cCode','mobile','driverName','dateFrom','dateTo'].forEach(function(n) {
+        ['code','customer','driverName','dateFrom','dateTo'].forEach(function(n) {
             var el = form.querySelector('[name="'+n+'"]');
             if (el && el.value.trim()) vals[n] = el.value.trim();
         });

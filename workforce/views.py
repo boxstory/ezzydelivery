@@ -5643,9 +5643,8 @@ def dl_list_all(request):
     ).order_by('-updated_at')
 
     # Get filter parameters
-    dl_code = request.GET.get('dlCode', '')
-    c_code = request.GET.get('cCode', '')
-    mobile = request.GET.get('mobile', '')
+    code = (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip()
+    customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
     dl_status = request.GET.get('dlStatus', '')
@@ -5654,12 +5653,17 @@ def dl_list_all(request):
     business_id = request.GET.get('business', '')
 
     # Apply filters
-    if dl_code:
-        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
-    if c_code:
-        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
-    if mobile:
-        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if code:
+        dl_tasks = dl_tasks.filter(
+            Q(dl_task_number__icontains=code) |
+            Q(order__client_order_code__icontains=code) |
+            Q(order__order_number__icontains=code)
+        )
+    if customer:
+        dl_tasks = dl_tasks.filter(
+            Q(order__customer_phone__icontains=customer) |
+            Q(order__customer_name__icontains=customer)
+        )
     if driver_name:
         dl_tasks = dl_tasks.filter(
             Q(driver__user__first_name__icontains=driver_name) |
@@ -5683,7 +5687,7 @@ def dl_list_all(request):
     SORT_MAP = {
         'task_number': 'dl_task_number',
         'order': 'order__client_order_code',
-        'date': 'created_at',
+        'date': 'order__order_date',
         'updated': 'updated_at',
         'business': 'order__business__business_name',
         'customer': 'order__customer_name',
@@ -5706,9 +5710,8 @@ def dl_list_all(request):
 
     # Build filter_params for pagination links (preserves filters across pages)
     filter_params_list = []
-    if dl_code: filter_params_list.append(f'dlCode={dl_code}')
-    if c_code: filter_params_list.append(f'cCode={c_code}')
-    if mobile: filter_params_list.append(f'mobile={mobile}')
+    if code: filter_params_list.append(f'code={code}')
+    if customer: filter_params_list.append(f'customer={customer}')
     if driver_name: filter_params_list.append(f'driverName={driver_name}')
     if c_status: filter_params_list.append(f'cStatus={c_status}')
     if dl_status: filter_params_list.append(f'dlStatus={dl_status}')
@@ -5741,9 +5744,8 @@ def dl_list_all(request):
         'filter_params': filter_params,
         'per_page': request.GET.get('per_page', '50'),
         'filters': {
-            'dlCode': dl_code,
-            'cCode': c_code,
-            'mobile': mobile,
+            'code': code,
+            'customer': customer,
             'driverName': driver_name,
             'cStatus': c_status,
             'dlStatus': dl_status,
@@ -5772,9 +5774,8 @@ def fulfilled_clients_tasks(request):
     ).order_by('-created_at')
 
     # Get filter parameters
-    dl_code = request.GET.get('dlCode', '')
-    c_code = request.GET.get('cCode', '')
-    mobile = request.GET.get('mobile', '')
+    code = (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip()
+    customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
     dms_status = request.GET.get('dmsStatus', '')
@@ -5783,12 +5784,17 @@ def fulfilled_clients_tasks(request):
     business_id = request.GET.get('business', '')
 
     # Apply filters
-    if dl_code:
-        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
-    if c_code:
-        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
-    if mobile:
-        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if code:
+        dl_tasks = dl_tasks.filter(
+            Q(dl_task_number__icontains=code) |
+            Q(order__client_order_code__icontains=code) |
+            Q(order__order_number__icontains=code)
+        )
+    if customer:
+        dl_tasks = dl_tasks.filter(
+            Q(order__customer_phone__icontains=customer) |
+            Q(order__customer_name__icontains=customer)
+        )
     if driver_name:
         dl_tasks = dl_tasks.filter(
             Q(driver__user__first_name__icontains=driver_name) |
@@ -5822,9 +5828,8 @@ def fulfilled_clients_tasks(request):
         'list_type': 'fulfilled',
         'show_filters': True,
         'filters': {
-            'dlCode': dl_code,
-            'cCode': c_code,
-            'mobile': mobile,
+            'code': code,
+            'customer': customer,
             'driverName': driver_name,
             'cStatus': c_status,
             'dmsStatus': dms_status,
@@ -5852,9 +5857,8 @@ def non_fulfilled_clients_tasks(request):
     ).order_by('-created_at')
 
     # Get filter parameters
-    dl_code = request.GET.get('dlCode', '')
-    c_code = request.GET.get('cCode', '')
-    mobile = request.GET.get('mobile', '')
+    code = (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip()
+    customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
     dms_status = request.GET.get('dmsStatus', '')
@@ -5863,12 +5867,17 @@ def non_fulfilled_clients_tasks(request):
     business_id = request.GET.get('business', '')
 
     # Apply filters
-    if dl_code:
-        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
-    if c_code:
-        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
-    if mobile:
-        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if code:
+        dl_tasks = dl_tasks.filter(
+            Q(dl_task_number__icontains=code) |
+            Q(order__client_order_code__icontains=code) |
+            Q(order__order_number__icontains=code)
+        )
+    if customer:
+        dl_tasks = dl_tasks.filter(
+            Q(order__customer_phone__icontains=customer) |
+            Q(order__customer_name__icontains=customer)
+        )
     if driver_name:
         dl_tasks = dl_tasks.filter(
             Q(driver__user__first_name__icontains=driver_name) |
@@ -5902,9 +5911,8 @@ def non_fulfilled_clients_tasks(request):
         'list_type': 'non_fulfilled',
         'show_filters': True,
         'filters': {
-            'dlCode': dl_code,
-            'cCode': c_code,
-            'mobile': mobile,
+            'code': code,
+            'customer': customer,
             'driverName': driver_name,
             'cStatus': c_status,
             'dmsStatus': dms_status,
@@ -5931,9 +5939,8 @@ def dl_list_incompleted_details(request):
     ).order_by('-created_at')
 
     # Get filter parameters
-    dl_code = request.GET.get('dlCode', '')
-    c_code = request.GET.get('cCode', '')
-    mobile = request.GET.get('mobile', '')
+    code = (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip()
+    customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
     dms_status = request.GET.get('dmsStatus', '')
@@ -5941,12 +5948,17 @@ def dl_list_incompleted_details(request):
     date_to = request.GET.get('dateTo', '')
     business_id = request.GET.get('business', '')
 
-    if dl_code:
-        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
-    if c_code:
-        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
-    if mobile:
-        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if code:
+        dl_tasks = dl_tasks.filter(
+            Q(dl_task_number__icontains=code) |
+            Q(order__client_order_code__icontains=code) |
+            Q(order__order_number__icontains=code)
+        )
+    if customer:
+        dl_tasks = dl_tasks.filter(
+            Q(order__customer_phone__icontains=customer) |
+            Q(order__customer_name__icontains=customer)
+        )
     if driver_name:
         dl_tasks = dl_tasks.filter(
             Q(driver__user__first_name__icontains=driver_name) |
@@ -5995,7 +6007,7 @@ def dl_list_incompleted_details(request):
         'show_filters': True,
         'show_failure_reason': True,
         'filters': {
-            'dlCode': dl_code, 'cCode': c_code, 'mobile': mobile,
+            'code': code, 'customer': customer,
             'driverName': driver_name, 'cStatus': c_status, 'dmsStatus': dms_status,
             'dateFrom': date_from, 'dateTo': date_to, 'business': business_id,
         }
@@ -14446,6 +14458,67 @@ def bulk_print_tasks(request):
     return render(request, 'workforce/parts/bulk_print_tasks.html', context)
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+def bulk_print_waybills(request):
+    """Label-style waybills (same design as client dashboard Print Labels) for selected tasks."""
+    import base64
+    from delivery.label_utils import generate_barcode_image
+
+    raw_ids = request.GET.get('ids', '').split(',')
+    task_ids = [int(v) for v in raw_ids if v.isdigit() and len(v) <= 10][:100]
+
+    orders = []
+    if task_ids:
+        tasks = (
+            delivery_models.DeliveryTask.objects.filter(id__in=task_ids)
+            .select_related('order__business', 'order__pickup_location')
+            .prefetch_related('order__order_items__product')
+        )
+        seen_order_ids = set()
+        for task in tasks:
+            if task.order and task.order_id not in seen_order_ids:
+                seen_order_ids.add(task.order_id)
+                orders.append(task.order)
+
+    # Resolve zone numbers -> English zone names for sender + recipient in one query
+    zone_nums = set()
+    for order in orders:
+        if order.dl_zone and str(order.dl_zone).isdigit():
+            zone_nums.add(int(order.dl_zone))
+        pickup = order.pickup_location
+        if pickup and pickup.pickup_zone_no and str(pickup.pickup_zone_no).isdigit():
+            zone_nums.add(int(pickup.pickup_zone_no))
+    zone_names = dict(
+        delivery_models.ZoneName.objects.filter(zone_number__in=zone_nums)
+        .values_list('zone_number', 'zone_name')
+    )
+
+    def _zone_name(zone_no):
+        if zone_no and str(zone_no).isdigit():
+            return zone_names.get(int(zone_no), '')
+        return ''
+
+    waybills = []
+    for order in orders:
+        barcode_b64 = ''
+        buf = generate_barcode_image(order.order_number)
+        if buf:
+            barcode_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+        pickup_zone = order.pickup_location.pickup_zone_no if order.pickup_location else None
+        waybills.append({
+            'order': order,
+            'barcode_b64': barcode_b64,
+            'from_zone_name': _zone_name(pickup_zone),
+            'to_zone_name': _zone_name(order.dl_zone),
+        })
+
+    return render(request, 'business/print_waybill.html', {
+        'waybills': waybills,
+        'user_business': orders[0].business if orders else None,
+    })
+
+
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -14605,6 +14678,21 @@ def bulk_export_tasks(request):
         id__in=task_ids
     ).select_related('order', 'driver', 'driver__user', 'business', 'pickup_location')
 
+    # Zone number -> English zone name lookup for all zones in this export
+    zone_nums = {
+        int(t.order.dl_zone) for t in tasks
+        if t.order and t.order.dl_zone and str(t.order.dl_zone).isdigit()
+    }
+    zone_names = dict(
+        delivery_models.ZoneName.objects.filter(zone_number__in=zone_nums)
+        .values_list('zone_number', 'zone_name')
+    )
+
+    def _zone_name(order):
+        if order and order.dl_zone and str(order.dl_zone).isdigit():
+            return zone_names.get(int(order.dl_zone), '')
+        return ''
+
     # Log export for audit
     logger.info(f"CSV export by user {request.user.id}: {len(task_ids)} tasks")
 
@@ -14615,7 +14703,7 @@ def bulk_export_tasks(request):
     writer = csv.writer(response)
     writer.writerow([
         'Task Number', 'Date', 'Customer Name', 'Customer Phone',
-        'Delivery Address', 'Driver', 'Client Status', 'DMS Status',
+        'Delivery Address', 'Zone', 'Zone Name', 'Driver', 'Client Status', 'DMS Status',
         'Pickup Location', 'COD Amount', 'Notes'
     ])
 
@@ -14626,8 +14714,11 @@ def bulk_export_tasks(request):
             _sanitize_csv_value(task.order.customer_name if task.order else ''),
             _sanitize_csv_value(task.order.customer_phone if task.order else ''),
             _sanitize_csv_value(task.order.customer_address if task.order else ''),
+            _sanitize_csv_value(task.order.dl_zone if task.order and task.order.dl_zone else ''),
+            _sanitize_csv_value(_zone_name(task.order)),
             _sanitize_csv_value(str(task.driver) if task.driver else ''),
             _sanitize_csv_value(task.get_dl_task_status_client_display() if hasattr(task, 'get_dl_task_status_client_display') else task.dl_task_status_client),
+            _sanitize_csv_value(task.get_dl_task_status_display() if hasattr(task, 'get_dl_task_status_display') else task.dl_task_status),
             _sanitize_csv_value(task.pickup_location.pickup_location_title if task.pickup_location else ''),
             _sanitize_csv_value(task.order.cod_amount if task.order else ''),
             _sanitize_csv_value(task.notes if hasattr(task, 'notes') else ''),
@@ -21787,13 +21878,24 @@ def dl_tasks_export_page(request):
         headers = [
             'Task #', 'Task Date', 'Task Status', 'Driver',
             'Order Code', 'Customer Name', 'Customer Phone', 'Customer Address',
-            'Zone', 'Street', 'Building', 'COD Amount', 'COD Collected',
+            'Zone', 'Zone Name', 'Street', 'Building', 'COD Amount', 'COD Collected',
             'DL Price', 'DL Speed', 'Preferred Time', 'Completed At',
             'Failure Reason', 'Order Status',
         ]
+        zone_nums = {
+            int(t.order.dl_zone) for t in qs
+            if t.order and t.order.dl_zone and str(t.order.dl_zone).isdigit()
+        }
+        zone_names = dict(
+            delivery_models.ZoneName.objects.filter(zone_number__in=zone_nums)
+            .values_list('zone_number', 'zone_name')
+        )
         rows = []
         for t in qs:
             o = t.order
+            zone_name = ''
+            if o and o.dl_zone and str(o.dl_zone).isdigit():
+                zone_name = zone_names.get(int(o.dl_zone), '')
             rows.append([
                 t.dl_task_number or '',
                 str(t.dl_task_date) if t.dl_task_date else '',
@@ -21804,6 +21906,7 @@ def dl_tasks_export_page(request):
                 o.customer_phone if o else '',
                 o.customer_address if o else '',
                 str(o.dl_zone) if o and o.dl_zone else '',
+                zone_name,
                 str(o.dl_street) if o and o.dl_street else '',
                 str(o.dl_building) if o and o.dl_building else '',
                 str(o.cod_amount) if o else '',

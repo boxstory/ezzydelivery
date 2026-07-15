@@ -143,6 +143,7 @@ urlpatterns = [
 
     # Bulk action endpoints for delivery tasks
     path('tasks/bulk-print/', workforce_views.bulk_print_tasks, name='bulk_print_tasks'),
+    path('tasks/print-waybills/', workforce_views.bulk_print_waybills, name='bulk_print_waybills'),
     path('tasks/bulk-publish-fleets/', workforce_views.bulk_publish_fleets, name='bulk_publish_fleets'),
     path('tasks/bulk-publish-app/', workforce_views.bulk_publish_app, name='bulk_publish_app'),
     path('tasks/bulk-update-status/', workforce_views.bulk_update_status, name='bulk_update_status'),
