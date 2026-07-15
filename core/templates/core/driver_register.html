@@ -220,7 +220,7 @@
                         <input type="text" name="doc_no_{{ item.key }}" class="form-control form-control-sm mb-2"
                                placeholder="{{ item.type }} number"
                                value="{{ item.doc.document_no|default:'' }}">
-                        <input type="file" name="doc_{{ item.key }}" class="form-control form-control-sm" accept="image/*,.pdf">
+                        <input type="file" name="doc_{{ item.key }}" class="form-control form-control-sm" accept="image/*,.pdf" data-has-doc="{% if item.doc and item.doc.document_file %}1{% else %}0{% endif %}">
                         {% if item.doc and item.doc.document_file %}
                         <div class="mt-2">
                             <img src="{{ item.doc.document_file.url }}" alt="{{ item.type }}"
@@ -248,17 +248,15 @@
                 </button>
 
                 <button id="core_driver_register_btn_apply" type="submit" name="action" value="apply_verification"
-                        class="btn cdr__btn-action cdr__btn-apply">
+                        class="btn cdr__btn-action cdr__btn-apply{% if completion_percentage < 100 %} d-none{% endif %}">
                     <i class="fa-solid fa-paper-plane me-2"></i>Save & Submit for Verification
                 </button>
             </div>
 
-            {% if completion_percentage < 100 %}
-            <p class="text-muted small text-center mt-3 mb-0">
+            <p id="core_driver_register_hint_incomplete" class="text-muted small text-center mt-3 mb-0{% if completion_percentage == 100 %} d-none{% endif %}">
                 <i class="fa-solid fa-info-circle me-1"></i>
-                Complete all required fields ({{ completion_percentage }}% done) to apply for verification
+                Complete all required fields to unlock <strong>Submit for Verification</strong>
             </p>
-            {% endif %}
         </form>
         {% endif %}
         {% endif %}
@@ -272,6 +270,46 @@ document.addEventListener('DOMContentLoaded', function () {
     function update() { wrap.style.display = toggle.checked ? '' : 'none'; }
     toggle.addEventListener('change', update);
     update();
+});
+
+// Reveal "Submit for Verification" only when every required field is filled.
+// Mirrors calculate_driver_completion() in core/views.py: 5 driver fields,
+// vehicle type + model, and at least 2 documents (saved or newly attached).
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('core_driver_register_form_main');
+    const applyBtn = document.getElementById('core_driver_register_btn_apply');
+    const hint = document.getElementById('core_driver_register_hint_incomplete');
+    if (!form || !applyBtn) return;
+
+    function filled(name) {
+        const el = form.querySelector('[name="' + name + '"]');
+        return !!(el && el.value.trim());
+    }
+
+    function isComplete() {
+        if (!filled('driver_phone') || !filled('driver_whatsapp') ||
+            !filled('driver_languages') || !filled('driver_bio')) return false;
+        const lic = form.querySelector('[name="has_driver_license"]');
+        if (!lic || !lic.checked) return false;
+        const vType = form.querySelector('[name="veh-vehicle_type"]');
+        if (!vType || !vType.value || vType.value === 'none') return false;
+        if (!filled('veh-vehicle_model')) return false;
+        let docs = 0;
+        form.querySelectorAll('input[type="file"][name^="doc_"]').forEach(function (f) {
+            if (f.files.length > 0 || f.dataset.hasDoc === '1') docs++;
+        });
+        return docs >= 2;
+    }
+
+    function refresh() {
+        const ok = isComplete();
+        applyBtn.classList.toggle('d-none', !ok);
+        if (hint) hint.classList.toggle('d-none', ok);
+    }
+
+    form.addEventListener('input', refresh);
+    form.addEventListener('change', refresh);
+    refresh();
 });
 </script>
 
