@@ -16,13 +16,57 @@ window.addEventListener('DOMContentLoaded', function() {
 {% endif %}
 <!-- COD Amount Card -->
 <div class="fleet-card--gradient fleet-fade-in">
-    <div style="text-align: center; padding: var(--spacing-lg) 0;">
+    <div style="text-align: center; padding: var(--spacing-lg) 0 var(--spacing-sm);">
         <div style="font-size: var(--font-size-sm); opacity: 0.9; margin-bottom: var(--spacing-sm);">
-            Total Amount to Submit
+            Total Amount to Settle
         </div>
         <div style="font-size: var(--font-size-4xl); font-weight: 800;">
             <span id="codTotalDisplay">{{ total_cod_amount|floatformat:2|default:"0.00" }}</span> <small style="font-size: var(--font-size-xl); font-weight: 500;">QR</small>
         </div>
+    </div>
+    <div class="px-3 pb-3">
+        <div class="text-center mb-2" style="font-size: var(--font-size-xs); opacity: 0.85;">
+            <i class="fa-solid fa-calendar-days me-1"></i>
+            {% if settle_period_from %}{{ settle_period_from|date:"d M Y" }}{% else %}Start{% endif %}
+            &rarr; {{ settle_period_to|date:"d M Y" }}
+            <span class="ms-1">(since last settlement)</span>
+        </div>
+        <table class="table table-sm mb-0" style="color: inherit; --bs-table-bg: transparent; --bs-table-color: inherit;">
+            <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.35); font-size: var(--font-size-xs); text-transform: uppercase; opacity: 0.85;">
+                    <th class="fw-semibold" style="background: transparent; color: inherit;">Method</th>
+                    <th class="fw-semibold text-center" style="background: transparent; color: inherit;">Orders</th>
+                    <th class="fw-semibold text-end" style="background: transparent; color: inherit;">Amount (QR)</th>
+                </tr>
+            </thead>
+            <tbody style="font-size: var(--font-size-sm);">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.15);">
+                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-money-bill me-2"></i>Cash</td>
+                    <td class="text-center" style="background: transparent; color: inherit;" id="codCashCount">{{ cash_cod_count|default:0 }}</td>
+                    <td class="text-end fw-semibold" style="background: transparent; color: inherit;" id="codCashDisplay">{{ cash_cod_amount|floatformat:2|default:"0.00" }}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.15);">
+                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-mobile-screen me-2"></i>Fawran</td>
+                    <td class="text-center" style="background: transparent; color: inherit;">{{ fawran_cod_count|default:0 }}</td>
+                    <td class="text-end fw-semibold" style="background: transparent; color: inherit;">{{ fawran_cod_amount|floatformat:2|default:"0.00" }}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.15);">
+                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-credit-card me-2"></i>Card</td>
+                    <td class="text-center" style="background: transparent; color: inherit;">{{ pos_cod_count|default:0 }}</td>
+                    <td class="text-end fw-semibold" style="background: transparent; color: inherit;">{{ pos_cod_amount|floatformat:2|default:"0.00" }}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.35);">
+                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-box-open me-2"></i>Zero COD (Prepaid)</td>
+                    <td class="text-center" style="background: transparent; color: inherit;">{{ zero_cod_count|default:0 }}</td>
+                    <td class="text-end fw-semibold" style="background: transparent; color: inherit;">0.00</td>
+                </tr>
+                <tr style="font-weight: 700;">
+                    <td style="background: transparent; color: inherit;">Total</td>
+                    <td class="text-center" style="background: transparent; color: inherit;" id="codTotalOrders">{{ total_cod_count|default:0 }}</td>
+                    <td class="text-end" style="background: transparent; color: inherit;" id="codTotalAmountCell">{{ total_cod_amount|floatformat:2|default:"0.00" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -43,7 +87,7 @@ window.addEventListener('DOMContentLoaded', function() {
             <div class="fleet-form-group">
                 <label for="amount" class="fleet-label">
                     <i class="fa-solid fa-money-bill-wave me-1"></i>
-                    Amount (QR) *
+                    Cash to Hand In (QR) *
                 </label>
                 <div class="fleet-input-icon">
                     <span class="fleet-input-icon__icon">QR</span>
@@ -53,7 +97,7 @@ window.addEventListener('DOMContentLoaded', function() {
                         id="amount"
                         name="amount"
                         class="fleet-input"
-                        value="{{ total_cod_amount|floatformat:2 }}"
+                        value="{{ cash_cod_amount|floatformat:2 }}"
                         required
                         readonly
                     >
@@ -167,6 +211,27 @@ window.addEventListener('DOMContentLoaded', function() {
 
 
 <script>
+    // Fawran/card already with Ezzy and zero-COD rows — constant part of the
+    // settle totals; only the cash portion changes when orders are excluded.
+    const ELECTRONIC_COD_TOTAL = parseFloat("{{ fawran_cod_amount|floatformat:2|default:'0.00' }}") + parseFloat("{{ pos_cod_amount|floatformat:2|default:'0.00' }}");
+    const NON_CASH_ORDERS = parseInt("{{ fawran_cod_count|default:0 }}", 10) + parseInt("{{ pos_cod_count|default:0 }}", 10) + parseInt("{{ zero_cod_count|default:0 }}", 10);
+
+    function updateTotals(cashTotal, cashCount) {
+        amountInput.value = cashTotal.toFixed(2);
+        const grand = (cashTotal + ELECTRONIC_COD_TOTAL).toFixed(2);
+        document.getElementById('codTotalDisplay').textContent = grand;
+        const totalCell = document.getElementById('codTotalAmountCell');
+        if (totalCell) totalCell.textContent = grand;
+        const cashEl = document.getElementById('codCashDisplay');
+        if (cashEl) cashEl.textContent = cashTotal.toFixed(2);
+        if (typeof cashCount === 'number') {
+            const cc = document.getElementById('codCashCount');
+            if (cc) cc.textContent = cashCount;
+            const to = document.getElementById('codTotalOrders');
+            if (to) to.textContent = cashCount + NON_CASH_ORDERS;
+        }
+    }
+
     function removeOrder(btn) {
         const li = btn.closest('.cod-order-item');
         const deliveryId = li.dataset.deliveryId;
@@ -181,15 +246,13 @@ window.addEventListener('DOMContentLoaded', function() {
         let ids = idsInput.value.split(',').filter(id => id && id !== deliveryId);
         idsInput.value = ids.join(',');
 
-        // Update total amount
-        const currentTotal = parseFloat(amountInput.value) || 0;
-        const newTotal = Math.max(0, currentTotal - codAmt);
-        amountInput.value = newTotal.toFixed(2);
-        document.getElementById('codTotalDisplay').textContent = newTotal.toFixed(2);
-
         // Update order count
         const remaining = document.querySelectorAll('.cod-order-item:not(.removing)').length;
         document.getElementById('codOrderCount').textContent = remaining;
+
+        // Update total amount (cash portion only; electronic stays constant)
+        const currentCash = parseFloat(amountInput.value) || 0;
+        updateTotals(Math.max(0, currentCash - codAmt), remaining);
 
         // Disable submit if no orders left
         if (remaining === 0) {
@@ -319,8 +382,7 @@ window.addEventListener('DOMContentLoaded', function() {
         });
 
         document.getElementById('codOrderCount').textContent = visibleCount;
-        amountInput.value = visibleTotal.toFixed(2);
-        document.getElementById('codTotalDisplay').textContent = visibleTotal.toFixed(2);
+        updateTotals(visibleTotal, visibleCount);
 
         const visibleIds = Array.from(allItems)
             .filter(li => li.style.display !== 'none')

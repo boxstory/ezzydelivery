@@ -542,6 +542,24 @@
                 <span class="text-muted" style="font-size: 0.85rem;">Payment Method</span>
                 <span class="fw-medium" style="font-size: 0.85rem;" id="txn-modal-payment"></span>
               </div>
+              <div id="txn-modal-breakdown" style="display: none;">
+                <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;">
+                  <span class="text-muted" style="font-size: 0.85rem;"><i class="fa-solid fa-money-bill me-1" style="color: #059669;"></i>Cash Handed In</span>
+                  <span class="fw-medium" style="font-size: 0.85rem;" id="txn-modal-bd-cash"></span>
+                </div>
+                <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;">
+                  <span class="text-muted" style="font-size: 0.85rem;"><i class="fa-solid fa-mobile-screen me-1" style="color: #7c3aed;"></i>Fawran (with Ezzy)</span>
+                  <span class="fw-medium" style="font-size: 0.85rem;" id="txn-modal-bd-fawran"></span>
+                </div>
+                <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;">
+                  <span class="text-muted" style="font-size: 0.85rem;"><i class="fa-solid fa-credit-card me-1" style="color: #2563eb;"></i>Card (with Ezzy)</span>
+                  <span class="fw-medium" style="font-size: 0.85rem;" id="txn-modal-bd-pos"></span>
+                </div>
+                <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;">
+                  <span class="text-muted fw-semibold" style="font-size: 0.85rem;"><i class="fa-solid fa-sack-dollar me-1" style="color: #d97706;"></i>Settlement Total</span>
+                  <span class="fw-bold" style="font-size: 0.85rem;" id="txn-modal-bd-total"></span>
+                </div>
+              </div>
               <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;" id="txn-modal-ref-row">
                 <span class="text-muted" style="font-size: 0.85rem;">Reference No.</span>
                 <span class="fw-medium" style="font-size: 0.85rem; font-family: monospace;" id="txn-modal-reference"></span>
@@ -808,6 +826,19 @@ document.addEventListener('DOMContentLoaded', function() {
           document.getElementById('txn-modal-date').textContent = data.date;
           document.getElementById('txn-modal-description').textContent = data.description || 'COD Transaction';
           document.getElementById('txn-modal-payment').textContent = data.payment_method;
+
+          // Settlement method breakdown (deposits only)
+          var bdWrap = document.getElementById('txn-modal-breakdown');
+          if (data.settle_breakdown) {
+            var bd = data.settle_breakdown;
+            document.getElementById('txn-modal-bd-cash').textContent = bd.cash.toFixed(2) + ' QR (' + bd.cash_orders + ')';
+            document.getElementById('txn-modal-bd-fawran').textContent = bd.fawran.toFixed(2) + ' QR (' + bd.fawran_orders + ')';
+            document.getElementById('txn-modal-bd-pos').textContent = bd.pos.toFixed(2) + ' QR (' + bd.pos_orders + ')';
+            document.getElementById('txn-modal-bd-total').textContent = bd.total.toFixed(2) + ' QR (' + bd.total_orders + ' orders)';
+            bdWrap.style.display = 'block';
+          } else {
+            bdWrap.style.display = 'none';
+          }
           document.getElementById('txn-modal-cod-after').textContent = Math.round(data.cod_in_hand_after) + ' QR';
           document.getElementById('txn-modal-wallet-after').textContent = Math.round(data.wallet_balance_after) + ' QR';
           document.getElementById('txn-modal-earnings-after').textContent = Math.round(data.pending_earnings_after) + ' QR';

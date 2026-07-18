@@ -558,31 +558,25 @@ def cod_collection(request):
             .order_by('-total')
         )
 
-        # All-time unsettled COD total (unaffected by date filter) for hero card
-        all_time_cod_qs = delivery_models.DeliveryTask.objects.filter(
-            driver=driver, cod_collected=True, cod_settled=False, dl_task_status__in=['delivered','partial_delivery']
-        )
-        all_time_cod_total = all_time_cod_qs.aggregate(total=Sum('cod_collected_amount'))['total'] or 0
-
-        # All-time payment method breakdown for hero card
-        # Ensure all payment methods show (even with 0)
-        breakdown_dict = {}
-        for pm in ['cash', 'fawran', 'pos']:
-            breakdown_dict[pm] = 0
-
-        breakdown_qs = (
-            all_time_cod_qs
-            .values('payment_method')
-            .annotate(total=Sum('cod_collected_amount'))
-        )
-        for row in breakdown_qs:
-            if row['payment_method'] in breakdown_dict:
-                breakdown_dict[row['payment_method']] = row['total']
-
+        # All-time payment method breakdown for hero card — ledger running
+        # balances, same source as the workforce fleet-transactions page.
+        # Fawran/POS auto-settle at collection (money lands in Ezzy's bank),
+        # so unsettled-task sums would hide them; the ledger accumulates every
+        # collection by method and resets on a deposit/settle transaction.
+        ledger = WalletService.ledger_cod_balances(driver)
         all_time_payment_breakdown = [
-            {'payment_method': pm, 'total': breakdown_dict[pm]}
-            for pm in ['cash', 'fawran', 'pos']
+            {'payment_method': 'cash', 'total': ledger['cash'], 'count': ledger['cash_orders']},
+            {'payment_method': 'fawran', 'total': ledger['fawran'], 'count': ledger['fawran_orders']},
+            {'payment_method': 'pos', 'total': ledger['pos'], 'count': ledger['pos_orders']},
         ]
+        zero_cod_qs = delivery_models.DeliveryTask.objects.filter(
+            driver=driver, cod_settled=False, cod_collected=False,
+            dl_task_status__in=['delivered', 'partial_delivery'],
+            order__cod_amount=0,
+        )
+        if ledger['since']:
+            zero_cod_qs = zero_cod_qs.filter(completed_at__gt=ledger['since'])
+        zero_cod_count = zero_cod_qs.count()
 
         # Get recent settled COD deliveries
         cod_in_hand_ids = list(cod_in_hand_list.values_list('id', flat=True))
@@ -598,9 +592,6 @@ def cod_collection(request):
             id__in=cod_in_hand_list.values_list('order_id', flat=True)
         ).select_related('business', 'pickup_location').order_by('-created_at')
 
-        # All-time orders count (non-filtered)
-        all_time_orders_count = all_time_cod_qs.count()
-
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
@@ -610,10 +601,21 @@ def cod_collection(request):
             'cod_in_hand_total': cod_in_hand_total,
             'cod_in_hand_count': cod_in_hand_count,
             'cod_orders': cod_orders,
-            'total_cod_in_hand': all_time_cod_total,
-            'total_orders': all_time_orders_count,
+            'total_cod_in_hand': ledger['total'],
+            'total_orders': cod_in_hand_count,
             'payment_method_breakdown': payment_method_breakdown,
             'all_time_payment_breakdown': all_time_payment_breakdown,
+            'cash_cod_amount': ledger['cash'],
+            'fawran_cod_amount': ledger['fawran'],
+            'pos_cod_amount': ledger['pos'],
+            'cash_cod_count': ledger['cash_orders'],
+            'fawran_cod_count': ledger['fawran_orders'],
+            'pos_cod_count': ledger['pos_orders'],
+            'zero_cod_count': zero_cod_count,
+            'total_cod_count': ledger['orders'] + zero_cod_count,
+            'total_cod_amount': ledger['total'],
+            'settle_period_from': ledger['since'],
+            'settle_period_to': tz.now(),
             'filter_days': filter_days,
             'days_range': filter_days if filter_days != 'all' else 'All',
             'sort_by': sort_by,
@@ -634,13 +636,17 @@ def cod_submission(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
 
-        # GET request: show submission form with COD in hand data
+        # GET request: show submission form with COD in hand data.
+        # Cash only — electronic collections (Fawran/POS/bank/ATM) land in
+        # Ezzy's account at collection and are never part of a driver hand-in.
         if request.method == 'GET':
             cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
                 driver=driver,
                 cod_collected=True,
                 cod_settled=False,
                 dl_task_status__in=['delivered', 'partial_delivery']
+            ).exclude(
+                payment_method__in=WalletService.ELECTRONIC_METHODS
             ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
 
             from django.db.models import Sum
@@ -669,9 +675,32 @@ def cod_submission(request):
                 for t in cod_in_hand_list
             }
 
+            # Full settle total = cash hand-in + electronic already with Ezzy
+            # (ledger balances, same as the workforce transactions page)
+            ledger = WalletService.ledger_cod_balances(driver)
+            cash_count = cod_in_hand_list.count()
+            zero_cod_qs = delivery_models.DeliveryTask.objects.filter(
+                driver=driver, cod_settled=False, cod_collected=False,
+                dl_task_status__in=['delivered', 'partial_delivery'],
+                order__cod_amount=0,
+            )
+            if ledger['since']:
+                zero_cod_qs = zero_cod_qs.filter(completed_at__gt=ledger['since'])
+            zero_cod_count = zero_cod_qs.count()
+            from django.utils import timezone as _tz
             context = {
                 'driver': driver,
-                'total_cod_amount': cod_in_hand_total,
+                'total_cod_amount': cod_in_hand_total + ledger['fawran'] + ledger['pos'],
+                'cash_cod_amount': cod_in_hand_total,
+                'fawran_cod_amount': ledger['fawran'],
+                'pos_cod_amount': ledger['pos'],
+                'cash_cod_count': cash_count,
+                'fawran_cod_count': ledger['fawran_orders'],
+                'pos_cod_count': ledger['pos_orders'],
+                'zero_cod_count': zero_cod_count,
+                'total_cod_count': cash_count + ledger['fawran_orders'] + ledger['pos_orders'] + zero_cod_count,
+                'settle_period_from': ledger['since'],
+                'settle_period_to': _tz.now(),
                 'selected_orders': selected_orders,
                 'delivery_ids_str': delivery_ids_str,
                 'order_to_delivery': order_to_delivery,
@@ -704,6 +733,8 @@ def cod_submission(request):
                         driver=driver,
                         cod_collected=True,
                         cod_settled=False
+                    ).exclude(
+                        payment_method__in=WalletService.ELECTRONIC_METHODS
                     ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
                 else:
                     amount = delivery_models.DeliveryTask.objects.filter(
@@ -711,23 +742,29 @@ def cod_submission(request):
                         cod_collected=True,
                         cod_settled=False,
                         dl_task_status__in=['delivered', 'partial_delivery']
+                    ).exclude(
+                        payment_method__in=WalletService.ELECTRONIC_METHODS
                     ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
 
                 if amount <= 0:
                     messages.error(request, 'No valid COD amount to submit.')
                 else:
+                    # Snapshot ledger balances BEFORE the deposit resets them —
+                    # the settlement record carries the full method breakdown
+                    # (cash handed in + Fawran/card already with Ezzy).
+                    ledger = WalletService.ledger_cod_balances(driver)
+                    settle_total = amount + ledger['fawran'] + ledger['pos']
+                    breakdown_note = (
+                        f"Settlement breakdown: Cash {amount} QR | "
+                        f"Fawran {ledger['fawran']} QR | Card {ledger['pos']} QR | "
+                        f"Total {settle_total} QR"
+                    )
+                    notes = f'{notes} | {breakdown_note}' if notes else breakdown_note
+
                     with db_transaction.atomic():
                         driver = fleet_models.Driver.objects.select_for_update().get(user_id=request.user.id)
-                        # Sync cod_in_hand if it's out of date
-                        actual_cod = delivery_models.DeliveryTask.objects.filter(
-                            driver=driver,
-                            cod_collected=True,
-                            cod_settled=False,
-                            dl_task_status__in=['delivered', 'partial_delivery']
-                        ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
-                        if driver.cod_in_hand != actual_cod:
-                            driver.cod_in_hand = actual_cod
-                            driver.save(update_fields=['cod_in_hand'])
+                        # Sync cached cod_in_hand from the task truth (cash only)
+                        WalletService.sync_cod_in_hand(driver)
 
                         transaction = WalletService.submit_cod_to_admin(
                             driver=driver,
@@ -738,7 +775,21 @@ def cod_submission(request):
                             payment_method=payment_method,
                             delivery_ids=delivery_ids
                         )
-                        messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
+                        # Sweep zero-COD (prepaid) deliveries into this settlement
+                        # so the pending manifest resets — nothing to hand in for
+                        # them, they are reconciliation line items only.
+                        from django.utils import timezone as _tz
+                        delivery_models.DeliveryTask.objects.filter(
+                            driver=driver, cod_settled=False, cod_collected=False,
+                            dl_task_status__in=['delivered', 'partial_delivery'],
+                            order__cod_amount=0,
+                        ).update(cod_settled=True, cod_settled_at=_tz.now())
+                        messages.success(
+                            request,
+                            f'COD settled: {settle_total} QR total '
+                            f'(Cash {amount} QR handed in, Fawran {ledger["fawran"]} QR '
+                            f'+ Card {ledger["pos"]} QR already with Ezzy).'
+                        )
                         return redirect('fleet:cod_collection')
             except (ValueError, InvalidOperation) as e:
                 messages.error(request, str(e))
@@ -748,12 +799,15 @@ def cod_submission(request):
         # Get wallet status
         wallet_status = WalletService.get_wallet_status(driver)
 
-        # Get pending COD deliveries (unsettled)
+        # Get pending COD deliveries (unsettled, cash only — electronic never
+        # forms part of a driver hand-in)
         cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
             cod_collected=True,
             cod_settled=False,
             dl_task_status__in=['delivered', 'partial_delivery']
+        ).exclude(
+            payment_method__in=WalletService.ELECTRONIC_METHODS
         ).select_related(
             'order',
             'order__business',
@@ -793,12 +847,35 @@ def cod_submission(request):
             for t in cod_in_hand_list
         }
 
+        # Full settle total = cash hand-in + electronic already with Ezzy
+        ledger = WalletService.ledger_cod_balances(driver)
+        cash_count = cod_in_hand_list.count()
+        zero_cod_qs = delivery_models.DeliveryTask.objects.filter(
+            driver=driver, cod_settled=False, cod_collected=False,
+            dl_task_status__in=['delivered', 'partial_delivery'],
+            order__cod_amount=0,
+        )
+        if ledger['since']:
+            zero_cod_qs = zero_cod_qs.filter(completed_at__gt=ledger['since'])
+        zero_cod_count = zero_cod_qs.count()
+        from django.utils import timezone as _tz2
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
             'cod_in_hand_list': cod_in_hand_list,
             'cod_in_hand_total': cod_in_hand_total,
-            'total_cod_amount': cod_in_hand_total,
+            'total_cod_amount': cod_in_hand_total + ledger['fawran'] + ledger['pos'],
+            'cash_cod_amount': cod_in_hand_total,
+            'fawran_cod_amount': ledger['fawran'],
+            'pos_cod_amount': ledger['pos'],
+            'cash_cod_count': cash_count,
+            'fawran_cod_count': ledger['fawran_orders'],
+            'pos_cod_count': ledger['pos_orders'],
+            'zero_cod_count': zero_cod_count,
+            'total_cod_count': cash_count + ledger['fawran_orders'] + ledger['pos_orders'] + zero_cod_count,
+            'settle_period_from': ledger['since'],
+            'settle_period_to': _tz2.now(),
             'auto_reference': auto_reference,
             'recent_submissions': recent_submissions,
             'selected_orders': selected_orders,
@@ -1102,11 +1179,22 @@ def cod_transaction_detail(request):
                 })
 
         total = sum(o['amount'] for o in orders)
+        breakdown = WalletService.deposit_method_breakdown(txn)
 
         return JsonResponse({
             'transaction_code': txn.transaction_code,
             'transaction_type': txn.get_transaction_type_display(),
             'amount': float(txn.amount),
+            'settle_breakdown': {
+                'cash': float(breakdown['cash']),
+                'fawran': float(breakdown['fawran']),
+                'pos': float(breakdown['pos']),
+                'total': float(breakdown['total']),
+                'cash_orders': breakdown['cash_orders'],
+                'fawran_orders': breakdown['fawran_orders'],
+                'pos_orders': breakdown['pos_orders'],
+                'total_orders': breakdown['total_orders'],
+            } if breakdown else None,
             'date': txn.created_at.strftime('%d %b %Y, %H:%M'),
             'description': txn.description or '',
             'reference_number': txn.reference_number or '',
@@ -1573,6 +1661,7 @@ def transaction_detail_page(request, txn_code):
             'txn': txn,
             'orders': orders,
             'orders_count': len(orders),
+            'settle_breakdown': WalletService.deposit_method_breakdown(txn),
         }
 
         return render(request, 'fleet/parts/transaction_detail_page.html', context)

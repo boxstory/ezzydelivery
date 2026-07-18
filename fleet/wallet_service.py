@@ -260,8 +260,12 @@ class WalletService:
 
             # Lock the candidate unsettled tasks so a concurrent submission cannot
             # claim the same rows. Determine which to settle and their COD sum.
+            # Cash only: electronic collections (Fawran/POS/bank/ATM) settle to
+            # Ezzy at collection and are never part of a driver hand-in.
             base_qs = DeliveryTask.objects.select_for_update().filter(
                 driver=driver, cod_collected=True, cod_settled=False
+            ).exclude(
+                payment_method__in=WalletService.ELECTRONIC_METHODS
             )
             settled_task_ids = []
             settled_amount = Decimal('0')
@@ -403,6 +407,102 @@ class WalletService:
             )
 
         return len(to_update)
+
+    @staticmethod
+    def ledger_cod_balances(driver):
+        """Running COD balances by method since the driver's last deposit —
+        the same numbers the workforce fleet-transactions ledger shows.
+        Cash is the physical hand-in liability; Fawran/POS are already in
+        Ezzy's bank but stay on the ledger until a deposit transaction
+        resets the running balances."""
+        WalletService.recalculate_cod_balances(driver)
+        latest = DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['cod_collection', 'cod_deposit', 'cod_driver_settle']
+        ).order_by('-created_at').first()
+        cash = latest.cod_cash_after if latest else Decimal('0')
+        fawran = latest.cod_fawran_after if latest else Decimal('0')
+        pos = latest.cod_pos_after if latest else Decimal('0')
+
+        # Orders on the ledger: distinct tasks collected since the last deposit
+        # (multiple partial-collection txns on one task count once)
+        last_deposit = DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['cod_deposit', 'cod_driver_settle']
+        ).order_by('-created_at').first()
+        coll_qs = DriverTransaction.objects.filter(
+            driver=driver, transaction_type='cod_collection')
+        if last_deposit:
+            coll_qs = coll_qs.filter(created_at__gt=last_deposit.created_at)
+        counts = WalletService._collection_method_counts(coll_qs)
+        orders = counts['cash'] + counts['fawran'] + counts['pos']
+
+        return {'cash': cash, 'fawran': fawran, 'pos': pos,
+                'total': cash + fawran + pos, 'orders': orders,
+                'cash_orders': counts['cash'], 'fawran_orders': counts['fawran'],
+                'pos_orders': counts['pos'],
+                'since': last_deposit.created_at if last_deposit else None}
+
+    @staticmethod
+    def _collection_method_counts(coll_qs):
+        """Distinct collected tasks per method in a cod_collection queryset
+        (txns without a linked task count once each)."""
+        seen = {'cash': set(), 'fawran': set(), 'pos': set()}
+        extra = {'cash': 0, 'fawran': 0, 'pos': 0}
+        for c in coll_qs.select_related('delivery_task'):
+            method = (
+                (c.delivery_task.payment_method if c.delivery_task else None)
+                or c.payment_method or 'cash'
+            )
+            key = 'fawran' if method == 'fawran' else (
+                'pos' if method in ('pos', 'card') else 'cash')
+            if c.delivery_task_id:
+                seen[key].add(c.delivery_task_id)
+            else:
+                extra[key] += 1
+        return {k: len(seen[k]) + extra[k] for k in seen}
+
+    @staticmethod
+    def deposit_method_breakdown(txn):
+        """Method breakdown of one settlement (cod_deposit/cod_driver_settle):
+        cash is the deposited amount; Fawran/card are the electronic
+        collections this deposit swept off the ledger (everything collected
+        between the previous deposit and this one). Works for historical
+        settlements too — derived from the transaction ledger, not notes."""
+        if txn.transaction_type not in ('cod_deposit', 'cod_driver_settle'):
+            return None
+        prev = DriverTransaction.objects.filter(
+            driver=txn.driver,
+            transaction_type__in=['cod_deposit', 'cod_driver_settle'],
+            created_at__lt=txn.created_at,
+        ).order_by('-created_at').first()
+        coll = DriverTransaction.objects.filter(
+            driver=txn.driver,
+            transaction_type='cod_collection',
+            created_at__lt=txn.created_at,
+        ).select_related('delivery_task')
+        if prev:
+            coll = coll.filter(created_at__gt=prev.created_at)
+
+        fawran = Decimal('0')
+        pos = Decimal('0')
+        for c in coll:
+            method = (
+                (c.delivery_task.payment_method if c.delivery_task else None)
+                or c.payment_method or 'cash'
+            )
+            if method == 'fawran':
+                fawran += abs(c.amount)
+            elif method in ('pos', 'card'):
+                pos += abs(c.amount)
+
+        cash = abs(txn.amount)
+        counts = WalletService._collection_method_counts(coll)
+        return {'cash': cash, 'fawran': fawran, 'pos': pos,
+                'total': cash + fawran + pos,
+                'cash_orders': counts['cash'], 'fawran_orders': counts['fawran'],
+                'pos_orders': counts['pos'],
+                'total_orders': counts['cash'] + counts['fawran'] + counts['pos']}
 
     @staticmethod
     def settle_cod_with_client(business, amount, delivery_task_ids=None,

@@ -59,6 +59,24 @@
                 <span class="ftd__detail-value">{{ txn.get_payment_method_display }}</span>
             </div>
             {% endif %}
+            {% if settle_breakdown %}
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label"><i class="fa-solid fa-money-bill me-1"></i>Cash Handed In</span>
+                <span class="ftd__detail-value">{{ settle_breakdown.cash|floatformat:2 }} QR ({{ settle_breakdown.cash_orders }})</span>
+            </div>
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label"><i class="fa-solid fa-mobile-screen me-1"></i>Fawran (with Ezzy)</span>
+                <span class="ftd__detail-value">{{ settle_breakdown.fawran|floatformat:2 }} QR ({{ settle_breakdown.fawran_orders }})</span>
+            </div>
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label"><i class="fa-solid fa-credit-card me-1"></i>Card (with Ezzy)</span>
+                <span class="ftd__detail-value">{{ settle_breakdown.pos|floatformat:2 }} QR ({{ settle_breakdown.pos_orders }})</span>
+            </div>
+            <div class="ftd__detail-row">
+                <span class="ftd__detail-label"><i class="fa-solid fa-sack-dollar me-1"></i>Settlement Total</span>
+                <span class="ftd__detail-value"><strong>{{ settle_breakdown.total|floatformat:2 }} QR ({{ settle_breakdown.total_orders }} orders)</strong></span>
+            </div>
+            {% endif %}
             {% if txn.business %}
             <div class="ftd__detail-row">
                 <span class="ftd__detail-label">Business</span>
