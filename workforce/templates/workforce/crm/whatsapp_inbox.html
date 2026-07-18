@@ -6,7 +6,7 @@
 {# Notes: crmi__ namespace; promote/dismiss are fetch-POST JSON actions handled by inline delegated JS. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -18,6 +18,33 @@
         <div class="crm__eyebrow">Sales Pipeline</div>
         <h1 class="crm__title">WhatsApp Inbox</h1>
         <p class="crm__subtitle">Unknown senders who messaged the business WhatsApp — promote real prospects to leads</p>
+      </div>
+      <div class="crmi__session" id="workforce_crm_inbox_div_session">
+        {% if waha_session %}
+          {% if waha_session.status == 'WORKING' %}
+          <span class="crmi__session-dot crmi__session-dot--on"></span>
+          <div class="crmi__session-info">
+            <span class="crmi__session-number">{{ waha_session.phone|default:"Unknown number" }}</span>
+            <span class="crmi__session-label">
+              WAHA connected{% if waha_session.push_name %} · {{ waha_session.push_name }}{% endif %}
+            </span>
+          </div>
+          {% else %}
+          <span class="crmi__session-dot"></span>
+          <div class="crmi__session-info">
+            <span class="crmi__session-number">Not connected</span>
+            <span class="crmi__session-label">
+              WAHA session {{ waha_session.status|default:"unknown"|lower }}{% if not waha_session.reachable %} · bridge unreachable{% endif %}
+            </span>
+          </div>
+          {% endif %}
+        {% else %}
+          <span class="crmi__session-dot"></span>
+          <div class="crmi__session-info">
+            <span class="crmi__session-number">Status unavailable</span>
+            <span class="crmi__session-label">WAHA bridge not reachable</span>
+          </div>
+        {% endif %}
       </div>
       <div class="crm__head-actions">
         <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"

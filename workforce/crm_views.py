@@ -395,7 +395,16 @@ def crm_whatsapp_inbox(request):
     from workforce.views import paginate_queryset
 
     waha_enabled = getattr(settings, 'WAHA_ENABLED', False)
-    rows, known_lead_map = [], {}
+
+    # Live session status banner — which number the WAHA bridge is connected to
+    waha_session = None
+    try:
+        from whatsapp.waha_views import fetch_waha_session_status
+        waha_session = fetch_waha_session_status()
+    except Exception:
+        logger.exception('crm: WAHA session status fetch failed')
+
+    rows = []
     search = request.GET.get('search', '').strip()
 
     try:
@@ -460,6 +469,7 @@ def crm_whatsapp_inbox(request):
         'page_obj': page_obj,
         'search': search,
         'waha_enabled': waha_enabled,
+        'waha_session': waha_session,
     }
     return render(request, 'workforce/crm/whatsapp_inbox.html', context)
 
