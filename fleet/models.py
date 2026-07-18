@@ -300,6 +300,7 @@ class DriverDocument(models.Model):
     driver = models.ForeignKey(
         Driver, on_delete=models.CASCADE, related_name='driver_document')
     document_choices = (
+        ('Selfie', 'Selfie'),
         ('QID', 'QID'),
         ('Passport', 'Passport'),
         ('Driving License', 'Driving License'),

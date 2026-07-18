@@ -345,94 +345,176 @@ def join_business(request):
         return redirect('core:profile_add')
 
 
-@login_required(login_url='/accounts/login/')
 def join_driver(request):
-    """Handle driver registration process"""
-    try:
-        profile = get_cached_profile(request)
-        if not profile:
-            raise core_models.Profile.DoesNotExist()
+    """Public driver application — Google sign-in, then 3 sections: profile, vehicle, documents.
 
-        # Check if role already selected
-        if profile.is_driver or profile.is_business:
-            logger.info(f"User {request.user.id} already has role selected")
-            return redirect('core:profile', user_number=_get_user_number(request.user.id))
+    Anonymous visitors see the form with a Google login popup (One Tap +
+    explicit button). After login the form is prefilled from the Google
+    account / existing profile. Browser geolocation is captured on submit
+    and stored in driver_meta['registration_location'].
+    """
+    APPLY_DOC_TYPES = ['Selfie', 'QID', 'Passport', 'Driving License', 'Istimara']
+    ID_DOC_TYPES = [d for d in APPLY_DOC_TYPES if d != 'Selfie']
 
-        joinusform = core_forms.JoinUsForm(request.POST or None, instance=profile)
-        action = request.POST.get('action', '') if request.method == 'POST' else ''
+    profile = None
+    driver = None
+    primary_vehicle = None
 
-        if request.method == 'POST' and action == 'save_profile':
-            # Handle inline profile completion save
-            profileupdateform = core_forms.ProfileUpdateForm(request.POST, instance=profile)
-            profileupdateform.fields['username'].widget.attrs['readonly'] = True
-            profileupdateform.fields['username'].disabled = True
-            if profileupdateform.is_valid():
-                profileupdateform.save()
-                messages.success(request, "Profile saved! You can now submit your driver application.")
-                logger.info(f"Inline profile save on join_driver for user {request.user.id}")
-                return redirect('core:driver_register')
-            else:
-                messages.error(request, "Please fix the profile errors below.")
-            driverjoinform = fleet_forms.DriverJoinForm()
-        elif request.method == 'POST':
-            profileupdateform = core_forms.ProfileUpdateForm(instance=profile)
-            driverjoinform = fleet_forms.DriverJoinForm(request.POST)
-            if driverjoinform.is_valid():
-                logger.info(f"Driver form valid for user {request.user.id}")
-                driver = driverjoinform.save(commit=False)
-                driver.profile = profile
-                driver.driver_id = profile.id
-                driver.driver_status = DRIVER_STATUS_PROCESSING
-                driver.driver_code = ''.join(random.choice(string.digits) for _ in range(6))
-                driver.user_id = request.user.id
-                driver.driver_rating = 0
-                driver.driver_rating_count = 0
-                driver.driver_reviews = 0
-                driver.driver_reviews_count = 0
-                driver.created_at = dj_timezone.now()
-                driver.save()
+    if request.user.is_authenticated:
+        profile, _ = core_models.Profile.objects.get_or_create(user=request.user)
+        if profile.is_staff:
+            messages.warning(request, "Staff accounts cannot apply as drivers.")
+            return redirect('workforce:wf_dashboard')
+        driver = fleet_models.Driver.objects.filter(user_id=request.user.id).first()
+        if driver:
+            primary_vehicle = driver.driver_vehicle.first()
 
-                profile_update = joinusform.save(commit=False)
-                profile_update.user = request.user
-                profile_update.is_driver = True
-                profile_update.is_business = False
-                profile_update.save()
+    upload_errors = []
 
-                logger.info(f"Driver registration completed for user {request.user.id}")
-                messages.success(request, "Driver registration completed successfully!")
-                return redirect('core:profile_view')
-            else:
-                logger.warning(f"Invalid driver form for user {request.user.id}")
-                messages.error(request, "Please correct the errors below.")
-        else:
-            driverjoinform = fleet_forms.DriverJoinForm()
-            profileupdateform = core_forms.ProfileUpdateForm(instance=profile)
-            profileupdateform.fields['username'].widget.attrs['readonly'] = True
-            profileupdateform.fields['username'].disabled = True
+    if request.method == 'POST':
+        if not request.user.is_authenticated:
+            messages.error(request, "Please sign in with Google to submit your application.")
+            return redirect('core:join_driver')
 
-        logger.debug(f"Loading driver join form for profile {profile.id}")
+        pform = core_forms.DriverApplyProfileForm(request.POST, instance=profile)
+        vform = fleet_forms.DriverVehicleForm(request.POST, prefix='veh', instance=primary_vehicle)
 
-        # Get profile picture for sidebar
-        try:
-            profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
-        except core_models.ProfilePicture.DoesNotExist:
-            profile_picture = core_models.ProfilePicture.objects.create(
-                user=request.user, profile=profile
+        # Documents: selfie + at least 2 ID docs (new uploads count together with existing)
+        existing_types = set()
+        if driver:
+            existing_types = set(
+                driver.driver_document.filter(document_type__in=APPLY_DOC_TYPES)
+                .exclude(document_file='').exclude(document_file__isnull=True)
+                .values_list('document_type', flat=True)
             )
+        uploaded = {}
+        for doc_type in APPLY_DOC_TYPES:
+            f = request.FILES.get(f'doc_{doc_type.replace(" ", "_")}')
+            if f:
+                ok, err = validate_image_upload(f)
+                if ok:
+                    uploaded[doc_type] = f
+                else:
+                    upload_errors.append(f"{doc_type}: {err}")
 
-        completion_percentage = profile.get_profile_completion_percentage()
-        context = {
-            'driverjoinform': driverjoinform,
-            'profileupdateform': profileupdateform,
-            'profile': profile,
-            'profile_picture': profile_picture,
-            'completion_percentage': completion_percentage,
-        }
-        return render(request, 'core/join_us_driver.html', context)
-    except core_models.Profile.DoesNotExist:
-        logger.info(f"Profile does not exist yet for user {request.user.id} (normal onboarding path)")
-        messages.error(request, "Please create your profile first.")
-        return redirect('core:profile_add')
+        if 'Selfie' not in uploaded and 'Selfie' not in existing_types:
+            upload_errors.append("A selfie photo is required.")
+        id_docs_count = len({t for t in ID_DOC_TYPES if t in uploaded or t in existing_types})
+        if id_docs_count < 2:
+            upload_errors.append("Upload at least 2 ID documents (QID, Passport, Driving License or Istimara).")
+
+        veh_type = request.POST.get('veh-vehicle_type', '')
+        vehicle_selected = bool(veh_type) and veh_type != 'none'
+        if not vehicle_selected:
+            upload_errors.append("Please select your available vehicle type.")
+
+        if pform.is_valid() and vform.is_valid() and not upload_errors:
+            profile = pform.save(commit=False)
+            profile.user = request.user
+            if not profile.username:
+                profile.username = request.user.username
+            if not profile.email:
+                profile.email = request.user.email
+            profile.is_driver = True
+            profile.is_business = False
+            if profile.get_profile_completion_percentage() == 100:
+                profile.is_profile_completed = True
+            if profile.verification_status != 'verified':
+                profile.verification_status = VERIFICATION_STATUS_PENDING
+                profile.verification_applied_at = dj_timezone.now()
+            profile.save()
+
+            is_new_driver = driver is None
+            if is_new_driver:
+                driver = fleet_models.Driver(
+                    user=request.user,
+                    profile=profile,
+                    driver_id=profile.id,
+                    driver_status=DRIVER_STATUS_PENDING,
+                    driver_code=''.join(random.choice(string.digits) for _ in range(6)),
+                    driver_languages='english',
+                )
+            driver.profile = profile
+            driver.driver_phone = profile.phone or ''
+            driver.driver_whatsapp = profile.whatsapp or ''
+            driver.has_driver_license = request.POST.get('has_driver_license') == 'on'
+            license_no = (request.POST.get('driver_license_number') or '').strip()
+            if license_no:
+                driver.driver_license_number = license_no
+
+            # Registration location captured by the browser at submit time
+            geo_lat = (request.POST.get('geo_lat') or '').strip()
+            geo_lng = (request.POST.get('geo_lng') or '').strip()
+            if geo_lat and geo_lng:
+                meta = driver.driver_meta or {}
+                meta['registration_location'] = {
+                    'lat': geo_lat,
+                    'lng': geo_lng,
+                    'accuracy_m': (request.POST.get('geo_accuracy') or '').strip(),
+                    'captured_at': dj_timezone.now().isoformat(),
+                }
+                driver.driver_meta = meta
+            driver.save()
+
+            vehicle = vform.save(commit=False)
+            vehicle.driver = driver
+            vehicle.save()
+
+            for doc_type, f in uploaded.items():
+                doc, _ = fleet_models.DriverDocument.objects.get_or_create(
+                    driver=driver, document_type=doc_type,
+                    defaults={'document_no': ''}
+                )
+                doc.document_file = f
+                doc_no = (request.POST.get(f'doc_no_{doc_type.replace(" ", "_")}') or '').strip()
+                if doc_no:
+                    doc.document_no = doc_no
+                doc.save()
+
+            logger.info(
+                f"Driver application submitted for user {request.user.id} "
+                f"(new={is_new_driver}, geo={'yes' if geo_lat else 'no'})"
+            )
+            messages.success(request, "Application submitted! Our team will review it and contact you on WhatsApp.")
+            return redirect('core:join_driver')
+        else:
+            for err in upload_errors:
+                messages.error(request, err)
+            messages.error(request, "Please fix the highlighted fields and try again.")
+    else:
+        pform = core_forms.DriverApplyProfileForm(instance=profile)
+        vform = fleet_forms.DriverVehicleForm(prefix='veh', instance=primary_vehicle)
+        # First visit after Google login: prefill name from the Google account
+        if request.user.is_authenticated and profile and not profile.first_name:
+            pform.initial['first_name'] = request.user.first_name
+            pform.initial['last_name'] = request.user.last_name
+
+    application_status = ''
+    if profile and profile.is_driver and driver:
+        application_status = profile.verification_status
+
+    existing_docs = {}
+    if driver:
+        for doc in driver.driver_document.filter(document_type__in=APPLY_DOC_TYPES).exclude(document_file=''):
+            existing_docs[doc.document_type] = doc
+    doc_list = [
+        {'type': dt, 'key': dt.replace(' ', '_'), 'doc': existing_docs.get(dt)}
+        for dt in APPLY_DOC_TYPES
+    ]
+
+    show_status_only = application_status in ('pending', 'under_review', 'verified') and request.GET.get('edit') != '1'
+
+    context = {
+        'pform': pform,
+        'vform': vform,
+        'profile': profile,
+        'driver': driver,
+        'doc_list': doc_list,
+        'application_status': application_status,
+        'show_status_only': show_status_only,
+        'user_email': request.user.email if request.user.is_authenticated else '',
+    }
+    return render(request, 'core/join_us_driver.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -766,6 +848,18 @@ def main_dashboard(request):
             if pending_member:
                 messages.info(request, "Your team membership is pending staff verification. Please wait for approval.")
                 return render(request, 'core/verification_pending.html', {'profile': profile, 'ob_role': ''})
+            # Membership exists but none is active (deactivated/suspended, or
+            # never staff-verified) — tell the user instead of dropping them
+            # into the role-registration flow below. Declined/rejected
+            # memberships are treated as no membership.
+            blocked_member = memberships.exclude(team_status='rejected').first()
+            if blocked_member:
+                messages.warning(
+                    request,
+                    f"Your team membership with {blocked_member.business.business_name} is "
+                    f"{blocked_member.get_team_status_display().lower()}. Please contact the business owner."
+                )
+                return redirect('core:profile_complete_update')
 
         # Check verification status
         if profile.verification_status == VERIFICATION_STATUS_INCOMPLETE:
@@ -1699,4 +1793,11 @@ def google_one_tap_callback(request):
 
     auth_login(request, user,
                backend='allauth.account.auth_backends.AuthenticationBackend')
-    return JsonResponse({'success': True, 'redirect': django_settings.LOGIN_REDIRECT_URL})
+
+    # Return to the page the user was on (e.g. driver application) when safe
+    from django.utils.http import url_has_allowed_host_and_scheme
+    next_url = (request.POST.get('next') or '').strip()
+    if not (next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure())):
+        next_url = django_settings.LOGIN_REDIRECT_URL
+    return JsonResponse({'success': True, 'redirect': next_url})

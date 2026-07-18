@@ -1,44 +1,246 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
+{% load socialaccount %}
+{% comment %}
+Purpose: Public driver application — Google sign-in gate, 3 sections (profile, vehicle, documents) with geolocation on submit
+Used by: core.views.join_driver (/join_us/driver/)
+Notes: Anonymous users see a blurred form behind a Google login modal; One Tap from base.html also fires
+{% endcomment %}
 
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'core/css/core_dashboard.css' %}?v=20260301c" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260718a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<section id="core_join_driver_section_main">
-    <div class="container-xl px-3 py-3">
-        {% include "core/parts/filepath.html" %}
+<section id="core_join_driver_section_main" class="{% if not user.is_authenticated %}cja__login-gate{% endif %}">
+    <div class="container-lg px-3 py-4" >
 
-        <div class="row g-4">
-            <!-- Profile Sidebar -->
-            <div class="col-12 col-lg-4 col-xl-3">
-                <div class="position-lg-sticky" style="top: 2rem;">
-                    {% include "core/parts/dashboard_sidebar_profile.html" %}
+        <!-- Hero -->
+        <div class="cja__hero p-4 p-md-5 mb-4 text-center">
+            <h1 class="cja__hero-title h3 mb-2">Become an Ezzy Delivery Driver</h1>
+            <p class="mb-0">Apply in 3 quick steps — your details, your vehicle, and your documents.</p>
+        </div>
+
+        {% if show_status_only %}
+        <!-- Application status -->
+        <div class="cja__section-card p-4 p-md-5 text-center mx-auto col-12 col-md-8 col-lg-6">
+            {% if application_status == 'verified' %}
+                <div class="cja__status-icon text-success mb-2">&#10003;</div>
+                <h2 class="h5 mb-2">You're approved!</h2>
+                <p class="text-muted mb-3">Your driver account is active. Open your fleet dashboard to start accepting tasks.</p>
+                <a href="{% url 'fleet:fleet_dashboard' %}" class="btn btn-dark">Go to Fleet Dashboard</a>
+            {% else %}
+                <div class="cja__status-icon text-warning mb-2">&#8987;</div>
+                <h2 class="h5 mb-2">Application under review</h2>
+                <p class="text-muted mb-3">
+                    We received your application{% if profile.verification_applied_at %} on {{ profile.verification_applied_at|date:"d M Y" }}{% endif %}.
+                    Our team will contact you on WhatsApp after review.
+                </p>
+                <a href="{% url 'core:join_driver' %}?edit=1" class="btn btn-outline-dark btn-sm">Edit application</a>
+            {% endif %}
+        </div>
+
+        {% else %}
+
+        {% if application_status == 'rejected' and profile.rejection_reason %}
+        <div class="alert alert-danger" role="alert">
+            <strong>Your previous application was rejected:</strong> {{ profile.rejection_reason }}<br>
+            Please correct the issues below and submit again.
+        </div>
+        {% endif %}
+
+        <div class="cja__form-wrap mx-auto col-12 col-lg-10 col-xl-8">
+            <form id="core_join_driver_form_apply" method="post" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="geo_lat" id="core_join_driver_input_geolat">
+                <input type="hidden" name="geo_lng" id="core_join_driver_input_geolng">
+                <input type="hidden" name="geo_accuracy" id="core_join_driver_input_geoacc">
+
+                <!-- Section 1: Profile -->
+                <div class="cja__section-card p-3 p-md-4 mb-4">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="cja__step-badge d-flex align-items-center justify-content-center">1</span>
+                        <h2 class="h6 mb-0">Your Profile</h2>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label mb-1">Google Account Email</label>
+                            <input type="email" class="form-control" value="{{ user_email|default:'Sign in with Google to continue' }}" readonly disabled>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.first_name.id_for_label }}">First Name *</label>
+                            {{ pform.first_name }}
+                            {{ pform.first_name.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.last_name.id_for_label }}">Last Name *</label>
+                            {{ pform.last_name }}
+                            {{ pform.last_name.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.phone.id_for_label }}">Phone *</label>
+                            {{ pform.phone }}
+                            {{ pform.phone.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.whatsapp.id_for_label }}">WhatsApp *</label>
+                            {{ pform.whatsapp }}
+                            {{ pform.whatsapp.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.nationlity.id_for_label }}">Nationality *</label>
+                            {{ pform.nationlity }}
+                            {{ pform.nationlity.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.date_of_birth.id_for_label }}">Date of Birth *</label>
+                            {{ pform.date_of_birth }}
+                            {{ pform.date_of_birth.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.zone_name.id_for_label }}">Zone / Area *</label>
+                            {{ pform.zone_name }}
+                            {{ pform.zone_name.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ pform.address.id_for_label }}">Address *</label>
+                            {{ pform.address }}
+                            {{ pform.address.errors }}
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Main Content -->
-            <div class="col-12 col-lg-8 col-xl-9">
-                {% include "core/parts/join_driver_form.html" %}
+                <!-- Section 2: Vehicle -->
+                <div class="cja__section-card p-3 p-md-4 mb-4">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="cja__step-badge d-flex align-items-center justify-content-center">2</span>
+                        <h2 class="h6 mb-0">Vehicle Available</h2>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ vform.vehicle_type.id_for_label }}">Vehicle Type *</label>
+                            {{ vform.vehicle_type }}
+                            {{ vform.vehicle_type.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ vform.vehicle_model.id_for_label }}">Vehicle Model</label>
+                            {{ vform.vehicle_model }}
+                            {{ vform.vehicle_model.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ vform.vehicle_no.id_for_label }}">Plate Number</label>
+                            {{ vform.vehicle_no }}
+                            {{ vform.vehicle_no.errors }}
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="{{ vform.vehicle_color.id_for_label }}">Vehicle Color</label>
+                            {{ vform.vehicle_color }}
+                            {{ vform.vehicle_color.errors }}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" name="has_driver_license"
+                                       id="core_join_driver_check_license"
+                                       {% if driver.has_driver_license %}checked{% endif %}>
+                                <label class="form-check-label" for="core_join_driver_check_license">I have a valid driving license</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="core_join_driver_input_licenseno">Driving License Number</label>
+                            <input type="text" class="form-control" name="driver_license_number"
+                                   id="core_join_driver_input_licenseno" placeholder="e.g. 1234567"
+                                   value="{{ driver.driver_license_number|default:'' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Documents -->
+                <div class="cja__section-card p-3 p-md-4 mb-4">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="cja__step-badge d-flex align-items-center justify-content-center">3</span>
+                        <h2 class="h6 mb-0">Documents</h2>
+                    </div>
+                    <p class="text-muted small mb-3">Minimum 3 uploads: a selfie photo plus any 2 ID documents. Max 5MB each (JPG/PNG).</p>
+                    <div class="row g-3">
+                        {% for item in doc_list %}
+                        <div class="col-12 col-md-6">
+                            <div class="cja__doc-tile {% if item.doc %}cja__doc-tile--done{% endif %} p-3 h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label mb-0 fw-bold" for="core_join_driver_file_{{ item.key }}">
+                                        {{ item.type }}{% if item.type == 'Selfie' %} *{% endif %}
+                                    </label>
+                                    {% if item.doc %}<span class="cja__doc-status">Uploaded &#10003;</span>{% endif %}
+                                </div>
+                                <input type="file" class="form-control form-control-sm mb-2 cja__doc-input"
+                                       id="core_join_driver_file_{{ item.key }}"
+                                       name="doc_{{ item.key }}" accept="image/*"
+                                       {% if item.type == 'Selfie' %}capture="user"{% endif %}
+                                       data-doc-type="{{ item.type }}"
+                                       data-existing="{% if item.doc %}1{% else %}0{% endif %}">
+                                {% if item.type != 'Selfie' %}
+                                <input type="text" class="form-control form-control-sm" name="doc_no_{{ item.key }}"
+                                       placeholder="{{ item.type }} number (optional)"
+                                       value="{{ item.doc.document_no|default:'' }}">
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-2 mb-5">
+                    <p class="text-muted small mb-0" id="core_join_driver_text_geohint">
+                        Your location is captured when you submit, to help us assign nearby deliveries.
+                    </p>
+                    <button type="submit" class="btn btn-dark btn-lg px-5" id="core_join_driver_btn_submit"
+                            {% if not user.is_authenticated %}disabled{% endif %}>
+                        Submit Application
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% if not user.is_authenticated %}
+<!-- Google login gate modal -->
+<div class="modal fade" id="core_join_driver_modal_login" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <h2 class="h6 mb-2">Sign in to apply</h2>
+                <p class="text-muted small mb-3">Driver applications use your Google (Gmail) account — one tap and you're in.</p>
+                <form method="post" action="{% provider_login_url 'google' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'core:join_driver' %}">
+                    <button type="submit" class="btn cja__google-btn w-100">
+                        <img src="https://accounts.google.com/favicon.ico" alt="" width="18" height="18" class="me-2 align-text-bottom">
+                        Continue with Google
+                    </button>
+                </form>
             </div>
         </div>
     </div>
-</section>
+</div>
+{% endif %}
 {% endblock content %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Show Google login gate for anonymous visitors
+    var loginModal = document.getElementById('core_join_driver_modal_login');
+    if (loginModal && window.bootstrap) {
+        new bootstrap.Modal(loginModal).show();
+    }
+
     // Auto-fill WhatsApp from Phone when WhatsApp is empty
-    function setupPhoneAutoFill(phoneId, whatsappId) {
-        var phone = document.getElementById(phoneId);
-        var whatsapp = document.getElementById(whatsappId);
-        if (!phone || !whatsapp) return;
+    var phone = document.getElementById('id_phone');
+    var whatsapp = document.getElementById('id_whatsapp');
+    if (phone && whatsapp) {
         phone.addEventListener('blur', function() {
             if (phone.value && !whatsapp.value) {
                 var val = phone.value.replace(/\D/g, '');
@@ -46,29 +248,50 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    setupPhoneAutoFill('id_pf_phone', 'id_pf_whatsapp');
-    setupPhoneAutoFill('id_driver_phone', 'id_driver_whatsapp');
 
-    var faqSection = document.getElementById('core_join_driver_section_faq');
-    if (!faqSection) return;
-    faqSection.addEventListener('click', function(e) {
-        var item = e.target.closest('.cjd__faq-item');
-        if (!item) return;
-        var isActive = item.classList.contains('active');
-        faqSection.querySelectorAll('.cjd__faq-item').forEach(function(i) {
-            i.classList.remove('active');
-            i.setAttribute('aria-expanded', 'false');
+    var form = document.getElementById('core_join_driver_form_apply');
+    if (!form) return;
+    var submitBtn = document.getElementById('core_join_driver_btn_submit');
+
+    function docState() {
+        var selfieOk = false, idCount = 0;
+        form.querySelectorAll('.cja__doc-input').forEach(function(inp) {
+            var has = inp.files.length > 0 || inp.dataset.existing === '1';
+            if (inp.dataset.docType === 'Selfie') { selfieOk = has; }
+            else if (has) { idCount++; }
         });
-        if (!isActive) {
-            item.classList.add('active');
-            item.setAttribute('aria-expanded', 'true');
+        return { selfieOk: selfieOk, idCount: idCount };
+    }
+
+    form.addEventListener('submit', function(e) {
+        if (form.dataset.geoDone === '1') return;
+
+        var docs = docState();
+        var errs = [];
+        if (!docs.selfieOk) errs.push('Please upload a selfie photo.');
+        if (docs.idCount < 2) errs.push('Please upload at least 2 ID documents (QID, Passport, Driving License or Istimara).');
+        if (errs.length) {
+            e.preventDefault();
+            alert(errs.join('\n'));
+            return;
         }
-    });
-    faqSection.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-            var item = e.target.closest('.cjd__faq-item');
-            if (item) { e.preventDefault(); item.click(); }
+
+        // Capture location, then submit
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting…';
+
+        function go() {
+            form.dataset.geoDone = '1';
+            form.submit();
         }
+        if (!navigator.geolocation) { go(); return; }
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            document.getElementById('core_join_driver_input_geolat').value = pos.coords.latitude;
+            document.getElementById('core_join_driver_input_geolng').value = pos.coords.longitude;
+            document.getElementById('core_join_driver_input_geoacc').value = Math.round(pos.coords.accuracy);
+            go();
+        }, function() { go(); }, { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true });
     });
 });
 </script>

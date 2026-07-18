@@ -8296,7 +8296,8 @@ def update_verification_status(request, profile_id):
                     try:
                         from core.auto_flow_executor import execute_flows_for_trigger
                         execute_flows_for_trigger('staff_driver_approved', extra_context={
-                            'driver_name': driver.driver_name or '',
+                            'driver_name': (f"{profile.first_name or ''} {profile.last_name or ''}".strip()
+                                            or profile.username or ''),
                             'driver_phone': driver.driver_phone or '',
                         })
                     except Exception as e:

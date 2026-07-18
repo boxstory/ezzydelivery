@@ -195,6 +195,60 @@ class ProfileForm(forms.ModelForm):
         return whatsapp
 
 
+class DriverApplyProfileForm(forms.ModelForm):
+    """
+    Section 1 of the public driver application (core:join_driver).
+
+    Minimal personal-details form matching Profile fields. Email and
+    username are NOT included — they come from the Google account and
+    are set server-side in the view.
+
+    Template:
+        core/join_us_driver.html
+
+    View:
+        core.views.join_driver
+    """
+    class Meta:
+        model = Profile
+        fields = [
+            'first_name', 'last_name', 'phone', 'whatsapp',
+            'nationlity', 'zone_name', 'address', 'date_of_birth',
+        ]
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'}),
+            'phone': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number', 'inputmode': 'tel'}),
+            'whatsapp': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'WhatsApp Number', 'inputmode': 'tel'}),
+            'nationlity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nationality'}),
+            'zone_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zone / Area (e.g. Al Wakrah)'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Full Address', 'rows': 2}),
+            'date_of_birth': forms.DateInput(attrs={
+                'class': 'form-control', 'type': 'date',
+                'min': '1940-01-01', 'max': '2010-12-31',
+            }),
+        }
+        labels = {
+            'nationlity': 'Nationality',
+            'zone_name': 'Zone / Area',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in self.fields:
+            self.fields[field_name].required = True
+
+    def clean_whatsapp(self):
+        whatsapp = (self.cleaned_data.get('whatsapp') or '').strip()
+        if whatsapp:
+            qs = Profile.objects.filter(whatsapp=whatsapp)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError('This WhatsApp number is already registered with another account.')
+        return whatsapp
+
+
 class ProfileUpdateForm(forms.ModelForm):
     """
     Full profile editing form with all fields.
