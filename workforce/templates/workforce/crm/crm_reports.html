@@ -1,0 +1,187 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{# Purpose: CRM funnel and conversion reports — stat tiles, stage funnel, monthly leads by source, per-staff and per-source tables. #}
+{# Used by: workforce.crm_views.crm_reports #}
+{# Notes: crmr__ namespace; ApexCharts loaded globally via head-dashboard.html; chart data passed via json_script. Series colors follow the source entity (fixed map), tables provide the accessible view. #}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="crm crmr col-12 p-3">
+  <div class="crm__console">
+
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Sales Pipeline</div>
+        <h1 class="crm__title">CRM Reports</h1>
+        <p class="crm__subtitle">Funnel health and conversion performance across all lead sources</p>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-table-columns"></i> Board
+        </a>
+      </div>
+    </div>
+
+    <!-- STAT TILES -->
+    <div class="crmr__tiles">
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Total Leads</span>
+        <span class="crmr__tile-value">{{ total_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Open</span>
+        <span class="crmr__tile-value">{{ open_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Won</span>
+        <span class="crmr__tile-value">{{ won_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Lost</span>
+        <span class="crmr__tile-value">{{ lost_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Win Rate</span>
+        <span class="crmr__tile-value">{% if win_rate is not None %}{{ win_rate }}%{% else %}—{% endif %}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Avg Days to Close</span>
+        <span class="crmr__tile-value">{{ avg_days_to_close|default_if_none:"—" }}</span>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="crmr__charts">
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-filter"></i><h3>Pipeline by Stage</h3></div>
+        <div class="crm__panel-body">
+          <div id="workforce_crm_reports_chart_stages" class="crmr__chart"></div>
+        </div>
+      </div>
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-chart-column"></i><h3>Leads per Month by Source</h3></div>
+        <div class="crm__panel-body">
+          <div id="workforce_crm_reports_chart_monthly" class="crmr__chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLES -->
+    <div class="crmr__tables">
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-user-tie"></i><h3>Per Staff</h3></div>
+        <div class="crm__scroll">
+          <table class="crm__table" id="workforce_crm_reports_table_staff">
+            <thead>
+              <tr><th>Staff</th><th class="crm__num">Leads</th><th class="crm__num">Won</th>
+                  <th class="crm__num">Lost</th><th class="crm__num">Win Rate</th></tr>
+            </thead>
+            <tbody>
+              {% for row in per_staff %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td class="crm__num">{{ row.total }}</td>
+                <td class="crm__num">{{ row.won }}</td>
+                <td class="crm__num">{{ row.lost }}</td>
+                <td class="crm__num">{% if row.win_rate is not None %}{{ row.win_rate }}%{% else %}—{% endif %}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5"><div class="crm__empty">No assigned leads yet.</div></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-right-to-bracket"></i><h3>Per Source</h3></div>
+        <div class="crm__scroll">
+          <table class="crm__table" id="workforce_crm_reports_table_source">
+            <thead>
+              <tr><th>Source</th><th class="crm__num">Leads</th><th class="crm__num">Won</th>
+                  <th class="crm__num">Conversion</th></tr>
+            </thead>
+            <tbody>
+              {% for row in per_source %}
+              <tr>
+                <td>{{ row.label }}</td>
+                <td class="crm__num">{{ row.total }}</td>
+                <td class="crm__num">{{ row.won }}</td>
+                <td class="crm__num">{{ row.rate }}%</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4"><div class="crm__empty">No leads yet.</div></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{{ stage_data|json_script:"workforce_crm_reports_data_stages" }}
+{{ monthly_chart|json_script:"workforce_crm_reports_data_monthly" }}
+
+<!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
+<script>
+  (function () {
+    if (typeof ApexCharts === 'undefined') return;
+
+    var INK = '#16233a';
+    var MUTED = '#8a94a6';
+    var GRID = '#e7eaef';
+    // Color follows the source entity, never its position (validated palette)
+    var SOURCE_COLORS = {
+      'Pricing Inquiry': '#2a78d6',
+      'WhatsApp Form': '#008300',
+      'WhatsApp Inbound': '#e87ba4',
+      'Manual': '#eda100'
+    };
+
+    var stagesEl = document.getElementById('workforce_crm_reports_chart_stages');
+    var stageData = JSON.parse(document.getElementById('workforce_crm_reports_data_stages').textContent);
+    if (stagesEl && !stagesEl.dataset.rendered) {
+      stagesEl.dataset.rendered = '1';
+      new ApexCharts(stagesEl, {
+        chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'inherit' },
+        series: [{ name: 'Leads', data: stageData.map(function (s) { return s.count; }) }],
+        xaxis: { categories: stageData.map(function (s) { return s.label; }),
+                 labels: { style: { colors: MUTED } }, axisBorder: { color: GRID }, axisTicks: { show: false } },
+        yaxis: { labels: { style: { colors: MUTED } } },
+        colors: [INK],
+        plotOptions: { bar: { horizontal: true, barHeight: '55%', borderRadius: 4, borderRadiusApplication: 'end' } },
+        dataLabels: { enabled: true, style: { colors: ['#fff'] } },
+        grid: { borderColor: GRID, strokeDashArray: 0 },
+        tooltip: { y: { title: { formatter: function () { return 'Leads:'; } } } }
+      }).render();
+    }
+
+    var monthlyEl = document.getElementById('workforce_crm_reports_chart_monthly');
+    var monthly = JSON.parse(document.getElementById('workforce_crm_reports_data_monthly').textContent);
+    if (monthlyEl && !monthlyEl.dataset.rendered && monthly.series.length) {
+      monthlyEl.dataset.rendered = '1';
+      new ApexCharts(monthlyEl, {
+        chart: { type: 'bar', height: 300, stacked: true, toolbar: { show: false }, fontFamily: 'inherit' },
+        series: monthly.series,
+        xaxis: { categories: monthly.months, labels: { style: { colors: MUTED } },
+                 axisBorder: { color: GRID }, axisTicks: { show: false } },
+        yaxis: { labels: { style: { colors: MUTED } } },
+        colors: monthly.series.map(function (s) { return SOURCE_COLORS[s.name] || MUTED; }),
+        plotOptions: { bar: { columnWidth: '55%', borderRadius: 3, borderRadiusApplication: 'end' } },
+        stroke: { show: true, width: 2, colors: ['#fff'] },
+        dataLabels: { enabled: false },
+        legend: { position: 'top', horizontalAlign: 'left', labels: { colors: INK } },
+        grid: { borderColor: GRID, strokeDashArray: 0 }
+      }).render();
+    }
+  })();
+</script>
+{% endblock %}

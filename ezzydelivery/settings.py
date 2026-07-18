@@ -114,6 +114,7 @@ INSTALLED_APPS = [
     'dispatch',
     'ai_agent',
     'whatsapp',
+    'crm',
 
 ]
 

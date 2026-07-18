@@ -247,7 +247,7 @@ def delivery_inquiry(request):
             additional_info = request.POST.get('wa_additional_info', '')
 
             # Save to database
-            WhatsAppInquiry.objects.create(
+            wa_inquiry = WhatsAppInquiry.objects.create(
                 company_name=company_name,
                 contact_person=contact_person,
                 contact_number=contact_number,
@@ -255,6 +255,13 @@ def delivery_inquiry(request):
                 product_name=product_name,
                 additional_info=additional_info
             )
+
+            # Register as a CRM lead — never let CRM failures break the public form
+            try:
+                from crm.services import create_lead_from_whatsapp_inquiry
+                create_lead_from_whatsapp_inquiry(wa_inquiry)
+            except Exception:
+                logger.exception('CRM lead creation failed for WhatsAppInquiry %s', wa_inquiry.pk)
 
             # Generate WhatsApp message
             wa_message = f"Hi, I'm {contact_person} from {company_name}. "
@@ -350,6 +357,13 @@ def delivery_inquiry(request):
             _save_step3_to_db(inquiry, all_data)
             inquiry.is_complete = True
             inquiry.save()
+
+            # Register as a CRM lead — never let CRM failures break the public form
+            try:
+                from crm.services import create_lead_from_pricing_inquiry
+                create_lead_from_pricing_inquiry(inquiry)
+            except Exception:
+                logger.exception('CRM lead creation failed for PricingEnquiry %s', inquiry.pk)
 
             # Send thank you message via WhatsApp to customer
             from core.whatsapp_utils import send_inquiry_thank_you_message, send_admin_inquiry_notification

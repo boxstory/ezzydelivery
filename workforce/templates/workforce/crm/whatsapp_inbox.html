@@ -1,0 +1,181 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{# Purpose: WAHA WhatsApp inbox — unknown inbound senders; staff promotes real prospects to leads or dismisses noise. #}
+{# Used by: workforce.crm_views.crm_whatsapp_inbox #}
+{# Notes: crmi__ namespace; promote/dismiss are fetch-POST JSON actions handled by inline delegated JS. #}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="crm crmi col-12 p-3">
+  <div class="crm__console">
+
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Sales Pipeline</div>
+        <h1 class="crm__title">WhatsApp Inbox</h1>
+        <p class="crm__subtitle">Unknown senders who messaged the business WhatsApp — promote real prospects to leads</p>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-table-columns"></i> Board
+        </a>
+      </div>
+    </div>
+
+    {% if not waha_enabled %}
+    <div class="crmi__notice">
+      <i class="fa-solid fa-circle-info"></i>
+      The WAHA WhatsApp bridge is not enabled (WAHA_ENABLED is off), so no new inbound
+      messages are being captured. Historic messages below may be stale.
+    </div>
+    {% endif %}
+
+    <!-- TOOLBAR -->
+    <div class="crm__toolbar">
+      <form method="get"
+            hx-get="" hx-target="#main-content" hx-select="#main-content"
+            hx-swap="outerHTML" hx-push-url="true"
+            id="workforce_crm_inbox_form_filter" class="crm__filters">
+        <div class="crm__search {% if search %}is-filled{% endif %}">
+          <i class="fa-solid fa-magnifying-glass crm__search-icon"></i>
+          <input type="text" name="search" value="{{ search }}" id="workforce_crm_inbox_input_search"
+                 class="crm__search-input" autocomplete="off"
+                 placeholder="Search phone number…"
+                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 hx-swap="outerHTML" hx-push-url="true"
+                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-include="#workforce_crm_inbox_form_filter">
+        </div>
+        <button type="submit" class="crm__btn crm__btn--primary">Search</button>
+      </form>
+    </div>
+
+    <div class="crm__resultbar">
+      Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} unknown senders
+    </div>
+
+    <!-- TABLE -->
+    <div class="crm__scroll">
+      <table class="crm__table" id="workforce_crm_inbox_table_list">
+        <thead>
+          <tr>
+            <th>Number</th>
+            <th>Last Message</th>
+            <th class="crm__num">Msgs</th>
+            <th>Last Received</th>
+            <th style="width:15rem"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in page_obj %}
+          <tr data-inbox-phone="{{ row.from_number }}">
+            <td class="crm__num">{{ row.from_number }}</td>
+            <td class="crmi__body">
+              {% if row.last_body %}{{ row.last_body }}{% elif row.last_type %}<span class="crmi__media">[{{ row.last_type }}]</span>{% else %}—{% endif %}
+            </td>
+            <td class="crm__num">{{ row.msg_count }}</td>
+            <td class="crm__date">{{ row.last_at|date:"d M Y, H:i" }}</td>
+            <td class="crmi__actions">
+              {% if row.existing_lead_id %}
+              <a href="{% url 'workforce:crm_lead_detail' row.existing_lead_id %}" class="crm__view"
+                 hx-get="{% url 'workforce:crm_lead_detail' row.existing_lead_id %}"
+                 hx-target="#main-content" hx-select="#main-content"
+                 hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-arrow-right"></i> Existing lead
+              </a>
+              {% else %}
+              <button type="button" class="crm__btn crm__btn--primary crm__btn--sm" data-promote="{{ row.from_number }}">
+                <i class="fa-solid fa-user-plus"></i> Promote to Lead
+              </button>
+              <button type="button" class="crm__btn crm__btn--sm" data-dismiss-phone="{{ row.from_number }}">
+                <i class="fa-solid fa-ban"></i> Not a lead
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5">
+              <div class="crm__empty">
+                <i class="fa-brands fa-whatsapp"></i>
+                No unknown senders — every inbound number is a known business, lead, or dismissed.
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="crm__foot">
+      <div class="crm__foot-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+      <nav>
+        <ul class="crm__pager">
+          {% if page_obj.has_previous %}
+          <li><a href="?page={{ page_obj.previous_page_number }}&search={{ search }}"><i class="fa-solid fa-chevron-left"></i></a></li>
+          {% endif %}
+          {% if page_obj.has_next %}
+          <li><a href="?page={{ page_obj.next_page_number }}&search={{ search }}"><i class="fa-solid fa-chevron-right"></i></a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
+<script>
+  (function () {
+    var CSRF = "{{ csrf_token }}";
+    var URL_PROMOTE = "{% url 'workforce:crm_wa_promote' %}";
+    var URL_DISMISS = "{% url 'workforce:crm_wa_dismiss' %}";
+
+    function post(url, phone) {
+      var fd = new FormData();
+      fd.append('phone', phone);
+      fd.append('csrfmiddlewaretoken', CSRF);
+      return fetch(url, { method: 'POST', body: fd }).then(function (r) { return r.json(); });
+    }
+
+    if (window.__crmiInit) return;
+    window.__crmiInit = true;
+    document.addEventListener('click', function (e) {
+      var promoteBtn = e.target.closest('[data-promote]');
+      if (promoteBtn) {
+        promoteBtn.disabled = true;
+        post(URL_PROMOTE, promoteBtn.getAttribute('data-promote')).then(function (data) {
+          if (data.success) {
+            window.location.href = data.lead_url;
+          } else {
+            promoteBtn.disabled = false;
+            alert(data.error || 'Failed to create lead');
+          }
+        });
+        return;
+      }
+      var dismissBtn = e.target.closest('[data-dismiss-phone]');
+      if (dismissBtn) {
+        dismissBtn.disabled = true;
+        post(URL_DISMISS, dismissBtn.getAttribute('data-dismiss-phone')).then(function (data) {
+          if (data.success) {
+            var row = dismissBtn.closest('tr');
+            if (row) row.remove();
+          } else {
+            dismissBtn.disabled = false;
+            alert(data.error || 'Failed to dismiss');
+          }
+        });
+      }
+    });
+  })();
+</script>
+{% endblock %}

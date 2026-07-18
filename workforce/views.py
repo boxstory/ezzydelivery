@@ -15652,6 +15652,12 @@ def pricing_inquiry_update_status(request, inquiry_id):
             body='; '.join(changes),
             created_by=request.user,
         )
+        # Keep the CRM lead in sync with the legacy page (one-way, no back-write)
+        try:
+            from crm.services import sync_lead_from_pricing_status
+            sync_lead_from_pricing_status(inquiry)
+        except Exception:
+            logger.exception('CRM lead sync failed for PricingEnquiry %s', inquiry.pk)
 
     return JsonResponse({
         'success': True,

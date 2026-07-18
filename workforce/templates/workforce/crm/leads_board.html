@@ -1,0 +1,141 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{# Purpose: CRM kanban board — drag leads between pipeline stage columns. #}
+{# Used by: workforce.crm_views.crm_leads_board #}
+{# Notes: crmb__ namespace; HTML5 drag-and-drop posts to crm_lead_update_stage; Won/Lost show last {{ closed_window_days }} days only. #}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="crm crmb col-12 p-3">
+  <div class="crm__console">
+
+    <!-- HEADER BAR -->
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Sales Pipeline</div>
+        <h1 class="crm__title">Leads Board</h1>
+        <p class="crm__subtitle">Drag a card to change its stage · Won/Lost show last {{ closed_window_days }} days</p>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{% url 'workforce:crm_leads_list' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_leads_list' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-table-list"></i> List
+        </a>
+        <a href="{% url 'workforce:crm_lead_create' %}" class="crm__btn crm__btn--primary">
+          <i class="fa-solid fa-plus"></i> New Lead
+        </a>
+      </div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="crm__toolbar">
+      <form method="get"
+            hx-get="" hx-target="#main-content" hx-select="#main-content"
+            hx-swap="outerHTML" hx-push-url="true"
+            id="workforce_crm_board_form_filter" class="crm__filters">
+
+        <div class="crm__search {% if search %}is-filled{% endif %}">
+          <i class="fa-solid fa-magnifying-glass crm__search-icon"></i>
+          <input type="text" name="search" value="{{ search }}" id="workforce_crm_board_input_search"
+                 class="crm__search-input" autocomplete="off"
+                 placeholder="Search company, contact, phone…"
+                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 hx-swap="outerHTML" hx-push-url="true"
+                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-include="#workforce_crm_board_form_filter">
+        </div>
+
+        <div class="crm__facets">
+          <select name="source" class="crm__facet-select" aria-label="Filter by source"
+                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                  hx-include="#workforce_crm_board_form_filter">
+            <option value="">All sources</option>
+            {% for value, label in source_choices %}
+            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="assigned" class="crm__facet-select" aria-label="Filter by assignee"
+                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                  hx-include="#workforce_crm_board_form_filter">
+            <option value="">All assignees</option>
+            <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
+            <option value="none" {% if assigned_filter == 'none' %}selected{% endif %}>Unassigned</option>
+            {% for user in staff_users %}
+            <option value="{{ user.pk }}" {% if assigned_filter == user.pk|stringformat:"s" %}selected{% endif %}>
+              {{ user.get_full_name|default:user.username }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if search or source_filter or assigned_filter %}
+        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__clear-all"
+           hx-get="{% url 'workforce:crm_leads_board' %}"
+           hx-target="#main-content" hx-select="#main-content"
+           hx-swap="outerHTML" hx-push-url="true">Reset</a>
+        {% endif %}
+      </form>
+    </div>
+
+    <!-- BOARD -->
+    <div class="crmb__lanes" id="workforce_crm_board_div_lanes">
+      {% for column in columns %}
+      <div class="crmb__column" data-stage="{{ column.key }}">
+        <div class="crmb__col-head crmb__col-head--{{ column.key }}">
+          <span class="crmb__col-dot"></span>
+          <span class="crmb__col-title">{{ column.label }}</span>
+          <span class="crmb__col-count">{{ column.count }}</span>
+        </div>
+        <div class="crmb__col-body" data-stage-body="{{ column.key }}">
+          {% for lead in column.leads %}
+          <div class="crmb__card {% if lead.is_overdue %}crmb__card--overdue{% endif %}"
+               draggable="true" data-lead-id="{{ lead.pk }}"
+               data-detail-url="{% url 'workforce:crm_lead_detail' lead.pk %}"
+               data-stage-url="{% url 'workforce:crm_lead_update_stage' lead.pk %}">
+            <div class="crmb__card-top">
+              <span class="crmb__card-name">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Lead" }}</span>
+              <span class="crmb__card-id">#{{ lead.pk }}</span>
+            </div>
+            {% if lead.contact_name and lead.company_name %}
+            <div class="crmb__card-person">{{ lead.contact_name }}</div>
+            {% endif %}
+            {% if lead.phone %}<div class="crmb__card-phone">{{ lead.phone }}</div>{% endif %}
+            <div class="crmb__card-meta">
+              <span class="crm__source crm__source--{{ lead.source }}">{{ lead.get_source_display }}</span>
+              {% if lead.next_followup_at %}
+              <span class="crmb__card-due {% if lead.is_overdue %}crm__overdue-text{% endif %}">
+                <i class="fa-regular fa-calendar"></i>{{ lead.next_followup_at|date:"d M" }}
+              </span>
+              {% endif %}
+              {% if lead.assigned_to %}
+              <span class="crmb__card-avatar" title="{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}">
+                {{ lead.assigned_to.get_full_name|default:lead.assigned_to.username|slice:":1"|upper }}
+              </span>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <div class="crmb__col-empty">No leads</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
+
+<!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
+<script>
+  window.CRMB_CONFIG = { csrfToken: "{{ csrf_token }}" };
+</script>
+<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260718a"></script>
+{% endblock %}

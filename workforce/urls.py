@@ -2,6 +2,7 @@ from django.urls import path
 from webpages import views as webpages_views
 from workforce import views as workforce_views
 from workforce import dispatch_views
+from workforce import crm_views
 from delivery import views as delivery_views
 from orders import views as orders_views
 from core import views as core_views
@@ -299,6 +300,21 @@ urlpatterns = [
     path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
+
+    # CRM Leads
+    path('crm/leads/board/', crm_views.crm_leads_board, name='crm_leads_board'),
+    path('crm/leads/', crm_views.crm_leads_list, name='crm_leads_list'),
+    path('crm/leads/new/', crm_views.crm_lead_create, name='crm_lead_create'),
+    path('crm/leads/<int:lead_id>/', crm_views.crm_lead_detail, name='crm_lead_detail'),
+    path('crm/leads/<int:lead_id>/update-stage/', crm_views.crm_lead_update_stage, name='crm_lead_update_stage'),
+    path('crm/leads/<int:lead_id>/update/', crm_views.crm_lead_update, name='crm_lead_update'),
+    path('crm/leads/<int:lead_id>/add-activity/', crm_views.crm_lead_add_activity, name='crm_lead_add_activity'),
+    path('crm/leads/<int:lead_id>/delete-activity/<int:activity_id>/', crm_views.crm_lead_delete_activity, name='crm_lead_delete_activity'),
+    path('crm/leads/<int:lead_id>/convert/', crm_views.crm_lead_convert, name='crm_lead_convert'),
+    path('crm/whatsapp-inbox/', crm_views.crm_whatsapp_inbox, name='crm_whatsapp_inbox'),
+    path('crm/whatsapp-inbox/promote/', crm_views.crm_wa_promote, name='crm_wa_promote'),
+    path('crm/whatsapp-inbox/dismiss/', crm_views.crm_wa_dismiss, name='crm_wa_dismiss'),
+    path('crm/reports/', crm_views.crm_reports, name='crm_reports'),
 
     # Import History & Temp Orders
     path('import-history/', workforce_views.import_history, name='import_history'),

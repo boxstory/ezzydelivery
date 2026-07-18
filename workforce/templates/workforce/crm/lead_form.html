@@ -1,0 +1,88 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{# Purpose: Manual CRM lead creation form for staff. #}
+{# Used by: workforce.crm_views.crm_lead_create #}
+{# Notes: crmf__ namespace; plain form POST, redirects to the new lead's detail page. #}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="crm crmf col-12 p-3">
+  <div class="crm__console crmf__console">
+
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Sales Pipeline</div>
+        <h1 class="crm__title">New Lead</h1>
+        <p class="crm__subtitle">Register a lead received by phone, referral or walk-in</p>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-arrow-left"></i> Back to Board
+        </a>
+      </div>
+    </div>
+
+    <div class="crmf__body">
+      {% if error %}
+      <div class="alert alert-warning" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" id="workforce_crm_new_form_lead">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="workforce_crm_new_input_company">Company / Business name</label>
+            <input class="form-control" id="workforce_crm_new_input_company" name="company_name"
+                   value="{{ form_data.company_name|default:'' }}" maxlength="200">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="workforce_crm_new_input_contact">Contact person</label>
+            <input class="form-control" id="workforce_crm_new_input_contact" name="contact_name"
+                   value="{{ form_data.contact_name|default:'' }}" maxlength="100">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="workforce_crm_new_input_phone">Phone (with country code)</label>
+            <input class="form-control" id="workforce_crm_new_input_phone" name="phone"
+                   value="{{ form_data.phone|default:'' }}" maxlength="50" placeholder="9745…">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="workforce_crm_new_input_category">Product category</label>
+            <input class="form-control" id="workforce_crm_new_input_category" name="product_category"
+                   value="{{ form_data.product_category|default:'' }}" maxlength="200">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="workforce_crm_new_select_assignee">Assign to</label>
+            <select class="form-select" id="workforce_crm_new_select_assignee" name="assigned_to">
+              <option value="">— Unassigned —</option>
+              {% for user in staff_users %}
+              <option value="{{ user.pk }}">{{ user.get_full_name|default:user.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="workforce_crm_new_input_followup">Next follow-up</label>
+            <input type="date" class="form-control" id="workforce_crm_new_input_followup" name="next_followup_at">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="workforce_crm_new_textarea_notes">Notes</label>
+            <textarea class="form-control" id="workforce_crm_new_textarea_notes" name="notes" rows="3"
+                      placeholder="How did this lead arrive? What do they need?">{{ form_data.notes|default:'' }}</textarea>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="crm__btn crm__btn--primary">
+            <i class="fa-solid fa-plus"></i> Create Lead
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

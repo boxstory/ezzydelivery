@@ -4,6 +4,20 @@ Provides sidebar badge counts for the workforce dashboard.
 """
 
 
+def _safe_count_crm_overdue():
+    """Count open CRM leads whose follow-up date has passed. Returns 0 if the
+    crm app or its migrations aren't ready (defensive)."""
+    try:
+        from django.utils import timezone
+        from crm.models import Lead
+        return (
+            Lead.objects.filter(next_followup_at__lt=timezone.localdate())
+            .exclude(stage__in=Lead.CLOSED_STAGES).count()
+        )
+    except Exception:
+        return 0
+
+
 def _safe_count_avj():
     """Count AddressVerificationJob rows that need ops attention. Returns 0 if
     the whatsapp app or its migrations aren't ready (defensive)."""
@@ -99,6 +113,9 @@ def workforce_sidebar_counts(request):
         # manual_review). Surfaces in the Tasks/Import sidebar badges so ops
         # notice the WhatsApp pipeline backlog.
         'address_verify_pending_count': _safe_count_avj(),
+
+        # Open CRM leads with an overdue follow-up (CRM sidebar badge)
+        'crm_overdue_count': _safe_count_crm_overdue(),
     }
 
     cache.set(cache_key, counts, 60)  # 60 second TTL
