@@ -293,6 +293,13 @@ Format: `{type}: {description}` where type is feat/fix/refactor/docs/style/perf/
 | `api-development.md` | REST API development, webhooks |
 | `testing.md` | Test patterns, coverage, mocking |
 | `orders-management.md` | Order flow, COD, driver assignment |
+| `frontend-designer.md` | Visual design, Brand Kit, modern UI patterns (indexes the design skills below) |
+| `impeccable/` | Full-spectrum UI design/audit/polish skill (design, critique, animate, a11y, tokens) |
+| `design-taste-frontend/` | Anti-slop landing pages & redesigns — audit-first, non-templated output |
+| `emil-design-eng/` | Emil Kowalski's UI polish & animation-decision philosophy |
+| `apple-design/` | Apple-style fluid motion for web — springs, gestures, sheets, reduced-motion |
+| `review-animations/` | High-bar review of animation/motion code |
+| `animation-vocabulary/` | Motion-effect glossary — vague description → exact term |
 
 ### Available Commands (`.claude/commands/`)
 | Command | Description |

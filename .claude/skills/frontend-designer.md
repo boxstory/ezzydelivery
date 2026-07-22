@@ -2148,3 +2148,20 @@ When overriding the arrow (e.g. brand-yellow chevron on navy), declare all four 
 ### 4. Sidebar section rows: badge is structural, not conditional
 
 In the workforce sidebar, the count badge (`.wf-sidebar__badge` with `ms-auto me-2`) is what pushes the section chevron to the right edge. Always render it with `{{ count|default:"0" }}` — wrapping it in `{% if count %}` collapses the row's layout (chevron hugs the label) AND breaks live `data-badge` JS updates, which need the element present at render time.
+
+---
+
+## Supporting Design Skills
+
+Installed alongside this skill in `.claude/skills/` — invoke them for deeper craft passes:
+
+| Skill | When to use |
+|-------|-------------|
+| `impeccable` | Full-spectrum UI work: audit/critique, polish, layout, typography, color, motion, a11y, UX copy, design tokens. Modes: craft, audit, animate, bolder, quieter, polish, etc. |
+| `design-taste-frontend` | Anti-slop pass for landing pages and redesigns — audit-first, avoids templated AI-look output. |
+| `emil-design-eng` | Emil Kowalski's UI polish philosophy — component details, animation decisions, invisible details. |
+| `apple-design` | Apple-style fluid/physical motion for the web — springs, gestures, sheets, momentum, reduced-motion. |
+| `review-animations` | High-bar review of animation/motion code — default to flagging. |
+| `animation-vocabulary` | Name-that-effect glossary — turn a vague motion description into its exact term. |
+
+**Precedence:** EzzyDelivery rules win on conflict — Brand Kit variables, Bootstrap-first layout, BEM prefixes, no inline styles, and the "no childish UI" enterprise-console direction override any generic aesthetic suggestions from these skills.
