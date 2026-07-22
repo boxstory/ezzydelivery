@@ -67,7 +67,7 @@
         <i class="fas fa-wallet"></i>
       </div>
       <div class="pwa-stat-card__content">
-        <span class="pwa-stat-card__value">{{ driver.wallet_balance|floatformat:0 }}</span>
+        <span class="pwa-stat-card__value">{{ wallet_status.wallet_balance|floatformat:0 }}</span>
         <span class="pwa-stat-card__label">Wallet (QR)</span>
       </div>
     </div>
@@ -206,32 +206,32 @@
     <div class="pwa-wallet-summary">
       <div class="pwa-wallet-row">
         <span class="pwa-wallet-label">Available Wallet</span>
-        <span class="pwa-wallet-value {% if driver.available_wallet < 0 %}pwa-text-danger{% else %}pwa-text-success{% endif %}">
-          {{ driver.available_wallet|floatformat:2 }} QR
+        <span class="pwa-wallet-value {% if wallet_status.available_credit < 0 %}pwa-text-danger{% else %}pwa-text-success{% endif %}">
+          {{ wallet_status.available_credit|floatformat:2 }} QR
         </span>
       </div>
       <div class="pwa-wallet-row">
         <span class="pwa-wallet-label">Wallet Limit</span>
-        <span class="pwa-wallet-value">{{ driver.credit_limit|floatformat:2 }} QR</span>
+        <span class="pwa-wallet-value">{{ wallet_status.credit_limit|floatformat:2 }} QR</span>
       </div>
       <div class="pwa-wallet-row">
         <span class="pwa-wallet-label">COD in Hand</span>
-        <span class="pwa-wallet-value pwa-text-warning">{{ driver.cod_in_hand|floatformat:2 }} QR</span>
+        <span class="pwa-wallet-value pwa-text-warning">{{ wallet_status.cod_in_hand|floatformat:2 }} QR</span>
       </div>
       <div class="pwa-wallet-row">
         <span class="pwa-wallet-label">Pending Earnings</span>
-        <span class="pwa-wallet-value pwa-text-navy">{{ driver.pending_earnings|floatformat:2 }} QR</span>
+        <span class="pwa-wallet-value pwa-text-navy">{{ wallet_status.pending_earnings|floatformat:2 }} QR</span>
       </div>
 
       <!-- Wallet Usage Progress -->
       <div class="pwa-credit-progress">
         <div class="pwa-credit-progress__header">
           <span>Wallet Usage</span>
-          <span>{{ driver.wallet_usage_percentage|floatformat:0 }}%</span>
+          <span>{{ wallet_status.usage_percentage|floatformat:0 }}%</span>
         </div>
         <div class="pwa-credit-progress__bar">
-          <div class="pwa-credit-progress__fill {% if driver.wallet_usage_percentage >= 80 %}pwa-credit-progress__fill--warning{% elif driver.wallet_usage_percentage >= 100 %}pwa-credit-progress__fill--danger{% endif %}"
-               style="width: {{ driver.wallet_usage_percentage|floatformat:0 }}%"></div>
+          <div class="pwa-credit-progress__fill {% if wallet_status.usage_percentage >= 80 %}pwa-credit-progress__fill--warning{% elif wallet_status.usage_percentage >= 100 %}pwa-credit-progress__fill--danger{% endif %}"
+               style="width: {{ wallet_status.usage_percentage|floatformat:0 }}%"></div>
         </div>
       </div>
     </div>
@@ -455,7 +455,7 @@
               <div style="width: 45px; height: 45px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
                 <i class="fas fa-wallet fa-lg"></i>
               </div>
-              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ driver.wallet_balance|floatformat:0 }}</div>
+              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ wallet_status.wallet_balance|floatformat:0 }}</div>
               <div style="font-size: 13px; opacity: 0.8; margin-top: 6px;">Wallet (QR)</div>
             </div>
           </div>
@@ -464,7 +464,7 @@
               <div style="width: 45px; height: 45px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
                 <i class="fas fa-hand-holding-usd fa-lg"></i>
               </div>
-              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ driver.cod_in_hand|floatformat:0 }}</div>
+              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ wallet_status.cod_in_hand|floatformat:0 }}</div>
               <div style="font-size: 13px; opacity: 0.8; margin-top: 6px;">COD in Hand (QR)</div>
             </div>
           </div>
@@ -524,26 +524,26 @@
           <div class="card-body">
             <div class="row">
               <div class="col-md-6">
-                <p><strong>Wallet Balance:</strong> {{ driver.wallet_balance|floatformat:2 }} QR</p>
-                <p><strong>Wallet Limit:</strong> {{ driver.credit_limit|floatformat:2 }} QR</p>
+                <p><strong>Wallet Balance:</strong> {{ wallet_status.wallet_balance|floatformat:2 }} QR</p>
+                <p><strong>Wallet Limit:</strong> {{ wallet_status.credit_limit|floatformat:2 }} QR</p>
               </div>
               <div class="col-md-6">
-                <p><strong>COD in Hand:</strong> {{ driver.cod_in_hand|floatformat:2 }} QR</p>
-                <p><strong>Pending Earnings:</strong> {{ driver.pending_earnings|floatformat:2 }} QR</p>
+                <p><strong>COD in Hand:</strong> {{ wallet_status.cod_in_hand|floatformat:2 }} QR</p>
+                <p><strong>Pending Earnings:</strong> {{ wallet_status.pending_earnings|floatformat:2 }} QR</p>
               </div>
             </div>
             <!-- Wallet Usage Progress -->
             <div class="mt-3">
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="fw-semibold">Wallet Usage</span>
-                <span class="badge {% if driver.wallet_usage_percentage >= 100 %}bg-danger{% elif driver.wallet_usage_percentage >= 80 %}bg-warning text-dark{% else %}bg-primary{% endif %}">
-                  {{ driver.wallet_usage_percentage|floatformat:0 }}%
+                <span class="badge {% if wallet_status.usage_percentage >= 100 %}bg-danger{% elif wallet_status.usage_percentage >= 80 %}bg-warning text-dark{% else %}bg-primary{% endif %}">
+                  {{ wallet_status.usage_percentage|floatformat:0 }}%
                 </span>
               </div>
               <div class="progress" style="height: 10px; border-radius: 5px; background: #e9ecef;">
-                <div class="progress-bar {% if driver.wallet_usage_percentage >= 100 %}bg-danger{% elif driver.wallet_usage_percentage >= 80 %}bg-warning{% else %}bg-primary{% endif %}"
+                <div class="progress-bar {% if wallet_status.usage_percentage >= 100 %}bg-danger{% elif wallet_status.usage_percentage >= 80 %}bg-warning{% else %}bg-primary{% endif %}"
                      role="progressbar"
-                     style="width: {{ driver.wallet_usage_percentage|floatformat:0 }}%; border-radius: 5px;"></div>
+                     style="width: {{ wallet_status.usage_percentage|floatformat:0 }}%; border-radius: 5px;"></div>
               </div>
             </div>
           </div>

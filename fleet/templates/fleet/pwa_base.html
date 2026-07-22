@@ -19,7 +19,7 @@
 
     <!-- PWA Modern CSS -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260622b">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260722d">
     <!-- Fleet Component CSS - fth__ ffs__ fpm__ BEM blocks -->
     <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260630a">
 
@@ -42,7 +42,7 @@
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
     </style>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <!-- Main PWA Container -->
     <div class="fleet-pwa">
         {% block header %}
@@ -102,11 +102,14 @@
                     <span class="fleet-bottom-nav__label">Tasks</span>
                 </a>
 
-                <a href="{% url 'fleet:pickup_scanner' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--scan {% if request.resolver_match.url_name == 'pickup_scanner' %}active{% endif %}">
-                    <span class="fleet-bottom-nav__icon">
-                        <i class="fa-solid fa-qrcode"></i>
+                <a href="{% url 'fleet:driver_pickups' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--pickup {% if request.resolver_match.url_name == 'driver_pickups' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon" style="position:relative;">
+                        <i class="fa-solid fa-boxes-packing"></i>
+                        {% if pickup_badge_count > 0 %}
+                        <span class="fleet-bottom-nav__badge">{{ pickup_badge_count }}</span>
+                        {% endif %}
                     </span>
-                    <span class="fleet-bottom-nav__label">Scan</span>
+                    <span class="fleet-bottom-nav__label">Pickup</span>
                 </a>
 
                 <a href="{% url 'fleet:cod_collection' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--cod {% if request.resolver_match.url_name == 'cod_collection' %}active{% endif %}">

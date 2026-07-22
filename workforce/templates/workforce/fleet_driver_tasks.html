@@ -4,205 +4,150 @@
 {% block title %}Driver Tasks — Fleet A/Cs{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/fleet_driver_tasks.css' %}?v=20260514a">
+<link rel="stylesheet" href="{% static 'workforce/css/fleet_driver_tasks.css' %}?v=20260718b">
 {% endblock extra_css %}
 
 {% block content %}
 <div class="fdt">
 
   <!-- ── HERO ─────────────────────────────────────────────── -->
-  <div class="wfd__hero">
-    <div class="wfd__hero-content">
-      <h1 class="wfd__hero-title">
-        <i class="fa-solid fa-person-biking"></i>
-        Driver Tasks
-      </h1>
-      <p class="wfd__hero-subtitle">
-        {% if selected_driver %}
-          Mission active — <strong>{{ selected_driver }}</strong>
-        {% else %}
-          Select a driver from the roster below
-        {% endif %}
+  <div class="fdt__hero">
+    <div>
+      <h1 class="fdt__hero-title">Driver Tasks</h1>
+      <p class="fdt__hero-sub">
+        {% if selected_driver %}Task ledger and COD position for one driver{% else %}Select a driver to open their task ledger{% endif %}
       </p>
     </div>
     {% if selected_driver %}
-    <div class="wfd__hero-actions">
-      <a href="{% url 'workforce:driver_detail' selected_driver.driver_id %}"
-         class="btn btn-sm btn-outline-light fw-semibold">
-        <i class="fa-solid fa-id-card me-1"></i> Driver Profile
+    <div class="fdt__hero-actions">
+      <a href="{% url 'workforce:driver_detail' selected_driver.driver_id %}" class="fdt__hero-btn">
+        <i class="fa-solid fa-id-card"></i> Driver profile
       </a>
       <a href="{% url 'workforce:fleet_task_sheet' selected_driver.driver_id %}?date={{ current_filters.date_from|default:'' }}"
-         class="btn btn-sm btn-warning fw-semibold" target="_blank">
-        <i class="fa-solid fa-print me-1"></i> Print Task Sheet
+         class="fdt__hero-btn fdt__hero-btn--solid" target="_blank">
+        <i class="fa-solid fa-print"></i> Print task sheet
       </a>
     </div>
     {% endif %}
   </div>
 
-  <!-- ── DRIVER PICKER ────────────────────────────────────── -->
-  <div class="fdt__picker-bar">
-    <div class="fdt__picker-label">
-      <i class="fa-solid fa-motorcycle"></i>
-      <span>Roster</span>
-    </div>
-    <div class="fdt__picker-scroll">
+  <!-- ── ROSTER ───────────────────────────────────────────── -->
+  <div class="fdt__roster">
+    <span class="fdt__roster-label">Roster</span>
+    <div class="fdt__roster-scroll">
       {% for d in drivers %}
       <a href="?driver_id={{ d.driver_id }}"
-         class="fdt__driver-chip {% if selected_driver and selected_driver.driver_id == d.driver_id %}fdt__driver-chip--active{% endif %}">
-        <span class="fdt__driver-chip-avatar">
-          {{ d|stringformat:"s"|slice:":1"|upper }}
-        </span>
-        <span class="fdt__driver-chip-name">{{ d }}</span>
-        {% if d.driver_availability == 'available' %}<span class="fdt__avail-dot fdt__avail-dot--green"></span>
-        {% elif d.driver_availability == 'on_delivery' %}<span class="fdt__avail-dot fdt__avail-dot--amber"></span>
-        {% else %}<span class="fdt__avail-dot fdt__avail-dot--grey"></span>{% endif %}
+         class="fdt__roster-tab {% if selected_driver and selected_driver.driver_id == d.driver_id %}fdt__roster-tab--active{% endif %}">
+        {% if d.driver_availability == 'available' %}<span class="fdt__dot fdt__dot--green"></span>
+        {% elif d.driver_availability == 'on_delivery' %}<span class="fdt__dot fdt__dot--amber"></span>
+        {% else %}<span class="fdt__dot fdt__dot--grey"></span>{% endif %}
+        {{ d }}
       </a>
       {% empty %}
-      <span style="font-size:0.8rem;color:rgba(255,255,255,0.3)">No approved drivers found.</span>
+      <span class="fdt__roster-empty">No approved drivers yet.</span>
       {% endfor %}
     </div>
   </div>
 
   {% if selected_driver %}
 
-  <!-- ── STATS ROW ─────────────────────────────────────────── -->
-  <div class="fdt__stats">
+  <!-- ── DRIVER DOCKET (signature) ─────────────────────────── -->
+  <div class="fdt__docket">
 
-    <div class="fdt__stat">
-      <div class="fdt__stat-label">Total Tasks</div>
-      <div class="fdt__stat-num">{{ stats.total }}</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--grey" data-width="100"></div>
-      </div>
+    <div class="fdt__docket-id">
+      <span class="fdt__docket-code">DR-{{ selected_driver.driver_id }}</span>
+      <span class="fdt__docket-name">{{ selected_driver }}</span>
+      <span class="fdt__docket-avail">
+        {% if selected_driver.driver_availability == 'available' %}
+          <span class="fdt__dot fdt__dot--green"></span> Available
+        {% elif selected_driver.driver_availability == 'on_delivery' %}
+          <span class="fdt__dot fdt__dot--amber"></span> On delivery
+        {% else %}
+          <span class="fdt__dot fdt__dot--grey"></span> Offline
+        {% endif %}
+      </span>
     </div>
 
-    <div class="fdt__stat fdt__stat--green">
-      <div class="fdt__stat-label">Delivered</div>
-      <div class="fdt__stat-num">{{ stats.delivered }}</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--green"
-             data-width="{% if stats.total %}{{ stats.completion_rate }}{% else %}0{% endif %}"></div>
+    <div class="fdt__docket-cells">
+      <div class="fdt__cell">
+        <span class="fdt__cell-tag">Tasks</span>
+        <span class="fdt__cell-num">{{ stats.total }}</span>
       </div>
-    </div>
-
-    <div class="fdt__stat fdt__stat--amber">
-      <div class="fdt__stat-label">In Progress</div>
-      <div class="fdt__stat-num">{{ stats.in_progress }}</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--amber"
-             data-width="{% if stats.total %}{% widthratio stats.in_progress stats.total 100 %}{% else %}0{% endif %}"></div>
+      <div class="fdt__cell">
+        <span class="fdt__cell-tag">Delivered</span>
+        <span class="fdt__cell-num">{{ stats.delivered }}</span>
       </div>
-    </div>
-
-    <div class="fdt__stat fdt__stat--red">
-      <div class="fdt__stat-label">Failed / Cancelled</div>
-      <div class="fdt__stat-num">{{ stats.failed }}</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--red"
-             data-width="{% if stats.total %}{% widthratio stats.failed stats.total 100 %}{% else %}0{% endif %}"></div>
+      <div class="fdt__cell">
+        <span class="fdt__cell-tag">In progress</span>
+        <span class="fdt__cell-num">{{ stats.in_progress }}</span>
       </div>
-    </div>
-
-    <div class="fdt__stat fdt__stat--blue">
-      <div class="fdt__stat-label">Completion Rate</div>
-      <div class="fdt__stat-num">{{ stats.completion_rate }}%</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--blue"
-             data-width="{{ stats.completion_rate }}"></div>
+      <div class="fdt__cell">
+        <span class="fdt__cell-tag">Failed</span>
+        <span class="fdt__cell-num">{{ stats.failed }}</span>
       </div>
-    </div>
-
-    <div class="fdt__stat fdt__stat--yellow">
-      <div class="fdt__stat-label">Total Earnings</div>
-      <div class="fdt__stat-num">QAR {{ stats.total_earnings|floatformat:0 }}</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--yellow" data-width="60"></div>
+      <div class="fdt__cell">
+        <span class="fdt__cell-tag">Completion</span>
+        <span class="fdt__cell-num">{{ stats.completion_rate }}<small>%</small></span>
+        <span class="fdt__cell-meter"><span class="fdt__cell-meter-fill" data-width="{{ stats.completion_rate }}"></span></span>
       </div>
-    </div>
 
-    <div class="fdt__stat fdt__stat--purple">
-      <div class="fdt__stat-label">COD in Hand</div>
-      <div class="fdt__stat-num">QAR {{ stats.cod_in_hand|floatformat:0 }}</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--purple"
-             data-width="{% if stats.total_cod %}{% widthratio stats.cod_in_hand stats.total_cod 100 %}{% else %}0{% endif %}"></div>
+      <div class="fdt__cell fdt__cell--money">
+        <span class="fdt__cell-tag">Earnings</span>
+        <span class="fdt__cell-num"><small>QAR</small> {{ stats.total_earnings|floatformat:0 }}</span>
       </div>
-    </div>
-
-    <div class="fdt__stat fdt__stat--cyan">
-      <div class="fdt__stat-label">Settled Amount</div>
-      <div class="fdt__stat-num">QAR {{ stats.cod_settled|floatformat:0 }}</div>
-      <div class="fdt__stat-bar">
-        <div class="fdt__stat-fill fdt__stat-fill--cyan"
-             data-width="{% if stats.total_cod %}{% widthratio stats.cod_settled stats.total_cod 100 %}{% else %}0{% endif %}"></div>
+      <div class="fdt__cell">
+        <span class="fdt__cell-tag">COD in hand</span>
+        <span class="fdt__cell-num"><small>QAR</small> {{ stats.cod_in_hand|floatformat:0 }}</span>
+      </div>
+      <div class="fdt__cell">
+        <span class="fdt__cell-tag">Settled</span>
+        <span class="fdt__cell-num"><small>QAR</small> {{ stats.cod_settled|floatformat:0 }}</span>
       </div>
     </div>
 
   </div>
 
   <!-- ── FILTERS ───────────────────────────────────────────── -->
-  <div class="fdt__filters-card">
-    <form method="get" id="fdtFilterForm" class="fdt__filter-form">
-      <input type="hidden" name="driver_id" value="{{ selected_driver.driver_id }}">
+  <form method="get" id="fdtFilterForm" class="fdt__filters">
+    <input type="hidden" name="driver_id" value="{{ selected_driver.driver_id }}">
 
-      <!-- Search -->
-      <div class="fdt__filter-field fdt__filter-field--search">
-        <i class="fa-solid fa-magnifying-glass fdt__filter-icon"></i>
-        <input type="text" name="q" value="{{ current_filters.q }}"
-               placeholder="Task #, customer, phone…"
-               class="fdt__filter-input">
-      </div>
+    <div class="fdt__filter-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" name="q" value="{{ current_filters.q }}"
+             placeholder="Task #, customer, phone…" class="fdt__filter-input">
+    </div>
 
-      <!-- Status -->
-      <div class="fdt__filter-field">
-        <select name="status" class="fdt__filter-select">
-          <option value="">All Statuses</option>
-          {% for val, label in status_choices %}
-          <option value="{{ val }}" {% if current_filters.status == val %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
+    <select name="status" class="fdt__filter-select">
+      <option value="">All statuses</option>
+      {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if current_filters.status == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
 
-      <!-- Date preset -->
-      <div class="fdt__filter-field">
-        <select name="date_preset" id="fdtDatePreset" class="fdt__filter-select"
-                onchange="fdtToggleDates(this.value)">
-          <option value="" {% if not current_filters.date_preset %}selected{% endif %}>All Dates</option>
-          <option value="today"     {% if current_filters.date_preset == 'today'     %}selected{% endif %}>Today</option>
-          <option value="yesterday" {% if current_filters.date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
-          <option value="7days"     {% if current_filters.date_preset == '7days'     %}selected{% endif %}>Last 7 Days</option>
-          <option value="30days"    {% if current_filters.date_preset == '30days'    %}selected{% endif %}>Last 30 Days</option>
-          <option value="custom"    {% if current_filters.date_preset == 'custom'    %}selected{% endif %}>Custom Range</option>
-        </select>
-      </div>
+    <select name="date_preset" id="fdtDatePreset" class="fdt__filter-select" onchange="fdtToggleDates(this.value)">
+      <option value="" {% if not current_filters.date_preset %}selected{% endif %}>All dates</option>
+      <option value="today"     {% if current_filters.date_preset == 'today'     %}selected{% endif %}>Today</option>
+      <option value="yesterday" {% if current_filters.date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+      <option value="7days"     {% if current_filters.date_preset == '7days'     %}selected{% endif %}>Last 7 days</option>
+      <option value="30days"    {% if current_filters.date_preset == '30days'    %}selected{% endif %}>Last 30 days</option>
+      <option value="custom"    {% if current_filters.date_preset == 'custom'    %}selected{% endif %}>Custom range</option>
+    </select>
 
-      <!-- Custom dates -->
-      <div class="fdt__filter-field fdt__filter-field--dates"
-           id="fdtCustomDates"
-           {% if current_filters.date_preset != 'custom' %}hidden{% endif %}>
-        <input type="date" name="date_from" value="{{ current_filters.date_from }}"
-               class="fdt__filter-input fdt__filter-input--date">
-        <span class="fdt__filter-sep">→</span>
-        <input type="date" name="date_to" value="{{ current_filters.date_to }}"
-               class="fdt__filter-input fdt__filter-input--date">
-      </div>
+    <div class="fdt__filter-dates" id="fdtCustomDates"
+         {% if current_filters.date_preset != 'custom' %}hidden{% endif %}>
+      <input type="date" name="date_from" value="{{ current_filters.date_from }}" class="fdt__filter-input fdt__filter-input--date">
+      <span class="fdt__filter-sep">–</span>
+      <input type="date" name="date_to" value="{{ current_filters.date_to }}" class="fdt__filter-input fdt__filter-input--date">
+    </div>
 
-      <button type="submit" class="fdt__filter-btn">
-        <i class="fa-solid fa-filter me-1"></i> Filter
-      </button>
-      <a href="?driver_id={{ selected_driver.driver_id }}" class="fdt__filter-clear">
-        <i class="fa-solid fa-xmark me-1"></i> Clear
-      </a>
-    </form>
-  </div>
+    <button type="submit" class="fdt__filter-btn">Filter</button>
+    <a href="?driver_id={{ selected_driver.driver_id }}" class="fdt__filter-clear">Clear</a>
+  </form>
 
   <!-- ── TASKS TABLE ───────────────────────────────────────── -->
-  <div class="fdt__table-card">
-    <div class="fdt__table-head">
-      <span class="fdt__table-count">
-        <i class="fa-solid fa-list-check"></i>
-        {{ stats.total }} task{{ stats.total|pluralize }}
-      </span>
+  <div class="fdt__sheet">
+    <div class="fdt__sheet-head">
+      <span class="fdt__sheet-count">{{ stats.total }} task{{ stats.total|pluralize }}</span>
     </div>
 
     {% if tasks %}
@@ -217,75 +162,70 @@
             <th>COD</th>
             <th>Earnings</th>
             <th>Status</th>
-            <th class="fdt__th-actions">View</th>
+            <th class="fdt__th-view"><span class="visually-hidden">View</span></th>
           </tr>
         </thead>
         <tbody>
           {% for task in tasks %}
-          <tr class="fdt__row fdt__row--{{ task.dl_task_status }}">
+          <tr class="fdt__row">
 
             <td class="fdt__td-code">
-              <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="fdt__task-link">
-                {{ task.dl_task_number }}
-              </a>
+              <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="fdt__task-link">{{ task.dl_task_number }}</a>
             </td>
 
             <td class="fdt__td-date">{{ task.dl_task_date|date:"d M" }}</td>
 
             <td class="fdt__td-customer">
               {% if task.order %}
-              <div class="fdt__customer-name">{{ task.order.customer_name|default:"—" }}</div>
-              <div class="fdt__customer-phone">{{ task.order.customer_phone|default:"" }}</div>
-              {% else %}—{% endif %}
+              <span class="fdt__customer-name">{{ task.order.customer_name|default:"—" }}</span>
+              <span class="fdt__customer-phone">{{ task.order.customer_phone|default:"" }}</span>
+              {% else %}<span class="fdt__nil">—</span>{% endif %}
             </td>
 
             <td class="fdt__td-address">
               {% if task.order %}
-              <div>
                 {% if task.order.dl_zone %}
-                <span class="fdt__address-zone">Z{{ task.order.dl_zone }}</span>
-                {% if task.zone_name_display %}<span class="fdt__zone-name">{{ task.zone_name_display }}</span>{% endif %}
+                <span class="fdt__zone">Z{{ task.order.dl_zone }}{% if task.zone_name_display %} · {{ task.zone_name_display }}{% endif %}</span>
                 {% endif %}
-              </div>
-              <div class="fdt__address-text">{{ task.order.customer_address|default:"—"|truncatechars:38 }}</div>
-              {% if task.delivery_distance_km %}
-              <div class="fdt__distance"><i class="fa-solid fa-route"></i> {{ task.delivery_distance_km|floatformat:1 }} km</div>
-              {% endif %}
-              {% else %}—{% endif %}
+                <span class="fdt__address-text">{{ task.order.customer_address|default:"—"|truncatechars:38 }}</span>
+                {% if task.delivery_distance_km %}
+                <span class="fdt__distance">{{ task.delivery_distance_km|floatformat:1 }} km</span>
+                {% endif %}
+              {% else %}<span class="fdt__nil">—</span>{% endif %}
             </td>
 
             <td class="fdt__td-cod">
-              <span class="fdt__cod-amount">QAR {{ task.order.cod_amount|default:0 }}</span>
               {% if task.order.cod_amount %}
+              <span class="fdt__money">{{ task.order.cod_amount }}</span>
               {% if task.cod_collected %}
-              <span class="fdt__cod-badge fdt__cod-badge--collected">
-                <i class="fa-solid fa-check"></i> Collected
-              </span>
+              <span class="fdt__flag fdt__flag--ok"><span class="fdt__swatch fdt__swatch--green"></span>Collected</span>
               {% else %}
-              <span class="fdt__cod-badge fdt__cod-badge--pending">Pending</span>
+              <span class="fdt__flag"><span class="fdt__swatch fdt__swatch--grey"></span>Pending</span>
               {% endif %}
-              {% endif %}
+              {% else %}<span class="fdt__nil">—</span>{% endif %}
             </td>
 
             <td class="fdt__td-earn">
-              {% if task.dl_price %}QAR {{ task.dl_price }}{% else %}<span style="color:rgba(255,255,255,0.2)">—</span>{% endif %}
+              {% if task.dl_price %}<span class="fdt__money">{{ task.dl_price }}</span>{% else %}<span class="fdt__nil">—</span>{% endif %}
             </td>
 
             <td class="fdt__td-status">
-              <span class="fdt__status fdt__status--{{ task.dl_task_status }}">
-                {% if task.dl_task_status == 'delivered' %}<i class="fa-solid fa-circle-check"></i>
-                {% elif task.dl_task_status in 'failed,cancelled,rejected' %}<i class="fa-solid fa-circle-xmark"></i>
-                {% elif task.dl_task_status == 'out_for_delivery' or task.dl_task_status == 'in_transit' %}<i class="fa-solid fa-truck-fast"></i>
-                {% elif task.dl_task_status == 'start_ride' %}<i class="fa-solid fa-motorcycle"></i>
-                {% elif task.dl_task_status == 'accepted' or task.dl_task_status == 'picked_up' %}<i class="fa-solid fa-box-open"></i>
-                {% else %}<i class="fa-solid fa-clock"></i>{% endif %}
+              <span class="fdt__status">
+                {% if task.dl_task_status == 'delivered' or task.dl_task_status == 'partial_delivery' %}
+                <span class="fdt__swatch fdt__swatch--green"></span>
+                {% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' or task.dl_task_status == 'rejected' %}
+                <span class="fdt__swatch fdt__swatch--red"></span>
+                {% elif task.dl_task_status == 'for_review' or task.dl_task_status == 'pending' or task.dl_task_status == 'assigned' %}
+                <span class="fdt__swatch fdt__swatch--grey"></span>
+                {% else %}
+                <span class="fdt__swatch fdt__swatch--amber"></span>
+                {% endif %}
                 {{ task.get_dl_task_status_display }}
               </span>
             </td>
 
-            <td class="fdt__td-actions">
-              <a href="{% url 'workforce:delivery_task_detail' task.id %}"
-                 class="fdt__action-btn" title="View Task">
+            <td class="fdt__td-view">
+              <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="fdt__view-btn" title="Open task">
                 <i class="fa-solid fa-arrow-right"></i>
               </a>
             </td>
@@ -298,11 +238,8 @@
 
     {% else %}
     <div class="fdt__empty">
-      <div class="fdt__empty-icon"><i class="fa-solid fa-inbox"></i></div>
-      <p class="fdt__empty-text">No tasks match the current filters.</p>
-      <a href="?driver_id={{ selected_driver.driver_id }}" class="fdt__empty-link">
-        <i class="fa-solid fa-xmark me-1"></i> Clear filters
-      </a>
+      <p class="fdt__empty-text">No tasks match these filters.</p>
+      <a href="?driver_id={{ selected_driver.driver_id }}" class="fdt__empty-link">Clear filters</a>
     </div>
     {% endif %}
   </div>
@@ -310,11 +247,9 @@
   {% else %}
   <!-- ── NO DRIVER SELECTED ────────────────────────────────── -->
   <div class="fdt__no-driver">
-    <div class="fdt__no-driver-inner">
-      <i class="fa-solid fa-person-biking fdt__no-driver-icon"></i>
-      <h3 class="fdt__no-driver-title">Select a Driver</h3>
-      <p class="fdt__no-driver-sub">Pick a driver from the roster above to load their task history and performance stats.</p>
-    </div>
+    <span class="fdt__no-driver-mark">—</span>
+    <h3 class="fdt__no-driver-title">No driver selected</h3>
+    <p class="fdt__no-driver-sub">Pick a driver from the roster above to open their task ledger and COD position.</p>
   </div>
   {% endif %}
 
@@ -326,13 +261,10 @@ function fdtToggleDates(val) {
   document.getElementById('fdtCustomDates').hidden = (val !== 'custom');
 }
 
-// Animate stat fill bars on load
+// Set the completion meter width (CSP-safe: no inline styles in markup)
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.fdt__stat-fill[data-width]').forEach((el, i) => {
-    const w = parseFloat(el.dataset.width) || 0;
-    setTimeout(() => {
-      el.style.width = Math.min(w, 100) + '%';
-    }, 150 + i * 80);
+  document.querySelectorAll('.fdt__cell-meter-fill[data-width]').forEach((el) => {
+    el.style.width = Math.min(parseFloat(el.dataset.width) || 0, 100) + '%';
   });
 });
 </script>

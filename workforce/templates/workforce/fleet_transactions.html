@@ -222,7 +222,7 @@
                             {% elif sort_by == 'type_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
                             {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
                         </th>
-                        <th>Description</th>
+                        <th>Description / Reference</th>
                         <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'amount_asc' %}amount_desc{% else %}amount_asc{% endif %}')">
                             Amount
                             {% if sort_by == 'amount_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
@@ -230,7 +230,6 @@
                             {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
                         </th>
                         <th>Balance After</th>
-                        <th>Reference</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
@@ -257,7 +256,18 @@
                                 {{ txn.get_transaction_type_display }}
                             </span>
                         </td>
-                        <td>{{ txn.description }}</td>
+                        <td>
+                            <div>{{ txn.description }}</div>
+                            <div class="ftr__cell-ref">
+                                {% if txn.delivery_task %}
+                                <a href="{% url 'workforce:delivery_task_detail' txn.delivery_task.id %}" class="ftr__ref-link">
+                                    Task #{{ txn.delivery_task.dl_task_number }}
+                                </a>
+                                {% elif txn.reference_number %}
+                                {{ txn.reference_number }}
+                                {% endif %}
+                            </div>
+                        </td>
                         <td style="font-size: 0.8rem;">
                             {% if txn.transaction_type == 'cod_collection' and txn.delivery_task and txn.delivery_task.cod_collected_amount != txn.amount %}
                                 <span class="ftr__cod-changed">
@@ -332,17 +342,6 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if txn.delivery_task %}
-                            <a href="{% url 'workforce:delivery_task_detail' txn.delivery_task.id %}" class="ftr__ref-link">
-                                Task #{{ txn.delivery_task.dl_task_number }}
-                            </a>
-                            {% elif txn.reference_number %}
-                            {{ txn.reference_number }}
-                            {% else %}
-                            -
-                            {% endif %}
-                        </td>
-                        <td>
                             {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}
                                 {% if txn.is_received and txn.is_verified %}
                                 <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
@@ -357,7 +356,9 @@
                                 </div>
                                 {% endif %}
                             {% elif txn.transaction_type == 'cod_collection' %}
-                                {% if txn.delivery_task and txn.delivery_task.cod_submission_txn and txn.delivery_task.cod_submission_txn.is_received and txn.delivery_task.cod_submission_txn.is_verified %}
+                                {% if txn.is_received and txn.is_verified %}
+                                <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
+                                {% elif txn.delivery_task and txn.delivery_task.cod_submission_txn and txn.delivery_task.cod_submission_txn.is_received and txn.delivery_task.cod_submission_txn.is_verified %}
                                 <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
                                 {% elif txn.reference_number in deposited_refs %}
                                 <span class="ftr__txn-type ftr__txn-type--cod_deposit">Deposited</span>
@@ -966,10 +967,10 @@ function printReceipt() {
 document.getElementById('receiptModal').addEventListener('click', function(e) { if (e.target === this) closeReceiptModal(); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeReceiptModal(); });
 function exportToCSV() {
-    var csvData = [['TXN Code', 'Date & Time', 'Type', 'Description', 'Amount', 'Balance After', 'Reference', 'Status']];
+    var csvData = [['TXN Code', 'Date & Time', 'Type', 'Description / Reference', 'Amount', 'Balance After', 'Status']];
     document.querySelectorAll('#transactionsTable tbody tr:not([style*="display: none"])').forEach(function(row) {
         var cells = row.querySelectorAll('td');
-        csvData.push([cells[1].textContent.trim(), cells[2].textContent.trim(), cells[3].textContent.trim(), cells[4].textContent.trim(), cells[5].textContent.replace('QAR','').trim(), cells[6].textContent.trim(), cells[7].textContent.trim(), cells[8].textContent.trim()]);
+        csvData.push([cells[1].textContent.trim(), cells[2].textContent.trim(), cells[3].textContent.trim(), cells[4].textContent.trim(), cells[5].textContent.replace('QAR','').trim(), cells[6].textContent.trim(), cells[7].textContent.trim()]);
     });
     var csvContent = csvData.map(function(row) { return row.map(function(c) { return '"' + c + '"'; }).join(','); }).join('\n');
     var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

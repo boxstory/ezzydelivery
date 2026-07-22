@@ -613,7 +613,7 @@
                         <h3 class="sld__section-title mb-0">
                             <i class="fa-solid fa-map-location-dot sld__section-icon"></i> Pickup Locations
                         </h3>
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#pickupLocationModal">
+                        <button class="btn btn-sm btn-outline-primary" id="sld-loc-add-btn" data-bs-toggle="modal" data-bs-target="#pickupLocationModal">
                             <i class="fa-solid fa-plus me-1"></i> Add Location
                         </button>
                     </div>
@@ -624,8 +624,30 @@
                             <div class="sld__location-body">
                                 <div class="sld__location-title">{{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}</div>
                                 <div class="sld__location-addr">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</div>
+                                {% if loc.pickup_lat and loc.pickup_lon %}
+                                <a class="sld__location-pin" href="https://www.google.com/maps?q={{ loc.pickup_lat }},{{ loc.pickup_lon }}" target="_blank" rel="noopener">
+                                    <i class="fa-solid fa-location-dot"></i> {{ loc.pickup_lat|floatformat:5 }}, {{ loc.pickup_lon|floatformat:5 }}
+                                </a>
+                                {% else %}
+                                <span class="sld__location-pin sld__location-pin--none"><i class="fa-solid fa-location-crosshairs"></i> No map pin</span>
+                                {% endif %}
                             </div>
                             <span class="sld__badge {% if loc.pickup_status == 'active' %}sld__badge--success{% else %}sld__badge--warning{% endif %}">{{ loc.pickup_status|title }}</span>
+                            <button class="btn btn-sm btn-link p-0 ms-2 sld-edit-loc-btn"
+                                    data-update-url="{% url 'workforce:wf_pickup_location_update' business.business_id loc.id %}"
+                                    data-title="{{ loc.pickup_location_title }}"
+                                    data-locality="{{ loc.locality }}"
+                                    data-zone="{{ loc.pickup_zone_no|default_if_none:'' }}"
+                                    data-street="{{ loc.pickup_street_no|default_if_none:'' }}"
+                                    data-building="{{ loc.pickup_building_no|default_if_none:'' }}"
+                                    data-lat="{{ loc.pickup_lat|default_if_none:'' }}"
+                                    data-lon="{{ loc.pickup_lon|default_if_none:'' }}"
+                                    data-status="{{ loc.pickup_status }}"
+                                    data-default="{{ loc.is_default|yesno:'1,0' }}"
+                                    data-fulfilment="{{ loc.is_fulfilment_center|yesno:'1,0' }}"
+                                    title="Edit location">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
                             {% if loc.pickup_status != 'active' %}
                             <button class="btn btn-sm btn-link text-danger p-0 ms-2 sld-del-loc-btn"
                                     data-loc-id="{{ loc.id }}"
@@ -687,6 +709,9 @@
                                             <label class="form-label fw-semibold">Longitude</label>
                                             <input type="text" name="pickup_lon" class="form-control" placeholder="e.g. 51.5310">
                                         </div>
+                                        <div class="col-12">
+                                            <small class="text-muted"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Leave latitude/longitude empty to auto-locate the pin from Zone + Street + Building via QNAS.</small>
+                                        </div>
                                         <div class="col-12 col-md-4">
                                             <label class="form-label fw-semibold">Status</label>
                                             <select name="pickup_status" class="form-select">
@@ -724,8 +749,18 @@
                 <script>
                 (function () {
                     var addUrl = "{% url 'workforce:wf_pickup_location_add' business.business_id %}";
+                    var updateUrl = null; // null = add mode, otherwise edit mode
+                    var form = document.getElementById('sld-pickup-form');
+                    var modalTitle = document.getElementById('pickupLocationModalLabel');
 
-                    document.getElementById('sld-pickup-form').addEventListener('submit', function (e) {
+                    document.getElementById('sld-loc-add-btn').addEventListener('click', function () {
+                        updateUrl = null;
+                        form.reset();
+                        document.getElementById('sld-pickup-alert').className = 'alert d-none';
+                        modalTitle.innerHTML = '<i class="fa-solid fa-map-location-dot me-2"></i>Add Pickup Location';
+                    });
+
+                    form.addEventListener('submit', function (e) {
                         e.preventDefault();
                         var btn = document.getElementById('sld-pickup-submit');
                         var alertEl = document.getElementById('sld-pickup-alert');
@@ -734,46 +769,47 @@
                         alertEl.className = 'alert d-none';
 
                         var data = new FormData(this);
-                        fetch(addUrl, {method: 'POST', body: data, headers: {'X-CSRFToken': data.get('csrfmiddlewaretoken')}})
+                        fetch(updateUrl || addUrl, {method: 'POST', body: data, headers: {'X-CSRFToken': data.get('csrfmiddlewaretoken')}})
                             .then(function (r) { return r.json(); })
                             .then(function (json) {
                                 if (json.success) {
-                                    var loc = json.location;
-                                    var list = document.getElementById('sld-pickup-list');
-                                    var emptyEl = document.getElementById('sld-loc-empty');
-                                    if (emptyEl) emptyEl.remove();
-
-                                    var li = document.createElement('li');
-                                    li.className = 'sld__location-item';
-                                    li.id = 'sld-loc-' + loc.id;
-                                    li.innerHTML =
-                                        '<span class="sld__location-icon"><i class="fa-solid fa-location-dot"></i></span>' +
-                                        '<div class="sld__location-body">' +
-                                            '<div class="sld__location-title">' + loc.title + (loc.locality ? ' — ' + loc.locality : '') + '</div>' +
-                                            '<div class="sld__location-addr">Zone ' + (loc.zone || 'N/A') + ', St ' + (loc.street || 'N/A') + ', Bldg ' + (loc.building || 'N/A') + '</div>' +
-                                        '</div>' +
-                                        '<span class="sld__badge sld__badge--success">' + loc.status.charAt(0).toUpperCase() + loc.status.slice(1) + '</span>' +
-                                        '<button class="btn btn-sm btn-link text-danger p-0 ms-2 sld-del-loc-btn" data-loc-id="' + loc.id + '" data-del-url="/workforce/sellers/{{ business.business_id }}/pickup-location/' + loc.id + '/delete/" title="Delete location"><i class="fa-solid fa-trash-can"></i></button>';
-                                    list.appendChild(li);
-
-                                    bootstrap.Modal.getInstance(document.getElementById('pickupLocationModal')).hide();
-                                    document.getElementById('sld-pickup-form').reset();
+                                    window.location.reload();
                                 } else {
                                     alertEl.className = 'alert alert-danger';
                                     alertEl.textContent = json.error || 'Failed to save location.';
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Location';
                                 }
                             })
                             .catch(function () {
                                 alertEl.className = 'alert alert-danger';
                                 alertEl.textContent = 'Network error. Please try again.';
-                            })
-                            .finally(function () {
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Location';
                             });
                     });
 
                     document.getElementById('sld-pickup-list').addEventListener('click', function (e) {
+                        var editBtn = e.target.closest('.sld-edit-loc-btn');
+                        if (editBtn) {
+                            var d = editBtn.dataset;
+                            updateUrl = d.updateUrl;
+                            form.reset();
+                            document.getElementById('sld-pickup-alert').className = 'alert d-none';
+                            form.elements['pickup_location_title'].value = d.title || '';
+                            form.elements['locality'].value = d.locality || '';
+                            form.elements['pickup_zone_no'].value = d.zone || '';
+                            form.elements['pickup_street_no'].value = d.street || '';
+                            form.elements['pickup_building_no'].value = d.building || '';
+                            form.elements['pickup_lat'].value = d.lat || '';
+                            form.elements['pickup_lon'].value = d.lon || '';
+                            form.elements['pickup_status'].value = d.status || 'active';
+                            form.elements['is_default'].checked = d.default === '1';
+                            form.elements['is_fulfilment_center'].checked = d.fulfilment === '1';
+                            modalTitle.innerHTML = '<i class="fa-solid fa-pen me-2"></i>Edit Pickup Location';
+                            bootstrap.Modal.getOrCreateInstance(document.getElementById('pickupLocationModal')).show();
+                            return;
+                        }
                         var btn = e.target.closest('.sld-del-loc-btn');
                         if (!btn) return;
                         if (!confirm('Delete this pickup location?')) return;

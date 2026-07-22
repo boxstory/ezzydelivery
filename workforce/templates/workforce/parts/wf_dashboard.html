@@ -19,80 +19,6 @@
     </div>
   </div>
 
-  <!-- Key Metrics Row -->
-  <div class="wf-metrics-row">
-    <!-- Total Revenue Metric -->
-    <div class="wf-metric-card">
-      <span class="wf-metric-card__label">COD with Fleet</span>
-      <div class="wf-metric-card__row2">
-        <span class="wf-metric-card__trend wf-metric-card__trend--neutral">
-          Current
-        </span>
-        <div class="wf-metric-card__value wf-metric-card__value--sm">{{ cod_in_hand|default:0|floatformat:0 }}</div>
-      </div>
-      <div class="wf-metric-card__footer">
-        <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wf-metric-card__link">
-          <i class="fa-solid fa-arrow-right"></i>
-          View fleet balance
-        </a>
-      </div>
-    </div>
-
-    <!-- Total Orders Today -->
-    <div class="wf-metric-card">
-      <span class="wf-metric-card__label">Orders Today</span>
-      <div class="wf-metric-card__row2">
-        <span class="wf-metric-card__trend wf-metric-card__trend--up">
-          <i class="fa-solid fa-arrow-up"></i>
-          Live
-        </span>
-        <div class="wf-metric-card__value">{{ orders_today|default:0 }}</div>
-      </div>
-      <div class="wf-metric-card__footer">
-        <a href="{% url 'workforce:wf_orders_all' %}?dateFrom={{ today|date:'Y-m-d' }}&dateTo={{ today|date:'Y-m-d' }}" class="wf-metric-card__link">
-          <i class="fa-solid fa-arrow-right"></i>
-          View today's orders
-        </a>
-      </div>
-    </div>
-
-    <!-- Active Drivers -->
-    <div class="wf-metric-card">
-      <span class="wf-metric-card__label">Active Drivers</span>
-      <div class="wf-metric-card__row2">
-        <span class="wf-metric-card__trend wf-metric-card__trend--up">
-          <i class="fa-solid fa-circle"></i>
-          Online
-        </span>
-        <div class="wf-metric-card__value">{{ active_drivers|default:0 }}</div>
-      </div>
-      <div class="wf-metric-card__footer">
-        <a href="{% url 'workforce:drivers_active' %}" class="wf-metric-card__link">
-          <i class="fa-solid fa-arrow-right"></i>
-          Manage drivers
-        </a>
-      </div>
-    </div>
-
-    <!-- Active Sellers -->
-    <div class="wf-metric-card">
-      <span class="wf-metric-card__label">Active Sellers</span>
-      <div class="wf-metric-card__row2">
-        <span class="wf-metric-card__trend wf-metric-card__trend--neutral">
-          <i class="fa-solid fa-store"></i>
-          Total
-        </span>
-        <div class="wf-metric-card__value">{{ active_sellers|default:0 }}</div>
-      </div>
-      <div class="wf-metric-card__footer">
-        <a href="{% url 'workforce:sellers_active' %}" class="wf-metric-card__link">
-          <i class="fa-solid fa-arrow-right"></i>
-          View all sellers
-        </a>
-      </div>
-    </div>
-  </div>
-
   <!-- Operations Grid -->
   <div class="wf-dashboard__grid">
 
@@ -123,13 +49,52 @@
               </div>
             </a>
 
-            <a href="{% url 'workforce:wf_orders_to_publish' %}" class="wf-status-item wf-status-item--warning" id="wf_dashboard_link_not_published">
+            <a href="{% url 'workforce:temp_orders' %}" class="wf-status-item {% if temp_orders_new %}wf-status-item--warning{% else %}wf-status-item--primary{% endif %}" id="wf_dashboard_link_temp_orders">
+              <div class="wf-status-item__icon">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+              </div>
+              <div class="wf-status-item__content">
+                <span class="wf-status-item__label">Temp Orders (New)</span>
+                <span class="wf-status-item__value">{{ temp_orders_new|default:0 }}</span>
+              </div>
+              <div class="wf-status-item__arrow">
+                <i class="fa-solid fa-chevron-right"></i>
+              </div>
+            </a>
+
+            <a href="{% url 'workforce:wf_orders_to_publish' %}" class="wf-status-item {% if not_published %}wf-status-item--danger{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_not_published">
               <div class="wf-status-item__icon">
                 <i class="fa-solid fa-hourglass-half"></i>
               </div>
               <div class="wf-status-item__content">
-                <span class="wf-status-item__label">Not Published</span>
+                <span class="wf-status-item__label">Pending Publish to Task</span>
                 <span class="wf-status-item__value">{{ not_published|default:0 }}</span>
+              </div>
+              <div class="wf-status-item__arrow">
+                <i class="fa-solid fa-chevron-right"></i>
+              </div>
+            </a>
+
+            <a href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="wf-status-item {% if tasks_to_fleet_count %}wf-status-item--danger{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_tasks_to_fleet">
+              <div class="wf-status-item__icon">
+                <i class="fa-solid fa-truck"></i>
+              </div>
+              <div class="wf-status-item__content">
+                <span class="wf-status-item__label">Published to Task &mdash; Fleet Pending</span>
+                <span class="wf-status-item__value">{{ tasks_to_fleet_count|default:0 }}</span>
+              </div>
+              <div class="wf-status-item__arrow">
+                <i class="fa-solid fa-chevron-right"></i>
+              </div>
+            </a>
+
+            <a href="{% url 'workforce:tasks_followup_list' %}" class="wf-status-item wf-status-item--danger" id="wf_dashboard_link_follow_up">
+              <div class="wf-status-item__icon">
+                <i class="fa-solid fa-phone"></i>
+              </div>
+              <div class="wf-status-item__content">
+                <span class="wf-status-item__label">Follow Up Required</span>
+                <span class="wf-status-item__value">{{ follow_up_count|default:0 }}</span>
               </div>
               <div class="wf-status-item__arrow">
                 <i class="fa-solid fa-chevron-right"></i>
@@ -156,32 +121,6 @@
               <div class="wf-status-item__content">
                 <span class="wf-status-item__label">Location Reconfirm</span>
                 <span class="wf-status-item__value">{{ loc_reconfirm|default:0 }}</span>
-              </div>
-              <div class="wf-status-item__arrow">
-                <i class="fa-solid fa-chevron-right"></i>
-              </div>
-            </a>
-
-            <a href="{% url 'workforce:tasks_followup_list' %}" class="wf-status-item wf-status-item--danger" id="wf_dashboard_link_follow_up">
-              <div class="wf-status-item__icon">
-                <i class="fa-solid fa-phone"></i>
-              </div>
-              <div class="wf-status-item__content">
-                <span class="wf-status-item__label">Follow Up Required</span>
-                <span class="wf-status-item__value">{{ follow_up_count|default:0 }}</span>
-              </div>
-              <div class="wf-status-item__arrow">
-                <i class="fa-solid fa-chevron-right"></i>
-              </div>
-            </a>
-
-            <a href="{% url 'workforce:temp_orders' %}" class="wf-status-item {% if temp_orders_new %}wf-status-item--warning{% else %}wf-status-item--primary{% endif %}" id="wf_dashboard_link_temp_orders">
-              <div class="wf-status-item__icon">
-                <i class="fa-solid fa-cloud-arrow-down"></i>
-              </div>
-              <div class="wf-status-item__content">
-                <span class="wf-status-item__label">Temp Orders (New)</span>
-                <span class="wf-status-item__value">{{ temp_orders_new|default:0 }}</span>
               </div>
               <div class="wf-status-item__arrow">
                 <i class="fa-solid fa-chevron-right"></i>
@@ -235,8 +174,82 @@
 
     </div>
 
-    <!-- Right Column: Charts & Actions -->
+    <!-- Right Column: Metrics, Charts & Actions -->
     <div class="wf-dashboard__right">
+
+      <!-- Key Metrics Row -->
+      <div class="wf-metrics-row wf-metrics-row--in-grid">
+        <!-- COD with Fleet -->
+        <div class="wf-metric-card">
+          <span class="wf-metric-card__label">COD with Fleet</span>
+          <div class="wf-metric-card__row2">
+            <span class="wf-metric-card__trend wf-metric-card__trend--neutral">
+              Current
+            </span>
+            <div class="wf-metric-card__value wf-metric-card__value--sm">{{ cod_in_hand|default:0|floatformat:0 }}</div>
+          </div>
+          <div class="wf-metric-card__footer">
+            <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wf-metric-card__link">
+              <i class="fa-solid fa-arrow-right"></i>
+              View fleet balance
+            </a>
+          </div>
+        </div>
+
+        <!-- Total Orders Today -->
+        <div class="wf-metric-card">
+          <span class="wf-metric-card__label">Orders Today</span>
+          <div class="wf-metric-card__row2">
+            <span class="wf-metric-card__trend wf-metric-card__trend--up">
+              <i class="fa-solid fa-arrow-up"></i>
+              Live
+            </span>
+            <div class="wf-metric-card__value">{{ orders_today|default:0 }}</div>
+          </div>
+          <div class="wf-metric-card__footer">
+            <a href="{% url 'workforce:wf_orders_all' %}?dateFrom={{ today|date:'Y-m-d' }}&dateTo={{ today|date:'Y-m-d' }}" class="wf-metric-card__link">
+              <i class="fa-solid fa-arrow-right"></i>
+              View today's orders
+            </a>
+          </div>
+        </div>
+
+        <!-- Active Drivers -->
+        <div class="wf-metric-card">
+          <span class="wf-metric-card__label">Active Drivers</span>
+          <div class="wf-metric-card__row2">
+            <span class="wf-metric-card__trend wf-metric-card__trend--up">
+              <i class="fa-solid fa-circle"></i>
+              Online
+            </span>
+            <div class="wf-metric-card__value">{{ active_drivers|default:0 }}</div>
+          </div>
+          <div class="wf-metric-card__footer">
+            <a href="{% url 'workforce:drivers_active' %}" class="wf-metric-card__link">
+              <i class="fa-solid fa-arrow-right"></i>
+              Manage drivers
+            </a>
+          </div>
+        </div>
+
+        <!-- Active Sellers -->
+        <div class="wf-metric-card">
+          <span class="wf-metric-card__label">Active Sellers</span>
+          <div class="wf-metric-card__row2">
+            <span class="wf-metric-card__trend wf-metric-card__trend--neutral">
+              <i class="fa-solid fa-store"></i>
+              Total
+            </span>
+            <div class="wf-metric-card__value">{{ active_sellers|default:0 }}</div>
+          </div>
+          <div class="wf-metric-card__footer">
+            <a href="{% url 'workforce:sellers_active' %}" class="wf-metric-card__link">
+              <i class="fa-solid fa-arrow-right"></i>
+              View all sellers
+            </a>
+          </div>
+        </div>
+      </div>
 
       <!-- Orders Trend Chart -->
       <div class="wf-card">

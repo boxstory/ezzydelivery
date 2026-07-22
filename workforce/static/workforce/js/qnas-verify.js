@@ -548,7 +548,7 @@ function locDropHandle(ev, opts) {
 /**
  * Parse a shared-location link/text and SAVE it straight to the order
  * (used on read-only pages like the delivery task detail, which has no form).
- * Records accuracy as "by_customer" (customer-shared GPS pin).
+ * Records accuracy as "by_staff" — a staff member pasted/dropped the pin.
  * @param {string} text    - pasted link or "lat,lng"
  * @param {number} orderId - order to update
  * @param {object} opts    - { resultId, latId, lngId, accuracyWrapId } element IDs to refresh on success
@@ -579,7 +579,7 @@ function whatsappLocationSave(text, orderId, opts) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrfToken() },
-        body: JSON.stringify({ latitude: lat, longitude: lng, coords_accuracy: 'by_customer' })
+        body: JSON.stringify({ latitude: lat, longitude: lng, coords_accuracy: 'by_staff' })
     }).then(function(resp) {
         return resp.json();
     }).then(function(d) {
@@ -594,7 +594,7 @@ function whatsappLocationSave(text, orderId, opts) {
         var accEl = opts.accuracyWrapId ? document.getElementById(opts.accuracyWrapId) : null;
         if (latEl) latEl.value = la;
         if (lngEl) lngEl.value = lo;
-        if (accEl) accEl.innerHTML = '<span class="dtd__accuracy dtd__accuracy--by_customer"><i class="fa-solid fa-user-check"></i> By Customer</span>';
+        if (accEl) accEl.innerHTML = '<span class="dtd__accuracy dtd__accuracy--by_staff"><i class="fa-solid fa-user-gear"></i> By Staff</span>';
         if (resultDiv) {
             resultDiv.innerHTML = '<span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Saved: ' + la + ', ' + lo + '</span> ' +
                 '<a href="https://www.google.com/maps?q=' + la + ',' + lo + '" target="_blank" class="ms-1 text-decoration-none"><i class="fa-solid fa-map-location-dot"></i> Map</a>';

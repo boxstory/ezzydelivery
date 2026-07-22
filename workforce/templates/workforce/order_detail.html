@@ -334,7 +334,7 @@
                                 {% if order.coords_accuracy %}
                                 <span class="odp__loc-acc odp__loc-acc--{{ order.coords_accuracy }}">
                                     <i class="fa-solid fa-location-crosshairs"></i>
-                                    {% if order.coords_accuracy == 'by_customer' %}By Customer{% elif order.coords_accuracy == 'exact' %}100% Exact{% elif order.coords_accuracy == 'street' %}75% Street{% elif order.coords_accuracy == 'landmark' %}50% Landmark{% elif order.coords_accuracy == 'zone_center' %}25% Zone Center{% elif order.coords_accuracy == 'ai_estimate' %}~60% AI Estimate{% endif %}
+                                    {% if order.coords_accuracy == 'by_customer' %}By Client{% elif order.coords_accuracy == 'by_staff' %}By Staff{% elif order.coords_accuracy == 'exact' %}100% Exact{% elif order.coords_accuracy == 'street' %}75% Street{% elif order.coords_accuracy == 'landmark' %}50% Landmark{% elif order.coords_accuracy == 'zone_center' %}25% Zone Center{% elif order.coords_accuracy == 'ai_estimate' %}~60% AI Estimate{% endif %}
                                 </span>
                                 {% endif %}
                                 {% else %}
@@ -573,6 +573,9 @@
                     {% endif %}
                 </div>
             </div>
+
+            <!-- First-Mile Pickup leg (only for orders with a pickup task) -->
+            {% include "workforce/parts/_pickup_leg_card.html" with pickup=order.pickup_task %}
 
             <!-- Delivery Task -->
             {% if delivery_task %}
@@ -852,8 +855,8 @@ function wodRenderLatLng(orderId, lat, lng) {
         '<a href="https://www.google.com/maps?q=' + la + ',' + lo + '" target="_blank" class="odp__latlong-link">' +
             '<i class="fa-solid fa-map-pin"></i> ' + la + ', ' + lo +
         '</a>' +
-        '<span class="odp__loc-acc odp__loc-acc--by_customer">' +
-            '<i class="fa-solid fa-location-crosshairs"></i> By Customer' +
+        '<span class="odp__loc-acc odp__loc-acc--by_staff">' +
+            '<i class="fa-solid fa-location-crosshairs"></i> By Staff' +
         '</span>';
 }
 
@@ -878,7 +881,7 @@ function wodLocSave(text, orderId) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrfToken() },
-        body: JSON.stringify({ latitude: lat, longitude: lng, coords_accuracy: 'by_customer' })
+        body: JSON.stringify({ latitude: lat, longitude: lng, coords_accuracy: 'by_staff' })
     }).then(function(resp) { return resp.json(); }).then(function(d) {
         if (!d.success) {
             if (resultDiv) resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>' + (d.error || 'Save failed') + '</span>';

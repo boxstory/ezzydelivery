@@ -6691,3 +6691,354 @@ img.vf-photo-preview {
     color: var(--fleet-dark);
     white-space: nowrap;
 }
+
+/* ============================================================================
+   DRIVER TASKS — ledger pass (frontend-design), scoped to body.ftk.
+   Brand discipline: navy ink + ONE yellow primary action per card; kills the
+   purple/indigo/blue/green button rainbow. Signature: the dropoff address as
+   a mini QNAS plate (Zone/St/Bldg stamped mono) — same waybill language as
+   the staff console. Touch targets stay driver-sized.
+   ============================================================================ */
+
+/* --- Coded data renders mono --- */
+.ftk .task-card__order-num,
+.ftk .task-card__date,
+.ftk .task-card__strip-item--earn,
+.ftk .fleet-tab__badge {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+}
+.ftk .task-card__order-num { letter-spacing: 0; }
+
+/* --- Tabs: quiet counts, active carries the yellow rule --- */
+.ftk .fleet-tab.active {
+  box-shadow: inset 0 -3px 0 #f7c000, var(--shadow-sm);
+}
+.ftk .fleet-tab__badge,
+.ftk .fleet-tab__badge--success {
+  background: #001f3f;
+  color: #fff;
+  font-size: 10px;
+}
+.ftk .fleet-tab.active .fleet-tab__badge {
+  background: #f7c000;
+  color: #001f3f;
+}
+
+/* --- Status: swatch + text, no tinted pill backgrounds --- */
+.ftk .task-card__header .fleet-badge {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10.5px;
+  gap: 5px;
+}
+.ftk .task-card__header .fleet-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.ftk .task-card__header .fleet-badge--success { color: #15803d; }
+.ftk .task-card__header .fleet-badge--warning { color: #92400e; }
+.ftk .task-card__header .fleet-badge--danger  { color: #dc2626; }
+.ftk .task-card__header .fleet-badge--info    { color: #1d4ed8; }
+/* urgency chips stay filled — they are alerts, not states */
+.ftk .task-card__header .task-badge--urgent,
+.ftk .task-card__header .task-badge--sameday {
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+.ftk .task-card__header .task-badge--urgent::before,
+.ftk .task-card__header .task-badge--sameday::before { display: none; }
+
+/* --- Signature: mini QNAS plate for the dropoff --- */
+.ftk .ftk__plate {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1.5px solid #001f3f;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #fff;
+}
+.ftk .ftk__plate-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 9px 3px;
+  border-left: 1px solid #e5e7eb;
+  line-height: 1;
+}
+.ftk .ftk__plate-cell:first-child { border-left: 0; }
+.ftk .ftk__plate-tag {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #6b7280;
+}
+.ftk .ftk__plate-num {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 17px;
+  font-weight: 700;
+  color: #001f3f;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+.ftk .task-card__route-line1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* --- Accuracy: outline chips, colored text only --- */
+.ftk .task-card__acc-badge {
+  background: transparent;
+  border-color: #d5dbe3;
+}
+.ftk .task-card__acc-badge--exact,
+.ftk .task-card__acc-badge--street,
+.ftk .task-card__acc-badge--by_customer { color: #15803d; }
+.ftk .task-card__acc-badge--landmark,
+.ftk .task-card__acc-badge--zone_center { color: #92400e; }
+.ftk .task-card__acc-badge--ai_estimate { color: #dc2626; }
+
+/* --- COD: cash to collect gets the strongest ink; zero goes quiet --- */
+.ftk .task-card__strip-item--cod {
+  background: #001f3f;
+  color: #fff;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-weight: 700;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.ftk .task-card__strip-item--cod-zero {
+  background: transparent;
+  color: #9ca3af;
+  font-family: inherit;
+  font-weight: 600;
+  padding-left: 0;
+}
+.ftk .task-card__strip-item--cod-paid {
+  background: transparent;
+  color: #15803d;
+  padding-left: 0;
+}
+.ftk .task-card__strip-item--earn { color: #001f3f; }
+
+/* --- Actions: ONE yellow primary per card, navy secondaries --- */
+.ftk .task-card__action-btn {
+  padding: 9px 15px;
+  border-radius: 7px;
+}
+.ftk .task-card__action-btn--scan,
+.ftk .task-card__action-btn--nav {
+  background: #001f3f;
+  color: #fff;
+}
+.ftk .task-card__action-btn--take,
+.ftk .task-card__action-btn--accept,
+.ftk .task-card__action-btn--start {
+  background: #f7c000;
+  color: #001f3f;
+}
+.ftk .task-card__action-btn:focus-visible {
+  outline: 2px solid #f7c000;
+  outline-offset: 2px;
+}
+.ftk .task-card__action-btn--nav-disabled {
+  background: var(--fleet-grey-200) !important;
+  color: var(--fleet-grey-400) !important;
+}
+
+/* Zone name label beside the plate */
+.ftk .ftk__plate-zonename {
+  font-size: 12px;
+  font-weight: 700;
+  color: #001f3f;
+  line-height: 1.2;
+}
+
+/* ============================================================================
+   TASK DETAIL SHEET — ledger pass (frontend-design). Shared component, so
+   unscoped: same navy/yellow discipline as the ftk task cards. Signature
+   carried over: the QNAS plate (td-plate) stamped in the Deliver To section.
+   Outcome buttons keep semantic fills — on a control panel color = meaning.
+   ============================================================================ */
+
+/* --- Header: status as swatch + text; urgency chips stay filled --- */
+.td-sheet__header .fleet-badge {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+  gap: 5px;
+}
+.td-sheet__header .fleet-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.td-sheet__header .fleet-badge--success { color: #15803d; }
+.td-sheet__header .fleet-badge--warning { color: #92400e; }
+.td-sheet__header .fleet-badge--danger  { color: #dc2626; }
+.td-sheet__header .fleet-badge--info    { color: #1d4ed8; }
+.td-sheet__header .task-badge--urgent,
+.td-sheet__header .task-badge--sameday {
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+.td-sheet__header .task-badge--urgent::before,
+.td-sheet__header .task-badge--sameday::before { display: none; }
+
+/* --- Meta row: coded data in mono, task number never wraps ugly --- */
+.td-meta-item strong {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: 0;
+  word-break: keep-all;
+}
+
+/* --- COD: navy mono plate when money rides, quiet when zero --- */
+.td-cod-badge {
+  background: #001f3f;
+  color: #fff;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+.td-cod-badge--zero {
+  background: transparent;
+  color: #9ca3af;
+  padding: 8px 0;
+}
+
+/* --- Signature: QNAS plate in Deliver To --- */
+.td-plate {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1.5px solid #001f3f;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #fff;
+  margin: 2px 0;
+}
+.td-plate__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 10px 3px;
+  border-left: 1px solid #e5e7eb;
+  line-height: 1;
+}
+.td-plate__cell:first-child { border-left: 0; }
+.td-plate__tag {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #6b7280;
+}
+.td-plate__num {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #001f3f;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+
+/* --- Nav row: quiet navy outline pills (Waze/Maps/Edit/AI Parse) --- */
+.td-sheet .td-nav-btn,
+.td-sheet .task-card__contact-pill.td-nav-btn,
+.td-sheet #tdAiParseBtn {
+  background: #fff;
+  border: 1.5px solid #001f3f;
+  color: #001f3f;
+  font-weight: 700;
+}
+.td-sheet .td-nav-btn i { color: #001f3f; }
+
+/* --- Map tiles: navy when live, hairline when empty --- */
+.td-map-tile--green,
+.td-map-tile--blue {
+  background: #001f3f;
+  border-color: #001f3f;
+}
+.td-map-tile--green .td-map-tile__pin,
+.td-map-tile--green .td-map-tile__label,
+.td-map-tile--blue .td-map-tile__pin,
+.td-map-tile--blue .td-map-tile__label { color: #f7c000; }
+
+/* --- Journey steps: navy outline; done = quiet check --- */
+.td-status-btn--transit,
+.td-status-btn--contacted,
+.td-status-btn--noreachable {
+  background: #fff;
+  border: 1.5px solid #001f3f;
+  color: #001f3f;
+}
+.td-status-btn--done {
+  background: #f8f9fb;
+  border: 1.5px solid #e5e7eb;
+  color: #15803d;
+}
+
+/* --- Outcomes: semantic fills, brand-calibrated hues --- */
+.td-outcome-btn--delivered { background: #15803d; }
+.td-outcome-btn--partial   { background: #d97706; }
+.td-outcome-btn--failed    { background: #dc2626; }
+
+/* --- Earnings stat: ink, not candy --- */
+.td-stat--earn {
+  background: #f8f9fb;
+  color: #001f3f;
+  border: 1px solid #e5e7eb;
+}
+.td-stat--earn strong {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+}
+
+/* Empty plate cells: number missing, slot still stamped */
+.ftk .ftk__plate-num--empty,
+.td-plate__num--empty { color: #b0b0b0; }
+
+/* Map tile + accuracy label stacked beside Deliver To, flush right */
+.td-map-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.td-section > .td-map-tile { margin-left: auto; }
+/* Dropoff tile rides at the end (bottom) of the text block */
+.td-section .td-map-col { align-self: flex-end; }
+.td-map-col .td-accuracy-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* Staff/driver-set coordinates: trusted, green like by_customer */
+.ftk .task-card__acc-badge--by_staff  { color: #15803d; }
+.ftk .task-card__acc-badge--by_driver { color: #1d4ed8; }

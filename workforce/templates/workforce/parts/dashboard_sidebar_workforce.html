@@ -17,7 +17,9 @@
         {% include "workforce/parts/sidebar/temp_orders.html" %}
         {% include "workforce/parts/sidebar/orders.html" %}
         {% include "workforce/parts/sidebar/tasks.html" %}
+        {% include "workforce/parts/sidebar/pickup.html" %}
         {% include "workforce/parts/sidebar/fleet_accounts.html" %}
+        {% include "workforce/parts/sidebar/sellers.html" %}
 
         <p class="dsb-section">Finance &amp; Fulfillment</p>
         {% include "workforce/parts/sidebar/finance.html" %}
@@ -26,6 +28,7 @@
 
         <p class="dsb-section">Marketing</p>
         {% include "workforce/parts/sidebar/crm.html" %}
+        {% include "workforce/parts/sidebar/whatsapp.html" %}
         {% include "workforce/parts/sidebar/onboarding.html" %}
 
         <p class="dsb-section">Operations</p>
@@ -34,14 +37,11 @@
           {% include "workforce/parts/sidebar/triggers.html" %}
         {% endif %}
         {% include "workforce/parts/sidebar/zones.html" %}
-        {% include "workforce/parts/sidebar/sellers.html" %}
 
         {% include "workforce/parts/sidebar/import.html" %}
 
         <p class="dsb-section">Reports &amp; Tools</p>
         {% include "workforce/parts/sidebar/reports.html" %}
-        {% include "workforce/parts/sidebar/forms.html" %}
-        {% include "workforce/parts/sidebar/whatsapp.html" %}
 
         <p class="dsb-section">Admin</p>
         {% include "workforce/parts/sidebar/profile_admin.html" %}
@@ -64,7 +64,6 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/import-wizard\//,                   menu: 'submenu-import',        link: 'workforce_sidebar_link_temp_orders'},
     {re: /^\/workforce\/import-history\//,                  menu: 'submenu-import',        link: 'workforce_sidebar_link_import_history'},
     {re: /^\/workforce\/import-wizard\/mapping-manager\//,  menu: 'submenu-import',        link: 'workforce_sidebar_link_mapping_manager'},
-    {re: /^\/workforce\/webhook-imports\//,                 menu: 'submenu-import',        link: 'workforce_sidebar_link_webhook_imports'},
     {re: /^\/workforce\/orders\/pending-verification\//,    menu: 'submenu-orders',        link: 'workforce_sidebar_link_wf_orders_all'},
     {re: /^\/workforce\/orders\/\d+/,                       menu: 'submenu-orders',        link: 'workforce_sidebar_link_wf_orders_all'},
     {re: /^\/workforce\/order\//,                           menu: 'submenu-orders',        link: 'workforce_sidebar_link_wf_orders_all'},
@@ -78,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/drivers\/\d+/,                      menu: 'submenu-accounts',      link: 'workforce_sidebar_link_all_drivers'},
     {re: /^\/workforce\/drivers\//,                         menu: 'submenu-accounts',      link: null},
     {re: /^\/workforce\/fleet\//,                           menu: 'submenu-accounts',      link: null},
-    {re: /^\/workforce\/sellers\/api-configs\/\d+/,         menu: 'submenu-sellers',       link: 'workforce_sidebar_link_seller_api_configs'},
+    {re: /^\/workforce\/sellers\/api-configs\/\d+/,         menu: 'submenu-triggers',      link: 'workforce_sidebar_link_seller_api_configs'},
     {re: /^\/workforce\/sellers\/\d+/,                      menu: 'submenu-sellers',       link: 'workforce_sidebar_link_all_sellers'},
     {re: /^\/workforce\/sellers\//,                         menu: 'submenu-sellers',       link: null},
     {re: /^\/workforce\/finance\//,                         menu: 'submenu-finance',       link: 'workforce_sidebar_link_finance_overview'},
@@ -87,8 +86,8 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/suppliers\//,                       menu: 'submenu-warehouse',     link: 'workforce_sidebar_link_suppliers'},
     {re: /^\/workforce\/purchase-orders\//,                 menu: 'submenu-warehouse',     link: 'workforce_sidebar_link_purchase_orders'},
     {re: /^\/workforce\/warehouses\//,                      menu: 'submenu-verifications', link: 'workforce_sidebar_link_warehouses_list'},
-    {re: /^\/workforce\/sellers\/api-configs\//,            menu: 'submenu-verifications', link: 'workforce_sidebar_link_seller_api_configs'},
-    {re: /^\/workforce\/webhook-imports\//,                 menu: 'submenu-verifications', link: 'workforce_sidebar_link_webhook_imports'},
+    {re: /^\/workforce\/sellers\/api-configs\//,            menu: 'submenu-triggers',      link: 'workforce_sidebar_link_seller_api_configs'},
+    {re: /^\/workforce\/webhook-imports\//,                 menu: 'submenu-triggers',      link: 'workforce_sidebar_link_webhook_imports'},
     {re: /^\/workforce\/dispatch\/batches\/\d+/,            menu: 'submenu-dispatch',      link: 'workforce_sidebar_link_dispatch_batches'},
     {re: /^\/workforce\/dispatch\/shifts\/\d+/,             menu: 'submenu-dispatch',      link: 'workforce_sidebar_link_dispatch_shifts'},
     {re: /^\/workforce\/dispatch\/kpis\/rider\//,           menu: 'submenu-dispatch',      link: 'workforce_sidebar_link_dispatch_kpis'},
@@ -105,9 +104,8 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/reports\//,                         menu: 'submenu-reports',       link: 'workforce_sidebar_link_staff_reports'},
     {re: /^\/workforce\/inventory\//,                       menu: 'submenu-wh-inventory',  link: null},
     {re: /^\/workforce\/product-requests\//,                menu: 'submenu-warehouse',     link: 'workforce_sidebar_link_product_requests'},
-    {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     menu: 'submenu-forms',         link: 'workforce_sidebar_link_pricing_inquiries'},
-    {re: /^\/workforce\/forms\/whatsapp-inquiries\/\d+/,    menu: 'submenu-forms',         link: 'workforce_sidebar_link_whatsapp_inquiries'},
-    {re: /^\/workforce\/forms\//,                           menu: 'submenu-forms',         link: null},
+    {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     menu: 'submenu-verifications', link: 'workforce_sidebar_link_pricing_inquiries'},
+    {re: /^\/workforce\/forms\//,                           menu: 'submenu-verifications', link: null},
     {re: /^\/workforce\/crm\/leads\/\d+/,                   menu: 'submenu-crm',           link: 'workforce_sidebar_link_crm_board'},
     {re: /^\/workforce\/crm\//,                             menu: 'submenu-crm',           link: null}
   ];

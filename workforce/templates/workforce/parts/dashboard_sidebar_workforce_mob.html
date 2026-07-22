@@ -27,33 +27,6 @@
             </a>
         </div>
 
-        <!-- Sellers -->
-        <div id="workforce_sidebar_mob_section_sellers" class="wsm__nav-section">
-            <div class="wsm__nav-header" onclick="toggleMobileSection('sellers')">
-                <div class="wsm__nav-header-title">
-                    <i class="fa-solid fa-store"></i>
-                    <span>Sellers</span>
-                </div>
-                <i class="fa-solid fa-chevron-down"></i>
-            </div>
-            <div class="wsm__nav-submenu" id="mobile-section-sellers">
-                <a id="workforce_sidebar_mob_link_all_sellers" href="{% url 'workforce:sellers_list' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-list"></i><span>All Sellers</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_sellers_pending" href="{% url 'workforce:sellers_pending' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-clock"></i><span>Pending Approval</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_sellers_active" href="{% url 'workforce:sellers_active' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-circle-check"></i><span>Active Sellers</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_sellers_inactive" href="{% url 'workforce:sellers_inactive' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-circle-xmark"></i><span>Inactive Sellers</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_seller_api_configs" href="{% url 'workforce:wf_seller_api_configs' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-plug"></i><span>API Configs</span>
-                </a>
-            </div>
-        </div>
 
         <!-- Orders -->
         <div id="workforce_sidebar_mob_section_orders" class="wsm__nav-section">
@@ -138,6 +111,29 @@
             </div>
         </div>
 
+        <!-- First-Mile Pickup -->
+        <div id="workforce_sidebar_mob_section_pickup" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('pickup')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-boxes-packing"></i>
+                    <span>Pickup</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-pickup">
+                <a id="workforce_sidebar_mob_link_pickup_pool" href="{% url 'workforce:pickup_pool_status' %}" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-layer-group"></i><span>Pool Status</span>
+                    <span class="badge ms-auto" style="background:var(--brand-primary);color:#000;font-size:0.6rem;" data-badge="pickup_pending">{{ pickup_pending_count|default:"0" }}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_pickup_assign" href="{% url 'workforce:pickup_pool_status' %}?status=pending" class="wsm__nav-link">
+                    <i class="fa-solid fa-user-check"></i><span>Pickup Assign</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_pickup_fleets" href="{% url 'workforce:pickup_automation_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-users-gear"></i><span>Client Driver List</span>
+                </a>
+            </div>
+        </div>
+
         <!-- Fleet Accounts (includes Drivers) -->
         <div id="workforce_sidebar_mob_section_fleet" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('accounts')">
@@ -172,6 +168,34 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_fleet_transactions" href="{% url 'workforce:fleet_transactions' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-money-bill-transfer"></i><span>Transactions</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sellers -->
+        <div id="workforce_sidebar_mob_section_sellers" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('sellers')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-store"></i>
+                    <span>Sellers</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-sellers">
+                <a id="workforce_sidebar_mob_link_all_sellers" href="{% url 'workforce:sellers_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-list"></i><span>All Sellers</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_sellers_pending" href="{% url 'workforce:sellers_pending' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-clock"></i><span>Pending Approval</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-box"></i><span>Orders by Seller</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_seller_transactions" href="{% url 'workforce:seller_transactions' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-money-bill-transfer"></i><span>Seller Transactions</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_seller_api_configs" href="{% url 'workforce:wf_seller_api_configs' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plug"></i><span>API Configs</span>
                 </a>
             </div>
         </div>
@@ -322,6 +346,12 @@
                 <a id="workforce_sidebar_mob_link_wa_instances" href="{% url 'workforce:whatsapp_instances_list' %}" class="wsm__nav-link">
                     <i class="fa-brands fa-whatsapp"></i><span>WA Instances</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_seller_api_configs" href="{% url 'workforce:wf_seller_api_configs' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plug"></i><span>API Configs</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_webhook_imports" href="{% url 'workforce:wf_webhook_imports' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-satellite-dish"></i><span>Webhook Imports</span>
+                </a>
             </div>
         </div>
         {% endif %}
@@ -427,8 +457,24 @@
                 <a id="workforce_sidebar_mob_link_pricing_inquiries" href="{% url 'workforce:pricing_inquiries_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-tag"></i><span>Pricing Inquiries</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_whatsapp_inquiries" href="{% url 'workforce:whatsapp_inquiries_list' %}" class="wsm__nav-link">
-                    <i class="fa-brands fa-whatsapp"></i><span>WhatsApp Inquiries</span>
+            </div>
+        </div>
+
+        <!-- WAHA WhatsApp (htpasswd-gated by nginx) -->
+        <div id="workforce_sidebar_mob_section_wa" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('wa')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    <span>WhatsApp</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-wa">
+                <a id="workforce_sidebar_mob_link_wa_chats" href="/waha/wa-chats/" class="wsm__nav-link">
+                    <i class="fa-solid fa-comments"></i><span>Live Chats</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_wa_dashboard" href="/waha/wa-dashboard/" class="wsm__nav-link">
+                    <i class="fa-solid fa-qrcode"></i><span>Session Status</span>
                 </a>
             </div>
         </div>
@@ -466,9 +512,6 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_import_history" href="{% url 'workforce:import_history' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-clock-rotate-left"></i><span>Import History</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_webhook_imports" href="{% url 'workforce:wf_webhook_imports' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-satellite-dish"></i><span>Webhook Imports</span>
                 </a>
             </div>
         </div>
@@ -525,25 +568,6 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_team_verification" href="{% url 'workforce:team_verification_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-users-line"></i><span>Team</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- WAHA WhatsApp (htpasswd-gated by nginx) -->
-        <div id="workforce_sidebar_mob_section_wa" class="wsm__nav-section">
-            <div class="wsm__nav-header" onclick="toggleMobileSection('wa')">
-                <div class="wsm__nav-header-title">
-                    <i class="fa-brands fa-whatsapp"></i>
-                    <span>WhatsApp</span>
-                </div>
-                <i class="fa-solid fa-chevron-down"></i>
-            </div>
-            <div class="wsm__nav-submenu" id="mobile-section-wa">
-                <a id="workforce_sidebar_mob_link_wa_chats" href="/waha/wa-chats/" class="wsm__nav-link">
-                    <i class="fa-solid fa-comments"></i><span>Live Chats</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_wa_dashboard" href="/waha/wa-dashboard/" class="wsm__nav-link">
-                    <i class="fa-solid fa-qrcode"></i><span>Session Status</span>
                 </a>
             </div>
         </div>
@@ -628,7 +652,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/onedrive-sources\//,                section: 'import',        link: 'workforce_sidebar_mob_link_onedrive'},
         {re: /^\/workforce\/import-wizard\//,                   section: 'import',        link: null},
         {re: /^\/workforce\/import-history\//,                  section: 'import',        link: 'workforce_sidebar_mob_link_import_history'},
-        {re: /^\/workforce\/webhook-imports\//,                  section: 'import',        link: 'workforce_sidebar_mob_link_webhook_imports'},
+        {re: /^\/workforce\/webhook-imports\//,                  section: 'triggers',      link: 'workforce_sidebar_mob_link_webhook_imports'},
         // Orders
         {re: /^\/workforce\/orders\/pending-verification\//,    section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
         {re: /^\/workforce\/orders\/\d+/,                       section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
@@ -644,7 +668,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/drivers\//,                         section: 'accounts',      link: null},
         {re: /^\/workforce\/fleet\//,                           section: 'accounts',      link: null},
         // Sellers
-        {re: /^\/workforce\/sellers\/api-configs\/\d+/,         section: 'sellers',       link: 'workforce_sidebar_mob_link_seller_api_configs'},
+        {re: /^\/workforce\/sellers\/api-configs\/\d+/,         section: 'triggers',      link: 'workforce_sidebar_mob_link_seller_api_configs'},
         {re: /^\/workforce\/sellers\/\d+/,                      section: 'sellers',       link: 'workforce_sidebar_mob_link_all_sellers'},
         {re: /^\/workforce\/sellers\//,                         section: 'sellers',       link: null},
         // Finance
@@ -679,7 +703,6 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/product-requests\//,                section: 'warehouse',     link: 'workforce_sidebar_mob_link_product_requests'},
         // Forms
         {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     section: 'forms',         link: 'workforce_sidebar_mob_link_pricing_inquiries'},
-        {re: /^\/workforce\/forms\/whatsapp-inquiries\/\d+/,    section: 'forms',         link: 'workforce_sidebar_mob_link_whatsapp_inquiries'},
         {re: /^\/workforce\/forms\//,                           section: 'forms',         link: null},
     ];
 

@@ -62,251 +62,132 @@
     </a>
 </div>
 
-<!-- Driver Verification Cards -->
+<!-- Driver Manifest -->
 {% if page_obj.object_list %}
-    {% for driver in page_obj %}
-    <div class="uvl__card">
-        <!-- Card Header -->
-        <div class="uvl__card__head">
-            <div class="d-flex align-items-center gap-3">
-                <div class="uvl__avatar">
-                    <i class="fa-solid fa-id-card"></i>
-                </div>
-                <div>
-                    <div class="uvl__name">
-                        {{ driver.user.get_full_name|default:driver.user.email }}
-                        <span class="uvl__role uvl__role--drv">Driver</span>
-                    </div>
-                    <div class="uvl__contact">
-                        {% if driver.user.email %}
-                        <span><i class="fa-solid fa-envelope"></i> {{ driver.user.email }}</span>
-                        {% endif %}
-                        {% if driver.driver_phone %}
-                        {% if driver.user.email %}<span class="uvl__contact__sep">|</span>{% endif %}
-                        <span><i class="fa-solid fa-phone"></i> {{ driver.driver_phone }}</span>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <span class="uvl__status uvl__status--{{ driver.profile.verification_status }}">
-                {% if driver.profile.verification_status == 'verified' %}<i class="fa-solid fa-circle-check"></i>
-                {% elif driver.profile.verification_status == 'pending' %}<i class="fa-solid fa-clock"></i>
-                {% elif driver.profile.verification_status == 'under_review' %}<i class="fa-solid fa-eye"></i>
-                {% elif driver.profile.verification_status == 'rejected' %}<i class="fa-solid fa-circle-xmark"></i>
-                {% else %}<i class="fa-solid fa-triangle-exclamation"></i>
-                {% endif %}
-                Profile: {{ driver.profile.get_verification_status_display }}
-            </span>
+    <div class="dvm__manifest">
+        <div class="dvm__header" aria-hidden="true">
+            <span></span>
+            <span>Applicant</span>
+            <span>Code</span>
+            <span>Languages</span>
+            <span>Readiness</span>
+            <span>Applied</span>
+            <span></span>
         </div>
 
-        <!-- Scope Badges -->
-        <div class="uvl__scopes">
-            <span class="uvl__scope uvl__scope--neutral">
-                <i class="fa-solid fa-hashtag"></i> Code: {{ driver.driver_code|default:"No Code" }}
-            </span>
-            <span class="uvl__scope {% if driver.driver_status == 'approved' %}uvl__scope--ok{% elif driver.driver_status == 'rejected' %}uvl__scope--danger{% else %}uvl__scope--warn{% endif %}">
-                <i class="fa-solid fa-car"></i> Account: {{ driver.get_driver_status_display }}
-            </span>
-            {% if driver.driver_languages %}
-            <span class="uvl__scope uvl__scope--neutral">
-                <i class="fa-solid fa-language"></i> {{ driver.get_driver_languages_display }}
-            </span>
-            {% endif %}
-        </div>
+        {% for driver in page_obj %}
+        <details class="dvm__row">
+            <summary class="dvm__summary">
+                <span class="dvm__stamp dvm__stamp--{{ driver.profile.verification_status }}">{{ driver.stamp_label }}</span>
+                <span class="dvm__who">
+                    <span class="dvm__name">{{ driver.user.get_full_name|default:driver.user.email }}</span>
+                    <span class="dvm__contact">
+                        {% if driver.user.email %}{{ driver.user.email }}{% endif %}
+                        {% if driver.driver_phone %}<span class="dvm__dot">&middot;</span>{{ driver.driver_phone }}{% endif %}
+                    </span>
+                </span>
+                <span class="dvm__code" data-label="Code">{{ driver.driver_code|default:"—" }}</span>
+                <span class="dvm__lang" data-label="Languages">{{ driver.get_driver_languages_display|default:"—" }}</span>
+                <span class="dvm__meter" data-label="Readiness" title="User profile {{ driver.profile.get_profile_completion_percentage }}% &middot; Driver profile {% if driver.profile.is_driver_profile_completed %}100{% else %}0{% endif %}%">
+                    <span class="dvm__meter-track"><span class="dvm__meter-fill" style="width:{{ driver.readiness_pct }}%"></span></span>
+                    <span class="dvm__meter-pct">{{ driver.readiness_pct }}%</span>
+                </span>
+                <span class="dvm__applied" data-label="Applied">
+                    {% if driver.profile.verification_applied_at %}{{ driver.profile.verification_applied_at|date:"d M Y" }}{% else %}<em>Not applied</em>{% endif %}
+                </span>
+                <i class="fa-solid fa-chevron-down dvm__chev" aria-hidden="true"></i>
+            </summary>
 
-        {% if driver.driver_status == 'approved' and driver.profile.verification_status != 'verified' %}
-        <div class="uvl__callout uvl__callout--danger">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <div>
-                <span class="uvl__callout__title">Status Mismatch</span>
-                <span class="uvl__callout__text">Driver account is Approved but profile verification is still "{{ driver.profile.get_verification_status_display }}". Approving here will sync the profile verification status.</span>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Driver & Account Details -->
-        <div class="row g-0">
-            <div class="col-sm-6 uvl__col-left">
-                <div class="uvl__section-head"><i class="fa-solid fa-id-card"></i> Driver Details</div>
-                <div class="uvl__fields">
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">License No.</span>
-                        <span class="uvl__field__value">{{ driver.driver_license_number|default:"—" }}</span>
-                    </div>
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">Languages</span>
-                        <span class="uvl__field__value">{{ driver.get_driver_languages_display|default:"—" }}</span>
-                    </div>
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">WhatsApp</span>
-                        <span class="uvl__field__value">{{ driver.profile.whatsapp|default:"—" }}</span>
-                    </div>
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">Nationality</span>
-                        <span class="uvl__field__value">{{ driver.profile.nationlity|default:"—" }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-sm-6 uvl__col-right">
-                <div class="uvl__section-head"><i class="fa-solid fa-user-circle"></i> Account</div>
-                <div class="uvl__fields">
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">Email</span>
-                        <span class="uvl__field__value">{{ driver.user.email }}</span>
-                    </div>
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">Date of Birth</span>
-                        <span class="uvl__field__value">{{ driver.profile.date_of_birth|default:"—" }}</span>
-                    </div>
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">Address</span>
-                        <span class="uvl__field__value">{{ driver.profile.address|default:"—" }}</span>
-                    </div>
-                    <div class="uvl__field">
-                        <span class="uvl__field__label">Joined</span>
-                        <span class="uvl__field__value">{{ driver.profile.created_at|date:"M d, Y" }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Completion Bars (2 Columns) -->
-        <div class="row g-3">
-            <!-- Profile Completion -->
-            <div class="col-sm-6">
-                <div class="uvl__progress-wrap">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="uvl__section-head"><i class="fa-solid fa-user-check"></i> User Profile</span>
-                        <span class="uvl__progress-pct {% if driver.profile.get_profile_completion_percentage == 100 %}uvl__progress-pct--ok{% elif driver.profile.get_profile_completion_percentage >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
-                            {{ driver.profile.get_profile_completion_percentage }}%
-                        </span>
-                    </div>
-                    <div class="uvl__progress-bar">
-                        <div class="uvl__progress-fill {% if driver.profile.get_profile_completion_percentage == 100 %}uvl__progress-fill--ok{% elif driver.profile.get_profile_completion_percentage >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
-                             style="width: {{ driver.profile.get_profile_completion_percentage }}%"></div>
-                    </div>
-                    <div class="small text-muted mt-1">
-                        {% if driver.profile.is_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
-                    </div>
-                </div>
-            </div>
-            <!-- Driver Profile Completion -->
-            <div class="col-sm-6">
-                <div class="uvl__progress-wrap">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="uvl__section-head"><i class="fa-solid fa-car"></i> Driver Profile</span>
-                        <span class="uvl__progress-pct {% if driver.profile.is_driver_profile_completed %}uvl__progress-pct--ok{% else %}uvl__progress-pct--low{% endif %}">
-                            {% if driver.profile.is_driver_profile_completed %}100{% else %}0{% endif %}%
-                        </span>
-                    </div>
-                    <div class="uvl__progress-bar">
-                        <div class="uvl__progress-fill {% if driver.profile.is_driver_profile_completed %}uvl__progress-fill--ok{% else %}uvl__progress-fill--low{% endif %}"
-                             style="width: {% if driver.profile.is_driver_profile_completed %}100{% else %}0{% endif %}%"></div>
-                    </div>
-                    <div class="small text-muted mt-1">
-                        {% if driver.profile.is_driver_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Timeline -->
-        <div class="uvl__timeline">
-            <div class="uvl__section-head"><i class="fa-solid fa-clock-rotate-left"></i> Timeline</div>
-            <div class="uvl__tl-row">
-                <div class="uvl__tl-bubble uvl__tl-bubble--neutral">
-                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-user-plus"></i></div>
-                    <div class="uvl__tl-bubble__body">
-                        <span class="uvl__tl-bubble__label">Registered</span>
-                        <span class="uvl__tl-bubble__date">{{ driver.profile.created_at|date:"M d, Y" }}</span>
-                        <span class="uvl__tl-bubble__time">{{ driver.profile.created_at|date:"g:i A" }}</span>
-                    </div>
-                </div>
-
-                {% if driver.profile.verification_applied_at %}
-                <div class="uvl__tl-bubble uvl__tl-bubble--applied">
-                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-paper-plane"></i></div>
-                    <div class="uvl__tl-bubble__body">
-                        <span class="uvl__tl-bubble__label">Applied</span>
-                        <span class="uvl__tl-bubble__date">{{ driver.profile.verification_applied_at|date:"M d, Y" }}</span>
-                        <span class="uvl__tl-bubble__time">{{ driver.profile.verification_applied_at|date:"g:i A" }}</span>
-                    </div>
-                </div>
-                {% else %}
-                <div class="uvl__tl-bubble uvl__tl-bubble--waiting">
-                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-hourglass-half"></i></div>
-                    <div class="uvl__tl-bubble__body">
-                        <span class="uvl__tl-bubble__label">Application</span>
-                        <span class="uvl__tl-bubble__na">Not yet applied</span>
-                    </div>
+            <div class="dvm__case">
+                {% if driver.driver_status == 'approved' and driver.profile.verification_status != 'verified' %}
+                <div class="dvm__flag">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span><strong>Status mismatch</strong> &mdash; driver account is Approved but profile verification is still &ldquo;{{ driver.profile.get_verification_status_display }}&rdquo;. Approving here will sync the profile verification status.</span>
                 </div>
                 {% endif %}
 
-                {% if driver.profile.verified_at %}
-                <div class="uvl__tl-bubble uvl__tl-bubble--verified">
-                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-circle-check"></i></div>
-                    <div class="uvl__tl-bubble__body">
-                        <span class="uvl__tl-bubble__label">Verified</span>
-                        <span class="uvl__tl-bubble__date">{{ driver.profile.verified_at|date:"M d, Y" }}</span>
-                        <span class="uvl__tl-bubble__time">
-                            {{ driver.profile.verified_at|date:"g:i A" }}
-                            {% if driver.profile.verified_by %}
-                                <span class="uvl__tl-bubble__by">by {{ driver.profile.verified_by.username }}</span>
-                            {% endif %}
-                        </span>
+                <div class="dvm__case-grid">
+                    <div class="dvm__case-col">
+                        <span class="dvm__case-head">Driver details</span>
+                        <div class="dvm__case-field"><span>License no.</span><strong>{{ driver.driver_license_number|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>Languages</span><strong>{{ driver.get_driver_languages_display|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>WhatsApp</span><strong>{{ driver.profile.whatsapp|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>Nationality</span><strong>{{ driver.profile.nationlity|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>Account status</span><strong class="dvm__case-status dvm__case-status--{{ driver.driver_status }}">{{ driver.get_driver_status_display }}</strong></div>
+                    </div>
+                    <div class="dvm__case-col">
+                        <span class="dvm__case-head">Account</span>
+                        <div class="dvm__case-field"><span>Email</span><strong>{{ driver.user.email|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>Date of birth</span><strong>{{ driver.profile.date_of_birth|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>Address</span><strong>{{ driver.profile.address|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>Registered</span><strong>{{ driver.profile.created_at|date:"d M Y" }}</strong></div>
+                    </div>
+                    <div class="dvm__case-col dvm__case-col--trail">
+                        <span class="dvm__case-head">Timeline</span>
+                        <ol class="dvm__trail">
+                            <li class="dvm__trail-step dvm__trail-step--done">
+                                <span class="dvm__trail-dot"></span>
+                                <span class="dvm__trail-label">Registered</span>
+                                <span class="dvm__trail-date">{{ driver.profile.created_at|date:"d M Y" }}</span>
+                            </li>
+                            <li class="dvm__trail-step {% if driver.profile.verification_applied_at %}dvm__trail-step--done{% endif %}">
+                                <span class="dvm__trail-dot"></span>
+                                <span class="dvm__trail-label">Applied</span>
+                                <span class="dvm__trail-date">{% if driver.profile.verification_applied_at %}{{ driver.profile.verification_applied_at|date:"d M Y" }}{% else %}Not yet applied{% endif %}</span>
+                            </li>
+                            <li class="dvm__trail-step {% if driver.profile.verified_at %}dvm__trail-step--done{% endif %}">
+                                <span class="dvm__trail-dot"></span>
+                                <span class="dvm__trail-label">Verified</span>
+                                <span class="dvm__trail-date">
+                                    {% if driver.profile.verified_at %}{{ driver.profile.verified_at|date:"d M Y" }}{% if driver.profile.verified_by %} &middot; {{ driver.profile.verified_by.username }}{% endif %}{% else %}Pending{% endif %}
+                                </span>
+                            </li>
+                        </ol>
                     </div>
                 </div>
+
+                {% if driver.profile.rejection_reason %}
+                <div class="dvm__flag dvm__flag--reason">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span><strong>Rejection reason:</strong> {{ driver.profile.rejection_reason }}</span>
+                </div>
                 {% endif %}
-            </div>
-        </div>
 
-        <!-- Rejection Reason -->
-        {% if driver.profile.rejection_reason %}
-        <div class="uvl__callout uvl__callout--danger">
-            <i class="fa-solid fa-circle-exclamation"></i>
-            <div>
-                <span class="uvl__callout__title">Rejection Reason</span>
-                <span class="uvl__callout__text">{{ driver.profile.rejection_reason }}</span>
+                <div class="dvm__case-actions">
+                    <a href="{% url 'workforce:view_user_driver_profile' driver.profile.id %}" class="uvl__btn uvl__btn--detail">
+                        <i class="fa-solid fa-chart-line"></i> View progress
+                    </a>
+                    <a href="{% url 'workforce:driver_detail' driver.driver_id %}" class="uvl__btn uvl__btn--detail">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Full profile
+                    </a>
+                    {% if driver.profile.verification_status != 'verified' %}
+                    <button type="button" class="uvl__btn uvl__btn--verify" data-action="verify"
+                        data-profile-id="{{ driver.profile.id }}"
+                        data-user-name="{{ driver.user.get_full_name|default:driver.user.email }}"
+                        data-user-email="{{ driver.user.email }}"
+                        data-is-business="0"
+                        data-is-driver="1"
+                        data-biz-name=""
+                        data-driver-code="{{ driver.driver_code }}"
+                        data-team-memberships="[]">
+                        <i class="fa-solid fa-check-double"></i> Approve
+                    </button>
+                    <button type="button" class="uvl__btn uvl__btn--review" data-action="under_review" data-profile-id="{{ driver.profile.id }}">
+                        <i class="fa-solid fa-eye"></i> Mark under review
+                    </button>
+                    <button type="button" class="uvl__btn uvl__btn--reject" data-action="reject"
+                        data-profile-id="{{ driver.profile.id }}"
+                        data-user-name="{{ driver.user.get_full_name|default:driver.user.email }}">
+                        <i class="fa-solid fa-xmark"></i> Reject
+                    </button>
+                    {% else %}
+                    <div class="dvm__verified-note"><i class="fa-solid fa-circle-check"></i> Driver is verified</div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        {% endif %}
-
-        <!-- Action Buttons -->
-        <div class="uvl__actions">
-            <a href="{% url 'workforce:view_user_driver_profile' driver.profile.id %}" class="uvl__btn uvl__btn--detail">
-                <i class="fa-solid fa-chart-line"></i> View Progress
-            </a>
-            <a href="{% url 'workforce:driver_detail' driver.driver_id %}" class="uvl__btn uvl__btn--detail">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Full Profile
-            </a>
-            {% if driver.profile.verification_status != 'verified' %}
-            <button type="button" class="uvl__btn uvl__btn--verify" data-action="verify"
-                data-profile-id="{{ driver.profile.id }}"
-                data-user-name="{{ driver.user.get_full_name|default:driver.user.email }}"
-                data-user-email="{{ driver.user.email }}"
-                data-is-business="0"
-                data-is-driver="1"
-                data-biz-name=""
-                data-driver-code="{{ driver.driver_code }}"
-                data-team-memberships="[]">
-                <i class="fa-solid fa-check-double"></i> Approve
-            </button>
-            <button type="button" class="uvl__btn uvl__btn--review" data-action="under_review" data-profile-id="{{ driver.profile.id }}">
-                <i class="fa-solid fa-eye"></i> Review
-            </button>
-            <button type="button" class="uvl__btn uvl__btn--reject" data-action="reject"
-                data-profile-id="{{ driver.profile.id }}"
-                data-user-name="{{ driver.user.get_full_name|default:driver.user.email }}">
-                <i class="fa-solid fa-xmark"></i> Reject
-            </button>
-            {% else %}
-            <div class="uvl__verified-bar">
-                <i class="fa-solid fa-circle-check"></i> Driver is verified
-            </div>
-            {% endif %}
-        </div>
+        </details>
+        {% endfor %}
     </div>
-    {% endfor %}
 
     <!-- Pagination -->
     {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="dvl" %}

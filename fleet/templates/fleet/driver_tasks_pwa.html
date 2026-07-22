@@ -2,9 +2,13 @@
 {% load static fleet_extras %}
 
 {% block title %}Tasks{% endblock %}
+{% block body_class %}ftk{% endblock %}
 {% block page_title %}My Tasks{% endblock %}
 
 {% block header_actions %}
+<a href="{% url 'fleet:pickup_scanner' %}" class="fleet-btn-icon" title="Scan Package" style="text-decoration:none;">
+    <i class="fa-solid fa-qrcode"></i>
+</a>
 <a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon" title="Tasks Map" style="text-decoration:none;">
     <i class="fa-solid fa-map-location-dot"></i>
 </a>
@@ -290,22 +294,24 @@
             <div class="task-card__route-point task-card__route-point--dropoff">
                 <i class="fa-solid fa-location-dot task-card__route-pin task-card__route-pin--red"></i>
                 <div class="task-card__route-info">
-                    {% if card.order.dl_zone %}
+                    {% with azone=addr.dl_zone azstreet=addr.dl_street azbldg=addr.dl_building %}
+                    {% with pzone=card.order.dl_zone|default:azone pst=card.order.dl_street|default:azstreet pbldg=card.order.dl_building|default:azbldg %}
                     <div class="task-card__route-line1">
-                        <span class="task-card__route-value">Zone {{ card.order.dl_zone }}{% if card.order.dl_street %}, St {{ card.order.dl_street }}{% endif %}{% if card.order.dl_building %}, Bldg {{ card.order.dl_building }}{% endif %}{% if addr %}{% if addr.dl_unit %}, Unit {{ addr.dl_unit }}{% endif %}{% endif %}</span>
+                        <span class="ftk__plate">
+                            <span class="ftk__plate-cell"><span class="ftk__plate-tag">Zone</span><span class="ftk__plate-num{% if not pzone %} ftk__plate-num--empty{% endif %}">{{ pzone|default:"—" }}</span></span>
+                            <span class="ftk__plate-cell"><span class="ftk__plate-tag">St</span><span class="ftk__plate-num{% if not pst %} ftk__plate-num--empty{% endif %}">{{ pst|default:"—" }}</span></span>
+                            <span class="ftk__plate-cell"><span class="ftk__plate-tag">Bldg</span><span class="ftk__plate-num{% if not pbldg %} ftk__plate-num--empty{% endif %}">{{ pbldg|default:"—" }}</span></span>
+                            {% if addr and addr.dl_unit %}<span class="ftk__plate-cell"><span class="ftk__plate-tag">Unit</span><span class="ftk__plate-num">{{ addr.dl_unit }}</span></span>{% endif %}
+                        </span>
+                        {% if pzone and zone_name_map and pzone in zone_name_map %}
+                        <span class="ftk__plate-zonename">{{ zone_name_map|get_item:pzone }}</span>
+                        {% endif %}
                         {% if card.order.coords_accuracy %}
-                        <span class="task-card__acc-badge task-card__acc-badge--{{ card.order.coords_accuracy }}">{% if card.order.coords_accuracy == 'by_customer' %}By Customer{% elif card.order.coords_accuracy == 'exact' %}Exact{% elif card.order.coords_accuracy == 'street' %}Street{% elif card.order.coords_accuracy == 'landmark' %}Landmark{% elif card.order.coords_accuracy == 'zone_center' %}Zone Ctr{% elif card.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
+                        <span class="task-card__acc-badge task-card__acc-badge--{{ card.order.coords_accuracy }}">{% if card.order.coords_accuracy == 'by_customer' %}By Client{% elif card.order.coords_accuracy == 'by_staff' %}By Staff{% elif card.order.coords_accuracy == 'by_driver' %}By Driver{% elif card.order.coords_accuracy == 'exact' %}Exact{% elif card.order.coords_accuracy == 'street' %}Street{% elif card.order.coords_accuracy == 'landmark' %}Landmark{% elif card.order.coords_accuracy == 'zone_center' %}Zone Ctr{% elif card.order.coords_accuracy == 'ai_estimate' %}AI Est.{% else %}{{ card.order.get_coords_accuracy_display }}{% endif %}</span>
                         {% endif %}
                     </div>
-                    <span class="task-card__route-sub">{% if card.order.customer_address %}<span class="task-card__route-addr">{{ card.order.customer_address }}</span>{% elif addr and addr.area_name %}<span class="task-card__route-addr">{{ addr.area_name }}</span>{% endif %}{% if zone_name_map and card.order.dl_zone in zone_name_map %}<span class="task-card__zone-name"> · {{ zone_name_map|get_item:card.order.dl_zone }}</span>{% endif %}</span>
-                    {% elif addr and addr.dl_zone %}
-                    <div class="task-card__route-line1">
-                        <span class="task-card__route-value">Zone {{ addr.dl_zone }}{% if addr.dl_street %}, St {{ addr.dl_street }}{% endif %}{% if addr.dl_building %}, Bldg {{ addr.dl_building }}{% endif %}{% if addr.dl_unit %}, Unit {{ addr.dl_unit }}{% endif %}</span>
-                    </div>
-                    <span class="task-card__route-sub">{% if card.order.customer_address %}<span class="task-card__route-addr">{{ card.order.customer_address }}</span>{% elif addr.area_name %}<span class="task-card__route-addr">{{ addr.area_name }}</span>{% endif %}{% if zone_name_map and addr.dl_zone in zone_name_map %}<span class="task-card__zone-name"> · {{ zone_name_map|get_item:addr.dl_zone }}</span>{% endif %}</span>
-                    {% else %}
-                    <span class="task-card__route-value">{{ card.order.customer_address|default:"Address not set" }}</span>
-                    {% endif %}
+                    <span class="task-card__route-sub">{% if card.order.customer_address %}<span class="task-card__route-addr">{{ card.order.customer_address }}</span>{% elif addr and addr.area_name %}<span class="task-card__route-addr">{{ addr.area_name }}</span>{% endif %}</span>
+                    {% endwith %}{% endwith %}
                 </div>
             </div>
         </div>
@@ -340,7 +346,7 @@
                 </div>
                 {% endif %}
             {% else %}
-            <div class="task-card__strip-item task-card__strip-item--cod">
+            <div class="task-card__strip-item task-card__strip-item--cod task-card__strip-item--cod-zero">
                 <span>COD 0 QR</span>
             </div>
             {% endif %}

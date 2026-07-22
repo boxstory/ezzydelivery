@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260720a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -70,6 +70,21 @@
   <div class="znm__map-wrap">
     <div id="zone-map" class="znm__map"></div>
 
+    <!-- Pin Edit Toolbar (shown while editing a zone point) -->
+    <div class="znm__pin-bar" id="znm-pin-bar">
+      <div class="znm__pin-bar-info">
+        <i class="fa-solid fa-location-crosshairs me-1"></i>
+        <span id="znm-pin-bar-zone">Zone</span> — drag the marker to the new point
+      </div>
+      <div class="znm__pin-bar-coords" id="znm-pin-bar-coords">–</div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm znm__pin-bar-cancel" id="znm-pin-bar-btn-cancel" onclick="cancelPinEdit()">Cancel</button>
+        <button class="btn btn-sm znm__pin-bar-save" id="znm-pin-bar-btn-save" onclick="savePinEdit()">
+          <i class="fa-solid fa-floppy-disk me-1"></i> Save Point
+        </button>
+      </div>
+    </div>
+
     <!-- Legend -->
     <div class="znm__legend">
       <h4 class="znm__legend-title"><i class="fa-solid fa-circle-info me-1"></i> Legend</h4>
@@ -121,8 +136,8 @@
             <td><span class="znl__zone-num">{{ zone.zone_number }}</span></td>
             <td><strong>{{ zone.zone_name }}</strong></td>
             <td class="znl__arabic">{{ zone.zone_name_arabic|default:"-" }}</td>
-            <td><span class="znm__table-coord">{{ zone.latitude|floatformat:5 }}</span></td>
-            <td><span class="znm__table-coord">{{ zone.longitude|floatformat:5 }}</span></td>
+            <td><span class="znm__table-coord" id="zone-lat-{{ zone.zone_number }}">{{ zone.latitude|floatformat:5 }}</span></td>
+            <td><span class="znm__table-coord" id="zone-lng-{{ zone.zone_number }}">{{ zone.longitude|floatformat:5 }}</span></td>
             <td>
               {% if zone.has_polygon %}
               <span class="znl__poly znl__poly--yes"><i class="fa-solid fa-check"></i> {{ zone.polygon|length }}</span>
@@ -135,8 +150,11 @@
               <button class="znl__action me-1" onclick="focusZone({{ zone.zone_number }})" title="Focus on map">
                 <i class="fa-solid fa-crosshairs"></i>
               </button>
+              <button class="znl__action me-1" onclick="startPinEdit({{ zone.zone_number }})" title="Edit point">
+                <i class="fa-solid fa-location-crosshairs"></i>
+              </button>
               <a href="{% url 'delivery:edit_zone_polygon' zone.zone_number %}" class="znl__action" title="Edit polygon">
-                <i class="fa-solid fa-pen-to-square"></i>
+                <i class="fa-solid fa-draw-polygon"></i>
               </a>
             </td>
           </tr>
@@ -153,6 +171,8 @@
 <script>
   // Zone data from Django
   const zonesData = {{ zones_json|safe }};
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  const UPDATE_PIN_URL = '{% url "delivery:update_zone_pin" %}';
 
   // Map initialization - centered on Qatar
   const map = L.map('zone-map').setView([25.276987, 51.520008], 11);
@@ -199,20 +219,12 @@
     });
   }
 
-  // Initialize markers
-  zonesData.forEach(zone => {
-    const color = zone.groups.length > 0 ? (groupColors[zone.groups[0]] || '#001f3f') : '#001f3f';
-
-    const marker = L.marker([zone.lat, zone.lng], {
-      icon: createMarkerIcon(zone.zone_number, color),
-      zoneData: zone
-    });
-
-    // Create popup content
+  // Build popup HTML for a zone (also used to refresh after a pin edit)
+  function buildPopupContent(zone) {
     const neighbourList = zone.neighbours.map(n => `Zone ${n.zone_number}`).join(', ') || 'None';
     const groupList = zone.groups.join(', ') || 'Unassigned';
 
-    const popupContent = `
+    return `
       <div class="znm__popup">
         <div class="znm__popup-title">Zone ${zone.zone_number} - ${zone.name}</div>
         ${zone.name_arabic ? `<div class="znm__popup-arabic">${zone.name_arabic}</div>` : ''}
@@ -223,15 +235,28 @@
           <div class="znm__popup-neighbours-title"><i class="fa-solid fa-diagram-project me-1"></i> Neighbours (${zone.neighbour_count})</div>
           <div class="znm__popup-neighbour-list">${neighbourList}</div>
         </div>
-        <div class="znm__popup-actions">
+        <div class="znm__popup-actions d-flex gap-1">
+          <button type="button" class="znm__popup-btn znm__popup-btn--point" onclick="startPinEdit(${zone.zone_number})">
+            <i class="fa-solid fa-location-crosshairs me-1"></i> Edit Point
+          </button>
           <a href="/delivery/zones/edit-polygon/${zone.zone_number}/" class="znm__popup-btn znm__popup-btn--edit">
             <i class="fa-solid fa-draw-polygon me-1"></i> Edit Polygon
           </a>
         </div>
       </div>
     `;
+  }
 
-    marker.bindPopup(popupContent);
+  // Initialize markers
+  zonesData.forEach(zone => {
+    const color = zone.groups.length > 0 ? (groupColors[zone.groups[0]] || '#001f3f') : '#001f3f';
+
+    const marker = L.marker([zone.lat, zone.lng], {
+      icon: createMarkerIcon(zone.zone_number, color),
+      zoneData: zone
+    });
+
+    marker.bindPopup(buildPopupContent(zone));
 
     // Click event to show neighbour lines
     marker.on('click', function() {
@@ -263,7 +288,7 @@
         zoneData: zone
       });
 
-      polygonLayer.bindPopup(popupContent);
+      polygonLayer.bindPopup(buildPopupContent(zone));
 
       polygonLayer.on('click', function(e) {
         highlightNeighbours(zone);
@@ -446,6 +471,112 @@
       const color = zone && zone.groups.length > 0 ? (groupColors[zone.groups[0]] || '#001f3f') : '#001f3f';
       polygon.setStyle({ fillOpacity: 0.2, weight: 2, color: color });
       if (!showingPolygons) { map.removeLayer(polygon); }
+    });
+  }
+
+  // ---- Pin (point) edit mode ----
+  let pinEditZone = null;
+  let pinEditOriginal = null;
+
+  function updatePinBarCoords(lat, lng) {
+    document.getElementById('znm-pin-bar-coords').textContent =
+      `${parseFloat(lat).toFixed(7)}, ${parseFloat(lng).toFixed(7)}`;
+  }
+
+  function onPinDrag(e) {
+    const pos = e.target.getLatLng();
+    updatePinBarCoords(pos.lat, pos.lng);
+  }
+
+  function startPinEdit(zoneNumber) {
+    if (pinEditZone !== null && pinEditZone !== zoneNumber) { cancelPinEdit(); }
+    const marker = markers[zoneNumber];
+    const zone = zonesData.find(z => z.zone_number === zoneNumber);
+    if (!marker || !zone) return;
+
+    pinEditZone = zoneNumber;
+    pinEditOriginal = L.latLng(marker.getLatLng().lat, marker.getLatLng().lng);
+
+    map.closePopup();
+    clearNeighbourLines();
+    if (!map.hasLayer(marker)) { marker.addTo(map); }
+    map.setView(marker.getLatLng(), Math.max(map.getZoom(), 14));
+
+    marker.setZIndexOffset(1000);
+    marker.dragging.enable();
+    marker.on('drag', onPinDrag);
+
+    document.getElementById('znm-pin-bar-zone').textContent = `Zone ${zoneNumber} – ${zone.name}`;
+    updatePinBarCoords(pinEditOriginal.lat, pinEditOriginal.lng);
+    document.getElementById('znm-pin-bar').classList.add('znm__pin-bar--active');
+  }
+
+  function endPinEdit() {
+    const marker = markers[pinEditZone];
+    if (marker) {
+      marker.dragging.disable();
+      marker.off('drag', onPinDrag);
+      marker.setZIndexOffset(0);
+    }
+    document.getElementById('znm-pin-bar').classList.remove('znm__pin-bar--active');
+    pinEditZone = null;
+    pinEditOriginal = null;
+  }
+
+  function cancelPinEdit() {
+    if (pinEditZone === null) return;
+    const marker = markers[pinEditZone];
+    if (marker && pinEditOriginal) { marker.setLatLng(pinEditOriginal); }
+    endPinEdit();
+  }
+
+  function savePinEdit() {
+    if (pinEditZone === null) return;
+    const zoneNumber = pinEditZone;
+    const marker = markers[zoneNumber];
+    const pos = marker.getLatLng();
+    const saveBtn = document.getElementById('znm-pin-bar-btn-save');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving…';
+
+    fetch(UPDATE_PIN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ zone_number: zoneNumber, latitude: pos.lat, longitude: pos.lng })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) { throw new Error(data.error || 'Unknown error'); }
+
+      // Update in-memory zone data
+      const zone = zonesData.find(z => z.zone_number === zoneNumber);
+      zone.lat = pos.lat;
+      zone.lng = pos.lng;
+
+      // Update this zone's entry in other zones' neighbour lists
+      zonesData.forEach(z => {
+        z.neighbours.forEach(n => {
+          if (n.zone_number === zoneNumber) { n.lat = pos.lat; n.lng = pos.lng; }
+        });
+      });
+
+      // Move label, refresh popups, update table row
+      if (labels[zoneNumber]) { labels[zoneNumber].setLatLng(pos); }
+      marker.setPopupContent(buildPopupContent(zone));
+      if (polygons[zoneNumber]) { polygons[zoneNumber].setPopupContent(buildPopupContent(zone)); }
+      const latCell = document.getElementById(`zone-lat-${zoneNumber}`);
+      const lngCell = document.getElementById(`zone-lng-${zoneNumber}`);
+      if (latCell) { latCell.textContent = pos.lat.toFixed(5); }
+      if (lngCell) { lngCell.textContent = pos.lng.toFixed(5); }
+
+      endPinEdit();
+    })
+    .catch(err => {
+      alert('Error saving point: ' + err.message);
+    })
+    .finally(() => {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Point';
     });
   }
 

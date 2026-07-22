@@ -82,7 +82,6 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                     <span class="td-label">Deliver To</span>
                     <div id="tdAddrLine1" class="td-addr-line1" style="display:none;">
                         <strong id="tdAddrStructured"></strong>
-                        <span id="tdAccuracyBadge" class="td-accuracy-badge"></span>
                     </div>
                     <span id="tdAddress" class="td-addr-full"></span>
                     <div id="tdPtypeRow" class="td-tags" style="display:none;">
@@ -92,10 +91,13 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                         </span>
                     </div>
                 </div>
-                <a id="tdDropoffMapBtn" href="#" target="_blank" class="td-map-tile td-map-tile--grey" title="Open Dropoff in Maps" style="display:none;">
-                    <i class="fa-solid fa-location-pin td-map-tile__pin"></i>
-                    <span class="td-map-tile__label">Maps</span>
-                </a>
+                <div class="td-map-col">
+                    <a id="tdDropoffMapBtn" href="#" target="_blank" class="td-map-tile td-map-tile--grey" title="Open Dropoff in Maps" style="display:none;">
+                        <i class="fa-solid fa-location-pin td-map-tile__pin"></i>
+                        <span class="td-map-tile__label">Maps</span>
+                    </a>
+                    <span id="tdAccuracyBadge" class="td-accuracy-badge" style="display:none;"></span>
+                </div>
             </div>
             <!-- Navigation + AI + Coords -->
             <div class="td-section">
@@ -115,10 +117,6 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                             onclick="tdAiParse()">
                             <i class="fa-solid fa-wand-magic-sparkles" style="font-size:1rem;"></i> AI Parse
                         </button>
-                    </div>
-                    <div id="tdAddrVerifyBox" class="td-addr-verify" style="display:none;">
-                        <div class="td-addr-verify__badge" id="tdAddrVerifyBadge"></div>
-                        <div class="td-addr-verify__details" id="tdAddrVerifyDetails"></div>
                     </div>
                 </div>
             </div>
@@ -447,7 +445,8 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         non_reachable: 'fleet-badge--danger',
     };
     const ACCURACY_LABEL = {
-        by_customer: { label: 'By Customer',       pct: 100, color: '#059669' },
+        by_customer: { label: 'By Client',       pct: 100, color: '#059669' },
+        by_staff:    { label: 'By Staff',          pct: 95,  color: '#059669' },
         by_driver:   { label: 'By Driver',         pct: 90,  color: '#2563eb' },
         exact:       { label: 'Exact (Building)',  pct: 100, color: '#27ae60' },
         street:      { label: 'Street Level',      pct: 75,  color: '#2ecc71' },
@@ -534,26 +533,36 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const st = avData.order_street   || d.street;
         const bl = avData.order_building || d.building;
 
-        if (zn || st || bl) {
-            let structured = '';
-            if (zn) structured += 'Zone ' + zn;
-            if (st) structured += (structured ? ', ' : '') + 'St ' + st;
-            if (bl) structured += (structured ? ', ' : '') + 'Bldg ' + bl;
-            if (d.unit) structured += ', Unit ' + d.unit;
-            addrStructEl.textContent = structured;
+        // QNAS plate — same waybill stamp as the task card; always rendered,
+        // missing numbers stamp as muted dashes
+        addrStructEl.innerHTML = '';
+        const plate = document.createElement('span');
+        plate.className = 'td-plate';
+        [['Zone', zn, true], ['St', st, true], ['Bldg', bl, true], ['Unit', d.unit, false]].forEach(([tag, val, always]) => {
+            if (!val && !always) return;
+            const cell = document.createElement('span');
+            cell.className = 'td-plate__cell';
+            const t = document.createElement('span');
+            t.className = 'td-plate__tag';
+            t.textContent = tag;
+            const n = document.createElement('span');
+            n.className = 'td-plate__num' + (val ? '' : ' td-plate__num--empty');
+            n.textContent = val || '—';
+            cell.append(t, n);
+            plate.append(cell);
+        });
+        addrStructEl.appendChild(plate);
+        addrLine1El.style.display = '';
 
-            const acc = avData.coords_accuracy && ACCURACY_LABEL[avData.coords_accuracy];
-            if (acc) {
-                accBadgeEl.textContent = acc.label;
-                accBadgeEl.style.background = acc.color + '18';
-                accBadgeEl.style.color = acc.color;
-                accBadgeEl.style.borderColor = acc.color + '40';
-                accBadgeEl.style.display = '';
-            } else { accBadgeEl.style.display = 'none'; }
-            addrLine1El.style.display = '';
-        } else {
-            addrLine1El.style.display = 'none';
-        }
+        // Accuracy label sits under the Maps tile, colored by status
+        const accUM = avData.coords_accuracy && ACCURACY_LABEL[avData.coords_accuracy];
+        if (accUM) {
+            accBadgeEl.textContent = accUM.label;
+            accBadgeEl.style.background = accUM.color + '18';
+            accBadgeEl.style.color = accUM.color;
+            accBadgeEl.style.borderColor = accUM.color + '40';
+            accBadgeEl.style.display = '';
+        } else { accBadgeEl.style.display = 'none'; }
 
         const fullAddr = d.area || d.address || '';
         const addrEl = document.getElementById('tdAddress');
@@ -574,7 +583,11 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         // COD / Items / Earnings
         const codBox = document.getElementById('tdCodBox');
         const ernBox = document.getElementById('tdEarnBox');
-        if (d.cod !== null && d.cod !== undefined && d.cod !== '') { document.getElementById('tdCod').textContent = d.cod + ' QR'; codBox.style.display = ''; } else { codBox.style.display = 'none'; }
+        if (d.cod !== null && d.cod !== undefined && d.cod !== '') {
+            document.getElementById('tdCod').textContent = 'COD ' + d.cod + ' QR';
+            codBox.classList.toggle('td-cod-badge--zero', !(parseFloat(d.cod) > 0));
+            codBox.style.display = '';
+        } else { codBox.style.display = 'none'; }
         if (d.earn)                       { document.getElementById('tdEarn').textContent  = parseFloat(d.earn).toFixed(2) + ' QR'; ernBox.style.display = ''; } else { ernBox.style.display = 'none'; }
 
         // Notes
@@ -594,87 +607,33 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             pdBox.style.display = 'none';
         }
 
-        // Address Verification
-        const addrBox    = document.getElementById('tdAddrVerifyBox');
-        const addrBadge  = document.getElementById('tdAddrVerifyBadge');
-        const addrDetail = document.getElementById('tdAddrVerifyDetails');
+        // Location data — drives nav links + accuracy coloring (verify card removed;
+        // the accuracy level shows as the colored pin + chip under the Maps tile)
         const addrScript = card.querySelector('.task-address-data');
         let av = {};
         try { av = JSON.parse(addrScript ? addrScript.textContent : '{}'); } catch(e) {}
 
-        // Badge based on QNAS status or accuracy
-        const QNAS_BADGE = {
-            verified:  { label: 'QNAS Verified',  icon: 'fa-check-circle',        cls: 'verified' },
-            not_found: { label: 'QNAS Not Found', icon: 'fa-exclamation-triangle', cls: 'needs'    },
-            error:     { label: 'QNAS Error',     icon: 'fa-times-circle',         cls: 'needs'    },
-        };
-        const qb = QNAS_BADGE[av.qnas_status];
-        const accInfo = av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy];
-        let badgeLabel, badgeIcon, badgeCls;
-        if (qb) {
-            badgeLabel = qb.label; badgeIcon = qb.icon; badgeCls = qb.cls;
-        } else if (accInfo) {
-            badgeLabel = accInfo.label; badgeIcon = 'fa-location-crosshairs'; badgeCls = 'verified';
-        } else {
-            badgeLabel = 'Location Info'; badgeIcon = 'fa-map-pin'; badgeCls = 'default';
-        }
-        addrBox.className = 'td-addr-verify td-addr-verify--' + badgeCls;
-        addrBadge.className = 'td-addr-verify__badge';
-        addrBadge.innerHTML = `<i class="fa-solid ${badgeIcon}"></i> ${badgeLabel}`;
-
-        let rows = '';
-        const oZone = av.order_zone, oStreet = av.order_street, oBuilding = av.order_building;
-        if (oZone || oStreet || oBuilding) {
-            let loc = '';
-            if (oZone)     loc += 'Zone ' + oZone;
-            if (oStreet)   loc += (loc ? ', ' : '') + 'St ' + oStreet;
-            if (oBuilding) loc += (loc ? ', ' : '') + 'Bldg ' + oBuilding;
-            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-map-pin"></i><strong>${loc}</strong></div>`;
-        }
-        if (av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy]) {
-            const acc = ACCURACY_LABEL[av.coords_accuracy];
-            rows += `<div class="td-addr-verify__row td-addr-verify__row--accuracy">
-                <i class="fa-solid fa-robot"></i>
-                <div class="td-accuracy-bar">
-                    <div class="td-accuracy-bar__label">
-                        <span>GPS Accuracy</span>
-                        <strong style="color:${acc.color}">${acc.label}</strong>
-                    </div>
-                    <div class="td-accuracy-bar__track">
-                        <div class="td-accuracy-bar__fill" style="width:${acc.pct}%;background:${acc.color};"></div>
-                    </div>
-                </div>
-            </div>`;
-        }
-        // QNAS status row
-        const QNAS_LABEL = {
-            verified:  { label: 'Verified',  icon: 'fa-check-circle',        color: '#27ae60' },
-            not_found: { label: 'Not Found', icon: 'fa-exclamation-triangle', color: '#e74c3c' },
-            error:     { label: 'Error',     icon: 'fa-times-circle',         color: '#f39c12' },
-        };
-        if (av.qnas_status && QNAS_LABEL[av.qnas_status]) {
-            const qs = QNAS_LABEL[av.qnas_status];
-            rows += `<div class="td-addr-verify__row">
-                <i class="fa-solid fa-satellite-dish"></i>
-                <span>QNAS: <strong style="color:${qs.color}"><i class="fa-solid ${qs.icon} me-1"></i>${qs.label}</strong></span>
-            </div>`;
-        }
         const bestLat  = av.order_lat || av.lat || av.dl_lat || d.lat;
         const bestLng  = av.order_lng || av.lng || av.dl_lng || d.lng;
-        const pinColor = (av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy]) ? ACCURACY_LABEL[av.coords_accuracy].color : '#718096';
+        const accMeta  = av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy];
 
-        // Dropoff Maps & Navigation Routing
+        // Dropoff Maps & Navigation Routing — pin carries the accuracy color
         const navWaze = document.getElementById('tdNavWaze');
         const navGoogle = document.getElementById('tdNavGoogle');
         const dropoffMapBtn = document.getElementById('tdDropoffMapBtn');
+        const dropoffPin = dropoffMapBtn.querySelector('.td-map-tile__pin');
         if (bestLat && bestLng && parseFloat(bestLat) !== 0 && parseFloat(bestLng) !== 0) {
             navWaze.href = `https://waze.com/ul?ll=${bestLat},${bestLng}&navigate=yes`;
             navGoogle.href = `https://www.google.com/maps/dir/?api=1&destination=${bestLat},${bestLng}&travelmode=driving`;
             dropoffMapBtn.href = `https://www.google.com/maps?q=${bestLat},${bestLng}`;
+            dropoffMapBtn.className = 'td-map-tile td-map-tile--blue';
+            if (dropoffPin) dropoffPin.style.color = accMeta ? accMeta.color : '';
             dropoffMapBtn.style.display = '';
         } else {
             navWaze.href = '#';
             navGoogle.href = '#';
+            dropoffMapBtn.className = 'td-map-tile td-map-tile--grey';
+            if (dropoffPin) dropoffPin.style.color = '';
             dropoffMapBtn.style.display = 'none';
         }
 
@@ -696,40 +655,6 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             aiParseBtn.style.display = 'none';
         }
 
-        if (bestLat && bestLng && parseFloat(bestLat) !== 0) {
-            const mapsUrl = `https://www.google.com/maps?q=${bestLat},${bestLng}`;
-            const navUrl  = `https://www.google.com/maps/dir/?api=1&destination=${bestLat},${bestLng}&travelmode=driving`;
-            rows += `<div class="td-gps-row">
-                <a href="${mapsUrl}" target="_blank" class="td-gps-pill" style="--pin-color:${pinColor};">
-                    <i class="fa-solid fa-location-pin td-gps-pill__icon"></i>
-                    <span class="td-gps-pill__coords">${parseFloat(bestLat).toFixed(5)},&nbsp;${parseFloat(bestLng).toFixed(5)}</span>
-                    <span class="td-gps-pill__cta"><i class="fa-solid fa-arrow-up-right-from-square"></i> Maps</span>
-                </a>
-                <a href="${navUrl}" target="_blank" class="td-nav-btn" style="--pin-color:${pinColor};" title="Navigate">
-                    <i class="fa-solid fa-diamond-turn-right"></i>
-                </a>
-            </div>`;
-        }
-        if (av.dl_pluscode) {
-            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-qrcode"></i><span>${av.dl_pluscode}</span></div>`;
-        }
-        if (av.verified_address) {
-            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-circle-check"></i><span>${av.verified_address}</span></div>`;
-        }
-        if (av.zone && av.zone !== oZone) {
-            let corrected = 'Corrected: Zone ' + av.zone;
-            if (av.street)   corrected += ', St '   + av.street;
-            if (av.building) corrected += ', Bldg ' + av.building;
-            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-pen-to-square"></i><span>${corrected}</span></div>`;
-        }
-        if (av.notes) {
-            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-note-sticky"></i><span>${av.notes}</span></div>`;
-        }
-        if (av.verified_at) {
-            rows += `<div class="td-addr-verify__row"><i class="fa-regular fa-calendar-check"></i><span>Verified ${av.verified_at}</span></div>`;
-        }
-        addrDetail.innerHTML = rows || '<span style="color:var(--fleet-grey-400)">No location data yet.</span>';
-        addrBox.style.display = '';
 
         // Products
         const productsBox  = document.getElementById('tdProductsBox');

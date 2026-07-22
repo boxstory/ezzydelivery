@@ -1,7 +1,9 @@
 {% load workforce_tags %}
 {% url 'workforce:sellers_list' as u_sellers_list %}
-{% url 'workforce:sellers_active' as u_sellers_active %}
-{% url 'workforce:sellers_inactive' as u_sellers_inactive %}
+{% url 'workforce:sellers_pending' as u_sellers_pending %}
+{% url 'workforce:wf_orders_by_seller' as u_wf_orders_by_seller %}
+{% url 'workforce:seller_transactions' as u_seller_transactions %}
+{% url 'workforce:wf_seller_api_configs' as u_wf_seller_api_configs %}
 {% with active="sellers_list,sellers_active,sellers_inactive,seller_detail" %}
 <li id="workforce_sidebar_menu_sellers" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_sellers" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-sellers" data-title="Sellers">
@@ -12,8 +14,10 @@
   <div id="submenu-sellers" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_all_sellers" url=u_sellers_list icon="fa-solid fa-list" label="All Sellers" active_names="sellers_list,seller_detail" %}
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_sellers_active" url=u_sellers_active icon="fa-solid fa-circle-check" label="Active Sellers" active_names="sellers_active" %}
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_sellers_inactive" url=u_sellers_inactive icon="fa-solid fa-circle-xmark" label="Inactive Sellers" active_names="sellers_inactive" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_sellers_pending_menu" url=u_sellers_pending icon="fa-solid fa-store-slash" label="Pending Sellers" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_orders_by_seller_menu" url=u_wf_orders_by_seller icon="fa-solid fa-box" label="Orders by Seller" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_transactions_menu" url=u_seller_transactions icon="fa-solid fa-money-bill-transfer" label="Seller Transactions" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_api_configs_menu" url=u_wf_seller_api_configs icon="fa-solid fa-plug" label="API Configs" %}
     </ul>
   </div>
 </li>

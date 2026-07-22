@@ -3,7 +3,7 @@
 {% load static %}
 {% load custom_filters %}
 {% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'orders/css/orders.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
 <!-- Page Header -->
@@ -35,8 +35,18 @@
                 </option>
                 {% endfor %}
             </select>
+            <!-- Date Range Filter (defaults to last 7 days) -->
+            <div class="d-flex align-items-center gap-1">
+                <input type="date" name="dateFrom" class="form-control form-control-sm" style="max-width: 150px;"
+                       value="{{ current_date_from|date:'Y-m-d' }}" onchange="this.form.submit()"
+                       title="From date" aria-label="From date">
+                <span class="text-muted small">to</span>
+                <input type="date" name="dateTo" class="form-control form-control-sm" style="max-width: 150px;"
+                       value="{{ current_date_to|date:'Y-m-d' }}" onchange="this.form.submit()"
+                       title="To date" aria-label="To date">
+            </div>
             <span class="text-muted small">Filter by status:</span>
-            {% if current_statuses or current_driver %}
+            {% if current_statuses or current_driver or request.GET.dateFrom or request.GET.dateTo %}
             <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary ms-1">
                 <i class="fa-solid fa-xmark me-1"></i>Clear filters
             </a>
@@ -217,9 +227,9 @@
                                 <div class="dl-table__address-line1">
                                     {% if dl.order.latitude and dl.order.longitude %}<a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-location-dot"></i></a>{% else %}<span class="dl-table__location-pin dl-table__location-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %} {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>--</strong>{% endif %}
                                 </div>
-                                {% if dl.order.dl_zone %}
+                                {% if dl.order.dl_zone or dl.order.coords_accuracy %}
                                 <div class="dl-table__address-line2">
-                                    Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
+                                    {% if dl.order.coords_accuracy %}<span class="oal__table-zone-accuracy oal__table-zone-accuracy--{{ dl.order.coords_accuracy }}" title="Location accuracy"><i class="fa-solid fa-crosshairs"></i> {{ dl.order.get_coords_accuracy_display }}</span>{% endif %}{% if dl.order.dl_zone %} Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}{% endif %}
                                 </div>
                                 {% endif %}
                                 <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
@@ -287,13 +297,13 @@
         </div>
         <h4 class="text-muted mb-3">No Active Tasks</h4>
         <p class="text-muted mb-4">
-            {% if current_statuses or current_driver %}
+            {% if current_statuses or current_driver or request.GET.dateFrom or request.GET.dateTo %}
             No tasks match your current filters.
             {% else %}
             There are no active tasks requiring follow-up.
             {% endif %}
         </p>
-        {% if current_statuses or current_driver %}
+        {% if current_statuses or current_driver or request.GET.dateFrom or request.GET.dateTo %}
         <a href="{{ request.path }}" class="btn btn-primary">
             <i class="fa fa-times me-2"></i>Clear Filters
         </a>
