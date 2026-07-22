@@ -12,6 +12,7 @@
   --crm-line: #e7eaef;
   --crm-line-2: #d9dee6;
   --crm-canvas: #fbfbfc;
+  --crm-well: #f1f3f7;
   --crm-accent: var(--brand-primary);
   --crm-alert: #b3462f;
   font-family: var(--brand-font-primary);
@@ -109,9 +110,11 @@
   border-radius: 6px;
   background: var(--brand-white);
 }
-.crm__search-input:focus { outline: none; border-color: var(--crm-ink-2); }
+.crm__search-input:focus { outline: none; border-color: var(--crm-ink-2); box-shadow: none; }
 .crm__facets { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .crm__facet-select {
+  width: auto;
+  flex: 0 0 auto;
   height: 2.35rem;
   padding: 0 1.7rem 0 0.7rem;
   font-size: 0.78rem;
@@ -120,6 +123,7 @@
   border-radius: 6px;
   background: var(--brand-white);
 }
+.crm__facet-select:focus { outline: none; border-color: var(--crm-ink-2); box-shadow: none; }
 .crm__clear-all { font-size: 0.76rem; color: var(--crm-ink-2); text-decoration: underline; }
 
 /* ── RESULT BAR / TABLE ───────────────────────────────────────────────────── */
@@ -213,6 +217,23 @@
   white-space: nowrap;
 }
 
+/* Lead type badge — driver applicants vs business clients */
+.crm__cat {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.crm__cat--driver {
+  color: var(--crm-ink);
+  border: 1px solid var(--crm-ink-2);
+}
+.crm__cat--driver i { margin-right: 0.25rem; }
+
 /* ── PAGINATION FOOT ──────────────────────────────────────────────────────── */
 .crm__foot {
   display: flex;
@@ -221,6 +242,10 @@
   padding: 0.8rem 1.5rem;
 }
 .crm__foot-info { font-size: 0.74rem; color: var(--crm-muted); }
+/* Brand pgn__ pagination inside the console foot: let it span the full row and
+   self-center; strip its standalone card chrome (shadow/radius/margin). */
+.crm__foot--pgn { display: block; padding: 0; }
+.crm__foot--pgn .pgn { margin-top: 0; box-shadow: none; border-radius: 0; }
 .crm__pager { display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
 .crm__pager a, .crm__pager span {
   display: inline-flex;
@@ -258,26 +283,61 @@
 .crm__panel-body--flush { padding: 0; }
 
 /* ── BOARD (crmb__) ───────────────────────────────────────────────────────── */
+/* Pipeline rail: flowing stages (new→negotiating) chained by chevron connectors;
+   a full-height hairline divider sets off the terminal bays (won/lost/on hold).
+   Columns are recessed wells so white cards read as items sitting in them. */
 .crmb__lanes {
   display: flex;
-  gap: 0.8rem;
-  padding: 1rem 1.5rem 1.4rem;
+  gap: 0.9rem;
+  padding: 1.1rem 1.5rem 1.4rem;
   overflow-x: auto;
   align-items: flex-start;
-  background: var(--crm-canvas);
-}
-.crmb__column {
-  flex: 0 0 250px;
-  width: 250px;
   background: var(--brand-white);
-  border: 1px solid var(--crm-line-2);
+  scrollbar-width: thin;
+}
+.crmb__lanes::-webkit-scrollbar { height: 8px; }
+.crmb__lanes::-webkit-scrollbar-thumb { background: var(--crm-line-2); border-radius: 4px; }
+.crmb__column {
+  position: relative;
+  flex: 0 0 258px;
+  width: 258px;
+  background: var(--crm-well);
+  border: 1px solid var(--crm-line);
   border-radius: 8px;
 }
+/* Chevron connector in the gap between flowing stages */
+.crmb__column::before {
+  content: "\203A";
+  position: absolute;
+  top: 0.55rem;
+  left: -0.9rem;
+  width: 0.9rem;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--crm-muted);
+}
+.crmb__column--new::before { content: none; }
+/* Divider ahead of the terminal bays — the route ends here */
+.crmb__column--won::before {
+  content: "";
+  top: 0.3rem;
+  bottom: 0.3rem;
+  left: -0.5rem;
+  width: 1px;
+  background: var(--crm-line-2);
+}
+.crmb__column--lost::before,
+.crmb__column--on_hold::before { content: none; }
+.crmb__column--won .crmb__col-title,
+.crmb__column--lost .crmb__col-title,
+.crmb__column--on_hold .crmb__col-title { color: var(--crm-ink-2); }
 .crmb__col-head {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.6rem 0.8rem;
+  padding: 0.6rem 0.75rem;
   border-bottom: 1px solid var(--crm-line);
 }
 .crmb__col-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--crm-muted); }
@@ -288,6 +348,16 @@
 .crmb__col-head--won .crmb__col-dot { background: #0a6e0a; }
 .crmb__col-head--lost .crmb__col-dot { background: var(--crm-alert); }
 .crmb__col-title { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.crmb__col-late {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--crm-alert);
+  white-space: nowrap;
+}
 .crmb__col-count {
   margin-left: auto;
   font-size: 0.7rem;
@@ -295,18 +365,54 @@
   font-variant-numeric: tabular-nums;
   color: var(--crm-muted);
 }
-.crmb__col-body { min-height: 4rem; padding: 0.55rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.crmb__col-body.is-dragover { background: #f2f5f9; outline: 2px dashed var(--crm-line-2); outline-offset: -4px; }
-.crmb__col-empty { font-size: 0.72rem; color: var(--crm-muted); text-align: center; padding: 0.8rem 0; }
+.crmb__col-late + .crmb__col-count { margin-left: 0; }
+.crmb__col-body {
+  min-height: 5rem;
+  max-height: max(14rem, calc(100vh - 340px));
+  overflow-y: auto;
+  padding: 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  scrollbar-width: thin;
+}
+.crmb__col-body::-webkit-scrollbar { width: 6px; }
+.crmb__col-body::-webkit-scrollbar-thumb { background: var(--crm-line-2); border-radius: 4px; }
+.crmb__col-body.is-dragover {
+  background: #e8ecf3;
+  outline: 2px dashed var(--crm-ink-2);
+  outline-offset: -4px;
+  border-radius: 0 0 8px 8px;
+}
+.crmb__col-empty { font-size: 0.72rem; color: var(--crm-muted); text-align: center; padding: 1rem 0; }
 .crmb__card {
+  /* display:block + flex-shrink:0 override mobile-app.css [role="button"] touch
+     rules (inline-flex centering, 44px min-height) that break card layout */
+  display: block;
+  flex-shrink: 0;
   border: 1px solid var(--crm-line-2);
   border-radius: 7px;
   padding: 0.6rem 0.7rem;
   background: var(--brand-white);
   cursor: grab;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
 }
-.crmb__card:hover { border-color: var(--crm-ink-2); }
-.crmb__card.is-dragging { opacity: 0.45; }
+.crmb__card:hover {
+  border-color: var(--crm-ink-2);
+  box-shadow: 0 2px 8px rgba(22, 35, 58, 0.08);
+  transform: translateY(-1px);
+}
+.crmb__card:focus-visible { outline: 2px solid var(--crm-ink); outline-offset: 2px; }
+.crmb__card.is-dragging { opacity: 0.45; transform: none; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .crmb__card { transition: none; }
+  .crmb__card:hover { transform: none; }
+}
+@media (max-width: 575px) {
+  .crmb__lanes { gap: 0.7rem; padding: 0.8rem 0.9rem 1.1rem; scroll-snap-type: x proximity; }
+  .crmb__column { flex-basis: 82vw; width: 82vw; scroll-snap-align: start; }
+  .crmb__column::before { content: none; }
+}
 .crmb__card--overdue { border-left: 3px solid var(--crm-alert); }
 .crmb__card-top { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
 .crmb__card-name { font-size: 0.8rem; font-weight: 600; color: var(--crm-ink); word-break: break-word; }
@@ -315,6 +421,21 @@
 .crmb__card-phone { font-size: 0.72rem; color: var(--crm-muted); font-variant-numeric: tabular-nums; }
 .crmb__card-meta { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.45rem; flex-wrap: wrap; }
 .crmb__card-due { font-size: 0.68rem; color: var(--crm-ink-2); display: inline-flex; gap: 0.25rem; align-items: center; }
+.crmb__card-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.08rem 0.4rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--crm-ink-2);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 3px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.crmb__card-wa .fa-whatsapp { color: #1f7a52; }
+.crmb__card-wa:hover { color: var(--crm-ink); border-color: var(--crm-ink-2); }
 .crmb__card-avatar {
   margin-left: auto;
   width: 1.4rem;
@@ -434,6 +555,57 @@
 .crmd__msg--outbound { align-self: flex-end; background: #f3f7f3; }
 .crmd__msg-body { color: var(--crm-ink); white-space: pre-wrap; word-break: break-word; }
 .crmd__msg-time { font-size: 0.64rem; color: var(--crm-muted); margin-top: 0.2rem; text-align: right; }
+.crmd__chat--full { max-height: 34rem; }
+.crmd__msg-img { max-width: 100%; max-height: 14rem; border-radius: 6px; display: block; }
+.crmd__msg-imglink { display: block; line-height: 0; margin-bottom: 0.3rem; }
+.crmd__msg-audio { width: 15rem; max-width: 100%; height: 2.2rem; }
+.crmd__msg-video { max-width: 100%; max-height: 14rem; border-radius: 6px; }
+.crmd__msg-doc { font-size: 0.74rem; color: var(--crm-ink-2); text-decoration: none; }
+.crmd__msg-doc:hover { color: var(--crm-ink); }
+
+/* AI summary */
+.crmd__ai-btn { margin-left: auto; font-size: 0.7rem; padding: 0.25rem 0.6rem; }
+.crmd__ai-body { font-size: 0.78rem; color: var(--crm-ink); white-space: pre-wrap; word-break: break-word; }
+.crmd__ai-body--empty { color: var(--crm-muted); font-style: italic; }
+.crmd__ai-meta { font-size: 0.64rem; color: var(--crm-muted); margin-top: 0.4rem; }
+
+/* Shared media grid */
+.crmd__media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: 0.4rem; }
+.crmd__media-item { position: relative; display: block; aspect-ratio: 1; border: 1px solid var(--crm-line-2); border-radius: 6px; overflow: hidden; background: var(--crm-canvas); }
+.crmd__media-item img, .crmd__media-item video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.crmd__media-item:hover { border-color: var(--crm-ink-2); }
+.crmd__media-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1rem; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+
+/* Manual WhatsApp chat link (typeahead) */
+.crmd__link-search-wrap { position: relative; }
+.crmd__link-results {
+  position: absolute;
+  top: calc(100% + 0.2rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--brand-white);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  display: none;
+}
+.crmd__link-results.show { display: block; }
+.crmd__link-result-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--crm-line);
+}
+.crmd__link-result-item:last-child { border-bottom: 0; }
+.crmd__link-result-item:hover { background: var(--crm-canvas); }
+.crmd__link-result-name { font-size: 0.78rem; font-weight: 600; color: var(--crm-ink); }
+.crmd__link-result-phone { font-size: 0.68rem; color: var(--crm-muted); }
+.crmd__link-empty { padding: 0.6rem 0.7rem; font-size: 0.74rem; color: var(--crm-muted); }
 
 /* ── FORM (crmf__) ────────────────────────────────────────────────────────── */
 .crmf__console { max-width: 860px; }
@@ -485,9 +657,115 @@
   border: 1px solid var(--crm-line-2);
   border-radius: 8px;
 }
+/* The td itself must stay a table-cell (display overrides break
+   vertical-align:top and rows stop lining up) — clamp/flex live on inner
+   wrappers instead. */
 .crmi__body { max-width: 26rem; color: var(--crm-ink-2); }
+.crmi__msgtext {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .crmi__media { color: var(--crm-muted); font-style: italic; }
-.crmi__actions { display: flex; gap: 0.4rem; white-space: nowrap; }
+.crmi__media i { margin-right: 0.25rem; }
+.crmi__chat-btn .fa-whatsapp { color: #1f7a52; font-size: 0.85rem; }
+.crmi__lid { font-size: 0.6875rem; color: var(--crm-muted); }
+.crmi__cname { font-weight: 600; color: var(--crm-ink); }
+.crm__chip {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.6875rem;
+  border: 1px solid var(--crm-line-2);
+  border-radius: 3px;
+  color: var(--crm-ink-2);
+  margin-right: 0.25rem;
+  white-space: nowrap;
+}
+.crmi__actions { white-space: nowrap; }
+.crmi__actions-row { display: flex; gap: 0.4rem; align-items: center; width: 100%; }
+
+/* Chat preview modal */
+.crmi__overlay {
+  position: fixed; inset: 0; z-index: 1050;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(15, 23, 42, 0.55); padding: 1rem;
+}
+.crmi__dialog {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 34rem; max-height: 85vh;
+  background: var(--crm-surface, #fff);
+  border: 1px solid var(--crm-line-2); border-radius: 8px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+}
+.crmi__dialog-hd {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--crm-line-2);
+}
+.crmi__dialog-hd h3 { font-size: 0.9rem; font-weight: 700; color: var(--crm-ink); margin: 0; }
+.crmi__dialog-close {
+  margin-left: auto; border: 0; background: none;
+  color: var(--crm-muted); cursor: pointer; font-size: 1rem; line-height: 1;
+}
+.crmi__dialog-close:hover { color: var(--crm-ink); }
+.crmi__dialog-body { flex: 1; overflow-y: auto; padding: 0.9rem 1rem; }
+.crmi__dialog-ft {
+  display: flex; justify-content: flex-end; gap: 0.5rem;
+  padding: 0.75rem 1rem; border-top: 1px solid var(--crm-line-2);
+}
+.crmi__chat-empty {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  padding: 2rem 0; color: var(--crm-muted); font-size: 0.8rem;
+}
+
+/* Inbox table collapses to stacked sender cards on phones — otherwise the
+   count/date/action columns sit off-screen behind a horizontal scroll. */
+@media (max-width: 768px) {
+  .crmi .crm__table thead { display: none; }
+  .crmi .crm__table tbody tr {
+    display: block;
+    margin: 0.65rem 0.9rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--crm-line-2);
+    border-radius: 8px;
+    background: var(--brand-white);
+  }
+  .crmi .crm__table tbody tr:nth-child(even),
+  .crmi .crm__table tbody tr:hover td { background: var(--brand-white); }
+  .crmi .crm__table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    border: none;
+    padding: 0.3rem 0;
+  }
+  .crmi .crm__table tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--crm-muted);
+  }
+  .crmi .crm__table tbody td[data-label="Number"],
+  .crmi .crm__table tbody td[data-label="Last message"] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+  }
+  .crmi__body { max-width: none; }
+  .crmi__actions::before { content: none; }
+  .crmi__actions {
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--crm-line);
+    margin-top: 0.3rem;
+  }
+  .crmi__actions .crmi__chat-btn { flex: 1; justify-content: center; }
+  .crmi .crm__table tbody td[colspan]::before { content: none; }
+}
 
 /* ── REPORTS (crmr__) ─────────────────────────────────────────────────────── */
 .crmr__tiles {

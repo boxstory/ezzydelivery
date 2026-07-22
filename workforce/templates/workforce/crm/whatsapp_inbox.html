@@ -6,7 +6,7 @@
 {# Notes: crmi__ namespace; promote/dismiss are fetch-POST JSON actions handled by inline delegated JS. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718l" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -47,6 +47,15 @@
         {% endif %}
       </div>
       <div class="crm__head-actions">
+        <button type="button" class="crm__btn" id="workforce_crm_inbox_btn_resync"
+                title="Pull latest chats from WAHA and refresh the list">
+          <i class="fa-solid fa-rotate"></i> Resync
+        </button>
+        <a href="{% url 'workforce:crm_contacts' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_contacts' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-address-book"></i> Contacts
+        </a>
         <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
            hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
@@ -102,28 +111,34 @@
         <tbody>
           {% for row in page_obj %}
           <tr data-inbox-phone="{{ row.from_number }}">
-            <td class="crm__num">{{ row.from_number }}</td>
-            <td class="crmi__body">
-              {% if row.last_body %}{{ row.last_body }}{% elif row.last_type %}<span class="crmi__media">[{{ row.last_type }}]</span>{% else %}—{% endif %}
-            </td>
-            <td class="crm__num">{{ row.msg_count }}</td>
-            <td class="crm__date">{{ row.last_at|date:"d M Y, H:i" }}</td>
-            <td class="crmi__actions">
-              {% if row.existing_lead_id %}
-              <a href="{% url 'workforce:crm_lead_detail' row.existing_lead_id %}" class="crm__view"
-                 hx-get="{% url 'workforce:crm_lead_detail' row.existing_lead_id %}"
-                 hx-target="#main-content" hx-select="#main-content"
-                 hx-swap="outerHTML" hx-push-url="true">
-                <i class="fa-solid fa-arrow-right"></i> Existing lead
-              </a>
+            <td class="crm__num" data-label="Number">
+              {% if row.contact_name %}<div class="crmi__cname">{{ row.contact_name }}</div>{% endif %}
+              {% if row.real_number %}
+                <div>+{{ row.real_number }}</div>
+                <div class="crmi__lid">{{ row.from_number }}</div>
               {% else %}
-              <button type="button" class="crm__btn crm__btn--primary crm__btn--sm" data-promote="{{ row.from_number }}">
-                <i class="fa-solid fa-user-plus"></i> Promote to Lead
-              </button>
-              <button type="button" class="crm__btn crm__btn--sm" data-dismiss-phone="{{ row.from_number }}">
-                <i class="fa-solid fa-ban"></i> Not a lead
-              </button>
+                {{ row.from_number }}
               {% endif %}
+            </td>
+            <td class="crmi__body" data-label="Last message">
+              {% if row.last_body %}<span class="crmi__msgtext">{{ row.last_body }}</span>
+              {% elif row.last_media_label %}<span class="crmi__media"><i class="fa-solid {{ row.last_media_icon }}"></i> {{ row.last_media_label }}</span>
+              {% else %}<span class="crmi__media">—</span>{% endif %}
+            </td>
+            <td class="crm__num" data-label="Messages">{{ row.msg_count }}</td>
+            <td class="crm__date" data-label="Last received">{{ row.last_at|date:"d M Y, H:i" }}</td>
+            <td class="crmi__actions">
+              <div class="crmi__actions-row">
+                <button type="button" class="crm__btn crm__btn--sm crmi__chat-btn" data-chat="{{ row.from_number }}"
+                        data-chat-promote="{{ row.real_number|default:row.from_number }}"
+                        data-chat-lead="{{ row.existing_lead_id|default:'' }}"
+                        data-chat-label="{% if row.contact_name %}{{ row.contact_name }}{% elif row.real_number %}+{{ row.real_number }}{% else %}{{ row.from_number }}{% endif %}">
+                  <i class="fa-brands fa-whatsapp"></i> Conversation
+                </button>
+                {% if row.existing_lead_id %}
+                <span class="crm__chip" title="This sender already has a lead">Lead #{{ row.existing_lead_id }}</span>
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% empty %}
@@ -140,22 +155,39 @@
       </table>
     </div>
 
-    {% if page_obj.has_other_pages %}
-    <div class="crm__foot">
-      <div class="crm__foot-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-      <nav>
-        <ul class="crm__pager">
-          {% if page_obj.has_previous %}
-          <li><a href="?page={{ page_obj.previous_page_number }}&search={{ search }}"><i class="fa-solid fa-chevron-left"></i></a></li>
-          {% endif %}
-          {% if page_obj.has_next %}
-          <li><a href="?page={{ page_obj.next_page_number }}&search={{ search }}"><i class="fa-solid fa-chevron-right"></i></a></li>
-          {% endif %}
-        </ul>
-      </nav>
+    <div class="crm__foot crm__foot--pgn">
+      {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="crm_inbox" %}
     </div>
-    {% endif %}
 
+  </div>
+
+  <!-- CHAT PREVIEW MODAL -->
+  <div class="crmi__overlay" id="workforce_crm_inbox_div_chat_overlay" hidden>
+    <div class="crmi__dialog" role="dialog" aria-modal="true" aria-labelledby="workforce_crm_inbox_h_chat_title">
+      <div class="crmi__dialog-hd">
+        <i class="fa-brands fa-whatsapp"></i>
+        <h3 id="workforce_crm_inbox_h_chat_title">Conversation</h3>
+        <button type="button" class="crmi__dialog-close" id="workforce_crm_inbox_btn_chat_close" aria-label="Close">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="crmi__dialog-body crmd__chat crmd__chat--full" id="workforce_crm_inbox_div_chat_body"></div>
+      <div class="crmi__dialog-ft">
+        <a class="crm__btn crm__btn--primary" id="workforce_crm_inbox_a_chat_lead" href="#" hidden>
+          <i class="fa-solid fa-arrow-right"></i> Open Lead
+        </a>
+        <button type="button" class="crm__btn" id="workforce_crm_inbox_btn_chat_dismiss">
+          <i class="fa-solid fa-ban"></i> Not a lead
+        </button>
+        <button type="button" class="crm__btn" id="workforce_crm_inbox_btn_chat_driver"
+                title="This sender is a driver applicant, not a business client">
+          <i class="fa-solid fa-motorcycle"></i> Driver Lead
+        </button>
+        <button type="button" class="crm__btn crm__btn--primary" id="workforce_crm_inbox_btn_chat_promote">
+          <i class="fa-solid fa-user-plus"></i> Promote to Lead
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -165,42 +197,196 @@
     var CSRF = "{{ csrf_token }}";
     var URL_PROMOTE = "{% url 'workforce:crm_wa_promote' %}";
     var URL_DISMISS = "{% url 'workforce:crm_wa_dismiss' %}";
+    var URL_RESYNC = "{% url 'workforce:crm_wa_resync' %}";
+    var URL_CHAT = "{% url 'workforce:crm_wa_chat_preview' %}";
 
-    function post(url, phone) {
+    function post(url, phone, extra) {
       var fd = new FormData();
       fd.append('phone', phone);
       fd.append('csrfmiddlewaretoken', CSRF);
+      Object.keys(extra || {}).forEach(function (k) { fd.append(k, extra[k]); });
       return fetch(url, { method: 'POST', body: fd }).then(function (r) { return r.json(); });
+    }
+
+    function chatEl(id) { return document.getElementById(id); }
+
+    function closeChat() {
+      var ov = chatEl('workforce_crm_inbox_div_chat_overlay');
+      if (ov) ov.hidden = true;
+    }
+
+    function renderChat(messages) {
+      var body = chatEl('workforce_crm_inbox_div_chat_body');
+      if (!body) return;
+      body.innerHTML = '';
+      if (!messages.length) {
+        var empty = document.createElement('div');
+        empty.className = 'crmi__chat-empty';
+        empty.textContent = 'No messages on record for this sender.';
+        body.appendChild(empty);
+        return;
+      }
+      messages.forEach(function (m) {
+        var bubble = document.createElement('div');
+        bubble.className = 'crmd__msg crmd__msg--' + (m.direction === 'outbound' ? 'outbound' : 'inbound');
+        if (m.media_url) {
+          if (m.media_kind === 'image') {
+            var link = document.createElement('a');
+            link.href = m.media_url; link.target = '_blank'; link.rel = 'noopener';
+            link.className = 'crmd__msg-imglink';
+            var img = document.createElement('img');
+            img.src = m.media_url; img.alt = 'Shared photo';
+            img.loading = 'lazy'; img.className = 'crmd__msg-img';
+            link.appendChild(img); bubble.appendChild(link);
+          } else if (m.media_kind === 'audio') {
+            var au = document.createElement('audio');
+            au.controls = true; au.preload = 'none'; au.src = m.media_url;
+            au.className = 'crmd__msg-audio'; bubble.appendChild(au);
+          } else if (m.media_kind === 'video') {
+            var vid = document.createElement('video');
+            vid.controls = true; vid.preload = 'metadata'; vid.src = m.media_url;
+            vid.className = 'crmd__msg-video'; bubble.appendChild(vid);
+          } else {
+            var doc = document.createElement('a');
+            doc.href = m.media_url; doc.target = '_blank'; doc.rel = 'noopener';
+            doc.className = 'crmd__msg-doc';
+            doc.innerHTML = '<i class="fa-solid fa-paperclip"></i> ';
+            doc.appendChild(document.createTextNode(m.type + ' attachment'));
+            bubble.appendChild(doc);
+          }
+        } else if (m.type && m.type !== 'text') {
+          var miss = document.createElement('div');
+          miss.className = 'crmd__msg-doc';
+          miss.innerHTML = '<i class="fa-solid fa-paperclip"></i> ';
+          miss.appendChild(document.createTextNode(m.type + ' (media unavailable)'));
+          bubble.appendChild(miss);
+        }
+        if (m.body) {
+          var text = document.createElement('div');
+          text.className = 'crmd__msg-body';
+          text.textContent = m.body;
+          bubble.appendChild(text);
+        }
+        var time = document.createElement('div');
+        time.className = 'crmd__msg-time';
+        time.textContent = m.time || '';
+        bubble.appendChild(time);
+        body.appendChild(bubble);
+      });
+      body.scrollTop = body.scrollHeight;
+    }
+
+    function openChat(btn) {
+      var ov = chatEl('workforce_crm_inbox_div_chat_overlay');
+      var body = chatEl('workforce_crm_inbox_div_chat_body');
+      var title = chatEl('workforce_crm_inbox_h_chat_title');
+      if (!ov || !body) return;
+      ov.dataset.sender = btn.getAttribute('data-chat') || '';
+      ov.dataset.promote = btn.getAttribute('data-chat-promote') || '';
+      var promoteBtn = chatEl('workforce_crm_inbox_btn_chat_promote');
+      var driverBtn = chatEl('workforce_crm_inbox_btn_chat_driver');
+      var dismissBtn = chatEl('workforce_crm_inbox_btn_chat_dismiss');
+      var leadLink = chatEl('workforce_crm_inbox_a_chat_lead');
+      var leadId = btn.getAttribute('data-chat-lead') || '';
+      var hasLead = !!leadId;
+      if (promoteBtn) promoteBtn.hidden = hasLead;
+      if (driverBtn) driverBtn.hidden = hasLead;
+      if (dismissBtn) dismissBtn.hidden = hasLead;
+      if (leadLink) {
+        leadLink.hidden = !hasLead;
+        if (hasLead) {
+          leadLink.href = '/workforce/crm/leads/' + leadId + '/';
+          leadLink.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Open Lead #' + leadId;
+        }
+      }
+      if (title) title.textContent = btn.getAttribute('data-chat-label') || 'Conversation';
+      body.innerHTML = '<div class="crmi__chat-empty"><i class="fa-solid fa-rotate fa-spin"></i> Loading conversation…</div>';
+      ov.hidden = false;
+      fetch(URL_CHAT + '?sender=' + encodeURIComponent(ov.dataset.sender))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.success) { renderChat(data.messages || []); }
+          else { body.innerHTML = ''; body.textContent = data.error || 'Failed to load conversation.'; }
+        })
+        .catch(function () { body.innerHTML = ''; body.textContent = 'Failed to load conversation.'; });
     }
 
     if (window.__crmiInit) return;
     window.__crmiInit = true;
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeChat();
+    });
+
     document.addEventListener('click', function (e) {
-      var promoteBtn = e.target.closest('[data-promote]');
-      if (promoteBtn) {
-        promoteBtn.disabled = true;
-        post(URL_PROMOTE, promoteBtn.getAttribute('data-promote')).then(function (data) {
-          if (data.success) {
-            window.location.href = data.lead_url;
-          } else {
-            promoteBtn.disabled = false;
-            alert(data.error || 'Failed to create lead');
-          }
-        });
-        return;
+      var chatBtn = e.target.closest('[data-chat]');
+      if (chatBtn) { openChat(chatBtn); return; }
+
+      var overlay = chatEl('workforce_crm_inbox_div_chat_overlay');
+      if (overlay && !overlay.hidden) {
+        if (e.target.closest('#workforce_crm_inbox_btn_chat_close') || e.target === overlay) {
+          closeChat();
+          return;
+        }
+        if (e.target.closest('#workforce_crm_inbox_btn_chat_promote')) {
+          var pb = chatEl('workforce_crm_inbox_btn_chat_promote');
+          pb.disabled = true;
+          post(URL_PROMOTE, overlay.dataset.promote || overlay.dataset.sender).then(function (data) {
+            if (data.success) { window.location.href = data.lead_url; }
+            else { pb.disabled = false; alert(data.error || 'Failed to create lead'); }
+          });
+          return;
+        }
+        if (e.target.closest('#workforce_crm_inbox_btn_chat_driver')) {
+          var drb = chatEl('workforce_crm_inbox_btn_chat_driver');
+          drb.disabled = true;
+          post(URL_PROMOTE, overlay.dataset.promote || overlay.dataset.sender, { category: 'driver' }).then(function (data) {
+            if (data.success) { window.location.href = data.lead_url; }
+            else { drb.disabled = false; alert(data.error || 'Failed to create driver lead'); }
+          });
+          return;
+        }
+        if (e.target.closest('#workforce_crm_inbox_btn_chat_dismiss')) {
+          var db = chatEl('workforce_crm_inbox_btn_chat_dismiss');
+          db.disabled = true;
+          post(URL_DISMISS, overlay.dataset.sender).then(function (data) {
+            db.disabled = false;
+            if (data.success) {
+              closeChat();
+              var row = document.querySelector('tr[data-inbox-phone="' + (overlay.dataset.sender || '').replace(/"/g, '') + '"]');
+              if (row) row.remove();
+            } else {
+              alert(data.error || 'Failed to dismiss');
+            }
+          });
+          return;
+        }
       }
-      var dismissBtn = e.target.closest('[data-dismiss-phone]');
-      if (dismissBtn) {
-        dismissBtn.disabled = true;
-        post(URL_DISMISS, dismissBtn.getAttribute('data-dismiss-phone')).then(function (data) {
-          if (data.success) {
-            var row = dismissBtn.closest('tr');
-            if (row) row.remove();
-          } else {
-            dismissBtn.disabled = false;
-            alert(data.error || 'Failed to dismiss');
-          }
-        });
+      var resyncBtn = e.target.closest('#workforce_crm_inbox_btn_resync');
+      if (resyncBtn) {
+        resyncBtn.disabled = true;
+        resyncBtn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Syncing…';
+        var fd = new FormData();
+        fd.append('csrfmiddlewaretoken', CSRF);
+        fetch(URL_RESYNC, { method: 'POST', body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.success) {
+              resyncBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' +
+                data.new_messages + ' new · reloading…';
+              window.location.reload();
+            } else {
+              resyncBtn.disabled = false;
+              resyncBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Resync';
+              alert(data.error || 'Resync failed');
+            }
+          })
+          .catch(function (err) {
+            resyncBtn.disabled = false;
+            resyncBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Resync';
+            alert('Resync error: ' + err);
+          });
+        return;
       }
     });
   })();

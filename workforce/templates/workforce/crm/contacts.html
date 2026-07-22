@@ -1,0 +1,120 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{# Purpose: WhatsApp contact directory — synced phone ↔ lid ↔ name reference for CRM staff. #}
+{# Used by: workforce.crm_views.crm_contacts #}
+{# Notes: crmc__ rows reuse crm__ table shell; directory is refreshed by the inbox Resync button (Celery task). #}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718k" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="crm crmi col-12 p-3">
+  <div class="crm__console">
+
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Sales Pipeline</div>
+        <h1 class="crm__title">WhatsApp Contacts</h1>
+        <p class="crm__subtitle">
+          Synced directory of {{ total_count }} contacts — names, numbers and their WhatsApp lid aliases
+          {% if last_sync %}· last sync {{ last_sync|date:"d M Y, H:i" }}{% endif %}
+        </p>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{% url 'workforce:crm_whatsapp_inbox' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_whatsapp_inbox' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-brands fa-whatsapp"></i> Inbox
+        </a>
+        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-table-columns"></i> Board
+        </a>
+      </div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="crm__toolbar">
+      <form method="get"
+            hx-get="" hx-target="#main-content" hx-select="#main-content"
+            hx-swap="outerHTML" hx-push-url="true"
+            id="workforce_crm_contacts_form_filter" class="crm__filters">
+        <div class="crm__search {% if search %}is-filled{% endif %}">
+          <i class="fa-solid fa-magnifying-glass crm__search-icon"></i>
+          <input type="text" name="search" value="{{ search }}" id="workforce_crm_contacts_input_search"
+                 class="crm__search-input" autocomplete="off"
+                 placeholder="Search name, number or lid…"
+                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 hx-swap="outerHTML" hx-push-url="true"
+                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-include="#workforce_crm_contacts_form_filter">
+        </div>
+        {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+        <button type="submit" class="crm__btn crm__btn--primary">Search</button>
+      </form>
+    </div>
+
+    <div class="crm__resultbar">
+      Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+      {% if not search %}
+        {% if show_all %}
+          contacts · <a href="?">named &amp; saved only</a>
+        {% else %}
+          named or saved contacts · <a href="?all=1">show all {{ total_count }}</a>
+        {% endif %}
+      {% else %}matches{% endif %}
+    </div>
+
+    <!-- TABLE -->
+    <div class="crm__scroll">
+      <table class="crm__table" id="workforce_crm_contacts_table_list">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Number</th>
+            <th>Lid alias</th>
+            <th>Flags</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in page_obj %}
+          <tr>
+            <td>
+              {% if c.display_name %}{{ c.display_name }}{% else %}<span class="crmi__media">unnamed</span>{% endif %}
+              {% if c.saved_name and c.push_name and c.saved_name != c.push_name %}
+                <div class="crmi__lid">push: {{ c.push_name }}</div>
+              {% endif %}
+            </td>
+            <td class="crm__num">+{{ c.phone }}</td>
+            <td class="crm__num">{% if c.lid %}<span class="crmi__lid">{{ c.lid }}@lid</span>{% else %}—{% endif %}</td>
+            <td>
+              {% if c.is_my_contact %}<span class="crm__chip">saved</span>{% endif %}
+              {% if c.is_business %}<span class="crm__chip">business</span>{% endif %}
+            </td>
+            <td class="crm__date">{{ c.updated_at|date:"d M Y, H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5">
+              <div class="crm__empty">
+                <i class="fa-solid fa-address-book"></i>
+                No contacts synced yet — use Resync on the WhatsApp Inbox to populate the directory.
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="crm__foot crm__foot--pgn">
+      {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="crm_contacts" %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

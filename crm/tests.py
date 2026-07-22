@@ -1,4 +1,4 @@
-# Purpose: Unit tests for crm.services — lead creation idempotency, stage sync, WA promote dedup, convert-to-business.
+# Purpose: Unit tests for crm.services — lead creation idempotency, stage sync, WA promote dedup, convert/link-to-business.
 # Used by: python manage.py test crm
 
 from django.contrib.auth.models import User
@@ -60,6 +60,9 @@ class LeadCreationTests(TestCase):
         self.assertTrue(created1)
         self.assertFalse(created2)
         self.assertEqual(lead1.pk, lead2.pk)
+        # The bare 8-digit variant of the same Qatar number is the same lead
+        _, created_variant = services.create_lead_from_wa_number('50000001')
+        self.assertFalse(created_variant)
         # A closed lead does not block a new one
         services.set_lead_stage(lead1, Lead.STAGE_LOST)
         lead3, created3 = services.create_lead_from_wa_number('97450000001')
@@ -120,6 +123,33 @@ class ConvertTests(TestCase):
         self.assertFalse(created2)
         self.assertEqual(business2.pk, business.pk)
         self.assertEqual(Business.objects.count(), 1)
+
+    def test_link_lead_to_business_marks_won_and_logs_user(self):
+        user = User.objects.create_user('staff3', is_staff=True)
+        business = Business.objects.create(
+            business_id=123456, business_name='Pearl Trading', business_status='pending',
+        )
+        lead = Lead.objects.create(source=Lead.SOURCE_MANUAL, company_name='Pearl Trading')
+
+        linked, error = services.link_lead_to_business(lead, business, user)
+        self.assertTrue(linked)
+        self.assertEqual(error, '')
+        lead.refresh_from_db()
+        self.assertEqual(lead.converted_business_id, business.pk)
+        self.assertEqual(lead.stage, Lead.STAGE_WON)
+        conversion = lead.activities.filter(activity_type=LeadActivity.TYPE_CONVERSION).first()
+        self.assertIsNotNone(conversion)
+        self.assertEqual(conversion.created_by, user)
+
+        # Re-linking the same pair is a no-op success; a different business is refused
+        linked_again, _ = services.link_lead_to_business(lead, business, user)
+        self.assertTrue(linked_again)
+        other = Business.objects.create(
+            business_id=123457, business_name='Other Shop', business_status='pending',
+        )
+        linked_other, error_other = services.link_lead_to_business(lead, other, user)
+        self.assertFalse(linked_other)
+        self.assertIn('already linked', error_other)
 
 
 class DigestTests(TestCase):

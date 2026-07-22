@@ -18,6 +18,13 @@ class Lead(models.Model):
         (SOURCE_MANUAL, 'Manual'),
     ]
 
+    CATEGORY_BUSINESS = 'business'
+    CATEGORY_DRIVER = 'driver'
+    CATEGORY_CHOICES = [
+        (CATEGORY_BUSINESS, 'Business'),
+        (CATEGORY_DRIVER, 'Driver'),
+    ]
+
     STAGE_NEW = 'new'
     STAGE_CONTACTED = 'contacted'
     STAGE_QUOTED = 'quoted'
@@ -37,6 +44,10 @@ class Lead(models.Model):
     CLOSED_STAGES = [STAGE_WON, STAGE_LOST]
 
     source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    # What kind of prospect this is: a business client or a driver applicant.
+    category = models.CharField(
+        max_length=20, choices=CATEGORY_CHOICES, default=CATEGORY_BUSINESS, db_index=True,
+    )
     pricing_enquiry = models.OneToOneField(
         'webpages.PricingEnquiry', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='lead',
@@ -51,6 +62,9 @@ class Lead(models.Model):
     contact_name = models.CharField(max_length=100, blank=True, default='')
     phone = models.CharField(max_length=50, blank=True, default='', db_index=True)
     product_category = models.CharField(max_length=200, blank=True, default='')
+    # Staff-set WhatsApp identifier (phone or lid) used when auto-matching by `phone`
+    # misses or picks the wrong chat — see crm_lead_link_chat in workforce/crm_views.py.
+    wa_chat_override = models.CharField(max_length=50, blank=True, default='')
 
     stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default=STAGE_NEW, db_index=True)
     assigned_to = models.ForeignKey(
@@ -63,6 +77,10 @@ class Lead(models.Model):
         related_name='crm_leads',
     )
     notes = models.TextField(blank=True, default='')
+
+    # AI-generated conversation summary (workforce lead detail page)
+    ai_summary = models.TextField(blank=True, default='')
+    ai_summary_at = models.DateTimeField(null=True, blank=True)
 
     stage_changed_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)

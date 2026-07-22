@@ -1,12 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{# Purpose: CRM lead detail — source summary, stage/assignee/follow-up editors, convert-to-business, activity timeline, WA chat snippet. #}
+{# Purpose: CRM lead detail — source summary, stage/assignee/follow-up editors, activity timeline, WA chat snippet. Linking to a Business happens on the Business Verification page. #}
 {# Used by: workforce.crm_views.crm_lead_detail #}
 {# Notes: crmd__ namespace; writes go through fetch-POST JSON endpoints via crm_lead_detail.js. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -26,6 +26,9 @@
       <div class="crmd__hero-sub">
         {% if lead.contact_name %}<i class="fa-solid fa-user"></i> {{ lead.contact_name }} &nbsp;·&nbsp;{% endif %}
         <span class="crm__source crm__source--{{ lead.source }}">{{ lead.get_source_display }}</span>
+        {% if lead.category == 'driver' %}
+        &nbsp;<span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
+        {% endif %}
         &nbsp;·&nbsp;<i class="fa-solid fa-calendar"></i> {{ lead.created_at|date:"d M Y" }}
         &nbsp;·&nbsp;
         <span id="workforce_crm_detail_span_assignee">
@@ -52,11 +55,6 @@
       <a href="https://wa.me/{{ lead.phone }}" target="_blank" rel="noopener" class="crm__btn">
         <i class="fa-brands fa-whatsapp"></i> WhatsApp
       </a>
-      {% endif %}
-      {% if not lead.converted_business %}
-      <button type="button" class="crm__btn crm__btn--primary" id="workforce_crm_detail_btn_convert">
-        <i class="fa-solid fa-store"></i> Convert to Business
-      </button>
       {% endif %}
     </div>
   </div>
@@ -91,11 +89,6 @@
             <span class="crmd__field-val">{{ lead.whatsapp_inquiry.product_name|default:"—" }}</span></div>
           <div class="crmd__field"><span class="crmd__field-lbl">Info</span>
             <span class="crmd__field-val">{{ lead.whatsapp_inquiry.additional_info|default:"—" }}</span></div>
-          <a class="crm__view mt-2 d-inline-block" href="{% url 'workforce:whatsapp_inquiry_detail' lead.whatsapp_inquiry_id %}"
-             hx-get="{% url 'workforce:whatsapp_inquiry_detail' lead.whatsapp_inquiry_id %}"
-             hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-            <i class="fa-solid fa-arrow-right"></i> Full inquiry detail
-          </a>
           {% elif lead.source == 'whatsapp_inbound' %}
           <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
             <span class="crmd__field-val">Inbound WhatsApp message</span></div>
@@ -137,17 +130,100 @@
         </div>
       </div>
 
-      <!-- WHATSAPP CHAT SNIPPET -->
+      <!-- AI SUMMARY -->
+      {% if ai_available %}
+      <div class="crm__panel">
+        <div class="crm__panel-hd">
+          <i class="fa-solid fa-wand-magic-sparkles"></i><h3>AI Summary</h3>
+          <button type="button" class="crm__btn crmd__ai-btn" id="workforce_crm_detail_btn_ai_summary">
+            <i class="fa-solid fa-rotate"></i>
+            {% if ai_summary %}Refresh{% else %}Generate{% endif %}
+          </button>
+        </div>
+        <div class="crm__panel-body">
+          <div class="crmd__ai-body {% if not ai_summary %}crmd__ai-body--empty{% endif %}"
+               id="workforce_crm_detail_div_ai_summary">{% if ai_summary %}{{ ai_summary }}{% else %}No summary yet — click Generate to have AI read the conversation and activity log.{% endif %}</div>
+          {% if lead.ai_summary_at %}
+          <div class="crmd__ai-meta" id="workforce_crm_detail_div_ai_meta">Generated {{ lead.ai_summary_at|date:"d M Y, H:i" }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- LINK WHATSAPP CHAT (manual override) -->
+      <div class="crm__panel" id="workforce_crm_detail_div_chat_link">
+        <div class="crm__panel-hd"><i class="fa-brands fa-whatsapp"></i><h3>Link WhatsApp Chat</h3></div>
+        <div class="crm__panel-body">
+          {% if lead.wa_chat_override %}
+          <div class="crmd__field-lbl mb-2">Manually linked to <strong>{{ lead.wa_chat_override }}</strong>{% if not wa_messages %} — no messages found there yet{% endif %}.</div>
+          {% elif not wa_messages %}
+          <div class="crmd__field-lbl mb-2">No WhatsApp chat auto-matched for this lead's phone. Search below to connect one.</div>
+          {% endif %}
+          <div class="crmd__link-search-wrap">
+            <input type="text" class="form-control form-control-sm" id="workforce_crm_detail_input_wa_search"
+                   placeholder="Search WhatsApp contacts by phone or name…" autocomplete="off">
+            <div class="crmd__link-results" id="workforce_crm_detail_div_wa_results"></div>
+          </div>
+          <span class="crmd__feedback" id="workforce_crm_detail_span_link_feedback"></span>
+        </div>
+      </div>
+
+      <!-- FULL WHATSAPP CONVERSATION -->
       {% if wa_messages %}
       <div class="crm__panel">
-        <div class="crm__panel-hd"><i class="fa-brands fa-whatsapp"></i><h3>Recent WhatsApp Chat</h3></div>
-        <div class="crm__panel-body crmd__chat">
+        <div class="crm__panel-hd">
+          <i class="fa-brands fa-whatsapp"></i><h3>WhatsApp Conversation</h3>
+          <span class="crmd__count">{{ wa_messages|length }}</span>
+        </div>
+        <div class="crm__panel-body crmd__chat crmd__chat--full" id="workforce_crm_detail_div_chat">
           {% for msg in wa_messages %}
           <div class="crmd__msg crmd__msg--{{ msg.direction }}">
-            <div class="crmd__msg-body">{{ msg.body|truncatechars:300 }}</div>
+            {% if msg.media_proxy %}
+              {% if msg.media_kind == 'image' %}
+              <a href="{{ msg.media_proxy }}" target="_blank" rel="noopener" class="crmd__msg-imglink">
+                <img src="{{ msg.media_proxy }}" alt="Shared photo" loading="lazy" class="crmd__msg-img">
+              </a>
+              {% elif msg.media_kind == 'audio' %}
+              <audio controls preload="none" src="{{ msg.media_proxy }}" class="crmd__msg-audio"></audio>
+              {% elif msg.media_kind == 'video' %}
+              <video controls preload="metadata" src="{{ msg.media_proxy }}" class="crmd__msg-video"></video>
+              {% else %}
+              <a href="{{ msg.media_proxy }}" target="_blank" rel="noopener" class="crmd__msg-doc">
+                <i class="fa-solid fa-paperclip"></i> {{ msg.get_message_type_display }} attachment
+              </a>
+              {% endif %}
+            {% elif msg.message_type != 'text' %}
+              <div class="crmd__msg-doc"><i class="fa-solid fa-paperclip"></i> {{ msg.get_message_type_display }} (media unavailable)</div>
+            {% endif %}
+            {% if msg.body %}<div class="crmd__msg-body">{{ msg.body }}</div>{% endif %}
             <div class="crmd__msg-time">{{ msg.received_at|date:"d M, H:i" }}</div>
           </div>
           {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- SHARED MEDIA -->
+      {% if wa_media %}
+      <div class="crm__panel">
+        <div class="crm__panel-hd">
+          <i class="fa-solid fa-images"></i><h3>Media</h3>
+          <span class="crmd__count">{{ wa_media|length }}</span>
+        </div>
+        <div class="crm__panel-body">
+          <div class="crmd__media-grid">
+            {% for msg in wa_media %}
+            <a href="{{ msg.media_proxy }}" target="_blank" rel="noopener" class="crmd__media-item"
+               title="{{ msg.received_at|date:'d M Y, H:i' }}">
+              {% if msg.media_kind == 'video' %}
+              <video preload="metadata" src="{{ msg.media_proxy }}" muted></video>
+              <span class="crmd__media-play"><i class="fa-solid fa-play"></i></span>
+              {% else %}
+              <img src="{{ msg.media_proxy }}" alt="Shared media" loading="lazy">
+              {% endif %}
+            </a>
+            {% endfor %}
+          </div>
         </div>
       </div>
       {% endif %}
@@ -276,10 +352,12 @@
     urlUpdateStage: "{% url 'workforce:crm_lead_update_stage' lead.pk %}",
     urlUpdate: "{% url 'workforce:crm_lead_update' lead.pk %}",
     urlAddActivity: "{% url 'workforce:crm_lead_add_activity' lead.pk %}",
-    urlConvert: "{% url 'workforce:crm_lead_convert' lead.pk %}",
+    urlAiSummary: "{% url 'workforce:crm_lead_ai_summary' lead.pk %}",
     urlDeleteBase: "/workforce/crm/leads/{{ lead.pk }}/delete-activity/",
+    urlLinkChat: "{% url 'workforce:crm_lead_link_chat' lead.pk %}",
+    urlWaSearch: "{% url 'workforce:crm_wa_contact_search' %}",
     csrfToken: "{{ csrf_token }}"
   };
 </script>
-<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260718b"></script>
+<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260719a"></script>
 {% endblock %}

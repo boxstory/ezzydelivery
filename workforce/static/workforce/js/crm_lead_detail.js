@@ -1,4 +1,4 @@
-/* Purpose: CRM lead detail page actions — stage change, save assignee/follow-up/notes, contact edit, add/delete activity, convert to business.
+/* Purpose: CRM lead detail page actions — stage change, save assignee/follow-up/notes, contact edit, add/delete activity, AI summary.
    Used by: workforce/templates/workforce/crm/lead_detail.html (reads window.CRMD_CONFIG for URLs + CSRF).
    Notes: All writes are fetch POST → JSON endpoints in workforce/crm_views.py; re-runs safely after HTMX swaps because it re-reads CRMD_CONFIG per action. */
 
@@ -22,8 +22,15 @@
     setTimeout(function () { el.textContent = ''; }, 3500);
   }
 
+  function scrollChatToEnd() {
+    var chat = document.getElementById('workforce_crm_detail_div_chat');
+    if (chat) chat.scrollTop = chat.scrollHeight;
+  }
+  scrollChatToEnd();
+
   if (window.__crmdInit) return;
   window.__crmdInit = true;
+  document.addEventListener('htmx:afterSettle', scrollChatToEnd);
 
   document.addEventListener('click', function (e) {
     // Stage buttons
@@ -110,21 +117,101 @@
       return;
     }
 
-    // Convert to business
-    if (e.target.closest && e.target.closest('#workforce_crm_detail_btn_convert')) {
-      if (!window.confirm('Convert this lead into a pending Business account?')) return;
-      var btn = document.getElementById('workforce_crm_detail_btn_convert');
-      btn.disabled = true;
-      post(cfg().urlConvert, {}).then(function (data) {
+    // AI summary
+    if (e.target.closest && e.target.closest('#workforce_crm_detail_btn_ai_summary')) {
+      var aiBtn = document.getElementById('workforce_crm_detail_btn_ai_summary');
+      var aiBody = document.getElementById('workforce_crm_detail_div_ai_summary');
+      if (!aiBody || aiBtn.disabled) return;
+      var hadSummary = !aiBody.classList.contains('crmd__ai-body--empty');
+      aiBtn.disabled = true;
+      aiBtn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Thinking…';
+      aiBody.classList.remove('crmd__ai-body--empty');
+      aiBody.textContent = 'Reading the conversation…';
+      post(cfg().urlAiSummary, { force: hadSummary ? '1' : '0' }).then(function (data) {
+        aiBtn.disabled = false;
+        aiBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Refresh';
         if (data.success) {
-          window.location.reload();
+          aiBody.textContent = data.summary;
         } else {
-          btn.disabled = false;
-          alert(data.error || 'Conversion failed');
+          aiBody.classList.add('crmd__ai-body--empty');
+          aiBody.textContent = data.error || 'AI summary failed.';
+        }
+      }).catch(function () {
+        aiBtn.disabled = false;
+        aiBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Retry';
+        aiBody.classList.add('crmd__ai-body--empty');
+        aiBody.textContent = 'AI summary failed — try again.';
+      });
+      return;
+    }
+
+    // Manual WA chat link — pick a search result
+    var resultItem = e.target.closest && e.target.closest('.crmd__link-result-item');
+    if (resultItem) {
+      var phone = resultItem.getAttribute('data-phone');
+      var searchInput = document.getElementById('workforce_crm_detail_input_wa_search');
+      var linkResults = document.getElementById('workforce_crm_detail_div_wa_results');
+      if (searchInput) searchInput.value = phone;
+      if (linkResults) linkResults.classList.remove('show');
+      flash('workforce_crm_detail_span_link_feedback', 'Linking…');
+      post(cfg().urlLinkChat, { identifier: phone }).then(function (data) {
+        if (data.success) {
+          flash('workforce_crm_detail_span_link_feedback', data.message || 'Linked.');
+          if (data.connected) setTimeout(function () { window.location.reload(); }, 900);
+        } else {
+          flash('workforce_crm_detail_span_link_feedback', data.error || 'Link failed', true);
         }
       });
+      return;
+    }
+
+    // Click outside the WA search box closes its results dropdown
+    var linkResultsEl = document.getElementById('workforce_crm_detail_div_wa_results');
+    if (linkResultsEl && !(e.target.closest && e.target.closest('.crmd__link-search-wrap'))) {
+      linkResultsEl.classList.remove('show');
     }
   });
+
+  var waSearchTimer = null;
+  document.addEventListener('input', function (e) {
+    if (e.target.id !== 'workforce_crm_detail_input_wa_search') return;
+    var q = e.target.value.trim();
+    var resultsEl = document.getElementById('workforce_crm_detail_div_wa_results');
+    if (!resultsEl) return;
+    clearTimeout(waSearchTimer);
+    if (q.length < 3) {
+      resultsEl.classList.remove('show');
+      resultsEl.innerHTML = '';
+      return;
+    }
+    waSearchTimer = setTimeout(function () {
+      fetch(cfg().urlWaSearch + '?q=' + encodeURIComponent(q))
+        .then(function (r) { return r.json(); })
+        .then(function (data) { renderWaResults(data.results || []); });
+    }, 300);
+  });
+
+  function renderWaResults(results) {
+    var resultsEl = document.getElementById('workforce_crm_detail_div_wa_results');
+    if (!resultsEl) return;
+    if (!results.length) {
+      resultsEl.innerHTML = '<div class="crmd__link-empty">No matching WhatsApp contacts</div>';
+      resultsEl.classList.add('show');
+      return;
+    }
+    resultsEl.innerHTML = results.map(function () {
+      return '<div class="crmd__link-result-item" data-phone="">' +
+        '<span class="crmd__link-result-name"></span>' +
+        '<span class="crmd__link-result-phone"></span>' +
+      '</div>';
+    }).join('');
+    resultsEl.querySelectorAll('.crmd__link-result-item').forEach(function (el, i) {
+      el.setAttribute('data-phone', results[i].phone);
+      el.querySelector('.crmd__link-result-name').textContent = results[i].name || results[i].phone;
+      el.querySelector('.crmd__link-result-phone').textContent = results[i].phone;
+    });
+    resultsEl.classList.add('show');
+  }
 
   document.addEventListener('submit', function (e) {
     var form = e.target.closest && e.target.closest('#workforce_crm_detail_form_contact');

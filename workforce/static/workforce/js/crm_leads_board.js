@@ -69,10 +69,22 @@
       .catch(function (err) { revert(card, sourceBody, err.message); });
   });
 
-  // Open detail on click (but not while dragging)
+  // Open detail on click (but not while dragging, and not on inner links
+  // like the WhatsApp chat chip — those navigate on their own)
   document.addEventListener('click', function (e) {
     var card = e.target.closest && e.target.closest('.crmb__card');
     if (!card) return;
+    if (e.target.closest('a')) return;
+    var url = card.getAttribute('data-detail-url');
+    if (url) window.location.href = url;
+  });
+
+  // Keyboard: Enter/Space opens the focused card
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var card = e.target.closest && e.target.closest('.crmb__card');
+    if (!card) return;
+    e.preventDefault();
     var url = card.getAttribute('data-detail-url');
     if (url) window.location.href = url;
   });

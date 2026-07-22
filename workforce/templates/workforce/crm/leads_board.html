@@ -6,7 +6,7 @@
 {# Notes: crmb__ namespace; HTML5 drag-and-drop posts to crm_lead_update_stage; Won/Lost show last {{ closed_window_days }} days only. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260718j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -19,6 +19,20 @@
         <div class="crm__eyebrow">Sales Pipeline</div>
         <h1 class="crm__title">Leads Board</h1>
         <p class="crm__subtitle">Drag a card to change its stage · Won/Lost show last {{ closed_window_days }} days</p>
+      </div>
+      <div class="crm__metrics d-none d-md-flex">
+        <div class="crm__metric">
+          <span class="crm__metric-label">Open</span>
+          <span class="crm__metric-value">{{ open_total }}</span>
+        </div>
+        <div class="crm__metric">
+          <span class="crm__metric-label">Overdue</span>
+          <span class="crm__metric-value {% if overdue_total %}crm__metric-value--alert{% endif %}">{{ overdue_total }}</span>
+        </div>
+        <div class="crm__metric">
+          <span class="crm__metric-label">Won · {{ closed_window_days }}d</span>
+          <span class="crm__metric-value">{{ won_window }}</span>
+        </div>
       </div>
       <div class="crm__head-actions">
         <a href="{% url 'workforce:crm_leads_list' %}" class="crm__btn"
@@ -61,6 +75,16 @@
             {% endfor %}
           </select>
 
+          <select name="category" class="crm__facet-select" aria-label="Filter by lead type"
+                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                  hx-include="#workforce_crm_board_form_filter">
+            <option value="">All types</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
           <select name="assigned" class="crm__facet-select" aria-label="Filter by assignee"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
@@ -76,7 +100,7 @@
           </select>
         </div>
 
-        {% if search or source_filter or assigned_filter %}
+        {% if search or source_filter or assigned_filter or category_filter %}
         <a href="{% url 'workforce:crm_leads_board' %}" class="crm__clear-all"
            hx-get="{% url 'workforce:crm_leads_board' %}"
            hx-target="#main-content" hx-select="#main-content"
@@ -88,15 +112,17 @@
     <!-- BOARD -->
     <div class="crmb__lanes" id="workforce_crm_board_div_lanes">
       {% for column in columns %}
-      <div class="crmb__column" data-stage="{{ column.key }}">
+      <div class="crmb__column crmb__column--{{ column.key }}" data-stage="{{ column.key }}">
         <div class="crmb__col-head crmb__col-head--{{ column.key }}">
           <span class="crmb__col-dot"></span>
           <span class="crmb__col-title">{{ column.label }}</span>
+          {% if column.overdue %}<span class="crmb__col-late">{{ column.overdue }} late</span>{% endif %}
           <span class="crmb__col-count">{{ column.count }}</span>
         </div>
         <div class="crmb__col-body" data-stage-body="{{ column.key }}">
           {% for lead in column.leads %}
           <div class="crmb__card {% if lead.is_overdue %}crmb__card--overdue{% endif %}"
+               role="button" tabindex="0"
                draggable="true" data-lead-id="{{ lead.pk }}"
                data-detail-url="{% url 'workforce:crm_lead_detail' lead.pk %}"
                data-stage-url="{% url 'workforce:crm_lead_update_stage' lead.pk %}">
@@ -109,7 +135,16 @@
             {% endif %}
             {% if lead.phone %}<div class="crmb__card-phone">{{ lead.phone }}</div>{% endif %}
             <div class="crmb__card-meta">
+              {% if lead.has_wa_chat %}
+              <a class="crmb__card-wa" title="Open WhatsApp conversation"
+                 href="{% url 'workforce:crm_lead_detail' lead.pk %}#workforce_crm_detail_div_chat">
+                <i class="fa-brands fa-whatsapp"></i> Chat
+              </a>
+              {% endif %}
               <span class="crm__source crm__source--{{ lead.source }}">{{ lead.get_source_display }}</span>
+              {% if lead.category == 'driver' %}
+              <span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
+              {% endif %}
               {% if lead.next_followup_at %}
               <span class="crmb__card-due {% if lead.is_overdue %}crm__overdue-text{% endif %}">
                 <i class="fa-regular fa-calendar"></i>{{ lead.next_followup_at|date:"d M" }}
@@ -123,7 +158,7 @@
             </div>
           </div>
           {% empty %}
-          <div class="crmb__col-empty">No leads</div>
+          <div class="crmb__col-empty">Drop leads here</div>
           {% endfor %}
         </div>
       </div>
@@ -137,5 +172,5 @@
 <script>
   window.CRMB_CONFIG = { csrfToken: "{{ csrf_token }}" };
 </script>
-<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260718b"></script>
+<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260718d"></script>
 {% endblock %}
