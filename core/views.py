@@ -437,6 +437,8 @@ def join_driver(request):
                 upload_errors.append("Upload at least 2 ID documents (QID, Passport, Driving License or Istimara).")
             if not vehicle_selected:
                 upload_errors.append("Please select your available vehicle type.")
+            if request.POST.get('job_type') not in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):
+                upload_errors.append("Please select your work preference (full time / part time / flexible).")
 
         if pform.is_valid() and (not vehicle_selected or vform.is_valid()) and not upload_errors:
             from django.db import transaction
@@ -591,7 +593,10 @@ def join_driver(request):
     ]
     sec1_done = sum(1 for f in PROFILE_PROGRESS_FIELDS if profile and getattr(profile, f, None))
     sec1_total = len(PROFILE_PROGRESS_FIELDS)
-    sec2_complete = bool(primary_vehicle and primary_vehicle.vehicle_type and primary_vehicle.vehicle_type != 'none')
+    sec2_complete = bool(
+        primary_vehicle and primary_vehicle.vehicle_type and primary_vehicle.vehicle_type != 'none'
+        and driver and driver.job_type
+    )
     sec3_selfie = 'Selfie' in existing_docs
     sec3_ids = len([t for t in existing_docs if t != 'Selfie'])
     sec3_complete = sec3_selfie and sec3_ids >= 2
