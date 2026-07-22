@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load static %}
+{% load socialaccount %}
+{% comment %}
+Purpose: Small public onboarding intro — how to become a driver, 4 steps + join button
+Used by: core.views.join_driver_start (/join_us/driver/start/)
+Notes: Join button starts Google sign-in for anonymous visitors, links straight to the form when logged in
+{% endcomment %}
+
+{% block title %}Become a Driver - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260718c" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<section id="core_join_driver_start_section_main">
+    <div class="container-lg px-3 py-4">
+
+        <!-- Hero -->
+        <div class="cja__hero p-4 p-md-5 mb-4 text-center">
+            <h1 class="cja__hero-title h3 mb-2">Become an Ezzy Delivery Driver</h1>
+            <p class="mb-0">Deliver across Qatar on your own schedule and get paid for every drop.</p>
+        </div>
+
+        <!-- How to join -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8">
+            <h2 class="h5 text-center mb-2">How to join — 4 easy steps</h2>
+            <p class="text-muted text-center small mb-4">Takes about 5 minutes. All you need is your phone, your ID and your vehicle.</p>
+
+            <div class="d-flex flex-column gap-3 mb-4">
+                <div class="d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">1</span>
+                    <div>
+                        <div class="fw-bold">Sign in with Google</div>
+                        <div class="text-muted small">Use your Gmail account — one tap, no password to remember.</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">2</span>
+                    <div>
+                        <div class="fw-bold">Fill your details</div>
+                        <div class="text-muted small">Your name, phone, WhatsApp and the vehicle you drive. You can save and continue later anytime.</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">3</span>
+                    <div>
+                        <div class="fw-bold">Upload 3 photos</div>
+                        <div class="text-muted small">A selfie plus any 2 IDs — QID, passport, driving license or Istimara.</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">4</span>
+                    <div>
+                        <div class="fw-bold">Get approved &amp; start earning</div>
+                        <div class="text-muted small">Our team reviews your application and confirms on WhatsApp. Then open your dashboard and start delivering.</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if user.is_authenticated %}
+            <div class="text-center">
+                <a href="{% url 'core:join_driver' %}" class="btn btn-dark btn-lg px-5" id="core_join_driver_start_btn_join">
+                    Start My Application
+                </a>
+            </div>
+            {% else %}
+            <form method="post" action="{% provider_login_url 'google' %}" class="text-center">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'core:join_driver' %}">
+                <button type="submit" class="btn cja__google-btn btn-lg px-5" id="core_join_driver_start_btn_googlejoin">
+                    <img src="https://accounts.google.com/favicon.ico" alt="" width="20" height="20" class="me-2 align-text-bottom">
+                    Join with Google
+                </button>
+                <div class="text-muted small mt-2">Already applied? Sign in with the same Gmail to check your status.</div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock content %}

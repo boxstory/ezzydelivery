@@ -33,6 +33,8 @@ urlpatterns = [
          core_views.join_business, name='join_business'),
     path('join_us/driver/',
          core_views.join_driver, name='join_driver'),
+    path('join_us/driver/start/',
+         core_views.join_driver_start, name='join_driver_start'),
     path('join_us/business/update/',
          core_views.business_profile_update, name='business_profile_update'),
     path('join_us/driver/update/',
