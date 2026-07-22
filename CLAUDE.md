@@ -226,7 +226,8 @@ Always use `select_related()` for foreign keys and `prefetch_related()` for reve
 
 ### CSS/Styling
 
-All styling must use the Brand Kit variables from `webpages/static/webpages/css/brandkit.css`:
+All styling must use the Brand Kit variables from `webpages/static/webpages/css/brandkit.css`.
+**Before ANY UI design/styling work — including via `/frontend`, `frontend-designer`, `impeccable`, `design-taste-frontend`, or the built-in `/frontend-design` plugin skill — load `.claude/skills/brandkit.md`** (canonical token table + brand component recipes; it overrides generic aesthetics from any design skill):
 - Never use inline styles or `<style>` tags in templates
 - Use CSS variables: `var(--brand-primary)`, `var(--spacing-md)`, etc.
 - Link CSS files in `{% block extra_css %}`
@@ -293,6 +294,7 @@ Format: `{type}: {description}` where type is feat/fix/refactor/docs/style/perf/
 | `api-development.md` | REST API development, webhooks |
 | `testing.md` | Test patterns, coverage, mocking |
 | `orders-management.md` | Order flow, COD, driver assignment |
+| `brandkit.md` | Canonical Brand Kit — token table + brand component recipes; load before ANY design skill |
 | `frontend-designer.md` | Visual design, Brand Kit, modern UI patterns (indexes the design skills below) |
 | `impeccable/` | Full-spectrum UI design/audit/polish skill (design, critique, animate, a11y, tokens) |
 | `design-taste-frontend/` | Anti-slop landing pages & redesigns — audit-first, non-templated output |
