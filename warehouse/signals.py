@@ -1112,11 +1112,59 @@ def stock_level_post_save_handler(sender, instance, created, *args, **kwargs):
 # Auto-sync PickupLocation when a business is linked/unlinked to a warehouse
 # =============================================================================
 
+def merge_placeholder_fulfilment_rows(business, keep_row, apply=True):
+    """
+    Retire generic fulfilment-centre placeholder pickup locations (e.g. the old
+    auto-created "Fulfillment Store" rows with no coordinates) in favour of
+    `keep_row` — the warehouse-identity row. Re-points Order, DeliveryTask and
+    PickupTask references, then marks the placeholder inactive (never deleted:
+    other FKs like HubPickupBatch may still reference it).
+    Returns a list of merge descriptions (useful for dry-run reporting).
+    """
+    from django.db.models import Q as _Q
+    from business.models import PickupLocation
+
+    placeholders = PickupLocation.objects.filter(
+        business=business, is_fulfilment_center=True,
+    ).exclude(pk=keep_row.pk).filter(
+        _Q(pickup_location_title__icontains='fulfillment')
+        | _Q(pickup_location_title__icontains='fulfilment')
+        | _Q(pickup_lat__isnull=True)
+    )
+
+    actions = []
+    for row in placeholders:
+        from orders.models import Order
+        from delivery.models import DeliveryTask, PickupTask
+
+        counts = {
+            'orders': Order.objects.filter(pickup_location=row).count(),
+            'delivery_tasks': DeliveryTask.objects.filter(pickup_location=row).count(),
+            'pickup_tasks': PickupTask.objects.filter(pickup_location=row).count(),
+        }
+        actions.append(
+            f"{business.business_name}: '{row.pickup_location_title}' (id={row.pk}) "
+            f"→ '{keep_row.pickup_location_title}' (id={keep_row.pk}) "
+            f"[{counts['orders']} orders, {counts['delivery_tasks']} dl-tasks, "
+            f"{counts['pickup_tasks']} pickups]"
+        )
+        if apply:
+            Order.objects.filter(pickup_location=row).update(pickup_location=keep_row)
+            DeliveryTask.objects.filter(pickup_location=row).update(pickup_location=keep_row)
+            PickupTask.objects.filter(pickup_location=row).update(pickup_location=keep_row)
+            row.pickup_status = 'inactive'
+            row.is_default = False
+            row.save(update_fields=['pickup_status', 'is_default'])
+            logger.info(f"[fulfilment-merge] {actions[-1]}")
+    return actions
+
+
 @receiver(post_save, sender='warehouse.SellerWarehouseLink', dispatch_uid='warehouse.seller_warehouse_link_post_save')
 def seller_warehouse_link_post_save(sender, instance, created, **kwargs):
     """
     When a SellerWarehouseLink is created or updated, create/update a
-    PickupLocation for the business using the warehouse address.
+    PickupLocation for the business using the warehouse address, and retire
+    any generic placeholder fulfilment rows in its favour.
     """
     from business.models import PickupLocation
 
@@ -1143,6 +1191,8 @@ def seller_warehouse_link_post_save(sender, instance, created, **kwargs):
             f"{action} PickupLocation for {business.business_name} "
             f"linked to warehouse {warehouse.code}"
         )
+        if instance.is_active:
+            merge_placeholder_fulfilment_rows(business, pickup)
     except Exception as e:
         logger.exception(
             f"Error syncing PickupLocation for SellerWarehouseLink "
