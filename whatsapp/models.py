@@ -5,7 +5,18 @@ One row per inbound or outbound message. Webhook upserts on `waha_message_id`.
 The legacy `business.WhatsAppNotificationTrigger` model is unrelated — it
 configures *what* to send for which order events; this table is the *log*.
 """
+import os
+
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.db import models
+
+
+def _private_media_storage():
+    """Storage outside MEDIA_ROOT — customer WhatsApp media must not be
+    reachable through the public /media/ nginx alias. Served only via the
+    staff-gated CRM proxy view."""
+    return FileSystemStorage(location=os.path.join(settings.BASE_DIR, 'private_media'))
 
 
 class WhatsAppMessage(models.Model):
@@ -44,6 +55,12 @@ class WhatsAppMessage(models.Model):
 
     media_url = models.CharField(max_length=500, blank=True, default='')
     media_mime = models.CharField(max_length=80, blank=True, default='')
+    # Local archive of the WAHA media file — WAHA purges its own copy within
+    # minutes, so the archive_wa_media cron downloads it into private storage.
+    media_file = models.FileField(
+        upload_to='whatsapp/media/', storage=_private_media_storage,
+        blank=True, default='',
+    )
 
     # Populated when message_type='location' — extracted from payload.location.*
     # or payload._data.location.* by the webhook.
@@ -90,6 +107,37 @@ class WhatsAppMessage(models.Model):
 
     def __str__(self):
         return f'{self.direction} {self.from_number or self.to_number} {self.waha_message_id}'
+
+
+class WhatsAppContact(models.Model):
+    """Directory of WhatsApp contacts synced from WAHA — one row per phone.
+
+    Persists the lid→phone mapping and names so the CRM inbox (and anything
+    else) resolves senders from the DB instead of hitting WAHA per page load.
+    Upserted by whatsapp.contacts.sync_contacts(); phone/lid are bare digits.
+    """
+    phone = models.CharField(max_length=32, unique=True, db_index=True)
+    lid = models.CharField(max_length=32, blank=True, default='', db_index=True)
+    saved_name = models.CharField(max_length=255, blank=True, default='')
+    push_name = models.CharField(max_length=255, blank=True, default='')
+    is_business = models.BooleanField(default=False)
+    is_my_contact = models.BooleanField(default=False)
+    notes = models.TextField(blank=True, default='')
+    synced_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'WhatsApp Contact'
+        verbose_name_plural = 'WhatsApp Contacts'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'{self.phone} ({self.saved_name or self.push_name or "unnamed"})'
+
+    @property
+    def display_name(self):
+        return self.saved_name or self.push_name or ''
 
 
 class WahaConfig(models.Model):

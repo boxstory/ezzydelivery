@@ -33,6 +33,17 @@ def run_backfill(skip_today=True, days=120, limit_per_chat=100, max_chats=200,
     call_command('backfill_waha', *args)
 
 
+@shared_task(name='whatsapp.tasks.sync_wa_contacts', ignore_result=True)
+def sync_wa_contacts(session=None):
+    """Refresh the WhatsAppContact directory from WAHA (lids + contacts)."""
+    from whatsapp.contacts import sync_contacts
+    try:
+        result = sync_contacts(session=session)
+        logger.info('wa contact sync: %s', result)
+    except Exception:
+        logger.exception('wa contact sync failed')
+
+
 # =============================================================================
 # Address Verification Queue Drain
 # =============================================================================

@@ -143,9 +143,13 @@ def _group_sender(payload):
         payload.get('notifyName')
         or data.get('notifyName')
         or payload.get('senderName')
-        or sid
-    )
-    return {'id': sid, 'name': name}
+        or ''
+    ).strip()
+    if name == sid:
+        name = ''  # a bare id is not a name — let the UI fall back to '+id' once
+    # Group authors arrive as anonymized @lid JIDs, not phone numbers —
+    # _resolve_lid_senders() swaps these for the real number via WAHA's lids API.
+    return {'id': sid, 'name': name or None, 'is_lid': str(author).endswith('@lid')}
 
 
 def _sender_color(sender_id):
@@ -153,6 +157,77 @@ def _sender_color(sender_id):
         return _SENDER_PALETTE[0]
     h = hashlib.md5(str(sender_id).encode('utf-8')).digest()
     return _SENDER_PALETTE[h[0] % len(_SENDER_PALETTE)]
+
+
+_LID_CACHE_KEY = 'waha_lid_map_v1'
+_LID_CACHE_TTL = 6 * 3600
+
+
+def _lid_map(base, session, api_key):
+    """lid digits -> phone digits, from WAHA's /lids API. Cached 6h."""
+    from django.core.cache import cache
+    mp = cache.get(_LID_CACHE_KEY)
+    if isinstance(mp, dict):
+        return mp
+    mp = {}
+    try:
+        resp = requests.get(
+            f"{base}/api/{session}/lids",
+            params={'limit': 100000},
+            headers={'X-Api-Key': api_key},
+            timeout=15,
+        )
+        if 200 <= resp.status_code < 300:
+            for row in resp.json():
+                if isinstance(row, dict):
+                    lid = _strip_jid(row.get('lid'))
+                    pn = _strip_jid(row.get('pn'))
+                    if lid and pn:
+                        mp[lid] = pn
+    except (requests.exceptions.RequestException, ValueError) as e:
+        logger.warning("waha lids fetch failed: %s", e)
+        return mp  # don't cache a failed fetch
+    cache.set(_LID_CACHE_KEY, mp, _LID_CACHE_TTL)
+    return mp
+
+
+def _resolve_lid_senders(msgs, base, session, api_key):
+    """Swap anonymized @lid sender ids for real phone digits, in place."""
+    from django.core.cache import cache
+    lids = set()
+    for m in msgs:
+        s = m.get('sender')
+        if s and s.pop('is_lid', False) and s.get('id'):
+            s['_lid'] = s['id']
+            lids.add(s['id'])
+    if not lids:
+        return
+    mp = _lid_map(base, session, api_key)
+    # New participants may not be in the cached bulk map yet — look up a few
+    # individually and fold them into the cache.
+    updated = False
+    for lid in [l for l in lids if l not in mp][:5]:
+        try:
+            resp = requests.get(
+                f"{base}/api/{session}/lids/{lid}",
+                headers={'X-Api-Key': api_key},
+                timeout=5,
+            )
+            if 200 <= resp.status_code < 300:
+                pn = _strip_jid(resp.json().get('pn'))
+                if pn:
+                    mp[lid] = pn
+                    updated = True
+        except (requests.exceptions.RequestException, ValueError):
+            pass
+    if updated:
+        cache.set(_LID_CACHE_KEY, mp, _LID_CACHE_TTL)
+    for m in msgs:
+        s = m.get('sender')
+        if s and s.get('_lid'):
+            pn = mp.get(s.pop('_lid'))
+            if pn:
+                s['id'] = pn
 
 
 def _row_to_dict(row, chat_id):
@@ -360,6 +435,8 @@ def _messages_response(request, chat_id):
         # newest items just-before before_ts, so keep the tail).
         if len(merged) > limit:
             merged = merged[-limit:]
+        if is_group:
+            _resolve_lid_senders(merged, base, session, api_key)
         has_more = len(db_rows) >= limit or len(live_msgs) > 0
 
         resp = JsonResponse(
@@ -422,6 +499,8 @@ def _messages_response(request, chat_id):
     merged.sort(key=lambda x: x.get('timestamp') or 0)
     if len(merged) > limit:
         merged = merged[-limit:]
+    if is_group:
+        _resolve_lid_senders(merged, base, session, api_key)
     has_more = len(db_rows) >= limit or len(live_msgs) >= live_limit
 
     resp = JsonResponse(
@@ -631,6 +710,14 @@ def wa_chats_resync(request):
                 changed = True
             if changed:
                 obj.save(update_fields=['media_url', 'media_mime', 'updated_at'])
+        if obj.media_url and not obj.media_file:
+            # WAHA purges downloaded media in minutes — archive it right away
+            # while this resync's fresh download still exists.
+            try:
+                from whatsapp.media_archive import archive_message_media
+                archive_message_media(obj)
+            except Exception:
+                logger.exception('resync: media archive failed for msg %s', obj.pk)
 
     return JsonResponse({"ok": True, "count": total, "inserted": inserted, "messages": []}, status=200)
 
@@ -862,6 +949,7 @@ body {
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
   cursor: pointer;
+  text-decoration: none;
 }
 .wa-btn:hover { background: var(--wa-brand-hover); }
 .wa-btn--ghost {
@@ -870,6 +958,17 @@ body {
   border: 0.0625rem solid var(--wa-brand);
 }
 .wa-btn--ghost:hover { background: var(--wa-brand-tint); }
+.wa-session { display: inline-flex; align-items: center; gap: 0.375rem; }
+.wa-session__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #9aa5ad;
+  flex: 0 0 auto;
+}
+.wa-session--up .wa-session__dot { background: #06cf9c; }
+.wa-session--down { color: #f04a4a; border-color: #f04a4a; }
+.wa-session--down .wa-session__dot { background: #f04a4a; }
 .wa-conv__spacer { flex: 1; }
 
 .wa-msgs {
@@ -993,6 +1092,7 @@ body {
         <div class="wa-conv__sub" id="wa-conv-sub"></div>
       </div>
       <div class="wa-conv__spacer"></div>
+      <a class="wa-btn wa-btn--ghost wa-session" id="wa-session-link" href="/waha/wa-dashboard/" title="Session health &amp; QR"><span class="wa-session__dot" id="wa-session-dot"></span><span id="wa-session-text">Session</span></a>
       <button class="wa-btn wa-btn--ghost" id="wa-resync" type="button" title="Resync from WAHA">↻ Resync</button>
     </div>
     <div class="wa-msgs" id="wa-msgs">
@@ -1716,8 +1816,9 @@ body {
     var hdr = document.createElement('div');
     hdr.className = 'wa-bubble__sender';
     hdr.style.color = sender.color || senderColor(sender.id);
-    hdr.textContent = sender.name || sender.id || '';
-    if (sender.id) {
+    // With a push name: "Name +974...". Without: just "+974..." — never twice.
+    hdr.textContent = sender.name || (sender.id ? '+' + sender.id : '');
+    if (sender.name && sender.id && sender.name !== sender.id) {
       var idSpan = document.createElement('span');
       idSpan.className = 'wa-bubble__sender-id';
       idSpan.textContent = ' +' + sender.id;
@@ -1853,10 +1954,40 @@ body {
       });
   }
 
+  // ---------- Session status (header pill) ----------
+  function loadSessionStatus() {
+    var link = $('wa-session-link');
+    var text = $('wa-session-text');
+    fetch('/waha/api/sessions/' + SESSION, {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var status = data && data.status ? String(data.status).toUpperCase() : '';
+        link.classList.remove('wa-session--up', 'wa-session--down');
+        if (status === 'WORKING') {
+          link.classList.add('wa-session--up');
+          var me = data.me || {};
+          var num = me.id ? String(me.id).split('@')[0] : (me.pushName || '');
+          text.textContent = num ? '+' + num : 'Connected';
+        } else {
+          link.classList.add('wa-session--down');
+          text.textContent = status || 'UNREACHABLE';
+        }
+      })
+      .catch(function () {
+        link.classList.remove('wa-session--up');
+        link.classList.add('wa-session--down');
+        text.textContent = 'UNREACHABLE';
+      });
+  }
+
   // ---------- Poll ----------
   function poll() {
     loadChats();
     if (state.activeChatId) loadMessages();
+    loadSessionStatus();
   }
 
   // ---------- Wire up ----------
@@ -1909,6 +2040,7 @@ body {
 
   loadChats();
   loadLabels();
+  loadSessionStatus();
   setInterval(poll, 30000);
 })();
 </script>

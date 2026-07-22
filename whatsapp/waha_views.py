@@ -577,6 +577,9 @@ def waha_webhook(request):
             },
         )
 
+        # Media is archived into Django storage by the per-minute
+        # archive_wa_media cron — WAHA purges its own copy within minutes.
+
         # Try to apply the location pin to a queued verification job. We swallow
         # exceptions because the webhook must still return 200 to WAHA — the
         # message has been saved either way, agents can re-process manually.

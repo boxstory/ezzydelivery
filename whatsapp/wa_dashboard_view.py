@@ -148,6 +148,18 @@ _DASHBOARD_HTML = r"""<!doctype html>
     font-size: 0.75rem;
     color: var(--wa-muted);
   }
+  .wa-qr-wait {
+    display: none;
+    width: 100%;
+    max-width: 16rem;
+    padding: 2rem 0.75rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--wa-muted);
+    background: #ffffff;
+    border: 0.0625rem dashed var(--wa-border);
+    border-radius: 0.5rem;
+  }
   .wa-foot {
     margin-top: 1.25rem;
     padding-top: 0.875rem;
@@ -178,6 +190,7 @@ _DASHBOARD_HTML = r"""<!doctype html>
     <div class="wa-actions" id="wa-actions"></div>
     <div class="wa-qr" id="wa-qr">
       <img id="wa-qr-img" alt="WhatsApp QR code">
+      <div class="wa-qr-wait" id="wa-qr-wait">QR not ready yet — waiting for session…</div>
       <div class="wa-qr-hint">Open WhatsApp → Linked devices → Link a device</div>
     </div>
     <div class="wa-foot">
@@ -204,8 +217,29 @@ _DASHBOARD_HTML = r"""<!doctype html>
   const actionsEl = document.getElementById('wa-actions');
   const qrEl = document.getElementById('wa-qr');
   const qrImgEl = document.getElementById('wa-qr-img');
+  const qrWaitEl = document.getElementById('wa-qr-wait');
 
   const QR_URL = '/waha/api/' + SESSION + '/auth/qr?format=image';
+  const QR_RETRY_MS = 4000;
+  let qrRetryTimer = null;
+
+  // WAHA 422s on the QR endpoint unless the session is in SCAN_QR_CODE, so a
+  // too-early click shows a broken image. Swap it for a waiting note and keep
+  // retrying while the pane is open — the QR appears as soon as WAHA has one.
+  qrImgEl.addEventListener('load', function () {
+    qrImgEl.style.display = 'block';
+    qrWaitEl.style.display = 'none';
+  });
+  qrImgEl.addEventListener('error', function () {
+    if (!qrImgEl.getAttribute('src')) return;  // ignore src removal on hideQr
+    qrImgEl.style.display = 'none';
+    qrWaitEl.style.display = 'block';
+    clearTimeout(qrRetryTimer);
+    qrRetryTimer = setTimeout(function () {
+      if (qrEl.style.display !== 'flex') return;
+      qrImgEl.src = QR_URL + '&t=' + Date.now();
+    }, QR_RETRY_MS);
+  });
 
   function setDot(color) { dotEl.style.background = color; }
 
@@ -253,8 +287,11 @@ _DASHBOARD_HTML = r"""<!doctype html>
   }
 
   function hideQr() {
+    clearTimeout(qrRetryTimer);
     qrEl.style.display = 'none';
     qrImgEl.removeAttribute('src');
+    qrImgEl.style.display = 'block';
+    qrWaitEl.style.display = 'none';
   }
 
   function formatPhone(me) {

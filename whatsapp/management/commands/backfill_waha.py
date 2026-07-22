@@ -125,6 +125,8 @@ def upsert_message(m, session, chat_id):
         obj.save(update_fields=[
             'media_url', 'media_mime', 'message_type', 'raw_payload', 'updated_at',
         ])
+    # Media download into Django storage is handled by the per-minute
+    # archive_wa_media cron, which picks up freshly touched rows.
     return obj, False
 
 
