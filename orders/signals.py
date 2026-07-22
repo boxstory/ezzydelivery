@@ -1,4 +1,5 @@
 import logging
+from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
@@ -76,6 +77,14 @@ def generate_order_number(business, client_order_code):
     order_number = f"{business_code}-{code_part}-{sequence}"
 
     return order_number
+
+def _create_pickup_task_on_commit(order_id):
+    """Runs after the creating transaction commits — order row is guaranteed visible."""
+    from delivery.services.pickup import create_pickup_task_if_needed
+    order = Order.objects.filter(pk=order_id).select_related('business', 'pickup_location').first()
+    if order:
+        create_pickup_task_if_needed(order, source='order_create')
+
 
 @receiver(pre_save, sender=Order, dispatch_uid='orders.order_pre_save')
 def order_pre_save_receiver(sender, instance, *args, **kwargs):
@@ -185,6 +194,12 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
         except Exception as e:
             logger.warning(f"Auto flow failed for order create {instance.pk}: {e}")
 
+        # First-mile pickup: auto-create a pickup task for non-fulfilment clients
+        # with pickup_task_enabled (service gates internally; never raises).
+        transaction.on_commit(
+            lambda order_id=instance.pk: _create_pickup_task_on_commit(order_id)
+        )
+
     # Handle verification status changes
     if not created:
         old_status = getattr(instance, '_old_verification_status', '')
@@ -257,6 +272,12 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
         # Send customer WhatsApp notification on order cancellation
         old_order_status2 = getattr(instance, '_old_order_status', '')
         if instance.order_status == 'cancelled' and old_order_status2 != 'cancelled':
+            # Cancel guard: an order cancellation pulls its first-mile pickup task
+            try:
+                from delivery.services.pickup import cancel_pickup_for_order
+                cancel_pickup_for_order(instance)
+            except Exception as e:
+                logger.warning(f"Pickup cancel guard failed for order {instance.pk}: {e}")
             try:
                 from core.order_notifications import notify_order_event
                 notify_order_event('order_cancelled', order=instance)
@@ -580,6 +601,7 @@ def _create_delivery_task_from_order(order):
         # Keys must match Order.COORDS_ACCURACY choices (orders/models.py)
         coords_to_accuracy = {
             'by_customer': 'by_customer',
+            'by_staff':    'by_staff',
             'by_driver':   'by_driver',
             'exact':       'geocoded',
             'street':      'geocoded',

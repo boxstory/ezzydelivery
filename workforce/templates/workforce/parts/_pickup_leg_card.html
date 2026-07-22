@@ -1,0 +1,53 @@
+{% comment %}
+Purpose: First-mile pickup strip — stage rail, driver, mode and disposition for an order's PickupTask.
+Used by: workforce/order_detail.html, workforce/parts/delivery_task_detail.html (pass pickup=<PickupTask or None>).
+Notes: Renders nothing when pickup is empty; cancelled shows a flat row instead of the rail.
+{% endcomment %}
+{% if pickup %}
+<div class="pkl">
+    <div class="pkl__head">
+        <span class="pkl__title"><i class="fa-solid fa-box-open"></i> First-Mile Pickup</span>
+        <span class="pkl__meta">
+            {{ pickup.get_pickup_mode_display }} · plan: {{ pickup.get_disposition_display }}
+            {% if pickup.driver %}· <span class="pkl__driver">{{ pickup.driver }}{% if pickup.driver.driver_code %} — {{ pickup.driver.driver_code }}{% endif %}</span>{% endif %}
+        </span>
+    </div>
+
+    {% if pickup.status == 'cancelled' %}
+    <div class="pkl__cancelled"><i class="fa-solid fa-circle-xmark"></i> Pickup cancelled</div>
+    {% else %}
+    <div class="pkl__rail">
+        <div class="pkl__step {% if pickup.stage_index >= 0 %}pkl__step--done{% endif %} {% if pickup.stage_index == 0 %}pkl__step--now{% endif %}">
+            <span class="pkl__dot"></span>
+            <span class="pkl__step-label">Pending</span>
+        </div>
+        <div class="pkl__step {% if pickup.stage_index >= 1 %}pkl__step--done{% endif %} {% if pickup.stage_index == 1 %}pkl__step--now{% endif %}">
+            <span class="pkl__dot"></span>
+            <span class="pkl__step-label">Accepted</span>
+            {% if pickup.accepted_at %}<span class="pkl__step-time">{{ pickup.accepted_at|date:"d M, H:i" }}</span>{% endif %}
+        </div>
+        <div class="pkl__step {% if pickup.stage_index >= 2 %}pkl__step--done{% endif %} {% if pickup.stage_index == 2 %}pkl__step--now{% endif %}">
+            <span class="pkl__dot"></span>
+            <span class="pkl__step-label">On the way</span>
+        </div>
+        <div class="pkl__step {% if pickup.stage_index >= 3 %}pkl__step--done{% endif %} {% if pickup.stage_index == 3 %}pkl__step--now{% endif %}">
+            <span class="pkl__dot"></span>
+            <span class="pkl__step-label">Arrived</span>
+        </div>
+        <div class="pkl__step {% if pickup.stage_index >= 4 %}pkl__step--done{% endif %} {% if pickup.stage_index == 4 %}pkl__step--now{% endif %}">
+            <span class="pkl__dot"></span>
+            <span class="pkl__step-label">Collected</span>
+            {% if pickup.collected_at %}<span class="pkl__step-time">{{ pickup.collected_at|date:"d M, H:i" }}</span>{% endif %}
+        </div>
+        <div class="pkl__step {% if pickup.stage_index >= 5 %}pkl__step--done{% endif %} {% if pickup.stage_index == 5 %}pkl__step--now{% endif %}">
+            <span class="pkl__dot"></span>
+            <span class="pkl__step-label">{% if pickup.status == 'handed_off' %}Handed off{% elif pickup.disposition == 'drop' %}Dropped at hub{% else %}Handed off{% endif %}</span>
+            {% if pickup.dropped_at %}<span class="pkl__step-time">{{ pickup.dropped_at|date:"d M, H:i" }}</span>{% endif %}
+        </div>
+    </div>
+    {% if pickup.transfer_to_driver and not pickup.transfer_confirmed_at %}
+    <div class="pkl__note"><i class="fa-solid fa-people-arrows"></i> Transfer to {{ pickup.transfer_to_driver }} awaiting confirmation</div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endif %}

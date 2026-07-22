@@ -435,6 +435,11 @@ class DeliveryTask(models.Model):
         max_length=20, choices=TASK_LEG_CHOICES, default='single',
         help_text="Leg type: 'single' = standard delivery. 'hub_delivery' = Leg 2 of hub model."
     )
+    source_pickup_task = models.ForeignKey(
+        'delivery.PickupTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='delivery_tasks',
+        help_text="First-mile pickup task this delivery leg originated from"
+    )
     hub_pickup_batch = models.ForeignKey(
         HubPickupBatch,
         on_delete=models.SET_NULL,
@@ -452,7 +457,7 @@ class DeliveryTask(models.Model):
 
     # --- Address Accuracy ---
     ADDRESS_ACCURACY_CHOICES = [
-        ('by_customer', 'By Customer'),
+        ('by_customer', 'By Client'),
         ('by_staff', 'By Staff'),
         ('by_driver', 'By Driver'),
         ('geocoded', 'Geocoded'),
@@ -815,12 +820,108 @@ class AssignedDriver(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.driver.driver_name
+        return str(self.driver)
 
     class Meta:
         verbose_name_plural = "Assigned Driver"
         app_label = 'delivery'
         unique_together = [('driver', 'dl_task')]
+
+
+# =============================================================================
+# FIRST-MILE PICKUP
+# =============================================================================
+
+
+class PickupTask(models.Model):
+    """
+    First-mile pickup: a driver collects one order's goods from the client's
+    pickup location, then routes it per the client's preset disposition —
+    drop at the default hub, deliver it themselves, or hand off to another
+    driver (both-party confirm). Auto-created on order creation for
+    non-fulfilment clients with pickup_task_enabled. No COD and no earnings
+    at this leg — cash and pay both belong to the delivery leg.
+    """
+    PICKUP_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('in_progress', 'In Progress'),
+        ('arrived', 'Arrived at Client'),
+        ('collected', 'Collected'),
+        ('dropped', 'Dropped at Hub'),
+        ('handed_off', 'Handed Off'),
+        ('cancelled', 'Cancelled'),
+    ]
+    PICKUP_MODE_CHOICES = [
+        ('assigned', 'Assigned fleet only'),
+        ('public_pool', 'Public pool'),
+    ]
+    DISPOSITION_CHOICES = [
+        ('drop', 'Drop at hub'),
+        ('self_deliver', 'Deliver by self'),
+        ('transfer', 'Transfer to another driver'),
+    ]
+
+    order = models.OneToOneField(
+        orders_models.Order, on_delete=models.CASCADE, related_name='pickup_task')
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.CASCADE, related_name='pickup_tasks')
+    pickup_location = models.ForeignKey(
+        business_models.PickupLocation, on_delete=models.SET_NULL,
+        null=True, related_name='pickup_tasks')
+    drop_warehouse = models.ForeignKey(
+        'warehouse.WarehouseLocation', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='pickup_drop_tasks',
+        help_text="Hub drop point (default warehouse), used when disposition is 'drop'")
+
+    pickup_mode = models.CharField(
+        max_length=20, choices=PICKUP_MODE_CHOICES, default='assigned', db_index=True)
+    disposition = models.CharField(
+        max_length=20, choices=DISPOSITION_CHOICES, default='drop',
+        help_text="Preset from the business config at creation; the driver executes it")
+    status = models.CharField(
+        max_length=20, choices=PICKUP_STATUS_CHOICES, default='pending', db_index=True)
+
+    driver = models.ForeignKey(
+        fleet_models.Driver, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='pickup_tasks')
+
+    # Transfer hand-off (disposition='transfer'): initiated by the pickup driver,
+    # final only when the target driver confirms.
+    transfer_to_driver = models.ForeignKey(
+        fleet_models.Driver, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='incoming_pickup_transfers')
+    transfer_initiated_at = models.DateTimeField(null=True, blank=True)
+    transfer_confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    collected_at = models.DateTimeField(null=True, blank=True)
+    dropped_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Pickup {self.order.order_number} [{self.status}]"
+
+    @property
+    def stage_index(self):
+        """Position on the 6-step progress rail; both terminal states share
+        the last step, cancelled is -1 (rendered flat, no rail)."""
+        return {
+            'pending': 0, 'accepted': 1, 'in_progress': 2, 'arrived': 3,
+            'collected': 4, 'dropped': 5, 'handed_off': 5,
+        }.get(self.status, -1)
+
+    class Meta:
+        verbose_name = "Pickup Task"
+        verbose_name_plural = "Pickup Tasks"
+        app_label = 'delivery'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'pickup_mode'], name='pickup_pool_idx'),
+            models.Index(fields=['driver', 'status'], name='pickup_driver_idx'),
+        ]
 
 
 def shipping_label_upload_path(instance, filename):

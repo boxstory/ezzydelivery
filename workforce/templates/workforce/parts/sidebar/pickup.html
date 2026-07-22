@@ -1,0 +1,24 @@
+{% load workforce_tags %}
+{% comment %}
+Purpose: Workforce sidebar — First-Mile Pickup section (pool status, assign, client fleets)
+Used by: dashboard_sidebar_workforce.html / dashboard_sidebar_workforce_mob.html
+{% endcomment %}
+{% url 'workforce:pickup_pool_status' as u_pickup_pool %}
+{% url 'workforce:pickup_automation_list' as u_pickup_automation %}
+{% with active="pickup_pool_status,pickup_automation_list" %}
+<li id="workforce_sidebar_menu_pickup" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_pickup" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-pickup" data-title="Pickup">
+    <i class="fa-solid fa-boxes-packing me-2"></i>
+    <span>Pickup</span>
+    <span class="badge wf-sidebar__badge ms-auto me-2" data-badge="pickup_pending">{{ pickup_pending_count|default:"0" }}</span>
+    <i class="fa-solid fa-chevron-down"></i>
+  </div>
+  <div id="submenu-pickup" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_pickup_pool" url=u_pickup_pool icon="fa-solid fa-layer-group" label="Pool Status" active_names="pickup_pool_status" badge_var=pickup_pending_count badge_key="pickup_pending" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_pickup_assign" url=u_pickup_pool|add:"?status=pending" icon="fa-solid fa-user-check" label="Pickup Assign" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_pickup_fleets" url=u_pickup_automation icon="fa-solid fa-users-gear" label="Client Driver List" active_names="pickup_automation_list" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

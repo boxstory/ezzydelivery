@@ -1,0 +1,249 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff config — per-business first-mile pickup automation (enabled, pool mode, disposition)
+Used by: workforce_views.pickup_automation_list at /workforce/pickup-automation/
+Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are audit-logged
+{% endcomment %}
+
+{% block title %}Pickup Automation - Staff Dashboard{% endblock title %}
+
+{% block content %}
+{% csrf_token %}
+<div class="col-12">
+
+    <div class="pau__hero">
+        <div>
+            <span class="pau__hero-eyebrow">First-mile &middot; Dispatch rules</span>
+            <h1 class="pau__hero-title">Pickup Automation</h1>
+            <span class="pau__hero-sub">
+                Each new order of an enabled business creates a pickup job automatically —
+                the rule per row decides who sees it and what the driver does after collecting.
+            </span>
+        </div>
+        <div class="d-flex align-items-center flex-wrap gap-3">
+            <div class="pau__tally">
+                <span class="pau__tally-num">{{ enabled_count }}</span>
+                <span class="pau__tally-lbl">Enabled</span>
+            </div>
+            <form method="GET" class="d-flex gap-2">
+                <input type="search" name="search" value="{{ search }}" class="form-control form-control-sm pau__search"
+                       placeholder="Search business…">
+                <button class="btn btn-sm pau__search-btn" type="submit">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="pau__card table-responsive">
+        <table class="pau__table" id="workforce_pickup_automation_table_view">
+            <thead>
+                <tr>
+                    <th class="pau__th">Business</th>
+                    <th class="pau__th text-center">Auto pickup</th>
+                    <th class="pau__th">Pool mode</th>
+                    <th class="pau__th">After collection</th>
+                    <th class="pau__th">Fleet drivers</th>
+                    <th class="pau__th text-end">Save</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for biz in businesses %}
+                <tr class="pau__row{% if not biz.pickup_task_enabled %} pau__row--off{% endif %}" data-business-id="{{ biz.business_id }}">
+                    <td class="pau__td">
+                        <span class="pau__biz">{{ biz.business_name|default:biz.business_code }}</span>
+                        <span class="pau__code">{{ biz.business_code }}</span>
+                    </td>
+                    <td class="pau__td text-center">
+                        <input type="checkbox" role="switch" class="pau__switch pa-enabled"
+                               {% if biz.pickup_task_enabled %}checked{% endif %}>
+                    </td>
+                    <td class="pau__td pau__td--rule">
+                        <select class="form-select form-select-sm pau__select pa-mode">
+                            <option value="assigned" {% if biz.pickup_mode_default == 'assigned' %}selected{% endif %}>Assigned fleet</option>
+                            <option value="public_pool" {% if biz.pickup_mode_default == 'public_pool' %}selected{% endif %}>Public pool</option>
+                        </select>
+                    </td>
+                    <td class="pau__td pau__td--rule">
+                        <select class="form-select form-select-sm pau__select pa-disposition">
+                            <option value="drop" {% if biz.pickup_disposition_default == 'drop' %}selected{% endif %}>Drop at hub</option>
+                            <option value="self_deliver" {% if biz.pickup_disposition_default == 'self_deliver' %}selected{% endif %}>Deliver by self</option>
+                            <option value="transfer" {% if biz.pickup_disposition_default == 'transfer' %}selected{% endif %}>Transfer to driver</option>
+                        </select>
+                    </td>
+                    <td class="pau__td">
+                        <div class="d-flex align-items-center">
+                            {% if biz.active_fleet_count > 0 %}
+                                <span class="pau__fleet-state pau__fleet-state--ok pa-fleet-count">{{ biz.active_fleet_count }} active</span>
+                            {% else %}
+                                <span class="pau__fleet-state pau__fleet-state--none pa-fleet-count">0 drivers</span>
+                            {% endif %}
+                            <button type="button" class="pau__manage ms-2 pa-fleet-open">Manage</button>
+                        </div>
+                        <span class="pau__fleet-names pa-fleet-names">{% for dd in biz.active_fleet %}{{ dd.driver }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                    </td>
+                    <td class="pau__td text-end">
+                        <button type="button" class="btn btn-sm pau__save pa-save">Save</button>
+                    </td>
+                </tr>
+                <tr class="pa-fleet-row" data-business-id="{{ biz.business_id }}" hidden>
+                    <td colspan="6" class="pau__td p-0">
+                        <div class="pau__panel">
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <span class="pau__panel-title me-2">Pickup-allowed drivers — {{ biz.business_name|default:biz.business_code }}</span>
+                                <input type="search" class="form-control form-control-sm w-auto pa-fleet-search"
+                                       placeholder="Search approved driver to add…">
+                                <div class="pa-fleet-search-results d-flex flex-wrap gap-1"></div>
+                            </div>
+                            <div class="pa-fleet-drivers d-flex flex-column">
+                                <small class="text-muted">Loading…</small>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="pau__td text-center text-muted py-4">No active businesses found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Dim the routing cells while a business's auto-pickup rule is off
+    document.querySelectorAll('#workforce_pickup_automation_table_view .pa-enabled').forEach(cb => {
+        cb.addEventListener('change', () =>
+            cb.closest('tr').classList.toggle('pau__row--off', !cb.checked));
+    });
+
+    document.querySelectorAll('#workforce_pickup_automation_table_view .pa-save').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('tr');
+            const form = new FormData();
+            form.append('csrfmiddlewaretoken', csrf);
+            form.append('business_id', row.dataset.businessId);
+            form.append('enabled', row.querySelector('.pa-enabled').checked ? '1' : '0');
+            form.append('mode', row.querySelector('.pa-mode').value);
+            form.append('disposition', row.querySelector('.pa-disposition').value);
+            btn.disabled = true;
+            fetch("{% url 'workforce:pickup_automation_save' %}", { method: 'POST', body: form })
+                .then(r => r.json())
+                .then(res => {
+                    btn.disabled = false;
+                    btn.classList.toggle('pau__save--done', res.success);
+                    btn.classList.toggle('pau__save--fail', !res.success);
+                    btn.textContent = res.success ? 'Saved' : (res.error || 'Failed');
+                    if (res.success) setTimeout(() => {
+                        btn.classList.remove('pau__save--done');
+                        btn.textContent = 'Save';
+                    }, 1600);
+                })
+                .catch(() => { btn.disabled = false; btn.classList.add('pau__save--fail'); btn.textContent = 'Failed'; });
+        });
+    });
+
+    // ---- Per-business pickup fleet management (list / add / toggle / remove) ----
+
+    function fleetPost(data, done) {
+        const form = new FormData();
+        form.append('csrfmiddlewaretoken', csrf);
+        Object.entries(data).forEach(([k, v]) => form.append(k, v));
+        fetch("{% url 'workforce:pickup_fleet_update' %}", { method: 'POST', body: form })
+            .then(r => r.json()).then(done);
+    }
+
+    function loadFleet(panelRow) {
+        const bizId = panelRow.dataset.businessId;
+        const box = panelRow.querySelector('.pa-fleet-drivers');
+        fetch("{% url 'workforce:pickup_automation_list' %}fleet/" + bizId + "/")
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) { box.innerHTML = '<small class="text-danger">Failed to load</small>'; return; }
+                if (!res.drivers.length) {
+                    box.innerHTML = '<small class="text-muted">No drivers yet — search above to add. ' +
+                        'Assigned-mode pickups are invisible until at least one active driver is here.</small>';
+                    return;
+                }
+                box.innerHTML = res.drivers.map(d => `
+                    <div class="d-flex align-items-center gap-2 pau__driver-row py-1" data-row-id="${d.id}">
+                        <span class="${d.is_active ? '' : 'text-muted text-decoration-line-through'}">
+                            ${d.name} <small class="pau__code">${d.code}</small>
+                        </span>
+                        ${d.status !== 'approved' ? '<span class="badge text-bg-warning">' + d.status + '</span>' : ''}
+                        <span class="ms-auto"></span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary pa-fleet-toggle">
+                            ${d.is_active ? 'Disable' : 'Enable'}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger pa-fleet-remove">Remove</button>
+                    </div>`).join('');
+                box.querySelectorAll('.pa-fleet-toggle').forEach(b =>
+                    b.addEventListener('click', () => fleetPost(
+                        { action: 'toggle', row_id: b.closest('[data-row-id]').dataset.rowId },
+                        () => { loadFleet(panelRow); refreshCount(panelRow); })));
+                box.querySelectorAll('.pa-fleet-remove').forEach(b =>
+                    b.addEventListener('click', () => {
+                        if (!confirm('Remove this driver from the pickup fleet?')) return;
+                        fleetPost({ action: 'remove', row_id: b.closest('[data-row-id]').dataset.rowId },
+                            () => { loadFleet(panelRow); refreshCount(panelRow); });
+                    }));
+            });
+    }
+
+    function refreshCount(panelRow) {
+        const bizId = panelRow.dataset.businessId;
+        fetch("{% url 'workforce:pickup_automation_list' %}fleet/" + bizId + "/")
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) return;
+                const activeDrivers = res.drivers.filter(d => d.is_active && d.status === 'approved');
+                const mainRow = document.querySelector(`tr[data-business-id="${bizId}"]:not(.pa-fleet-row)`);
+                if (!mainRow) return;
+                const badge = mainRow.querySelector('.pa-fleet-count');
+                if (badge) {
+                    badge.textContent = activeDrivers.length > 0 ? activeDrivers.length + ' active' : '0 drivers';
+                    badge.className = 'pau__fleet-state pa-fleet-count ' + (activeDrivers.length > 0 ? 'pau__fleet-state--ok' : 'pau__fleet-state--none');
+                }
+                const names = mainRow.querySelector('.pa-fleet-names');
+                if (names) names.textContent = activeDrivers.map(d => d.name).join(', ');
+            });
+    }
+
+    document.querySelectorAll('.pa-fleet-open').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const mainRow = btn.closest('tr');
+            const panelRow = mainRow.nextElementSibling;
+            panelRow.hidden = !panelRow.hidden;
+            if (!panelRow.hidden) loadFleet(panelRow);
+        });
+    });
+
+    document.querySelectorAll('.pa-fleet-search').forEach(input => {
+        let timer = null;
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                const panelRow = input.closest('.pa-fleet-row');
+                const results = panelRow.querySelector('.pa-fleet-search-results');
+                const q = input.value.trim();
+                if (!q) { results.innerHTML = ''; return; }
+                fetch("{% url 'workforce:pickup_fleet_driver_search' %}?q=" + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(res => {
+                        results.innerHTML = (res.drivers || []).map(d =>
+                            `<button type="button" class="btn btn-sm pau__save" data-driver-id="${d.id}">
+                                + ${d.name} <small class="pau__code">${d.code}</small>
+                            </button>`).join('') || '<small class="text-muted">No matches</small>';
+                        results.querySelectorAll('[data-driver-id]').forEach(b =>
+                            b.addEventListener('click', () => fleetPost(
+                                { action: 'add', business_id: panelRow.dataset.businessId, driver_id: b.dataset.driverId },
+                                () => { input.value = ''; results.innerHTML = ''; loadFleet(panelRow); refreshCount(panelRow); })));
+                    });
+            }, 300);
+        });
+    });
+})();
+</script>
+{% endblock content %}

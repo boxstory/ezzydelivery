@@ -216,7 +216,8 @@ class Order(models.Model):
     ]
     qnas_status = models.CharField(max_length=15, choices=QNAS_STATUS, default='not_checked', blank=True)
     COORDS_ACCURACY = [
-        ('by_customer', 'By Customer'),
+        ('by_customer', 'By Client'),
+        ('by_staff', 'By Staff'),
         ('by_driver', 'By Driver'),
         ('exact', 'Exact (Building)'),
         ('street', 'Street Level'),
@@ -595,10 +596,12 @@ class OrderStatusHistory(models.Model):
         ('verification_status', 'Verification Status'),
         ('cod_status_by_staff', 'COD Status'),
         ('dl_task_status', 'Delivery Task Status'),
+        ('pickup_status', 'First-Mile Pickup'),
         ('dl_task_publish', 'Published to Fleet'),
         ('order_edited', 'Order Edited'),
         ('task_edited', 'Task Edited'),
         ('item_deleted', 'Item Deleted'),
+        ('cod_correction', 'COD Correction'),
     ]
 
     order = models.ForeignKey(

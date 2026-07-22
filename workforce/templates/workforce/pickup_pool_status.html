@@ -1,0 +1,189 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff pickup pool — every first-mile pickup task, filters, and assign/reassign to driver
+Used by: workforce_views.pickup_pool_status at /workforce/pickups/
+Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reuses fleet search
+{% endcomment %}
+
+{% block title %}Pickup Pool - Staff Dashboard{% endblock title %}
+
+{% block content %}
+{% csrf_token %}
+<div class="col-12">
+
+    <div class="ppl__hero">
+        <div>
+            <span class="ppl__hero-eyebrow">First-mile &middot; Live pool</span>
+            <h1 class="ppl__hero-title">Pickup Pool</h1>
+        </div>
+        <div class="d-flex align-items-end flex-wrap gap-3">
+            <div class="ppl__tallies">
+                <div class="ppl__tally ppl__tally--alert">
+                    <span class="ppl__tally-num">{{ pending_count }}</span>
+                    <span class="ppl__tally-lbl">Unclaimed</span>
+                </div>
+                <div class="ppl__tally">
+                    <span class="ppl__tally-num">{{ active_count }}</span>
+                    <span class="ppl__tally-lbl">Active</span>
+                </div>
+            </div>
+            <form method="GET" class="d-flex flex-wrap gap-2">
+                <select name="status" class="form-select form-select-sm w-auto ppl__ffield" onchange="this.form.submit()">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <select name="mode" class="form-select form-select-sm w-auto ppl__ffield" onchange="this.form.submit()">
+                    <option value="all" {% if mode_filter == 'all' %}selected{% endif %}>All modes</option>
+                    <option value="assigned" {% if mode_filter == 'assigned' %}selected{% endif %}>Assigned fleet</option>
+                    <option value="public_pool" {% if mode_filter == 'public_pool' %}selected{% endif %}>Public pool</option>
+                </select>
+                <input type="search" name="search" value="{{ search }}" class="form-control form-control-sm w-auto ppl__ffield"
+                       placeholder="Order / business / driver…">
+                <button class="btn btn-sm ppl__fbtn" type="submit">Filter</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="ppl__card table-responsive">
+        <table class="ppl__table" id="workforce_pickup_pool_table_view">
+            <thead>
+                <tr>
+                    <th class="ppl__th">Order</th>
+                    <th class="ppl__th">Client / collect from</th>
+                    <th class="ppl__th">Mode</th>
+                    <th class="ppl__th">After collection</th>
+                    <th class="ppl__th">Status</th>
+                    <th class="ppl__th">Driver</th>
+                    <th class="ppl__th">Age</th>
+                    <th class="ppl__th text-end">Assign</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pickups %}
+                <tr class="ppl__row{% if p.status == 'pending' %} ppl__row--pending{% endif %}" data-pickup-id="{{ p.id }}">
+                    <td class="ppl__td"><span class="ppl__order">{{ p.order.order_number }}</span></td>
+                    <td class="ppl__td">
+                        <span class="ppl__biz">{{ p.business.business_name|default:p.business.business_code }}</span>
+                        {% if p.pickup_location %}
+                        <span class="ppl__sub">{{ p.pickup_location.pickup_location_title }}
+                            {% if p.pickup_location.pickup_zone_no %}· Z{{ p.pickup_location.pickup_zone_no }}{% endif %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="ppl__td">
+                        {% if p.pickup_mode == 'public_pool' %}
+                        <span class="ppl__mode ppl__mode--public">Public pool</span>
+                        {% else %}
+                        <span class="ppl__mode">Assigned</span>
+                        {% endif %}
+                    </td>
+                    <td class="ppl__td"><span class="ppl__sub">{{ p.get_disposition_display }}</span></td>
+                    <td class="ppl__td">
+                        <span class="ppl__status {% if p.status == 'pending' %}ppl__status--pending{% elif p.status == 'cancelled' %}ppl__status--cancelled{% elif p.status == 'dropped' or p.status == 'handed_off' %}ppl__status--done{% elif p.status == 'collected' %}ppl__status--collected{% else %}ppl__status--moving{% endif %}">
+                            {{ p.get_status_display }}
+                        </span>
+                        {% if p.transfer_to_driver and p.status == 'collected' %}
+                        <span class="ppl__sub">→ {{ p.transfer_to_driver }} (awaiting confirm)</span>
+                        {% endif %}
+                    </td>
+                    <td class="ppl__td">
+                        {% if p.driver %}{{ p.driver }} <span class="ppl__code">{{ p.driver.driver_code }}</span>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="ppl__td"><span class="ppl__age">{{ p.created_at|timesince }}</span></td>
+                    <td class="ppl__td text-end">
+                        {% if p.status == 'pending' %}
+                        <button type="button" class="btn btn-sm ppl__btn ppl__btn--primary pp-assign-open">Assign</button>
+                        {% elif p.status == 'accepted' or p.status == 'in_progress' or p.status == 'arrived' %}
+                        <button type="button" class="btn btn-sm ppl__btn pp-assign-open">Reassign</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr class="pp-assign-row" hidden>
+                    <td colspan="8" class="ppl__td p-0">
+                        <div class="ppl__panel">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="ppl__panel-title me-1">Assign {{ p.order.order_number }} to</span>
+                                <input type="search" class="form-control form-control-sm w-auto pp-assign-search"
+                                       placeholder="Search approved driver…" autocomplete="off">
+                                <div class="pp-assign-results d-flex flex-wrap gap-1"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="ppl__td text-center text-muted py-4">No pickup tasks match this filter.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav class="d-flex justify-content-center">
+        <ul class="pagination pagination-sm">
+            {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?status={{ status_filter }}&mode={{ mode_filter }}&search={{ search }}&page={{ page_obj.previous_page_number }}">‹</a></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?status={{ status_filter }}&mode={{ mode_filter }}&search={{ search }}&page={{ page_obj.next_page_number }}">›</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<script>
+(function () {
+    'use strict';
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    document.querySelectorAll('#workforce_pickup_pool_table_view .pp-assign-open').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const panel = btn.closest('tr').nextElementSibling;
+            panel.hidden = !panel.hidden;
+            if (!panel.hidden) panel.querySelector('.pp-assign-search').focus();
+        });
+    });
+
+    document.querySelectorAll('.pp-assign-search').forEach(input => {
+        let timer = null;
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                const panel = input.closest('.pp-assign-row');
+                const pickupId = panel.previousElementSibling.dataset.pickupId;
+                const results = panel.querySelector('.pp-assign-results');
+                const q = input.value.trim();
+                if (!q) { results.innerHTML = ''; return; }
+                fetch("{% url 'workforce:pickup_fleet_driver_search' %}?q=" + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(res => {
+                        results.innerHTML = (res.drivers || []).map(d =>
+                            `<button type="button" class="btn btn-sm ppl__btn" data-driver-id="${d.id}">
+                                + ${d.name} <small class="ppl__code">${d.code}</small>
+                            </button>`).join('') || '<small class="text-muted">No matches</small>';
+                        results.querySelectorAll('[data-driver-id]').forEach(b =>
+                            b.addEventListener('click', () => {
+                                const form = new FormData();
+                                form.append('csrfmiddlewaretoken', csrf);
+                                form.append('pickup_id', pickupId);
+                                form.append('driver_id', b.dataset.driverId);
+                                b.disabled = true;
+                                fetch("{% url 'workforce:pickup_staff_assign' %}", { method: 'POST', body: form })
+                                    .then(r => r.json())
+                                    .then(res2 => {
+                                        if (res2.success) location.reload();
+                                        else { alert(res2.error || 'Failed'); b.disabled = false; }
+                                    });
+                            }));
+                    });
+            }, 300);
+        });
+    });
+})();
+</script>
+{% endblock content %}

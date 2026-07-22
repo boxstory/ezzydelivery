@@ -163,6 +163,30 @@ class Business(models.Model):
         help_text="Enable temp order sync for this business"
     )
 
+    # First-mile pickup — a PickupTask is auto-created on order creation so a driver
+    # collects goods from the client's location (skipped for fulfilment-centre orders).
+    PICKUP_MODE_CHOICES = [
+        ('assigned', 'Assigned fleet only'),
+        ('public_pool', 'Public pool (all active drivers)'),
+    ]
+    PICKUP_DISPOSITION_CHOICES = [
+        ('drop', 'Drop at hub'),
+        ('self_deliver', 'Deliver by self'),
+        ('transfer', 'Transfer to another driver'),
+    ]
+    pickup_task_enabled = models.BooleanField(
+        default=False,
+        help_text="Auto-create a first-mile pickup task when this business creates an order"
+    )
+    pickup_mode_default = models.CharField(
+        max_length=20, choices=PICKUP_MODE_CHOICES, default='assigned',
+        help_text="Who may claim this business's pickup tasks"
+    )
+    pickup_disposition_default = models.CharField(
+        max_length=20, choices=PICKUP_DISPOSITION_CHOICES, default='drop',
+        help_text="Preset route after collection: drop at hub, deliver by self, or transfer"
+    )
+
     # Shared column mapping used across all import sources (OneDrive, Google Sheet, CSV, Public Link)
     # Format: {db_field: source_column_header}  e.g. {"customer_name": "Customer Name", "customer_phone": "Phone"}
     import_mapping = models.JSONField(default=dict, blank=True,
@@ -742,6 +766,10 @@ class DriverDirectory(models.Model):
         Business, on_delete=models.CASCADE, related_name='driver_directory')
     driver = models.ForeignKey(
         fleet_models.Driver, on_delete=models.CASCADE, related_name='driver_directory')
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Inactive drivers stay linked but no longer see this business's assigned pickups"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

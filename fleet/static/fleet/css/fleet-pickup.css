@@ -1,0 +1,339 @@
+/* Purpose: First-mile Pickup tab styles (fps__) — card route block, mode badge, transfer sheet */
+/* Used by: fleet/templates/fleet/driver_pickups_pwa.html */
+/* Notes: Layout comes from existing task-card/fleet classes; only pickup-specific visuals here */
+
+.fps__card { border-left: 3px solid var(--brand-primary, #1a2233); }
+
+.fps__mode {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--gray-300, #d5d9e0);
+    color: var(--gray-700, #444c5c);
+    background: var(--gray-100, #f4f5f7);
+}
+.fps__mode--public_pool {
+    border-color: var(--brand-secondary, #d8971a);
+    color: var(--brand-secondary-dark, #8a5f0d);
+    background: transparent;
+}
+
+.fps__order { font-weight: 600; font-size: 0.85rem; }
+.fps__status { margin-left: auto; font-size: 0.75rem; color: var(--gray-600, #55607a); }
+
+.fps__route { display: flex; flex-direction: column; gap: 2px; padding: 10px 0 6px; }
+.fps__stop { display: flex; gap: 10px; align-items: flex-start; }
+.fps__stop > i { margin-top: 3px; color: var(--gray-600, #55607a); width: 16px; text-align: center; }
+.fps__stop-label {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-500, #7a8298);
+}
+.fps__stop-name { font-weight: 600; font-size: 0.9rem; }
+.fps__stop-addr { font-size: 0.78rem; color: var(--gray-600, #55607a); }
+.fps__arrow { padding-left: 4px; color: var(--gray-400, #aab0bf); font-size: 0.7rem; }
+
+.fps__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 0.75rem;
+    color: var(--gray-600, #55607a);
+    border-top: 1px solid var(--gray-200, #e7e9ee);
+    padding-top: 8px;
+}
+.fps__meta i { margin-right: 3px; }
+.fps__meta-time { margin-left: auto; }
+
+.fps__actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.fps__actions .fleet-btn { flex: 1; justify-content: center; }
+.fps__btn-accept { background: var(--brand-primary, #1a2233); color: #fff; }
+.fps__btn-collect { background: var(--success, #2f7a52); color: #fff; }
+.fps__waiting { font-size: 0.8rem; color: var(--gray-600, #55607a); padding: 8px 0; }
+
+/* Transfer driver picker sheet */
+.fps__sheet {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 20, 28, 0.55);
+    z-index: 1200;
+    display: flex;
+    align-items: flex-end;
+}
+.fps__sheet[hidden] { display: none; }
+.fps__sheet-panel {
+    background: var(--white, #fff);
+    width: 100%;
+    max-height: 70vh;
+    border-radius: 14px 14px 0 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: fps-sheet-up 0.22s ease-out;
+}
+@keyframes fps-sheet-up {
+    from { transform: translateY(24px); opacity: 0.6; }
+    to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fps__sheet-panel { animation: none; }
+}
+.fps__sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.fps__sheet-list { overflow-y: auto; display: flex; flex-direction: column; }
+.fps__sheet-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+    padding: 12px 4px;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--gray-200, #e7e9ee);
+    font-size: 0.92rem;
+    text-align: left;
+}
+.fps__sheet-item small { color: var(--gray-500, #7a8298); }
+.fps__sheet-empty { color: var(--gray-500, #7a8298); font-size: 0.85rem; padding: 12px 4px; }
+
+/* Customer line — who the parcel is for (name to match the label + tap-to-call) */
+.fps__customer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0 2px;
+    font-size: 0.8rem;
+}
+.fps__customer > i { color: #9ca3af; font-size: 0.72rem; }
+.fps__customer-name { font-weight: 700; color: #001f3f; }
+.fps__customer-phone {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #001f3f;
+    text-decoration: none;
+    border: 1px solid #d5dbe3;
+    border-radius: 6px;
+    padding: 3px 9px;
+}
+.fps__customer-phone i { font-size: 0.66rem; }
+
+/* ============================================================================
+   LEDGER PASS (frontend-design) — same navy/yellow system as the Tasks page
+   (body.ftk): mono coded data, swatch statuses, ONE yellow primary per card,
+   QNAS plate on the collect-from address. Overrides the base rules above.
+   ============================================================================ */
+
+.fps__card { border-left: 0; }
+
+.fps__order {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-weight: 700;
+    color: #001f3f;
+}
+
+/* Status: square swatch + uppercase text, colored by state */
+.fps__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+}
+.fps__status::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: currentColor;
+    flex-shrink: 0;
+}
+.fps__status--pending     { color: #92400e; }
+.fps__status--accepted,
+.fps__status--in_progress { color: #1d4ed8; }
+.fps__status--arrived     { color: #92400e; }
+.fps__status--collected,
+.fps__status--dropped,
+.fps__status--handed_off  { color: #15803d; }
+.fps__status--cancelled   { color: #dc2626; }
+
+/* Smaller plate for the collect-from address */
+.ftk .ftk__plate--sm { margin-top: 3px; }
+.ftk .ftk__plate--sm .ftk__plate-num { font-size: 14px; }
+.ftk .ftk__plate--sm .ftk__plate-cell { padding: 2px 7px 3px; }
+.ftk .ftk__plate--sm .ftk__plate-tag { font-size: 7px; }
+
+/* Actions: the card's single primary is yellow; steps navy; navigate outline */
+.fps__btn-accept,
+.fps__btn-collect {
+    background: #f7c000;
+    color: #001f3f;
+    font-weight: 700;
+}
+.fps__btn-step {
+    background: #001f3f;
+    color: #fff;
+}
+.fps__btn-nav {
+    background: #fff;
+    border: 1.5px solid #001f3f;
+    color: #001f3f;
+}
+.fps__actions .fleet-btn:focus-visible { outline: 2px solid #f7c000; outline-offset: 2px; }
+
+/* ============================================================================
+   MOBILE POLISH — console-grade density. Structured route rail (icon tiles on
+   a hairline spine), boxed customer strip, compact type scale, slim actions.
+   Overrides the base + ledger rules above by source order.
+   ============================================================================ */
+
+.ftk .fps__card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    margin-bottom: 10px;
+    padding-bottom: 12px;
+    cursor: default;
+}
+.fps__card .task-card__header {
+    padding: 7px 14px;
+    gap: 8px;
+}
+.fps__mode {
+    font-size: 0.56rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.fps__order { font-size: 0.76rem; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; }
+.fps__status { font-size: 0.58rem; flex-shrink: 0; }
+
+/* --- Route rail: icon tiles on a hairline spine, no floating arrow --- */
+.fps__route {
+    position: relative;
+    margin: 0 14px;
+    padding: 11px 0 4px;
+    gap: 12px;
+}
+.fps__arrow { display: none; }
+.fps__route::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 34px;
+    bottom: 14px;
+    width: 1.5px;
+    background: #e5e7eb;
+}
+.fps__stop { gap: 11px; }
+.fps__stop > i {
+    position: relative;
+    z-index: 1;
+    width: 23px;
+    height: 23px;
+    margin-top: 0;
+    border-radius: 7px;
+    background: #eef1f5;
+    color: #001f3f;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.58rem;
+    flex-shrink: 0;
+}
+.fps__stop-label {
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    color: #9ca3af;
+    line-height: 1.3;
+}
+.fps__stop-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #001f3f;
+    line-height: 1.25;
+}
+.fps__stop-addr { font-size: 0.7rem; color: #6b7280; line-height: 1.3; }
+
+/* --- Customer strip: its own quiet panel --- */
+.fps__customer {
+    margin: 6px 14px 0;
+    padding: 8px 10px;
+    background: #f8f9fb;
+    border: 1px solid #eef1f5;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+.fps__customer-name { font-size: 0.92rem; }
+.fps__customer-phone { background: #fff; padding: 5px 10px; font-size: 0.85rem; }
+
+/* --- Meta: one quiet line --- */
+.fps__meta {
+    margin: 8px 14px 0;
+    padding-top: 7px;
+    font-size: 0.66rem;
+    color: #9ca3af;
+    border-top: 1px solid #f1f3f6;
+}
+.fps__meta i { color: #c3c9d2; }
+
+/* --- Actions: slim, still thumb-sized --- */
+.fps__actions {
+    margin: 9px 14px 0;
+    gap: 8px;
+}
+.fps__actions .fleet-btn {
+    min-height: 42px;
+    padding: 9px 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    border-radius: 9px;
+    box-shadow: none;
+}
+.fps__actions .fleet-btn:active { transform: scale(0.98); }
+
+/* Plate hugs the rail column */
+.ftk .ftk__plate--sm { margin-top: 4px; }
+
+/* Pin links at the right of each stop row */
+.fps__stop-pin {
+    margin-left: auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    border: 1.5px solid #001f3f;
+    border-radius: 8px;
+    background: #fff;
+    color: #001f3f;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+.fps__stop-pin i { color: #f7c000; font-size: 0.72rem; }
+.fps__stop-pin:active { transform: scale(0.96); }
+
+/* Location grouping: stable left-border color per pickup location */
+.ftk .fps__card[class*="fps__card--loc"] { border-left-width: 4px; border-left-style: solid; }
+.ftk .fps__card--loc0 { border-left-color: #f7c000; }
+.ftk .fps__card--loc1 { border-left-color: #2563eb; }
+.ftk .fps__card--loc2 { border-left-color: #15803d; }
+.ftk .fps__card--loc3 { border-left-color: #d97706; }
+.ftk .fps__card--loc4 { border-left-color: #7c3aed; }
+.ftk .fps__card--loc5 { border-left-color: #0e7490; }
+.ftk .fps__card--loc6 { border-left-color: #be185d; }
+.ftk .fps__card--loc7 { border-left-color: #64748b; }

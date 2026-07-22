@@ -1,0 +1,282 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Driver PWA Pickup tab — first-mile list (collect from client, then drop/self/transfer)
+Used by: fleet_views.driver_pickups at /fleet/pickups/
+Notes: Separate from delivery tasks; cards act per preset disposition, transfer needs both-party confirm
+{% endcomment %}
+
+{% block title %}Pickups{% endblock %}
+{% block body_class %}ftk{% endblock %}
+{% block page_title %}Pickups{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-pickup.css' %}?v=20260722h">
+{% endblock %}
+
+{% block content %}
+
+<!-- Tab Navigation -->
+<div class="fleet-tabs fleet-fade-in">
+    <button type="button" class="fleet-tab {% if current_tab == 'available' %}active{% endif %}"
+            onclick="location.href='?tab=available'">
+        Available
+        {% if available_count > 0 %}<span class="fleet-tab__badge">{{ available_count }}</span>{% endif %}
+    </button>
+    <button type="button" class="fleet-tab {% if current_tab == 'mine' %}active{% endif %}"
+            onclick="location.href='?tab=mine'">
+        Mine
+        {% if mine_count > 0 %}<span class="fleet-tab__badge fleet-tab__badge--success">{{ mine_count }}</span>{% endif %}
+    </button>
+    <button type="button" class="fleet-tab {% if current_tab == 'in_progress' %}active{% endif %}"
+            onclick="location.href='?tab=in_progress'">
+        In Progress
+        {% if in_progress_count > 0 %}<span class="fleet-tab__badge">{{ in_progress_count }}</span>{% endif %}
+    </button>
+</div>
+
+{% if cards %}
+{% for pk_task in cards %}
+<div class="task-card fleet-slide-up fps__card fps__card--loc{{ pk_task.loc_color }}" style="animation-delay: {{ forloop.counter0 }}00ms;">
+
+    <div class="task-card__header">
+        <span class="fps__mode fps__mode--{{ pk_task.pickup_mode }}">
+            {% if pk_task.pickup_mode == 'public_pool' %}Public Pool{% else %}Assigned{% endif %}
+        </span>
+        <span class="fps__order">{{ pk_task.order.order_number }}</span>
+        <span class="fps__status fps__status--{{ pk_task.status }}">{{ pk_task.get_status_display }}</span>
+    </div>
+
+    <div class="fps__route">
+        <div class="fps__stop">
+            <i class="fa-solid fa-store"></i>
+            <div>
+                <div class="fps__stop-label">Collect from</div>
+                <div class="fps__stop-name">{{ pk_task.business.business_name }}</div>
+                {% if pk_task.pickup_location %}
+                <div class="fps__stop-addr">{{ pk_task.pickup_location.pickup_location_title }}</div>
+                {% if pk_task.pickup_location.pickup_zone_no or pk_task.pickup_location.pickup_street_no or pk_task.pickup_location.pickup_building_no %}
+                <span class="ftk__plate ftk__plate--sm">
+                    <span class="ftk__plate-cell"><span class="ftk__plate-tag">Zone</span><span class="ftk__plate-num{% if not pk_task.pickup_location.pickup_zone_no %} ftk__plate-num--empty{% endif %}">{{ pk_task.pickup_location.pickup_zone_no|default:"—" }}</span></span>
+                    <span class="ftk__plate-cell"><span class="ftk__plate-tag">St</span><span class="ftk__plate-num{% if not pk_task.pickup_location.pickup_street_no %} ftk__plate-num--empty{% endif %}">{{ pk_task.pickup_location.pickup_street_no|default:"—" }}</span></span>
+                    <span class="ftk__plate-cell"><span class="ftk__plate-tag">Bldg</span><span class="ftk__plate-num{% if not pk_task.pickup_location.pickup_building_no %} ftk__plate-num--empty{% endif %}">{{ pk_task.pickup_location.pickup_building_no|default:"—" }}</span></span>
+                </span>
+                {% endif %}
+                {% endif %}
+            </div>
+            {% if pk_task.pickup_location.pickup_lat and pk_task.pickup_location.pickup_lon %}
+            <a class="fps__stop-pin" href="https://www.google.com/maps?q={{ pk_task.pickup_location.pickup_lat }},{{ pk_task.pickup_location.pickup_lon }}"
+               target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open pickup in Maps">
+                <i class="fa-solid fa-location-dot"></i> Pin
+            </a>
+            {% endif %}
+        </div>
+        <div class="fps__arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <div class="fps__stop">
+            {% if pk_task.disposition == 'drop' %}
+            <i class="fa-solid fa-warehouse"></i>
+            <div>
+                <div class="fps__stop-label">Drop at hub</div>
+                <div class="fps__stop-name">{% if pk_task.drop_warehouse %}{{ pk_task.drop_warehouse.warehouse.name }} · {{ pk_task.drop_warehouse.name }}{% else %}EzzyDelivery Hub{% endif %}</div>
+            </div>
+            {% if pk_task.drop_warehouse %}
+            {% with wwlat=pk_task.drop_warehouse.warehouse.latitude wwlon=pk_task.drop_warehouse.warehouse.longitude %}
+            {% with wlat=pk_task.drop_warehouse.latitude|default:wwlat wlon=pk_task.drop_warehouse.longitude|default:wwlon %}
+            {% if wlat and wlon %}
+            <a class="fps__stop-pin" href="https://www.google.com/maps?q={{ wlat }},{{ wlon }}"
+               target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open hub in Maps">
+                <i class="fa-solid fa-location-dot"></i> Pin
+            </a>
+            {% endif %}
+            {% endwith %}{% endwith %}
+            {% endif %}
+            {% elif pk_task.disposition == 'self_deliver' %}
+            <i class="fa-solid fa-person-biking"></i>
+            <div>
+                <div class="fps__stop-label">Then</div>
+                <div class="fps__stop-name">Deliver to customer yourself</div>
+            </div>
+            {% else %}
+            <i class="fa-solid fa-people-arrows"></i>
+            <div>
+                <div class="fps__stop-label">Then</div>
+                <div class="fps__stop-name">
+                    {% if pk_task.transfer_to_driver %}Hand to {{ pk_task.transfer_to_driver }}{% else %}Hand to another driver{% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="fps__customer">
+        <i class="fa-solid fa-user"></i>
+        <span class="fps__customer-name">{{ pk_task.order.customer_name|default:"—" }}</span>
+        {% if pk_task.order.customer_phone %}
+        <a href="tel:{{ pk_task.order.customer_phone }}" class="fps__customer-phone" onclick="event.stopPropagation()">
+            <i class="fa-solid fa-phone"></i> xxx{{ pk_task.order.customer_phone|slice:"3:" }}
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="fps__meta">
+        <span><i class="fa-solid fa-box"></i> {{ pk_task.order.package_qty|default:1 }} pkg</span>
+        {% if pk_task.order.package_description %}<span>{{ pk_task.order.package_description|truncatechars:34 }}</span>{% endif %}
+        <span class="fps__meta-time">{{ pk_task.created_at|timesince }} ago</span>
+    </div>
+
+    <div class="fps__actions" data-pickup-id="{{ pk_task.id }}">
+        {% if current_tab == 'available' %}
+            <button class="fleet-btn fps__btn-accept" onclick="pickupAccept({{ pk_task.id }}, this)">
+                <i class="fa-solid fa-hand"></i> Accept pickup
+            </button>
+        {% elif current_tab == 'mine' %}
+            {% if pk_task.pickup_location.pickup_lat %}
+            <a class="fleet-btn fps__btn-nav"
+               href="https://www.google.com/maps/dir/?api=1&destination={{ pk_task.pickup_location.pickup_lat }},{{ pk_task.pickup_location.pickup_lon }}"
+               target="_blank" rel="noopener"><i class="fa-solid fa-diamond-turn-right"></i> Navigate</a>
+            {% endif %}
+            {% if pk_task.status == 'accepted' %}
+            <button class="fleet-btn fps__btn-step" onclick="pickupStatus({{ pk_task.id }}, 'in_progress', this)">
+                <i class="fa-solid fa-truck-fast"></i> Start
+            </button>
+            {% elif pk_task.status == 'in_progress' %}
+            <button class="fleet-btn fps__btn-step" onclick="pickupStatus({{ pk_task.id }}, 'arrived', this)">
+                <i class="fa-solid fa-location-dot"></i> Arrived
+            </button>
+            {% elif pk_task.status == 'arrived' %}
+            <button class="fleet-btn fps__btn-collect" onclick="pickupStatus({{ pk_task.id }}, 'collected', this)">
+                <i class="fa-solid fa-box-open"></i> Collected
+            </button>
+            {% endif %}
+        {% elif current_tab == 'in_progress' %}
+            {% if pk_task.transfer_to_driver_id and pk_task.transfer_to_driver_id == driver.pk %}
+            <button class="fleet-btn fps__btn-collect" onclick="pickupConfirmTransfer({{ pk_task.id }}, this)">
+                <i class="fa-solid fa-handshake"></i> Confirm hand-off from {{ pk_task.driver }}
+            </button>
+            {% elif pk_task.transfer_to_driver %}
+            <span class="fps__waiting"><i class="fa-solid fa-hourglass-half"></i> Waiting for {{ pk_task.transfer_to_driver }} to confirm</span>
+            {% else %}
+            <button class="fleet-btn {% if pk_task.disposition == 'drop' %}fps__btn-collect{% else %}fps__btn-step{% endif %}"
+                    onclick="pickupRoute({{ pk_task.id }}, this, 'drop')">
+                <i class="fa-solid fa-warehouse"></i> Drop at hub
+            </button>
+            <button class="fleet-btn {% if pk_task.disposition == 'self_deliver' %}fps__btn-collect{% else %}fps__btn-step{% endif %}"
+                    onclick="pickupRoute({{ pk_task.id }}, this, 'self_deliver')">
+                <i class="fa-solid fa-person-biking"></i> Deliver myself
+            </button>
+            <button class="fleet-btn {% if pk_task.disposition == 'transfer' %}fps__btn-collect{% else %}fps__btn-step{% endif %}"
+                    onclick="pickupOpenTransfer({{ pk_task.id }})">
+                <i class="fa-solid fa-people-arrows"></i> Transfer
+            </button>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="fleet-empty fleet-fade-in">
+    <div class="fleet-empty__icon">
+        {% if current_tab == 'available' %}<i class="fa-solid fa-boxes-packing"></i>
+        {% elif current_tab == 'mine' %}<i class="fa-solid fa-hand"></i>
+        {% else %}<i class="fa-solid fa-truck-ramp-box"></i>{% endif %}
+    </div>
+    <div class="fleet-empty__title">
+        {% if current_tab == 'available' %}No pickups available
+        {% elif current_tab == 'mine' %}No accepted pickups
+        {% else %}Nothing in progress{% endif %}
+    </div>
+    <div class="fleet-empty__text">
+        {% if current_tab == 'available' %}New pickup jobs from clients will appear here.
+        {% elif current_tab == 'mine' %}Accept a pickup from the Available tab to start collecting.
+        {% else %}Packages you collect will appear here until they are dropped off or handed over.{% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Transfer driver picker sheet -->
+<div class="fps__sheet" id="fps_transfer_sheet" hidden>
+    <div class="fps__sheet-panel">
+        <div class="fps__sheet-head">
+            <strong>Transfer to driver</strong>
+            <button type="button" class="fleet-btn-icon" onclick="pickupCloseTransfer()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <input type="search" id="fps_transfer_search" class="fleet-select" placeholder="Search driver name…"
+               oninput="pickupLoadTargets(this.value)">
+        <div id="fps_transfer_list" class="fps__sheet-list"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    let transferPickupId = null;
+
+    function csrf() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    function post(url, data, btn, done) {
+        if (btn) { btn.disabled = true; }
+        const form = new FormData();
+        Object.entries(data).forEach(([k, v]) => form.append(k, v));
+        form.append('csrfmiddlewaretoken', csrf());
+        fetch(url, { method: 'POST', body: form })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    if (typeof showToast === 'function' && res.message) showToast(res.message, 'success');
+                    done ? done(res) : location.reload();
+                } else {
+                    if (typeof showToast === 'function') showToast(res.error || 'Failed', 'danger');
+                    else alert(res.error || 'Failed');
+                    if (btn) btn.disabled = false;
+                }
+            })
+            .catch(() => { if (btn) btn.disabled = false; });
+    }
+
+    window.pickupAccept = function (id, btn) {
+        post('{% url "fleet:accept_pickup" %}', { pickup_id: id }, btn, () => location.href = '?tab=mine');
+    };
+    window.pickupStatus = function (id, status, btn) {
+        post('{% url "fleet:update_pickup_status" %}', { pickup_id: id, status: status }, btn,
+            status === 'collected' ? () => location.href = '?tab=in_progress' : null);
+    };
+    window.pickupRoute = function (id, btn, disposition) {
+        post('{% url "fleet:route_pickup" %}', { pickup_id: id, disposition: disposition || '' }, btn);
+    };
+    window.pickupConfirmTransfer = function (id, btn) {
+        post('{% url "fleet:confirm_pickup_transfer" %}', { pickup_id: id }, btn);
+    };
+
+    window.pickupOpenTransfer = function (id) {
+        transferPickupId = id;
+        document.getElementById('fps_transfer_sheet').hidden = false;
+        pickupLoadTargets('');
+    };
+    window.pickupCloseTransfer = function () {
+        document.getElementById('fps_transfer_sheet').hidden = true;
+        transferPickupId = null;
+    };
+    window.pickupLoadTargets = function (q) {
+        fetch('{% url "fleet:pickup_transfer_targets" %}?q=' + encodeURIComponent(q || ''))
+            .then(r => r.json())
+            .then(res => {
+                const list = document.getElementById('fps_transfer_list');
+                if (!res.success) { list.innerHTML = ''; return; }
+                list.innerHTML = res.drivers.map(d =>
+                    `<button type="button" class="fps__sheet-item" data-id="${d.id}">
+                        <span>${d.name}</span><small>${d.code || ''}</small>
+                    </button>`).join('') || '<p class="fps__sheet-empty">No drivers found</p>';
+                list.querySelectorAll('.fps__sheet-item').forEach(el => {
+                    el.addEventListener('click', () => {
+                        post('{% url "fleet:route_pickup" %}',
+                            { pickup_id: transferPickupId, target_driver_id: el.dataset.id, disposition: 'transfer' }, el);
+                        pickupCloseTransfer();
+                    });
+                });
+            });
+    };
+})();
+</script>
+{% endblock %}

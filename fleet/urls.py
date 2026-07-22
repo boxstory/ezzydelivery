@@ -76,6 +76,20 @@ urlpatterns = [
      path('pickup/scan/',
           fleet_views.pickup_scan_process, name='pickup_scan_process'),
 
+     # First-Mile Pickups (collect from client)
+     path('pickups/',
+          fleet_views.driver_pickups, name='driver_pickups'),
+     path('pickups/accept/',
+          fleet_views.accept_pickup, name='accept_pickup'),
+     path('pickups/status/',
+          fleet_views.update_pickup_status, name='update_pickup_status'),
+     path('pickups/route/',
+          fleet_views.route_pickup, name='route_pickup'),
+     path('pickups/transfer/confirm/',
+          fleet_views.confirm_pickup_transfer, name='confirm_pickup_transfer'),
+     path('pickups/transfer/targets/',
+          fleet_views.pickup_transfer_targets, name='pickup_transfer_targets'),
+
      # Notifications
      path('notifications/',
           fleet_views.driver_notifications, name='driver_notifications'),

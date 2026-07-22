@@ -4,6 +4,15 @@ Provides sidebar badge counts for the workforce dashboard.
 """
 
 
+def _safe_count_pickup_pending():
+    """Count unclaimed first-mile pickup tasks. Returns 0 defensively."""
+    try:
+        from delivery.models import PickupTask
+        return PickupTask.objects.filter(status='pending', driver__isnull=True).count()
+    except Exception:
+        return 0
+
+
 def _safe_count_crm_overdue():
     """Count open CRM leads whose follow-up date has passed. Returns 0 if the
     crm app or its migrations aren't ready (defensive)."""
@@ -116,6 +125,9 @@ def workforce_sidebar_counts(request):
 
         # Open CRM leads with an overdue follow-up (CRM sidebar badge)
         'crm_overdue_count': _safe_count_crm_overdue(),
+
+        # Unclaimed first-mile pickups (Pickup sidebar badge)
+        'pickup_pending_count': _safe_count_pickup_pending(),
     }
 
     cache.set(cache_key, counts, 60)  # 60 second TTL

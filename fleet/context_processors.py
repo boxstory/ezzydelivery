@@ -19,6 +19,7 @@ def driver_wallet_status(request):
         'driver_wallet_warning': None,
         'driver_wallet_blocked': False,
         'unread_notifications': 0,
+        'pickup_badge_count': 0,
     }
 
     if not request.user.is_authenticated:
@@ -46,6 +47,13 @@ def driver_wallet_status(request):
 
         context['unread_notifications'] = fleet_models.DriverNotification.objects.filter(
             driver=driver, is_read=False
+        ).count()
+
+        # Pickup tab badge: claimable first-mile pickups + own active ones
+        from delivery.selectors import pickup_pool_for
+        from delivery.models import PickupTask
+        context['pickup_badge_count'] = pickup_pool_for(driver).count() + PickupTask.objects.filter(
+            driver=driver, status__in=['accepted', 'in_progress', 'arrived', 'collected']
         ).count()
 
     except fleet_models.Driver.DoesNotExist:
