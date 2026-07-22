@@ -583,6 +583,7 @@ def send_admin_inquiry_notification(inquiry):
 *Company:* {inquiry.business_name}
 *Contact:* {inquiry.full_name}
 *Phone:* {inquiry.business_contact_number}
+*Email:* {inquiry.email or '—'}
 
 *Product Category:* {inquiry.product_category}
 *Order Volume (Last Month):* {inquiry.avarage_number_of_order_done_last_month}

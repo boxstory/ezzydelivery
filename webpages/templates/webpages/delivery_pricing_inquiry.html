@@ -11,7 +11,7 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260627a" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260722i" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -20,41 +20,24 @@
      HERO SECTION
      ═══════════════════════════════════════════════════════════════════════════ -->
 <div class="wppi__hero" id="wppi_hero">
-  <div class="wppi__hero-bg-ring wppi__hero-bg-ring--1"></div>
-  <div class="wppi__hero-bg-ring wppi__hero-bg-ring--2"></div>
+  <div class="wppi__hero-barcode d-none d-lg-block"></div>
   <div class="container position-relative">
     <div class="wppi__hero-inner">
 
-      <!-- Badge -->
-      <div class="wppi__hero-badge" id="wppi_hero_badge">
-        <i class="fa-solid fa-truck-fast"></i>
-        Qatar's Leading 3PL Partner
-      </div>
+      <div class="wppi__hero-kicker" id="wppi_hero_badge">3PL Rate Request &middot; Qatar</div>
 
       <h1 class="wppi__hero-title" id="wppi_hero_title">
-        Get Your Custom<br>
-        <span class="wppi__hero-title--accent">Delivery Quote</span>
+        Get your delivery<br>rate card.
       </h1>
       <p class="wppi__hero-sub" id="wppi_hero_sub">
-        Tell us about your business — we'll tailor a pricing plan that fits your volume, product, and delivery needs.
+        Tell us about your business — we'll price a plan around your volume, product, and delivery routes.
       </p>
 
-      <!-- Trust Stats -->
-      <div class="wppi__hero-stats" id="wppi_hero_stats">
-        <div class="wppi__hero-stat">
-          <span class="wppi__hero-stat__num">500+</span>
-          <span class="wppi__hero-stat__label">Businesses Served</span>
-        </div>
-        <div class="wppi__hero-stat">
-          <span class="wppi__hero-stat__num">24h</span>
-          <span class="wppi__hero-stat__label">Quote Turnaround</span>
-        </div>
-        <div class="wppi__hero-stat">
-          <span class="wppi__hero-stat__num">All Qatar</span>
-          <span class="wppi__hero-stat__label">Coverage</span>
-        </div>
+      <div class="wppi__hero-meta" id="wppi_hero_stats">
+        <span class="wppi__hero-meta-item">500+ businesses served</span>
+        <span class="wppi__hero-meta-item">24h quote turnaround</span>
+        <span class="wppi__hero-meta-item">All-Qatar coverage</span>
       </div>
-
 
     </div>
   </div>
@@ -102,6 +85,10 @@
 
   <!-- Form Card -->
   <div class="wppi__form-card" id="wppi_form_card">
+    <div class="wppi__doc-header" id="wppi_doc_header">
+      <span>Ezzy Delivery &middot; Doha, Qatar</span>
+      <span>Form RRQ-3PL</span>
+    </div>
     <form method="POST" id="inquiryForm" novalidate>
       {% csrf_token %}
 
@@ -112,9 +99,7 @@
            {% if current_step != 1 %}style="display:none"{% endif %}>
 
         <div class="wppi__step-header" id="wppi_step1_header">
-          <div class="wppi__step-icon">
-            <i class="fa-solid fa-building"></i>
-          </div>
+          <div class="wppi__step-icon">01</div>
           <div>
             <h2 class="wppi__section-title">Company &amp; Product Details</h2>
             <p class="wppi__section-sub">Step 1 of 3 — Tell us who you are and what you sell</p>
@@ -130,7 +115,7 @@
         <!-- Contact Info Group -->
         <div class="wppi__field-group" id="wppi_step1_contact_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-address-card"></i> Contact Information
+            Contact Information
           </div>
           <div class="row g-3">
             <div class="col-md-6">
@@ -152,6 +137,11 @@
               <label class="form-label" for="operation_team_contact_number">Operations Team Contact</label>
               <input type="tel" class="form-control" id="operation_team_contact_number" name="operation_team_contact_number"
                      value="{{ saved_data.operation_team_contact_number }}" placeholder="+974 …">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="email">Email <span class="text-muted fw-normal">(Optional — we'll send your quote here)</span></label>
+              <input type="email" class="form-control" id="email" name="email"
+                     value="{{ saved_data.email }}" placeholder="you@company.com">
             </div>
             <div class="col-12">
               <p class="wppi__field-hint mb-0"><i class="fa-solid fa-circle-info"></i> Provide at least one of the following: Website, Instagram, or Facebook <span class="wppi__req">*</span></p>
@@ -177,7 +167,7 @@
         <!-- Product Group -->
         <div class="wppi__field-group" id="wppi_step1_product_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-box-open"></i> Product &amp; Business Profile
+            Product &amp; Business Profile
           </div>
           <div class="row g-3">
             <div class="col-md-12">
@@ -186,18 +176,18 @@
                      value="{{ saved_data.product_category }}" required>
               <div class="wppi__bubbles" data-target="product_category" id="wppi_bubbles_product_category">
                 {% with cats=saved_data.product_category|default:"" %}
-                <button type="button" class="wppi__bubble{% if 'Fashion' in cats %} wppi__bubble--active{% endif %}" data-value="Fashion & Clothing">Fashion &amp; Clothing</button>
-                <button type="button" class="wppi__bubble{% if 'Electronics' in cats %} wppi__bubble--active{% endif %}" data-value="Electronics & Gadgets">Electronics &amp; Gadgets</button>
-                <button type="button" class="wppi__bubble{% if 'Food' in cats %} wppi__bubble--active{% endif %}" data-value="Food & Beverages">Food &amp; Beverages</button>
-                <button type="button" class="wppi__bubble{% if 'Beauty' in cats %} wppi__bubble--active{% endif %}" data-value="Beauty & Cosmetics">Beauty &amp; Cosmetics</button>
-                <button type="button" class="wppi__bubble{% if 'Home' in cats %} wppi__bubble--active{% endif %}" data-value="Home & Furniture">Home &amp; Furniture</button>
-                <button type="button" class="wppi__bubble{% if 'Health' in cats %} wppi__bubble--active{% endif %}" data-value="Health & Wellness">Health &amp; Wellness</button>
-                <button type="button" class="wppi__bubble{% if 'Sports' in cats %} wppi__bubble--active{% endif %}" data-value="Sports & Outdoor">Sports &amp; Outdoor</button>
-                <button type="button" class="wppi__bubble{% if 'Jewellery' in cats %} wppi__bubble--active{% endif %}" data-value="Jewellery & Accessories">Jewellery &amp; Accessories</button>
-                <button type="button" class="wppi__bubble{% if 'Books' in cats %} wppi__bubble--active{% endif %}" data-value="Books & Stationery">Books &amp; Stationery</button>
-                <button type="button" class="wppi__bubble{% if 'Toys' in cats %} wppi__bubble--active{% endif %}" data-value="Toys & Kids">Toys &amp; Kids</button>
-                <button type="button" class="wppi__bubble{% if 'Gifts' in cats %} wppi__bubble--active{% endif %}" data-value="Gifts & Flowers">Gifts &amp; Flowers</button>
-                <button type="button" class="wppi__bubble{% if 'Other' in cats %} wppi__bubble--active{% endif %}" data-value="Other">Other</button>
+                <button type="button" class="wppi__bubble{% if 'Fashion' in cats %} wppi__bubble--active{% endif %}" data-value="Fashion & Clothing"><i class="fa-solid fa-shirt wppi__ico--purple"></i> Fashion &amp; Clothing</button>
+                <button type="button" class="wppi__bubble{% if 'Electronics' in cats %} wppi__bubble--active{% endif %}" data-value="Electronics & Gadgets"><i class="fa-solid fa-mobile-screen wppi__ico--info"></i> Electronics &amp; Gadgets</button>
+                <button type="button" class="wppi__bubble{% if 'Food' in cats %} wppi__bubble--active{% endif %}" data-value="Food & Beverages"><i class="fa-solid fa-utensils wppi__ico--warn"></i> Food &amp; Beverages</button>
+                <button type="button" class="wppi__bubble{% if 'Beauty' in cats %} wppi__bubble--active{% endif %}" data-value="Beauty & Cosmetics"><i class="fa-solid fa-spa wppi__ico--danger"></i> Beauty &amp; Cosmetics</button>
+                <button type="button" class="wppi__bubble{% if 'Home' in cats %} wppi__bubble--active{% endif %}" data-value="Home & Furniture"><i class="fa-solid fa-couch wppi__ico--success"></i> Home &amp; Furniture</button>
+                <button type="button" class="wppi__bubble{% if 'Health' in cats %} wppi__bubble--active{% endif %}" data-value="Health & Wellness"><i class="fa-solid fa-heart-pulse wppi__ico--danger"></i> Health &amp; Wellness</button>
+                <button type="button" class="wppi__bubble{% if 'Sports' in cats %} wppi__bubble--active{% endif %}" data-value="Sports & Outdoor"><i class="fa-solid fa-person-running wppi__ico--info"></i> Sports &amp; Outdoor</button>
+                <button type="button" class="wppi__bubble{% if 'Jewellery' in cats %} wppi__bubble--active{% endif %}" data-value="Jewellery & Accessories"><i class="fa-solid fa-gem wppi__ico--purple"></i> Jewellery &amp; Accessories</button>
+                <button type="button" class="wppi__bubble{% if 'Books' in cats %} wppi__bubble--active{% endif %}" data-value="Books & Stationery"><i class="fa-solid fa-book wppi__ico--navy"></i> Books &amp; Stationery</button>
+                <button type="button" class="wppi__bubble{% if 'Toys' in cats %} wppi__bubble--active{% endif %}" data-value="Toys & Kids"><i class="fa-solid fa-puzzle-piece wppi__ico--warn"></i> Toys &amp; Kids</button>
+                <button type="button" class="wppi__bubble{% if 'Gifts' in cats %} wppi__bubble--active{% endif %}" data-value="Gifts & Flowers"><i class="fa-solid fa-gift wppi__ico--danger"></i> Gifts &amp; Flowers</button>
+                <button type="button" class="wppi__bubble{% if 'Other' in cats %} wppi__bubble--active{% endif %}" data-value="Other"><i class="fa-solid fa-ellipsis wppi__ico--grey"></i> Other</button>
                 {% endwith %}
               </div>
             </div>
@@ -258,7 +248,7 @@
         <!-- Location Group -->
         <div class="wppi__field-group" id="wppi_step1_location_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-location-dot"></i> Business Location
+            Business Location
           </div>
           <div class="row g-3">
             <div class="col-md-12">
@@ -355,9 +345,7 @@
            {% if current_step != 2 %}style="display:none"{% endif %}>
 
         <div class="wppi__step-header" id="wppi_step2_header">
-          <div class="wppi__step-icon">
-            <i class="fa-solid fa-chart-line"></i>
-          </div>
+          <div class="wppi__step-icon">02</div>
           <div>
             <h2 class="wppi__section-title">Operations &amp; Orders Details</h2>
             <p class="wppi__section-sub">Step 2 of 3 — Help us understand your order volumes and logistics needs</p>
@@ -367,10 +355,31 @@
         <!-- Volume Group -->
         <div class="wppi__field-group" id="wppi_step2_volume_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-boxes-stacked"></i> Order Volumes
+            Order Volumes
           </div>
           <div class="row g-3">
             <div class="col-md-12">
+              <label class="form-label">Is your business already operating? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_existing">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_existing_business" id="existing_yes"
+                         value="True" {% if saved_data.is_existing_business != 'False' %}checked{% endif %}>
+                  <label class="form-check-label" for="existing_yes">Yes — already taking orders</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_existing_business" id="existing_no"
+                         value="False" {% if saved_data.is_existing_business == 'False' %}checked{% endif %}>
+                  <label class="form-check-label" for="existing_no">No — new business</label>
+                </div>
+              </div>
+            </div>
+            <!-- Shown for a new business -->
+            <div class="col-12" id="new_business_note"
+                 style="{% if saved_data.is_existing_business != 'False' %}display:none{% endif %}">
+              <p class="wppi__field-hint mb-0"><i class="fa-solid fa-circle-info"></i> New business — no order history needed. Just tell us what you expect.</p>
+            </div>
+            <div class="col-md-12" id="orders_last_week_field"
+                 style="{% if saved_data.is_existing_business == 'False' %}display:none{% endif %}">
               <label class="form-label">Orders Last Week <span class="wppi__req">*</span></label>
               <input type="hidden" name="avarage_number_of_order_last_week" id="avarage_number_of_order_last_week"
                      value="{{ saved_data.avarage_number_of_order_last_week }}">
@@ -384,7 +393,8 @@
                 {% endwith %}
               </div>
             </div>
-            <div class="col-md-12">
+            <div class="col-md-12" id="orders_last_month_field"
+                 style="{% if saved_data.is_existing_business == 'False' %}display:none{% endif %}">
               <label class="form-label">Orders Last Month <span class="wppi__req">*</span></label>
               <input type="hidden" name="avarage_number_of_order_done_last_month" id="avarage_number_of_order_done_last_month"
                      value="{{ saved_data.avarage_number_of_order_done_last_month }}">
@@ -432,7 +442,7 @@
         <!-- Services Group -->
         <div class="wppi__field-group" id="wppi_step2_services_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-handshake"></i> Services Required
+            Services Required
           </div>
           <div class="row g-3">
             <div class="col-md-12">
@@ -450,6 +460,24 @@
                 </div>
               </div>
             </div>
+
+            <!-- Shown when COD = Yes -->
+            <div class="col-md-12" id="cod_share_field"
+                 style="{% if saved_data.is_required_COD_service != 'True' %}display:none{% endif %}">
+              <label class="form-label">Roughly what share of your orders are COD?</label>
+              <input type="hidden" name="cod_orders_share" id="cod_orders_share"
+                     value="{{ saved_data.cod_orders_share }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="cod_orders_share" id="wppi_bubbles_codshare">
+                {% with v=saved_data.cod_orders_share %}
+                <button type="button" class="wppi__bubble{% if v == 'Below 25%' %} wppi__bubble--active{% endif %}" data-value="Below 25%">Below 25%</button>
+                <button type="button" class="wppi__bubble{% if v == '25-50%' %} wppi__bubble--active{% endif %}" data-value="25-50%">25–50%</button>
+                <button type="button" class="wppi__bubble{% if v == '50-75%' %} wppi__bubble--active{% endif %}" data-value="50-75%">50–75%</button>
+                <button type="button" class="wppi__bubble{% if v == 'Above 75%' %} wppi__bubble--active{% endif %}" data-value="Above 75%">Above 75%</button>
+                <button type="button" class="wppi__bubble{% if v == 'Not sure' %} wppi__bubble--active{% endif %}" data-value="Not sure">Not sure</button>
+                {% endwith %}
+              </div>
+            </div>
+
             <div class="col-md-12">
               <label class="form-label">Do you need fulfillment service to operate from outside Qatar? <span class="wppi__req">*</span></label>
               <div class="wppi__radio-group" id="wppi_radio_fulfillment_outside">
@@ -484,6 +512,24 @@
                 </div>
               </div>
             </div>
+
+            <!-- Shown when Doha hub = Yes -->
+            <div class="col-md-12" id="fulfillment_storage_field"
+                 style="{% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha != 'True' %}display:none{% endif %}">
+              <label class="form-label">Roughly how much storage would you need?</label>
+              <input type="hidden" name="fulfillment_storage_volume" id="fulfillment_storage_volume"
+                     value="{{ saved_data.fulfillment_storage_volume }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="fulfillment_storage_volume" id="wppi_bubbles_storage">
+                {% with v=saved_data.fulfillment_storage_volume %}
+                <button type="button" class="wppi__bubble{% if v == 'A few shelves' %} wppi__bubble--active{% endif %}" data-value="A few shelves">A few shelves</button>
+                <button type="button" class="wppi__bubble{% if v == '1-5 pallets' %} wppi__bubble--active{% endif %}" data-value="1-5 pallets">1–5 pallets</button>
+                <button type="button" class="wppi__bubble{% if v == '5-20 pallets' %} wppi__bubble--active{% endif %}" data-value="5-20 pallets">5–20 pallets</button>
+                <button type="button" class="wppi__bubble{% if v == '20+ pallets' %} wppi__bubble--active{% endif %}" data-value="20+ pallets">20+ pallets</button>
+                <button type="button" class="wppi__bubble{% if v == 'Not sure' %} wppi__bubble--active{% endif %}" data-value="Not sure">Not sure</button>
+                {% endwith %}
+              </div>
+            </div>
+
             <div class="col-md-12">
               <label class="form-label">Do you require return / reverse logistics? <span class="wppi__req">*</span></label>
               <div class="wppi__radio-group" id="wppi_radio_return">
@@ -507,7 +553,7 @@
         <!-- Provider / Timeline Group -->
         <div class="wppi__field-group" id="wppi_step2_provider_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-calendar-check"></i> Provider &amp; Timeline
+            Provider &amp; Timeline
           </div>
           <div class="row g-3">
             <div class="col-md-6">
@@ -541,6 +587,25 @@
                   <div class="wppi__select-option {% if saved_data.delivery_coverage == 'Doha Only' %}selected{% endif %}" data-value="Doha Only">Doha Only</div>
                   <div class="wppi__select-option {% if saved_data.delivery_coverage == 'All Qatar' %}selected{% endif %}" data-value="All Qatar">All Qatar</div>
                   <div class="wppi__select-option {% if saved_data.delivery_coverage == 'Both' %}selected{% endif %}" data-value="Both">Both (Doha + Qatar)</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Current Cost Per Delivery <span class="text-muted fw-normal">(Optional)</span></label>
+              <input type="hidden" name="current_delivery_cost" id="current_delivery_cost"
+                     value="{{ saved_data.current_delivery_cost }}">
+              <div class="wppi__select" data-target="current_delivery_cost" id="wppi_select_cost">
+                <div class="wppi__select-trigger {% if not saved_data.current_delivery_cost %}placeholder{% endif %}">
+                  <span>{{ saved_data.current_delivery_cost|default:"Select range" }}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.current_delivery_cost == 'Below 10 QAR' %}selected{% endif %}" data-value="Below 10 QAR">Below 10 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.current_delivery_cost == '10-15 QAR' %}selected{% endif %}" data-value="10-15 QAR">10 – 15 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.current_delivery_cost == '15-20 QAR' %}selected{% endif %}" data-value="15-20 QAR">15 – 20 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.current_delivery_cost == '20-30 QAR' %}selected{% endif %}" data-value="20-30 QAR">20 – 30 QAR</div>
+                  <div class="wppi__select-option {% if saved_data.current_delivery_cost == '30+ QAR' %}selected{% endif %}" data-value="30+ QAR">30+ QAR</div>
+                  <div class="wppi__select-option {% if saved_data.current_delivery_cost == 'Not sure' %}selected{% endif %}" data-value="Not sure">Not sure</div>
                 </div>
               </div>
             </div>
@@ -582,9 +647,7 @@
            {% if current_step != 3 %}style="display:none"{% endif %}>
 
         <div class="wppi__step-header" id="wppi_step3_header">
-          <div class="wppi__step-icon">
-            <i class="fa-solid fa-truck"></i>
-          </div>
+          <div class="wppi__step-icon">03</div>
           <div>
             <h2 class="wppi__section-title">Delivery &amp; Pickup Details</h2>
             <p class="wppi__section-sub">Step 3 of 3 — Final details to complete your quote request</p>
@@ -594,7 +657,7 @@
         <!-- Delivery Preferences Group -->
         <div class="wppi__field-group" id="wppi_step3_delivery_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-gauge-high"></i> Delivery Preferences
+            Delivery Preferences
           </div>
           <div class="row g-3">
             <div class="col-md-12">
@@ -603,11 +666,10 @@
                      value="{{ saved_data.speed_delivery_offer_to_customers }}">
               <div class="wppi__bubbles" data-target="speed_delivery_offer_to_customers" id="wppi_bubbles_speed">
                 {% with speeds=saved_data.speed_delivery_offer_to_customers|default:"" %}
-                <button type="button" class="wppi__bubble{% if 'Same Day' in speeds %} wppi__bubble--active{% endif %}" data-value="Same Day">Same Day</button>
-                <button type="button" class="wppi__bubble{% if 'Next Day' in speeds %} wppi__bubble--active{% endif %}" data-value="Next Day">Next Day</button>
-                <button type="button" class="wppi__bubble{% if '2-3 Days' in speeds %} wppi__bubble--active{% endif %}" data-value="2-3 Days">2–3 Days</button>
-                <button type="button" class="wppi__bubble{% if 'Standard' in speeds %} wppi__bubble--active{% endif %}" data-value="Standard (3-5 Days)">Standard (3–5 Days)</button>
-                <button type="button" class="wppi__bubble{% if 'Express' in speeds %} wppi__bubble--active{% endif %}" data-value="Express (Few Hours)">Express (Few Hours)</button>
+                <button type="button" class="wppi__bubble{% if 'Express' in speeds %} wppi__bubble--active{% endif %}" data-value="Express (Few Hours)"><i class="fa-solid fa-bolt wppi__ico--danger"></i> Express (Few Hours)</button>
+                <button type="button" class="wppi__bubble{% if 'Same Day' in speeds %} wppi__bubble--active{% endif %}" data-value="Same Day"><i class="fa-solid fa-truck-fast wppi__ico--info"></i> Same Day</button>
+                <button type="button" class="wppi__bubble{% if '48 Hours' in speeds %} wppi__bubble--active{% endif %}" data-value="48 Hours"><i class="fa-solid fa-clock wppi__ico--warn"></i> 48 Hours</button>
+                <button type="button" class="wppi__bubble{% if 'Standard' in speeds %} wppi__bubble--active{% endif %}" data-value="Standard (3-5 Days)"><i class="fa-solid fa-calendar-days wppi__ico--grey"></i> Standard (3–5 Days)</button>
                 {% endwith %}
               </div>
             </div>
@@ -628,16 +690,16 @@
                 </div>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-12">
               <label class="form-label">Preferred Delivery Time Window</label>
               <input type="hidden" name="preferred_delivery_time_window" id="preferred_delivery_time_window"
                      value="{{ saved_data.preferred_delivery_time_window }}">
               <div class="wppi__bubbles" data-target="preferred_delivery_time_window" id="wppi_bubbles_deliverytime">
                 {% with v=saved_data.preferred_delivery_time_window %}
-                <button type="button" class="wppi__bubble{% if v == 'Morning (8AM–12PM)' %} wppi__bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
-                <button type="button" class="wppi__bubble{% if v == 'Afternoon (12PM–5PM)' %} wppi__bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
-                <button type="button" class="wppi__bubble{% if v == 'Evening (5PM–9PM)' %} wppi__bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
-                <button type="button" class="wppi__bubble{% if v == 'Any Time' %} wppi__bubble--active{% endif %}" data-value="Any Time">Any Time</button>
+                <button type="button" class="wppi__bubble{% if v == 'Morning (8AM–12PM)' %} wppi__bubble--active{% endif %}" data-value="Morning (8AM–12PM)"><i class="fa-solid fa-sun wppi__ico--warn"></i> Morning</button>
+                <button type="button" class="wppi__bubble{% if v == 'Afternoon (12PM–5PM)' %} wppi__bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)"><i class="fa-solid fa-cloud-sun wppi__ico--info"></i> Afternoon</button>
+                <button type="button" class="wppi__bubble{% if v == 'Evening (5PM–9PM)' %} wppi__bubble--active{% endif %}" data-value="Evening (5PM–9PM)"><i class="fa-solid fa-moon wppi__ico--navy"></i> Evening</button>
+                <button type="button" class="wppi__bubble{% if v == 'Any Time' %} wppi__bubble--active{% endif %}" data-value="Any Time"><i class="fa-solid fa-clock wppi__ico--grey"></i> Any Time</button>
                 {% endwith %}
               </div>
             </div>
@@ -647,10 +709,24 @@
                      value="{{ saved_data.typical_package_size }}">
               <div class="wppi__bubbles" data-target="typical_package_size" id="wppi_bubbles_packagesize">
                 {% with v=saved_data.typical_package_size %}
-                <button type="button" class="wppi__bubble{% if v == 'Small (Envelopes / Packets)' %} wppi__bubble--active{% endif %}" data-value="Small (Envelopes / Packets)">Small</button>
-                <button type="button" class="wppi__bubble{% if v == 'Medium (Shoe Box Size)' %} wppi__bubble--active{% endif %}" data-value="Medium (Shoe Box Size)">Medium</button>
-                <button type="button" class="wppi__bubble{% if v == 'Large (Appliances / Bulky)' %} wppi__bubble--active{% endif %}" data-value="Large (Appliances / Bulky)">Large</button>
-                <button type="button" class="wppi__bubble{% if v == 'Mixed Sizes' %} wppi__bubble--active{% endif %}" data-value="Mixed Sizes">Mixed</button>
+                <button type="button" class="wppi__bubble{% if v == 'Small (Envelopes / Packets)' %} wppi__bubble--active{% endif %}" data-value="Small (Envelopes / Packets)"><i class="fa-solid fa-envelope wppi__ico--info"></i> Small &middot; Envelopes</button>
+                <button type="button" class="wppi__bubble{% if v == 'Medium (Shoe Box Size)' %} wppi__bubble--active{% endif %}" data-value="Medium (Shoe Box Size)"><i class="fa-solid fa-box wppi__ico--warn"></i> Medium &middot; Shoe box</button>
+                <button type="button" class="wppi__bubble{% if v == 'Large (Appliances / Bulky)' %} wppi__bubble--active{% endif %}" data-value="Large (Appliances / Bulky)"><i class="fa-solid fa-boxes-stacked wppi__ico--success"></i> Large &middot; Bulky</button>
+                <button type="button" class="wppi__bubble{% if v == 'Mixed Sizes' %} wppi__bubble--active{% endif %}" data-value="Mixed Sizes"><i class="fa-solid fa-layer-group wppi__ico--grey"></i> Mixed</button>
+                {% endwith %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Average Package Weight</label>
+              <input type="hidden" name="average_package_weight" id="average_package_weight"
+                     value="{{ saved_data.average_package_weight }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="average_package_weight" id="wppi_bubbles_weight">
+                {% with v=saved_data.average_package_weight %}
+                <button type="button" class="wppi__bubble{% if v == 'Under 1 kg' %} wppi__bubble--active{% endif %}" data-value="Under 1 kg"><i class="fa-solid fa-feather wppi__ico--info"></i> Under 1 kg</button>
+                <button type="button" class="wppi__bubble{% if v == '1-5 kg' %} wppi__bubble--active{% endif %}" data-value="1-5 kg"><i class="fa-solid fa-box wppi__ico--success"></i> 1–5 kg</button>
+                <button type="button" class="wppi__bubble{% if v == '5-15 kg' %} wppi__bubble--active{% endif %}" data-value="5-15 kg"><i class="fa-solid fa-weight-hanging wppi__ico--warn"></i> 5–15 kg</button>
+                <button type="button" class="wppi__bubble{% if v == '15+ kg' %} wppi__bubble--active{% endif %}" data-value="15+ kg"><i class="fa-solid fa-dumbbell wppi__ico--danger"></i> 15+ kg</button>
+                <button type="button" class="wppi__bubble{% if v == 'Mixed' %} wppi__bubble--active{% endif %}" data-value="Mixed"><i class="fa-solid fa-layer-group wppi__ico--grey"></i> Mixed</button>
                 {% endwith %}
               </div>
             </div>
@@ -671,13 +747,31 @@
                 </div>
               </div>
             </div>
+
+            <!-- Shown when special handling = Yes -->
+            <div class="col-md-12" id="special_handling_detail_field"
+                 style="{% if saved_data.is_special_handling_required != 'True' %}display:none{% endif %}">
+              <label class="form-label">What kind of handling? <span class="text-muted fw-normal">(Select all that apply)</span></label>
+              <input type="hidden" name="special_handling_detail" id="special_handling_detail"
+                     value="{{ saved_data.special_handling_detail }}">
+              <div class="wppi__bubbles" data-target="special_handling_detail" id="wppi_bubbles_handling">
+                {% with v=saved_data.special_handling_detail|default:"" %}
+                <button type="button" class="wppi__bubble{% if 'Fragile' in v %} wppi__bubble--active{% endif %}" data-value="Fragile"><i class="fa-solid fa-wine-glass wppi__ico--danger"></i> Fragile</button>
+                <button type="button" class="wppi__bubble{% if 'Chilled' in v %} wppi__bubble--active{% endif %}" data-value="Chilled / Frozen"><i class="fa-solid fa-snowflake wppi__ico--info"></i> Chilled / Frozen</button>
+                <button type="button" class="wppi__bubble{% if 'High-value' in v %} wppi__bubble--active{% endif %}" data-value="High-value"><i class="fa-solid fa-gem wppi__ico--purple"></i> High-value</button>
+                <button type="button" class="wppi__bubble{% if 'Oversized' in v %} wppi__bubble--active{% endif %}" data-value="Oversized / Heavy"><i class="fa-solid fa-boxes-stacked wppi__ico--warn"></i> Oversized / Heavy</button>
+                <button type="button" class="wppi__bubble{% if 'Other' in v %} wppi__bubble--active{% endif %}" data-value="Other"><i class="fa-solid fa-ellipsis wppi__ico--grey"></i> Other</button>
+                {% endwith %}
+              </div>
+            </div>
+
           </div>
         </div>
 
         <!-- Pickup Group -->
         <div class="wppi__field-group" id="wppi_step3_pickup_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-map-pin"></i> Pickup Configuration
+            Pickup Configuration
           </div>
           <div class="row g-3">
             <div class="col-md-6">
@@ -686,29 +780,45 @@
                      value="{{ saved_data.type_of_pickup_location }}">
               <div class="wppi__bubbles" data-target="type_of_pickup_location" id="wppi_bubbles_pickuptype">
                 {% with v=saved_data.type_of_pickup_location %}
-                <button type="button" class="wppi__bubble{% if v == 'Home' %} wppi__bubble--active{% endif %}" data-value="Home">Home</button>
-                <button type="button" class="wppi__bubble{% if v == 'Office' %} wppi__bubble--active{% endif %}" data-value="Office">Office</button>
-                <button type="button" class="wppi__bubble{% if v == 'Store' %} wppi__bubble--active{% endif %}" data-value="Store">Store</button>
-                <button type="button" class="wppi__bubble{% if v == 'Multiple Store' %} wppi__bubble--active{% endif %}" data-value="Multiple Store">Multi Store</button>
-                <button type="button" class="wppi__bubble{% if v == 'Fulfillment' %} wppi__bubble--active{% endif %}" data-value="Fulfillment">Fulfillment Center</button>
+                <button type="button" class="wppi__bubble{% if v == 'Home' %} wppi__bubble--active{% endif %}" data-value="Home"><i class="fa-solid fa-house wppi__ico--success"></i> Home</button>
+                <button type="button" class="wppi__bubble{% if v == 'Office' %} wppi__bubble--active{% endif %}" data-value="Office"><i class="fa-solid fa-building wppi__ico--info"></i> Office</button>
+                <button type="button" class="wppi__bubble{% if v == 'Store' %} wppi__bubble--active{% endif %}" data-value="Store"><i class="fa-solid fa-store wppi__ico--warn"></i> Store</button>
+                <button type="button" class="wppi__bubble{% if v == 'Multiple Store' %} wppi__bubble--active{% endif %}" data-value="Multiple Store"><i class="fa-solid fa-city wppi__ico--purple"></i> Multi Store</button>
+                <button type="button" class="wppi__bubble{% if v == 'Fulfillment' %} wppi__bubble--active{% endif %}" data-value="Fulfillment"><i class="fa-solid fa-warehouse wppi__ico--navy"></i> Fulfillment Center</button>
                 {% endwith %}
               </div>
             </div>
+            <!-- Shown when pickup type = Multiple Store -->
+            <div class="col-md-6" id="pickup_locations_field"
+                 style="{% if saved_data.type_of_pickup_location != 'Multiple Store' %}display:none{% endif %}">
+              <label class="form-label">How many pickup locations?</label>
+              <input type="hidden" name="number_of_pickup_locations" id="number_of_pickup_locations"
+                     value="{{ saved_data.number_of_pickup_locations }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="number_of_pickup_locations" id="wppi_bubbles_pickupcount2">
+                {% with v=saved_data.number_of_pickup_locations %}
+                <button type="button" class="wppi__bubble{% if v == '2-3' %} wppi__bubble--active{% endif %}" data-value="2-3">2–3</button>
+                <button type="button" class="wppi__bubble{% if v == '4-5' %} wppi__bubble--active{% endif %}" data-value="4-5">4–5</button>
+                <button type="button" class="wppi__bubble{% if v == '6-10' %} wppi__bubble--active{% endif %}" data-value="6-10">6–10</button>
+                <button type="button" class="wppi__bubble{% if v == '10+' %} wppi__bubble--active{% endif %}" data-value="10+">10+</button>
+                {% endwith %}
+              </div>
+            </div>
+
             <div class="col-md-6">
               <label class="form-label" for="pickup_Location_area_name">Pickup Location Area</label>
               <input type="text" class="form-control" name="pickup_Location_area_name" id="pickup_Location_area_name"
                      value="{{ saved_data.pickup_Location_area_name }}" placeholder="e.g., Al Sadd, West Bay">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Pickup Time Slot</label>
+              <label class="form-label">Preferred Pickup Time</label>
               <input type="hidden" name="pickup_location_time_slab" id="pickup_location_time_slab"
                      value="{{ saved_data.pickup_location_time_slab }}">
               <div class="wppi__bubbles" data-target="pickup_location_time_slab" id="wppi_bubbles_pickuptime">
                 {% with v=saved_data.pickup_location_time_slab %}
-                <button type="button" class="wppi__bubble{% if v == 'Morning (8AM–12PM)' %} wppi__bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
-                <button type="button" class="wppi__bubble{% if v == 'Afternoon (12PM–5PM)' %} wppi__bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
-                <button type="button" class="wppi__bubble{% if v == 'Evening (5PM–9PM)' %} wppi__bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
-                <button type="button" class="wppi__bubble{% if v == 'Flexible' %} wppi__bubble--active{% endif %}" data-value="Flexible">Flexible</button>
+                <button type="button" class="wppi__bubble{% if v == 'Morning (8AM–12PM)' %} wppi__bubble--active{% endif %}" data-value="Morning (8AM–12PM)"><i class="fa-solid fa-sun wppi__ico--warn"></i> Morning</button>
+                <button type="button" class="wppi__bubble{% if v == 'Afternoon (12PM–5PM)' %} wppi__bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)"><i class="fa-solid fa-cloud-sun wppi__ico--info"></i> Afternoon</button>
+                <button type="button" class="wppi__bubble{% if v == 'Evening (5PM–9PM)' %} wppi__bubble--active{% endif %}" data-value="Evening (5PM–9PM)"><i class="fa-solid fa-moon wppi__ico--navy"></i> Evening</button>
+                <button type="button" class="wppi__bubble{% if v == 'Flexible' %} wppi__bubble--active{% endif %}" data-value="Flexible"><i class="fa-solid fa-clock wppi__ico--grey"></i> Flexible</button>
                 {% endwith %}
               </div>
             </div>
@@ -732,21 +842,21 @@
         <!-- OMS & Communication Group -->
         <div class="wppi__field-group" id="wppi_step3_comm_group">
           <div class="wppi__field-group-label">
-            <i class="fa-solid fa-comments"></i> Systems &amp; Communication
+            Systems &amp; Communication
           </div>
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label">How do you manage orders?</label>
+              <label class="form-label">How do you manage orders? <span class="wppi__req">*</span></label>
               <input type="hidden" name="order_management_system" id="order_management_system"
                      value="{{ saved_data.order_management_system }}">
               <div class="wppi__bubbles" data-target="order_management_system" id="wppi_bubbles_oms">
                 {% with v=saved_data.order_management_system %}
-                <button type="button" class="wppi__bubble{% if v == 'Shopify' %} wppi__bubble--active{% endif %}" data-value="Shopify">Shopify</button>
-                <button type="button" class="wppi__bubble{% if v == 'WooCommerce' %} wppi__bubble--active{% endif %}" data-value="WooCommerce">WooCommerce</button>
-                <button type="button" class="wppi__bubble{% if v == 'Instagram / WhatsApp' %} wppi__bubble--active{% endif %}" data-value="Instagram / WhatsApp">Instagram / WhatsApp</button>
-                <button type="button" class="wppi__bubble{% if v == 'Spreadsheet / Manual' %} wppi__bubble--active{% endif %}" data-value="Spreadsheet / Manual">Spreadsheet</button>
-                <button type="button" class="wppi__bubble{% if v == 'Custom System' %} wppi__bubble--active{% endif %}" data-value="Custom System">Custom / ERP</button>
-                <button type="button" class="wppi__bubble{% if v == 'Other' %} wppi__bubble--active{% endif %}" data-value="Other">Other</button>
+                <button type="button" class="wppi__bubble{% if v == 'Shopify' %} wppi__bubble--active{% endif %}" data-value="Shopify"><i class="fa-brands fa-shopify wppi__ico--success"></i> Shopify</button>
+                <button type="button" class="wppi__bubble{% if v == 'WooCommerce' %} wppi__bubble--active{% endif %}" data-value="WooCommerce"><i class="fa-brands fa-wordpress wppi__ico--info"></i> WooCommerce</button>
+                <button type="button" class="wppi__bubble{% if v == 'Instagram / WhatsApp' %} wppi__bubble--active{% endif %}" data-value="Instagram / WhatsApp"><i class="fa-brands fa-instagram wppi__ico--danger"></i> Instagram / WhatsApp</button>
+                <button type="button" class="wppi__bubble{% if v == 'Spreadsheet / Manual' %} wppi__bubble--active{% endif %}" data-value="Spreadsheet / Manual"><i class="fa-solid fa-table wppi__ico--grey"></i> Spreadsheet</button>
+                <button type="button" class="wppi__bubble{% if v == 'Custom System' %} wppi__bubble--active{% endif %}" data-value="Custom System"><i class="fa-solid fa-gears wppi__ico--navy"></i> Custom / ERP</button>
+                <button type="button" class="wppi__bubble{% if v == 'Other' %} wppi__bubble--active{% endif %}" data-value="Other"><i class="fa-solid fa-ellipsis wppi__ico--grey"></i> Other</button>
                 {% endwith %}
               </div>
             </div>
@@ -756,10 +866,10 @@
                      value="{{ saved_data.preferred_communication_channel }}">
               <div class="wppi__bubbles" data-target="preferred_communication_channel" id="wppi_bubbles_comm">
                 {% with v=saved_data.preferred_communication_channel %}
-                <button type="button" class="wppi__bubble{% if v == 'WhatsApp' %} wppi__bubble--active{% endif %}" data-value="WhatsApp">WhatsApp</button>
-                <button type="button" class="wppi__bubble{% if v == 'Phone Call' %} wppi__bubble--active{% endif %}" data-value="Phone Call">Phone Call</button>
-                <button type="button" class="wppi__bubble{% if v == 'Email' %} wppi__bubble--active{% endif %}" data-value="Email">Email</button>
-                <button type="button" class="wppi__bubble{% if v == 'Any' %} wppi__bubble--active{% endif %}" data-value="Any">Any</button>
+                <button type="button" class="wppi__bubble{% if v == 'WhatsApp' %} wppi__bubble--active{% endif %}" data-value="WhatsApp"><i class="fa-brands fa-whatsapp wppi__ico--wa"></i> WhatsApp</button>
+                <button type="button" class="wppi__bubble{% if v == 'Phone Call' %} wppi__bubble--active{% endif %}" data-value="Phone Call"><i class="fa-solid fa-phone wppi__ico--info"></i> Phone Call</button>
+                <button type="button" class="wppi__bubble{% if v == 'Email' %} wppi__bubble--active{% endif %}" data-value="Email"><i class="fa-solid fa-envelope wppi__ico--warn"></i> Email</button>
+                <button type="button" class="wppi__bubble{% if v == 'Any' %} wppi__bubble--active{% endif %}" data-value="Any"><i class="fa-solid fa-comments wppi__ico--grey"></i> Any</button>
                 {% endwith %}
               </div>
             </div>
@@ -769,22 +879,9 @@
                      value="{{ saved_data.is_delivery_free_to_customers }}" required>
               <div class="wppi__bubbles wppi__bubbles--single" data-target="is_delivery_free_to_customers" id="wppi_bubbles_freedeivery">
                 {% with v=saved_data.is_delivery_free_to_customers %}
-                <button type="button" class="wppi__bubble{% if v == 'Free' %} wppi__bubble--active{% endif %}" data-value="Free">Yes – Free</button>
-                <button type="button" class="wppi__bubble{% if v == 'Paid' %} wppi__bubble--active{% endif %}" data-value="Paid">No – Paid</button>
-                <button type="button" class="wppi__bubble{% if v == 'Mixed' %} wppi__bubble--active{% endif %}" data-value="Mixed">Mixed</button>
-                {% endwith %}
-              </div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Preferred Pickup Time</label>
-              <input type="hidden" name="preferred_pickup_time" id="preferred_pickup_time"
-                     value="{{ saved_data.preferred_pickup_time }}">
-              <div class="wppi__bubbles wppi__bubbles--single" data-target="preferred_pickup_time" id="wppi_bubbles_pickuptime2">
-                {% with v=saved_data.preferred_pickup_time %}
-                <button type="button" class="wppi__bubble{% if v == 'Morning (8am–12pm)' %} wppi__bubble--active{% endif %}" data-value="Morning (8am–12pm)">Morning</button>
-                <button type="button" class="wppi__bubble{% if v == 'Afternoon (12pm–4pm)' %} wppi__bubble--active{% endif %}" data-value="Afternoon (12pm–4pm)">Afternoon</button>
-                <button type="button" class="wppi__bubble{% if v == 'Evening (4pm–8pm)' %} wppi__bubble--active{% endif %}" data-value="Evening (4pm–8pm)">Evening</button>
-                <button type="button" class="wppi__bubble{% if v == 'Flexible' %} wppi__bubble--active{% endif %}" data-value="Flexible">Flexible</button>
+                <button type="button" class="wppi__bubble{% if v == 'Free' %} wppi__bubble--active{% endif %}" data-value="Free"><i class="fa-solid fa-gift wppi__ico--success"></i> Yes – Free</button>
+                <button type="button" class="wppi__bubble{% if v == 'Paid' %} wppi__bubble--active{% endif %}" data-value="Paid"><i class="fa-solid fa-coins wppi__ico--warn"></i> No – Paid</button>
+                <button type="button" class="wppi__bubble{% if v == 'Mixed' %} wppi__bubble--active{% endif %}" data-value="Mixed"><i class="fa-solid fa-scale-balanced wppi__ico--grey"></i> Mixed</button>
                 {% endwith %}
               </div>
             </div>
@@ -794,11 +891,34 @@
                      value="{{ saved_data.preferred_payment_method }}" required>
               <div class="wppi__bubbles wppi__bubbles--single" data-target="preferred_payment_method" id="wppi_bubbles_payment">
                 {% with v=saved_data.preferred_payment_method %}
-                <button type="button" class="wppi__bubble{% if v == 'Cash' %} wppi__bubble--active{% endif %}" data-value="Cash">Cash</button>
-                <button type="button" class="wppi__bubble{% if v == 'Bank Transfer' %} wppi__bubble--active{% endif %}" data-value="Bank Transfer">Bank Transfer</button>
-                <button type="button" class="wppi__bubble{% if v == 'Card' %} wppi__bubble--active{% endif %}" data-value="Card">Card</button>
-                <button type="button" class="wppi__bubble{% if v == 'Mixed' %} wppi__bubble--active{% endif %}" data-value="Mixed">Mixed</button>
+                <button type="button" class="wppi__bubble{% if v == 'Cash' %} wppi__bubble--active{% endif %}" data-value="Cash"><i class="fa-solid fa-money-bill-wave wppi__ico--success"></i> Cash</button>
+                <button type="button" class="wppi__bubble{% if v == 'Bank Transfer' %} wppi__bubble--active{% endif %}" data-value="Bank Transfer"><i class="fa-solid fa-building-columns wppi__ico--info"></i> Bank Transfer</button>
+                <button type="button" class="wppi__bubble{% if v == 'Card' %} wppi__bubble--active{% endif %}" data-value="Card"><i class="fa-solid fa-credit-card wppi__ico--purple"></i> Card</button>
+                <button type="button" class="wppi__bubble{% if v == 'Mixed' %} wppi__bubble--active{% endif %}" data-value="Mixed"><i class="fa-solid fa-shuffle wppi__ico--grey"></i> Mixed</button>
                 {% endwith %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes & Consent Group -->
+        <div class="wppi__field-group" id="wppi_step3_notes_group">
+          <div class="wppi__field-group-label">
+            Additional Notes
+          </div>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="additional_notes">Anything else we should know? <span class="text-muted fw-normal">(Optional)</span></label>
+              <textarea class="form-control" id="additional_notes" name="additional_notes" rows="3"
+                        placeholder="Special requirements, delivery constraints, questions — anything the form didn't cover.">{{ saved_data.additional_notes }}</textarea>
+            </div>
+            <div class="col-12">
+              <div class="form-check d-flex align-items-center gap-2">
+                <input class="form-check-input" type="checkbox" id="contact_consent" name="contact_consent"
+                       {% if saved_data.contact_consent %}checked{% endif %}>
+                <label class="form-check-label" for="contact_consent">
+                  I agree to be contacted by Ezzy Delivery about this inquiry <span class="wppi__req">*</span>
+                </label>
               </div>
             </div>
           </div>
@@ -884,6 +1004,35 @@
       var hidden   = document.getElementById(targetId);
 
       if (!trigger || !options) return;
+
+      // Keyboard access: the trigger is a div, so it needs tabindex + key handling
+      trigger.setAttribute('tabindex', '0');
+      trigger.setAttribute('role', 'button');
+      trigger.setAttribute('aria-haspopup', 'listbox');
+
+      trigger.addEventListener('keydown', function (e) {
+        var opts = Array.prototype.slice.call(options.querySelectorAll('.wppi__select-option'));
+        var isOpen = options.classList.contains('open');
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          var focused = options.querySelector('.wppi__select-option.kb-focus');
+          if (isOpen && focused) { focused.click(); } else { trigger.click(); }
+        } else if (e.key === 'Escape' && isOpen) {
+          options.classList.remove('open');
+          trigger.classList.remove('open');
+          opts.forEach(function (o) { o.classList.remove('kb-focus'); });
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!isOpen) { trigger.click(); return; }
+          var idx = opts.indexOf(options.querySelector('.wppi__select-option.kb-focus'));
+          var next;
+          if (idx === -1) next = e.key === 'ArrowDown' ? 0 : opts.length - 1;
+          else next = e.key === 'ArrowDown' ? Math.min(idx + 1, opts.length - 1) : Math.max(idx - 1, 0);
+          opts.forEach(function (o) { o.classList.remove('kb-focus'); });
+          opts[next].classList.add('kb-focus');
+          opts[next].scrollIntoView({ block: 'nearest' });
+        }
+      });
 
       trigger.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -982,6 +1131,11 @@ function validateStep(step) {
       showBubbleError('business_operating_age', 'Please select how long you have been operating.');
       errors.push('business_operating_age');
     }
+    var emailVal = (document.getElementById('email').value || '').trim();
+    if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+      showBubbleError('email', 'Please enter a valid email address, or leave it empty.');
+      errors.push('email');
+    }
     var websiteVal = (document.getElementById('website_url').value || '').trim();
     var instagramVal = (document.getElementById('instagram_profile').value || '').trim();
     var facebookVal = (document.getElementById('facebook_profile').value || '').trim();
@@ -990,11 +1144,14 @@ function validateStep(step) {
       errors.push('website_url');
     }
   } else if (step === 2) {
-    if (!document.getElementById('avarage_number_of_order_last_week').value) {
+    // Order history only applies to businesses that have started operating
+    var existingChecked = document.querySelector('input[name="is_existing_business"]:checked');
+    var isNewBusiness = existingChecked && existingChecked.value === 'False';
+    if (!isNewBusiness && !document.getElementById('avarage_number_of_order_last_week').value) {
       showBubbleError('avarage_number_of_order_last_week', 'Please select orders last week.');
       errors.push('avarage_number_of_order_last_week');
     }
-    if (!document.getElementById('avarage_number_of_order_done_last_month').value) {
+    if (!isNewBusiness && !document.getElementById('avarage_number_of_order_done_last_month').value) {
       showBubbleError('avarage_number_of_order_done_last_month', 'Please select orders last month.');
       errors.push('avarage_number_of_order_done_last_month');
     }
@@ -1019,6 +1176,10 @@ function validateStep(step) {
       showBubbleError('type_of_pickup_location', 'Please select type of pickup location.');
       errors.push('type_of_pickup_location');
     }
+    if (!document.getElementById('order_management_system').value) {
+      showBubbleError('order_management_system', 'Please select how you manage orders.');
+      errors.push('order_management_system');
+    }
     if (!document.getElementById('preferred_communication_channel').value) {
       showBubbleError('preferred_communication_channel', 'Please select a preferred communication channel.');
       errors.push('preferred_communication_channel');
@@ -1026,6 +1187,10 @@ function validateStep(step) {
     if (!document.getElementById('is_delivery_free_to_customers').value) {
       showBubbleError('is_delivery_free_to_customers', 'Please select delivery pricing for customers.');
       errors.push('is_delivery_free_to_customers');
+    }
+    if (!document.getElementById('contact_consent').checked) {
+      showBubbleError('contact_consent', 'Please confirm you agree to be contacted about this inquiry.');
+      errors.push('contact_consent');
     }
   }
   if (errors.length > 0) {
@@ -1067,6 +1232,88 @@ document.querySelectorAll('input[name="is_located_in_qatar"]').forEach(function 
   r.addEventListener('change', toggleLocationFields);
 });
 toggleLocationFields();
+
+// ── Conditional detail fields (radio-driven) ─────────────────────────────────
+function bindRadioToggle(radioName, fieldId) {
+  function update() {
+    var checked = document.querySelector('input[name="' + radioName + '"]:checked');
+    var field = document.getElementById(fieldId);
+    if (field) field.style.display = (checked && checked.value === 'True') ? '' : 'none';
+  }
+  document.querySelectorAll('input[name="' + radioName + '"]').forEach(function (r) {
+    r.addEventListener('change', update);
+  });
+  update();
+}
+bindRadioToggle('is_required_COD_service', 'cod_share_field');
+bindRadioToggle('is_required_fulfillment_service_for_make_hub_in_doha', 'fulfillment_storage_field');
+bindRadioToggle('is_special_handling_required', 'special_handling_detail_field');
+
+// ── Order volumes: explicit new/existing toggle drives the history questions ─
+(function () {
+  var radios    = document.querySelectorAll('input[name="is_existing_business"]');
+  var lastWeek  = document.getElementById('orders_last_week_field');
+  var lastMonth = document.getElementById('orders_last_month_field');
+  var note      = document.getElementById('new_business_note');
+  if (!radios.length || !lastWeek || !lastMonth) return;
+
+  function clearGroup(targetId) {
+    var hidden = document.getElementById(targetId);
+    if (hidden) hidden.value = '';
+    var group = document.querySelector('.wppi__bubbles[data-target="' + targetId + '"]');
+    if (group) group.querySelectorAll('.wppi__bubble--active').forEach(function (b) {
+      b.classList.remove('wppi__bubble--active');
+    });
+  }
+
+  function isNewBusiness() {
+    var checked = document.querySelector('input[name="is_existing_business"]:checked');
+    return checked && checked.value === 'False';
+  }
+
+  function update() {
+    var isNew = isNewBusiness();
+    lastWeek.style.display  = isNew ? 'none' : '';
+    lastMonth.style.display = isNew ? 'none' : '';
+    if (note) note.style.display = isNew ? '' : 'none';
+    if (isNew) {
+      // drop any history answers picked before switching to "New"
+      clearGroup('avarage_number_of_order_last_week');
+      clearGroup('avarage_number_of_order_done_last_month');
+    }
+  }
+
+  radios.forEach(function (r) { r.addEventListener('change', update); });
+
+  // Step 1's operating-age answer keeps the toggle's default in sync
+  var ageSelect = document.getElementById('wppi_select_age');
+  var ageHidden = document.getElementById('business_operating_age');
+  if (ageSelect && ageHidden) {
+    ageSelect.addEventListener('click', function () {
+      setTimeout(function () {
+        if (!ageHidden.value) return;
+        var target = ageHidden.value === 'New (not started yet)' ? 'existing_no' : 'existing_yes';
+        document.getElementById(target).checked = true;
+        update();
+      }, 0);
+    });
+  }
+  update();
+})();
+
+// ── Pickup-locations count (bubble-driven: shown for Multiple Store) ─────────
+(function () {
+  var group  = document.getElementById('wppi_bubbles_pickuptype');
+  var hidden = document.getElementById('type_of_pickup_location');
+  var field  = document.getElementById('pickup_locations_field');
+  if (!group || !hidden || !field) return;
+  function update() { field.style.display = hidden.value === 'Multiple Store' ? '' : 'none'; }
+  group.querySelectorAll('.wppi__bubble').forEach(function (b) {
+    // run after the generic bubble handler has updated the hidden input
+    b.addEventListener('click', function () { setTimeout(update, 0); });
+  });
+  update();
+})();
 
 // ── WhatsApp Form AJAX ───────────────────────────────────────────────────────
 document.getElementById('whatsappForm').addEventListener('submit', function (e) {

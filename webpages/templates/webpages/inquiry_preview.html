@@ -120,6 +120,15 @@
             <div class="pid__contact__val">{{ inquiry.business_contact_number }}</div>
           </div>
         </a>
+        {% if inquiry.email %}
+        <a href="mailto:{{ inquiry.email }}" class="pid__contact__item">
+          <i class="fa-solid fa-envelope pid__contact__icon"></i>
+          <div>
+            <div class="pid__contact__lbl">Email</div>
+            <div class="pid__contact__val">{{ inquiry.email }}</div>
+          </div>
+        </a>
+        {% endif %}
         {% if inquiry.operation_team_contact_number %}
         <a href="tel:{{ inquiry.operation_team_contact_number }}" class="pid__contact__item">
           <i class="fa-solid fa-headset"></i>
@@ -275,6 +284,26 @@
         <span class="pid__field__val">{{ inquiry.typical_package_size|default:"—" }}</span>
       </div>
       <div class="pid__field">
+        <span class="pid__field__lbl">Average Package Weight</span>
+        <span class="pid__field__val">{{ inquiry.average_package_weight|default:"—" }}</span>
+      </div>
+      <div class="pid__field">
+        <span class="pid__field__lbl">Special Handling Detail</span>
+        <span class="pid__field__val">{{ inquiry.special_handling_detail|default:"—" }}</span>
+      </div>
+      <div class="pid__field">
+        <span class="pid__field__lbl">COD Share of Orders</span>
+        <span class="pid__field__val">{{ inquiry.cod_orders_share|default:"—" }}</span>
+      </div>
+      <div class="pid__field">
+        <span class="pid__field__lbl">Current Cost Per Delivery</span>
+        <span class="pid__field__val">{{ inquiry.current_delivery_cost|default:"—" }}</span>
+      </div>
+      <div class="pid__field">
+        <span class="pid__field__lbl">Storage Needed (Doha Hub)</span>
+        <span class="pid__field__val">{{ inquiry.fulfillment_storage_volume|default:"—" }}</span>
+      </div>
+      <div class="pid__field">
         <span class="pid__field__lbl">Free delivery to customers?</span>
         <span class="pid__field__val">
           {% if inquiry.is_delivery_free_to_customers == 'Free' %}<span class="pid__chip pid__chip--yes">Free</span>
@@ -337,11 +366,11 @@
       </div>
       <div class="pid__field">
         <span class="pid__field__lbl">Preferred Pickup Time</span>
-        <span class="pid__field__val">{{ inquiry.preferred_pickup_time|default:"—" }}</span>
+        <span class="pid__field__val">{{ inquiry.pickup_location_time_slab|default:inquiry.preferred_pickup_time|default:"—" }}</span>
       </div>
       <div class="pid__field">
-        <span class="pid__field__lbl">Pickup Time Slot</span>
-        <span class="pid__field__val">{{ inquiry.pickup_location_time_slab|default:"—" }}</span>
+        <span class="pid__field__lbl">Number of Pickup Locations</span>
+        <span class="pid__field__val pid__field__val--num">{{ inquiry.number_of_pickup_locations|default:"—" }}</span>
       </div>
       <div class="pid__field">
         <span class="pid__field__lbl">Number of Pickups Per Day</span>
@@ -349,6 +378,21 @@
       </div>
     </div>
   </div>
+
+  {% if inquiry.additional_notes %}
+  <!-- CLIENT NOTES -->
+  <div class="pid__panel">
+    <div class="pid__panel__hd">
+      <i class="fa-solid fa-message"></i>
+      <h3>Client Notes</h3>
+    </div>
+    <div class="pid__panel__body">
+      <div class="pid__field">
+        <span class="pid__field__val">{{ inquiry.additional_notes|linebreaksbr }}</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock content %}

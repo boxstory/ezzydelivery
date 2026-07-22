@@ -148,6 +148,7 @@ class PricingEnquiry(models.Model):
     business_name = models.CharField(max_length=100)
     business_contact_number = models.CharField(max_length=100)
     operation_team_contact_number = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(max_length=254, blank=True, null=True)  # optional — for sending the quote
 
     # Contact Information
     website_url = models.CharField(max_length=200, blank=True, null=True)
@@ -208,6 +209,16 @@ class PricingEnquiry(models.Model):
     is_delivery_free_to_customers = models.CharField(max_length=50, blank=True, null=True)  # Free / Paid / Mixed
     preferred_pickup_time = models.CharField(max_length=100, blank=True, null=True)  # e.g. "Morning", "Afternoon", "Evening", "Flexible"
     preferred_payment_method = models.CharField(max_length=100, blank=True, null=True)  # e.g. "Cash", "Bank Transfer", "Card", "Mixed"
+
+    # Pricing-relevant detail fields
+    cod_orders_share = models.CharField(max_length=50, blank=True, null=True)             # shown when COD = Yes; e.g. "Below 25%"
+    fulfillment_storage_volume = models.CharField(max_length=100, blank=True, null=True)  # shown when Doha hub = Yes; e.g. "1-5 pallets"
+    current_delivery_cost = models.CharField(max_length=50, blank=True, null=True)        # optional benchmark; e.g. "10-15 QAR"
+    special_handling_detail = models.CharField(max_length=200, blank=True, null=True)     # shown when special handling = Yes; multi e.g. "Fragile, Chilled / Frozen"
+    average_package_weight = models.CharField(max_length=50, blank=True, null=True)       # e.g. "1-5 kg"
+    number_of_pickup_locations = models.CharField(max_length=20, blank=True, null=True)   # shown when pickup type = Multiple Store
+    additional_notes = models.TextField(blank=True, null=True)
+    contact_consent = models.BooleanField(default=False)
 
     # Completion status — False for partial (in-progress), True for fully submitted
     is_complete = models.BooleanField(default=False)

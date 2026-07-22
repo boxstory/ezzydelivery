@@ -171,12 +171,21 @@ def p2p_resolve_url(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+def _derive_business_status(saved):
+    """Default the step-2 new/existing toggle from the step-1 operating age (UI only, not stored in DB)."""
+    if 'is_existing_business' not in saved:
+        saved = dict(saved)
+        saved['is_existing_business'] = 'False' if saved.get('business_operating_age') == 'New (not started yet)' else 'True'
+    return saved
+
+
 def _save_step1_to_db(inquiry, data):
     """Save step 1 fields to a PricingEnquiry instance."""
     inquiry.full_name = data.get('full_name', '')
     inquiry.business_name = data.get('business_name', '')
     inquiry.business_contact_number = data.get('business_contact_number', '')
     inquiry.operation_team_contact_number = data.get('operation_team_contact_number', '')
+    inquiry.email = (data.get('email') or '').strip()
     inquiry.website_url = data.get('website_url', '')
     inquiry.instagram_profile = data.get('instagram_profile', '')
     inquiry.facebook_profile = data.get('facebook_profile', '')
@@ -205,6 +214,9 @@ def _save_step2_to_db(inquiry, data):
     inquiry.delivery_coverage = data.get('delivery_coverage', '')
     inquiry.is_return_logistics_required = data.get('is_return_logistics_required', 'False') == 'True'
     inquiry.preferred_start_date = data.get('preferred_start_date', '')
+    inquiry.cod_orders_share = data.get('cod_orders_share', '')
+    inquiry.fulfillment_storage_volume = data.get('fulfillment_storage_volume', '')
+    inquiry.current_delivery_cost = data.get('current_delivery_cost', '')
     inquiry.save()
 
 
@@ -217,13 +229,19 @@ def _save_step3_to_db(inquiry, data):
     inquiry.is_special_handling_required = data.get('is_special_handling_required', 'False') == 'True'
     inquiry.type_of_pickup_location = data.get('type_of_pickup_location', '')
     inquiry.pickup_Location_area_name = data.get('pickup_Location_area_name', '')
+    # Single "Preferred Pickup Time" question feeds both columns (merged duplicate fields)
     inquiry.pickup_location_time_slab = data.get('pickup_location_time_slab', '')
     inquiry.number_of_pickup_times_in_day = data.get('number_of_pickup_times_in_day', '1')
     inquiry.order_management_system = data.get('order_management_system', '')
     inquiry.preferred_communication_channel = data.get('preferred_communication_channel', '')
     inquiry.is_delivery_free_to_customers = data.get('is_delivery_free_to_customers', '')
-    inquiry.preferred_pickup_time = data.get('preferred_pickup_time', '')
+    inquiry.preferred_pickup_time = data.get('preferred_pickup_time', '') or data.get('pickup_location_time_slab', '')
     inquiry.preferred_payment_method = data.get('preferred_payment_method', '')
+    inquiry.special_handling_detail = data.get('special_handling_detail', '')
+    inquiry.average_package_weight = data.get('average_package_weight', '')
+    inquiry.number_of_pickup_locations = data.get('number_of_pickup_locations', '')
+    inquiry.additional_notes = data.get('additional_notes', '')
+    inquiry.contact_consent = data.get('contact_consent') == 'on'
     inquiry.save()
 
 
@@ -318,7 +336,7 @@ def delivery_inquiry(request):
                             ),
                         ),
                         'current_step': 1,
-                        'saved_data': all_data,
+                        'saved_data': _derive_business_status(all_data),
                         'total_steps': 3,
                         'inquiry_error': 'Please provide at least one: Website URL, Instagram, or Facebook.',
                     }
@@ -398,7 +416,7 @@ def delivery_inquiry(request):
     data = {
         'seo': meta,
         'current_step': current_step,
-        'saved_data': saved_data,
+        'saved_data': _derive_business_status(saved_data),
         'total_steps': 3,
     }
     return render(request, 'webpages/delivery_pricing_inquiry.html', data)
