@@ -273,7 +273,7 @@ def delivery_inquiry(request):
                 wa_message += f". Additional info: {additional_info}"
 
             # WhatsApp business number (replace with actual number)
-            wa_number = "97466609347"  # Example Qatar number
+            wa_number = "97466451589"  # Example Qatar number
             wa_link = f"https://wa.me/{wa_number}?text={quote(wa_message)}"
 
             return JsonResponse({'success': True, 'redirect_url': wa_link})

@@ -8,7 +8,7 @@
         "image": "https://ezzydelivery.qa/static/webpages/img/ezzy-logo.png",
         "@id": "https://ezzydelivery.qa/courier-service-qatar/",
         "url": "https://ezzydelivery.qa/courier-service-qatar/",
-        "telephone": "+974-6660-9347",
+        "telephone": "+974-6645-1589",
         "priceRange": "QAR 8 - QAR 15",
         "address": {
             "@type": "PostalAddress",

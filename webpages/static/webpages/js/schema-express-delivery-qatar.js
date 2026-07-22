@@ -12,7 +12,7 @@
             "logo": "https://ezzydelivery.qa/static/webpages/img/ezzy-logo.png",
             "contactPoint": {
                 "@type": "ContactPoint",
-                "telephone": "+974-6660-9347",
+                "telephone": "+974-6645-1589",
                 "contactType": "Customer Service",
                 "areaServed": "QA",
                 "availableLanguage": ["English", "Arabic"]

@@ -28,7 +28,7 @@ class SEOMetadata:
 
     # Contact information for local SEO
     BUSINESS_NAME = "EzzyDelivery"
-    BUSINESS_PHONE = "+974-6660-9347"
+    BUSINESS_PHONE = "+974-6645-1589"
     BUSINESS_EMAIL = "info@ezzydelivery.qa"
     BUSINESS_ADDRESS = "Doha, Qatar"
 

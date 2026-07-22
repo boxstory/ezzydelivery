@@ -7,7 +7,7 @@
         "name": "EzzyDelivery Logistics Services Qatar",
         "image": "https://ezzydelivery.qa/static/webpages/img/ezzy-logo.png",
         "url": "https://ezzydelivery.qa/logistics-services-qatar/",
-        "telephone": "+974-6660-9347",
+        "telephone": "+974-6645-1589",
         "priceRange": "$$",
         "address": {
             "@type": "PostalAddress",

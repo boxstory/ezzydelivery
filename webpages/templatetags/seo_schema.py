@@ -157,7 +157,7 @@ def service_schema(context):
         "availableChannel": {
             "@type": "ServiceChannel",
             "serviceUrl": page_url,
-            "servicePhone": "+974-6660-9347",
+            "servicePhone": "+974-6645-1589",
             "availableLanguage": ["English", "Arabic"],
         },
     }

@@ -22,7 +22,7 @@ const organizationSchema = {
 
   "contactPoint": [{
     "@type": "ContactPoint",
-    "telephone": "+974-66609347",
+    "telephone": "+974-66451589",
     "contactType": "customer service",
     "areaServed": "QA",
     "availableLanguage": ["en", "ar"]
@@ -81,7 +81,7 @@ const localBusinessSchema = {
   "image": "https://ezzydelivery.qa/static/webpages/img/logo.png",
   "url": "https://ezzydelivery.qa",
   "@id": "https://ezzydelivery.qa",
-  "telephone": "+974-66609347",
+  "telephone": "+974-66451589",
   "priceRange": "QAR 8 - QAR 50",
 
   "address": {
