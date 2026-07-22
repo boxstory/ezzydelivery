@@ -3986,8 +3986,15 @@ def driver_pickups(request):
 
     # Stable left-border color per pickup location so same-store cards group visually
     cards = list(cards)
+    from delivery.models import ZoneName
+    dest_zones = {c.order.dl_zone for c in cards if c.order.dl_zone}
+    zone_names = dict(
+        ZoneName.objects.filter(zone_number__in=dest_zones)
+        .values_list('zone_number', 'zone_name')
+    ) if dest_zones else {}
     for pk_task in cards:
         pk_task.loc_color = (pk_task.pickup_location_id or 0) % 8
+        pk_task.dest_zone_name = zone_names.get(pk_task.order.dl_zone, '')
 
     context = {
         'driver': driver,

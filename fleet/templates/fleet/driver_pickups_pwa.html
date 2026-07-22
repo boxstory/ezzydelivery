@@ -11,7 +11,7 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
 {% block page_title %}Pickups{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'fleet/css/fleet-pickup.css' %}?v=20260722h">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-pickup.css' %}?v=20260722i">
 {% endblock %}
 
 {% block content %}
@@ -110,7 +110,12 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
 
     <div class="fps__customer">
         <i class="fa-solid fa-user"></i>
-        <span class="fps__customer-name">{{ pk_task.order.customer_name|default:"—" }}</span>
+        <div class="fps__customer-info">
+            <span class="fps__customer-name">{{ pk_task.order.customer_name|default:"—" }}</span>
+            {% if current_tab == 'in_progress' and pk_task.order.dl_zone %}
+            <span class="fps__customer-zone">Zone {{ pk_task.order.dl_zone }}{% if pk_task.dest_zone_name %} · {{ pk_task.dest_zone_name }}{% endif %}</span>
+            {% endif %}
+        </div>
         {% if pk_task.order.customer_phone %}
         <a href="tel:{{ pk_task.order.customer_phone }}" class="fps__customer-phone" onclick="event.stopPropagation()">
             <i class="fa-solid fa-phone"></i> xxx{{ pk_task.order.customer_phone|slice:"3:" }}
