@@ -2107,3 +2107,44 @@ See existing implementations:
 - Homepage hero: `webpages/templates/webpages/homepage.html`
 - SEO landing pages: `webpages/templates/webpages/delivery_*.html`
 - Dashboard cards: `business/templates/business/dashboard.html`
+
+## Form Controls & Input Fields — Hard Rules
+
+Lessons from production bugs. Apply to every input, select, and filter pill, especially on dark/navy hero bars.
+
+### 1. Never use the `background:` shorthand on a control that carries a background-image
+
+The shorthand resets `background-repeat` / `background-position` / `background-size` to initial. On a Bootstrap `.form-select` (or any select with a custom arrow), a later `background: rgba(...)` from a higher-specificity rule resets repeat to `repeat` — and the arrow SVG tiles across the whole control (yellow-chevron wallpaper bug, Pickup Pool hero, 2026-07-20).
+
+```css
+/* WRONG — resets background-repeat, arrow tiles */
+.hero .ffield { background: rgba(255, 255, 255, 0.08); }
+
+/* RIGHT — longhand only on controls */
+.hero .ffield { background-color: rgba(255, 255, 255, 0.08); }
+```
+
+### 2. Custom select arrows always declare the full background set
+
+When overriding the arrow (e.g. brand-yellow chevron on navy), declare all four longhands together — never rely on Bootstrap's `no-repeat` surviving the cascade:
+
+```css
+.hero select.ffield {
+    padding-right: 1.6rem;
+    background-image: url("data:image/svg+xml,...");
+    background-repeat: no-repeat;
+    background-size: 12px 9px;
+    background-position: right 0.45rem center;
+}
+```
+
+### 3. Dark-surface field recipe (navy hero filter bars)
+
+- Field: `background-color: rgba(255,255,255,0.08)`, `border: 1px solid rgba(255,255,255,0.25)`, white text.
+- `<option>` elements need explicit dark-on-white (`option { color: #1a1a2e; background: #fff; }`) or they inherit white-on-white in some browsers.
+- Placeholder: `rgba(255,255,255,0.45)`.
+- Focus: yellow border `#f7c000`, `box-shadow: none` (kill Bootstrap's blue glow).
+
+### 4. Sidebar section rows: badge is structural, not conditional
+
+In the workforce sidebar, the count badge (`.wf-sidebar__badge` with `ms-auto me-2`) is what pushes the section chevron to the right edge. Always render it with `{{ count|default:"0" }}` — wrapping it in `{% if count %}` collapses the row's layout (chevron hugs the label) AND breaks live `data-badge` JS updates, which need the element present at render time.

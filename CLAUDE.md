@@ -23,6 +23,30 @@ python manage.py collectstatic --noinput
 
 ---
 
+## ⚠️ CRITICAL RULE: Log Every Coding Task (No Permission Needed)
+
+**After completing ANY coding task (bug fix, feature, refactor, config change — anything that edited a file), IMMEDIATELY append a summary entry to today's dev log — DO NOT ASK FOR PERMISSION:**
+
+- File: `.claude/devlog/YYYY-MM-DD.md` (use today's date; create the file if it doesn't exist yet, with a `# Dev Log — YYYY-MM-DD` header)
+- Append to the **end** of the file (chronological order)
+
+**Entry format:**
+```markdown
+## HH:MM — <short title>
+<2-4 sentence summary of what changed and why>
+
+**Files:** `path/one.py`, `path/two.html`
+```
+
+**RULES:**
+1. Do NOT ask "should I log this?" - JUST DO IT
+2. One entry per coding task (not per individual file edit within that task)
+3. Only log when files actually changed — skip for pure Q&A, research, or read-only exploration
+4. Use the local system time (24h `HH:MM`) for the entry heading
+5. Keep the summary in plain English — this is a human-readable history, not a commit message
+
+---
+
 ## ⚠️ CRITICAL RULE: Read Before Coding
 
 **Before making ANY code changes, ALWAYS read the relevant existing code first. Trace the full data flow:**
