@@ -357,10 +357,15 @@ def _sync_onedrive_source(source):
         empty template rows."""
         return (not val) or val.strip() in ('0', '0.0')
 
-    existing = {
-        to.row_num: to
-        for to in TempOrder.objects.filter(source_type='onedrive', onedrive_source=source)
-    }
+    # Keyed row_num → list: a sheet row can be reused for a different order
+    # (sellers overwrite formula/placeholder rows), in which case the old
+    # imported record is kept as history and the new order gets its own
+    # TempOrder — matching within a row is by client_order_code.
+    existing = {}
+    for to in TempOrder.objects.filter(
+        source_type='onedrive', onedrive_source=source,
+    ).order_by('pk'):
+        existing.setdefault(to.row_num, []).append(to)
 
     # Imported client codes
     all_codes = [get_cell(r, 'client_order_code') for r in data_rows]
@@ -402,18 +407,35 @@ def _sync_onedrive_source(source):
         if _is_placeholder(customer_name) and _is_placeholder(customer_phone):
             continue
 
+        client_code = get_cell(row_data, 'client_order_code')
+
+        # Match this row's temp order by row AND order code, so a row reused
+        # for a different order never touches the old imported record.
+        temp_order = next(
+            (to for to in existing.get(row_num, ())
+             if (to.client_order_code or '') == client_code),
+            None,
+        )
+
         # Check if already imported in temp_orders table
-        if row_num in existing and existing[row_num].status == 'imported':
+        if temp_order is not None and temp_order.status == 'imported':
             consecutive_imported += 1
             if consecutive_imported >= 10:
                 break
             continue
         consecutive_imported = 0
 
-        client_code = get_cell(row_data, 'client_order_code')
-        already_imported = row_num in imported_row_nums
-        if not already_imported and client_code and client_code in imported_codes:
-            already_imported = True
+        already_imported = bool(client_code) and client_code in imported_codes
+        if not already_imported and row_num in imported_row_nums:
+            # The row-number import marker is only trustworthy while the row
+            # hasn't been reused for a different order: an imported temp order
+            # with a different code at this row means it has, and the new
+            # order must list as 'new'.
+            row_reused = any(
+                to.status == 'imported' and (to.client_order_code or '') != client_code
+                for to in existing.get(row_num, ())
+            )
+            already_imported = not row_reused
 
         status = 'imported' if already_imported else 'new'
         raw_row = [str(c) if c is not None else '' for c in row_data]
@@ -438,8 +460,7 @@ def _sync_onedrive_source(source):
 
         seen_row_nums.add(row_num)
 
-        if row_num in existing:
-            temp_order = existing[row_num]
+        if temp_order is not None:
             # Don't reset status if already marked as imported
             if temp_order.status == 'imported':
                 defaults.pop('status', None)
@@ -652,14 +673,17 @@ def _sync_google_sheet_source(api_settings):
 
     business = api_settings.business
 
-    existing = {
-        to.row_num: to
-        for to in TempOrder.objects.filter(
-            source_type='google_sheet',
-            api_settings=api_settings,
-            sheet_name=worksheet.title,
-        )
-    }
+    # Keyed row_num → list: a sheet row can be reused for a different order,
+    # in which case the old imported record is kept as history and the new
+    # order gets its own TempOrder — matching within a row is by
+    # client_order_code.
+    existing = {}
+    for to in TempOrder.objects.filter(
+        source_type='google_sheet',
+        api_settings=api_settings,
+        sheet_name=worksheet.title,
+    ).order_by('pk'):
+        existing.setdefault(to.row_num, []).append(to)
 
     # Imported client codes
     all_codes = [cell(r, idx_order) for r in data_rows]
@@ -696,18 +720,35 @@ def _sync_google_sheet_source(api_settings):
         if not customer_name and not customer_phone:
             continue
 
+        client_code = cell(row, idx_order)
+
+        # Match this row's temp order by row AND order code, so a row reused
+        # for a different order never touches the old imported record.
+        temp_order = next(
+            (to for to in existing.get(row_num, ())
+             if (to.client_order_code or '') == client_code),
+            None,
+        )
+
         # Check if already imported in temp_orders table
-        if row_num in existing and existing[row_num].status == 'imported':
+        if temp_order is not None and temp_order.status == 'imported':
             consecutive_imported += 1
             if consecutive_imported >= 10:
                 break
             continue
         consecutive_imported = 0
 
-        client_code = cell(row, idx_order)
-        already_imported = row_num in imported_rows_from_db
-        if not already_imported and client_code and client_code in imported_codes:
-            already_imported = True
+        already_imported = bool(client_code) and client_code in imported_codes
+        if not already_imported and row_num in imported_rows_from_db:
+            # The row-number import marker is only trustworthy while the row
+            # hasn't been reused for a different order: an imported temp order
+            # with a different code at this row means it has, and the new
+            # order must list as 'new'.
+            row_reused = any(
+                to.status == 'imported' and (to.client_order_code or '') != client_code
+                for to in existing.get(row_num, ())
+            )
+            already_imported = not row_reused
 
         status = 'imported' if already_imported else 'new'
         raw_row = [str(c) if c is not None else '' for c in row]
@@ -729,8 +770,7 @@ def _sync_google_sheet_source(api_settings):
 
         seen_row_nums.add(row_num)
 
-        if row_num in existing:
-            temp_order = existing[row_num]
+        if temp_order is not None:
             # Don't reset status if already marked as imported
             if temp_order.status == 'imported':
                 defaults.pop('status', None)
