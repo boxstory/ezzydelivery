@@ -2,7 +2,8 @@
 {% load static %}
 
 {% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}?v=20260630c" rel="stylesheet" type="text/css" />
+<link href="{% static 'orders/css/orders.css' %}?v=20260718f" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/auto-triggers.css' %}?v=20260718f" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -14,7 +15,7 @@
     </div>
 </header>
 
-<div class="col-12 p-3">
+<div class="col-12 p-3 atl">
 
     <!-- WhatsApp Notifications Section -->
     <div class="card mb-4">
@@ -29,10 +30,10 @@
                     <thead class="table-light">
                         <tr>
                             <th style="width:4%">#</th>
-                            <th style="width:9%">Code</th>
-                            <th style="width:11%">Trigger</th>
-                            <th style="width:18%">Description</th>
-                            <th style="width:17%">Action</th>
+                            <th style="width:14%">Trigger</th>
+                            <th style="width:16%">Description</th>
+                            <th style="width:14%">Action</th>
+                            <th style="width:9%">Pages</th>
                             <th style="width:14%">From WhatsApp</th>
                             <th style="width:7%">Status</th>
                             <th style="width:9%" class="text-center">Enabled</th>
@@ -40,13 +41,90 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <!-- Sub-group: Sender Routing -->
+                        <tr class="table-light">
+                            <td colspan="9" class="fw-bold text-uppercase small text-muted">
+                                <i class="fa-solid fa-route me-1"></i>Sender Routing — which number each section sends from
+                            </td>
+                        </tr>
+                        {% for r in wa_routes %}
+                        <tr id="route-row-{{ r.section }}">
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ r.label }}</strong>
+                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ r.code }}</code></div>
+                            </td>
+                            <td>{{ r.description }}</td>
+                            <td><code>{{ r.action }}</code></td>
+                            <td>
+                                {% if r.links %}
+                                <div class="d-flex flex-column gap-1 align-items-start">
+                                    {% for name, url in r.links %}
+                                    <a href="{{ url }}" class="wa-notif__page-link">
+                                        {{ name }}<i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div id="route-fromcell-{{ r.section }}" data-instance-id="{{ r.instance.id|default:'' }}">
+                                    {% if r.instance %}
+                                        <span class="badge wa-notif__from-badge" title="{{ r.instance.label }} · {{ r.instance.instance_name }}">
+                                            <i class="fa-brands fa-whatsapp me-1"></i>{{ r.instance.phone_number|default:r.instance.instance_name }}
+                                        </span>
+                                    {% elif wa_sender.number %}
+                                        <span class="badge wa-notif__from-badge wa-notif__from-badge--default" title="Default sender · {{ wa_sender.label }}{% if wa_sender.instance %} · {{ wa_sender.instance }}{% endif %}">
+                                            <i class="fa-brands fa-whatsapp me-1"></i>{{ wa_sender.number }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted small">Not configured</span>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-1">
+                                    <span class="badge wa-notif__via-badge" title="Delivery channel for this route">
+                                        <i class="fa-solid fa-paper-plane me-1"></i>via Evolution API
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge {% if not r.is_enabled %}bg-secondary{% elif r.instance %}bg-success{% else %}bg-warning text-dark{% endif %}" id="route-badge-{{ r.section }}">
+                                    {% if not r.is_enabled %}Disabled{% elif r.instance %}Active{% else %}Default{% endif %}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="route-toggle-{{ r.section }}"
+                                           {% if r.is_enabled %}checked{% endif %}
+                                           onchange="toggleRoute('{{ r.section }}', this)">
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="openRouteModal('{{ r.section }}', '{{ r.label|escapejs }}')" title="Edit sender route">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Sub-group: Notification Triggers -->
+                        <tr class="table-light">
+                            <td colspan="9" class="fw-bold text-uppercase small text-muted">
+                                <i class="fa-brands fa-whatsapp me-1"></i>Notification Triggers — automatic messages per event
+                            </td>
+                        </tr>
                         {% for t in wa_triggers %}
                         <tr id="trigger-row-{{ t.trigger_key }}">
                             <td>{{ forloop.counter }}</td>
-                            <td><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></td>
-                            <td><strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong></td>
+                            <td>
+                                <strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
+                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></div>
+                            </td>
                             <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
                             <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
+                            <td><span class="text-muted small">—</span></td>
                             <td>
                                 <div id="fromcell-{{ t.trigger_key }}" data-instance-id="{{ t.whatsapp_instance_id|default:'' }}" data-channel="{{ t.whatsapp_channel }}">
                                     {% if t.whatsapp_instance %}
@@ -118,8 +196,7 @@
                     <thead class="table-light">
                         <tr>
                             <th style="width:4%">#</th>
-                            <th style="width:10%">Code</th>
-                            <th style="width:10%">Event</th>
+                            <th style="width:20%">Event</th>
                             <th style="width:22%">Description</th>
                             <th style="width:22%">Action</th>
                             <th style="width:8%">Status</th>
@@ -131,8 +208,10 @@
                         {% for t in wh_triggers %}
                         <tr id="trigger-row-{{ t.trigger_key }}">
                             <td>{{ forloop.counter }}</td>
-                            <td><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></td>
-                            <td><code id="label-{{ t.trigger_key }}">{{ t.label }}</code></td>
+                            <td>
+                                <code id="label-{{ t.trigger_key }}">{{ t.label }}</code>
+                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></div>
+                            </td>
                             <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
                             <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
                             <td>
@@ -155,7 +234,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="8" class="text-center text-muted py-3">No webhook triggers configured</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-3">No webhook triggers configured</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -176,8 +255,7 @@
                     <thead class="table-light">
                         <tr>
                             <th style="width:4%">#</th>
-                            <th style="width:10%">Code</th>
-                            <th style="width:12%">Action</th>
+                            <th style="width:22%">Action</th>
                             <th style="width:22%">Description</th>
                             <th style="width:22%">Action Taken</th>
                             <th style="width:8%">Status</th>
@@ -189,8 +267,10 @@
                         {% for t in sys_triggers %}
                         <tr id="trigger-row-{{ t.trigger_key }}">
                             <td>{{ forloop.counter }}</td>
-                            <td><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></td>
-                            <td><strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong></td>
+                            <td>
+                                <strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
+                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></div>
+                            </td>
                             <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
                             <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
                             <td>
@@ -213,7 +293,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="8" class="text-center text-muted py-3">No system triggers configured</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-3">No system triggers configured</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -224,6 +304,36 @@
 </div>
 
 <!-- Edit Trigger Modal -->
+<!-- Edit Sender Route Modal -->
+<div class="modal fade" id="editRouteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'workforce:whatsapp_sender_routes_save' %}">
+            {% csrf_token %}
+            <input type="hidden" name="section" id="editRouteSection">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-route me-2"></i>Sender Route — <span id="editRouteTitle"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-bold" for="editRouteInstance"><i class="fa-brands fa-whatsapp wa-notif__icon me-1"></i>Send from WhatsApp number</label>
+                    <select class="form-select" name="route_instance" id="editRouteInstance">
+                        <option value="">Default ({{ wa_sender.number|default:wa_sender.instance|default:"not set" }})</option>
+                        {% for inst in wa_instances %}
+                        <option value="{{ inst.id }}">{{ inst.label }} — {{ inst.phone_number|default:inst.instance_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">All messages from this section will send from the selected number. Choose Default to use the platform default sender.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-check me-1"></i>Save</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="modal fade" id="editTriggerModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -281,6 +391,48 @@
 </div>
 
 <script>
+function openRouteModal(section, label) {
+    document.getElementById('editRouteSection').value = section;
+    document.getElementById('editRouteTitle').textContent = label;
+    var cell = document.getElementById('route-fromcell-' + section);
+    document.getElementById('editRouteInstance').value = (cell && cell.dataset.instanceId) ? cell.dataset.instanceId : '';
+    new bootstrap.Modal(document.getElementById('editRouteModal')).show();
+}
+
+function toggleRoute(section, checkbox) {
+    checkbox.disabled = true;
+    fetch("{% url 'workforce:whatsapp_sender_route_toggle' %}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+        body: JSON.stringify({section: section})
+    })
+    .then(r => r.json())
+    .then(data => {
+        checkbox.disabled = false;
+        if (data.success) {
+            const badge = document.getElementById('route-badge-' + section);
+            if (!data.is_enabled) {
+                badge.className = 'badge bg-secondary';
+                badge.textContent = 'Disabled';
+                checkbox.checked = false;
+            } else if (data.has_instance) {
+                badge.className = 'badge bg-success';
+                badge.textContent = 'Active';
+                checkbox.checked = true;
+            } else {
+                badge.className = 'badge bg-warning text-dark';
+                badge.textContent = 'Default';
+                checkbox.checked = true;
+            }
+            if (typeof showToast === 'function') showToast(data.is_enabled ? 'Route enabled' : 'Route disabled — section unrestricted', 'success');
+        } else {
+            checkbox.checked = !checkbox.checked;
+            alert('Error: ' + (data.error || 'Failed to toggle'));
+        }
+    })
+    .catch(() => { checkbox.disabled = false; checkbox.checked = !checkbox.checked; });
+}
+
 function getCSRFToken() {
     var meta = document.querySelector('meta[name="csrf-token"]');
     if (meta) return meta.getAttribute('content');

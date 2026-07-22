@@ -460,6 +460,21 @@ Thank you for choosing EZZY Delivery! 🚚"""
         }
 
 
+def get_route_instance(section):
+    """Return the active WhatsAppInstance a platform section must send from, or None.
+
+    Sections are defined in core.models.WhatsAppSenderRoute.SECTION_CHOICES and
+    configured on the workforce Auto Triggers page. A disabled route or an
+    inactive instance means "no restriction" (caller falls back to default).
+    """
+    from core.models import WhatsAppSenderRoute
+    route = (WhatsAppSenderRoute.objects
+             .select_related('instance')
+             .filter(section=section, is_enabled=True).first())
+    inst = route.instance if route else None
+    return inst if (inst and inst.is_active) else None
+
+
 def send_whatsapp_message_api(phone_number, message, instance_obj=None):
     """
     Send WhatsApp message via Evolution API

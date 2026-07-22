@@ -4,7 +4,9 @@
 {% url 'workforce:auto_flow_add' as u_auto_flow_add %}
 {% url 'workforce:whatsapp_instances_list' as u_whatsapp_instances_list %}
 {% url 'workforce:wf_ai_config' as u_wf_ai_config %}
-{% with active="auto_triggers_list,auto_flows_list,auto_flow_add,auto_flow_edit,auto_flow_logs,whatsapp_instances_list,wf_ai_config" %}
+{% url 'workforce:wf_seller_api_configs' as u_wf_seller_api_configs %}
+{% url 'workforce:wf_webhook_imports' as u_wf_webhook_imports %}
+{% with active="auto_triggers_list,auto_flows_list,auto_flow_add,auto_flow_edit,auto_flow_logs,whatsapp_instances_list,wf_ai_config,wf_seller_api_configs,wf_test_api_config,wf_webhook_imports" %}
 <li id="workforce_sidebar_menu_triggers" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_triggers" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-triggers" data-title="Auto Triggers">
     <i class="fa-solid fa-bolt me-2"></i>
@@ -18,6 +20,8 @@
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_auto_flow_add" url=u_auto_flow_add icon="fa-solid fa-plus" label="Add Flow" active_names="auto_flow_add" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wa_instances" url=u_whatsapp_instances_list icon="fa-brands fa-whatsapp" label="WA Instances" active_names="whatsapp_instances_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_ai_config" url=u_wf_ai_config icon="fa-solid fa-microchip" label="AI Config" active_names="wf_ai_config" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_api_configs" url=u_wf_seller_api_configs icon="fa-solid fa-plug" label="API Configs" active_names="wf_seller_api_configs,wf_test_api_config" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_webhook_imports" url=u_wf_webhook_imports icon="fa-solid fa-satellite-dish" label="Webhook Imports" active_names="wf_webhook_imports" %}
     </ul>
   </div>
 </li>

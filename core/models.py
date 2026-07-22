@@ -490,3 +490,35 @@ class WhatsAppInstance(models.Model):
         if self.is_default:
             WhatsAppInstance.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+class WhatsAppSenderRoute(models.Model):
+    """Maps a platform section to the WhatsApp instance its messages must send from."""
+
+    SECTION_CHOICES = [
+        ('orders_tasks', 'Orders & Delivery Tasks'),
+        ('crm_leads', 'CRM & Leads'),
+        ('marketing_campaigns', 'Marketing Campaigns'),
+        ('followups', 'Follow-up Digests'),
+    ]
+
+    section = models.CharField(max_length=30, choices=SECTION_CHOICES, unique=True)
+    instance = models.ForeignKey(
+        WhatsAppInstance, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sender_routes',
+        help_text='WhatsApp number this section sends from (blank = default).'
+    )
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text='Off = section is not restricted; falls back to the default sender.'
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['section']
+        verbose_name = 'WhatsApp Sender Route'
+        verbose_name_plural = 'WhatsApp Sender Routes'
+
+    def __str__(self):
+        target = self.instance.label if self.instance else 'default'
+        return f"{self.get_section_display()} → {target}"

@@ -1,0 +1,180 @@
+/* Purpose: Auto Triggers ledger design layer — restrained console styling for /workforce/auto-triggers/
+   Used by: workforce/templates/workforce/auto_triggers_list.html (page wrapper class .atl)
+   Notes: Visual overrides only (colors, chrome); layout stays Bootstrap utilities. Status pills become swatch+text. */
+
+.atl {
+  --atl-ink: #16233a;
+  --atl-muted: #64748b;
+  --atl-hair: #e2e6ec;
+  --atl-navy: #14213d;
+  --atl-gold: #f6c344;
+  --atl-ok: #2fae5f;
+  --atl-off: #9aa3af;
+  --atl-warn: #d97706;
+}
+
+/* ---- Cards as ledger panels ---- */
+.atl .card {
+  border: 1px solid var(--atl-hair);
+  border-radius: 6px;
+  box-shadow: none;
+  overflow: hidden;
+}
+.atl .card-header {
+  background: var(--atl-navy) !important;
+  border-bottom: none !important;
+  padding: 0.6rem 1rem !important;
+}
+.atl .card-header strong {
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.atl .card-header i { color: rgba(255, 255, 255, 0.5); }
+.atl .card-header .fs-5 { font-size: 0.9rem !important; }
+.atl .card-header .wa-notif__icon { color: #25d366 !important; }
+.atl .card-header .badge {
+  background: transparent;
+  border: 1px solid rgba(246, 195, 68, 0.55);
+  color: var(--atl-gold);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+}
+
+/* ---- Table: hairline ledger ---- */
+.atl thead th {
+  background: #f7f8fb;
+  color: var(--atl-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--atl-hair);
+  padding: 0.55rem 0.75rem;
+}
+.atl tbody td {
+  font-size: 0.83rem;
+  color: var(--atl-ink);
+  padding: 0.65rem 0.75rem;
+  border-color: var(--atl-hair);
+  vertical-align: top;
+}
+.atl .table-light { --bs-table-bg: #fbfcfe; }
+.atl tbody tr.table-light td {
+  color: var(--atl-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  padding: 0.45rem 0.75rem;
+}
+.atl tbody strong { font-weight: 600; }
+.atl code {
+  color: #5b6472;
+  background: transparent;
+  font-size: 0.72rem;
+}
+
+/* ---- Status: swatch + text, not pills ---- */
+.atl tbody .badge.bg-success,
+.atl tbody .badge.bg-secondary,
+.atl tbody .badge.bg-warning {
+  background: transparent !important;
+  color: var(--atl-ink);
+  font-weight: 500;
+  font-size: 0.78rem;
+  padding: 0 0 0 0.8rem;
+  border-radius: 0;
+  position: relative;
+}
+.atl tbody .badge.bg-success::before,
+.atl tbody .badge.bg-secondary::before,
+.atl tbody .badge.bg-warning::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+}
+.atl tbody .badge.bg-success::before { background: var(--atl-ok); }
+.atl tbody .badge.bg-secondary::before { background: var(--atl-off); }
+.atl tbody .badge.bg-secondary { color: var(--atl-muted); }
+.atl tbody .badge.bg-warning::before { background: var(--atl-warn); }
+.atl tbody .badge.bg-secondary-subtle {
+  background: transparent !important;
+  border: none !important;
+  color: var(--atl-muted);
+  padding: 0;
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+/* ---- Sender identity: mono number, quiet channel caption ---- */
+.atl tbody .wa-notif__from-badge {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--atl-ink);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.atl tbody .wa-notif__from-badge i { color: #25d366; }
+.atl tbody .wa-notif__from-badge--default { color: var(--atl-muted); font-weight: 500; }
+.atl tbody .wa-notif__via-badge {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--atl-muted);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+.atl tbody .wa-notif__via-badge i { color: var(--atl-off); }
+
+/* ---- Pages column links: quiet ink references (hardened against themed link defaults) ---- */
+.atl .wa-notif__page-link {
+  color: #3d4451 !important;
+  text-decoration: none !important;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-bottom: 1px dotted #b8bec9;
+  white-space: nowrap;
+}
+.atl .wa-notif__page-link:hover {
+  color: #111826 !important;
+  border-bottom-color: currentColor;
+  border-bottom-style: solid;
+}
+
+/* ---- Controls: navy switch, ghost edit button ---- */
+/* brandkit-overrides.css squares all [type=checkbox] with !important — restore the switch shape here */
+.atl .form-switch .form-check-input {
+  width: 2.1rem !important;
+  height: 1.15rem !important;
+  border: 1px solid #c7cdd6 !important;
+  border-radius: 2rem !important;
+  background-color: #eef0f4;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23848d9c'/%3e%3c/svg%3e") !important;
+}
+.atl .form-switch .form-check-input:checked {
+  background-color: var(--atl-navy) !important;
+  border-color: var(--atl-navy) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e") !important;
+}
+.atl .form-switch .form-check-input:focus {
+  box-shadow: 0 0 0 0.15rem rgba(20, 33, 61, 0.15) !important;
+}
+.atl tbody .btn-outline-secondary {
+  --bs-btn-color: #7a8494;
+  --bs-btn-border-color: var(--atl-hair);
+  --bs-btn-hover-bg: var(--atl-navy);
+  --bs-btn-hover-border-color: var(--atl-navy);
+  --bs-btn-hover-color: #fff;
+  border-radius: 4px;
+}
