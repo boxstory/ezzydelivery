@@ -4634,6 +4634,57 @@ def driver_set_status(request):
     }, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
+def driver_set_work_preference(request):
+    """Update driver work preference.
+
+    Body: {"job_type": "full_time"|"part_time"|"flexible"|"",
+           "work_time_slabs": ["morning", "evening"]}  (list or CSV string)
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    update_fields = []
+    if 'job_type' in request.data:
+        job_type = (request.data.get('job_type') or '').strip()
+        valid_types = dict(fleet_models.DRIVER_JOB_TYPE_CHOICES)
+        if job_type and job_type not in valid_types:
+            return Response(
+                {'error': f'Invalid job_type. Must be one of: {list(valid_types)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        driver.job_type = job_type
+        update_fields.append('job_type')
+
+    if 'work_time_slabs' in request.data:
+        raw = request.data.get('work_time_slabs')
+        slabs = raw if isinstance(raw, list) else (raw or '').split(',')
+        valid_slabs = dict(fleet_models.WORK_TIME_SLAB_CHOICES)
+        cleaned = [s.strip() for s in slabs if s and s.strip()]
+        invalid = [s for s in cleaned if s not in valid_slabs]
+        if invalid:
+            return Response(
+                {'error': f'Invalid work_time_slabs {invalid}. Must be from: {list(valid_slabs)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        driver.work_time_slabs = ','.join(cleaned)
+        update_fields.append('work_time_slabs')
+
+    if update_fields:
+        driver.save(update_fields=update_fields)
+
+    return Response({
+        'success': True,
+        'job_type': driver.job_type,
+        'job_type_display': driver.get_job_type_display() if driver.job_type else '',
+        'work_time_slabs': driver.work_time_slab_list,
+        'work_time_slabs_display': driver.work_time_slabs_display,
+    }, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_dashboard(request):

@@ -92,6 +92,43 @@
             {% endif %}
         </div>
 
+        <div class="wdd__status-row">
+            <span class="wdd__status-row__label">Work preference</span>
+            <span class="wdd__status-row__value">
+                {% if driver.job_type %}{{ driver.get_job_type_display }}{% if driver.work_time_slabs %} &middot; {{ driver.work_time_slabs_display }}{% endif %}{% else %}Not set{% endif %}
+            </span>
+            <button class="btn btn-sm wdd__hero__toggle" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#wdd_workpref_form" aria-expanded="false">
+                <i class="fa-solid fa-pen"></i> Edit
+            </button>
+        </div>
+        <div class="collapse" id="wdd_workpref_form">
+            <form method="post" action="{% url 'workforce:driver_set_work_pref' driver.driver_id %}"
+                  class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                {% csrf_token %}
+                <div>
+                    <label class="wdd__status-row__label d-block" for="wdd_workpref_jobtype">Job type</label>
+                    <select class="form-select form-select-sm" name="job_type" id="wdd_workpref_jobtype">
+                        <option value="">Not set</option>
+                        {% for value, label in job_type_choices %}
+                        <option value="{{ value }}" {% if driver.job_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for value, label in work_time_slab_choices %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="work_time_slabs"
+                               value="{{ value }}" id="wdd_workpref_slab_{{ value }}"
+                               {% if value in driver_time_slabs %}checked{% endif %}>
+                        <label class="form-check-label wdd__status-row__value" for="wdd_workpref_slab_{{ value }}">{{ label }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-sm wdd__hero__toggle wdd__hero__toggle--activate">Save</button>
+            </form>
+        </div>
+
         {% if driver.driver_rating > 0 %}
         <span class="wdd__hero__rating">
             <i class="fa-solid fa-star"></i> {{ driver.driver_rating }}/5

@@ -345,6 +345,15 @@ def join_business(request):
         return redirect('core:profile_add')
 
 
+def join_driver_start(request):
+    """Public onboarding intro — how to become a driver in 4 steps, with a join button.
+
+    Anonymous visitors get a 'Join with Google' button (sign-in returns to the
+    application form); logged-in users get a direct link to the form.
+    """
+    return render(request, 'core/join_driver_start.html')
+
+
 def join_driver(request):
     """Public driver application — Google sign-in, then 3 sections: profile, vehicle, documents.
 
@@ -360,14 +369,21 @@ def join_driver(request):
     driver = None
     primary_vehicle = None
 
+    already_business = False
+    is_verified_driver = False
+
     if request.user.is_authenticated:
         profile, _ = core_models.Profile.objects.get_or_create(user=request.user)
         if profile.is_staff:
             messages.warning(request, "Staff accounts cannot apply as drivers.")
             return redirect('workforce:wf_dashboard')
+        already_business = profile.is_business
         driver = fleet_models.Driver.objects.filter(user_id=request.user.id).first()
         if driver:
             primary_vehicle = driver.driver_vehicle.first()
+        is_verified_driver = bool(
+            driver and profile.is_driver and profile.verification_status == 'verified'
+        )
 
     upload_errors = []
 
@@ -375,11 +391,22 @@ def join_driver(request):
         if not request.user.is_authenticated:
             messages.error(request, "Please sign in with Google to submit your application.")
             return redirect('core:join_driver')
+        if already_business:
+            messages.warning(request, "You are already registered as a business. One account cannot be both business and driver.")
+            return redirect('core:join_driver')
+        if is_verified_driver:
+            messages.info(request, "Your driver account is already verified — application editing is closed.")
+            return redirect('core:join_driver')
+
+        is_partial_save = request.POST.get('action') == 'save'
 
         pform = core_forms.DriverApplyProfileForm(request.POST, instance=profile)
+        if is_partial_save:
+            # Save-progress accepts incomplete sections
+            for field in pform.fields.values():
+                field.required = False
         vform = fleet_forms.DriverVehicleForm(request.POST, prefix='veh', instance=primary_vehicle)
 
-        # Documents: selfie + at least 2 ID docs (new uploads count together with existing)
         existing_types = set()
         if driver:
             existing_types = set(
@@ -397,85 +424,134 @@ def join_driver(request):
                 else:
                     upload_errors.append(f"{doc_type}: {err}")
 
-        if 'Selfie' not in uploaded and 'Selfie' not in existing_types:
-            upload_errors.append("A selfie photo is required.")
-        id_docs_count = len({t for t in ID_DOC_TYPES if t in uploaded or t in existing_types})
-        if id_docs_count < 2:
-            upload_errors.append("Upload at least 2 ID documents (QID, Passport, Driving License or Istimara).")
-
         veh_type = request.POST.get('veh-vehicle_type', '')
         vehicle_selected = bool(veh_type) and veh_type != 'none'
-        if not vehicle_selected:
-            upload_errors.append("Please select your available vehicle type.")
 
-        if pform.is_valid() and vform.is_valid() and not upload_errors:
-            profile = pform.save(commit=False)
-            profile.user = request.user
-            if not profile.username:
-                profile.username = request.user.username
-            if not profile.email:
-                profile.email = request.user.email
-            profile.is_driver = True
-            profile.is_business = False
-            if profile.get_profile_completion_percentage() == 100:
-                profile.is_profile_completed = True
-            if profile.verification_status != 'verified':
-                profile.verification_status = VERIFICATION_STATUS_PENDING
-                profile.verification_applied_at = dj_timezone.now()
-            profile.save()
+        # Minimum requirements enforced only on final submission:
+        # selfie + at least 2 ID documents + a vehicle type
+        if not is_partial_save:
+            if 'Selfie' not in uploaded and 'Selfie' not in existing_types:
+                upload_errors.append("A selfie photo is required.")
+            id_docs_count = len({t for t in ID_DOC_TYPES if t in uploaded or t in existing_types})
+            if id_docs_count < 2:
+                upload_errors.append("Upload at least 2 ID documents (QID, Passport, Driving License or Istimara).")
+            if not vehicle_selected:
+                upload_errors.append("Please select your available vehicle type.")
 
-            is_new_driver = driver is None
-            if is_new_driver:
-                driver = fleet_models.Driver(
-                    user=request.user,
-                    profile=profile,
-                    driver_id=profile.id,
-                    driver_status=DRIVER_STATUS_PENDING,
-                    driver_code=''.join(random.choice(string.digits) for _ in range(6)),
-                    driver_languages='english',
+        if pform.is_valid() and (not vehicle_selected or vform.is_valid()) and not upload_errors:
+            from django.db import transaction
+            from django.db.models import Max
+
+            with transaction.atomic():
+                profile = pform.save(commit=False)
+                profile.user = request.user
+                if not profile.username:
+                    profile.username = request.user.username
+                if not profile.email:
+                    profile.email = request.user.email
+                if not is_partial_save:
+                    profile.is_driver = True
+                    profile.is_business = False
+                    if profile.get_profile_completion_percentage() == 100:
+                        profile.is_profile_completed = True
+                    if profile.verification_status != 'verified':
+                        profile.verification_status = VERIFICATION_STATUS_PENDING
+                        profile.verification_applied_at = dj_timezone.now()
+                profile.save()
+
+                # A driver row is needed to attach vehicle/documents; on a bare
+                # partial save (profile fields only) we skip creating one.
+                need_driver_row = (
+                    driver is not None or not is_partial_save or uploaded
+                    or vehicle_selected
+                    or bool((request.POST.get('driver_license_number') or '').strip())
+                    or request.POST.get('has_driver_license') == 'on'
+                    or bool(request.POST.get('job_type'))
+                    or bool(request.POST.getlist('work_time_slabs'))
                 )
-            driver.profile = profile
-            driver.driver_phone = profile.phone or ''
-            driver.driver_whatsapp = profile.whatsapp or ''
-            driver.has_driver_license = request.POST.get('has_driver_license') == 'on'
-            license_no = (request.POST.get('driver_license_number') or '').strip()
-            if license_no:
-                driver.driver_license_number = license_no
+                is_new_driver = driver is None
+                if is_new_driver and need_driver_row:
+                    # Legacy join paths used user.id for this PK — never clobber
+                    # another driver's row when the sequences collide.
+                    new_id = profile.id
+                    if fleet_models.Driver.objects.filter(pk=new_id).exists():
+                        new_id = (fleet_models.Driver.objects.aggregate(m=Max('driver_id'))['m'] or 0) + 1
+                    code = ''.join(random.choice(string.digits) for _ in range(6))
+                    while fleet_models.Driver.objects.filter(driver_code=code).exists():
+                        code = ''.join(random.choice(string.digits) for _ in range(6))
+                    driver = fleet_models.Driver(
+                        user=request.user,
+                        profile=profile,
+                        driver_id=new_id,
+                        driver_status=DRIVER_STATUS_PENDING,
+                        driver_code=code,
+                        driver_languages='english',
+                    )
 
-            # Registration location captured by the browser at submit time
-            geo_lat = (request.POST.get('geo_lat') or '').strip()
-            geo_lng = (request.POST.get('geo_lng') or '').strip()
-            if geo_lat and geo_lng:
-                meta = driver.driver_meta or {}
-                meta['registration_location'] = {
-                    'lat': geo_lat,
-                    'lng': geo_lng,
-                    'accuracy_m': (request.POST.get('geo_accuracy') or '').strip(),
-                    'captured_at': dj_timezone.now().isoformat(),
-                }
-                driver.driver_meta = meta
-            driver.save()
+                if driver:
+                    driver.profile = profile
+                    driver.driver_phone = profile.phone or driver.driver_phone or ''
+                    driver.driver_whatsapp = profile.whatsapp or driver.driver_whatsapp or ''
+                    driver.has_driver_license = request.POST.get('has_driver_license') == 'on'
+                    license_no = (request.POST.get('driver_license_number') or '').strip()
+                    if license_no:
+                        driver.driver_license_number = license_no
 
-            vehicle = vform.save(commit=False)
-            vehicle.driver = driver
-            vehicle.save()
+                    # Work availability preference (Section 2)
+                    job_type = (request.POST.get('job_type') or '').strip()
+                    if job_type in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):
+                        driver.job_type = job_type
+                    valid_slabs = dict(fleet_models.WORK_TIME_SLAB_CHOICES)
+                    slabs = [s for s in request.POST.getlist('work_time_slabs') if s in valid_slabs]
+                    driver.work_time_slabs = ','.join(slabs)
 
-            for doc_type, f in uploaded.items():
-                doc, _ = fleet_models.DriverDocument.objects.get_or_create(
-                    driver=driver, document_type=doc_type,
-                    defaults={'document_no': ''}
-                )
-                doc.document_file = f
-                doc_no = (request.POST.get(f'doc_no_{doc_type.replace(" ", "_")}') or '').strip()
-                if doc_no:
-                    doc.document_no = doc_no
-                doc.save()
+                    # Registration location captured by the browser at submit time
+                    try:
+                        geo_lat = float(request.POST.get('geo_lat', ''))
+                        geo_lng = float(request.POST.get('geo_lng', ''))
+                    except (TypeError, ValueError):
+                        geo_lat = geo_lng = None
+                    if geo_lat is not None and -90 <= geo_lat <= 90 and -180 <= geo_lng <= 180:
+                        meta = driver.driver_meta or {}
+                        meta['registration_location'] = {
+                            'lat': geo_lat,
+                            'lng': geo_lng,
+                            'accuracy_m': (request.POST.get('geo_accuracy') or '').strip(),
+                            'captured_at': dj_timezone.now().isoformat(),
+                        }
+                        driver.driver_meta = meta
+                    driver.save()
 
-            logger.info(
-                f"Driver application submitted for user {request.user.id} "
-                f"(new={is_new_driver}, geo={'yes' if geo_lat else 'no'})"
-            )
-            messages.success(request, "Application submitted! Our team will review it and contact you on WhatsApp.")
+                    if vehicle_selected:
+                        vehicle = vform.save(commit=False)
+                        vehicle.driver = driver
+                        vehicle.save()
+
+                    for doc_type in APPLY_DOC_TYPES:
+                        f = uploaded.get(doc_type)
+                        doc_no = (request.POST.get(f'doc_no_{doc_type.replace(" ", "_")}') or '').strip()
+                        doc = fleet_models.DriverDocument.objects.filter(
+                            driver=driver, document_type=doc_type).first()
+                        if not f and not (doc_no and doc):
+                            continue
+                        if doc is None:
+                            doc = fleet_models.DriverDocument(
+                                driver=driver, document_type=doc_type, document_no='')
+                        if f:
+                            # Replace: drop the old image so protected media doesn't accumulate orphans
+                            if doc.pk and doc.document_file and 'doc_default' not in doc.document_file.name:
+                                doc.document_file.delete(save=False)
+                            doc.document_file = f
+                        if doc_no:
+                            doc.document_no = doc_no
+                        doc.save()
+
+            if is_partial_save:
+                logger.info(f"Driver application progress saved for user {request.user.id}")
+                messages.success(request, "Progress saved! You can continue your application anytime.")
+            else:
+                logger.info(f"Driver application submitted for user {request.user.id} (new={is_new_driver})")
+                messages.success(request, "Application submitted! Our team will review it and contact you on WhatsApp.")
             return redirect('core:join_driver')
         else:
             for err in upload_errors:
@@ -502,16 +578,52 @@ def join_driver(request):
         for dt in APPLY_DOC_TYPES
     ]
 
-    show_status_only = application_status in ('pending', 'under_review', 'verified') and request.GET.get('edit') != '1'
+    # Verified drivers are locked to the status page; pending ones may still edit
+    if is_verified_driver:
+        show_status_only = True
+    else:
+        show_status_only = application_status in ('pending', 'under_review') and request.GET.get('edit') != '1'
+
+    # Per-section progress (resume indicator for partially-filled applications)
+    PROFILE_PROGRESS_FIELDS = [
+        'first_name', 'last_name', 'phone', 'whatsapp',
+        'nationlity', 'zone_name', 'address', 'date_of_birth',
+    ]
+    sec1_done = sum(1 for f in PROFILE_PROGRESS_FIELDS if profile and getattr(profile, f, None))
+    sec1_total = len(PROFILE_PROGRESS_FIELDS)
+    sec2_complete = bool(primary_vehicle and primary_vehicle.vehicle_type and primary_vehicle.vehicle_type != 'none')
+    sec3_selfie = 'Selfie' in existing_docs
+    sec3_ids = len([t for t in existing_docs if t != 'Selfie'])
+    sec3_complete = sec3_selfie and sec3_ids >= 2
+    sections_progress = {
+        'sec1_done': sec1_done,
+        'sec1_total': sec1_total,
+        'sec1_complete': sec1_done == sec1_total,
+        'sec2_complete': sec2_complete,
+        'sec3_selfie': sec3_selfie,
+        'sec3_ids': sec3_ids,
+        'sec3_complete': sec3_complete,
+        'has_any': bool(sec1_done or sec2_complete or existing_docs),
+        'percent': int(
+            (sec1_done / sec1_total * 60)
+            + (20 if sec2_complete else 0)
+            + (20 if sec3_complete else (10 if (sec3_selfie or sec3_ids) else 0))
+        ),
+    }
 
     context = {
         'pform': pform,
         'vform': vform,
         'profile': profile,
         'driver': driver,
+        'job_type_choices': fleet_models.DRIVER_JOB_TYPE_CHOICES,
+        'work_time_slab_choices': fleet_models.WORK_TIME_SLAB_CHOICES,
+        'driver_time_slabs': driver.work_time_slab_list if driver else [],
         'doc_list': doc_list,
         'application_status': application_status,
         'show_status_only': show_status_only,
+        'already_business': already_business,
+        'progress': sections_progress,
         'user_email': request.user.email if request.user.is_authenticated else '',
     }
     return render(request, 'core/join_us_driver.html', context)
@@ -726,22 +838,11 @@ def join_us(request):
 
         if request.method == 'POST':
             if driverjoinform.is_valid():
-                logger.info(f"Processing driver join for user {request.user.id}")
-                profile_update = joinusform.save(commit=False)
-                profile_update.user = request.user
-                profile_update.is_driver = True
-                profile_update.is_business = False
-                profile_update.save()
-
-                driver = driverjoinform.save(commit=False)
-                driver.user = request.user
-                driver.driver_id = request.user.id
-                # Must go through staff review, like join_driver — never self-approve.
-                driver.driver_status = DRIVER_STATUS_PROCESSING
-                driver.save()
-
-                logger.info(f"Driver join completed for user {request.user.id}")
-                messages.success(request, 'Your driver account has been submitted for review!')
+                # Legacy path retired: driver applications go through the full
+                # 3-section flow (documents + vehicle + geo) at core:join_driver.
+                logger.info(f"Redirecting legacy driver join to application flow for user {request.user.id}")
+                messages.info(request, "Please complete your driver application here — it takes 3 quick steps.")
+                return redirect('core:join_driver')
 
             if businessjoinform.is_valid():
                 logger.info(f"Processing business join for user {request.user.id}")

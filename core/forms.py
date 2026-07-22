@@ -51,6 +51,19 @@ ProfilePicture = core_models.ProfilePicture
 
 YEARS = [i for i in range(1930, 2020)]
 
+# Demonyms for the nationality dropdown. Profile.nationlity stays a free
+# CharField, so legacy values outside this list are appended per-instance.
+NATIONALITY_CHOICES = [
+    'Afghan', 'Algerian', 'American', 'Bangladeshi', 'British', 'Cameroonian',
+    'Canadian', 'Chinese', 'Egyptian', 'Emirati', 'Eritrean', 'Ethiopian',
+    'Filipino', 'French', 'Ghanaian', 'Indian', 'Indonesian', 'Iranian',
+    'Iraqi', 'Jordanian', 'Kenyan', 'Kuwaiti', 'Lebanese', 'Malaysian',
+    'Moroccan', 'Nepali', 'Nigerian', 'Omani', 'Pakistani', 'Palestinian',
+    'Qatari', 'Saudi', 'Senegalese', 'Somali', 'South African', 'Sri Lankan',
+    'Sudanese', 'Syrian', 'Tanzanian', 'Thai', 'Tunisian', 'Turkish',
+    'Ugandan', 'Ukrainian', 'Uzbek', 'Vietnamese', 'Yemeni', 'Other',
+]
+
 
 # =============================================================================
 # AUTHENTICATION & REGISTRATION FORMS
@@ -220,7 +233,6 @@ class DriverApplyProfileForm(forms.ModelForm):
             'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'}),
             'phone': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number', 'inputmode': 'tel'}),
             'whatsapp': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'WhatsApp Number', 'inputmode': 'tel'}),
-            'nationlity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nationality'}),
             'zone_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zone / Area (e.g. Al Wakrah)'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Full Address', 'rows': 2}),
             'date_of_birth': forms.DateInput(attrs={
@@ -235,6 +247,13 @@ class DriverApplyProfileForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        nationality_choices = [('', 'Select Nationality')] + [
+            (n, n) for n in NATIONALITY_CHOICES]
+        current = getattr(self.instance, 'nationlity', None)
+        if current and current not in NATIONALITY_CHOICES:
+            nationality_choices.append((current, current))
+        self.fields['nationlity'].widget = forms.Select(
+            choices=nationality_choices, attrs={'class': 'form-select'})
         for field_name in self.fields:
             self.fields[field_name].required = True
 
@@ -247,6 +266,16 @@ class DriverApplyProfileForm(forms.ModelForm):
             if qs.exists():
                 raise forms.ValidationError('This WhatsApp number is already registered with another account.')
         return whatsapp
+
+    def clean_phone(self):
+        phone = (self.cleaned_data.get('phone') or '').strip()
+        if phone:
+            qs = Profile.objects.filter(phone=phone)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError('This phone number is already registered with another account.')
+        return phone
 
 
 class ProfileUpdateForm(forms.ModelForm):

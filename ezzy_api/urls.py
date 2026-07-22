@@ -26,6 +26,7 @@ urlpatterns = [
     path('driver/logout/', ezzy_api_views.driver_logout, name='driver_logout'),
     path('driver/profile/', ezzy_api_views.driver_profile, name='driver_profile'),
     path('driver/status/', ezzy_api_views.driver_set_status, name='driver_set_status'),
+    path('driver/work-preference/', ezzy_api_views.driver_set_work_preference, name='driver_set_work_preference'),
     path('driver/dashboard/', ezzy_api_views.driver_dashboard, name='driver_dashboard'),
     path('driver/tasks/', ezzy_api_views.driver_tasks, name='driver_tasks'),
     path('driver/tasks/<int:task_id>/', ezzy_api_views.driver_task_detail, name='driver_task_detail'),

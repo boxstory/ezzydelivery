@@ -72,6 +72,7 @@
 
         <form method="POST" action="{% url 'fleet:driver_settings' %}" id="notifyForm">
             {% csrf_token %}
+            <input type="hidden" name="notify_form" value="1">
             <label class="fleet-avail__option" style="display:flex; align-items:center; justify-content:space-between; gap:var(--spacing-sm);
                           padding:var(--spacing-md); border-radius:var(--radius-sm);
                           border:2px solid {% if driver.to_be_notified %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
@@ -90,6 +91,48 @@
                        onchange="document.getElementById('notifyForm').submit();"
                        style="width:1.25rem; height:1.25rem; flex-shrink:0; cursor:pointer; accent-color:var(--fleet-primary);">
             </label>
+        </form>
+    </div>
+</div>
+
+<!-- Work Preference -->
+<div class="fleet-card fleet-slide-up" style="animation-delay:0.05s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-business-time me-2"></i>
+            Work Preference
+        </h3>
+    </div>
+    <div class="fleet-card__body">
+        <p style="font-size:var(--font-size-sm); color:var(--fleet-grey-600); margin-bottom:var(--spacing-md);">
+            Tell dispatchers when you prefer to work. Leave hours unticked if you're flexible.
+        </p>
+        <form method="POST" action="{% url 'fleet:driver_settings' %}" id="workPrefForm">
+            {% csrf_token %}
+            <input type="hidden" name="work_pref_form" value="1">
+            <div class="mb-3">
+                <label class="form-label mb-1" for="fleet_settings_select_jobtype"
+                       style="font-size:var(--font-size-sm); font-weight:700;">Job Type</label>
+                <select class="form-select" name="job_type" id="fleet_settings_select_jobtype">
+                    <option value="">Not set</option>
+                    {% for value, label in job_type_choices %}
+                    <option value="{{ value }}" {% if driver.job_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <span class="form-label d-block mb-1" style="font-size:var(--font-size-sm); font-weight:700;">Preferred Working Hours</span>
+                {% for value, label in work_time_slab_choices %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="work_time_slabs"
+                           value="{{ value }}" id="fleet_settings_check_slab_{{ value }}"
+                           {% if value in driver_time_slabs %}checked{% endif %}>
+                    <label class="form-check-label" for="fleet_settings_check_slab_{{ value }}"
+                           style="font-size:var(--font-size-sm);">{{ label }}</label>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="fleet-btn fleet-btn--block">Save Work Preference</button>
         </form>
     </div>
 </div>

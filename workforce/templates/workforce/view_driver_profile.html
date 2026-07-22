@@ -1,284 +1,201 @@
+{# Purpose: Staff read-only dossier for vetting a driver applicant (verification review) #}
+{# Used by: workforce.views.view_user_driver_profile — /workforce/verification/<id>/driver-profile/ #}
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}View Driver Profile - Staff Dashboard{% endblock title %}
+{% block title %}Driver Verification — {{ profile.user.get_full_name }}{% endblock title %}
 
 {% block content %}
-<div class="col-12">
+<div class="dvp">
 
-<!-- Header with Progress Circle -->
-<div class="wfd__hero">
-    <div class="wfd__hero-content d-flex align-items-center gap-4">
-        <!-- Circular Progress -->
-        <div style="flex-shrink: 0;">
-            <svg width="120" height="120" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
-                <!-- Background circle -->
-                <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="8"/>
-                <!-- Progress circle -->
-                <circle cx="60" cy="60" r="50" fill="none"
-                        stroke="{% if completion_percentage == 100 %}#198754{% elif completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %}"
-                        stroke-width="8"
-                        stroke-dasharray="314.159"
-                        stroke-linecap="round"
-                        style="stroke-dashoffset: calc(314.159 - (314.159 * {{ completion_percentage }} / 100)); transition: all 0.3s ease;"/>
-            </svg>
-            <!-- Progress text overlay -->
-            <div style="position: absolute; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; margin-top: -120px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; font-weight: 700; color: {% if completion_percentage == 100 %}#198754{% elif completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %};">{{ completion_percentage }}%</div>
-                    <small style="color: #6c757d; font-size: 12px;">complete</small>
-                </div>
-            </div>
+    <!-- Case header -->
+    <header class="dvp__hero">
+        <div class="dvp__hero-left">
+            <span class="dvp__hero-eyebrow">Driver verification &middot; User {{ profile.user_number }}</span>
+            <h1 class="dvp__hero-name">{{ profile.user.get_full_name|default:profile.user.username }}</h1>
+            <span class="dvp__hero-sub">{{ profile.user.email }}</span>
         </div>
-        <!-- Title and Subtitle -->
-        <div>
-            <h1 class="wfd__hero-title mb-2"><i class="fa-solid fa-car me-2"></i>Driver Profile</h1>
-            <p class="wfd__hero-subtitle mb-0">{{ profile.user.get_full_name }}</p>
-            <small class="text-muted d-block mt-2">
-                {% if completion_percentage == 100 %}
-                    <i class="fa-solid fa-check-circle text-success me-1"></i>Profile Complete
-                {% elif completion_percentage >= 75 %}
-                    <i class="fa-solid fa-exclamation-circle text-warning me-1"></i>{{ completion_percentage }}% Complete
-                {% elif completion_percentage >= 50 %}
-                    <i class="fa-solid fa-exclamation-circle text-warning me-1"></i>Half way there ({{ completion_percentage }}%)
-                {% else %}
-                    <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>Incomplete ({{ completion_percentage }}%)
-                {% endif %}
-            </small>
+        <div class="dvp__hero-right">
+            {% if driver %}
+            <span class="dvp__code" title="Driver code">{{ driver.driver_code }}</span>
+            {% endif %}
+            <span class="dvp__status dvp__status--{{ profile.verification_status|default:'pending' }}">
+                <span class="dvp__status-swatch"></span>{{ profile.get_verification_status_display }}
+            </span>
+            <span class="dvp__hero-applied">
+                {% if profile.verification_applied_at %}Applied {{ profile.verification_applied_at|date:"d M Y, g:i A" }}{% else %}Not yet applied{% endif %}
+            </span>
         </div>
-    </div>
-</div>
+    </header>
 
-<!-- Back Link -->
-<a href="javascript:history.back()" class="btn btn-outline-secondary mb-3">
-    <i class="fa-solid fa-arrow-left me-2"></i>Back
-</a>
+    <div class="dvp__layout">
 
-<!-- Card -->
-<div class="card border-0 shadow-sm" style="border-radius: var(--brand-radius-lg);">
-    <div class="card-body p-4">
+        <!-- Vetting rail -->
+        <aside class="dvp__rail">
+            <a href="javascript:history.back()" class="btn btn-sm dvp__back">
+                <i class="fa-solid fa-arrow-left me-1"></i>Back to verification list
+            </a>
 
-        <!-- User Profile Completion (at top) -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, {% if profile.get_profile_completion_percentage == 100 %}#d4edda{% elif profile.get_profile_completion_percentage >= 50 %}#fff3cd{% else %}#f8d7da{% endif %} 0%, rgba(255,255,255,0) 100%);">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h6 class="mb-1"><i class="fa-solid fa-user-check me-2"></i>User Profile</h6>
-                            <small class="text-muted">
-                                {% if profile.get_profile_completion_percentage == 100 %}
-                                    All fields completed
-                                {% else %}
-                                    {{ profile.get_profile_completion_percentage }}% filled
-                                {% endif %}
-                            </small>
-                        </div>
-                        <span class="badge {% if profile.get_profile_completion_percentage == 100 %}bg-success{% elif profile.get_profile_completion_percentage >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %} p-2 fs-6">
-                            {{ profile.get_profile_completion_percentage }}%
-                        </span>
-                    </div>
-                    <!-- Progress bar -->
-                    <div class="progress mb-2" style="height: 10px; border-radius: 10px; overflow: hidden; background-color: #e9ecef;">
-                        <div style="width: {{ profile.get_profile_completion_percentage }}% !important; height: 100%; background-color: {% if profile.get_profile_completion_percentage == 100 %}#198754{% elif profile.get_profile_completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %}; transition: width 0.3s ease; border-radius: 10px;"></div>
-                    </div>
-                    <!-- Status -->
-                    <small class="mt-2 d-block">
-                        {% if profile.get_profile_completion_percentage == 100 %}
-                            <i class="fa-solid fa-check-circle text-success me-1"></i><span class="text-success fw-bold">Complete</span>
-                        {% elif profile.get_profile_completion_percentage >= 50 %}
-                            <i class="fa-solid fa-exclamation-circle text-warning me-1"></i><span class="text-warning fw-bold">In Progress</span>
-                        {% else %}
-                            <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i><span class="text-danger fw-bold">Incomplete</span>
-                        {% endif %}
-                    </small>
+            {% if driver %}
+            <div class="dvp__tally">
+                <div class="dvp__tally-count"><strong>{{ checklist_met }}</strong><span>/ {{ checklist|length }}</span></div>
+                <div class="dvp__tally-label">requirements on file</div>
+                <div class="dvp__tally-meter" role="img" aria-label="{{ checklist_met }} of {{ checklist|length }} requirements met">
+                    {% for item in checklist %}<span class="dvp__seg {% if item.ok %}dvp__seg--filled{% endif %}"></span>{% endfor %}
                 </div>
             </div>
-        </div>
 
-        <!-- User Information -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-user me-2"></i>User Information</h6>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Name</label>
-                    <div class="form-control form-control-plaintext">{{ profile.user.get_full_name }}</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Email</label>
-                    <div class="form-control form-control-plaintext">{{ profile.user.email }}</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">User Number</label>
-                    <div class="form-control form-control-plaintext">{{ profile.user_number }}</div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-info-circle me-2"></i>Profile Status</h6>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Verification Status</label>
-                    <div>
-                        <span class="badge bg-{% if profile.verification_status == 'verified' %}success{% elif profile.verification_status == 'under_review' %}info{% elif profile.verification_status == 'rejected' %}danger{% else %}warning{% endif %}">
-                            {{ profile.get_verification_status_display }}
-                        </span>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Applied At</label>
-                    <div class="form-control form-control-plaintext">
-                        {% if profile.verification_applied_at %}
-                            {{ profile.verification_applied_at|date:"M d, Y - g:i A" }}
-                        {% else %}
-                            <em class="text-muted">Not yet applied</em>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
+            <nav class="dvp__checklist" aria-label="Vetting checklist">
+                {% for item in checklist %}
+                <a class="dvp__check" href="#{{ item.anchor }}">
+                    <span class="dvp__check-swatch {% if item.ok %}dvp__check-swatch--ok{% else %}dvp__check-swatch--missing{% endif %}"></span>
+                    <span class="dvp__check-label">{{ item.label }}</span>
+                    <span class="dvp__check-state {% if not item.ok %}dvp__check-state--missing{% endif %}">{% if item.ok %}On file{% else %}Missing{% endif %}</span>
+                </a>
+                {% endfor %}
+            </nav>
 
-        <!-- Driver Profile Completion (after user info) -->
-        <hr>
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, {% if completion_percentage == 100 %}#d4edda{% elif completion_percentage >= 50 %}#fff3cd{% else %}#f8d7da{% endif %} 0%, rgba(255,255,255,0) 100%);">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h6 class="mb-1"><i class="fa-solid fa-car me-2"></i>Driver Profile</h6>
-                            <small class="text-muted">
-                                {% if completion_percentage == 100 %}
-                                    All fields completed
-                                {% else %}
-                                    {{ completion_percentage }}% filled
-                                {% endif %}
-                            </small>
-                        </div>
-                        <span class="badge {% if completion_percentage == 100 %}bg-success{% elif completion_percentage >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %} p-2 fs-6">
-                            {{ completion_percentage }}%
-                        </span>
-                    </div>
-                    <!-- Progress bar -->
-                    <div class="progress mb-2" style="height: 10px; border-radius: 10px; overflow: hidden; background-color: #e9ecef;">
-                        <div style="width: {{ completion_percentage }}% !important; height: 100%; background-color: {% if completion_percentage == 100 %}#198754{% elif completion_percentage >= 50 %}#ffc107{% else %}#dc3545{% endif %}; transition: width 0.3s ease; border-radius: 10px;"></div>
-                    </div>
-                    <!-- Status -->
-                    <small class="mt-2 d-block">
-                        {% if completion_percentage == 100 %}
-                            <i class="fa-solid fa-check-circle text-success me-1"></i><span class="text-success fw-bold">Complete</span>
-                        {% elif completion_percentage >= 50 %}
-                            <i class="fa-solid fa-exclamation-circle text-warning me-1"></i><span class="text-warning fw-bold">In Progress</span>
-                        {% else %}
-                            <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i><span class="text-danger fw-bold">Incomplete</span>
-                        {% endif %}
-                    </small>
+            <dl class="dvp__stats">
+                <div class="dvp__stat"><dt>User profile</dt><dd>{{ profile.get_profile_completion_percentage }}%</dd></div>
+                <div class="dvp__stat"><dt>Driver profile</dt><dd>{{ completion_percentage }}%</dd></div>
+                <div class="dvp__stat"><dt>Account status</dt>
+                    <dd class="dvp__stat-status dvp__stat-status--{{ driver.driver_status }}">{{ driver.get_driver_status_display }}</dd>
                 </div>
-            </div>
-        </div>
+            </dl>
+            {% endif %}
+        </aside>
 
-        {% if driver %}
-        <!-- Driver Details -->
-        <hr>
-        <div class="row mb-4">
-            <div class="col-12">
-                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-id-card me-2"></i>Driver Details</h6>
-            </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Driver Code</label>
-                    <div class="form-control form-control-plaintext fw-bold">{{ driver.driver_code }}</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Driver Phone <span class="text-danger">*</span></label>
-                    <div class="form-control form-control-plaintext">
-                        {% if driver.driver_phone %}
-                            {{ driver.driver_phone }}
-                            <i class="fa-solid fa-check text-success ms-2"></i>
-                        {% else %}
-                            <em class="text-muted">Not provided</em>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">WhatsApp <span class="text-danger">*</span></label>
-                    <div class="form-control form-control-plaintext">
-                        {% if driver.driver_whatsapp %}
-                            {{ driver.driver_whatsapp }}
-                            <i class="fa-solid fa-check text-success ms-2"></i>
-                        {% else %}
-                            <em class="text-muted">Not provided</em>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label text-muted small">License Number <span class="text-danger">*</span></label>
-                    <div class="form-control form-control-plaintext">
-                        {% if driver.driver_license_number %}
-                            {{ driver.driver_license_number }}
-                            <i class="fa-solid fa-check text-success ms-2"></i>
-                        {% else %}
-                            <em class="text-muted">Not provided</em>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Languages <span class="text-danger">*</span></label>
-                    <div class="form-control form-control-plaintext">
-                        {% if driver.driver_languages %}
-                            {{ driver.get_driver_languages_display }}
-                            <i class="fa-solid fa-check text-success ms-2"></i>
-                        {% else %}
-                            <em class="text-muted">Not provided</em>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-12">
-                <div class="mb-3">
-                    <label class="form-label text-muted small">About Skills & Experience <span class="text-danger">*</span></label>
-                    <div class="form-control form-control-plaintext" style="min-height: 100px; white-space: pre-wrap;">
-                        {% if driver.driver_bio %}
-                            {{ driver.driver_bio }}
-                            <i class="fa-solid fa-check text-success ms-2"></i>
-                        {% else %}
-                            <em class="text-muted">Not provided</em>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Evidence -->
+        <div class="dvp__main">
+            {% if driver %}
 
-        <!-- Driver Status -->
-        <hr>
-        <div class="row">
-            <div class="col-12">
-                <h6 class="text-muted text-uppercase fw-bold mb-3"><i class="fa-solid fa-sliders me-2"></i>Driver Account Status</h6>
-            </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Driver Status</label>
-                    <div>
-                        <span class="badge {% if driver.driver_status == 'approved' %}bg-success{% elif driver.driver_status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
-                            {{ driver.get_driver_status_display }}
-                        </span>
+            <section class="dvp__card" id="dvp-identity">
+                <header class="dvp__card-head">
+                    <i class="fa-solid fa-user"></i>
+                    <span class="dvp__card-title">Identity</span>
+                </header>
+                <div class="dvp__card-body dvp__fields">
+                    <div class="dvp__field"><span class="dvp__field-label">Full name</span><span class="dvp__field-value">{{ profile.user.get_full_name|default:"—" }}</span></div>
+                    <div class="dvp__field"><span class="dvp__field-label">Email</span><span class="dvp__field-value">{{ profile.user.email|default:"—" }}</span></div>
+                    <div class="dvp__field"><span class="dvp__field-label">User number</span><span class="dvp__field-value">{{ profile.user_number|default:"—" }}</span></div>
+                </div>
+            </section>
+
+            <section class="dvp__card" id="dvp-details">
+                <header class="dvp__card-head">
+                    <i class="fa-solid fa-id-card"></i>
+                    <span class="dvp__card-title">Driver details</span>
+                </header>
+                <div class="dvp__card-body dvp__fields">
+                    <div class="dvp__field"><span class="dvp__field-label">Phone</span>
+                        {% if driver.driver_phone %}<span class="dvp__field-value">{{ driver.driver_phone }}</span>{% else %}<span class="dvp__field-value dvp__field-value--empty">Not provided</span>{% endif %}
+                    </div>
+                    <div class="dvp__field"><span class="dvp__field-label">WhatsApp</span>
+                        {% if driver.driver_whatsapp %}<span class="dvp__field-value">{{ driver.driver_whatsapp }}</span>{% else %}<span class="dvp__field-value dvp__field-value--empty">Not provided</span>{% endif %}
+                    </div>
+                    <div class="dvp__field"><span class="dvp__field-label">License number</span>
+                        {% if driver.driver_license_number %}<span class="dvp__field-value">{{ driver.driver_license_number }}</span>{% else %}<span class="dvp__field-value dvp__field-value--empty">Not provided</span>{% endif %}
+                    </div>
+                    <div class="dvp__field"><span class="dvp__field-label">Languages</span>
+                        {% if driver.driver_languages %}<span class="dvp__field-value">{{ driver.get_driver_languages_display }}</span>{% else %}<span class="dvp__field-value dvp__field-value--empty">Not provided</span>{% endif %}
+                    </div>
+                    <div class="dvp__field"><span class="dvp__field-label">Work preference</span>
+                        {% if driver.job_type %}<span class="dvp__field-value">{{ driver.get_job_type_display }}</span>{% else %}<span class="dvp__field-value dvp__field-value--empty">Not provided</span>{% endif %}
+                    </div>
+                    <div class="dvp__field"><span class="dvp__field-label">Preferred hours</span>
+                        {% if driver.work_time_slabs %}<span class="dvp__field-value">{{ driver.work_time_slabs_display }}</span>{% else %}<span class="dvp__field-value dvp__field-value--empty">Not provided</span>{% endif %}
+                    </div>
+                    <div class="dvp__field dvp__field--wide"><span class="dvp__field-label">Skills &amp; experience</span>
+                        {% if driver.driver_bio %}<span class="dvp__field-value dvp__field-value--prose">{{ driver.driver_bio }}</span>{% else %}<span class="dvp__field-value dvp__field-value--empty">Not provided</span>{% endif %}
                     </div>
                 </div>
-            </div>
-        </div>
-        {% else %}
-        <div class="alert alert-info">
-            <i class="fa-solid fa-info-circle me-2"></i>
-            No driver profile found for this user.
-        </div>
-        {% endif %}
+            </section>
 
-        <!-- Footer -->
-        <hr>
-        <div class="text-center text-muted small">
-            <i class="fa-solid fa-lock me-1"></i>This is a read-only view for staff members to verify user registration details.
+            <section class="dvp__card" id="dvp-docs">
+                <header class="dvp__card-head">
+                    <i class="fa-solid fa-file-shield"></i>
+                    <span class="dvp__card-title">Identity documents</span>
+                    <span class="dvp__card-meta">{{ documents|length }} on file</span>
+                </header>
+                <div class="dvp__card-body">
+                    {% if documents %}
+                    <div class="dvp__docs">
+                        {% for doc in documents %}
+                        <a class="dvp__doc" href="{{ doc.document_file.url }}" target="_blank" rel="noopener" title="Open full size">
+                            <img class="dvp__doc-img" src="{{ doc.document_file.url }}" alt="{{ doc.document_type }}" loading="lazy">
+                            <span class="dvp__doc-caption">
+                                <span class="dvp__doc-type">{{ doc.document_type }}</span>
+                                <span class="dvp__doc-no">{% if doc.document_no %}{{ doc.document_no }}{% else %}no number{% endif %}</span>
+                                <span class="dvp__doc-date">{{ doc.updated_at|date:"d M Y" }}</span>
+                            </span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="dvp__warning"><i class="fa-solid fa-triangle-exclamation me-2"></i>No documents uploaded. Do not approve without verifying identity documents.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="dvp__card" id="dvp-vehicles">
+                <header class="dvp__card-head">
+                    <i class="fa-solid fa-truck"></i>
+                    <span class="dvp__card-title">Vehicles</span>
+                    <span class="dvp__card-meta">{{ vehicles|length }} registered</span>
+                </header>
+                <div class="dvp__card-body">
+                    {% if vehicles %}
+                    <ul class="dvp__vehicles">
+                        {% for v in vehicles %}
+                        <li class="dvp__vehicle">
+                            <span class="dvp__vehicle-type">{{ v.get_vehicle_type_display }}</span>
+                            <span class="dvp__vehicle-model">{% if v.vehicle_model %}{{ v.vehicle_model }}{% endif %}{% if v.vehicle_color %} &middot; {{ v.vehicle_color }}{% endif %}</span>
+                            <span class="dvp__vehicle-plate" title="Plate number">{{ v.vehicle_no|default:"—" }}</span>
+                            <span class="dvp__vehicle-status {% if v.vehicle_status == 'active' %}dvp__vehicle-status--active{% endif %}">
+                                <span class="dvp__status-swatch"></span>{{ v.vehicle_status }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="dvp__empty">No vehicle registered.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="dvp__card" id="dvp-location">
+                <header class="dvp__card-head">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span class="dvp__card-title">Registration location</span>
+                </header>
+                <div class="dvp__card-body">
+                    {% if registration_location %}
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <span class="dvp__coords">{{ registration_location.lat }}, {{ registration_location.lng }}</span>
+                        {% if registration_location.accuracy_m %}<span class="dvp__coords-acc">&plusmn;{{ registration_location.accuracy_m }} m</span>{% endif %}
+                        <a class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener"
+                           href="https://www.google.com/maps?q={{ registration_location.lat }},{{ registration_location.lng }}">
+                            <i class="fa-solid fa-map me-1"></i>Open in Google Maps
+                        </a>
+                    </div>
+                    <p class="dvp__note">Self-reported by the applicant's browser at submission — indicative only, not proof of location.</p>
+                    {% else %}
+                    <p class="dvp__empty">Not captured — the applicant denied location permission or applied before this feature.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% else %}
+            <section class="dvp__card">
+                <div class="dvp__card-body">
+                    <p class="dvp__empty mb-0"><i class="fa-solid fa-circle-info me-2"></i>No driver profile exists for this user yet. They registered an account but have not started the driver application.</p>
+                </div>
+            </section>
+            {% endif %}
+
+            <p class="dvp__footer"><i class="fa-solid fa-lock me-1"></i>Read-only view for staff verification. Nothing on this page can be edited.</p>
         </div>
 
     </div>
-</div>
-
 </div>
 {% endblock content %}

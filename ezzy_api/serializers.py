@@ -45,7 +45,8 @@ class DriverSerializer(serializers.ModelSerializer):
         fields = [
             'driver_id', 'driver_code', 'driver_phone', 'driver_whatsapp',
             'driver_bio', 'driver_languages', 'driver_license_number', 'driver_rating',
-            'driver_rating_count', 'driver_status', 'driver_availability', 'profile', 'driver_vehicle', 'driver_document',
+            'driver_rating_count', 'driver_status', 'driver_availability',
+            'job_type', 'work_time_slabs', 'profile', 'driver_vehicle', 'driver_document',
             'created_at', 'updated_at'
         ]
 
@@ -116,7 +117,7 @@ class DriverListSerializer(serializers.ModelSerializer):
         fields = [
             'driver_id', 'driver_code', 'driver_phone',
             'driver_whatsapp', 'driver_status', 'driver_availability', 'driver_rating', 'driver_rating_count',
-            'driver_name', 'vehicle_type'
+            'driver_name', 'vehicle_type', 'job_type', 'work_time_slabs'
         ]
     
     def get_driver_name(self, obj):

@@ -425,6 +425,12 @@ def accept_task(request):
             driver = fleet_models.Driver.objects.get(user_id=request.user.id)
             logger.info(f"Driver found: {driver.driver_id}")
 
+            # Only staff-approved drivers may take tasks (the UI hides tasks,
+            # but this endpoint must enforce it server-side too)
+            if driver.driver_status != 'approved':
+                logger.warning(f"Unapproved driver {driver.driver_id} tried to accept task {task_id}")
+                return JsonResponse({"success": False, "error": "Your driver account is not approved yet"})
+
             # Get task by ID
             task = delivery_models.DeliveryTask.objects.get(id=task_id)
             logger.info(f"Task found: {task.id}, status={task.dl_task_status}, driver={task.driver_id}")
@@ -462,6 +468,15 @@ def accept_task(request):
             task._status_changed_by = request.user
             task.save(update_fields=['dl_task_status', 'driver'])
             logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
+
+            # Accepting work while marked offline/on-break means the stored
+            # availability is stale — bring it in line (signals then flip it
+            # to on_delivery once the task is active).
+            if driver.driver_availability in ('offline', 'on_break'):
+                logger.info(
+                    f"Driver {driver.driver_id} accepted task while '{driver.driver_availability}' — auto-set available")
+                driver.driver_availability = 'available'
+                driver.save(update_fields=['driver_availability'])
 
             return JsonResponse({"success": True})
 
@@ -1235,6 +1250,34 @@ def update_area_pin(request):
     except delivery_models.ZoneArea.DoesNotExist:
         return JsonResponse({'error': 'Area not found'}, status=404)
     except (ValueError, json.JSONDecodeError) as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required(login_url='account_login')
+@api_staff_required
+def update_zone_pin(request):
+    """AJAX endpoint to update ZoneName center point latitude/longitude."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        data = json.loads(request.body)
+        zone_number = data.get('zone_number')
+        lat = data.get('latitude')
+        lng = data.get('longitude')
+        if zone_number is None or lat is None or lng is None:
+            return JsonResponse({'error': 'Missing fields'}, status=400)
+        lat = float(lat)
+        lng = float(lng)
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            return JsonResponse({'error': 'Coordinates out of range'}, status=400)
+        zone = delivery_models.ZoneName.objects.get(zone_number=zone_number)
+        zone.latitude = lat
+        zone.longitude = lng
+        zone.save(update_fields=['latitude', 'longitude', 'updated_at'])
+        return JsonResponse({'success': True, 'latitude': str(zone.latitude), 'longitude': str(zone.longitude)})
+    except delivery_models.ZoneName.DoesNotExist:
+        return JsonResponse({'error': 'Zone not found'}, status=404)
+    except (ValueError, TypeError, json.JSONDecodeError) as e:
         return JsonResponse({'error': str(e)}, status=400)
 
 

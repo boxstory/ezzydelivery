@@ -41,7 +41,7 @@ def _build_context_from_task(task):
         })
     if task.driver:
         ctx.update({
-            'driver_name': task.driver.driver_name or '',
+            'driver_name': str(task.driver),
             'driver_phone': task.driver.driver_phone or '',
         })
     else:
@@ -196,7 +196,10 @@ def _resolve_recipient_phones(flow, task=None, order=None):
 
     elif recipient == 'all_active_drivers':
         from fleet.models import Driver
+        # Drivers with preferred working hours are skipped outside those hours
         for d in Driver.objects.filter(driver_status='approved', driver_availability__in=['available', 'on_delivery'], to_be_notified=True):
+            if not d.is_in_preferred_hours:
+                continue
             p = _pick_phone(d, 'driver_whatsapp', 'driver_phone')
             if p and is_valid_phone(p):
                 phones.append(p)
@@ -204,6 +207,8 @@ def _resolve_recipient_phones(flow, task=None, order=None):
     elif recipient == 'available_drivers':
         from fleet.models import Driver
         for d in Driver.objects.filter(driver_status='approved', driver_availability='available', to_be_notified=True):
+            if not d.is_in_preferred_hours:
+                continue
             p = _pick_phone(d, 'driver_whatsapp', 'driver_phone')
             if p and is_valid_phone(p):
                 phones.append(p)

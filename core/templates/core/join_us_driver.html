@@ -10,7 +10,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260718a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260718c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -23,7 +23,20 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
             <p class="mb-0">Apply in 3 quick steps — your details, your vehicle, and your documents.</p>
         </div>
 
-        {% if show_status_only %}
+        {% if already_business %}
+        <!-- Already registered as business -->
+        <div class="cja__section-card p-4 p-md-5 text-center mx-auto col-12 col-md-8 col-lg-6">
+            <div class="cja__status-icon text-warning mb-2">&#9888;</div>
+            <h2 class="h5 mb-2">You're already registered as a Business</h2>
+            <p class="text-muted mb-3">
+                This Google account ({{ user_email }}) has a business profile.
+                One account cannot be both a business and a driver — to apply as a driver,
+                please sign in with a different Gmail account.
+            </p>
+            <a href="{% url 'business:business_dashboard' %}" class="btn btn-dark">Go to Business Dashboard</a>
+        </div>
+
+        {% elif show_status_only %}
         <!-- Application status -->
         <div class="cja__section-card p-4 p-md-5 text-center mx-auto col-12 col-md-8 col-lg-6">
             {% if application_status == 'verified' %}
@@ -52,17 +65,44 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
         {% endif %}
 
         <div class="cja__form-wrap mx-auto col-12 col-lg-10 col-xl-8">
+
+            {% if user.is_authenticated and progress.has_any %}
+            <!-- Resume progress strip -->
+            <div class="cja__section-card p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold small">Your application progress</span>
+                    <span class="small text-muted">{{ progress.percent }}%</span>
+                </div>
+                <div class="progress mb-2" role="progressbar" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar bg-dark cja__progress-bar" data-percent="{{ progress.percent }}"></div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge {% if progress.sec1_complete %}text-bg-success{% else %}text-bg-light border{% endif %}">
+                        1. Profile {{ progress.sec1_done }}/{{ progress.sec1_total }}
+                    </span>
+                    <span class="badge {% if progress.sec2_complete %}text-bg-success{% else %}text-bg-light border{% endif %}">
+                        2. Vehicle {% if progress.sec2_complete %}&#10003;{% else %}pending{% endif %}
+                    </span>
+                    <span class="badge {% if progress.sec3_complete %}text-bg-success{% else %}text-bg-light border{% endif %}">
+                        3. Documents {% if progress.sec3_selfie %}selfie &#10003;{% else %}selfie missing{% endif %} · {{ progress.sec3_ids }}/2 IDs
+                    </span>
+                </div>
+            </div>
+            {% endif %}
+
             <form id="core_join_driver_form_apply" method="post" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
                 <input type="hidden" name="geo_lat" id="core_join_driver_input_geolat">
                 <input type="hidden" name="geo_lng" id="core_join_driver_input_geolng">
                 <input type="hidden" name="geo_accuracy" id="core_join_driver_input_geoacc">
+                <input type="hidden" name="action" value="" id="core_join_driver_input_action">
 
                 <!-- Section 1: Profile -->
                 <div class="cja__section-card p-3 p-md-4 mb-4">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="cja__step-badge d-flex align-items-center justify-content-center">1</span>
                         <h2 class="h6 mb-0">Your Profile</h2>
+                        {% if progress.sec1_complete %}<span class="cja__doc-status ms-auto">Complete &#10003;</span>{% endif %}
                     </div>
                     <div class="row g-3">
                         <div class="col-12">
@@ -117,6 +157,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="cja__step-badge d-flex align-items-center justify-content-center">2</span>
                         <h2 class="h6 mb-0">Vehicle Available</h2>
+                        {% if progress.sec2_complete %}<span class="cja__doc-status ms-auto">Complete &#10003;</span>{% endif %}
                     </div>
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
@@ -153,6 +194,28 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                                    id="core_join_driver_input_licenseno" placeholder="e.g. 1234567"
                                    value="{{ driver.driver_license_number|default:'' }}">
                         </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1" for="core_join_driver_select_jobtype">Work Preference</label>
+                            <select class="form-select" name="job_type" id="core_join_driver_select_jobtype">
+                                <option value="">Select Work Preference</option>
+                                {% for value, label in job_type_choices %}
+                                <option value="{{ value }}" {% if driver.job_type == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label mb-1">Preferred Working Hours</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                {% for value, label in work_time_slab_choices %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="work_time_slabs"
+                                           value="{{ value }}" id="core_join_driver_check_slab_{{ value }}"
+                                           {% if value in driver_time_slabs %}checked{% endif %}>
+                                    <label class="form-check-label" for="core_join_driver_check_slab_{{ value }}">{{ label }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -161,6 +224,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                     <div class="d-flex align-items-center gap-2 mb-1">
                         <span class="cja__step-badge d-flex align-items-center justify-content-center">3</span>
                         <h2 class="h6 mb-0">Documents</h2>
+                        {% if progress.sec3_complete %}<span class="cja__doc-status ms-auto">Complete &#10003;</span>{% endif %}
                     </div>
                     <p class="text-muted small mb-3">Minimum 3 uploads: a selfie photo plus any 2 ID documents. Max 5MB each (JPG/PNG).</p>
                     <div class="row g-3">
@@ -194,10 +258,16 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                     <p class="text-muted small mb-0" id="core_join_driver_text_geohint">
                         Your location is captured when you submit, to help us assign nearby deliveries.
                     </p>
-                    <button type="submit" class="btn btn-dark btn-lg px-5" id="core_join_driver_btn_submit"
-                            {% if not user.is_authenticated %}disabled{% endif %}>
-                        Submit Application
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-outline-dark btn-lg" id="core_join_driver_btn_save"
+                                {% if not user.is_authenticated %}disabled{% endif %}>
+                            Save Progress
+                        </button>
+                        <button type="submit" class="btn btn-dark btn-lg px-5" id="core_join_driver_btn_submit"
+                                {% if not user.is_authenticated %}disabled{% endif %}>
+                            Submit Application
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -237,6 +307,10 @@ document.addEventListener('DOMContentLoaded', function() {
         new bootstrap.Modal(loginModal).show();
     }
 
+    // Progress bar width (no inline styles in template)
+    var pbar = document.querySelector('.cja__progress-bar');
+    if (pbar) { pbar.style.width = (pbar.dataset.percent || 0) + '%'; }
+
     // Auto-fill WhatsApp from Phone when WhatsApp is empty
     var phone = document.getElementById('id_phone');
     var whatsapp = document.getElementById('id_whatsapp');
@@ -252,6 +326,15 @@ document.addEventListener('DOMContentLoaded', function() {
     var form = document.getElementById('core_join_driver_form_apply');
     if (!form) return;
     var submitBtn = document.getElementById('core_join_driver_btn_submit');
+    var saveBtn = document.getElementById('core_join_driver_btn_save');
+    var actionField = document.getElementById('core_join_driver_input_action');
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function() { actionField.value = 'save'; });
+    }
+    if (submitBtn) {
+        submitBtn.addEventListener('click', function() { actionField.value = 'submit'; });
+    }
 
     function docState() {
         var selfieOk = false, idCount = 0;
@@ -265,6 +348,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.addEventListener('submit', function(e) {
         if (form.dataset.geoDone === '1') return;
+
+        // Save Progress: no minimum-doc check, no geolocation — plain submit
+        if (actionField.value === 'save') {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving…';
+            return;
+        }
 
         var docs = docState();
         var errs = [];

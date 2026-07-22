@@ -1380,7 +1380,7 @@ def dispatch_queue(request):
     # Available drivers
     from fleet.models import Driver
     drivers = Driver.objects.filter(
-        driver_status='approved', driver_availability__in=['online', 'available']
+        driver_status='approved', driver_availability='available'
     ).select_related('user')
 
     context = {

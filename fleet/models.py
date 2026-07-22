@@ -71,6 +71,32 @@ DRIVER_AVAILABILITY_CHOICES = [
     ('returning', 'Returning'),
 ]
 
+DRIVER_JOB_TYPE_CHOICES = [
+    ('full_time', 'Full Time'),
+    ('part_time', 'Part Time'),
+    ('flexible', 'Flexible / Both'),
+]
+
+WORK_TIME_SLAB_CHOICES = [
+    ('morning', 'Morning (6 AM – 12 PM)'),
+    ('afternoon', 'Afternoon (12 PM – 6 PM)'),
+    ('evening', 'Evening (6 PM – 12 AM)'),
+    ('night', 'Night (12 AM – 6 AM)'),
+]
+
+
+def current_work_time_slab():
+    """Slab key for the current local (Asia/Qatar) hour, matching WORK_TIME_SLAB_CHOICES."""
+    from django.utils import timezone as dj_timezone
+    hour = dj_timezone.localtime().hour
+    if 6 <= hour < 12:
+        return 'morning'
+    if 12 <= hour < 18:
+        return 'afternoon'
+    if 18 <= hour < 24:
+        return 'evening'
+    return 'night'
+
 VEHICLE_CHOICES = [
     ('none', 'None'),
     ('bike', 'Bike'),
@@ -150,6 +176,14 @@ class Driver(models.Model):
     driver_availability = models.CharField(
         max_length=20, choices=DRIVER_AVAILABILITY_CHOICES, default='offline', db_index=True,
         help_text="Real-time availability status of the driver"
+    )
+    job_type = models.CharField(
+        max_length=20, choices=DRIVER_JOB_TYPE_CHOICES, blank=True, default='',
+        help_text="Employment preference declared by the driver (full time / part time / flexible)"
+    )
+    work_time_slabs = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Comma-separated preferred working time slabs (keys from WORK_TIME_SLAB_CHOICES)"
     )
 
     # COD Wallet System Fields
@@ -235,6 +269,22 @@ class Driver(models.Model):
         """Calculate available credit for new COD orders (credit_limit minus COD currently held)"""
         return self.credit_limit - self.cod_in_hand
 
+    @property
+    def work_time_slab_list(self):
+        """Preferred time slab keys as a list (work_time_slabs is stored CSV)."""
+        return [s for s in (self.work_time_slabs or '').split(',') if s]
+
+    @property
+    def work_time_slabs_display(self):
+        """Human-readable preferred time slabs, e.g. 'Morning (6 AM – 12 PM), Evening (6 PM – 12 AM)'."""
+        labels = dict(WORK_TIME_SLAB_CHOICES)
+        return ', '.join(labels.get(s, s) for s in self.work_time_slab_list)
+
+    @property
+    def is_in_preferred_hours(self):
+        """True when the current time falls in the driver's preferred slabs (no slabs = always)."""
+        return not self.work_time_slabs or current_work_time_slab() in self.work_time_slab_list
+
     class Meta:
         verbose_name_plural = "Drivers"
         # COMPOUND INDEX: user + driver_status for fast driver lookups
@@ -278,11 +328,10 @@ class DriverVehicle(models.Model):
 
 
 def upload_path_handler(instance, filename):
+    # Storage creates directories under MEDIA_ROOT itself — never makedirs here
     upload_dir = os.path.join('core/driver', str(instance.driver_id), 'documents', instance.document_type)
     extension = os.path.splitext(filename)[1]
-    filename = f'{instance.document_type}_{instance.driver_id}.{extension}'
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
+    filename = f'{instance.document_type}_{instance.driver_id}{extension}'
     return os.path.join(upload_dir, filename)
 
 
@@ -290,8 +339,6 @@ def upload_path_handler_back(instance, filename):
     upload_dir = os.path.join('core/driver', str(instance.driver_id), 'documents', instance.document_type)
     extension = os.path.splitext(filename)[1]
     filename = f'{instance.document_type}_{instance.driver_id}_back{extension}'
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
     return os.path.join(upload_dir, filename)
 
 
@@ -750,6 +797,8 @@ class ZoneEarningsRate(models.Model):
 
 NOTIFICATION_TYPE_CHOICES = [
     ('delivery_assigned', 'Delivery Assigned'),
+    ('pickup_available', 'Pickup Available'),
+    ('pickup_transfer', 'Pickup Transfer Request'),
     ('cod_collected', 'COD Collected'),
     ('earnings_settled', 'Earnings Settled'),
     ('order_comment', 'Order Comment'),

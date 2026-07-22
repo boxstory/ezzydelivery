@@ -32,6 +32,7 @@ urlpatterns = [
     path('sellers/<int:business_id>/api-orders/', workforce_views.seller_api_orders, name='seller_api_orders'),
     path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
     path('sellers/<int:business_id>/pickup-location/add/', workforce_views.wf_pickup_location_add, name='wf_pickup_location_add'),
+    path('sellers/<int:business_id>/pickup-location/<int:location_id>/update/', workforce_views.wf_pickup_location_update, name='wf_pickup_location_update'),
     path('sellers/<int:business_id>/pickup-location/<int:location_id>/delete/', workforce_views.wf_pickup_location_delete, name='wf_pickup_location_delete'),
 
     # Drivers section urls -------------------------------------------------------------------
@@ -41,6 +42,7 @@ urlpatterns = [
     path('drivers/inactive/', workforce_views.drivers_inactive, name='drivers_inactive'),
     path('drivers/<int:driver_id>/', workforce_views.driver_detail, name='driver_detail'),
     path('drivers/<int:driver_id>/toggle-status/', workforce_views.driver_toggle_status, name='driver_toggle_status'),
+    path('drivers/<int:driver_id>/work-pref/', workforce_views.driver_set_work_pref, name='driver_set_work_pref'),
     path('drivers/<int:driver_id>/set-status/', workforce_views.driver_set_status, name='driver_set_status'),
     path('drivers/<int:driver_id>/vehicle/add/', workforce_views.driver_vehicle_save, name='driver_vehicle_add'),
     path('drivers/<int:driver_id>/vehicle/<int:vehicle_id>/edit/', workforce_views.driver_vehicle_save, name='driver_vehicle_edit'),
@@ -150,6 +152,15 @@ urlpatterns = [
     path('tasks/bulk-update-status/', workforce_views.bulk_update_status, name='bulk_update_status'),
     path('tasks/bulk-export/', workforce_views.bulk_export_tasks, name='bulk_export_tasks'),
     path('tasks/bulk-assign-driver/', workforce_views.bulk_assign_driver, name='bulk_assign_driver'),
+
+    # First-Mile Pickup Automation
+    path('pickups/', workforce_views.pickup_pool_status, name='pickup_pool_status'),
+    path('pickups/assign/', workforce_views.pickup_staff_assign, name='pickup_staff_assign'),
+    path('pickup-automation/', workforce_views.pickup_automation_list, name='pickup_automation_list'),
+    path('pickup-automation/save/', workforce_views.pickup_automation_save, name='pickup_automation_save'),
+    path('pickup-automation/fleet/<int:business_id>/', workforce_views.pickup_fleet_list, name='pickup_fleet_list'),
+    path('pickup-automation/fleet/search/', workforce_views.pickup_fleet_driver_search, name='pickup_fleet_driver_search'),
+    path('pickup-automation/fleet/update/', workforce_views.pickup_fleet_update, name='pickup_fleet_update'),
 
     # User Verification URLs
     path('verification/business/', workforce_views.business_verification_list, name='business_verification_list'),
@@ -298,8 +309,6 @@ urlpatterns = [
     path('forms/pricing-inquiries/<int:inquiry_id>/edit/', workforce_views.pricing_inquiry_edit, name='pricing_inquiry_edit'),
     path('forms/pricing-inquiries/<int:inquiry_id>/add-activity/', workforce_views.pricing_inquiry_add_activity, name='pricing_inquiry_add_activity'),
     path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
-    path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
-    path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
 
     # CRM Leads
     path('crm/leads/board/', crm_views.crm_leads_board, name='crm_leads_board'),
@@ -310,10 +319,18 @@ urlpatterns = [
     path('crm/leads/<int:lead_id>/update/', crm_views.crm_lead_update, name='crm_lead_update'),
     path('crm/leads/<int:lead_id>/add-activity/', crm_views.crm_lead_add_activity, name='crm_lead_add_activity'),
     path('crm/leads/<int:lead_id>/delete-activity/<int:activity_id>/', crm_views.crm_lead_delete_activity, name='crm_lead_delete_activity'),
-    path('crm/leads/<int:lead_id>/convert/', crm_views.crm_lead_convert, name='crm_lead_convert'),
+    path('crm/leads/link-business/', crm_views.crm_lead_link_business, name='crm_lead_link_business'),
+    path('crm/leads/<int:lead_id>/ai-summary/', crm_views.crm_lead_ai_summary, name='crm_lead_ai_summary'),
+    path('crm/leads/<int:lead_id>/wa-media/<int:msg_id>/', crm_views.crm_lead_wa_media, name='crm_lead_wa_media'),
+    path('crm/leads/<int:lead_id>/link-chat/', crm_views.crm_lead_link_chat, name='crm_lead_link_chat'),
+    path('crm/wa-contacts/search/', crm_views.crm_wa_contact_search, name='crm_wa_contact_search'),
     path('crm/whatsapp-inbox/', crm_views.crm_whatsapp_inbox, name='crm_whatsapp_inbox'),
+    path('crm/whatsapp-inbox/chat/', crm_views.crm_wa_chat_preview, name='crm_wa_chat_preview'),
+    path('crm/wa-media/<int:msg_id>/', crm_views.crm_wa_media, name='crm_wa_media'),
     path('crm/whatsapp-inbox/promote/', crm_views.crm_wa_promote, name='crm_wa_promote'),
     path('crm/whatsapp-inbox/dismiss/', crm_views.crm_wa_dismiss, name='crm_wa_dismiss'),
+    path('crm/whatsapp-inbox/resync/', crm_views.crm_wa_resync, name='crm_wa_resync'),
+    path('crm/contacts/', crm_views.crm_contacts, name='crm_contacts'),
     path('crm/reports/', crm_views.crm_reports, name='crm_reports'),
 
     # Import History & Temp Orders
@@ -382,6 +399,8 @@ urlpatterns = [
 
     # WhatsApp Instances
     path('auto-triggers/whatsapp-instances/', workforce_views.whatsapp_instances_list, name='whatsapp_instances_list'),
+    path('auto-triggers/sender-routes/', workforce_views.whatsapp_sender_routes_save, name='whatsapp_sender_routes_save'),
+    path('auto-triggers/sender-routes/toggle/', workforce_views.whatsapp_sender_route_toggle, name='whatsapp_sender_route_toggle'),
     path('whatsapp/get-instances/', workforce_views.whatsapp_get_instances, name='whatsapp_get_instances'),
     path('whatsapp/last-message/', workforce_views.whatsapp_last_message, name='whatsapp_last_message'),
     path('whatsapp/send-message/', workforce_views.whatsapp_send_message, name='whatsapp_send_message'),

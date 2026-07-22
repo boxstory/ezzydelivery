@@ -1322,6 +1322,33 @@ textarea.uvl__modal__textarea:focus {
 }
 .uvl__modal__textarea::placeholder { color: var(--brand-grey-400, #b0b0b0); }
 
+/* Link CRM Lead — searchable combobox */
+.uvl__lead-picker { position: relative; }
+.uvl__lead-picker__list {
+    position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 20;
+    max-height: 15rem; overflow-y: auto;
+    background: var(--brand-white, #fff);
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 20px rgba(0, 31, 63, 0.12);
+}
+.uvl__lead-picker__item {
+    display: block; width: 100%; text-align: left;
+    padding: 0.5rem 0.75rem; border: 0; background: transparent;
+    font-size: 0.8rem; color: var(--brand-grey-800, #1f1f1f);
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+    cursor: pointer;
+}
+.uvl__lead-picker__item:last-child { border-bottom: 0; }
+.uvl__lead-picker__item:hover,
+.uvl__lead-picker__item--active { background: var(--brand-grey-100, #fafafa); }
+.uvl__lead-picker__item--selected { font-weight: 600; }
+.uvl__lead-picker__empty {
+    padding: 0.625rem 0.75rem; font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+.uvl__lead-picker__status { min-height: 1.2em; }
+
 /* Modal Footer */
 .uvl__modal__footer {
     display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem;
@@ -5045,6 +5072,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
     color: #9ca3af; letter-spacing: 0.05em; min-width: 3.5rem;
 }
+.wdd__status-row__value {
+    font-size: 0.8rem; color: #e5e7eb;
+}
 
 /* Stats Strip */
 .wdd__stats {
@@ -8407,6 +8437,8 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 /* High confidence — green */
 .dl-table__accuracy--by_customer,
 .dl-table__accuracy--exact { background: #dcfce7; color: #15803d; }
+/* Staff-set pin — blue */
+.dl-table__accuracy--by_staff { background: #e0f2fe; color: #0369a1; }
 /* Medium — amber */
 .dl-table__accuracy--street { background: #fef3c7; color: #b45309; }
 /* Low — red/muted */
@@ -9613,6 +9645,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     gap: 1rem;
     margin-bottom: 1.25rem;
 }
+.sll__stats {
+    grid-template-columns: repeat(5, 1fr);
+}
 .drl__stat-card, .sll__stat-card {
     background: #fff;
     border: 1px solid #f0f0f0;
@@ -9673,10 +9708,10 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .drl__filter, .dra__filter, .dri__filter, .drp__filter,
 .sll__filter, .sla__filter, .sli__filter, .slp__filter {
     background: #fff;
-    border: 1px solid #f0f0f0;
-    border-radius: 0.75rem;
-    padding: 1rem 1.25rem;
-    margin-bottom: 1.25rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.9rem;
 }
 .drl__filter-header, .dra__filter-header, .dri__filter-header, .drp__filter-header,
 .sll__filter-header, .sla__filter-header, .sli__filter-header, .slp__filter-header {
@@ -9725,14 +9760,16 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     color: #f7c000;
     margin-right: 0.25rem;
 }
-.drl__filter-input, .dra__filter-input, .dri__filter-input, .drp__filter-input,
-.sll__filter-input, .sla__filter-input, .sli__filter-input, .slp__filter-input {
+input.drl__filter-input, input.dra__filter-input, input.dri__filter-input, input.drp__filter-input,
+input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input.slp__filter-input {
     width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.8125rem;
-    color: #1a1a2e;
+    min-height: 0;
+    height: 34px;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid #d5dbe3;
+    border-radius: 0.4rem;
+    font-size: 0.8rem;
+    color: #001f3f;
     background: #fff;
     transition: border-color 0.2s;
 }
@@ -9786,12 +9823,24 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 }
 .drl__btn:hover, .dra__btn:hover, .dri__btn:hover, .drp__btn:hover,
 .sll__btn:hover, .sla__btn:hover, .sli__btn:hover, .slp__btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    transform: none;
+    box-shadow: none;
 }
 .drl__btn--primary, .dra__btn--primary, .dri__btn--primary, .drp__btn--primary,
 .sll__btn--primary, .sla__btn--primary, .sli__btn--primary, .slp__btn--primary {
     background: #001f3f;
+    color: #fff;
+    height: 34px;
+    padding: 0 0.85rem;
+    border-radius: 0.4rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 2px solid #f7c000;
+}
+.drl__btn--primary:hover, .dra__btn--primary:hover, .dri__btn--primary:hover, .drp__btn--primary:hover,
+.sll__btn--primary:hover, .sla__btn--primary:hover, .sli__btn--primary:hover, .slp__btn--primary:hover {
+    background: #002a54;
     color: #fff;
 }
 .drl__btn--view, .dra__btn--view, .dri__btn--view,
@@ -12187,6 +12236,8 @@ select.woe__form-input, select.woa__form-input {
     white-space: nowrap;
 }
 .odp__loc-acc i { font-size: 0.6rem; }
+.odp__loc-acc--by_customer { background: #f0fdf4; color: #16a34a; }
+.odp__loc-acc--by_staff    { background: #e0f2fe; color: #0369a1; }
 .odp__loc-acc--exact       { background: #d1fae5; color: #065f46; }
 .odp__loc-acc--street      { background: #dbeafe; color: #1e40af; }
 .odp__loc-acc--landmark    { background: #fef3c7; color: #92400e; }
@@ -18908,3 +18959,1772 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     color: #fff;
 }
 .sld__row-btn:focus-visible { outline: 2px solid var(--sld-gold, #f7c000); outline-offset: 1px; }
+
+/* ============================================================================
+   SELLERS LIST (sll) — ledger console pass (frontend-design)
+   Same language as Batch-2 order/delivery pages: flat navy ink + one yellow
+   accent + hairline paper + mono coded data. Scoped under .sll page root so
+   the drivers list (which shares these class groups) is untouched.
+   Signature: the five stat cards collapse into ONE ruled tally strip; the
+   applied filter segment carries the page's single yellow rule.
+   ============================================================================ */
+
+/* --- Hero: flat navy, yellow base rule (kills the gradient card look) --- */
+.sll .wfd__hero {
+    background: #001f3f;
+    border-radius: 0.5rem 0.5rem 0 0;
+    border-bottom: 3px solid #f7c000;
+    padding: 1rem 1.35rem 0.9rem;
+    margin-bottom: 0;
+}
+.sll .wfd__hero-title { font-size: 1.05rem; letter-spacing: -0.01em; }
+.sll .wfd__hero-subtitle { font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+.sll .wfd__hero-count__num {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 1.6rem;
+}
+
+/* --- Tally strip: one hairline box, segments split by rules, mono counts --- */
+.sll .sll__stats {
+    display: flex;
+    gap: 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-top: 0;
+    border-radius: 0 0 0.5rem 0.5rem;
+    overflow: hidden;
+    margin-bottom: 0.9rem;
+}
+.sll .sll__stat-card {
+    flex: 1 1 0;
+    border: 0;
+    border-left: 1px solid #eef1f5;
+    border-radius: 0;
+    background: transparent;
+    padding: 0.6rem 0.9rem 0.55rem;
+    box-shadow: inset 0 3px 0 transparent;
+    transition: background 0.15s;
+}
+.sll .sll__stat-card:first-child { border-left: 0; }
+.sll .sll__stat-card:hover { box-shadow: inset 0 3px 0 transparent; background: #f8f9fb; }
+.sll .sll__stat-icon { display: none; }
+.sll .sll__stat-value {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 1.1rem;
+    color: #001f3f;
+}
+.sll .sll__stat-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+}
+/* The page's single yellow accent: the segment currently filtering the list */
+.sll .sll__stat-card--active,
+.sll .sll__stat-card--active:hover {
+    box-shadow: inset 0 3px 0 #f7c000;
+    background: #fffdf4;
+}
+
+/* --- Ledger table: navy rule under the header, hairline rows, mono codes --- */
+.sll .sll__table-wrap { border: 1px solid #dee2e6; border-radius: 0.5rem; box-shadow: none; }
+.sll .sll__table th {
+    font-size: 0.64rem;
+    letter-spacing: 0.09em;
+    color: #001f3f;
+    background: #fff;
+    border-bottom: 2px solid #001f3f;
+    padding: 0.55rem 0.65rem;
+}
+.sll .sll__table td { padding: 0.5rem 0.65rem; border-bottom: 1px solid #eef1f5; }
+.sll .sll__table tbody tr:hover { background: #f8f9fb; }
+.sll .sll__seller-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 0.3rem;
+    background: #eef1f5;
+    color: #001f3f;
+    font-size: 0.68rem;
+    box-shadow: none;
+}
+.sll .sll__seller-name { font-size: 0.8rem; color: #001f3f; }
+.sll .sll__seller-code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.66rem;
+}
+.sll .sll__contact-line { font-size: 0.72rem; }
+.sll .sll__date {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+}
+
+/* --- Status: swatch + text, no coloured chip backgrounds --- */
+.sll .sll__badge {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.sll .sll__badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: currentColor;
+    flex-shrink: 0;
+}
+.sll .sll__badge i { display: none; }
+.sll .sll__badge--success { color: #15803d; }
+.sll .sll__badge--warning { color: #92400e; }
+.sll .sll__badge--danger  { color: #dc2626; }
+.sll .sll__badge--info    { color: #2563eb; }
+.sll .sll__badge--muted   { color: #9ca3af; }
+
+/* --- Row action: quiet outline, no lift --- */
+.sll .sll__btn--view {
+    background: #fff;
+    border: 1px solid #d5dbe3;
+    color: #001f3f;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 0.35rem;
+}
+.sll .sll__btn--view:hover { border-color: #001f3f; background: #fff; color: #001f3f; }
+
+.sll .sll__empty i { color: #d1d5db; }
+
+/* --- Strip wraps on small screens, keeping its rules --- */
+@media (max-width: 991px) {
+    .sll .sll__stats { flex-wrap: wrap; }
+    .sll .sll__stat-card { flex: 1 1 33%; border-top: 1px solid #eef1f5; margin-top: -1px; }
+}
+@media (max-width: 575px) {
+    .sll .sll__stat-card { flex: 1 1 50%; }
+}
+
+
+/* ============================================================================
+   DRIVERS LIST (drl) — ledger console pass (frontend-design)
+   Same navy-ink + single-yellow ledger language as the sellers list (sll) and
+   Batch-2 order/delivery pages. Scoped under the .drl page root so the other
+   driver pages (dra/dri/drp) keep their base look until their own pass.
+   Signature: the vehicle registration PLATE chip (mono digits behind a navy
+   QAT band, kin to the QNAS waybill plate) and the duty-dot roster — round
+   dot = live duty state, square swatch = administrative standing.
+   ============================================================================ */
+
+/* --- Hero: flat navy, yellow base rule, fused to the tally strip --- */
+.drl .wfd__hero {
+    background: #001f3f;
+    border-radius: 0.5rem 0.5rem 0 0;
+    border-bottom: 3px solid #f7c000;
+    padding: 1rem 1.35rem 0.9rem;
+    margin-bottom: 0;
+}
+.drl .wfd__hero-title { font-size: 1.05rem; letter-spacing: -0.01em; }
+.drl .wfd__hero-subtitle { font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+.drl .wfd__hero-count__num {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 1.6rem;
+}
+
+/* --- Tally strip: one hairline box, ruled segments, mono counts --- */
+.drl .drl__stats {
+    display: flex;
+    gap: 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-top: 0;
+    border-radius: 0 0 0.5rem 0.5rem;
+    overflow: hidden;
+    margin-bottom: 0.9rem;
+}
+.drl .drl__stat-card {
+    flex: 1 1 0;
+    display: block;
+    text-align: left;
+    cursor: pointer;
+    border: 0;
+    border-left: 1px solid #eef1f5;
+    border-radius: 0;
+    background: transparent;
+    padding: 0.6rem 0.9rem 0.55rem;
+    box-shadow: inset 0 3px 0 transparent;
+    transition: background 0.15s;
+}
+.drl .drl__stat-card:first-child { border-left: 0; }
+.drl .drl__stat-card:hover { box-shadow: inset 0 3px 0 transparent; background: #f8f9fb; }
+.drl .drl__stat-card:focus-visible { outline: 2px solid #f7c000; outline-offset: -2px; }
+.drl .drl__stat-icon { display: none; }
+.drl .drl__stat-value {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 1.1rem;
+    color: #001f3f;
+}
+.drl .drl__stat-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+/* The page's single yellow accent: the segment currently scoping the roster */
+.drl .drl__stat-card--active,
+.drl .drl__stat-card--active:hover {
+    box-shadow: inset 0 3px 0 #f7c000;
+    background: #fffdf4;
+}
+
+/* --- Sort select: match the filter inputs (base only styles the text input) --- */
+.drl select.drl__filter-select {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.78rem;
+    color: #001f3f;
+    background: #fff;
+    border: 1px solid #d5dbe3;
+    border-radius: 0.4rem;
+}
+.drl select.drl__filter-select:focus {
+    outline: none;
+    border-color: #f7c000;
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.22);
+}
+.drl input.drl__filter-input:focus {
+    border-color: #f7c000;
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.22);
+}
+
+/* --- Ledger table: navy rule under the header, hairline rows --- */
+.drl .drl__table-wrap {
+    border: 1px solid #dee2e6;
+    border-left: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: none;
+}
+.drl .drl__table th {
+    font-size: 0.64rem;
+    letter-spacing: 0.09em;
+    color: #001f3f;
+    background: #fff;
+    border-bottom: 2px solid #001f3f;
+    padding: 0.55rem 0.65rem;
+}
+.drl .drl__table td { padding: 0.5rem 0.65rem; border-bottom: 1px solid #eef1f5; }
+.drl .drl__table tbody tr:hover { background: #f8f9fb; }
+.drl .drl__driver-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 0.3rem;
+    background: #eef1f5;
+    color: #001f3f;
+    font-size: 0.68rem;
+}
+.drl .drl__driver-name { font-size: 0.8rem; color: #001f3f; }
+.drl .drl__driver-code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.66rem;
+}
+.drl .drl__contact-line {
+    font-size: 0.72rem;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+}
+.drl .drl__contact-line i { color: #9ca3af; }
+
+/* --- Standing: square swatch + text, no coloured chip background --- */
+.drl .drl__badge {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.drl .drl__badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: currentColor;
+    flex-shrink: 0;
+}
+.drl .drl__badge--success { color: #15803d; }
+.drl .drl__badge--warning { color: #92400e; }
+.drl .drl__badge--danger  { color: #dc2626; }
+
+/* --- Duty: round dot + text — the live half of the roster --- */
+.drl .dra__avail-badge {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.drl .dra__avail-badge::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+.drl .dra__avail-badge i { display: none; }
+.drl .dra__avail-badge--available   { color: #15803d; }
+.drl .dra__avail-badge--on_delivery { color: #1d4ed8; }
+.drl .dra__avail-badge--on_break    { color: #92400e; }
+.drl .dra__avail-badge--returning   { color: #0369a1; }
+.drl .dra__avail-badge--offline     { color: #9ca3af; }
+.drl .dra__avail-badge--offline::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* --- Vehicle: registration plate chip (page signature) --- */
+.drl .drl__vehicle-type { font-size: 0.7rem; color: #6b7280; margin-bottom: 0.15rem; }
+.drl__work-pref { font-size: 0.7rem; color: #6b7280; margin-top: 0.25rem; }
+.drl .drl__plate {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1.5px solid #001f3f;
+    border-radius: 0.25rem;
+    overflow: hidden;
+    background: #fff;
+    line-height: 1;
+}
+.drl .drl__plate-band {
+    display: flex;
+    align-items: center;
+    padding: 0.18rem 0.24rem;
+    background: #001f3f;
+    color: #f7c000;
+    font-size: 0.42rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    writing-mode: initial;
+}
+.drl .drl__plate-no {
+    display: flex;
+    align-items: center;
+    padding: 0.18rem 0.4rem;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #001f3f;
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Rating: mono figure, quiet count --- */
+.drl .drl__rating {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.74rem;
+    color: #001f3f;
+}
+.drl .drl__rating-star { color: #f7c000; font-size: 0.62rem; }
+.drl .drl__rating-count { font-size: 0.64rem; color: #9ca3af; }
+
+/* --- Row action: quiet outline, no lift --- */
+.drl .drl__btn--view {
+    background: #fff;
+    border: 1px solid #d5dbe3;
+    color: #001f3f;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 0.35rem;
+    box-shadow: none;
+}
+.drl .drl__btn--view:hover { border-color: #001f3f; background: #fff; color: #001f3f; transform: none; }
+
+.drl .drl__empty i { color: #d1d5db; }
+
+/* --- Strip wraps on small screens, keeping its rules --- */
+@media (max-width: 991px) {
+    .drl .drl__stats { flex-wrap: wrap; }
+    .drl .drl__stat-card { flex: 1 1 33%; border-top: 1px solid #eef1f5; margin-top: -1px; }
+}
+@media (max-width: 575px) {
+    .drl .drl__stat-card { flex: 1 1 50%; }
+}
+
+/* --- The roster scrolls inside its own frame on narrow screens --- */
+.drl .drl__table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.drl .drl__table { min-width: 760px; }
+
+/* ============================================================================
+   DVP — DRIVER VERIFICATION DOSSIER (staff read-only review page)
+   Used by: workforce/view_driver_profile.html
+   Notes: follows the Batch-2 ledger language — navy ink #001f3f, one yellow
+   accent #f7c000, hairline cards, mono data. Signature: the vetting rail —
+   a requirements tally whose meter segments ARE the checklist items.
+   ============================================================================ */
+
+.dvp { padding: 0 0 2rem; }
+
+/* --- Case header: flat navy band, single yellow rule --- */
+.dvp__hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    background: #001f3f;
+    border-bottom: 3px solid #f7c000;
+    padding: 1.1rem 1.35rem 1rem;
+    margin-bottom: 1rem;
+}
+.dvp__hero-eyebrow {
+    display: block;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 0.3rem;
+}
+.dvp__hero-name {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #fff;
+    margin: 0;
+    line-height: 1.15;
+}
+.dvp__hero-sub {
+    display: block;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.25rem;
+}
+.dvp__hero-right {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+}
+.dvp__code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-left: 3px solid #f7c000;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.3rem;
+}
+.dvp__hero-applied { font-size: 0.68rem; color: rgba(255, 255, 255, 0.55); }
+
+/* --- Status: swatch + text, never a pill --- */
+.dvp__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #fff;
+}
+.dvp__status-swatch {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 2px;
+    background: #f7c000; /* default: anything not explicitly mapped reads as "needs attention" */
+    flex-shrink: 0;
+}
+.dvp__status--verified .dvp__status-swatch { background: #22c55e; }
+.dvp__status--under_review .dvp__status-swatch { background: #3b82f6; }
+.dvp__status--rejected .dvp__status-swatch { background: #ef4444; }
+
+/* --- Two-column dossier: sticky vetting rail + evidence sheets --- */
+.dvp__layout {
+    display: grid;
+    grid-template-columns: 264px 1fr;
+    gap: 1rem;
+    align-items: start;
+    padding: 0 1rem;
+}
+.dvp__rail {
+    position: sticky;
+    top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.dvp__back {
+    align-self: flex-start;
+    font-size: 0.7rem;
+    border: 1px solid #dee2e6;
+    color: #001f3f;
+    background: #fff;
+}
+.dvp__back:hover { background: #eef1f5; color: #001f3f; }
+
+/* --- The tally: requirements met, meter segments are the requirements --- */
+.dvp__tally {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 0.85rem 0.9rem 0.9rem;
+}
+.dvp__tally-count {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    color: #001f3f;
+    line-height: 1;
+}
+.dvp__tally-count strong { font-size: 1.9rem; font-weight: 700; }
+.dvp__tally-count span { font-size: 0.95rem; color: #6b7280; margin-left: 0.2rem; }
+.dvp__tally-label {
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin: 0.25rem 0 0.6rem;
+}
+.dvp__tally-meter { display: flex; gap: 3px; }
+.dvp__seg {
+    flex: 1;
+    height: 5px;
+    border-radius: 1px;
+    background: #e5e7eb;
+}
+.dvp__seg--filled { background: #f7c000; }
+
+/* --- Checklist: hairline ledger rows, jump links into the evidence --- */
+.dvp__checklist {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+.dvp__check {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid #eef1f5;
+    font-size: 0.74rem;
+    color: #001f3f;
+    text-decoration: none;
+    transition: background 0.12s ease;
+}
+.dvp__check:last-child { border-bottom: 0; }
+.dvp__check:hover { background: #f8f9fb; color: #001f3f; }
+.dvp__check:focus-visible { outline: 2px solid #f7c000; outline-offset: -2px; }
+.dvp__check-swatch {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.dvp__check-swatch--ok { background: #001f3f; }
+.dvp__check-swatch--missing { background: #fff; border: 1.5px solid #b91c1c; }
+.dvp__check-label { flex: 1; }
+.dvp__check-state {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.dvp__check-state--missing { color: #b91c1c; }
+
+/* --- Rail stats: quiet mono figures --- */
+.dvp__stats {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 0.25rem 0;
+    margin: 0;
+}
+.dvp__stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0.8rem;
+    border-bottom: 1px solid #eef1f5;
+}
+.dvp__stat:last-child { border-bottom: 0; }
+.dvp__stat dt {
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin: 0;
+}
+.dvp__stat dd {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #001f3f;
+    margin: 0;
+}
+.dvp__stat-status { text-transform: capitalize; }
+.dvp__stat-status--approved { color: #15803d; }
+.dvp__stat-status--pending { color: #b45309; }
+.dvp__stat-status--suspended, .dvp__stat-status--rejected { color: #b91c1c; }
+
+/* --- Evidence sheets --- */
+.dvp__main { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; }
+.dvp__card {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    scroll-margin-top: 0.75rem;
+}
+.dvp__card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid #eef1f5;
+}
+.dvp__card-head > i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 0.35rem;
+    font-size: 0.68rem;
+    background: #eef1f5;
+    color: #001f3f;
+    flex-shrink: 0;
+}
+.dvp__card-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #001f3f;
+}
+.dvp__card-meta {
+    margin-left: auto;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.66rem;
+    color: #6b7280;
+}
+.dvp__card-body { padding: 0.9rem 0.8rem; }
+
+/* --- Field grid: micro label over mono value, hairline underline --- */
+.dvp__fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.7rem 1.25rem;
+}
+.dvp__field { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.dvp__field--wide { grid-column: 1 / -1; }
+.dvp__field-label {
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.dvp__field-value {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    letter-spacing: -0.01em;
+    color: #001f3f;
+    border-bottom: 1px solid #eef1f5;
+    padding-bottom: 0.3rem;
+    overflow-wrap: anywhere;
+}
+.dvp__field-value--empty { color: #b91c1c; font-style: italic; }
+.dvp__field-value--prose {
+    font-family: inherit;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+/* --- Document evidence grid --- */
+.dvp__docs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0.7rem;
+}
+.dvp__doc {
+    display: block;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    overflow: hidden;
+    text-decoration: none;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.dvp__doc:hover { border-color: #001f3f; box-shadow: 0 2px 8px rgba(0, 31, 63, 0.12); }
+.dvp__doc:focus-visible { outline: 2px solid #f7c000; outline-offset: 2px; }
+.dvp__doc-img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    display: block;
+    background: #eef1f5;
+}
+.dvp__doc-caption {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.45rem 0.6rem;
+    border-top: 1px solid #eef1f5;
+}
+.dvp__doc-type {
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #001f3f;
+}
+.dvp__doc-no, .dvp__doc-date {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.64rem;
+    color: #6b7280;
+}
+
+/* --- Vehicles: ledger rows with mono plate --- */
+.dvp__vehicles { list-style: none; margin: 0; padding: 0; }
+.dvp__vehicle {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid #eef1f5;
+}
+.dvp__vehicle:first-child { padding-top: 0; }
+.dvp__vehicle:last-child { border-bottom: 0; padding-bottom: 0; }
+.dvp__vehicle-type { font-size: 0.78rem; font-weight: 700; color: #001f3f; }
+.dvp__vehicle-model { font-size: 0.74rem; color: #6b7280; flex: 1; }
+.dvp__vehicle-plate {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #001f3f;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.1rem 0.45rem;
+}
+.dvp__vehicle-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.dvp__vehicle-status .dvp__status-swatch { background: #9ca3af; }
+.dvp__vehicle-status--active { color: #15803d; }
+.dvp__vehicle-status--active .dvp__status-swatch { background: #22c55e; }
+
+/* --- Location, notes, empty & warning states --- */
+.dvp__coords {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #001f3f;
+}
+.dvp__coords-acc {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    color: #6b7280;
+}
+.dvp__note { font-size: 0.7rem; color: #6b7280; margin: 0.6rem 0 0; }
+.dvp__empty { font-size: 0.78rem; color: #6b7280; font-style: italic; margin: 0; }
+.dvp__warning {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    border-left: 3px solid #b91c1c;
+    border-radius: 0.35rem;
+    background: #fff;
+    padding: 0.6rem 0.8rem;
+    margin: 0;
+}
+.dvp__footer {
+    font-size: 0.66rem;
+    color: #9ca3af;
+    text-align: center;
+    margin: 0.4rem 0 0;
+}
+
+/* --- Responsive: rail folds above the evidence on narrow screens --- */
+@media (max-width: 991px) {
+    .dvp__layout { grid-template-columns: 1fr; }
+    .dvp__rail { position: static; }
+    .dvp__hero { padding: 0.9rem 1rem 0.8rem; }
+    .dvp__hero-name { font-size: 1.1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .dvp__check, .dvp__doc { transition: none; }
+}
+
+/* ============================================================================
+   DVM — DRIVER VERIFICATION MANIFEST (driver_verification_list.html only)
+   Scope: page-local. Does NOT touch .uvl__card/__field/__progress/__timeline —
+   those stay shared with business/team/user verification lists & driver_detail.
+   Signature: the ink stamp — a rotated double-ring status mark (customs/
+   passport-control motif) replacing the generic colour pill, on a collapsible
+   manifest row so a full queue of applicants fits without scrolling.
+   ============================================================================ */
+
+.dvm__manifest {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.dvm__header {
+    display: grid;
+    grid-template-columns: 108px minmax(200px, 1.5fr) 108px 120px 150px 100px 20px;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.5rem 0.9rem;
+    background: #f8f9fb;
+    border-bottom: 1px solid #eef1f5;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+@media (max-width: 991px) { .dvm__header { display: none; } }
+
+.dvm__row { border-bottom: 1px solid #eef1f5; }
+.dvm__row:last-child { border-bottom: 0; }
+.dvm__row[open] > .dvm__summary { background: #f8f9fb; border-bottom: 1px solid #eef1f5; }
+
+.dvm__summary {
+    display: grid;
+    grid-template-columns: 108px minmax(200px, 1.5fr) 108px 120px 150px 100px 20px;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.65rem 0.9rem;
+    cursor: pointer;
+    list-style: none;
+}
+.dvm__summary::-webkit-details-marker { display: none; }
+.dvm__summary::marker { content: ""; }
+.dvm__summary:hover { background: #f8f9fb; }
+.dvm__summary:focus-visible { outline: 2px solid #f7c000; outline-offset: -2px; }
+
+.dvm__chev { color: #9ca3af; font-size: 0.72rem; justify-self: end; transition: transform 0.15s ease; }
+.dvm__row[open] .dvm__chev { transform: rotate(180deg); }
+
+/* --- The stamp: rotated double ring, mono uppercase — the one bold move --- */
+.dvm__stamp {
+    position: relative;
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.55rem;
+    border: 1.5px solid currentColor;
+    border-radius: 0.2rem;
+    transform: rotate(-2deg);
+    white-space: nowrap;
+}
+.dvm__stamp::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border: 1px solid currentColor;
+    opacity: 0.45;
+    border-radius: 0.1rem;
+    pointer-events: none;
+}
+.dvm__stamp--pending      { color: #b45309; background: #fffbeb; }
+.dvm__stamp--under_review { color: #1d4ed8; background: #eff6ff; }
+.dvm__stamp--verified     { color: #15803d; background: #f0fdf4; }
+.dvm__stamp--rejected     { color: #b91c1c; background: #fef2f2; }
+.dvm__stamp--incomplete   { color: #6b7280; background: #f8f9fb; }
+
+.dvm__who { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.dvm__name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #001f3f;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dvm__contact {
+    font-size: 0.68rem;
+    color: #6b7280;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dvm__dot { margin: 0 0.3rem; }
+
+.dvm__code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #001f3f;
+}
+.dvm__lang { font-size: 0.72rem; color: #6b7280; }
+
+.dvm__meter { display: flex; align-items: center; gap: 0.4rem; }
+.dvm__meter-track {
+    flex: 1;
+    min-width: 48px;
+    height: 5px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.dvm__meter-fill { display: block; height: 100%; background: #f7c000; border-radius: 2px; }
+.dvm__meter-pct {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.66rem;
+    color: #6b7280;
+    width: 2.2rem;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.dvm__applied {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    color: #6b7280;
+}
+.dvm__applied em { font-style: italic; color: #b91c1c; }
+
+/* --- Case file: revealed on expand --- */
+.dvm__case { padding: 0.9rem 0.9rem 1rem; border-top: 1px solid #eef1f5; background: #fbfbfc; }
+
+.dvm__flag {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.74rem;
+    color: #92400e;
+    border: 1px solid #fde68a;
+    border-left: 3px solid #f7c000;
+    background: #fffbeb;
+    border-radius: 0.35rem;
+    padding: 0.55rem 0.7rem;
+    margin-bottom: 0.8rem;
+}
+.dvm__flag--reason { color: #991b1b; border-color: #fecaca; border-left-color: #b91c1c; background: #fff; }
+.dvm__flag i { margin-top: 0.15rem; flex-shrink: 0; }
+
+.dvm__case-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; margin-bottom: 0.8rem; }
+@media (max-width: 767px) { .dvm__case-grid { grid-template-columns: 1fr; gap: 1rem; } }
+
+.dvm__case-head {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.dvm__case-field {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid #eef1f5;
+    font-size: 0.76rem;
+}
+.dvm__case-field:last-child { border-bottom: 0; }
+.dvm__case-field span { color: #6b7280; }
+.dvm__case-field strong {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-weight: 600;
+    color: #001f3f;
+    text-align: right;
+}
+/* Compound selector (not just the modifier alone) so this outranks the
+   `.dvm__case-field strong` base rule above instead of losing to it. */
+.dvm__case-field strong.dvm__case-status--approved { color: #15803d; }
+.dvm__case-field strong.dvm__case-status--pending { color: #b45309; }
+.dvm__case-field strong.dvm__case-status--rejected,
+.dvm__case-field strong.dvm__case-status--suspended { color: #b91c1c; }
+
+/* --- Timeline trail: compact vertical connector --- */
+.dvm__trail { list-style: none; margin: 0; padding: 0; }
+.dvm__trail-step { position: relative; padding: 0 0 0.65rem 1.1rem; font-size: 0.74rem; }
+.dvm__trail-step:last-child { padding-bottom: 0; }
+.dvm__trail-dot {
+    position: absolute;
+    left: 0;
+    top: 0.2rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #e5e7eb;
+}
+.dvm__trail-step--done .dvm__trail-dot { background: #f7c000; }
+.dvm__trail-step::before {
+    content: "";
+    position: absolute;
+    left: 0.22rem;
+    top: 0.7rem;
+    bottom: -0.15rem;
+    width: 1px;
+    background: #e5e7eb;
+}
+.dvm__trail-step:last-child::before { display: none; }
+.dvm__trail-label { font-weight: 600; color: #001f3f; margin-right: 0.4rem; }
+.dvm__trail-date {
+    color: #6b7280;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+}
+
+.dvm__case-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid #eef1f5;
+}
+
+.dvm__verified-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #15803d;
+}
+
+/* --- Mobile: grid collapses to a wrapped, labelled stack --- */
+@media (max-width: 991px) {
+    .dvm__summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.6rem;
+        padding: 0.7rem 0.85rem;
+    }
+    .dvm__who { flex: 1 1 100%; order: 1; }
+    .dvm__stamp { order: 0; }
+    .dvm__chev { order: 2; margin-left: auto; }
+    .dvm__code, .dvm__lang, .dvm__applied { order: 3; font-size: 0.68rem; }
+    .dvm__meter { order: 3; flex: 1 1 110px; }
+    .dvm__code::before, .dvm__lang::before, .dvm__applied::before, .dvm__meter::before {
+        content: attr(data-label) ": ";
+        color: #9ca3af;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.58rem;
+        letter-spacing: 0.05em;
+        margin-right: 0.2rem;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .dvm__chev { transition: none; }
+}
+
+/* ============================================================================
+   PICKUP AUTOMATION — staff dispatch-rules console (pau__)
+   Used by: workforce/templates/workforce/pickup_automation_list.html
+   Notes: follows the Batch-2 ledger language — navy ink #001f3f, one yellow
+   accent #f7c000, hairline card, mono data, swatch+text fleet status.
+   Signature: each row reads as a routing rule (auto → pool → after collection).
+   ============================================================================ */
+
+/* --- Hero: flat navy band, single yellow rule --- */
+.pau__hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    background: #001f3f;
+    border-bottom: 3px solid #f7c000;
+    border-radius: 0.4rem 0.4rem 0 0;
+    padding: 1.1rem 1.35rem 1rem;
+    margin-bottom: 1rem;
+}
+.pau__hero-eyebrow {
+    display: block;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 0.3rem;
+}
+.pau__hero-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #fff;
+    margin: 0;
+    line-height: 1.15;
+}
+.pau__hero-sub {
+    display: block;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.25rem;
+    max-width: 34rem;
+}
+.pau__tally {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    border-right: 3px solid #f7c000;
+    padding-right: 0.75rem;
+}
+.pau__tally-num {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+.pau__tally-lbl {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-top: 0.2rem;
+}
+.pau__search {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    min-width: 12rem;
+}
+.pau__search::placeholder { color: rgba(255, 255, 255, 0.45); }
+.pau__search:focus {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: #f7c000;
+    color: #fff;
+    box-shadow: none;
+}
+.pau__search-btn {
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.pau__search-btn:hover { color: #001f3f; background: #f7c000; border-color: #f7c000; }
+
+/* --- Ledger card + table --- */
+.pau__card {
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 0 0 0.75rem 0.75rem;
+    overflow: hidden;
+}
+.pau__table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.pau__th {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6c757d;
+    background: #fafafa;
+    border-bottom: 2px solid #f0f0f0;
+    white-space: nowrap;
+}
+.pau__td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid #f5f5f5;
+    vertical-align: middle;
+}
+.pau__row:hover .pau__td { background: #f8f9ff; }
+
+.pau__biz { display: block; font-weight: 600; color: #1a1a2e; line-height: 1.2; }
+.pau__code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 0.68rem;
+    color: #6c757d;
+    letter-spacing: 0.03em;
+}
+
+/* Rule arrow between config cells */
+.pau__td--rule { position: relative; }
+.pau__td--rule::before {
+    content: "\2192";
+    position: absolute;
+    left: -0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: #d0d0d0;
+    pointer-events: none;
+}
+
+/* Switch: brand ink when on */
+.pau__card .form-check-input { cursor: pointer; }
+.pau__card .form-check-input:checked { background-color: #001f3f; border-color: #001f3f; }
+.pau__card .form-check-input:focus { border-color: #001f3f; box-shadow: 0 0 0 0.15rem rgba(0, 31, 63, 0.15); }
+
+/* Selects read as inline ledger values: quiet until hover/focus */
+.pau__select {
+    background-color: transparent;
+    border: 1px solid transparent;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    max-width: 11rem;
+    padding: 0.25rem 1.7rem 0.25rem 0.45rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23001f3f' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-size: 12px 9px;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+    cursor: pointer;
+}
+.pau__select:hover { border-color: #d0d0d0; background-color: #fff; }
+.pau__select:focus {
+    border-color: #001f3f;
+    background-color: #fff;
+    box-shadow: 0 0 0 0.15rem rgba(0, 31, 63, 0.12);
+}
+
+/* Rule switched off — the routing cells lose their ink until re-enabled */
+.pau__row--off .pau__select,
+.pau__row--off .pau__td--rule::before { opacity: 0.4; }
+.pau__row--off .pau__select:hover,
+.pau__row--off .pau__select:focus { opacity: 1; }
+
+/* --- Fleet status: swatch + text, never a pill --- */
+.pau__fleet-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    font-variant-numeric: tabular-nums;
+}
+.pau__fleet-state::before {
+    content: "";
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 2px;
+    background: #d0d0d0;
+    flex-shrink: 0;
+}
+.pau__fleet-state--ok::before { background: #22c55e; }
+.pau__fleet-state--none { color: #b91c1c; }
+.pau__fleet-state--none::before { background: #ef4444; }
+
+.pau__manage {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #001f3f;
+    text-decoration: none;
+    border: 0;
+    background: none;
+    padding: 0;
+    border-bottom: 1px solid #d0d0d0;
+}
+.pau__manage:hover { color: #001f3f; border-bottom-color: #f7c000; }
+
+/* --- Save: ink outline, quiet confirm --- */
+.pau__save {
+    border: 1px solid #001f3f;
+    color: #001f3f;
+    font-weight: 600;
+    min-width: 4.2rem;
+}
+.pau__save:hover { background: #001f3f; color: #fff; }
+.pau__save--done { border-color: #15803d; color: #15803d; background: #fff; }
+.pau__save--done:hover { background: #fff; color: #15803d; }
+.pau__save--fail { border-color: #b91c1c; color: #b91c1c; }
+
+/* --- Fleet management panel: inset sheet under the rule row --- */
+.pau__panel {
+    background: #fafbfc;
+    border-left: 3px solid #001f3f;
+    padding: 0.75rem 1rem;
+}
+.pau__panel-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #001f3f;
+}
+.pau__panel .pau__td { border-bottom: 2px solid #f0f0f0; }
+.pau__driver-row { border-bottom: 1px solid #eceef1; }
+.pau__driver-row:last-child { border-bottom: 0; }
+
+@media (max-width: 767.98px) {
+    .pau__hero { padding: 0.9rem 1rem 0.8rem; }
+    .pau__tally { border-right: 0; padding-right: 0; align-items: flex-start; }
+    .pau__td--rule::before { display: none; }
+}
+.pau__save .pau__code { color: inherit; opacity: 0.65; }
+
+/* Panel input fields — hairline, ink focus, same voice as the selects */
+.pau__panel .form-control {
+    font-size: 0.78rem;
+    border-color: #e5e7eb;
+    color: #1a1a2e;
+    background-color: #fff;
+}
+.pau__panel .form-control::placeholder { color: #9ca3af; }
+.pau__panel .form-control:focus {
+    border-color: #001f3f;
+    box-shadow: 0 0 0 0.15rem rgba(0, 31, 63, 0.12);
+}
+
+/* --- pau refinement pass: bespoke switch, tight fields, fleet names line --- */
+
+/* Custom switch — no Bootstrap/brandkit classes, fully owned */
+.pau__card input.pau__switch {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 2.1rem;
+    height: 1.15rem;
+    margin: 0;
+    border: 1px solid #d0d0d0;
+    border-radius: 1rem;
+    background: #e5e7eb;
+    position: relative;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.pau__card input.pau__switch::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: left 0.15s ease;
+}
+.pau__card input.pau__switch:checked {
+    background: #001f3f;
+    border-color: #001f3f;
+}
+.pau__card input.pau__switch:checked::after { left: calc(100% - 0.95rem - 1px); }
+.pau__card input.pau__switch:focus-visible {
+    outline: 2px solid rgba(0, 31, 63, 0.35);
+    outline-offset: 2px;
+}
+
+/* Save button — sharp corners, tight padding (beats brandkit pill radius) */
+.pau__card .btn.pau__save,
+.pau__panel .btn.pau__save {
+    border-radius: 0.3rem;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.72rem;
+    line-height: 1.25;
+    background-color: #fff;
+    box-shadow: none;
+}
+.pau__card .btn.pau__save:hover,
+.pau__panel .btn.pau__save:hover { background-color: #001f3f; color: #fff; }
+.pau__card .btn.pau__save--done:hover { background-color: #fff; color: #15803d; }
+
+/* Selects + inputs — tighter inner padding, sharper radius */
+.pau__card select.pau__select {
+    padding: 0.22rem 1.4rem 0.22rem 0.4rem;
+    border-radius: 0.3rem;
+    line-height: 1.3;
+    background-position: right 0.45rem center;
+}
+.pau__panel input.form-control {
+    padding: 0.24rem 0.5rem;
+    border-radius: 0.3rem;
+}
+.pau__hero input.pau__search {
+    padding: 0.24rem 0.6rem;
+    border-radius: 0.3rem;
+}
+
+/* Fleet names — second line under the count, plain muted text */
+.pau__fleet-names {
+    display: block;
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-top: 0.15rem;
+    max-width: 16rem;
+    line-height: 1.35;
+}
+.pau__fleet-names:empty { display: none; }
+
+/* ============================================================================
+   PICKUP POOL — staff first-mile monitor (ppl__)
+   Used by: workforce/templates/workforce/pickup_pool_status.html
+   Notes: Batch-2 ledger language — navy ink #001f3f, one yellow accent
+   #f7c000, hairline card, mono data, swatch+text status.
+   Signature: unclaimed (pending) rows carry a red left rule — the triage queue
+   reads at a glance.
+   ============================================================================ */
+
+.ppl__hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    background: #001f3f;
+    border-bottom: 3px solid #f7c000;
+    border-radius: 0.4rem 0.4rem 0 0;
+    padding: 1.1rem 1.35rem 1rem;
+    margin-bottom: 1rem;
+}
+.ppl__hero-eyebrow {
+    display: block;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 0.3rem;
+}
+.ppl__hero-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #fff;
+    margin: 0;
+    line-height: 1.15;
+}
+.ppl__tallies { display: flex; align-items: center; gap: 1.1rem; }
+.ppl__tally { display: flex; flex-direction: column; align-items: flex-end; }
+.ppl__tally--alert { border-right: 3px solid #f7c000; padding-right: 0.75rem; }
+.ppl__tally-num {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+.ppl__tally-lbl {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-top: 0.2rem;
+}
+
+/* In-band filters — dark fields on navy */
+.ppl__hero .ppl__ffield {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 0.78rem;
+    padding: 0.24rem 0.6rem;
+    border-radius: 0.3rem;
+}
+.ppl__hero select.ppl__ffield {
+    padding-right: 1.6rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f7c000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-size: 12px 9px;
+    background-position: right 0.45rem center;
+}
+.ppl__hero select.ppl__ffield option { color: #1a1a2e; background: #fff; }
+.ppl__hero .ppl__ffield::placeholder { color: rgba(255, 255, 255, 0.45); }
+.ppl__hero .ppl__ffield:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: #f7c000;
+    color: #fff;
+    box-shadow: none;
+}
+.ppl__fbtn { color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 0.3rem; font-size: 0.78rem; padding: 0.24rem 0.7rem; }
+.ppl__fbtn:hover { color: #001f3f; background: #f7c000; border-color: #f7c000; }
+
+/* --- Ledger card + table --- */
+.ppl__card {
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 0 0 0.75rem 0.75rem;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.ppl__table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.ppl__th {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6c757d;
+    background: #fafafa;
+    border-bottom: 2px solid #f0f0f0;
+    white-space: nowrap;
+}
+.ppl__td { padding: 0.55rem 0.75rem; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+.ppl__row:hover .ppl__td { background: #f8f9ff; }
+.ppl__row--pending .ppl__td:first-child { box-shadow: inset 3px 0 0 #ef4444; }
+
+.ppl__order {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #001f3f;
+    letter-spacing: 0.02em;
+}
+.ppl__biz { display: block; font-weight: 600; color: #1a1a2e; line-height: 1.25; }
+.ppl__sub { display: block; font-size: 0.7rem; color: #6c757d; line-height: 1.35; }
+
+/* Mode: quiet small caps + dot (yellow = open pool, grey = assigned fleet) */
+.ppl__mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6c757d;
+    white-space: nowrap;
+}
+.ppl__mode::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 2px;
+    background: #d0d0d0;
+    flex-shrink: 0;
+}
+.ppl__mode--public::before { background: #f7c000; }
+
+/* Status: swatch + text, never a pill */
+.ppl__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #1a1a2e;
+    white-space: nowrap;
+}
+.ppl__status::before {
+    content: "";
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 2px;
+    background: #d0d0d0;
+    flex-shrink: 0;
+}
+.ppl__status--pending { color: #b91c1c; }
+.ppl__status--pending::before { background: #ef4444; }
+.ppl__status--moving::before { background: #3b82f6; }
+.ppl__status--collected::before { background: #f7c000; }
+.ppl__status--done::before { background: #22c55e; }
+.ppl__status--cancelled { color: #9ca3af; }
+.ppl__status--cancelled::before { background: #d0d0d0; }
+
+.ppl__code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 0.68rem;
+    color: #6c757d;
+    letter-spacing: 0.03em;
+}
+.ppl__age {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 0.7rem;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+/* Actions: ink buttons, sharp corners */
+.ppl__card .btn.ppl__btn {
+    border: 1px solid #001f3f;
+    color: #001f3f;
+    background-color: #fff;
+    font-weight: 600;
+    font-size: 0.72rem;
+    line-height: 1.25;
+    padding: 0.28rem 0.7rem;
+    border-radius: 0.3rem;
+    box-shadow: none;
+}
+.ppl__card .btn.ppl__btn:hover { background-color: #001f3f; color: #fff; }
+.ppl__card .btn.ppl__btn--primary { background-color: #001f3f; color: #fff; }
+.ppl__card .btn.ppl__btn--primary:hover { background-color: #003366; border-color: #003366; }
+.ppl__card .btn.ppl__btn .ppl__code { color: inherit; opacity: 0.65; }
+
+/* Assign panel: inset sheet with navy rule */
+.ppl__panel { background: #fafbfc; border-left: 3px solid #001f3f; padding: 0.75rem 1rem; }
+.ppl__panel-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #001f3f;
+}
+.ppl__panel input.form-control {
+    font-size: 0.78rem;
+    border-color: #e5e7eb;
+    color: #1a1a2e;
+    padding: 0.24rem 0.5rem;
+    border-radius: 0.3rem;
+}
+.ppl__panel input.form-control:focus { border-color: #001f3f; box-shadow: 0 0 0 0.15rem rgba(0, 31, 63, 0.12); }
+
+@media (max-width: 767.98px) {
+    .ppl__hero { padding: 0.9rem 1rem 0.8rem; }
+    .ppl__tally--alert { border-right: 0; padding-right: 0; }
+}
+
+/* ============================================================================
+   FIRST-MILE PICKUP STRIP (pkl) — shared card on order detail + task detail.
+   Stage rail: done = navy filled, current = yellow ring, upcoming = hollow.
+   Timeline icon variant for pickup_status history entries lives here too.
+   ============================================================================ */
+.pkl {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.7rem 0.9rem 0.8rem;
+    margin-bottom: 1rem;
+}
+.pkl__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin-bottom: 0.65rem;
+}
+.pkl__title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: #001f3f;
+}
+.pkl__title i { color: #b58900; margin-right: 0.3rem; }
+.pkl__meta { font-size: 0.7rem; color: #6b7280; }
+.pkl__driver {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    color: #001f3f;
+    font-weight: 600;
+}
+.pkl__rail {
+    display: flex;
+    align-items: flex-start;
+}
+.pkl__step {
+    flex: 1 1 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.3rem;
+    min-width: 0;
+}
+/* connector line between dots */
+.pkl__step::before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: -50%;
+    width: 100%;
+    height: 2px;
+    background: #e5e7eb;
+}
+.pkl__step:first-child::before { display: none; }
+.pkl__step--done::before { background: #001f3f; }
+.pkl__dot {
+    position: relative;
+    z-index: 1;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #d1d5db;
+}
+.pkl__step--done .pkl__dot { background: #001f3f; border-color: #001f3f; }
+.pkl__step--now .pkl__dot {
+    background: #001f3f;
+    border-color: #f7c000;
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.35);
+}
+.pkl__step-label {
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #9ca3af;
+    line-height: 1.15;
+}
+.pkl__step--done .pkl__step-label { color: #001f3f; }
+.pkl__step-time {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.58rem;
+    color: #6b7280;
+    line-height: 1;
+}
+.pkl__cancelled {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #dc2626;
+}
+.pkl__note {
+    margin-top: 0.55rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #eef1f5;
+    font-size: 0.68rem;
+    color: #92400e;
+}
+.pkl__note i { margin-right: 0.25rem; }
+
+/* Timeline icon for pickup_status entries (matches odp__tl-icon variants) */
+.odp__tl-icon--pickup { background: #fff3c9; color: #8a6d00; }
+
+@media (max-width: 575.98px) {
+    .pkl__step-label { font-size: 0.55rem; }
+    .pkl__step-time { display: none; }
+}
+
+/* Seller detail — pickup location map pin line (coords in mono, ledger style) */
+.sld__location-pin {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: #001f3f;
+    text-decoration: none;
+}
+.sld__location-pin i { color: #15803d; font-size: 0.62rem; }
+.sld__location-pin:hover { color: #001f3f; text-decoration: underline; }
+.sld__location-pin--none { color: #9ca3af; font-family: inherit; font-weight: 500; }
+.sld__location-pin--none i { color: #d1d5db; }

@@ -8,7 +8,7 @@ class DriverAdmin(admin.ModelAdmin):
     list_display = ('user', 'driver_code', 'driver_phone',
                     'driver_whatsapp', 'driver_status', 'driver_availability',
                     'wallet_balance', 'cod_in_hand', 'pending_earnings', 'created_at')
-    list_filter = ('driver_status', 'driver_availability', 'created_at', 'updated_at')
+    list_filter = ('driver_status', 'driver_availability', 'job_type', 'created_at', 'updated_at')
     list_per_page = 10
     readonly_fields = ('wallet_usage_percentage', 'is_wallet_warning',
                        'is_wallet_blocked', 'available_credit')
@@ -20,7 +20,8 @@ class DriverAdmin(admin.ModelAdmin):
         }),
         ('License & Status', {
             'fields': ('driver_license_number', 'driver_languages', 'driver_status',
-                      'driver_availability', 'driver_rating', 'driver_rating_count')
+                      'driver_availability', 'job_type', 'work_time_slabs',
+                      'driver_rating', 'driver_rating_count')
         }),
         ('COD Wallet System', {
             'fields': ('wallet_balance', 'credit_limit', 'cod_in_hand',
@@ -33,6 +34,15 @@ class DriverAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(fleet_models.DriverVacancyAplication)
+class DriverVacancyAplicationAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'mobile_no', 'zone_name', 'job_type',
+                    'licence', 'own_vehicle', 'is_in_qatar')
+    list_filter = ('job_type', 'licence', 'own_vehicle', 'is_in_qatar')
+    search_fields = ('full_name', 'mobile_no', 'whatsapp_no', 'zone_name')
+    list_per_page = 25
 
 
 @admin.register(fleet_models.DriverVehicle)

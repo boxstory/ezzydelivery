@@ -17,7 +17,7 @@ class RiderShiftForm(forms.ModelForm):
     )
 
     pickup_location = forms.ModelChoiceField(
-        queryset=PickupLocation.objects.filter(is_active=True),
+        queryset=PickupLocation.objects.filter(pickup_status='active'),
         widget=forms.Select(attrs={'class': 'form-select'}),
         help_text='Store the rider will be locked to for this shift'
     )
@@ -37,6 +37,15 @@ class RiderShiftForm(forms.ModelForm):
     class Meta:
         model = RiderShift
         fields = ['rider', 'pickup_location', 'scheduled_start', 'scheduled_end']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        def _rider_label(d):
+            parts = [str(d), d.get_driver_availability_display()]
+            if d.job_type:
+                parts.append(d.get_job_type_display())
+            return ' — '.join(parts)
+        self.fields['rider'].label_from_instance = _rider_label
 
     def clean(self):
         cleaned_data = super().clean()
@@ -83,7 +92,7 @@ class RiderShiftEditForm(RiderShiftForm):
     """Extended form for editing shifts with status changes"""
 
     status = forms.ChoiceField(
-        choices=RiderShift.STATUS_CHOICES,
+        choices=RiderShift.SHIFT_STATUS,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -185,7 +194,7 @@ class BatchFilterForm(forms.Form):
     )
 
     location = forms.ModelChoiceField(
-        queryset=PickupLocation.objects.filter(is_active=True),
+        queryset=PickupLocation.objects.filter(pickup_status='active'),
         required=False,
         empty_label='All Locations',
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -205,7 +214,7 @@ class BatchFilterForm(forms.Form):
 class ShiftFilterForm(forms.Form):
     """Form for filtering shifts in the list view"""
 
-    STATUS_CHOICES = [('', 'All Statuses')] + list(RiderShift.STATUS_CHOICES)
+    STATUS_CHOICES = [('', 'All Statuses')] + list(RiderShift.SHIFT_STATUS)
 
     status = forms.ChoiceField(
         choices=STATUS_CHOICES,
@@ -214,7 +223,7 @@ class ShiftFilterForm(forms.Form):
     )
 
     location = forms.ModelChoiceField(
-        queryset=PickupLocation.objects.filter(is_active=True),
+        queryset=PickupLocation.objects.filter(pickup_status='active'),
         required=False,
         empty_label='All Locations',
         widget=forms.Select(attrs={'class': 'form-select'})

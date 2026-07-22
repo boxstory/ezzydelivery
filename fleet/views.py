@@ -51,6 +51,7 @@ Related:
 import json
 import logging
 from django.db import connection, transaction
+from django.db.models import Q
 from django.shortcuts import redirect, render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -2460,11 +2461,26 @@ def driver_settings(request):
                 driver.driver_availability = new_availability
                 updated_fields.append('driver_availability')
 
-            # Notification opt-in (unchecked checkbox → no value posted).
-            new_notify = bool(request.POST.get('to_be_notified'))
-            if new_notify != driver.to_be_notified:
-                driver.to_be_notified = new_notify
-                updated_fields.append('to_be_notified')
+            # Notification opt-in (unchecked checkbox → no value posted), so
+            # only touch it when the notify form itself was submitted —
+            # otherwise the availability/work-pref forms would reset it off.
+            if 'notify_form' in request.POST:
+                new_notify = bool(request.POST.get('to_be_notified'))
+                if new_notify != driver.to_be_notified:
+                    driver.to_be_notified = new_notify
+                    updated_fields.append('to_be_notified')
+
+            if 'work_pref_form' in request.POST:
+                job_type = (request.POST.get('job_type') or '').strip()
+                if job_type in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES) or job_type == '':
+                    if job_type != driver.job_type:
+                        driver.job_type = job_type
+                        updated_fields.append('job_type')
+                valid_slabs = dict(fleet_models.WORK_TIME_SLAB_CHOICES)
+                slabs = ','.join(s for s in request.POST.getlist('work_time_slabs') if s in valid_slabs)
+                if slabs != driver.work_time_slabs:
+                    driver.work_time_slabs = slabs
+                    updated_fields.append('work_time_slabs')
 
             if updated_fields:
                 driver.save(update_fields=updated_fields)
@@ -2476,6 +2492,9 @@ def driver_settings(request):
         context = {
             'driver': driver,
             'availability_choices': availability_choices,
+            'job_type_choices': fleet_models.DRIVER_JOB_TYPE_CHOICES,
+            'work_time_slab_choices': fleet_models.WORK_TIME_SLAB_CHOICES,
+            'driver_time_slabs': driver.work_time_slab_list,
         }
         return render(request, 'fleet/driver_settings_pwa.html', context)
 
@@ -2632,13 +2651,15 @@ def driver_tasks(request):
         accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__gt=50)
         history_tasks = history_tasks.filter(dl_to_address__dl_zone__gt=50)
 
-    # Zone filter
+    # Zone filter — order.dl_zone is primary, dl_to_address fallback
     if zone_filter and zone_filter.isdigit():
+        from django.db.models import Q as _Q
         zone_num = int(zone_filter)
-        all_tasks = all_tasks.filter(dl_to_address__dl_zone=zone_num)
-        assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone=zone_num)
-        accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone=zone_num)
-        history_tasks = history_tasks.filter(dl_to_address__dl_zone=zone_num)
+        zone_q = _Q(order__dl_zone=zone_num) | _Q(dl_to_address__dl_zone=zone_num)
+        all_tasks = all_tasks.filter(zone_q)
+        assigned_tasks = assigned_tasks.filter(zone_q)
+        accepted_tasks = accepted_tasks.filter(zone_q)
+        history_tasks = history_tasks.filter(zone_q)
 
     # Type filter
     if type_filter == 'pnd':
@@ -2716,10 +2737,16 @@ def driver_tasks(request):
     cards = paginator.get_page(page)
 
     # Available zones dropdown
-    zone_numbers = delivery_models.DeliveryTask.objects.filter(
-        dl_to_address__isnull=False
-    ).values_list('dl_to_address__dl_zone', flat=True).distinct()
-    zone_numbers = [z for z in zone_numbers if z is not None][:50]
+    # Zone source: order.dl_zone is the staff-corrected primary (dl_to_address
+    # rows rarely carry a zone), union the address fallback for completeness
+    zone_numbers = set(
+        delivery_models.DeliveryTask.objects.filter(order__dl_zone__isnull=False)
+        .values_list('order__dl_zone', flat=True).distinct()
+    ) | set(
+        delivery_models.DeliveryTask.objects.filter(dl_to_address__dl_zone__isnull=False)
+        .values_list('dl_to_address__dl_zone', flat=True).distinct()
+    )
+    zone_numbers = [z for z in zone_numbers if z]
 
     available_zones = delivery_models.ZoneName.objects.filter(
         zone_number__in=zone_numbers
@@ -3912,4 +3939,251 @@ def staff_cod_submission_approve(request, txn_code):
         'is_received': txn.is_received,
         'is_verified': txn.is_verified,
         'is_approved': txn.is_approved,
+    })
+
+
+# =============================================================================
+# FIRST-MILE PICKUP (driver collects from client, then drop / self-deliver / transfer)
+# =============================================================================
+
+def _get_request_driver(request):
+    """Resolve the logged-in user's Driver row, or None."""
+    try:
+        return fleet_models.Driver.objects.select_related('user').get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        return None
+
+
+@login_required(login_url='/accounts/login/')
+def driver_pickups(request):
+    """
+    Pickup tab — the driver's first-mile list, separate from delivery tasks.
+    URL: /fleet/pickups/
+    """
+    from delivery.models import PickupTask
+    from delivery.selectors import pickup_pool_for
+
+    driver = _get_request_driver(request)
+    if not driver:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+
+    tab = request.GET.get('tab', 'available')
+
+    available = pickup_pool_for(driver).order_by('-id')
+    mine = PickupTask.objects.filter(
+        driver=driver, status__in=['accepted', 'in_progress', 'arrived'],
+    ).select_related('order', 'business', 'pickup_location', 'drop_warehouse__warehouse').order_by('-id')
+    in_progress = PickupTask.objects.filter(
+        Q(driver=driver, status='collected')
+        | Q(transfer_to_driver=driver, status='collected'),
+    ).select_related(
+        'order', 'business', 'pickup_location', 'drop_warehouse__warehouse',
+        'driver', 'transfer_to_driver',
+    ).order_by('-id')
+
+    cards = {'available': available, 'mine': mine, 'in_progress': in_progress}.get(tab, available)
+
+    # Stable left-border color per pickup location so same-store cards group visually
+    cards = list(cards)
+    for pk_task in cards:
+        pk_task.loc_color = (pk_task.pickup_location_id or 0) % 8
+
+    context = {
+        'driver': driver,
+        'current_tab': tab,
+        'cards': cards,
+        'available_count': available.count(),
+        'mine_count': mine.count(),
+        'in_progress_count': in_progress.count(),
+    }
+    return render(request, 'fleet/driver_pickups_pwa.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def accept_pickup(request):
+    """Claim a pickup — atomic, first tap wins. POST: pickup_id."""
+    from delivery.models import PickupTask
+    from delivery.selectors import pickup_pool_for
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+    if driver.driver_status != 'approved':
+        return JsonResponse({'success': False, 'error': 'Your driver account is not approved yet'})
+
+    pickup_id = request.POST.get('pickup_id')
+    if not pickup_id:
+        return JsonResponse({'success': False, 'error': 'Pickup ID required'})
+
+    # Server-side pool rule — the list filter is not enforcement
+    if not pickup_pool_for(driver).filter(pk=pickup_id).exists():
+        return JsonResponse({'success': False, 'error': 'This pickup is not available to you'})
+
+    updated = PickupTask.objects.filter(
+        pk=pickup_id, driver__isnull=True, status='pending',
+    ).update(driver=driver, status='accepted', accepted_at=timezone.now())
+    if not updated:
+        return JsonResponse({'success': False, 'error': 'Already taken by another driver'})
+
+    logger.info(f"Pickup {pickup_id} accepted by driver {driver.driver_id}")
+    from delivery.services.pickup import log_pickup_history
+    pickup = PickupTask.objects.select_related('order').get(pk=pickup_id)
+    log_pickup_history(pickup, 'pending', 'accepted', actor=request.user,
+                       notes=f"Accepted by {driver}")
+    return JsonResponse({'success': True})
+
+
+@login_required(login_url='/accounts/login/')
+def update_pickup_status(request):
+    """Forward-only pickup progress. POST: pickup_id, status in {in_progress, arrived, collected}."""
+    from delivery.models import PickupTask
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    pickup_id = request.POST.get('pickup_id')
+    new_status = request.POST.get('status')
+    flow = ['accepted', 'in_progress', 'arrived', 'collected']
+    if new_status not in flow[1:]:
+        return JsonResponse({'success': False, 'error': 'Invalid status'})
+
+    pickup = PickupTask.objects.filter(pk=pickup_id, driver=driver).first()
+    if not pickup:
+        return JsonResponse({'success': False, 'error': 'Pickup not found'})
+    if pickup.status not in flow or flow.index(new_status) <= flow.index(pickup.status):
+        return JsonResponse({'success': False, 'error': f'Cannot move from {pickup.status} to {new_status}'})
+    if pickup.order.order_status == 'cancelled':
+        return JsonResponse({'success': False, 'error': 'Order is cancelled'})
+
+    from delivery.services.pickup import log_pickup_history
+    old_status = pickup.status
+    pickup.status = new_status
+    update_fields = ['status', 'updated_at']
+    if new_status == 'collected':
+        pickup.collected_at = timezone.now()
+        update_fields.append('collected_at')
+    pickup.save(update_fields=update_fields)
+    log_pickup_history(
+        pickup, old_status, new_status, actor=request.user,
+        notes=f"Package collected by {driver}" if new_status == 'collected' else '')
+
+    # Same-store batch: driving to / arriving at a store applies to every other
+    # pickup this driver holds at that location. Collection stays per-package.
+    siblings_updated = 0
+    if new_status in ('in_progress', 'arrived') and pickup.pickup_location_id:
+        behind = flow[:flow.index(new_status)]
+        siblings = PickupTask.objects.filter(
+            driver=driver,
+            pickup_location_id=pickup.pickup_location_id,
+            status__in=behind,
+        ).exclude(pk=pickup.pk).exclude(order__order_status='cancelled')
+        for sib in siblings:
+            sib_old = sib.status
+            sib.status = new_status
+            sib.save(update_fields=['status', 'updated_at'])
+            log_pickup_history(
+                sib, sib_old, new_status, actor=request.user,
+                notes=f"Updated together with {pickup.order.order_number} (same pickup location)")
+            siblings_updated += 1
+
+    msg = ''
+    if siblings_updated:
+        label = 'On the way' if new_status == 'in_progress' else 'Arrived'
+        msg = f"{label} — {siblings_updated + 1} pickups at this location updated"
+    return JsonResponse({'success': True, 'status': new_status, 'message': msg,
+                         'siblings_updated': siblings_updated})
+
+
+@login_required(login_url='/accounts/login/')
+def route_pickup(request):
+    """
+    Execute the preset disposition after collection.
+    POST: pickup_id (+ target_driver_id when disposition is transfer).
+    """
+    from delivery.models import PickupTask
+    from delivery.services.pickup import execute_disposition, initiate_transfer
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    pickup = PickupTask.objects.filter(pk=request.POST.get('pickup_id'), driver=driver).first()
+    if not pickup:
+        return JsonResponse({'success': False, 'error': 'Pickup not found'})
+
+    # Driver picks the route at collection time; falls back to the preset
+    chosen = request.POST.get('disposition') or pickup.disposition
+    if chosen not in ('drop', 'self_deliver', 'transfer'):
+        return JsonResponse({'success': False, 'error': 'Invalid disposition'})
+    if chosen != pickup.disposition:
+        pickup.disposition = chosen
+        pickup.save(update_fields=['disposition', 'updated_at'])
+
+    if chosen == 'transfer':
+        target_id = request.POST.get('target_driver_id')
+        target = fleet_models.Driver.objects.filter(pk=target_id).first() if target_id else None
+        if not target:
+            return JsonResponse({'success': False, 'error': 'Select a driver to transfer to'})
+        ok, msg = initiate_transfer(pickup, target)
+    else:
+        ok, msg = execute_disposition(pickup, actor_user=request.user)
+
+    return JsonResponse({'success': ok, 'message' if ok else 'error': msg})
+
+
+@login_required(login_url='/accounts/login/')
+def confirm_pickup_transfer(request):
+    """Target driver confirms an incoming hand-off. POST: pickup_id."""
+    from delivery.models import PickupTask
+    from delivery.services.pickup import confirm_transfer
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    pickup = PickupTask.objects.filter(pk=request.POST.get('pickup_id')).first()
+    if not pickup:
+        return JsonResponse({'success': False, 'error': 'Pickup not found'})
+
+    ok, msg = confirm_transfer(pickup, driver)
+    return JsonResponse({'success': ok, 'message' if ok else 'error': msg})
+
+
+@login_required(login_url='/accounts/login/')
+def pickup_transfer_targets(request):
+    """Approved drivers selectable as transfer targets (excludes self). GET ?q= filter."""
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    q = request.GET.get('q', '').strip()
+    targets = fleet_models.Driver.objects.filter(
+        driver_status='approved').exclude(pk=driver.pk).select_related('profile__user')
+    if q:
+        targets = targets.filter(
+            Q(driver_code__icontains=q)
+            | Q(profile__first_name__icontains=q)
+            | Q(profile__last_name__icontains=q)
+            | Q(profile__user__username__icontains=q)
+        )
+    return JsonResponse({
+        'success': True,
+        'drivers': [
+            {'id': d.pk, 'name': str(d), 'code': d.driver_code}
+            for d in targets.order_by('driver_code')[:30]
+        ],
     })

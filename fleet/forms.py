@@ -34,7 +34,8 @@ class DriverJoinForm(forms.ModelForm):
         exclude = ['user', 'driver_id', 'profile', 'driver_code', 'driver_status', 'driver_rating',
                    'driver_rating_count', 'driver_reviews', 'driver_reviews_count', 'updated_at', 'created_at',
                    'wallet_balance', 'credit_limit', 'cod_in_hand', 'total_earnings', 'pending_earnings',
-                   'last_settlement_date', 'preferred_zone_groups', 'driver_availability', ]
+                   'last_settlement_date', 'preferred_zone_groups', 'driver_availability',
+                   'job_type', 'work_time_slabs', ]
         labels = {
                 "driver_bio": "About Skills & Experience",
                 "has_driver_license": "I have a valid driving license",

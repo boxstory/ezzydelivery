@@ -497,9 +497,25 @@ def wf_dashboard(request):
     published_orders = order_stats['published']
     loc_reconfirm = order_stats['loc_reconfirm']
 
-    # Follow up count - tasks that need attention
+    # Follow up count - same query as tasks_followup_list default view
+    # (active businesses, in-flight statuses, last 7 days)
+    followup_statuses = [
+        'pending', 'assigned', 'accepted', 'picked_up', 'start_ride',
+        'out_for_delivery', 'in_transit', 'contacted', 'non_reachable',
+        'failed', 'rejected',
+    ]
     follow_up_count = DeliveryTask.objects.filter(
-        dl_task_status__in=['failed', 'rescheduled', 'customer_unavailable']
+        order__business__business_status='active',
+        dl_task_status__in=followup_statuses,
+        dl_task_date__gte=today - timedelta(days=7),
+    ).count()
+
+    # Tasks published to task but still pending publish to fleet
+    tasks_to_fleet_count = DeliveryTask.objects.filter(
+        order__business__business_status='active',
+        dl_task_publish=False,
+    ).exclude(
+        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed', 'rejected']
     ).count()
 
     # User Verification pending
@@ -526,9 +542,18 @@ def wf_dashboard(request):
     active_sellers = seller_stats['active']
     pending_sellers = seller_stats['pending']
 
-    # Temp orders pending import
+    # Temp orders pending import — same visibility rules as the temp orders page
+    # (import-enabled businesses only, orphaned source rows excluded)
     from orders.models import TempOrder
-    temp_orders_new = TempOrder.objects.filter(status='new').count()
+    temp_orders_new = TempOrder.objects.filter(
+        status='new',
+        business__temp_order_enabled=True,
+    ).exclude(
+        Q(source_type='onedrive', onedrive_source__isnull=True) |
+        Q(source_type='google_sheet', api_settings__isnull=True) |
+        Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True) |
+        Q(source_type='public_link', public_link_source__isnull=True)
+    ).count()
 
     # Recent orders (last 10 updated)
     orders = Order.objects.select_related('business').order_by('-updated_at')[:10]
@@ -580,6 +605,7 @@ def wf_dashboard(request):
         'published_orders': published_orders,
         'loc_reconfirm': loc_reconfirm,
         'follow_up_count': follow_up_count,
+        'tasks_to_fleet_count': tasks_to_fleet_count,
         # Verification
         'pending_verifications': pending_verifications,
         # Driver/Seller stats
@@ -683,7 +709,7 @@ def all_orders(request):
 
     filter_params = '&'.join(filter_params_list)
 
-    wa_data = _fetch_whatsapp_instances()
+    wa_data = _apply_wa_route(_fetch_whatsapp_instances(), 'orders_tasks')
 
     data = {
         'orders': orders,
@@ -6278,7 +6304,7 @@ def order_detail(request, order_id):
     ).select_related('changed_by').order_by('created_at')
 
     from core.templatetags.custom_filters import whatsapp_number
-    wa_data = _fetch_whatsapp_instances()
+    wa_data = _apply_wa_route(_fetch_whatsapp_instances(), 'orders_tasks')
     wa_default_to = whatsapp_number(order.customer_whatsapp or order.customer_phone)
     wa_default_message = _build_order_whatsapp_message(order)
 
@@ -6457,6 +6483,28 @@ def _fetch_whatsapp_instances():
     return result
 
 
+def _wa_route_instance(section):
+    """Return the active WhatsAppInstance configured for a platform section, or None."""
+    from core.whatsapp_utils import get_route_instance
+    return get_route_instance(section)
+
+
+def _apply_wa_route(wa_data, section):
+    """Limit a _fetch_whatsapp_instances() result to the section's configured sender."""
+    inst = _wa_route_instance(section)
+    if not inst:
+        return wa_data
+    matched = [dict(i, is_default=True) for i in wa_data.get('instances', [])
+               if i['name'] == inst.instance_name]
+    if not matched:
+        # Configured sender missing from the Evolution server: still pin the
+        # dropdown to it so messages never fall through to another number.
+        digits = ''.join(c for c in (inst.phone_number or '') if c.isdigit())
+        matched = [{'name': inst.instance_name, 'number': digits,
+                    'status': '', 'is_default': True, 'connected': False}]
+    return {**wa_data, 'instances': matched, 'default': inst.instance_name}
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def order_whatsapp_defaults(request, order_id):
@@ -6483,7 +6531,10 @@ def _send_order_whatsapp_internal(order, message=None, instance=None, to=None):
     from django.conf import settings as dj_settings
     from core.templatetags.custom_filters import whatsapp_number
 
-    instance = (instance or '').strip() or getattr(dj_settings, 'EVOLUTION_INSTANCE', '')
+    instance = (instance or '').strip()
+    if not instance:
+        route_inst = _wa_route_instance('orders_tasks')
+        instance = route_inst.instance_name if route_inst else getattr(dj_settings, 'EVOLUTION_INSTANCE', '')
     to_raw = (to or '').strip() or order.customer_whatsapp or order.customer_phone
     phone = whatsapp_number(to_raw)
     if not phone:
@@ -7527,6 +7578,15 @@ def delivery_task_detail(request, task_id):
         except Exception:
             pass
 
+    # WhatsApp send modal (Evolution API) — same context as order_detail
+    from core.templatetags.custom_filters import whatsapp_number
+    wa_data = _apply_wa_route(_fetch_whatsapp_instances(), 'orders_tasks')
+    wa_default_to = ''
+    wa_default_message = ''
+    if task.order:
+        wa_default_to = whatsapp_number(task.order.customer_whatsapp or task.order.customer_phone)
+        wa_default_message = _build_order_whatsapp_message(task.order)
+
     context = {
         'page_title': f'Delivery Task #{task.dl_task_number}',
         'task': task,
@@ -7541,6 +7601,11 @@ def delivery_task_detail(request, task_id):
         'pick_list': pick_list,
         'pick_list_items': pick_list_items,
         'payment_split_calc': payment_split_calc,  # Calculated from actual transactions
+        'wa_instances': wa_data['instances'],
+        'wa_default_instance': wa_data['default'],
+        'wa_instances_error': wa_data['error'],
+        'wa_default_to': wa_default_to,
+        'wa_default_message': wa_default_message,
     }
 
     return render(request, 'workforce/parts/delivery_task_detail.html', context)
@@ -7704,14 +7769,33 @@ def unassign_driver_from_task(request, task_id):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def api_drivers_list(request):
-    """API endpoint to get active drivers for dropdowns"""
+    """API endpoint to get active drivers for dropdowns.
+
+    Consumers render `name` verbatim, so availability is baked into the label
+    (available drivers listed first, others suffixed with their status).
+    """
+    from django.db.models import Case, When, Value, IntegerField
     drivers = fleet_models.Driver.objects.select_related('user').filter(
         driver_status='approved'
-    ).order_by('user__first_name')
+    ).annotate(
+        avail_rank=Case(
+            When(driver_availability='available', then=Value(0)),
+            When(driver_availability='on_delivery', then=Value(1)),
+            default=Value(2),
+            output_field=IntegerField(),
+        )
+    ).order_by('avail_rank', 'user__first_name')
     driver_list = []
     for d in drivers:
         name = d.user.get_full_name() or d.user.username
-        driver_list.append({'id': d.pk, 'name': name})  # Use d.pk instead of d.id (driver_id is PK)
+        if d.driver_availability != 'available':
+            name = f"{name} — {d.get_driver_availability_display()}"
+        driver_list.append({
+            'id': d.pk,  # Use d.pk instead of d.id (driver_id is PK)
+            'name': name,
+            'availability': d.driver_availability,
+            'job_type': d.job_type,
+        })
     return JsonResponse({'drivers': driver_list})
 
 
@@ -7986,6 +8070,38 @@ def business_verification_list(request):
     # Paginate
     page_obj = paginate_queryset(request, businesses, items_per_page=50)
 
+    # CRM linkage — open business leads for the "Link CRM Lead" modal, the
+    # already-linked lead per business on this page, and phone variants so the
+    # modal can preselect a lead matching the business's number.
+    from crm import services as crm_services
+    from crm.models import Lead
+    page_ids = [b.pk for b in page_obj]
+    linked_leads = {
+        lead.converted_business_id: lead
+        for lead in Lead.objects.filter(converted_business_id__in=page_ids)
+    }
+    crm_open_leads = []
+    for lead in (
+        Lead.objects.filter(category=Lead.CATEGORY_BUSINESS, converted_business__isnull=True)
+        .exclude(stage__in=Lead.CLOSED_STAGES)
+        .order_by('company_name', 'contact_name')
+    ):
+        normalized = crm_services.normalize_phone(lead.phone)
+        crm_open_leads.append({
+            'pk': lead.pk,
+            'label': lead.company_name or lead.contact_name or lead.phone or f'Lead #{lead.pk}',
+            'phone': lead.phone,
+            'phones': ' '.join(crm_services._phone_variants(normalized)) if normalized else '',
+        })
+    for b in page_obj:
+        b.crm_lead = linked_leads.get(b.pk)
+        variants = set()
+        for value in (b.business_phone, b.business_whatsapp):
+            normalized = crm_services.normalize_phone(value)
+            if normalized:
+                variants.update(crm_services._phone_variants(normalized))
+        b.crm_phones = ' '.join(sorted(variants))
+
     filter_parts = []
     if verification_filter and verification_filter != 'all':
         filter_parts.append(f'status={verification_filter}')
@@ -8005,6 +8121,7 @@ def business_verification_list(request):
         'per_page': get_per_page(request),
         'filter_params': filter_params,
         'total_count': sum(status_counts.values()),
+        'crm_open_leads': crm_open_leads,
     }
     return render(request, 'workforce/business_verification_list.html', context)
 
@@ -8046,6 +8163,21 @@ def driver_verification_list(request):
     drivers = drivers.order_by('-profile__verification_applied_at', '-driver_id')
 
     page_obj = paginate_queryset(request, drivers, items_per_page=50)
+
+    # Manifest annotations — short stamp label + combined readiness reading,
+    # computed here so the template stays free of arithmetic/branching.
+    stamp_labels = {
+        'pending': 'PENDING',
+        'under_review': 'REVIEW',
+        'verified': 'VERIFIED',
+        'rejected': 'REJECTED',
+        'incomplete': 'INCOMPLETE',
+    }
+    for d in page_obj.object_list:
+        profile_pct = d.profile.get_profile_completion_percentage()
+        driver_pct = 100 if d.profile.is_driver_profile_completed else 0
+        d.readiness_pct = round((profile_pct + driver_pct) / 2)
+        d.stamp_label = stamp_labels.get(d.profile.verification_status, 'NEW')
 
     filter_parts = []
     if verification_filter and verification_filter != 'all':
@@ -8292,6 +8424,8 @@ def update_verification_status(request, profile_id):
                     driver = fleet_models.Driver.objects.get(user=profile.user)
                     driver.driver_status = 'approved'
                     driver.save()
+                    # Registered vehicles go live together with the driver
+                    driver.driver_vehicle.filter(vehicle_status='inactive').update(vehicle_status='active')
                     # Fire auto flow for driver approved
                     try:
                         from core.auto_flow_executor import execute_flows_for_trigger
@@ -8319,6 +8453,19 @@ def update_verification_status(request, profile_id):
         elif new_status == 'rejected':
             profile.rejection_reason = rejection_reason
             profile.verified_at = None
+            if profile.is_driver:
+                # Tell the driver on WhatsApp why and how to fix it (flow configured in AutoFlow admin)
+                try:
+                    from core.auto_flow_executor import execute_flows_for_trigger
+                    driver = fleet_models.Driver.objects.filter(user=profile.user).first()
+                    execute_flows_for_trigger('staff_driver_rejected', extra_context={
+                        'driver_name': (f"{profile.first_name or ''} {profile.last_name or ''}".strip()
+                                        or profile.username or ''),
+                        'driver_phone': (driver.driver_phone if driver else '') or profile.phone or '',
+                        'rejection_reason': rejection_reason or '',
+                    })
+                except Exception as e:
+                    logger.warning(f"Auto flow failed for driver rejected {profile.pk}: {e}")
 
         elif new_status == 'under_review':
             profile.verified_at = None
@@ -8436,6 +8583,12 @@ def tasks_followup_list(request):
 
     seven_days_ago = timezone.now().date() - timedelta(days=7)
 
+    # Date range filter — defaults to last 7 days when no dates are given
+    date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
+    date_to = _parse_date_param(request.GET.get('dateTo', '').strip())
+    if not date_from and not date_to:
+        date_from = seven_days_ago
+
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).prefetch_related(
@@ -8443,8 +8596,11 @@ def tasks_followup_list(request):
     ).filter(
         order__business__business_status='active',
         dl_task_status__in=active_statuses,
-        dl_task_date__gte=seven_days_ago,
     )
+    if date_from:
+        tasks_list = tasks_list.filter(dl_task_date__gte=date_from)
+    if date_to:
+        tasks_list = tasks_list.filter(dl_task_date__lte=date_to)
 
     # Optional filters
     status_filters = request.GET.getlist('status')
@@ -8488,6 +8644,10 @@ def tasks_followup_list(request):
         filter_params_nosort += f'&status={s}'
     if driver_filter:
         filter_params_nosort += f'&driver={driver_filter}'
+    if request.GET.get('dateFrom'):
+        filter_params_nosort += f"&dateFrom={request.GET.get('dateFrom')}"
+    if request.GET.get('dateTo'):
+        filter_params_nosort += f"&dateTo={request.GET.get('dateTo')}"
     filter_params = filter_params_nosort
     if sort_param and sort_param != 'updated':
         filter_params += f'&sort={sort_param}'
@@ -8502,6 +8662,8 @@ def tasks_followup_list(request):
         'active_statuses': active_statuses_choices,
         'current_statuses': status_filters,
         'current_driver': driver_filter,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
         'current_sort': current_sort,
         'current_dir': sort_dir,
         'filter_params': filter_params,
@@ -9966,43 +10128,44 @@ def fleet_transactions(request):
     payment_method_filter = request.GET.get('payment_method', '')
     task_search = request.GET.get('task_search', '').strip()
 
-    if selected_driver:
+    def _apply_txn_filters(qs):
+        """Apply every user-selected filter; called after the view tab picks its base set."""
         if date_from:
-            transactions = transactions.filter(created_at__date__gte=date_from)
+            qs = qs.filter(created_at__date__gte=date_from)
         if date_to:
-            transactions = transactions.filter(created_at__date__lte=date_to)
+            qs = qs.filter(created_at__date__lte=date_to)
         if txn_type == 'cod_driver_settle':
             # Include legacy cod_deposit too
-            transactions = transactions.filter(transaction_type__in=['cod_driver_settle', 'cod_deposit'])
+            qs = qs.filter(transaction_type__in=['cod_driver_settle', 'cod_deposit'])
         elif txn_type == 'cod_collection':
-            # Show only COD collection transactions
-            transactions = transactions.filter(transaction_type='cod_collection')
+            qs = qs.filter(transaction_type='cod_collection')
         elif txn_type:
-            transactions = transactions.filter(transaction_type=txn_type)
+            qs = qs.filter(transaction_type=txn_type)
         if status == 'settled':
-            transactions = transactions.filter(settlement__isnull=False)
+            qs = qs.filter(settlement__isnull=False)
         elif status == 'pending':
-            transactions = transactions.filter(settlement__isnull=True)
+            qs = qs.filter(settlement__isnull=True)
         if min_amount:
-            transactions = transactions.filter(amount__gte=min_amount)
+            qs = qs.filter(amount__gte=min_amount)
         if max_amount:
-            transactions = transactions.filter(amount__lte=max_amount)
+            qs = qs.filter(amount__lte=max_amount)
         if business_filter:
-            transactions = transactions.filter(
+            qs = qs.filter(
                 Q(business_id=business_filter) |
                 Q(delivery_task__business_id=business_filter) |
                 Q(delivery_task__order__business_id=business_filter)
             )
         if payment_method_filter:
-            transactions = transactions.filter(
+            qs = qs.filter(
                 Q(payment_method=payment_method_filter) |
                 Q(delivery_task__payment_method=payment_method_filter)
             )
         if task_search:
-            transactions = transactions.filter(
+            qs = qs.filter(
                 Q(delivery_task__dl_task_number__icontains=task_search) |
                 Q(reference_number__icontains=task_search)
             )
+        return qs
 
     # Sorting
     sort_by = request.GET.get('sort', 'date_desc')
@@ -10112,23 +10275,11 @@ def fleet_transactions(request):
             transactions = all_txns.filter(transaction_type__in=['cod_collection', 'cod_driver_settle', 'cod_deposit'])
             view_type = 'cod'
 
-        # Re-apply business and payment method filters after view_type reassignment
-        if business_filter:
-            transactions = transactions.filter(
-                Q(business_id=business_filter) |
-                Q(delivery_task__business_id=business_filter) |
-                Q(delivery_task__order__business_id=business_filter)
-            )
-        if payment_method_filter:
-            transactions = transactions.filter(
-                Q(payment_method=payment_method_filter) |
-                Q(delivery_task__payment_method=payment_method_filter)
-            )
-        if task_search:
-            transactions = transactions.filter(
-                Q(delivery_task__dl_task_number__icontains=task_search) |
-                Q(reference_number__icontains=task_search)
-            )
+        # Re-apply ALL user filters after the view_type reassignment (previously only
+        # business/payment/search survived — date, type, status, amount were dropped)
+        transactions = _apply_txn_filters(transactions).select_related(
+            'delivery_task', 'delivery_task__cod_submission_txn', 'settlement'
+        )
 
         # Apply sort after view_type filter
         transactions = transactions.order_by(sort_options.get(sort_by, '-created_at'))
@@ -10761,6 +10912,7 @@ def fleet_task_cod_correct(request, task_id):
                 f"{' (' + reason + ')' if reason else ''}"
             )
 
+            created_new_txn = False
             if cod_collected:
                 if existing_txn:
                     existing_txn.amount = amount
@@ -10772,6 +10924,7 @@ def fleet_task_cod_correct(request, task_id):
                         'amount', 'payment_method', 'description'
                     ])
                 else:
+                    created_new_txn = True
                     WalletService.record_transaction(
                         driver=task.driver,
                         transaction_type='cod_collection',
@@ -10790,8 +10943,57 @@ def fleet_task_cod_correct(request, task_id):
                 if existing_txn:
                     existing_txn.delete()
 
+            # Sync driver.wallet_balance for the delta in cash liability.
+            # Only cash cod_collection debits wallet_balance (see
+            # WalletService.record_transaction); mirror that rule here so a
+            # correction adjusts the wallet by exactly the change, including
+            # when the payment method itself changes to/from cash.
+            # When a brand-new transaction was just created above, record_transaction()
+            # already applied the new-side debit internally — only the old side
+            # (if any) still needs manual reversal here to avoid double-counting.
+            old_wallet_hit = (
+                old_amount if (old_collected and old_method not in WalletService.ELECTRONIC_METHODS)
+                else Decimal('0')
+            )
+            new_wallet_hit = (
+                amount if (cod_collected and payment_method not in WalletService.ELECTRONIC_METHODS)
+                else Decimal('0')
+            )
+            wallet_delta = new_wallet_hit - old_wallet_hit
+            if created_new_txn:
+                wallet_delta -= new_wallet_hit
+            if wallet_delta != 0:
+                driver = fleet_models.Driver.objects.select_for_update().get(pk=task.driver_id)
+                driver.wallet_balance -= wallet_delta
+                driver.save(update_fields=['wallet_balance'])
+
             # Recalculate driver balances after the change
             WalletService.recalculate_cod_balances(task.driver)
+
+            # cod_in_hand is a denormalization of task truth — refresh it now
+            # that DeliveryTask.cod_collected_amount has changed.
+            WalletService.sync_cod_in_hand(task.driver)
+
+            # Staff-facing task timeline entry (workforce dashboard only — the
+            # client order timeline templates never generically loop over
+            # OrderStatusHistory, so this field_name won't surface there).
+            if task.order:
+                old_display = (
+                    f"{old_amount} QAR ({old_method or 'unknown'})" if old_collected else 'Not collected'
+                )
+                new_display = (
+                    f"{amount} QAR ({payment_method})" if cod_collected else 'Not collected'
+                )
+                orders_models.OrderStatusHistory.objects.create(
+                    order=task.order,
+                    field_name='cod_correction',
+                    old_value=str(old_amount),
+                    new_value=str(amount),
+                    old_display=old_display,
+                    new_display=new_display,
+                    changed_by=request.user,
+                    notes=reason,
+                )
 
             logger.info(
                 "COD correction by %s on task %s (id=%s): collected=%s amount %s→%s method %s→%s",
@@ -12528,6 +12730,13 @@ def sellers_list(request):
     statuses = request.GET.getlist('status')  # multi-select
     verification_statuses = request.GET.getlist('verification')  # multi-select
 
+    # "all" pseudo-status shows everything; with no filters at all, default to active sellers
+    show_all = 'all' in statuses
+    if show_all:
+        statuses = []
+    elif not statuses and not verification_statuses and not search:
+        statuses = ['active']
+
     if search:
         businesses = businesses.filter(
             Q(business_name__icontains=search) |
@@ -12577,6 +12786,8 @@ def sellers_list(request):
         'search': search,
         'selected_statuses': statuses,
         'selected_verifications': verification_statuses,
+        'status': 'all' if show_all else (statuses[0] if len(statuses) == 1 and not verification_statuses else ''),
+        'verification': verification_statuses[0] if len(verification_statuses) == 1 and not statuses else '',
         'status_choices': [
             ('active', 'Active'), ('pending', 'Pending (New)'),
             ('inactive', 'Inactive'), ('suspended', 'Suspended'),
@@ -13545,6 +13756,74 @@ def wf_pickup_location_add(request, business_id):
             'street': loc.pickup_street_no,
             'building': loc.pickup_building_no,
             'status': loc.pickup_status,
+            'lat': str(loc.pickup_lat) if loc.pickup_lat is not None else '',
+            'lon': str(loc.pickup_lon) if loc.pickup_lon is not None else '',
+        }
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def wf_pickup_location_update(request, business_id, location_id):
+    """Staff: edit an existing pickup location for any seller (address, pin, status)."""
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+    loc = get_object_or_404(business_models.PickupLocation, id=location_id, business=business)
+
+    title = request.POST.get('pickup_location_title', '').strip()
+    if not title:
+        return JsonResponse({'success': False, 'error': 'Location title is required'}, status=400)
+
+    def _int_or_none(val):
+        try:
+            return int(val) if val and val.strip() else None
+        except (ValueError, TypeError):
+            return None
+
+    def _dec_or_none(val):
+        try:
+            from decimal import Decimal
+            return Decimal(val) if val and val.strip() else None
+        except Exception:
+            return None
+
+    pickup_status = request.POST.get('pickup_status', loc.pickup_status)
+    if pickup_status not in ('active', 'inactive', 'pending', 'suspended'):
+        pickup_status = loc.pickup_status
+
+    is_default = request.POST.get('is_default') == 'on'
+    if is_default and not loc.is_default:
+        business_models.PickupLocation.objects.filter(
+            business=business, is_default=True
+        ).update(is_default=False)
+
+    loc.pickup_location_title = title
+    loc.locality = request.POST.get('locality', '').strip()
+    loc.pickup_zone_no = _int_or_none(request.POST.get('pickup_zone_no'))
+    loc.pickup_street_no = _int_or_none(request.POST.get('pickup_street_no'))
+    loc.pickup_building_no = _int_or_none(request.POST.get('pickup_building_no'))
+    loc.pickup_lat = _dec_or_none(request.POST.get('pickup_lat'))
+    loc.pickup_lon = _dec_or_none(request.POST.get('pickup_lon'))
+    loc.pickup_status = pickup_status
+    loc.is_fulfilment_center = request.POST.get('is_fulfilment_center') == 'on'
+    loc.is_default = is_default
+    # Cleared/missing pin triggers the QNAS auto-geocode pre_save signal
+    loc.save()
+
+    logger.info("Staff %s updated pickup location %s for business %s", request.user.id, loc.id, business_id)
+    return JsonResponse({
+        'success': True,
+        'message': 'Pickup location updated successfully',
+        'location': {
+            'id': loc.id,
+            'title': loc.pickup_location_title,
+            'locality': loc.locality,
+            'zone': loc.pickup_zone_no,
+            'street': loc.pickup_street_no,
+            'building': loc.pickup_building_no,
+            'status': loc.pickup_status,
+            'lat': str(loc.pickup_lat) if loc.pickup_lat is not None else '',
+            'lon': str(loc.pickup_lon) if loc.pickup_lon is not None else '',
         }
     })
 
@@ -13590,7 +13869,7 @@ def drivers_list(request):
         'user', 'profile'
     ).prefetch_related(
         'driver_vehicle', 'driver_document'
-    ).order_by('-driver_id')
+    )
 
     # Apply search filter
     search = request.GET.get('search', '').strip()
@@ -13604,10 +13883,35 @@ def drivers_list(request):
             Q(driver_phone__icontains=search)
         )
 
-    # Apply status filter (multi-select)
+    # Apply status filter (multi-select); default view is active drivers,
+    # ?all=1 (the Total tally segment) shows everyone
     status_filters = request.GET.getlist('status')
+    show_all = request.GET.get('all') == '1'
+    if not status_filters and not show_all:
+        status_filters = ['approved']
     if status_filters:
         drivers = drivers.filter(driver_status__in=status_filters)
+
+    # Work preference filters (slab keys never substring-collide, so icontains on the CSV is safe)
+    job_type_filter = request.GET.get('job_type', '').strip()
+    if job_type_filter in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):
+        drivers = drivers.filter(job_type=job_type_filter)
+    slab_filter = request.GET.get('slab', '').strip()
+    if slab_filter in dict(fleet_models.WORK_TIME_SLAB_CHOICES):
+        drivers = drivers.filter(work_time_slabs__icontains=slab_filter)
+
+    # Sorting
+    from django.db.models import F
+    from django.db.models.functions import Lower
+    sort = request.GET.get('sort', 'newest')
+    sort_map = {
+        'newest': ('-driver_id',),
+        'oldest': ('driver_id',),
+        'name': (Lower('user__first_name'), Lower('user__last_name')),
+        'rating': (F('driver_rating').desc(nulls_last=True),),
+        'code': ('driver_code',),
+    }
+    drivers = drivers.order_by(*sort_map.get(sort, sort_map['newest']))
 
     # Pagination
     page_obj = paginate_queryset(request, drivers, items_per_page=50)
@@ -13623,10 +13927,21 @@ def drivers_list(request):
         'page_obj': page_obj,
         'search': search,
         'selected_statuses': status_filters,
+        'show_all': show_all,
+        'sort': sort,
+        'sort_choices': [
+            ('newest', 'Newest first'), ('oldest', 'Oldest first'),
+            ('name', 'Name A–Z'), ('rating', 'Rating high–low'),
+            ('code', 'Driver code'),
+        ],
         'status_choices': [
             ('approved', 'Approved'), ('pending', 'Pending'), ('processing', 'Processing'),
             ('rejected', 'Rejected'), ('blocked', 'Blocked'), ('suspended', 'Suspended'),
         ],
+        'job_type_choices': fleet_models.DRIVER_JOB_TYPE_CHOICES,
+        'work_time_slab_choices': fleet_models.WORK_TIME_SLAB_CHOICES,
+        'selected_job_type': job_type_filter,
+        'selected_slab': slab_filter,
         'total_count': total_count,
         'active_count': active_count,
         'pending_count': pending_count,
@@ -13940,6 +14255,9 @@ def driver_detail(request, driver_id):
         'user_is_superadmin': user_is_superadmin,
         'vehicle_type_choices': fleet_models.VEHICLE_CHOICES,
         'document_type_choices': fleet_models.DriverDocument.document_choices,
+        'job_type_choices': fleet_models.DRIVER_JOB_TYPE_CHOICES,
+        'work_time_slab_choices': fleet_models.WORK_TIME_SLAB_CHOICES,
+        'driver_time_slabs': driver.work_time_slab_list,
     }
 
     return render(request, 'workforce/driver_detail.html', context)
@@ -13979,6 +14297,23 @@ def driver_toggle_status(request, driver_id):
     driver.driver_availability = 'offline' if driver.driver_availability == 'available' else 'available'
     driver.save(update_fields=['driver_availability'])
     return JsonResponse({'success': True, 'availability': driver.driver_availability})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_set_work_pref(request, driver_id):
+    """Staff edit of a driver's work preference (job type + preferred time slabs)."""
+    driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
+    if request.method == 'POST':
+        job_type = (request.POST.get('job_type') or '').strip()
+        if job_type in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES) or job_type == '':
+            driver.job_type = job_type
+        valid_slabs = dict(fleet_models.WORK_TIME_SLAB_CHOICES)
+        driver.work_time_slabs = ','.join(
+            s for s in request.POST.getlist('work_time_slabs') if s in valid_slabs)
+        driver.save(update_fields=['job_type', 'work_time_slabs'])
+        messages.success(request, 'Work preference updated.')
+    return redirect('workforce:driver_detail', driver_id=driver.driver_id)
 
 
 @login_required(login_url='/accounts/login/')
@@ -14292,12 +14627,22 @@ def delivery_task_edit(request, task_id):
                 if total_qty and total_qty.isdigit():
                     order.package_qty = int(total_qty)
 
-                # COD details
-                cod_amount = request.POST.get('cod_amount', '0').strip()
-                try:
-                    order.cod_amount = Decimal(cod_amount) if cod_amount else 0
-                except (InvalidOperation, ValueError):
-                    order.cod_amount = 0
+                # COD details — locked once the driver has actually collected,
+                # same rule enforced in update_task_status (workforce/views.py:7925-7936).
+                _profile = get_cached_profile(request)
+                _is_sa = getattr(_profile, 'is_superadmin', False) if _profile else request.user.is_superuser
+                if getattr(order, 'cod_amount_locked', False) and not _is_sa:
+                    messages.warning(
+                        request,
+                        'COD already collected for this order — the quoted amount is locked. '
+                        'To correct the actually-collected amount, use "Edit COD" on the driver transactions page.'
+                    )
+                else:
+                    cod_amount = request.POST.get('cod_amount', '0').strip()
+                    try:
+                        order.cod_amount = Decimal(cod_amount) if cod_amount else 0
+                    except (InvalidOperation, ValueError):
+                        order.cod_amount = 0
 
                 dl_amount = request.POST.get('dl_amount', '0')
                 order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
@@ -15562,33 +15907,6 @@ def pricing_inquiries_list(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
-def whatsapp_inquiries_list(request):
-    """List all WhatsApp quick inquiry submissions."""
-    inquiries = webpages_models.WhatsAppInquiry.objects.all().order_by('-created_at')
-
-    search = request.GET.get('search', '').strip()
-    if search:
-        inquiries = inquiries.filter(
-            Q(company_name__icontains=search) |
-            Q(contact_person__icontains=search) |
-            Q(contact_number__icontains=search) |
-            Q(product_category__icontains=search)
-        )
-
-    total_count = webpages_models.WhatsAppInquiry.objects.count()
-    page_obj = paginate_queryset(request, inquiries, items_per_page=50)
-
-    context = {
-        'page_title': 'WhatsApp Inquiries',
-        'page_obj': page_obj,
-        'search': search,
-        'total_count': total_count,
-    }
-    return render(request, 'workforce/forms/whatsapp_inquiries_list.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
 def pricing_inquiry_detail(request, inquiry_id):
     """Full detail view for a single PricingEnquiry submission."""
     inquiry = get_object_or_404(
@@ -15783,18 +16101,6 @@ def pricing_inquiry_delete_activity(request, inquiry_id, activity_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     activity.delete()
     return JsonResponse({'success': True})
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def whatsapp_inquiry_detail(request, inquiry_id):
-    """Full detail view for a single WhatsAppInquiry submission."""
-    inquiry = get_object_or_404(webpages_models.WhatsAppInquiry, pk=inquiry_id)
-    context = {
-        'page_title': f'WhatsApp Inquiry – {inquiry.company_name}',
-        'inquiry': inquiry,
-    }
-    return render(request, 'workforce/forms/whatsapp_inquiry_detail.html', context)
 
 
 # =============================================================================
@@ -20119,7 +20425,66 @@ def auto_triggers_list(request):
     # Active instances to populate the "Send from" dropdown in the Edit modal.
     wa_instances = WhatsAppInstance.objects.filter(is_active=True)
 
+    # Section → sender routing (which number each part of the platform sends from).
+    from core.models import WhatsAppSenderRoute
+    from django.urls import reverse
+    route_meta = {
+        'orders_tasks': {
+            'description': 'All messages sent from order pages and delivery task pages. '
+                           'Locks the FROM dropdown in the send modal and the automatic '
+                           'address-verification sends to this number.',
+            'action': 'order/task send modal + order pipeline',
+            'links': [
+                ('Orders', reverse('workforce:wf_orders_all')),
+                ('Delivery Tasks', reverse('workforce:dl_list_all')),
+                ('Verification Trigger', '#trigger-row-wa_location_verification'),
+            ],
+        },
+        'crm_leads': {
+            'description': 'Messages sent from CRM lead pages and the WhatsApp leads '
+                           'inbox go out from this number.',
+            'action': 'crm lead pages / WA inbox',
+            'links': [
+                ('Leads Board', reverse('workforce:crm_leads_board')),
+                ('WA Inbox', reverse('workforce:crm_whatsapp_inbox')),
+            ],
+        },
+        'marketing_campaigns': {
+            'description': 'Marketing campaign and promotional broadcast messages go '
+                           'out from this number.',
+            'action': 'campaign / bulk promotional sends',
+            'links': [
+                ('WhatsApp Instances', reverse('workforce:whatsapp_instances_list')),
+            ],
+        },
+        'followups': {
+            'description': 'Automated daily lead follow-up digest reminders sent to '
+                           'staff go out from this number.',
+            'action': 'crm follow-up digest cron',
+            'links': [
+                ('Leads List', reverse('workforce:crm_leads_list')),
+            ],
+        },
+    }
+    route_map = {r.section: r for r in WhatsAppSenderRoute.objects.select_related('instance')}
+    wa_routes = []
+    for key, label in WhatsAppSenderRoute.SECTION_CHOICES:
+        r = route_map.get(key)
+        inst = r.instance if r and r.instance else None
+        is_enabled = r.is_enabled if r else True
+        wa_routes.append({
+            'section': key,
+            'code': f'route_{key}',
+            'label': label,
+            'description': route_meta.get(key, {}).get('description', ''),
+            'action': route_meta.get(key, {}).get('action', ''),
+            'links': route_meta.get(key, {}).get('links', []),
+            'instance': inst,
+            'is_enabled': is_enabled,
+        })
+
     return render(request, 'workforce/auto_triggers_list.html', {
+        'wa_routes': wa_routes,
         'wa_triggers': wa_triggers,
         'wh_triggers': wh_triggers,
         'sys_triggers': sys_triggers,
@@ -20840,6 +21205,51 @@ def auto_trigger_update(request):
 
 @login_required(login_url='account_login')
 @superuser_required
+def whatsapp_sender_routes_save(request):
+    """Save one section → sender instance route (Auto Triggers edit modal)."""
+    from core.models import WhatsAppSenderRoute, WhatsAppInstance
+    if request.method == 'POST':
+        section = request.POST.get('section', '').strip()
+        if section in dict(WhatsAppSenderRoute.SECTION_CHOICES):
+            inst_id = request.POST.get('route_instance', '').strip()
+            inst = None
+            if inst_id:
+                inst = WhatsAppInstance.objects.filter(id=inst_id, is_active=True).first()
+            WhatsAppSenderRoute.objects.update_or_create(
+                section=section, defaults={'instance': inst})
+    return redirect('workforce:auto_triggers_list')
+
+
+@login_required(login_url='account_login')
+@superuser_required
+def whatsapp_sender_route_toggle(request):
+    """Toggle a sender route on/off via AJAX (off = section unrestricted)."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as json_lib
+    from core.models import WhatsAppSenderRoute
+    try:
+        body = json_lib.loads(request.body)
+    except (json_lib.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    section = body.get('section', '')
+    if section not in dict(WhatsAppSenderRoute.SECTION_CHOICES):
+        return JsonResponse({'success': False, 'error': 'Unknown section'}, status=400)
+
+    route, _ = WhatsAppSenderRoute.objects.get_or_create(section=section)
+    route.is_enabled = not route.is_enabled
+    route.save(update_fields=['is_enabled', 'updated_at'])
+    return JsonResponse({
+        'success': True,
+        'section': section,
+        'is_enabled': route.is_enabled,
+        'has_instance': bool(route.instance_id),
+    })
+
+
+@login_required(login_url='account_login')
+@superuser_required
 def whatsapp_instances_list(request):
     """List, add, edit, delete WhatsApp instances."""
     if request.method == 'POST':
@@ -20872,9 +21282,50 @@ def whatsapp_instances_list(request):
 
         return redirect('workforce:whatsapp_instances_list')
 
-    instances = core_models.WhatsAppInstance.objects.all()
+    # Auto-sync with Evolution API: create rows for instances that exist on the
+    # server but not in the DB; flag DB rows that no longer exist on the server.
+    wa_data = _fetch_whatsapp_instances()
+    sync_error = wa_data.get('error')
+    evo_by_name = {i['name']: i for i in wa_data.get('instances', [])}
+
+    def _digits(s):
+        return ''.join(c for c in (s or '') if c.isdigit())
+
+    if not sync_error:
+        existing = list(core_models.WhatsAppInstance.objects.values_list(
+            'instance_name', 'phone_number'))
+        existing_names = {name for name, _ in existing}
+        existing_numbers = {_digits(num) for _, num in existing if _digits(num)}
+        for evo in wa_data.get('instances', []):
+            if evo['name'] in existing_names:
+                continue
+            if evo['number'] and _digits(evo['number']) in existing_numbers:
+                # Same number already saved under a different instance name
+                continue
+            core_models.WhatsAppInstance.objects.create(
+                label=evo['number'] or evo['name'],
+                instance_name=evo['name'],
+                phone_number=evo['number'],
+                is_default=False,
+                is_active=True,
+            )
+
+    instances = list(core_models.WhatsAppInstance.objects.all())
+    for inst in instances:
+        evo = evo_by_name.get(inst.instance_name)
+        if sync_error:
+            inst.live_state = 'unknown'
+            inst.live_status = ''
+        elif not evo:
+            inst.live_state = 'missing'
+            inst.live_status = ''
+        else:
+            inst.live_state = 'connected' if evo['connected'] else 'disconnected'
+            inst.live_status = evo.get('status', '')
+
     return render(request, 'workforce/whatsapp_instances_list.html', {
         'instances': instances,
+        'sync_error': sync_error,
     })
 
 
@@ -22261,10 +22712,41 @@ def view_user_driver_profile(request, profile_id):
 
     completion_percentage = profile.get_driver_profile_completion_percentage()
 
+    documents = []
+    vehicles = []
+    registration_location = None
+    if driver:
+        documents = list(
+            driver.driver_document.exclude(document_file='').order_by('document_type')
+        )
+        vehicles = list(driver.driver_vehicle.all())
+        registration_location = (driver.driver_meta or {}).get('registration_location')
+
+    # Vetting checklist — one row per requirement the reviewer must confirm
+    checklist = []
+    if driver:
+        checklist = [
+            {'label': 'Phone', 'ok': bool(driver.driver_phone), 'anchor': 'dvp-details'},
+            {'label': 'WhatsApp', 'ok': bool(driver.driver_whatsapp), 'anchor': 'dvp-details'},
+            {'label': 'License number', 'ok': bool(driver.driver_license_number), 'anchor': 'dvp-details'},
+            {'label': 'Languages', 'ok': bool(driver.driver_languages), 'anchor': 'dvp-details'},
+            {'label': 'Work preference', 'ok': bool(driver.job_type), 'anchor': 'dvp-details'},
+            {'label': 'Skills & experience', 'ok': bool(driver.driver_bio), 'anchor': 'dvp-details'},
+            {'label': 'Identity documents', 'ok': len(documents) > 0, 'anchor': 'dvp-docs'},
+            {'label': 'Vehicle', 'ok': len(vehicles) > 0, 'anchor': 'dvp-vehicles'},
+            {'label': 'Registration location', 'ok': bool(registration_location), 'anchor': 'dvp-location'},
+        ]
+    checklist_met = sum(1 for item in checklist if item['ok'])
+
     context = {
         'profile': profile,
         'driver': driver,
         'completion_percentage': completion_percentage,
+        'documents': documents,
+        'vehicles': vehicles,
+        'registration_location': registration_location,
+        'checklist': checklist,
+        'checklist_met': checklist_met,
     }
 
     return render(request, 'workforce/view_driver_profile.html', context)
@@ -22674,3 +23156,301 @@ def wf_ai_models_api(request):
 
     cache.set(cache_key, models, timeout=3600)
     return JsonResponse({'models': models, 'cached': False})
+
+
+# FIRST-MILE PICKUP AUTOMATION CONFIG --------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def pickup_automation_list(request):
+    """Staff page: per-business first-mile pickup config (enabled, mode, disposition)."""
+    from django.db.models import Count, Q as _Q, Prefetch
+
+    search = request.GET.get('search', '').strip()
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).annotate(
+        active_fleet_count=Count(
+            'driver_directory',
+            filter=_Q(driver_directory__is_active=True,
+                      driver_directory__driver__driver_status='approved'),
+            distinct=True,
+        ),
+    ).prefetch_related(
+        Prefetch(
+            'driver_directory',
+            queryset=business_models.DriverDirectory.objects.filter(
+                is_active=True, driver__driver_status='approved',
+            ).select_related('driver__profile__user'),
+            to_attr='active_fleet',
+        ),
+    ).order_by('business_name')
+    if search:
+        businesses = businesses.filter(business_name__icontains=search)
+
+    context = {
+        'businesses': businesses,
+        'search': search,
+        'enabled_count': business_models.Business.objects.filter(
+            business_status='active', pickup_task_enabled=True).count(),
+    }
+    return render(request, 'workforce/pickup_automation_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pickup_automation_save(request):
+    """Save one business row's pickup config (per-row save — no bulk untick footgun)."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    business = business_models.Business.objects.filter(
+        business_id=request.POST.get('business_id')).first()
+    if not business:
+        return JsonResponse({'success': False, 'error': 'Business not found'})
+
+    enabled = request.POST.get('enabled') == '1'
+    mode = request.POST.get('mode')
+    disposition = request.POST.get('disposition')
+    if mode not in dict(business_models.Business.PICKUP_MODE_CHOICES):
+        return JsonResponse({'success': False, 'error': 'Invalid pickup mode'})
+    if disposition not in dict(business_models.Business.PICKUP_DISPOSITION_CHOICES):
+        return JsonResponse({'success': False, 'error': 'Invalid disposition'})
+
+    old = (business.pickup_task_enabled, business.pickup_mode_default,
+           business.pickup_disposition_default)
+    business.pickup_task_enabled = enabled
+    business.pickup_mode_default = mode
+    business.pickup_disposition_default = disposition
+    business.save(update_fields=[
+        'pickup_task_enabled', 'pickup_mode_default', 'pickup_disposition_default'])
+
+    if old != (enabled, mode, disposition):
+        logger.info(
+            f"[pickup-automation] {request.user.username} set "
+            f"{business.business_name} ({business.business_id}): "
+            f"enabled={enabled}, mode={mode}, disposition={disposition} (was {old})"
+        )
+    return JsonResponse({'success': True})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pickup_fleet_list(request, business_id):
+    """JSON: a business's pickup-allowed drivers (DriverDirectory rows)."""
+    business = business_models.Business.objects.filter(business_id=business_id).first()
+    if not business:
+        return JsonResponse({'success': False, 'error': 'Business not found'})
+
+    rows = business_models.DriverDirectory.objects.filter(
+        business=business
+    ).select_related('driver__profile__user').order_by('-is_active', 'driver__driver_code')
+    return JsonResponse({
+        'success': True,
+        'drivers': [
+            {
+                'id': row.id,
+                'driver_id': row.driver_id,
+                'name': str(row.driver),
+                'code': row.driver.driver_code or '',
+                'status': row.driver.driver_status,
+                'is_active': row.is_active,
+            }
+            for row in rows
+        ],
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pickup_fleet_driver_search(request):
+    """JSON: approved drivers matching ?q= (to add to a business fleet)."""
+    from django.db.models import Q as _Q
+
+    q = request.GET.get('q', '').strip()
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='approved').select_related('profile__user')
+    if q:
+        drivers = drivers.filter(
+            _Q(driver_code__icontains=q)
+            | _Q(profile__first_name__icontains=q)
+            | _Q(profile__last_name__icontains=q)
+            | _Q(profile__user__username__icontains=q)
+        )
+    return JsonResponse({
+        'success': True,
+        'drivers': [
+            {'id': d.pk, 'name': str(d), 'code': d.driver_code or ''}
+            for d in drivers.order_by('driver_code')[:20]
+        ],
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pickup_fleet_update(request):
+    """
+    Mutate a business's pickup fleet. POST action:
+      add    (business_id, driver_id)  — link a driver
+      toggle (row_id)                  — flip is_active
+      remove (row_id)                  — delete the link
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    action = request.POST.get('action')
+
+    if action == 'add':
+        business = business_models.Business.objects.filter(
+            business_id=request.POST.get('business_id')).first()
+        driver = fleet_models.Driver.objects.filter(
+            pk=request.POST.get('driver_id'), driver_status='approved').first()
+        if not business or not driver:
+            return JsonResponse({'success': False, 'error': 'Business or driver not found'})
+        row, created = business_models.DriverDirectory.objects.get_or_create(
+            business=business, driver=driver)
+        if not created and not row.is_active:
+            row.is_active = True
+            row.save(update_fields=['is_active'])
+        logger.info(
+            f"[pickup-fleet] {request.user.username} added driver {driver.driver_code} "
+            f"to {business.business_name} ({business.business_id})"
+        )
+        return JsonResponse({'success': True, 'created': created})
+
+    row = business_models.DriverDirectory.objects.filter(
+        pk=request.POST.get('row_id')).select_related('business', 'driver').first()
+    if not row:
+        return JsonResponse({'success': False, 'error': 'Fleet entry not found'})
+
+    if action == 'toggle':
+        row.is_active = not row.is_active
+        row.save(update_fields=['is_active'])
+        logger.info(
+            f"[pickup-fleet] {request.user.username} set driver {row.driver.driver_code} "
+            f"{'active' if row.is_active else 'inactive'} for {row.business.business_name}"
+        )
+        return JsonResponse({'success': True, 'is_active': row.is_active})
+
+    if action == 'remove':
+        logger.info(
+            f"[pickup-fleet] {request.user.username} removed driver {row.driver.driver_code} "
+            f"from {row.business.business_name} ({row.business.business_id})"
+        )
+        row.delete()
+        return JsonResponse({'success': True})
+
+    return JsonResponse({'success': False, 'error': 'Unknown action'})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def pickup_pool_status(request):
+    """Staff pickup pool — all first-mile pickup tasks with filters and assign actions."""
+    from delivery.models import PickupTask
+    from django.core.paginator import Paginator
+    from django.db.models import Count
+
+    status_filter = request.GET.get('status', 'all')
+    mode_filter = request.GET.get('mode', 'all')
+    search = request.GET.get('search', '').strip()
+
+    qs = PickupTask.objects.select_related(
+        'order', 'business', 'pickup_location', 'driver',
+        'transfer_to_driver', 'drop_warehouse__warehouse',
+    ).order_by('-id')
+
+    status_counts = dict(
+        PickupTask.objects.values_list('status').annotate(cnt=Count('id')))
+    active_statuses = ['pending', 'accepted', 'in_progress', 'arrived', 'collected']
+
+    if status_filter == 'active':
+        qs = qs.filter(status__in=active_statuses)
+    elif status_filter != 'all':
+        qs = qs.filter(status=status_filter)
+    if mode_filter != 'all':
+        qs = qs.filter(pickup_mode=mode_filter)
+    if search:
+        qs = qs.filter(
+            Q(order__order_number__icontains=search)
+            | Q(business__business_name__icontains=search)
+            | Q(driver__driver_code__icontains=search)
+        )
+
+    paginator = Paginator(qs, 30)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    context = {
+        'page_obj': page_obj,
+        'pickups': page_obj.object_list,
+        'status_filter': status_filter,
+        'mode_filter': mode_filter,
+        'search': search,
+        'status_counts': status_counts,
+        'pending_count': status_counts.get('pending', 0),
+        'active_count': sum(status_counts.get(s, 0) for s in active_statuses),
+        'status_choices': PickupTask.PICKUP_STATUS_CHOICES,
+    }
+    return render(request, 'workforce/pickup_pool_status.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pickup_staff_assign(request):
+    """Staff assigns/reassigns a driver on a pickup task. POST: pickup_id, driver_id."""
+    from delivery.models import PickupTask
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    pickup = PickupTask.objects.select_related('order', 'driver').filter(
+        pk=request.POST.get('pickup_id')).first()
+    if not pickup:
+        return JsonResponse({'success': False, 'error': 'Pickup not found'})
+    if pickup.status not in ('pending', 'accepted', 'in_progress', 'arrived'):
+        return JsonResponse({'success': False, 'error': f'Cannot assign in status {pickup.status}'})
+
+    driver = fleet_models.Driver.objects.filter(
+        pk=request.POST.get('driver_id'), driver_status='approved').first()
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Approved driver not found'})
+    if pickup.driver_id == driver.pk:
+        return JsonResponse({'success': False, 'error': 'Already assigned to this driver'})
+
+    previous = pickup.driver
+    old_status = pickup.status
+    pickup.driver = driver
+    pickup.status = 'accepted'
+    pickup.accepted_at = timezone.now()
+    pickup.save(update_fields=['driver', 'status', 'accepted_at', 'updated_at'])
+
+    from delivery.services.pickup import log_pickup_history
+    log_pickup_history(
+        pickup, old_status, 'accepted', actor=request.user,
+        notes=f"Staff assigned {driver}" + (f" (was {previous})" if previous else ""))
+
+    fleet_models.DriverNotification.objects.create(
+        driver=driver,
+        title='Pickup assigned to you',
+        message=(
+            f"Staff assigned you pickup {pickup.order.order_number} — collect from "
+            f"{pickup.pickup_location.pickup_location_title if pickup.pickup_location else pickup.business.business_name}."
+        ),
+        notification_type='pickup_available',
+    )
+    if previous:
+        fleet_models.DriverNotification.objects.create(
+            driver=previous,
+            title='Pickup reassigned',
+            message=f"Pickup {pickup.order.order_number} was reassigned to another driver by staff.",
+            notification_type='alert',
+        )
+    logger.info(
+        f"[pickup-assign] {request.user.username} assigned pickup {pickup.pk} "
+        f"({pickup.order.order_number}) to {driver.driver_code}"
+        + (f" (was {previous.driver_code})" if previous else "")
+    )
+    return JsonResponse({'success': True})
