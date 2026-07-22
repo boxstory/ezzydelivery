@@ -1,135 +1,227 @@
-/* ==========================================================================
-   CAREERS PAGE - BEM Convention
-   Block: wpk (webpages-careers)
-   ========================================================================== */
+/* Purpose: Careers page — hiring-manifest design (navy hero + route, waybill role rows, dispatch-note form)
+   Used by: webpages/templates/webpages/careers.html (block prefix wpk__)
+   Notes: yellow accent budget = hero kicker + submit button only; Bootstrap handles layout, this file is visual only */
 
+/* ---------- Hero: navy manifest header ---------- */
 .wpk__hero {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  padding: 2rem 0;
-  border-bottom: 4px solid var(--brand-primary);
+    background: var(--brand-gradient-navy);
+    color: var(--brand-white);
+    padding: 3.5rem 0 3rem;
+}
+.wpk__hero-kicker {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: var(--brand-primary);
+}
+.wpk__hero-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: clamp(2.1rem, 5vw, 3.25rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--brand-white);
+}
+.wpk__hero-sub {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.72);
+    max-width: 34rem;
 }
 
-.wpk__badge {
-  display: inline-block;
-  background: var(--brand-navy);
-  color: white;
-  padding: 0.5rem 1.5rem;
-  border-radius: 3.125rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.0938rem;
-  margin-bottom: 1rem;
+/* Hiring route: true sequence, drawn on load */
+.wpk__route {
+    position: relative;
+    max-width: 40rem;
+}
+.wpk__route-line {
+    position: absolute;
+    top: 5px;
+    left: 4px;
+    right: 4px;
+    height: 0;
+    border-top: 1px dashed rgba(255, 255, 255, 0.35);
+}
+.wpk__route-stop {
+    position: relative;
+}
+.wpk__route-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--brand-navy);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+}
+.wpk__route-stop--last .wpk__route-dot {
+    background: var(--brand-white);
+}
+.wpk__route-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: nowrap;
+}
+.wpk__route-hint {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.45);
+}
+/* ---------- Section heads: ledger style ---------- */
+.wpk__section-head {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--brand-grey-500);
+    border-bottom: 1px solid var(--brand-grey-800);
+    padding-bottom: 0.4rem;
+}
+.wpk__section-head-count {
+    color: var(--brand-grey-800);
 }
 
-.wpk__job-card {
-  background: white;
-  border-radius: 1rem;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-  border: 0.125rem solid #e9ecef;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+/* ---------- Role rows: waybill entries ---------- */
+.wpk__role {
+    border-bottom: 1px solid var(--brand-grey-200);
+    padding: 1.1rem 0.25rem;
+    transition: background 0.2s ease;
+}
+.wpk__role:hover {
+    background: var(--brand-grey-50);
+}
+.wpk__role-ref {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--brand-grey-400);
+    letter-spacing: 0.06em;
+}
+.wpk__role-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    letter-spacing: -0.01em;
+}
+.wpk__role-meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    color: var(--brand-grey-500);
+}
+.wpk__role-desc {
+    font-size: 0.83rem;
+    color: var(--brand-grey-600);
+    max-width: 30rem;
+}
+.wpk__role-apply {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--brand-navy);
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--brand-grey-300);
+    padding-bottom: 1px;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+.wpk__role-apply:hover {
+    color: var(--brand-navy-light);
+    border-color: var(--brand-navy);
 }
 
-.wpk__job-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0.25rem;
-  height: 100%;
-  background: var(--brand-primary);
-  transform: scaleY(0);
-  transition: transform 0.3s ease;
+/* ---------- Terms grid: quiet, no icons ---------- */
+.wpk__term {
+    border-left: 2px solid var(--brand-grey-200);
+    padding-left: 0.75rem;
+}
+.wpk__term-label {
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--brand-grey-500);
+}
+.wpk__term-text {
+    font-size: 0.8rem;
+    color: var(--brand-grey-700);
 }
 
-.wpk__job-card:hover::before {
-  transform: scaleY(1);
+/* ---------- Dispatch-note form ---------- */
+.wpk__note {
+    background: var(--brand-white);
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    overflow: hidden;
 }
-
-.wpk__job-card:hover {
-  border-color: var(--brand-primary);
-  box-shadow: 0 0.625rem 1.875rem rgba(0, 0, 0, 0.1);
-  transform: translateX(0.3125rem);
+.wpk__note-head {
+    background: var(--brand-navy);
+    color: var(--brand-white);
+    padding: 0.9rem 1.25rem;
 }
-
-.wpk__job-title {
-  font-weight: 700;
-  color: var(--brand-navy);
-  margin-bottom: 0.75rem;
+.wpk__note-ref {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.55);
 }
-
-.wpk__job-badge {
-  display: inline-block;
-  background: var(--brand-secondary);
-  color: var(--brand-navy);
-  padding: 0.25rem 0.75rem;
-  border-radius: 1.25rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-right: 0.5rem;
+.wpk__note-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--brand-white);
 }
-
-.wpk__form-card {
-  background: white;
-  border-radius: 1rem;
-  padding: 2.5rem;
-  box-shadow: 0 0.25rem 0.375rem -1px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 1.25rem;
+.wpk__note-body {
+    padding: 1.25rem;
 }
-
-.wpk__form-card .form-control,
-.wpk__form-card .form-select {
-  border-radius: 0.5rem;
-  border: 0.125rem solid #e9ecef;
-  padding: 0.75rem 1rem;
-  transition: all 0.3s ease;
+.wpk__note-body label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--brand-grey-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
-
-.wpk__form-card .form-control:focus,
-.wpk__form-card .form-select:focus {
-  border-color: var(--brand-primary);
-  box-shadow: 0 0 0 0.2rem rgba(247, 192, 0, 0.2);
+.wpk__note-body .form-control,
+.wpk__note-body textarea {
+    font-size: 0.85rem;
+    border-color: var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
 }
-
+.wpk__note-body .form-control:focus,
+.wpk__note-body textarea:focus {
+    border-color: var(--brand-primary);
+    box-shadow: none;
+}
+.wpk__note-body .asteriskField {
+    color: var(--brand-grey-400);
+}
 .wpk__submit-btn {
-  background: var(--brand-navy);
-  color: white;
-  border: none;
-  padding: 0.875rem 2rem;
-  font-weight: 600;
-  letter-spacing: 0.0312rem;
-  border-radius: 0.5rem;
-  transition: all 0.3s ease;
+    background: var(--brand-primary);
+    color: var(--brand-grey-800);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border: 0;
+    border-radius: var(--brand-radius-sm);
+    padding: 0.7rem 1rem;
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
-
 .wpk__submit-btn:hover {
-  background: var(--brand-primary);
-  color: var(--brand-navy);
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(247, 192, 0, 0.3);
+    background: var(--brand-primary-dark);
+    color: var(--brand-grey-800);
+    transform: translateY(-1px);
+    box-shadow: var(--brand-shadow-sm);
+}
+.wpk__note-foot {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: var(--brand-grey-400);
 }
 
-.wpk__benefit-item {
-  display: flex;
-  align-items: start;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 0.75rem;
-}
-
-.wpk__benefit-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  background: var(--brand-primary);
-  color: var(--brand-navy);
-  border-radius: 0.625rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 1rem;
-  flex-shrink: 0;
+/* Sticky form on desktop */
+@media (min-width: 992px) {
+    .wpk__note-wrap {
+        position: sticky;
+        top: 5.5rem;
+    }
 }

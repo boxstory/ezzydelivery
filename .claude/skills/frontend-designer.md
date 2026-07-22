@@ -2153,6 +2153,8 @@ In the workforce sidebar, the count badge (`.wf-sidebar__badge` with `ms-auto me
 
 ## Supporting Design Skills
 
+**Always load `.claude/skills/brandkit.md` first** — canonical tokens + brand component recipes. It applies to every skill below *and* to the built-in `/frontend-design:frontend-design` plugin skill (which can't be edited, so the Brand Kit rides in via brandkit.md).
+
 Installed alongside this skill in `.claude/skills/` — invoke them for deeper craft passes:
 
 | Skill | When to use |

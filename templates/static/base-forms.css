@@ -1,13 +1,6 @@
-/* ============================================
-   BASE FORM STYLES - CENTRALIZED
-   All form styling for the entire application
-   ============================================ */
-
-/**
- * Form Styles - Centralized Form Components
- * Modern, polished UI for Business dashboard forms (teams, locations, API settings)
- * Version: 2.0 - Complete redesign with enhanced visual design
- */
+/* Purpose: Centralized form system — enterprise "dispatch note" register: ink on white, hairlines, navy ledger rule, yellow reserved for focus/identity
+   Used by: all dashboard bases (wf/fleet/wh/business) + core registration templates; selectors are load-bearing, restyle values only
+   Notes: single focus system (yellow border + focus-visible outline); no gradients, glows, or focus transforms by design */
 
 /* ============================================
    FORM CONTAINER & LAYOUT
@@ -20,70 +13,68 @@
 }
 
 /* ============================================
-   FORM HEADER - ENHANCED
+   FORM HEADER
    ============================================ */
 
 .form-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
   flex-wrap: wrap;
   gap: 1rem;
 }
 
 .form-header h1 {
-  font-size: 2rem;
+  font-size: 1.375rem;
   font-weight: 700;
-  color: #1f1f1f;
+  color: var(--brand-grey-800, #1f1f1f);
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  letter-spacing: -0.0312rem;
+  gap: 0.75rem;
+  letter-spacing: -0.01em;
 }
 
 .form-header h1 i {
-  width: 3rem;
-  height: 3rem;
-  background: linear-gradient(135deg, #f7c000 0%, #e6b000 100%);
-  border-radius: 0.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: var(--brand-navy, #001f3f);
+  border-radius: var(--brand-radius-sm, 0.5rem);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1f1f1f;
-  
-  box-shadow: 0 0.25rem 1rem rgba(247, 192, 0, 0.25);
+  color: var(--brand-white, #fff);
+  font-size: 1rem;
 }
 
 /* ============================================
-   BACK LINK - ENHANCED
+   BACK LINK
    ============================================ */
 
 .back-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: #1f1f1f;
+  color: var(--brand-grey-700, #333);
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.875rem;
-  padding: 0.75rem 1.25rem;
-  background: #fff;
-  border: 0.125rem solid #e8e8e8;
-  border-radius: 0.625rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.8125rem;
+  padding: 0.625rem 1rem;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .back-link:hover {
-  background: #1f1f1f;
-  border-color: #1f1f1f;
-  color: #fff;
-  transform: translateX(-0.25rem);
+  background: var(--brand-grey-50, #f8f9fa);
+  border-color: var(--brand-navy, #001f3f);
+  color: var(--brand-navy, #001f3f);
 }
 
 .back-link i {
-  transition: transform 0.3s ease;
+  transition: transform 0.2s ease;
 }
 
 .back-link:hover i {
@@ -91,125 +82,103 @@
 }
 
 /* ============================================
-   FORM CARD STRUCTURE - MODERN DESIGN
+   FORM CARD STRUCTURE
    ============================================ */
 
 .form-card {
-  background: #fff;
-  border-radius: 1rem;
-  box-shadow: 0 0.25rem 1.5rem rgba(0, 0, 0, 0.08), 0 0.125rem 0.5rem rgba(0, 0, 0, 0.04);
+  background: var(--brand-white, #fff);
+  border-radius: var(--brand-radius-md, 0.75rem);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
   overflow: hidden;
-  border: 1px solid #f0f0f0;
-  transition: all 0.3s ease;
 }
 
 .form-card:hover {
-  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.12), 0 0.25rem 0.75rem rgba(0, 0, 0, 0.06);
+  box-shadow: none;
 }
 
 /* ============================================
-   FORM CARD HEADER - GRADIENT DESIGN
+   FORM CARD HEADER — the ledger rule
    ============================================ */
 
 .form-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-bottom: 0.125rem solid #e0e0e0;
-  position: relative;
-  overflow: hidden;
-}
-
-.form-card-header::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  right: -10%;
-  width: 12.5rem;
-  height: 12.5rem;
-  background: radial-gradient(
-    circle,
-    rgba(247, 192, 0, 0.08) 0%,
-    transparent 70%
-  );
-  border-radius: 50%;
+  padding: 1.1rem 1.5rem;
+  background: var(--brand-white, #fff);
+  border-bottom: 2px solid var(--brand-navy, #001f3f);
 }
 
 .form-card-header h2 {
-  font-size: 1.125rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #1f1f1f;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand-navy, #001f3f);
   margin: 0;
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  position: relative;
-  z-index: 1;
 }
 
 .form-card-header h2 i {
-  color: #f7c000;
-  font-size: 1.125rem;
+  color: var(--brand-primary, #f7c000);
+  font-size: 0.9rem;
 }
 
 /* ============================================
-   STATUS BADGES - ENHANCED
+   STATUS BADGES — semantic bg + text pairs
    ============================================ */
 
 .status-badge {
-  padding: 0.5rem 1rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 3.125rem;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.0312rem;
+  letter-spacing: 0.04em;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  position: relative;
-  z-index: 1;
-  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
+  gap: 0.4rem;
 }
 
 .status-badge i {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
 }
 
 .status-badge--active,
 .status-badge.active {
-  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-  color: #155724;
+  background: var(--brand-success-bg, #dcfce7);
+  color: var(--brand-success-dark, #065f46);
 }
 
 .status-badge--inactive,
 .status-badge.inactive {
-  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-  color: #721c24;
+  background: var(--brand-danger-bg, #fef2f2);
+  color: var(--brand-danger-dark, #991b1b);
 }
 
 .status-badge--verified,
 .status-badge.verified {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: #fff;
+  background: var(--brand-success-bg, #dcfce7);
+  color: var(--brand-success-dark, #065f46);
 }
 
 .status-badge--not-verified,
 .status-badge.not-verified {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  color: #fff;
+  background: var(--brand-warning-bg, #fef3c7);
+  color: var(--brand-warning-text, #92400e);
 }
 
 /* BEM size modifiers */
 .status-badge--sm {
-  padding: 0.25rem 0.625rem;
-  font-size: 0.6875rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.65rem;
 }
 
 .status-badge--lg {
-  padding: 0.625rem 1.25rem;
-  font-size: 0.8125rem;
+  padding: 0.45rem 1rem;
+  font-size: 0.75rem;
 }
 
 /* BEM prefix element */
@@ -219,33 +188,34 @@
 }
 
 /* ============================================
-   FORM CARD BODY - ENHANCED SPACING
+   FORM CARD BODY
    ============================================ */
 
 .form-card-body {
-  padding: 2rem;
-  background: #fff;
+  padding: 1.75rem;
+  background: var(--brand-white, #fff);
 }
 
 .form-card-body .form-group {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .form-card-body .form-group:last-child {
   margin-bottom: 0;
 }
 
-/* Enhanced Label Styling */
+/* Labels: the paperwork voice — small caps, quiet */
 .form-card-body label {
-  font-weight: 700;
-  color: #1f1f1f;
-  margin-bottom: 0.625rem;
-  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--brand-grey-600, #555);
+  margin-bottom: 0.4rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   display: block;
-  letter-spacing: 0.0187rem;
 }
 
-/* Enhanced Form Controls */
+/* Form controls: hairline, calm */
 .form-card-body .form-control,
 .form-card-body .form-select,
 .form-card-body input[type="text"],
@@ -254,12 +224,13 @@
 .form-card-body input[type="number"],
 .form-card-body textarea,
 .form-card-body select {
-  border: 0.125rem solid #e8e8e8;
-  border-radius: 0.625rem;
-  padding: 0.875rem 1.125rem;
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: #fff;
+  color: var(--brand-grey-800, #1f1f1f);
+  transition: border-color 0.2s ease;
+  background-color: var(--brand-white, #fff);
   width: 100%;
 }
 
@@ -268,10 +239,9 @@
 .form-card-body input:focus,
 .form-card-body textarea:focus,
 .form-card-body select:focus {
-  border-color: #f7c000;
-  box-shadow: 0 0 0 0.25rem rgba(247, 192, 0, 0.12);
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
   outline: none;
-  transform: translateY(-0.0625rem);
 }
 
 /* Textarea Specific */
@@ -283,28 +253,28 @@
 /* Form Help Text */
 .form-card-body .form-text,
 .form-card-body .helptext {
-  font-size: 0.8125rem;
-  color: #666;
-  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--brand-grey-500, #6c757d);
+  margin-top: 0.4rem;
   display: block;
   line-height: 1.5;
 }
 
 /* ============================================
-   FORM CARD FOOTER - MODERN ACTIONS
+   FORM CARD FOOTER
    ============================================ */
 
 .form-card-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
-  padding: 1.5rem 2rem;
-  background: #fafafa;
-  border-top: 0.125rem solid #f0f0f0;
+  gap: 0.75rem;
+  padding: 1.1rem 1.5rem;
+  background: var(--brand-grey-50, #f8f9fa);
+  border-top: 1px solid var(--brand-grey-200, #f0f0f0);
 }
 
 /* ============================================
-   FORM BUTTONS - ENHANCED DESIGN
+   FORM BUTTONS
    ============================================ */
 
 .btn-cancel {
@@ -312,24 +282,22 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.875rem 1.75rem;
-  background: #fff;
-  color: #555;
-  border: 0.125rem solid #e8e8e8;
-  border-radius: 0.625rem;
+  padding: 0.625rem 1.375rem;
+  background: var(--brand-white, #fff);
+  color: var(--brand-grey-700, #333);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   text-decoration: none;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
 }
 
 .btn-cancel:hover {
-  background: #f8f9fa;
-  border-color: #d0d0d0;
-  color: #1f1f1f;
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+  background: var(--brand-grey-100, #fafafa);
+  border-color: var(--brand-grey-400, #b0b0b0);
+  color: var(--brand-grey-800, #1f1f1f);
 }
 
 .btn-submit {
@@ -337,22 +305,23 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.875rem 1.75rem;
-  background: linear-gradient(135deg, #f7c000 0%, #e6b000 100%);
-  color: #1f1f1f;
+  padding: 0.625rem 1.5rem;
+  background: var(--brand-navy, #001f3f);
+  color: var(--brand-white, #fff);
   border: none;
-  border-radius: 0.625rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0.25rem 1rem rgba(247, 192, 0, 0.3);
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-submit:hover {
-  background: linear-gradient(135deg, #e6b000 0%, #d4a000 100%);
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.375rem 1.5rem rgba(247, 192, 0, 0.4);
+  background: var(--brand-navy-light, #003366);
+  color: var(--brand-white, #fff);
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-sm, 0 0.0625rem 0.1875rem rgba(0, 0, 0, 0.08));
 }
 
 .btn-submit:active {
@@ -360,71 +329,71 @@
 }
 
 /* ============================================
-   FORM NOTES & ALERTS - MODERN GRADIENTS
+   FORM NOTES — flat semantic, ledger flag
    ============================================ */
 
 .form-info-note {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-  border: 0.125rem solid #93c5fd;
-  border-radius: 0.75rem;
-  padding: 1.25rem 1.5rem;
+  background: var(--brand-info-bg, #eff6ff);
+  border: 1px solid #bfdbfe;
+  border-left: 3px solid var(--brand-info, #2563eb);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 1rem 1.25rem;
   margin-top: 1.5rem;
-  box-shadow: 0 0.125rem 0.5rem rgba(59, 130, 246, 0.1);
 }
 
 .form-info-note-title {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
   font-weight: 700;
-  color: #1e40af;
-  margin-bottom: 0.625rem;
-  font-size: 0.875rem;
+  color: var(--brand-info-dark, #1e40af);
+  margin-bottom: 0.4rem;
+  font-size: 0.8125rem;
 }
 
 .form-info-note-title i {
-  font-size: 1.125rem;
+  font-size: 0.9rem;
 }
 
 .form-info-note-text {
-  color: #1e3a8a;
-  font-size: 0.875rem;
+  color: var(--brand-info-dark, #1e40af);
+  font-size: 0.8125rem;
   margin: 0;
   line-height: 1.6;
 }
 
 .form-warning-note {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border: 0.125rem solid #fcd34d;
-  border-radius: 0.75rem;
-  padding: 1.25rem 1.5rem;
+  background: var(--brand-warning-bg, #fef3c7);
+  border: 1px solid #fde68a;
+  border-left: 3px solid var(--brand-warning, #d97706);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 1rem 1.25rem;
   margin-top: 1.5rem;
-  box-shadow: 0 0.125rem 0.5rem rgba(245, 158, 11, 0.1);
 }
 
 .form-warning-note-title {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
   font-weight: 700;
-  color: #92400e;
-  margin-bottom: 0.625rem;
-  font-size: 0.875rem;
+  color: var(--brand-warning-text, #92400e);
+  margin-bottom: 0.4rem;
+  font-size: 0.8125rem;
 }
 
 .form-warning-note-title i {
-  font-size: 1.125rem;
+  font-size: 0.9rem;
 }
 
 .form-warning-note-text {
-  color: #92400e;
-  font-size: 0.875rem;
+  color: var(--brand-warning-text, #92400e);
+  font-size: 0.8125rem;
   margin: 0;
   line-height: 1.6;
 }
 
 /* ============================================
-   CHECKBOX & RADIO ENHANCEMENTS
+   CHECKBOX & RADIO
    ============================================ */
 
 .form-card-body .form-check {
@@ -435,55 +404,59 @@
 .form-card-body .form-check-input {
   width: 1.25rem;
   height: 1.25rem;
-  border: 0.125rem solid #e8e8e8;
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
   margin-right: 0.75rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .form-card-body .form-check-input:checked {
-  background-color: #f7c000;
-  border-color: #f7c000;
+  background-color: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
 }
 
 .form-card-body .form-check-input:focus {
-  box-shadow: 0 0 0 0.25rem rgba(247, 192, 0, 0.12);
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.25);
 }
 
 .form-card-body .form-check-label {
   font-weight: 500;
-  color: #333;
+  color: var(--brand-grey-700, #333);
   cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.8125rem;
 }
 
 /* ============================================
    RADIO BUTTON PILL STYLES (Crispy Forms Bootstrap 5)
-   Styled pill buttons for RadioSelect widgets
+   Quiet segmented choices — navy checked state
    Uses high specificity selectors to override mobile-app.css
    without !important
    ============================================ */
 
 /* CSS Custom Properties for Radio Pills - easily overridable */
 :root {
-  --radio-pill-gap: 0.75rem;
-  --radio-pill-padding-y: 0.625rem;
-  --radio-pill-padding-x: 1.5rem;
-  --radio-pill-border-width: 2px;
+  --radio-pill-gap: 0.5rem;
+  --radio-pill-padding-y: 0.5rem;
+  --radio-pill-padding-x: 1.125rem;
+  --radio-pill-border-width: 1px;
   --radio-pill-border-color: var(--brand-grey-300, #dcdcdc);
-  --radio-pill-border-radius: var(--brand-radius-md, 12px);
+  --radio-pill-border-radius: var(--brand-radius-sm, 0.5rem);
   --radio-pill-bg: var(--brand-white, #fff);
   --radio-pill-color: var(--brand-grey-600, #555);
   --radio-pill-font-weight: 500;
-  --radio-pill-font-size: 0.875rem;
+  --radio-pill-font-size: 0.8125rem;
   --radio-pill-min-width: 5.5rem;
-  --radio-pill-hover-border: var(--brand-primary, #f7c000);
-  --radio-pill-hover-bg: rgba(247, 192, 0, 0.08);
+  --radio-pill-hover-border: var(--brand-navy, #001f3f);
+  --radio-pill-hover-bg: var(--brand-grey-50, #f8f9fa);
   --radio-pill-hover-color: var(--brand-grey-800, #1f1f1f);
-  --radio-pill-checked-bg: linear-gradient(135deg, var(--brand-primary, #f7c000) 0%, var(--brand-primary-dark, #e6b000) 100%);
-  --radio-pill-checked-border: var(--brand-primary, #f7c000);
-  --radio-pill-checked-color: var(--brand-grey-800, #1f1f1f);
-  --radio-pill-checked-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
-  --radio-pill-focus-shadow: 0 0 0 4px rgba(247, 192, 0, 0.25);
+  --radio-pill-checked-bg: var(--brand-navy, #001f3f);
+  --radio-pill-checked-border: var(--brand-navy, #001f3f);
+  --radio-pill-checked-color: var(--brand-white, #fff);
+  --radio-pill-checked-shadow: none;
+  --radio-pill-focus-shadow: 0 0 0 3px rgba(247, 192, 0, 0.35);
 }
 
 /* Radio select container - make horizontal
@@ -546,11 +519,13 @@ div[id^="div_id_delivery_type"] > .form-check > input.form-check-input[type="rad
   font-weight: var(--radio-pill-font-weight);
   font-size: var(--radio-pill-font-size);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   min-width: var(--radio-pill-min-width);
   text-align: center;
   margin: 0;
   line-height: 1.4;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* Hover state */
@@ -632,35 +607,35 @@ div[id^="div_id_delivery_type"] > .form-check > input.form-check-input[type="rad
 .form-container .checkbox-toggle-container .form-check .form-check-input[type="checkbox"] {
   width: 1.375rem;
   height: 1.375rem;
-  border: 2px solid var(--brand-grey-300, #dcdcdc);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
   border-radius: 0.375rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
   margin-right: 0.75rem;
   flex-shrink: 0;
-  accent-color: var(--brand-primary, #f7c000);
+  accent-color: var(--brand-navy, #001f3f);
 }
 
 .form-card-body #div_id_task_created .form-check .form-check-input[type="checkbox"]:hover,
 .form-card-body .checkbox-toggle-container .form-check .form-check-input[type="checkbox"]:hover,
 .form-container #div_id_task_created .form-check .form-check-input[type="checkbox"]:hover,
 .form-container .checkbox-toggle-container .form-check .form-check-input[type="checkbox"]:hover {
-  border-color: var(--brand-primary, #f7c000);
+  border-color: var(--brand-navy, #001f3f);
 }
 
 .form-card-body #div_id_task_created .form-check .form-check-input[type="checkbox"]:checked,
 .form-card-body .checkbox-toggle-container .form-check .form-check-input[type="checkbox"]:checked,
 .form-container #div_id_task_created .form-check .form-check-input[type="checkbox"]:checked,
 .form-container .checkbox-toggle-container .form-check .form-check-input[type="checkbox"]:checked {
-  background-color: var(--brand-primary, #f7c000);
-  border-color: var(--brand-primary, #f7c000);
+  background-color: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
 }
 
 .form-card-body #div_id_task_created .form-check .form-check-input[type="checkbox"]:focus,
 .form-card-body .checkbox-toggle-container .form-check .form-check-input[type="checkbox"]:focus,
 .form-container #div_id_task_created .form-check .form-check-input[type="checkbox"]:focus,
 .form-container .checkbox-toggle-container .form-check .form-check-input[type="checkbox"]:focus {
-  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.2);
+  box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.3);
   outline: none;
 }
 
@@ -671,16 +646,17 @@ div[id^="div_id_delivery_type"] > .form-check > input.form-check-input[type="rad
   cursor: pointer;
   font-weight: 500;
   color: var(--brand-grey-700, #333);
-  font-size: .75rem;
+  font-size: 0.8125rem;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* ============================================
    SELECT & FORM CONTROL FOCUS STYLES
-   Subtle focus states for all form inputs
+   One system: yellow border, no glow
    High specificity via container class to avoid !important
    ============================================ */
 
-/* Standard form controls - subtle focus with high specificity */
 .form-card-body .form-control:focus,
 .form-card-body .form-select:focus,
 .form-card-body select:focus,
@@ -697,13 +673,13 @@ div[id^="div_id_delivery_type"] > .form-check > input.form-check-input[type="rad
 .form-container input[type="tel"]:focus,
 .form-container input[type="email"]:focus,
 .form-container textarea:focus {
-  border-color: var(--brand-grey-400, #b0b0b0);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
   outline: none;
 }
 
 /* ============================================
-   SELECT2 INTEGRATION - ENHANCED
+   SELECT2 INTEGRATION
    High specificity selectors to override Select2 defaults
    ============================================ */
 
@@ -711,12 +687,12 @@ div[id^="div_id_delivery_type"] > .form-check > input.form-check-input[type="rad
 .form-card-body .select2-container--default .select2-selection--single,
 .form-container .select2-container--default .select2-selection--single,
 body .select2-container--default.select2-container .select2-selection--single {
-  border: 2px solid var(--brand-grey-300, #dcdcdc);
-  border-radius: 0.625rem;
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
   height: auto;
   padding: 0 !important;
-  transition: all 0.3s ease;
-  background: #fff;
+  transition: border-color 0.2s ease;
+  background: var(--brand-white, #fff);
 }
 
 /* Select2 focus states */
@@ -726,15 +702,15 @@ body .select2-container--default.select2-container .select2-selection--single {
 .form-container .select2-container--default .select2-selection--single:focus,
 .form-container .select2-container--default.select2-container--focus .select2-selection--single,
 .form-container .select2-container--default.select2-container--open .select2-selection--single {
-  border-color: var(--brand-grey-400, #b0b0b0);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
   outline: none;
 }
 
 .select2-container--default .select2-selection--single .select2-selection__rendered {
   line-height: 1.5;
   padding-left: 0;
-  color: #1f1f1f;
+  color: var(--brand-grey-800, #1f1f1f);
   font-size: 0.875rem;
 }
 
@@ -745,19 +721,19 @@ body .select2-container--default.select2-container .select2-selection--single {
 
 /* Select2 dropdown - uses body-level specificity since dropdown appends to body */
 body .select2-container--default .select2-dropdown {
-  border: 2px solid var(--brand-grey-300, #dcdcdc);
-  border-radius: 0.625rem;
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  box-shadow: var(--brand-shadow-md, 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1));
   margin-top: 4px;
 }
 
 body .select2-container--default .select2-results__option--highlighted[aria-selected] {
-  background-color: var(--brand-primary, #f7c000);
-  color: #1f1f1f;
+  background-color: var(--brand-navy, #001f3f);
+  color: var(--brand-white, #fff);
 }
 
 body .select2-container--default .select2-results__option--selected {
-  background-color: rgba(247, 192, 0, 0.15);
+  background-color: var(--brand-secondary, #fff7d6);
 }
 
 /* ============================================
@@ -771,25 +747,27 @@ body .select2-container--default .select2-results__option--selected {
 }
 
 .field-group {
-  background: #f8f9fa;
-  border: 0.125rem solid #e8e8e8;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
+  background: var(--brand-grey-50, #f8f9fa);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 1.25rem;
   margin-bottom: 1.5rem;
 }
 
 .field-group-title {
-  font-size: .75rem;
-  font-weight: 700;
-  color: #1f1f1f;
-  margin: 0 0 1.25rem 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  margin: 0 0 1rem 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .field-group-title i {
-  color: #f7c000;
+  color: var(--brand-navy, #001f3f);
 }
 
 /* ============================================
@@ -804,7 +782,7 @@ input.is-invalid,
 select.is-invalid,
 textarea.is-invalid,
 .error {
-  border-color: #dc3545;
+  border-color: var(--brand-danger, #dc2626);
 }
 
 .form-control.is-invalid:focus,
@@ -813,27 +791,27 @@ input.is-invalid:focus,
 select.is-invalid:focus,
 textarea.is-invalid:focus,
 .error:focus {
-  border-color: #dc3545;
-  box-shadow: 0 0 0 0.1875rem rgba(220, 53, 69, 0.15);
+  border-color: var(--brand-danger, #dc2626);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
 }
 
 /* Global inline error message styling */
 .invalid-feedback,
 .error-message {
   display: block;
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  color: var(--brand-danger, #dc2626);
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
   font-weight: 500;
 }
 
 /* Django default errorlist styling - global */
 ul.errorlist {
-  color: #dc3545;
-  font-size: 0.875rem;
+  color: var(--brand-danger, #dc2626);
+  font-size: 0.75rem;
   list-style: none;
   padding: 0;
-  margin: 0.25rem 0 0 0;
+  margin: 0.3rem 0 0 0;
 }
 
 ul.errorlist li {
@@ -842,17 +820,17 @@ ul.errorlist li {
 
 /* text-danger error divs used in some templates */
 .text-danger.small {
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  color: var(--brand-danger, #dc2626);
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
   display: block;
 }
 
 /* Order update error class */
 .ou__error {
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  color: var(--brand-danger, #dc2626);
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
 }
 
 /* ============================================
@@ -872,7 +850,7 @@ ul.errorlist li {
   right: 1rem;
   width: 1.25rem;
   height: 1.25rem;
-  border: 0.1875rem solid #f7c000;
+  border: 0.1875rem solid var(--brand-navy, #001f3f);
   border-radius: 50%;
   border-top-color: transparent;
   animation: spin 0.8s linear infinite;
@@ -901,18 +879,18 @@ ul.errorlist li {
   }
 
   .form-header h1 {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
 
   .form-header h1 i {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1.125rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 0.9rem;
   }
 
   /* Form card adjustments */
   .form-card-header {
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.25rem;
   }
 
   .form-card-body {
@@ -920,7 +898,7 @@ ul.errorlist li {
   }
 
   .form-card-footer {
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.25rem;
     flex-direction: column;
   }
 
@@ -973,7 +951,6 @@ ul.errorlist li {
   button[type="submit"],
   button[type="button"],
   input[type="submit"] {
-    /* min-height: 44px; */
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
   }
@@ -1001,7 +978,7 @@ ul.errorlist li {
   .form-card-body label {
     display: block;
     width: 100%;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
   }
 
   /* Select2 container adjustments - !important required because Select2 sets inline width via JS */
@@ -1011,7 +988,7 @@ ul.errorlist li {
 
   /* Field group responsive */
   .field-group {
-    padding: 1.25rem;
+    padding: 1.1rem;
     margin-bottom: 1.25rem;
   }
 }
@@ -1026,32 +1003,27 @@ ul.errorlist li {
     padding: 1rem 0.75rem;
   }
 
-  /* Smaller heading on mobile */
-  .form-header h1 {
-    
-  }
-
   .form-header h1 i {
-    width: 2.25rem;
-    height: 2.25rem;
-    font-size: .75rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.8rem;
   }
 
   /* Reduced border radius for tighter mobile look */
   .form-card {
-    border-radius: 0.75rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
   }
 
   /* Stacked header on small screens */
   .form-card-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+    gap: 0.75rem;
     padding: 1rem;
   }
 
   .form-card-header h2 {
-    font-size: .75rem;
+    font-size: 0.75rem;
   }
 
   /* Compact body padding */
@@ -1068,8 +1040,8 @@ ul.errorlist li {
   .form-card-body label {
     display: block;
     width: 100%;
-    font-size: 0.8125rem;
-    margin-bottom: 0.375rem;
+    font-size: 0.7rem;
+    margin-bottom: 0.35rem;
   }
 
   /* Compact form controls with full width */
@@ -1081,7 +1053,7 @@ ul.errorlist li {
   .form-card-body input[type="number"],
   .form-card-body textarea,
   .form-card-body select {
-    padding: 0.75rem 1rem;
+    padding: 0.625rem 0.875rem;
     font-size: 16px; /* iOS zoom prevention */
     width: 100%;
   }
@@ -1103,7 +1075,7 @@ ul.errorlist li {
     width: 100%;
     min-height: 44px;
     padding: 0.75rem 1.25rem;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
   }
 
   /* Back link - touch target */
@@ -1117,44 +1089,42 @@ ul.errorlist li {
   .field-group {
     padding: 1rem;
     margin-bottom: 1rem;
-    border-radius: 0.625rem;
   }
 
   .field-group-title {
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
+    font-size: 0.7rem;
+    margin-bottom: 0.875rem;
   }
 
   /* Status badge - compact on mobile */
   .status-badge {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.6875rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.65rem;
   }
 
   /* Form notes - compact */
   .form-info-note,
   .form-warning-note {
-    padding: 1rem;
-    border-radius: 0.625rem;
+    padding: 0.875rem 1rem;
     margin-top: 1rem;
   }
 
   .form-info-note-title,
   .form-warning-note-title {
-    font-size: 0.875rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.8125rem;
+    margin-bottom: 0.4rem;
   }
 
   .form-info-note-text,
   .form-warning-note-text {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
   }
 
   /* Help text - slightly smaller */
   .form-card-body .form-text,
   .form-card-body .helptext {
-    font-size: 0.75rem;
-    margin-top: 0.375rem;
+    font-size: 0.7rem;
+    margin-top: 0.35rem;
   }
 
   /* Checkbox and radio - touch friendly */
@@ -1170,7 +1140,7 @@ ul.errorlist li {
   }
 
   .form-card-body .form-check-label {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
   }
 
   /* Select2 - ensure full width - !important required because Select2 sets inline width via JS */
@@ -1196,64 +1166,53 @@ ul.errorlist li {
   .form-control {
     transition: none;
   }
+
+  .btn-submit:hover {
+    transform: none;
+  }
 }
 
 /* ============================================
    FOCUS INDICATORS FOR ACCESSIBILITY
-   Visible focus states for keyboard navigation
+   Keyboard-visible, one yellow system
    ============================================ */
 
 /* Button focus indicators */
-.btn:focus,
 .btn:focus-visible {
-  outline: 2px solid var(--brand-primary, #0d6efd);
+  outline: 2px solid var(--brand-primary, #f7c000);
   outline-offset: 2px;
 }
 
-/* Form control focus indicators */
-.form-control:focus,
-.form-select:focus {
-  outline: 2px solid var(--brand-primary, #0d6efd);
+/* Form control keyboard focus */
+.form-control:focus-visible,
+.form-select:focus-visible {
+  outline: 2px solid var(--brand-primary, #f7c000);
   outline-offset: 1px;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
 /* Link focus indicators */
 a:focus-visible {
-  outline: 2px solid var(--brand-primary, #0d6efd);
+  outline: 2px solid var(--brand-primary, #f7c000);
   outline-offset: 2px;
 }
 
-/* Form card specific focus indicators */
-.form-card-body .form-control:focus-visible,
-.form-card-body .form-select:focus-visible {
-  outline: 0.1875rem solid #f7c000;
-  outline-offset: 0.125rem;
-  box-shadow: 0 0 0 0.2rem rgba(247, 192, 0, 0.25);
-}
-
 /* Submit and cancel button focus */
-.btn-submit:focus,
 .btn-submit:focus-visible,
-.btn-cancel:focus,
 .btn-cancel:focus-visible {
-  outline: 0.1875rem solid #f7c000;
-  outline-offset: 0.125rem;
+  outline: 2px solid var(--brand-primary, #f7c000);
+  outline-offset: 2px;
 }
 
 /* Back link focus */
-.back-link:focus,
 .back-link:focus-visible {
   outline: 2px solid var(--brand-primary, #f7c000);
   outline-offset: 2px;
 }
 
 /* Checkbox and radio focus */
-.form-check-input:focus,
 .form-check-input:focus-visible {
   outline: 2px solid var(--brand-primary, #f7c000);
   outline-offset: 2px;
-  box-shadow: 0 0 0 0.2rem rgba(247, 192, 0, 0.25);
 }
 
 /* Select2 focus */
@@ -1266,10 +1225,10 @@ a:focus-visible {
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   .form-card {
-    border: 0.125rem solid #1f1f1f;
+    border: 0.125rem solid var(--brand-grey-800, #1f1f1f);
   }
 
   .btn-submit {
-    border: 0.125rem solid #1f1f1f;
+    border: 0.125rem solid var(--brand-grey-800, #1f1f1f);
   }
 }

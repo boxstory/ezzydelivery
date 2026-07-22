@@ -33,8 +33,8 @@ Every element you create MUST pass:
 ## File Locations
 | Type | Location |
 |------|----------|
-| Brand Kit | `webpages/static/webpages/css/brand-kit.css` |
-| Brand Tokens | `webpages/static/webpages/css/brandkit-tokens.css` |
+| Brand Kit | `webpages/static/webpages/css/brandkit.css` (+ `brandkit-components.css`, `brandkit-overrides.css`) |
+| Brand Kit skill | `.claude/skills/brandkit.md` — full token table + component recipes |
 | Base Template | `templates/base.html` |
 | Dashboard Base | `templates/wf_dashboard_base.html` |
 | App CSS | `{app}/static/{app}/css/*.css` |
@@ -51,7 +51,7 @@ Then bump version: `?v=YYYYMMDDx` in the template `<link>` tag
 ---
 
 ## Brand Tokens
-Full token reference → `.claude/skills/frontend-designer.md` (Brand Identity section).
+**Full token table + brand component recipes → `.claude/skills/brandkit.md` (canonical — load it for any styling work).** Extended brand identity narrative → `.claude/skills/frontend-designer.md`.
 
 **Quick reference:**
 ```css

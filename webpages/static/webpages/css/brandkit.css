@@ -26,6 +26,7 @@
   --brand-grey-600: #555;
   --brand-grey-700: #333;
   --brand-grey-800: #1f1f1f;
+  --brand-grey-900: #111111;   /* referenced by 10+ page stylesheets; was undefined (computed to `unset`) */
   --brand-white: #ffffff;
 
   /* Semantic State Colors */
@@ -87,7 +88,7 @@
   --brand-transition: all 0.3s ease;
 
   /* Legacy Compatibility Variables (for older code) */
-  --brand-yellow: #ffd33b;
+  --brand-yellow: var(--brand-primary);   /* legacy alias — must match the one true brand yellow */
   --brand-grey: #333;
   --border-color: #dcdcdc;
   --bg-primary: #ffffff;
@@ -126,6 +127,7 @@ h1, h2, h3, h4, h5, h6 {
 h1 { font-size: 2rem; }
 h2 { font-size: 1.75rem; }
 h3 { font-size: 1.5rem; }
+h4 { font-size: 1.25rem; }
 h5 { font-size: 1rem; }
 h6 { font-size: 1rem; }
 
@@ -406,7 +408,7 @@ input[type="checkbox"].form-check-input:hover {
 input[type="checkbox"].form-check-input:focus {
   border-color: var(--brand-primary) !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(255, 211, 59, 0.3) !important;
+  box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.3) !important;
 }
 
 .form-check-input:checked,
@@ -450,7 +452,7 @@ input[type="checkbox"].form-check-input:indeterminate::after {
 input:focus, select:focus, textarea:focus {
   border-color: var(--brand-primary);
   outline: none;
-  box-shadow: 0 0 0 0.1875rem rgba(255, 211, 59, 0.3);
+  box-shadow: 0 0 0 0.1875rem rgba(247, 192, 0, 0.3);
 }
 
 input::placeholder, textarea::placeholder {
@@ -652,12 +654,12 @@ label {
 
 .stat-card__change--positive,
 .stat-card-change.positive {
-  color: #38ef7d;
+  color: var(--brand-success-light);
 }
 
 .stat-card__change--negative,
 .stat-card-change.negative {
-  color: #ff6b6b;
+  color: var(--brand-danger);
 }
 
 /* ---------- TOASTS ---------- */
@@ -945,16 +947,16 @@ label {
    =============================== */
 
 :root {
-  --bs-primary: #ffd33b !important;
-  --bs-primary-rgb: 255, 211, 59 !important;
+  --bs-primary: #f7c000 !important;
+  --bs-primary-rgb: 247, 192, 0 !important;
   --bs-secondary: #f0f0f0 !important;
   --bs-secondary-rgb: 240, 240, 240 !important;
   --bs-success: #38ef7d !important;
   --bs-success-rgb: 56, 239, 125 !important;
   --bs-danger: #ff6b6b !important;
   --bs-danger-rgb: 255, 107, 107 !important;
-  --bs-warning: #ffd33b !important;
-  --bs-warning-rgb: 255, 211, 59 !important;
+  --bs-warning: #f7c000 !important;
+  --bs-warning-rgb: 247, 192, 0 !important;
   --bs-info: #667eea !important;
   --bs-info-rgb: 102, 126, 234 !important;
   --bs-light: #fafafa !important;
@@ -978,8 +980,8 @@ label {
   --bs-body-color-rgb: 51, 51, 51 !important;
   --bs-body-bg: #fafafa !important;
   --bs-body-bg-rgb: 250, 250, 250 !important;
-  --bs-link-color: #ffd33b !important;
-  --bs-link-color-rgb: 255, 211, 59 !important;
+  --bs-link-color: #f7c000 !important;
+  --bs-link-color-rgb: 247, 192, 0 !important;
   --bs-link-hover-color: #f4c20d !important;
   --bs-link-hover-color-rgb: 244, 194, 13 !important;
   --bs-border-color: #dcdcdc !important;
@@ -1157,24 +1159,26 @@ label {
 
 /* Form Controls */
 .form-control { border: 1px solid var(--brand-grey-300) !important; border-radius: var(--brand-radius-sm) !important; transition: var(--brand-transition); }
-.form-control:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(255, 211, 59, 0.3) !important; }
+.form-control:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(247, 192, 0, 0.3) !important; }
 .form-select { border: 1px solid var(--brand-grey-300) !important; border-radius: var(--brand-radius-sm) !important; transition: var(--brand-transition); }
-.form-select:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(255, 211, 59, 0.3) !important; }
+.form-select:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(247, 192, 0, 0.3) !important; }
 
 /* Enhanced Form Check Inputs */
 .form-check-input[type="radio"] { width: 1.25rem !important; height: 1.25rem !important; border: 0.125rem solid var(--brand-grey-400) !important; cursor: pointer !important; transition: all 0.3s ease !important; margin-left: 0 !important; }
-.form-check-input[type="radio"]:hover { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(255, 211, 59, 0.1) !important; }
+.form-check-input[type="radio"]:hover { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(247, 192, 0, 0.1) !important; }
 .form-check-input[type="radio"]:checked { background-color: var(--brand-primary) !important; border-color: var(--brand-primary) !important; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%23000'/%3e%3c/svg%3e") !important; }
-.form-check-input[type="radio"]:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.25rem rgba(255, 211, 59, 0.2) !important; }
+.form-check-input[type="radio"]:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.25rem rgba(247, 192, 0, 0.2) !important; }
 
 .form-check-input[type="checkbox"] { width: 1.25rem !important; height: 1.25rem !important; border: 0.125rem solid var(--brand-grey-400) !important; border-radius: var(--brand-radius-sm) !important; cursor: pointer !important; transition: all 0.3s ease !important; margin-left: 0 !important; }
-.form-check-input[type="checkbox"]:hover { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(255, 211, 59, 0.1) !important; }
+.form-check-input[type="checkbox"]:hover { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.1875rem rgba(247, 192, 0, 0.1) !important; }
 .form-check-input[type="checkbox"]:checked { background-color: var(--brand-primary) !important; border-color: var(--brand-primary) !important; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important; }
-.form-check-input[type="checkbox"]:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.25rem rgba(255, 211, 59, 0.2) !important; }
+.form-check-input[type="checkbox"]:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.25rem rgba(247, 192, 0, 0.2) !important; }
 
-.form-check-label { cursor: pointer !important; font-weight: 500 !important; color: var(--brand-grey-700) !important; transition: color 0.3s ease !important; user-select: none !important; }
-.form-check-label:hover { color: var(--brand-grey-900) !important; }
-.form-check-input:checked ~ .form-check-label { color: var(--brand-grey-900) !important; font-weight: 600 !important; }
+/* No !important here: page-level chip/segment designs must be able to restyle labels
+   (the forced color broke selected chips that fill with a dark background) */
+.form-check-label { cursor: pointer; font-weight: 500; color: var(--brand-grey-700); transition: color 0.3s ease; user-select: none; }
+.form-check-label:hover { color: var(--brand-grey-900); }
+.form-check-input:checked ~ .form-check-label { color: var(--brand-grey-900); font-weight: 600; }
 
 /* Button-styled Radio/Checkbox */
 .btn-check:checked + .btn-outline-dark,
@@ -1184,24 +1188,24 @@ label {
   border-color: var(--brand-primary) !important;
   color: var(--brand-grey-800) !important;
   font-weight: 700 !important;
-  box-shadow: 0 0.25rem 0.75rem rgba(255, 211, 59, 0.3) !important;
+  box-shadow: 0 0.25rem 0.75rem rgba(247, 192, 0, 0.3) !important;
 }
 .btn-check + .btn-outline-dark:hover,
 .btn-check + .btn-outline-primary:hover,
 .btn-check + .btn-outline-secondary:hover {
   border-color: var(--brand-primary) !important;
   color: var(--brand-primary) !important;
-  background-color: rgba(255, 211, 59, 0.05) !important;
+  background-color: rgba(247, 192, 0, 0.05) !important;
 }
 
 /* Form Switch */
 .form-switch .form-check-input { width: 2rem !important; height: 1.5rem !important; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(0,0,0,0.25)'/%3e%3c/svg%3e") !important; background-color: var(--brand-grey-300) !important; border: 0.125rem solid var(--brand-grey-400) !important; cursor: pointer !important; transition: all 0.3s ease !important; }
 .form-switch .form-check-input:hover { background-color: var(--brand-grey-400) !important; }
 .form-switch .form-check-input:checked { background-color: var(--brand-primary) !important; border-color: var(--brand-primary) !important; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23000'/%3e%3c/svg%3e") !important; }
-.form-switch .form-check-input:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.25rem rgba(255, 211, 59, 0.2) !important; }
+.form-switch .form-check-input:focus { border-color: var(--brand-primary) !important; box-shadow: 0 0 0 0.25rem rgba(247, 192, 0, 0.2) !important; }
 
-/* Nav Tabs */
-.nav-tabs .nav-link.active { background-color: var(--brand-grey) !important; border-color: var(--brand-grey-300) var(--brand-grey-300) var(--brand-white) !important; color: var(--brand-grey-800) !important; }
+/* Nav Tabs — active tab is white paper joined to the pane (was --brand-grey #333: dark text on dark bg) */
+.nav-tabs .nav-link.active { background-color: var(--brand-white) !important; border-color: var(--brand-grey-300) var(--brand-grey-300) var(--brand-white) !important; color: var(--brand-grey-800) !important; }
 .nav-tabs .nav-link:hover { border-color: var(--brand-grey-300) !important; color: var(--brand-grey-800) !important; }
 
 /* Nav Pills */
@@ -1268,10 +1272,11 @@ label {
 .text-white { --bs-text-opacity: 1 !important; color: var(--brand-white) !important; }
 .text-primary { color: var(--brand-primary) !important; --bs-text-opacity: 1 !important; }
 .text-secondary { color: var(--brand-grey-600) !important; --bs-text-opacity: 1 !important; }
-.text-success { color: #38ef7d !important; --bs-text-opacity: 1 !important; }
-.text-danger { color: #ff6b6b !important; --bs-text-opacity: 1 !important; }
-.text-warning { color: #d4a200 !important; --bs-text-opacity: 1 !important; }
-.text-info { color: #667eea !important; --bs-text-opacity: 1 !important; }
+/* Semantic text uses the AA-safe tokens — the old neon hexes (#38ef7d 1.9:1, #ff6b6b 2.9:1) failed on white */
+.text-success { color: var(--brand-success) !important; --bs-text-opacity: 1 !important; }
+.text-danger { color: var(--brand-danger) !important; --bs-text-opacity: 1 !important; }
+.text-warning { color: var(--brand-warning) !important; --bs-text-opacity: 1 !important; }
+.text-info { color: var(--brand-info) !important; --bs-text-opacity: 1 !important; }
 
 /* Override Background Opacity System */
 .bg-primary { background-color: var(--brand-primary) !important; --bs-bg-opacity: 1 !important; }
