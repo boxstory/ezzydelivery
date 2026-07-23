@@ -172,17 +172,13 @@ Each task should have select_related: order, driver, business, pickup_location, 
                                 Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
                             </div>
                             {% endif %}
-                            {% if dl.order.coords_accuracy %}
-                            <div class="dl-table__accuracy dl-table__accuracy--{{ dl.order.coords_accuracy }}" title="Location accuracy">
-                                {% if dl.order.coords_accuracy == 'by_customer' %}<i class="fa-solid fa-user-check"></i>
-                                {% elif dl.order.coords_accuracy == 'by_staff' %}<i class="fa-solid fa-user-gear"></i>
-                                {% elif dl.order.coords_accuracy == 'exact' %}<i class="fa-solid fa-bullseye"></i>
-                                {% elif dl.order.coords_accuracy == 'street' %}<i class="fa-solid fa-road"></i>
-                                {% elif dl.order.coords_accuracy == 'landmark' %}<i class="fa-solid fa-map-marker-alt"></i>
-                                {% elif dl.order.coords_accuracy == 'zone_center' %}<i class="fa-solid fa-draw-polygon"></i>
-                                {% elif dl.order.coords_accuracy == 'ai_estimate' %}<i class="fa-solid fa-robot"></i>
-                                {% else %}<i class="fa-solid fa-location-crosshairs"></i>{% endif %}
-                                {{ dl.order.get_coords_accuracy_display }}
+                            {% if dl.order.latitude and dl.order.longitude %}
+                            <div class="dl-table__coords">
+                                <a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__coords-link" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-map-pin"></i>
+                                {{ dl.order.latitude|floatformat:4 }}, {{ dl.order.longitude|floatformat:4 }}</a>
+                                {% if dl.order.coords_accuracy %}
+                                <span class="orc__loc-acc orc__loc-acc--{{ dl.order.coords_accuracy }}">{% if dl.order.coords_accuracy == 'by_customer' %}By Client{% elif dl.order.coords_accuracy == 'by_staff' %}By Staff{% elif dl.order.coords_accuracy == 'by_driver' %}By Driver{% elif dl.order.coords_accuracy == 'exact' %}Exact{% elif dl.order.coords_accuracy == 'street' %}Street{% elif dl.order.coords_accuracy == 'landmark' %}Landmark{% elif dl.order.coords_accuracy == 'zone_center' %}Zone{% elif dl.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
+                                {% endif %}
                             </div>
                             {% endif %}
                             <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">

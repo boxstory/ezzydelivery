@@ -227,9 +227,18 @@
                                 <div class="dl-table__address-line1">
                                     {% if dl.order.latitude and dl.order.longitude %}<a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-location-dot"></i></a>{% else %}<span class="dl-table__location-pin dl-table__location-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %} {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>--</strong>{% endif %}
                                 </div>
-                                {% if dl.order.dl_zone or dl.order.coords_accuracy %}
+                                {% if dl.order.dl_zone %}
                                 <div class="dl-table__address-line2">
-                                    {% if dl.order.coords_accuracy %}<span class="oal__table-zone-accuracy oal__table-zone-accuracy--{{ dl.order.coords_accuracy }}" title="Location accuracy"><i class="fa-solid fa-crosshairs"></i> {{ dl.order.get_coords_accuracy_display }}</span>{% endif %}{% if dl.order.dl_zone %} Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}{% endif %}
+                                    Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
+                                </div>
+                                {% endif %}
+                                {% if dl.order.latitude and dl.order.longitude %}
+                                <div class="dl-table__coords">
+                                    <a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__coords-link" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-map-pin"></i>
+                                    {{ dl.order.latitude|floatformat:4 }}, {{ dl.order.longitude|floatformat:4 }}</a>
+                                    {% if dl.order.coords_accuracy %}
+                                    <span class="orc__loc-acc orc__loc-acc--{{ dl.order.coords_accuracy }}">{% if dl.order.coords_accuracy == 'by_customer' %}By Client{% elif dl.order.coords_accuracy == 'by_staff' %}By Staff{% elif dl.order.coords_accuracy == 'by_driver' %}By Driver{% elif dl.order.coords_accuracy == 'exact' %}Exact{% elif dl.order.coords_accuracy == 'street' %}Street{% elif dl.order.coords_accuracy == 'landmark' %}Landmark{% elif dl.order.coords_accuracy == 'zone_center' %}Zone{% elif dl.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
+                                    {% endif %}
                                 </div>
                                 {% endif %}
                                 <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">

@@ -7726,13 +7726,15 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     flex-wrap: nowrap;
 }
 .orc__map-pin {
-    color: #dc2626;
-    font-size: 0.6875rem;
+    color: var(--brand-danger);
+    font-size: 0.875rem;
     line-height: 1;
     text-decoration: none;
+    transition: color 0.2s ease, transform 0.2s ease;
 }
 .orc__map-pin:hover {
-    color: #b91c1c;
+    color: var(--brand-danger-dark);
+    transform: translateY(-1px);
 }
 .orc__map-pin--missing {
     color: #9ca3af;
@@ -7769,9 +7771,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .orc__loc-acc--landmark    { background: #fef3c7; color: #92400e; }
 .orc__loc-acc--zone_center { background: #fee2e2; color: #991b1b; }
 .orc__loc-acc--ai_estimate { background: #ede9fe; color: #5b21b6; }
-.orc__loc-acc--by_customer { background: #f0fdf4; color: #16a34a; }
-.orc__loc-acc--by_staff    { background: #e0f2fe; color: #0369a1; }
-.orc__loc-acc--by_driver   { background: #fff7ed; color: #c2410c; }
+.orc__loc-acc--by_customer { background: var(--brand-success-bg); color: var(--brand-success); }
+.orc__loc-acc--by_staff    { background: var(--brand-info-bg); color: var(--brand-info-dark); }
+.orc__loc-acc--by_driver   { background: var(--brand-warning-bg); color: var(--brand-warning-text); }
 .orc__coords {
     display: inline-flex;
     align-items: center;
@@ -7787,7 +7789,11 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     border: 1px solid #e5e7eb;
 }
 .orc__coords i { font-size: 0.5rem; color: #ef4444; }
-.orc__coords .orc__loc-acc { font-family: inherit; font-size: 0.5rem; padding: 0 4px; }
+.orc__coords-link { color: inherit; text-decoration: none; transition: color 0.2s ease; }
+.orc__coords-link:hover { color: var(--brand-info-dark); text-decoration: underline; }
+.orc__coords-link:hover i { color: var(--brand-info-dark); }
+.orc__coords .orc__loc-acc,
+.dl-table__coords .orc__loc-acc { font-family: inherit; font-size: 0.5rem; padding: 0 4px; }
 .orc__addr {
     display: block;
     color: var(--brand-grey-500, #6c757d);
@@ -8425,39 +8431,42 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 }
 
 /* Location accuracy line in the Zone / Address column */
-.dl-table__accuracy {
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2rem;
-    width: fit-content;
-    padding: 0.05rem 0.4rem;
-    border-radius: 0.5rem;
-    line-height: 1.4;
-}
-.dl-table__accuracy i { font-size: 0.7rem; }
-/* High confidence — green */
-.dl-table__accuracy--by_customer,
-.dl-table__accuracy--exact { background: #dcfce7; color: #15803d; }
-/* Staff-set pin — blue */
-.dl-table__accuracy--by_staff { background: #e0f2fe; color: #0369a1; }
-/* Medium — amber */
-.dl-table__accuracy--street { background: #fef3c7; color: #b45309; }
-/* Low — red/muted */
-.dl-table__accuracy--landmark,
-.dl-table__accuracy--zone_center,
-.dl-table__accuracy--ai_estimate { background: #fee2e2; color: #b91c1c; }
+/* Accuracy chip now reuses .orc__loc-acc inside .dl-table__coords (same format as orders list) */
 
 .dl-table__location-pin {
-    color: #dc2626;
+    color: var(--brand-danger);
     font-size: 0.875rem;
     margin-left: 0.25rem;
+    display: inline-block;
+    text-decoration: none;
+    transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .dl-table__location-pin:hover {
-    color: #b91c1c;
+    color: var(--brand-danger-dark);
+    transform: translateY(-1px);
 }
+
+.dl-table__coords {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.5625rem;
+    color: #1a1a1a;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-top: 2px;
+    line-height: 1;
+    background: #f3f4f6;
+    padding: 2px 7px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    width: fit-content;
+    white-space: nowrap;
+}
+.dl-table__coords i { font-size: 0.5rem; color: #ef4444; }
+.dl-table__coords-link { color: inherit; text-decoration: none; transition: color 0.2s ease; }
+.dl-table__coords-link:hover { color: var(--brand-info-dark); text-decoration: underline; }
+.dl-table__coords-link:hover i { color: var(--brand-info-dark); }
 
 .dl-table__location-pin--missing {
     color: #9ca3af;
@@ -12239,9 +12248,9 @@ select.woe__form-input, select.woa__form-input {
     white-space: nowrap;
 }
 .odp__loc-acc i { font-size: 0.6rem; }
-.odp__loc-acc--by_customer { background: #f0fdf4; color: #16a34a; }
-.odp__loc-acc--by_staff    { background: #e0f2fe; color: #0369a1; }
-.odp__loc-acc--by_driver   { background: #fff7ed; color: #c2410c; }
+.odp__loc-acc--by_customer { background: var(--brand-success-bg); color: var(--brand-success); }
+.odp__loc-acc--by_staff    { background: var(--brand-info-bg); color: var(--brand-info-dark); }
+.odp__loc-acc--by_driver   { background: var(--brand-warning-bg); color: var(--brand-warning-text); }
 .odp__loc-acc--exact       { background: #d1fae5; color: #065f46; }
 .odp__loc-acc--street      { background: #dbeafe; color: #1e40af; }
 .odp__loc-acc--landmark    { background: #fef3c7; color: #92400e; }
