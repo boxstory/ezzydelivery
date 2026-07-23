@@ -47,7 +47,6 @@ def workforce_sidebar_counts(request):
     Provides:
         - pending_publish_count: Orders verified but not yet published to task
         - unpublished_tasks_count: Tasks created but not yet published to fleet
-        - followup_count: Tasks in pending status (follow-up required)
     """
     if not hasattr(request, 'user') or not request.user.is_authenticated:
         return {}
@@ -111,11 +110,6 @@ def workforce_sidebar_counts(request):
             dl_task_publish=False
         ).exclude(
             dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
-        ).count(),
-
-        # Tasks in pending status (follow-up required)
-        'followup_count': DeliveryTask.objects.filter(
-            dl_task_status='pending'
         ).count(),
 
         # Address verification jobs awaiting attention (queued + sent +

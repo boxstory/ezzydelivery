@@ -117,6 +117,32 @@
                             {% endfor %}
                         </select>
                     </div>
+                    {% if list_type == 'all' %}
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="zone"><i class="fa-solid fa-map"></i> ZONE</label>
+                        <select class="pgf__select" name="zone" id="zone">
+                            <option value="">All</option>
+                            <option value="missing" {% if filters.zone == 'missing' %}selected{% endif %}>No Zone</option>
+                            <option value="has" {% if filters.zone == 'has' %}selected{% endif %}>Has Zone</option>
+                        </select>
+                    </div>
+                    <div class="pgf__field">
+                        <label class="pgf__label" for="accuracy"><i class="fa-solid fa-location-crosshairs"></i> ACCURACY</label>
+                        <select class="pgf__select" name="accuracy" id="accuracy">
+                            <option value="">All</option>
+                            <option value="low" {% if filters.accuracy == 'low' %}selected{% endif %}>Low (Landmark / Zone / Not Set)</option>
+                            <option value="not_set" {% if filters.accuracy == 'not_set' %}selected{% endif %}>Not Set</option>
+                            <option value="by_customer" {% if filters.accuracy == 'by_customer' %}selected{% endif %}>By Client</option>
+                            <option value="by_staff" {% if filters.accuracy == 'by_staff' %}selected{% endif %}>By Staff</option>
+                            <option value="by_driver" {% if filters.accuracy == 'by_driver' %}selected{% endif %}>By Driver</option>
+                            <option value="exact" {% if filters.accuracy == 'exact' %}selected{% endif %}>Exact (Building)</option>
+                            <option value="street" {% if filters.accuracy == 'street' %}selected{% endif %}>Street Level</option>
+                            <option value="landmark" {% if filters.accuracy == 'landmark' %}selected{% endif %}>Landmark/Area</option>
+                            <option value="zone_center" {% if filters.accuracy == 'zone_center' %}selected{% endif %}>Zone Center</option>
+                            <option value="ai_estimate" {% if filters.accuracy == 'ai_estimate' %}selected{% endif %}>AI Estimate</option>
+                        </select>
+                    </div>
+                    {% endif %}
 
                     <!-- Actions (inline, end of dropdowns row) -->
                     <div class="pgf__actions">

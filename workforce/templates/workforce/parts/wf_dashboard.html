@@ -30,26 +30,39 @@
         <div class="wf-card__header">
           <h2 class="wf-card__title">
             <i class="fa-solid fa-list-check"></i>
-            Order Status
+            ToDo Status
           </h2>
         </div>
         <div class="wf-card__body">
           <div class="wf-status-list">
 
-            <a href="{% url 'workforce:wf_orders_all' %}" class="wf-status-item wf-status-item--primary" id="wf_dashboard_link_total_orders">
+            <a href="{% url 'workforce:wf_orders_all' %}?cStatus=ready_to_pickup" class="wf-status-item {% if ready_to_pickup %}wf-status-item--warning{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_ready_to_pickup">
               <div class="wf-status-item__icon">
-                <i class="fa-solid fa-box"></i>
+                <i class="fa-solid fa-box-open"></i>
               </div>
               <div class="wf-status-item__content">
-                <span class="wf-status-item__label">Total Orders</span>
-                <span class="wf-status-item__value">{{ total_orders|default:0 }}</span>
+                <span class="wf-status-item__label">Ready to Pickup</span>
+                <span class="wf-status-item__value">{{ ready_to_pickup|default:0 }}</span>
               </div>
               <div class="wf-status-item__arrow">
                 <i class="fa-solid fa-chevron-right"></i>
               </div>
             </a>
 
-            <a href="{% url 'workforce:temp_orders' %}" class="wf-status-item {% if temp_orders_new %}wf-status-item--warning{% else %}wf-status-item--primary{% endif %}" id="wf_dashboard_link_temp_orders">
+            <a href="{% url 'workforce:pickup_pool_status' %}?status=active" class="wf-status-item {% if pickup_pool_active %}wf-status-item--warning{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_pickup_pool">
+              <div class="wf-status-item__icon">
+                <i class="fa-solid fa-boxes-stacked"></i>
+              </div>
+              <div class="wf-status-item__content">
+                <span class="wf-status-item__label">Pickup Pool (Active)</span>
+                <span class="wf-status-item__value">{{ pickup_pool_active|default:0 }}</span>
+              </div>
+              <div class="wf-status-item__arrow">
+                <i class="fa-solid fa-chevron-right"></i>
+              </div>
+            </a>
+
+            <a href="{% url 'workforce:temp_orders' %}" class="wf-status-item {% if temp_orders_new %}wf-status-item--warning{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_temp_orders">
               <div class="wf-status-item__icon">
                 <i class="fa-solid fa-cloud-arrow-down"></i>
               </div>
@@ -101,26 +114,14 @@
               </div>
             </a>
 
-            <a href="{% url 'workforce:wf_orders_published' %}" class="wf-status-item wf-status-item--success" id="wf_dashboard_link_published">
-              <div class="wf-status-item__icon">
-                <i class="fa-solid fa-circle-check"></i>
-              </div>
-              <div class="wf-status-item__content">
-                <span class="wf-status-item__label">Published</span>
-                <span class="wf-status-item__value">{{ published_orders|default:0 }}</span>
-              </div>
-              <div class="wf-status-item__arrow">
-                <i class="fa-solid fa-chevron-right"></i>
-              </div>
-            </a>
-
-            <a href="{% url 'workforce:wf_orders_all' %}?verification=pending" class="wf-status-item wf-status-item--warning" id="wf_dashboard_link_loc_reconfirm">
+            <a href="{% url 'workforce:dl_list_all' %}?zone=missing" class="wf-status-item {% if loc_issue_count %}wf-status-item--warning{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_loc_issue">
               <div class="wf-status-item__icon">
                 <i class="fa-solid fa-location-dot"></i>
               </div>
               <div class="wf-status-item__content">
-                <span class="wf-status-item__label">Location Reconfirm</span>
-                <span class="wf-status-item__value">{{ loc_reconfirm|default:0 }}</span>
+                <span class="wf-status-item__label">Location Issues (30d)</span>
+                <span class="wf-status-item__value">{{ loc_issue_count|default:0 }}</span>
+                <span class="wf-status-item__label">No Zone: {{ loc_no_zone|default:0 }} &middot; Low Accuracy: {{ loc_weak_accuracy|default:0 }}</span>
               </div>
               <div class="wf-status-item__arrow">
                 <i class="fa-solid fa-chevron-right"></i>
@@ -359,7 +360,7 @@
               <span class="wf-quick-action__label">Bulk Import</span>
             </a>
 
-            <a href="{% url 'workforce:temp_orders' %}" class="wf-quick-action {% if temp_orders_new %}wf-quick-action--warning{% else %}wf-quick-action--primary{% endif %}" id="wf_dashboard_action_temp_orders">
+            <a href="{% url 'workforce:temp_orders' %}" class="wf-quick-action {% if temp_orders_new %}wf-quick-action--warning{% else %}wf-quick-action--success{% endif %}" id="wf_dashboard_action_temp_orders">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-cloud-arrow-down"></i>
               </div>

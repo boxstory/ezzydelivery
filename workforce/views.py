@@ -486,29 +486,42 @@ def wf_dashboard(request):
                 then=1
             ), output_field=IntegerField())
         ), output_field=IntegerField())),
-        published=Count(Case(When(task_created=True, then=1), output_field=IntegerField())),
-        loc_reconfirm=Count(Case(When(
-            verification_status__in=['pending', 'needs_review'], then=1
-        ), output_field=IntegerField())),
+        ready_to_pickup=Count(Case(When(order_status='ready_to_pickup', then=1), output_field=IntegerField())),
     )
     total_orders = order_stats['total']
     orders_today = order_stats['today']
     not_published = order_stats['not_published']
-    published_orders = order_stats['published']
-    loc_reconfirm = order_stats['loc_reconfirm']
+    ready_to_pickup = order_stats['ready_to_pickup']
 
     # Follow up count - same query as tasks_followup_list default view
-    # (active businesses, in-flight statuses, last 7 days)
+    # (active businesses, in-flight statuses excluding failed, last 30 days)
     followup_statuses = [
         'pending', 'assigned', 'accepted', 'picked_up', 'start_ride',
         'out_for_delivery', 'in_transit', 'contacted', 'non_reachable',
-        'failed', 'rejected',
+        'rejected',
     ]
     follow_up_count = DeliveryTask.objects.filter(
         order__business__business_status='active',
         dl_task_status__in=followup_statuses,
-        dl_task_date__gte=today - timedelta(days=7),
+        dl_task_date__gte=today - timedelta(days=30),
     ).count()
+
+    # Location issues across ALL tasks from the last 30 days (any status)
+    no_zone_q = Q(order__dl_zone__isnull=True) | Q(order__dl_zone=0)
+    weak_accuracy_q = (
+        Q(order__coords_accuracy__in=['landmark', 'zone_center'])
+        | Q(order__coords_accuracy__isnull=True) | Q(order__coords_accuracy='')
+    )
+    loc_stats = DeliveryTask.objects.filter(
+        dl_task_date__gte=today - timedelta(days=30),
+    ).aggregate(
+        no_zone=Count(Case(When(no_zone_q, then=1), output_field=IntegerField())),
+        weak_accuracy=Count(Case(When(weak_accuracy_q, then=1), output_field=IntegerField())),
+        loc_issue=Count(Case(When(no_zone_q | weak_accuracy_q, then=1), output_field=IntegerField())),
+    )
+    loc_no_zone = loc_stats['no_zone']
+    loc_weak_accuracy = loc_stats['weak_accuracy']
+    loc_issue_count = loc_stats['loc_issue']
 
     # Tasks published to task but still pending publish to fleet
     tasks_to_fleet_count = DeliveryTask.objects.filter(
@@ -541,6 +554,11 @@ def wf_dashboard(request):
     )
     active_sellers = seller_stats['active']
     pending_sellers = seller_stats['pending']
+
+    # First-mile pickup pool — active statuses, same definition as the pickups page
+    pickup_pool_active = delivery_models.PickupTask.objects.filter(
+        status__in=['pending', 'accepted', 'in_progress', 'arrived', 'collected']
+    ).count()
 
     # Temp orders pending import — same visibility rules as the temp orders page
     # (import-enabled businesses only, orphaned source rows excluded)
@@ -602,8 +620,11 @@ def wf_dashboard(request):
         'total_orders': total_orders,
         'orders_today': orders_today,
         'not_published': not_published,
-        'published_orders': published_orders,
-        'loc_reconfirm': loc_reconfirm,
+        'ready_to_pickup': ready_to_pickup,
+        'pickup_pool_active': pickup_pool_active,
+        'loc_no_zone': loc_no_zone,
+        'loc_weak_accuracy': loc_weak_accuracy,
+        'loc_issue_count': loc_issue_count,
         'follow_up_count': follow_up_count,
         'tasks_to_fleet_count': tasks_to_fleet_count,
         # Verification
@@ -5687,6 +5708,8 @@ def dl_list_all(request):
     date_from = request.GET.get('dateFrom', '')
     date_to = request.GET.get('dateTo', '')
     business_id = request.GET.get('business', '')
+    zone_filter = request.GET.get('zone', '')
+    accuracy_filter = request.GET.get('accuracy', '')
 
     # Apply filters
     if code:
@@ -5716,6 +5739,21 @@ def dl_list_all(request):
         dl_tasks = dl_tasks.filter(dl_task_date__lte=date_to)
     if business_id:
         dl_tasks = dl_tasks.filter(order__business_id=business_id)
+    if zone_filter == 'missing':
+        dl_tasks = dl_tasks.filter(Q(order__dl_zone__isnull=True) | Q(order__dl_zone=0))
+    elif zone_filter == 'has':
+        dl_tasks = dl_tasks.filter(order__dl_zone__gt=0)
+    if accuracy_filter == 'low':
+        dl_tasks = dl_tasks.filter(
+            Q(order__coords_accuracy__in=['landmark', 'zone_center'])
+            | Q(order__coords_accuracy__isnull=True) | Q(order__coords_accuracy='')
+        )
+    elif accuracy_filter == 'not_set':
+        dl_tasks = dl_tasks.filter(
+            Q(order__coords_accuracy__isnull=True) | Q(order__coords_accuracy='')
+        )
+    elif accuracy_filter:
+        dl_tasks = dl_tasks.filter(order__coords_accuracy=accuracy_filter)
 
     # Apply sorting
     sort_field = request.GET.get('sort', '')
@@ -5754,6 +5792,8 @@ def dl_list_all(request):
     if date_from: filter_params_list.append(f'dateFrom={date_from}')
     if date_to: filter_params_list.append(f'dateTo={date_to}')
     if business_id: filter_params_list.append(f'business={business_id}')
+    if zone_filter: filter_params_list.append(f'zone={zone_filter}')
+    if accuracy_filter: filter_params_list.append(f'accuracy={accuracy_filter}')
     if sort_field: filter_params_list.append(f'sort={sort_field}&order={sort_order}')
     filter_params = '&'.join(filter_params_list)
 
@@ -5788,6 +5828,8 @@ def dl_list_all(request):
             'dateFrom': date_from,
             'dateTo': date_to,
             'business': business_id,
+            'zone': zone_filter,
+            'accuracy': accuracy_filter,
         }
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
@@ -8592,18 +8634,17 @@ def tasks_followup_list(request):
         ('in_transit', 'In Transit'),
         ('contacted', 'Contacted & Confirmed'),
         ('non_reachable', 'Non Reachable'),
-        ('failed', 'Failed'),
         ('rejected', 'Rejected'),
     ]
     active_statuses = [v for v, _ in active_statuses_choices]
 
-    seven_days_ago = timezone.now().date() - timedelta(days=7)
+    thirty_days_ago = timezone.now().date() - timedelta(days=30)
 
-    # Date range filter — defaults to last 7 days when no dates are given
+    # Date range filter — defaults to last 30 days when no dates are given
     date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
     date_to = _parse_date_param(request.GET.get('dateTo', '').strip())
     if not date_from and not date_to:
-        date_from = seven_days_ago
+        date_from = thirty_days_ago
 
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
