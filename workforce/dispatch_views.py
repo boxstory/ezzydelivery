@@ -101,6 +101,7 @@ def batch_list(request):
     # Filters
     status_filter = request.GET.get('status', '')
     location_filter = request.GET.get('location', '')
+    zone_filter = request.GET.get('zone', '')
     date_filter = request.GET.get('date', '')
 
     if status_filter:
@@ -111,6 +112,11 @@ def batch_list(request):
             batches = batches.filter(pickup_location_id=location_id)
         except (ValueError, TypeError):
             pass  # Invalid location filter, skip filtering
+    if zone_filter:
+        try:
+            batches = batches.filter(destination_zone=int(zone_filter))
+        except (ValueError, TypeError):
+            pass  # Invalid zone filter, skip filtering
     if date_filter:
         batches = batches.filter(created_at__date=date_filter)
 

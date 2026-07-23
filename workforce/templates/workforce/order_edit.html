@@ -364,6 +364,9 @@
                         <div class="mb-3">
                             <label class="woe__form-label" for="cod_status_by_client">COD Status</label>
                             <select class="woe__form-input" id="cod_status_by_client" name="cod_status_by_client">
+                                {% if not order.cod_status_by_client %}
+                                <option value="" selected>&mdash; Not set &mdash;</option>
+                                {% endif %}
                                 {% for value, label in cod_statuses %}
                                 <option value="{{ value }}" {% if order.cod_status_by_client == value %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}

@@ -646,6 +646,16 @@ def all_orders(request):
     date_preset = request.GET.get('datePreset', '').strip()
     sort = request.GET.get('sort', 'date_desc').strip()
 
+    # Fallback: resolve a named preset server-side when JS didn't fill the dates
+    if date_preset and not date_from and not date_to:
+        today = timezone.localtime().date()
+        preset_days = {'today': 0, 'yesterday': 0, '3days': 2, 'week': 6, 'month': 29}
+        if date_preset == 'yesterday':
+            date_from = date_to = today - timedelta(days=1)
+        elif date_preset in preset_days:
+            date_from = today - timedelta(days=preset_days[date_preset])
+            date_to = today
+
     # Filter by Business ID
     if business_id:
         orders = orders.filter(business_id=business_id)
@@ -5804,7 +5814,7 @@ def fulfilled_clients_tasks(request):
     customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
-    dms_status = request.GET.get('dmsStatus', '')
+    dl_status = request.GET.get('dlStatus', '') or request.GET.get('dmsStatus', '')
     date_from = request.GET.get('dateFrom', '')
     date_to = request.GET.get('dateTo', '')
     business_id = request.GET.get('business', '')
@@ -5829,6 +5839,8 @@ def fulfilled_clients_tasks(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dl_status:
+        dl_tasks = dl_tasks.filter(dl_task_status=dl_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -5858,7 +5870,7 @@ def fulfilled_clients_tasks(request):
             'customer': customer,
             'driverName': driver_name,
             'cStatus': c_status,
-            'dmsStatus': dms_status,
+            'dlStatus': dl_status,
             'dateFrom': date_from,
             'dateTo': date_to,
             'business': business_id,
@@ -5887,7 +5899,7 @@ def non_fulfilled_clients_tasks(request):
     customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
-    dms_status = request.GET.get('dmsStatus', '')
+    dl_status = request.GET.get('dlStatus', '') or request.GET.get('dmsStatus', '')
     date_from = request.GET.get('dateFrom', '')
     date_to = request.GET.get('dateTo', '')
     business_id = request.GET.get('business', '')
@@ -5912,6 +5924,8 @@ def non_fulfilled_clients_tasks(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dl_status:
+        dl_tasks = dl_tasks.filter(dl_task_status=dl_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -5941,7 +5955,7 @@ def non_fulfilled_clients_tasks(request):
             'customer': customer,
             'driverName': driver_name,
             'cStatus': c_status,
-            'dmsStatus': dms_status,
+            'dlStatus': dl_status,
             'dateFrom': date_from,
             'dateTo': date_to,
             'business': business_id,
@@ -5969,7 +5983,7 @@ def dl_list_incompleted_details(request):
     customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
     c_status = request.GET.get('cStatus', '')
-    dms_status = request.GET.get('dmsStatus', '')
+    dl_status = request.GET.get('dlStatus', '') or request.GET.get('dmsStatus', '')
     date_from = request.GET.get('dateFrom', '')
     date_to = request.GET.get('dateTo', '')
     business_id = request.GET.get('business', '')
@@ -5993,6 +6007,8 @@ def dl_list_incompleted_details(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dl_status:
+        dl_tasks = dl_tasks.filter(dl_task_status=dl_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -6034,7 +6050,7 @@ def dl_list_incompleted_details(request):
         'show_failure_reason': True,
         'filters': {
             'code': code, 'customer': customer,
-            'driverName': driver_name, 'cStatus': c_status, 'dmsStatus': dms_status,
+            'driverName': driver_name, 'cStatus': c_status, 'dlStatus': dl_status,
             'dateFrom': date_from, 'dateTo': date_to, 'business': business_id,
         }
     }
@@ -11501,6 +11517,29 @@ def fleet_task_sheets_list(request):
 
 
 # Inventory Section Functions
+LOW_STOCK_THRESHOLD = 5
+
+
+def _inventory_products_for(business):
+    """Products of a business with their current inventory quantity."""
+    from django.db.models import Sum, Max
+    products = product_models.Product.objects.filter(
+        business=business
+    ).select_related('product_category', 'unit').annotate(
+        inv_quantity=Sum('product_inventory__item_quantity'),
+        inv_updated=Max('product_inventory__updated_at'),
+    ).order_by('item_name')
+    return [{
+        'name': p.item_name,
+        'sku': p.item_sku,
+        'category': p.product_category,
+        'quantity': p.inv_quantity or 0,
+        'reorder_level': LOW_STOCK_THRESHOLD,
+        'unit': p.unit,
+        'updated_at': p.inv_updated,
+    } for p in products]
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def inventory_reports(request):
@@ -11508,6 +11547,26 @@ def inventory_reports(request):
     context = {
         'page_title': 'Inventory Reports',
     }
+    seller_id = request.GET.get('seller_id', '')
+    if seller_id:
+        selected_seller = business_models.Business.objects.filter(pk=seller_id).first()
+        if selected_seller:
+            context['selected_seller'] = selected_seller
+            context['products'] = _inventory_products_for(selected_seller)
+            return render(request, 'workforce/inventory_reports.html', context)
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active', product__isnull=False
+    ).select_related('business_profile').annotate(
+        product_count=Count('product', distinct=True)
+    ).order_by('business_name')
+    context['sellers'] = [{
+        'id': b.pk,
+        'name': b.business_name,
+        'location': getattr(getattr(b, 'business_profile', None), 'business_address', None),
+        'total_products': b.product_count,
+        'last_settled_date': None,
+    } for b in businesses]
     return render(request, 'workforce/inventory_reports.html', context)
 
 
@@ -11518,6 +11577,30 @@ def inventory_restock_list(request):
     context = {
         'page_title': 'Restock List',
     }
+    seller_id = request.GET.get('seller_id', '')
+    if seller_id:
+        selected_seller = business_models.Business.objects.filter(pk=seller_id).first()
+        if selected_seller:
+            low = [p for p in _inventory_products_for(selected_seller)
+                   if p['quantity'] <= LOW_STOCK_THRESHOLD]
+            for p in low:
+                p['suggested_qty'] = max(LOW_STOCK_THRESHOLD * 2 - p['quantity'], LOW_STOCK_THRESHOLD)
+            context['selected_seller'] = selected_seller
+            context['products'] = low
+            return render(request, 'workforce/inventory_restock_list.html', context)
+
+    from django.db.models import Sum
+    products = product_models.Product.objects.filter(
+        business__isnull=False, business__business_status='active'
+    ).select_related('business').annotate(
+        inv_quantity=Sum('product_inventory__item_quantity'),
+    ).order_by('inv_quantity')
+    context['products'] = [{
+        'name': p.item_name,
+        'seller_id': p.business_id,
+        'seller_name': p.business.business_name,
+        'quantity': p.inv_quantity or 0,
+    } for p in products if (p.inv_quantity or 0) <= LOW_STOCK_THRESHOLD]
     return render(request, 'workforce/inventory_restock_list.html', context)
 
 
@@ -14638,11 +14721,13 @@ def delivery_task_edit(request, task_id):
                         'To correct the actually-collected amount, use "Edit COD" on the driver transactions page.'
                     )
                 else:
-                    cod_amount = request.POST.get('cod_amount', '0').strip()
-                    try:
-                        order.cod_amount = Decimal(cod_amount) if cod_amount else 0
-                    except (InvalidOperation, ValueError):
-                        order.cod_amount = 0
+                    cod_amount = request.POST.get('cod_amount', '').strip()
+                    # Blank field leaves the stored amount untouched; staff must type 0 to clear
+                    if cod_amount:
+                        try:
+                            order.cod_amount = Decimal(cod_amount)
+                        except (InvalidOperation, ValueError):
+                            pass
 
                 dl_amount = request.POST.get('dl_amount', '0')
                 order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
@@ -15229,16 +15314,20 @@ def order_edit(request, order_id):
                 order.package_qty = int(total_qty)
 
             # COD details
-            cod_amount = request.POST.get('cod_amount', '0').strip()
-            try:
-                order.cod_amount = Decimal(cod_amount) if cod_amount else 0
-            except (InvalidOperation, ValueError):
-                order.cod_amount = 0
+            cod_amount = request.POST.get('cod_amount', '').strip()
+            # Blank field leaves the stored amount untouched; staff must type 0 to clear
+            if cod_amount:
+                try:
+                    order.cod_amount = Decimal(cod_amount)
+                except (InvalidOperation, ValueError):
+                    pass
             cod_status = request.POST.get('cod_status_by_client')
             if cod_status:
+                prev_cod_status = order.cod_status_by_client
                 order.cod_status_by_client = cod_status
-                # If online_paid, force COD to zero
-                if cod_status == 'online_paid':
+                # Force COD to zero only when staff actively switches to online_paid;
+                # a resave that arrives with the same value must not wipe the amount
+                if cod_status == 'online_paid' and prev_cod_status != 'online_paid':
                     order.cod_amount = 0
             elif order.cod_amount > 0 and order.cod_status_by_client in ('online_paid', 'no_cod'):
                 order.cod_status_by_client = 'unpaid'
@@ -19073,9 +19162,13 @@ def temp_verify_queue(request):
     )
     total_count = sum(status_counts.values())
 
-    # Pagination
+    # Pagination — page_size (used by the failed-rows JS fetch) overrides per_page, capped at 500
     from django.core.paginator import Paginator
-    per_page = get_per_page(request)
+    try:
+        page_size = min(int(request.GET.get('page_size', 0)), 500)
+    except (ValueError, TypeError):
+        page_size = 0
+    per_page = page_size if page_size > 0 else get_per_page(request)
     paginator = Paginator(qs, int(per_page))
     page_obj = paginator.get_page(request.GET.get('page', 1))
 

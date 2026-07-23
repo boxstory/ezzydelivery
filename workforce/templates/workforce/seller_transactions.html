@@ -19,7 +19,7 @@
         <div class="ftr__card-body">
             <div class="ftr__select-row">
                 <div class="ftr__select-group">
-                    <select id="sellerFilter" class="ftr__filter-select" onchange="window.location.href='?seller_id=' + this.value">
+                    <select id="sellerFilter" class="ftr__filter-select" onchange="ftrGo('seller_id', this.value)">
                         <option value="">-- Select a Seller --</option>
                         {% for seller in all_sellers|code_last %}
                         <option value="{{ seller.business_id }}">
@@ -260,6 +260,15 @@
 
 {% block extra_js %}
 <script>
+// Navigate to a new seller while preserving all other active filters
+function ftrGo(key, val) {
+    if (!val) return;
+    var p = new URLSearchParams(window.location.search);
+    p.set(key, val);
+    p.delete('page');
+    window.location.search = p.toString();
+}
+
 function initializeSellerModal() {
     if (typeof bootstrap === 'undefined') {
         setTimeout(initializeSellerModal, 100);
@@ -275,7 +284,7 @@ function initializeSellerModal() {
                     var modal = bootstrap.Modal.getInstance(modalElement);
                     if (modal) modal.hide();
                 }
-                setTimeout(() => window.location.href = '?seller_id=' + this.value, 300);
+                setTimeout(() => ftrGo('seller_id', this.value), 300);
             }
         });
     }

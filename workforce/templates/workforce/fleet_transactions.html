@@ -19,7 +19,7 @@
         <div class="ftr__card-body">
             <div class="ftr__select-row">
                 <div class="ftr__select-group">
-                    <select id="driverFilter" class="ftr__filter-select" onchange="window.location.href='?driver_id=' + this.value">
+                    <select id="driverFilter" class="ftr__filter-select" onchange="ftrGo('driver_id', this.value)">
                         <option value="">-- Select a Driver --</option>
                         {% for driver in all_drivers %}
                         <option value="{{ driver.driver_id }}">
@@ -143,6 +143,14 @@
                     <div class="ftr__filter-group">
                         <label class="ftr__filter-label"><i class="fa-solid fa-hashtag me-1"></i>Task Number</label>
                         <input type="text" name="task_search" value="{{ task_search }}" class="ftr__filter-input" placeholder="Search task #">
+                    </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Min Amount (QAR)</label>
+                        <input type="number" step="0.01" name="min_amount" value="{{ min_amount }}" class="ftr__filter-input" placeholder="0">
+                    </div>
+                    <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Max Amount (QAR)</label>
+                        <input type="number" step="0.01" name="max_amount" value="{{ max_amount }}" class="ftr__filter-input" placeholder="9999">
                     </div>
                     <div class="ftr__filter-actions">
                         <button type="submit" class="ftr__btn ftr__btn--primary">
@@ -722,6 +730,14 @@
 
 {% block extra_js %}
 <script>
+// Navigate to a new driver while preserving all other active filters
+function ftrGo(key, val) {
+    if (!val) return;
+    var p = new URLSearchParams(window.location.search);
+    p.set(key, val);
+    p.delete('page');
+    window.location.search = p.toString();
+}
 // Initialize driver change modal with driver list
 function initializeDriverModal() {
     if (typeof bootstrap === 'undefined') {
@@ -751,7 +767,7 @@ function initializeDriverModal() {
                     var modal = bootstrap.Modal.getInstance(modalElement);
                     if (modal) modal.hide();
                 }
-                setTimeout(() => window.location.href = '?driver_id=' + this.value, 300);
+                setTimeout(() => ftrGo('driver_id', this.value), 300);
             }
         });
     }
@@ -1366,7 +1382,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (driverSelect) {
         driverSelect.addEventListener('change', function() {
             if (this.value) {
-                window.location.href = '?driver_id=' + this.value;
+                ftrGo('driver_id', this.value);
             }
         });
     }
