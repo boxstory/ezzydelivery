@@ -68,10 +68,10 @@
                     <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary btn-sm" title="Clear">
                         <i class="fa fa-times"></i>
                     </a>
-                    <a href="{% url 'workforce:export_orders_csv' %}?{{ request.GET.urlencode }}"
-                       class="btn btn-outline-success btn-sm" title="Export CSV">
+                    <button type="button" class="btn btn-outline-success btn-sm" title="Export CSV"
+                            data-bs-toggle="modal" data-bs-target="#wfExportModal">
                         <i class="fa fa-file-csv"></i>
-                    </a>
+                    </button>
                 </div>
 
                 <!-- Row 2: Date quick-select | Order Status | DL Status -->
@@ -357,6 +357,9 @@
         {% endif %}
         </div><!-- /.wf-content -->
     </div>
+
+    <!-- Export column picker -->
+    {% include "workforce/parts/components/_export_columns_modal.html" %}
 
 
     <!-- Order Detail Slide Panel -->
@@ -926,4 +929,5 @@
     })();
 
     </script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
 {% endblock content %}

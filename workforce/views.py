@@ -763,6 +763,7 @@ def all_orders(request):
         'per_page': request.GET.get('per_page', '50'),
         'wa_instances': wa_data['instances'],
         'wa_instances_error': wa_data['error'],
+        **export_columns_context(ORDER_EXPORT_COLUMNS, 'workforce:export_orders_csv', 'wf_orders_export_cols'),
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
@@ -1021,9 +1022,67 @@ def non_fulfilled_clients_orders(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+# --- Reusable column-pick CSV export ------------------------------------------
+# Each export declares an ordered registry of (key, label, getter). The picker
+# modal renders a checkbox per column; the request's ?columns=key1,key2 chooses
+# which to write (in registry order). Shared by every list page's export button.
+
+def csv_columns_response(request, rows, columns, filename_prefix, limit=5000):
+    """Build a filtered CSV HttpResponse honouring ?columns=. `columns` is an
+    ordered list of (key, label, getter). Falls back to all columns."""
+    from django.utils import timezone
+    selected = (request.GET.get('columns', '') or '').strip()
+    wanted = [k for k in selected.split(',') if k]
+    colmap = {c[0]: c for c in columns}
+    chosen = [colmap[k] for k in wanted if k in colmap] or list(columns)
+
+    response = HttpResponse(content_type='text/csv')
+    ts = timezone.now().strftime('%Y%m%d_%H%M%S')
+    response['Content-Disposition'] = f'attachment; filename="{filename_prefix}_{ts}.csv"'
+    writer = csv.writer(response)
+    writer.writerow([c[1] for c in chosen])
+    for obj in rows[:limit]:
+        writer.writerow([c[2](obj) for c in chosen])
+    return response
+
+
+def export_columns_context(columns, url_name=None, storage_key='wf_export_cols', url=None):
+    """Context the shared _export_columns_modal.html needs: label list + target.
+    Pass url_name for a dedicated export endpoint, or url for a same-page
+    ?export=csv style export (e.g. transactions)."""
+    from django.urls import reverse
+    return {
+        'export_columns': [{'key': k, 'label': lbl} for k, lbl, _ in columns],
+        'export_url': url if url is not None else reverse(url_name),
+        'export_storage_key': storage_key,
+    }
+
+
+ORDER_EXPORT_COLUMNS = [
+    ('order_number',        'Order Number',        lambda o: o.order_number),
+    ('client_order_code',   'Client Order Code',   lambda o: o.client_order_code),
+    ('business',            'Business',            lambda o: o.business.business_name if o.business else ''),
+    ('customer_name',       'Customer Name',       lambda o: o.customer_name),
+    ('customer_phone',      'Customer Phone',      lambda o: o.customer_phone),
+    ('customer_address',    'Customer Address',    lambda o: o.customer_address),
+    ('zone',                'Zone',                lambda o: o.dl_zone or ''),
+    ('street',              'Street',              lambda o: o.dl_street or ''),
+    ('building',            'Building',            lambda o: o.dl_building or ''),
+    ('latitude',            'Latitude',            lambda o: o.latitude or ''),
+    ('longitude',           'Longitude',           lambda o: o.longitude or ''),
+    ('coords_accuracy',     'Coords Accuracy',     lambda o: o.get_coords_accuracy_display() if o.coords_accuracy else ''),
+    ('verification_status', 'Verification Status', lambda o: o.get_verification_status_display()),
+    ('order_status',        'Order Status',        lambda o: o.order_status),
+    ('task_status',         'Task Status',         lambda o: o.task_status),
+    ('cod_amount',          'COD Amount',          lambda o: o.cod_amount),
+    ('order_date',          'Order Date',          lambda o: o.order_date),
+    ('created_at',          'Created At',          lambda o: o.created_at.strftime('%Y-%m-%d %H:%M:%S') if o.created_at else ''),
+]
+
+
 def export_orders_csv(request):
     """
-    Export orders to CSV file with applied filters
+    Export orders to CSV file with applied filters (columns chosen via ?columns=)
     """
     from django.utils import timezone
 
@@ -1060,44 +1119,23 @@ def export_orders_csv(request):
 
     orders = orders.order_by('-created_at')
 
-    # Create the HttpResponse object with CSV content type
-    response = HttpResponse(content_type='text/csv')
-    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-    response['Content-Disposition'] = f'attachment; filename="orders_export_{timestamp}.csv"'
+    return csv_columns_response(request, orders, ORDER_EXPORT_COLUMNS, 'orders_export')
 
-    writer = csv.writer(response)
-    # Write header row
-    writer.writerow([
-        'Order Number',
-        'Client Order Code',
-        'Business',
-        'Customer Name',
-        'Customer Phone',
-        'Customer Address',
-        'Order Status',
-        'Task Status',
-        'COD Amount',
-        'Order Date',
-        'Created At',
-    ])
 
-    # Write data rows
-    for order in orders[:5000]:  # Limit to 5000 rows for performance
-        writer.writerow([
-            order.order_number,
-            order.client_order_code,
-            order.business.business_name if order.business else '',
-            order.customer_name,
-            order.customer_phone,
-            order.customer_address,
-            order.order_status,
-            order.task_status,
-            order.cod_amount,
-            order.order_date,
-            order.created_at.strftime('%Y-%m-%d %H:%M:%S') if order.created_at else '',
-        ])
-
-    return response
+DRIVER_EXPORT_COLUMNS = [
+    ('driver_id',      'Driver ID',      lambda d: d.driver_id),
+    ('driver_code',    'Driver Code',    lambda d: d.driver_code),
+    ('name',           'Name',           lambda d: f"{d.user.first_name} {d.user.last_name}".strip()),
+    ('phone',          'Phone',          lambda d: d.driver_phone),
+    ('whatsapp',       'WhatsApp',       lambda d: d.driver_whatsapp),
+    ('email',          'Email',          lambda d: d.user.email),
+    ('status',         'Status',         lambda d: d.driver_status),
+    ('availability',   'Availability',   lambda d: getattr(d, 'driver_availability', '')),
+    ('rating',         'Rating',         lambda d: d.driver_rating),
+    ('wallet_balance', 'Wallet Balance', lambda d: d.wallet_balance),
+    ('cod_in_hand',    'COD In Hand',    lambda d: getattr(d, 'cod_in_hand', 0)),
+    ('date_joined',    'Date Joined',    lambda d: d.user.date_joined.strftime('%Y-%m-%d') if d.user.date_joined else ''),
+]
 
 
 @login_required(login_url='/accounts/login/')
@@ -1129,41 +1167,7 @@ def export_drivers_csv(request):
 
     drivers = drivers.order_by('-driver_id')
 
-    response = HttpResponse(content_type='text/csv')
-    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-    response['Content-Disposition'] = f'attachment; filename="drivers_export_{timestamp}.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow([
-        'Driver ID',
-        'Driver Code',
-        'Name',
-        'Phone',
-        'WhatsApp',
-        'Email',
-        'Status',
-        'Rating',
-        'Wallet Balance',
-        'COD In Hand',
-        'Date Joined',
-    ])
-
-    for driver in drivers[:2000]:
-        writer.writerow([
-            driver.driver_id,
-            driver.driver_code,
-            f"{driver.user.first_name} {driver.user.last_name}",
-            driver.driver_phone,
-            driver.driver_whatsapp,
-            driver.user.email,
-            driver.driver_status,
-            driver.driver_rating,
-            driver.wallet_balance,
-            getattr(driver, 'cod_in_hand', 0),
-            driver.user.date_joined.strftime('%Y-%m-%d') if driver.user.date_joined else '',
-        ])
-
-    return response
+    return csv_columns_response(request, drivers, DRIVER_EXPORT_COLUMNS, 'drivers_export', limit=2000)
 
 
 @login_required(login_url='/accounts/login/')
@@ -10163,6 +10167,20 @@ def cod_business_settlement_pdf(request):
     return response
 
 
+FLEET_TXN_EXPORT_COLUMNS = [
+    ('txn_code',       'TXN Code',          lambda t: t.transaction_code or ''),
+    ('datetime',       'Date & Time',       lambda t: t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else ''),
+    ('type',           'Type',              lambda t: t.get_transaction_type_display()),
+    ('description',    'Description',        lambda t: t.description or ''),
+    ('amount',         'Amount',            lambda t: f"{t.amount}"),
+    ('payment_method', 'Payment Method',    lambda t: t.payment_method or ''),
+    ('balance_after',  'Balance After',     lambda t: f"{t.wallet_balance_after}" if t.wallet_balance_after is not None else ''),
+    ('cod_after',      'COD In Hand After', lambda t: f"{t.cod_in_hand_after}" if t.cod_in_hand_after is not None else ''),
+    ('reference',      'Reference',         lambda t: t.reference_number or ''),
+    ('status',         'Status',            lambda t: 'Settled' if t.settlement_id else 'Pending'),
+]
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 @require_http_methods(["GET", "POST"])
@@ -10428,42 +10446,10 @@ def fleet_transactions(request):
 
     # CSV export — stream the full filtered queryset (not paginated)
     if request.GET.get('export') == 'csv':
-        import csv
-        from django.http import StreamingHttpResponse
-
-        class _Echo:
-            def write(self, value):
-                return value
-
-        writer = csv.writer(_Echo())
-        header = [
-            'TXN Code', 'Date & Time', 'Type', 'Description',
-            'Amount', 'Payment Method', 'Balance After', 'COD In Hand After',
-            'Reference', 'Status',
-        ]
-
-        def _rows():
-            yield writer.writerow(header)
-            for t in transactions.iterator():
-                status_label = 'Settled' if t.settlement_id else 'Pending'
-                yield writer.writerow([
-                    t.transaction_code or '',
-                    t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else '',
-                    t.get_transaction_type_display(),
-                    t.description or '',
-                    f"{t.amount}",
-                    t.payment_method or '',
-                    f"{t.wallet_balance_after}" if t.wallet_balance_after is not None else '',
-                    f"{t.cod_in_hand_after}" if t.cod_in_hand_after is not None else '',
-                    t.reference_number or '',
-                    status_label,
-                ])
-
         driver_tag = selected_driver.driver_id if selected_driver else 'all'
-        filename = f"driver_transactions_{driver_tag}_{view_type}_{timezone.now().date().isoformat()}.csv"
-        resp = StreamingHttpResponse(_rows(), content_type='text/csv')
-        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
-        return resp
+        return csv_columns_response(
+            request, transactions, FLEET_TXN_EXPORT_COLUMNS,
+            f'driver_transactions_{driver_tag}_{view_type}', limit=50000)
 
     transactions_paginated = paginate_queryset(request, transactions, items_per_page=50)
 
@@ -10587,6 +10573,8 @@ def fleet_transactions(request):
         'driver_businesses': driver_businesses,
         'payment_method_choices': payment_method_choices,
         'unmatched_tasks': unmatched_tasks,
+        **export_columns_context(FLEET_TXN_EXPORT_COLUMNS, storage_key='wf_fleet_txn_export_cols',
+                                 url=request.path + '?export=csv'),
     }
     return render(request, 'workforce/fleet_transactions.html', context)
 
@@ -10641,6 +10629,18 @@ def _seller_transactions_export_rows(orders):
             (order.order_status or '').replace('_', ' ').title() or '-',
         ])
     return rows
+
+
+SELLER_TXN_EXPORT_COLUMNS = [
+    ('order_code',   'Order Code',          lambda o: o.order_number or '-'),
+    ('client_code',  'Client Code',         lambda o: o.client_order_code or '-'),
+    ('order_date',   'Order Date',          lambda o: o.order_date.strftime('%d %b %Y') if o.order_date else '-'),
+    ('customer',     'Customer',            lambda o: o.customer_name or '-'),
+    ('from_to',      'From / To Location',  lambda o: f"From: {_format_pickup_location(o.pickup_location)}\nTo: {o.customer_address or '-'}"),
+    ('cod_amount',   'COD Amount (QAR)',    lambda o: float(o.cod_amount or 0)),
+    ('status',       'Status',              lambda o: _SELLER_COD_STATUS_LABELS.get(o.cod_status_by_staff, 'Pending')),
+    ('order_status', 'Order Status',        lambda o: (o.order_status or '').replace('_', ' ').title() or '-'),
+]
 
 
 def _seller_transactions_csv(orders, selected_seller):
@@ -10822,7 +10822,9 @@ def seller_transactions(request):
     export_fmt = request.GET.get('export')
     if selected_seller and export_fmt in ('xlsx', 'csv'):
         if export_fmt == 'csv':
-            return _seller_transactions_csv(orders, selected_seller)
+            return csv_columns_response(
+                request, orders, SELLER_TXN_EXPORT_COLUMNS,
+                f'seller_cod_transactions_{selected_seller.business_id}', limit=50000)
         return _seller_transactions_xlsx(orders, selected_seller)
 
     # Build filter params for pagination
@@ -10853,6 +10855,8 @@ def seller_transactions(request):
         'min_amount': min_amount or '',
         'max_amount': max_amount or '',
         'sort_by': sort_by,
+        **export_columns_context(SELLER_TXN_EXPORT_COLUMNS, storage_key='wf_seller_txn_export_cols',
+                                 url=request.path + '?export=csv'),
     }
     return render(request, 'workforce/seller_transactions.html', context)
 
@@ -14144,6 +14148,7 @@ def drivers_list(request):
         'active_count': active_count,
         'pending_count': pending_count,
         'inactive_count': inactive_count,
+        **export_columns_context(DRIVER_EXPORT_COLUMNS, 'workforce:export_drivers_csv', 'wf_drivers_export_cols'),
     }
 
     return render(request, 'workforce/drivers_list.html', context)

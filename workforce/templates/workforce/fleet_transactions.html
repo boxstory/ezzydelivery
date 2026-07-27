@@ -182,9 +182,10 @@
         <button type="button" class="ftr__btn ftr__btn--outline" onclick="window.print()">
             <i class="fa-solid fa-print"></i> Print Report
         </button>
-        <a href="?{{ request.GET.urlencode }}{% if request.GET %}&{% endif %}export=csv" class="ftr__btn ftr__btn--primary" id="exportCsvLink">
+        <button type="button" class="ftr__btn ftr__btn--primary" id="exportCsvLink"
+                data-bs-toggle="modal" data-bs-target="#wfExportModal">
             <i class="fa-solid fa-file-export"></i> Export CSV
-        </a>
+        </button>
         <button type="button" class="ftr__btn ftr__btn--outline" id="recalcBtn" onclick="recalculateBalances()">
             <i class="fa-solid fa-rotate"></i> Recalculate Balances
         </button>
@@ -728,6 +729,10 @@
     </div>
 
 </div>
+
+<!-- Export column picker -->
+{% include "workforce/parts/components/_export_columns_modal.html" %}
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
 {% endblock content %}
 
 {% block extra_js %}

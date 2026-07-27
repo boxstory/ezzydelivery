@@ -169,10 +169,10 @@
                         hx-include="closest form">
                     <i class="fa-solid fa-search"></i> Filter
                 </button>
-                <a href="{% url 'workforce:export_drivers_csv' %}?{{ request.GET.urlencode }}"
-                   class="drl__btn drl__btn--export" title="Export to CSV">
+                <button type="button" class="drl__btn drl__btn--export" title="Export to CSV"
+                        data-bs-toggle="modal" data-bs-target="#wfExportModal">
                     <i class="fa-solid fa-file-csv"></i>
-                </a>
+                </button>
             </div>
         </form>
     </div>
@@ -280,4 +280,8 @@
         </div>
     </div>
 </div>
+
+<!-- Export column picker -->
+{% include "workforce/parts/components/_export_columns_modal.html" %}
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
 {% endblock content %}

@@ -1,0 +1,45 @@
+{% comment %}
+Purpose: Reusable "choose columns" CSV export modal for staff list pages.
+Used by: any list page that sets export_columns / export_url / export_storage_key
+         (see workforce.views.export_columns_context) and includes this partial.
+Notes: Selection persists per page via localStorage (export-columns.js, storage_key).
+{% endcomment %}
+<div class="modal fade" id="wfExportModal" tabindex="-1" aria-labelledby="wfExportModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content wfx"
+         data-export-url="{{ export_url }}"
+         data-export-storage="{{ export_storage_key }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="wfExportModalTitle"><i class="fa-solid fa-file-csv me-2"></i>Export columns</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-muted small">Pick the columns to include.</span>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-light" data-export-all>Select all</button>
+            <button type="button" class="btn btn-sm btn-light" data-export-none>Clear</button>
+          </div>
+        </div>
+        <div class="wfx__cols">
+          {% for col in export_columns %}
+          <label class="wfx__col">
+            <input type="checkbox" class="form-check-input" value="{{ col.key }}" checked>
+            <span>{{ col.label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <label class="me-auto small text-muted d-flex align-items-center gap-1">
+          <input type="checkbox" class="form-check-input mt-0" data-export-remember checked>
+          Remember my selection
+        </label>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success btn-sm" data-export-run>
+          <i class="fa-solid fa-download me-1"></i>Export CSV
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
