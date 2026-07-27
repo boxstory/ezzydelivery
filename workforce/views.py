@@ -7146,6 +7146,15 @@ def update_order_zone(request, order_id):
                     dl_address.dl_building = str(building_number)
                 dl_address.save()
 
+        # Tier 4 self-learning: capture the customer's free-text address -> this zone
+        # as an alias so the same spelling/typo resolves automatically next time.
+        if order.customer_address:
+            try:
+                from delivery.zone_resolver import learn_alias
+                learn_alias(order.customer_address, zone_number)
+            except Exception as e:
+                logger.warning("Zone alias learning failed for order %s: %s", order_id, e)
+
         # Log the update
         notes = f'Zone updated from AI parse: {zone_display}'
         if coords_saved:

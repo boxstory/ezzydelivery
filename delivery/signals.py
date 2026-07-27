@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -11,6 +11,8 @@ import logging
 # Local aliases for commonly used models
 DeliveryTask = delivery_models.DeliveryTask
 HubPickupBatch = delivery_models.HubPickupBatch
+ZoneName = delivery_models.ZoneName
+ZoneArea = delivery_models.ZoneArea
 
 logger = logging.getLogger(__name__)
 
@@ -724,3 +726,83 @@ def _cancel_pending_recovery_jobs(task):
             f"Cancelled {count} queued recovery job(s) for task {task.dl_task_number} "
             f"(status reverted from 'failed')"
         )
+
+
+# =============================================================================
+# ZONE / AREA CACHE + AI PARSE-LOCATION SYNC
+# =============================================================================
+# When a zone or area is added/edited/removed, two derived stores go stale:
+#   1. the cached active-area list used by orders.signals._resolve_zone_number
+#   2. ZoneTrainingData — the AI parse-location (`parse_address`) tool's lookup
+#      table, which is a materialised copy of ZoneName/ZoneArea names.
+# These receivers keep both in sync incrementally so neither path serves stale data.
+
+def _sync_training_row(zone, text, language):
+    """Upsert one authoritative ZoneTrainingData row (area/zone name -> zone).
+    Mirrors populate_zone_training_data. Best-effort: never blocks the zone save."""
+    if not text:
+        return
+    from ai_agent.models import ZoneTrainingData
+    ZoneTrainingData.objects.update_or_create(
+        zone=zone,
+        text_input=text.strip().lower(),
+        defaults={
+            'input_type': 'area_name',
+            'language': language,
+            'confidence': 1.0,
+            'is_verified': True,  # authoritative, from the zone tables
+        },
+    )
+
+
+@receiver(post_save, sender=ZoneName)
+def zonename_saved(sender, instance, **kwargs):
+    from delivery.zone_cache import invalidate_zone_cache
+    invalidate_zone_cache()
+    try:
+        _sync_training_row(instance, instance.zone_name, 'en')
+        _sync_training_row(instance, instance.zone_name_arabic, 'ar')
+    except Exception as e:
+        logger.warning(f"ZoneTrainingData sync failed for zone {instance.zone_number}: {e}")
+
+
+@receiver(post_save, sender=ZoneArea)
+def zonearea_saved(sender, instance, **kwargs):
+    from delivery.zone_cache import invalidate_zone_cache
+    invalidate_zone_cache()
+    try:
+        if instance.is_active:
+            _sync_training_row(instance.zone, instance.area_name, 'en')
+            _sync_training_row(instance.zone, instance.area_name_arabic, 'ar')
+        else:
+            # Deactivated area — drop its authoritative training rows
+            _remove_training_rows(instance.zone, [instance.area_name, instance.area_name_arabic])
+    except Exception as e:
+        logger.warning(f"ZoneTrainingData sync failed for area '{instance.area_name}': {e}")
+
+
+def _remove_training_rows(zone, texts):
+    """Delete authoritative (is_verified) training rows for the given texts of a zone."""
+    from ai_agent.models import ZoneTrainingData
+    keys = [t.strip().lower() for t in texts if t]
+    if keys:
+        ZoneTrainingData.objects.filter(
+            zone=zone, text_input__in=keys, is_verified=True
+        ).delete()
+
+
+@receiver(post_delete, sender=ZoneArea)
+def zonearea_deleted(sender, instance, **kwargs):
+    from delivery.zone_cache import invalidate_zone_cache
+    invalidate_zone_cache()
+    try:
+        _remove_training_rows(instance.zone, [instance.area_name, instance.area_name_arabic])
+    except Exception as e:
+        logger.warning(f"ZoneTrainingData cleanup failed for area '{instance.area_name}': {e}")
+
+
+@receiver(post_delete, sender=ZoneName)
+def zonename_deleted(sender, instance, **kwargs):
+    # ZoneTrainingData rows cascade-delete via their FK to ZoneName; just clear the cache.
+    from delivery.zone_cache import invalidate_zone_cache
+    invalidate_zone_cache()

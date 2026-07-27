@@ -713,6 +713,85 @@ class ZoneName(models.Model):
         group = self.zone_groups.filter(is_active=True).order_by('display_order').first()
         return group.name if group else None
 
+    @staticmethod
+    def _point_in_polygon(lat, lon, polygon):
+        """
+        Ray-casting point-in-polygon test.
+        polygon is [[lat, lon], [lat, lon], ...]. Returns True if (lat, lon) is inside.
+        """
+        inside = False
+        n = len(polygon)
+        j = n - 1
+        for i in range(n):
+            yi, xi = float(polygon[i][0]), float(polygon[i][1])
+            yj, xj = float(polygon[j][0]), float(polygon[j][1])
+            if ((xi > lon) != (xj > lon)) and \
+                    (lat < (yj - yi) * (lon - xi) / (xj - xi) + yi):
+                inside = not inside
+            j = i
+        return inside
+
+    @staticmethod
+    def _haversine_m(lat1, lon1, lat2, lon2):
+        """Great-circle distance in metres between two (lat, lon) points."""
+        import math
+        R = 6371000
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dp = math.radians(lat2 - lat1)
+        dl = math.radians(lon2 - lon1)
+        a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+        return 2 * R * math.asin(math.sqrt(a))
+
+    @classmethod
+    def find_by_coords(cls, lat, lon, max_center_km=None):
+        """
+        Resolve which active zone a GPS coordinate belongs to.
+
+        Strategy (polygon-first, nearest-center fallback):
+        1. Point-in-polygon test against every zone that has a boundary polygon.
+           The first zone whose polygon contains the point is returned (authoritative).
+        2. If no polygon contains the point (or no polygons defined), fall back to
+           the active zone whose center point is nearest by great-circle distance.
+
+        Args:
+            lat, lon: coordinate to resolve (float or Decimal-compatible).
+            max_center_km: if set, the nearest-center fallback only matches when the
+                nearest center is within this many kilometres (else returns None).
+
+        Returns:
+            (ZoneName, match_info) tuple, or (None, info) if nothing matched.
+            match_info = {'method': 'polygon'|'center', 'distance_m': float|None}
+        """
+        try:
+            lat = float(lat)
+            lon = float(lon)
+        except (TypeError, ValueError):
+            return None, {'method': None, 'distance_m': None}
+
+        active = cls.objects.filter(is_active=True)
+
+        # 1. Polygon containment (authoritative)
+        for zone in active:
+            if zone.has_polygon and cls._point_in_polygon(lat, lon, zone.polygon):
+                return zone, {'method': 'polygon', 'distance_m': None}
+
+        # 2. Nearest zone center fallback
+        nearest = None
+        nearest_dist = None
+        for zone in active:
+            if zone.latitude is None or zone.longitude is None:
+                continue
+            d = cls._haversine_m(lat, lon, float(zone.latitude), float(zone.longitude))
+            if nearest_dist is None or d < nearest_dist:
+                nearest, nearest_dist = zone, d
+
+        if nearest is not None:
+            if max_center_km is not None and nearest_dist > max_center_km * 1000:
+                return None, {'method': None, 'distance_m': nearest_dist}
+            return nearest, {'method': 'center', 'distance_m': nearest_dist}
+
+        return None, {'method': None, 'distance_m': None}
+
     class Meta:
         verbose_name = "Zone"
         verbose_name_plural = "Zones"
