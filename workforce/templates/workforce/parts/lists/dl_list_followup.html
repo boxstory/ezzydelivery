@@ -4,18 +4,36 @@
 {% load custom_filters %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/followup-list.css' %}?v=20260727e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<!-- Page Header -->
-<header class="oli__hero">
-    <div class="oli__hero__left">
-        <h2><i class="fa-solid {{ page_icon|default:'fa-flag' }} me-1" aria-hidden="true"></i>{{ page_title|default:"Follow-Up Tasks" }}</h2>
-        <span class="oli__hero__subtitle">| {{ page_subtitle|default:"Latest updates by driver & status" }}</span>
+<div class="wfl">
+<!-- Page Header — navy authority surface, backlog shaped by staleness -->
+<header class="wfl__hero">
+    <div class="wfl__hero__lead">
+        <span class="wfl__hero__icon"><i class="fa-solid {{ page_icon|default:'fa-flag' }}" aria-hidden="true"></i></span>
+        <div>
+            <h1 class="wfl__hero__title">{{ page_title|default:"Follow-Up Tasks" }}</h1>
+            <span class="wfl__hero__sub">{{ page_subtitle|default:"Latest updates by driver & status" }}</span>
+        </div>
     </div>
-    <div class="oli__hero__right">
-        <div class="oli__hero__count" aria-label="Task count summary">
-            <span class="oli__hero__count-value" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
-            <span class="oli__hero__count-label">tasks</span>
+    <div class="wfl__hero__shape" role="group" aria-label="Queue by time since last update">
+        <div class="wfl__tier">
+            <span class="wfl__tier__num" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
+            <span class="wfl__tier__lbl">In queue</span>
+        </div>
+        <span class="wfl__hero__div" aria-hidden="true"></span>
+        <div class="wfl__tier wfl__tier--fresh">
+            <span class="wfl__tier__num">{{ stale_fresh|default:"0" }}</span>
+            <span class="wfl__tier__lbl">Fresh · &lt;24h</span>
+        </div>
+        <div class="wfl__tier wfl__tier--aging">
+            <span class="wfl__tier__num">{{ stale_aging|default:"0" }}</span>
+            <span class="wfl__tier__lbl">Aging · 1–3d</span>
+        </div>
+        <div class="wfl__tier wfl__tier--stale">
+            <span class="wfl__tier__num">{{ stale_stale|default:"0" }}</span>
+            <span class="wfl__tier__lbl">Stale · 3d+</span>
         </div>
     </div>
 </header>
@@ -155,7 +173,7 @@
                 </thead>
                 <tbody>
                     {% for dl in dl_tasks %}
-                    <tr class="dl-table__row" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
+                    <tr class="dl-table__row dl-table__row--{{ dl.staleness_tier }}" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
                         <td class="dl-table__td-check" onclick="event.stopPropagation();">
                             <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
                         </td>
@@ -169,7 +187,7 @@
                         <!-- Last Updated -->
                         <td>
                             <div class="d-flex flex-column">
-                                <span class="small fw-semibold">{{ dl.updated_at|timesince }} ago</span>
+                                <span class="wfl__age wfl__age--{{ dl.staleness_tier }}">{{ dl.updated_at|timesince }} ago</span>
                                 <span class="small text-muted">{{ dl.updated_at|date:"d M H:i" }}</span>
                             </div>
                         </td>
@@ -320,6 +338,7 @@
     </div>
     {% endif %}
 </div>
+</div><!-- /.wfl -->
 
 <!-- Status Update Modal -->
 {% include "workforce/parts/components/_tasks_status_modal.html" %}

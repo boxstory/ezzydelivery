@@ -595,8 +595,20 @@ function whatsappLocationSave(text, orderId, opts) {
         if (latEl) latEl.value = la;
         if (lngEl) lngEl.value = lo;
         if (accEl) accEl.innerHTML = '<span class="dtd__accuracy dtd__accuracy--by_staff"><i class="fa-solid fa-user-gear"></i> By Staff</span>';
+        // Reflect a zone the backend reverse-resolved from the dropped pin
+        var zoneMsg = '';
+        if (d.resolved_zone && d.resolved_zone.zone_number) {
+            var zEl = opts.zoneNumId ? document.getElementById(opts.zoneNumId) : null;
+            if (zEl) {
+                zEl.textContent = d.resolved_zone.zone_number;
+                zEl.classList.remove('qnas-plate__num--empty');
+            }
+            zoneMsg = ' <span class="badge bg-primary"><i class="fa-solid fa-location-crosshairs me-1"></i>Zone ' +
+                d.resolved_zone.zone_number +
+                (d.resolved_zone.zone_name ? ' · ' + d.resolved_zone.zone_name : '') + '</span>';
+        }
         if (resultDiv) {
-            resultDiv.innerHTML = '<span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Saved: ' + la + ', ' + lo + '</span> ' +
+            resultDiv.innerHTML = '<span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Saved: ' + la + ', ' + lo + '</span>' + zoneMsg + ' ' +
                 '<a href="https://www.google.com/maps?q=' + la + ',' + lo + '" target="_blank" class="ms-1 text-decoration-none"><i class="fa-solid fa-map-location-dot"></i> Map</a>';
         }
     }).catch(function(err) {
