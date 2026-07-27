@@ -522,6 +522,8 @@ def wf_dashboard(request):
     loc_no_zone = loc_stats['no_zone']
     loc_weak_accuracy = loc_stats['weak_accuracy']
     loc_issue_count = loc_stats['loc_issue']
+    # 30-day window start, so the card link's list matches the counted total
+    loc_issue_from = (today - timedelta(days=30)).isoformat()
 
     # Tasks published to task but still pending publish to fleet
     tasks_to_fleet_count = DeliveryTask.objects.filter(
@@ -625,6 +627,7 @@ def wf_dashboard(request):
         'loc_no_zone': loc_no_zone,
         'loc_weak_accuracy': loc_weak_accuracy,
         'loc_issue_count': loc_issue_count,
+        'loc_issue_from': loc_issue_from,
         'follow_up_count': follow_up_count,
         'tasks_to_fleet_count': tasks_to_fleet_count,
         # Verification
@@ -5710,6 +5713,7 @@ def dl_list_all(request):
     business_id = request.GET.get('business', '')
     zone_filter = request.GET.get('zone', '')
     accuracy_filter = request.GET.get('accuracy', '')
+    locissue_filter = request.GET.get('locissue', '')  # combined: no-zone OR low-accuracy
 
     # Apply filters
     if code:
@@ -5754,6 +5758,14 @@ def dl_list_all(request):
         )
     elif accuracy_filter:
         dl_tasks = dl_tasks.filter(order__coords_accuracy=accuracy_filter)
+    # Combined "Location Issues" filter — mirrors the dashboard card count exactly
+    # (no zone OR weak/missing coordinate accuracy).
+    if locissue_filter:
+        dl_tasks = dl_tasks.filter(
+            Q(order__dl_zone__isnull=True) | Q(order__dl_zone=0)
+            | Q(order__coords_accuracy__in=['landmark', 'zone_center'])
+            | Q(order__coords_accuracy__isnull=True) | Q(order__coords_accuracy='')
+        )
 
     # Apply sorting
     sort_field = request.GET.get('sort', '')
@@ -5794,6 +5806,7 @@ def dl_list_all(request):
     if business_id: filter_params_list.append(f'business={business_id}')
     if zone_filter: filter_params_list.append(f'zone={zone_filter}')
     if accuracy_filter: filter_params_list.append(f'accuracy={accuracy_filter}')
+    if locissue_filter: filter_params_list.append(f'locissue={locissue_filter}')
     if sort_field: filter_params_list.append(f'sort={sort_field}&order={sort_order}')
     filter_params = '&'.join(filter_params_list)
 
@@ -5830,6 +5843,7 @@ def dl_list_all(request):
             'business': business_id,
             'zone': zone_filter,
             'accuracy': accuracy_filter,
+            'locissue': locissue_filter,
         }
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
@@ -7537,11 +7551,29 @@ def update_order_coords(request, order_id):
 
         order.save(update_fields=update_fields)
 
+        # Reverse-resolve the zone from the pasted pin when the order has none yet.
+        # A partial coords save (update_fields) doesn't run the task-creation
+        # reverse-resolve, so a staff-dropped pin otherwise leaves Zone empty.
+        resolved_zone = None
+        if latitude and longitude and not order.dl_zone:
+            zone_obj, match = delivery_models.ZoneName.find_by_coords(latitude, longitude)
+            if zone_obj is not None:
+                order.dl_zone = zone_obj.zone_number
+                order.save(update_fields=['dl_zone'])
+                resolved_zone = {'zone_number': zone_obj.zone_number,
+                                 'zone_name': zone_obj.zone_name,
+                                 'method': match['method']}
+                logger.info(
+                    "Order %s zone reverse-resolved from staff pin (%s, %s) -> zone %s via %s",
+                    order_id, latitude, longitude, zone_obj.zone_number, match['method'])
+
         response_data = {'success': True, 'qnas_status': order.qnas_status}
         if order.latitude:
             response_data['latitude'] = float(order.latitude)
         if order.longitude:
             response_data['longitude'] = float(order.longitude)
+        if resolved_zone:
+            response_data['resolved_zone'] = resolved_zone
 
         return JsonResponse(response_data)
     except Http404:
@@ -8702,7 +8734,28 @@ def tasks_followup_list(request):
         driver_status='approved'
     ).select_related('user').order_by('user__first_name')
 
+    # Staleness ("chase") tiers — how long since the last update. Drives the hero
+    # backlog-shape strip and the per-row urgency gutter. Fresh <24h, Aging 1-3d, Stale 3d+.
+    from django.db.models import Case, When, IntegerField
+    now = timezone.now()
+    d1 = now - timedelta(days=1)
+    d3 = now - timedelta(days=3)
+    stale_counts = tasks_list.aggregate(
+        fresh=Count(Case(When(updated_at__gte=d1, then=1), output_field=IntegerField())),
+        aging=Count(Case(When(updated_at__lt=d1, updated_at__gte=d3, then=1), output_field=IntegerField())),
+        stale=Count(Case(When(updated_at__lt=d3, then=1), output_field=IntegerField())),
+    )
+
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=50)
+
+    # Tag each visible row with its staleness tier for the gutter/timestamp styling
+    for _t in tasks_with_pagination:
+        if _t.updated_at >= d1:
+            _t.staleness_tier = 'fresh'
+        elif _t.updated_at >= d3:
+            _t.staleness_tier = 'aging'
+        else:
+            _t.staleness_tier = 'stale'
 
     # Build filter params for pagination
     filter_params_nosort = ''
@@ -8735,6 +8788,9 @@ def tasks_followup_list(request):
         'filter_params': filter_params,
         'filter_params_nosort': filter_params_nosort,
         'show_followup_filters': True,
+        'stale_fresh': stale_counts['fresh'],
+        'stale_aging': stale_counts['aging'],
+        'stale_stale': stale_counts['stale'],
     }
     return render(request, 'workforce/parts/lists/dl_list_followup.html', context)
 
