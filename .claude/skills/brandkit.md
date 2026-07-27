@@ -45,6 +45,7 @@ Extended (Bootstrap-aligned): `50 #f8f9fa · 150 #e9ecef · 250 #dee2e6 · 450 #
 ### Type & spacing
 - `--brand-font-primary: "Inter", "Poppins", sans-serif`; weights 400/600; base `0.875rem`, heading `1.25rem`
 - `--spacing-xs 0.25 · sm 0.5 · md 1 · lg 1.5 · xl 2 (rem)`
+- **Padding baseline = `0.375rem` (6px).** Every padding STARTS at `0.375rem` and only grows when the content genuinely needs the room — grow in `0.375rem` steps (`0.375` → `0.75` → `1.125`), never to an arbitrary `0.85rem`/`1rem`/`1.5rem`. Do NOT reach for Bootstrap `p-2`/`p-3` (`0.5`/`1rem`) or a `0.85rem` hero pad as a default — those are "unwanted big padding." Heroes, cards, filter bars, list rows: `0.375rem` unless a larger value is deliberately justified. Card that already sits inside a margined wrapper → `padding: 0`.
 - Scale: page title 1.375rem/700 · section header 0.7rem/600 uppercase ls .06em grey-500 · label 0.75rem grey-500 · value 0.8125rem/600 grey-800 · big amount 1.375–1.75rem/700 · code/IDs 0.8125rem/700 mono
 
 ## Ready-made components (`brandkit-components.css`)
@@ -135,3 +136,4 @@ Vertical hairline (`grey-200`), 8px dots using semantic colors, current step dot
 3. BEM with app prefix (`block__element--modifier`); never re-declare Bootstrap base styles in BEM classes.
 4. Yellow is scarce. If a design uses `--brand-primary` more than ~twice per view, cut it back.
 5. WCAG AA: body text ≥ grey-500 on white; never yellow text on white.
+6. Padding starts at `0.375rem` and grows only when justified (see Type & spacing). Treat any `0.85rem`+/`p-3`/`1rem` block padding as a smell to fix, not a default.

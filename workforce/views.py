@@ -7541,6 +7541,15 @@ def update_order_coords(request, order_id):
             if coords_accuracy and coords_accuracy in dict(orders_models.Order.COORDS_ACCURACY):
                 order.coords_accuracy = coords_accuracy
                 update_fields.append('coords_accuracy')
+            # Staff pinned a real location → mark the address verified (mirrors the
+            # customer update_location flow). Don't override an explicit rejection.
+            if order.verification_status not in ('verified', 'rejected'):
+                order.verification_status = 'address_verified'
+                order.address_verified = True
+                order.address_verified_by = request.user
+                order.address_verified_at = timezone.now()
+                update_fields += ['verification_status', 'address_verified',
+                                  'address_verified_by', 'address_verified_at']
 
         if qnas_status and qnas_status in dict(orders_models.Order.QNAS_STATUS):
             order.qnas_status = qnas_status

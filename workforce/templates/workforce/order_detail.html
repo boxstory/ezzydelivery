@@ -96,7 +96,7 @@
         </div>
     </div>
 
-    <div class="row g-3 p-3">
+    <div class="row g-3 px-1 pt-0">
         <!-- Order Info -->
         <div class="col-lg-8">
             <div class="wod__card">
@@ -131,12 +131,14 @@
                                 <span class="wod__field-label">Verification Status</span>
                                 {% if order.verification_status == 'pending' %}
                                 <span class="wod__badge wod__badge--amber">Pending</span>
-                                {% elif order.verification_status == 'verified' %}
+                                {% elif order.verification_status == 'verified' or order.verification_status == 'address_verified' or order.verification_status == 'verified_by_customer' %}
                                 <span class="wod__badge wod__badge--green">Verified</span>
+                                {% elif order.verification_status == 'address_needs_update' %}
+                                <span class="wod__badge wod__badge--amber">Needs Update</span>
                                 {% elif order.verification_status == 'rejected' %}
                                 <span class="wod__badge wod__badge--red">Rejected</span>
                                 {% else %}
-                                <span class="wod__badge">{{ order.verification_status }}</span>
+                                <span class="wod__badge">{{ order.get_verification_status_display }}</span>
                                 {% endif %}
                                 {% if address_verify_job %}
                                 <div class="mt-1">
