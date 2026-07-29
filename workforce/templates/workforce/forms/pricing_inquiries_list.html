@@ -7,7 +7,7 @@
 
 {% block extra_css %}
 {# workforce.css already loaded in wf_dashboard_base.html #}
-<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260711e" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260728g" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -324,29 +324,8 @@
       </table>
     </div>
 
-    <!-- PAGINATION -->
-    {% if page_obj.has_other_pages %}
-    <div class="pil__foot">
-      <div class="pil__foot-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-      <nav>
-        <ul class="pil__pager">
-          {% if page_obj.has_previous %}
-          <li><a href="?page={{ page_obj.previous_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}"><i class="fa-solid fa-chevron-left"></i></a></li>
-          {% endif %}
-          {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-            <li class="is-active"><span>{{ num }}</span></li>
-            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-            <li><a href="?page={{ num }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">{{ num }}</a></li>
-            {% endif %}
-          {% endfor %}
-          {% if page_obj.has_next %}
-          <li><a href="?page={{ page_obj.next_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}"><i class="fa-solid fa-chevron-right"></i></a></li>
-          {% endif %}
-        </ul>
-      </nav>
-    </div>
-    {% endif %}
+    <!-- PAGINATION (shared brand component) -->
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="pricing_inquiries" %}
 
   </div>
 </div>

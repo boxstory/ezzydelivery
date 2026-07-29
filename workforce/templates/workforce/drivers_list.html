@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}All Drivers - Ezzy Delivery{% endblock title %}
 {% block content %}
-<div class="drl" id="main-content">
+<div class="drl">
     <!-- Hero Header -->
     <div class="wfd__hero">
         <div class="wfd__hero-content">
@@ -15,268 +15,287 @@
         </div>
     </div>
 
-    <!-- Tally strip: segments filter the list; active segment carries the yellow rule -->
-    <div class="drl__stats">
-        <button type="button" class="drl__stat-card {% if show_all %}drl__stat-card--active{% endif %}"
-                hx-get="{% url 'workforce:drivers_list' %}?all=1"
-                hx-target="#main-content"
-                hx-select="#main-content"
-                hx-swap="outerHTML"
-                hx-push-url="true">
-            <div class="drl__stat-icon drl__stat-icon--primary">
-                <i class="fa-solid fa-motorcycle"></i>
-            </div>
-            <div class="drl__stat-body">
-                <div class="drl__stat-value">{{ total_count }}</div>
-                <div class="drl__stat-label">All Drivers</div>
-            </div>
-        </button>
-        <button type="button" class="drl__stat-card {% if not show_all and selected_statuses|length == 1 and 'approved' in selected_statuses %}drl__stat-card--active{% endif %}"
-                hx-get="{% url 'workforce:drivers_list' %}?status=approved"
-                hx-target="#main-content"
-                hx-select="#main-content"
-                hx-swap="outerHTML"
-                hx-push-url="true">
-            <div class="drl__stat-icon drl__stat-icon--success">
-                <i class="fa-solid fa-circle-check"></i>
-            </div>
-            <div class="drl__stat-body">
-                <div class="drl__stat-value">{{ active_count }}</div>
-                <div class="drl__stat-label">Active</div>
-            </div>
-        </button>
-        <button type="button" class="drl__stat-card {% if 'pending' in selected_statuses or 'processing' in selected_statuses %}drl__stat-card--active{% endif %}"
-                hx-get="{% url 'workforce:drivers_list' %}?status=pending&status=processing"
-                hx-target="#main-content"
-                hx-select="#main-content"
-                hx-swap="outerHTML"
-                hx-push-url="true">
-            <div class="drl__stat-icon drl__stat-icon--warning">
-                <i class="fa-solid fa-clock"></i>
-            </div>
-            <div class="drl__stat-body">
-                <div class="drl__stat-value">{{ pending_count }}</div>
-                <div class="drl__stat-label">Pending Approval</div>
-            </div>
-        </button>
-        <button type="button" class="drl__stat-card {% if 'rejected' in selected_statuses or 'blocked' in selected_statuses or 'suspended' in selected_statuses %}drl__stat-card--active{% endif %}"
-                hx-get="{% url 'workforce:drivers_list' %}?status=rejected&status=blocked&status=suspended"
-                hx-target="#main-content"
-                hx-select="#main-content"
-                hx-swap="outerHTML"
-                hx-push-url="true">
-            <div class="drl__stat-icon drl__stat-icon--danger">
-                <i class="fa-solid fa-circle-xmark"></i>
-            </div>
-            <div class="drl__stat-body">
-                <div class="drl__stat-value">{{ inactive_count }}</div>
-                <div class="drl__stat-label">Inactive</div>
-            </div>
-        </button>
-    </div>
-
-    <!-- Filter -->
-    <div class="drl__filter">
-        <div class="drl__filter-header">
-            <i class="fa-solid fa-sliders drl__filter-header-icon"></i>
-            <span class="drl__filter-header-text">Filters</span>
+    <!-- Post-hero console: tally strip, filters and roster read as one card -->
+    <div class="wf-content drl__body">
+        <!-- Tally strip: segments filter the list; active segment carries the yellow rule -->
+        <div class="drl__stats">
+            <button type="button" class="drl__stat-card {% if show_all %}drl__stat-card--active{% endif %}"
+                    hx-get="{% url 'workforce:drivers_list' %}?all=1"
+                    hx-target="#main-content"
+                    hx-select="#main-content"
+                    hx-swap="outerHTML"
+                    hx-push-url="true">
+                <div class="drl__stat-icon drl__stat-icon--primary">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+                <div class="drl__stat-body">
+                    <div class="drl__stat-value">{{ total_count }}</div>
+                    <div class="drl__stat-label">All Drivers</div>
+                </div>
+            </button>
+            <button type="button" class="drl__stat-card {% if not show_all and selected_statuses|length == 1 and 'approved' in selected_statuses %}drl__stat-card--active{% endif %}"
+                    hx-get="{% url 'workforce:drivers_list' %}?status=approved"
+                    hx-target="#main-content"
+                    hx-select="#main-content"
+                    hx-swap="outerHTML"
+                    hx-push-url="true">
+                <div class="drl__stat-icon drl__stat-icon--success">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div class="drl__stat-body">
+                    <div class="drl__stat-value">{{ active_count }}</div>
+                    <div class="drl__stat-label">Active</div>
+                </div>
+            </button>
+            <button type="button" class="drl__stat-card {% if 'pending' in selected_statuses or 'processing' in selected_statuses %}drl__stat-card--active{% endif %}"
+                    hx-get="{% url 'workforce:drivers_list' %}?status=pending&status=processing"
+                    hx-target="#main-content"
+                    hx-select="#main-content"
+                    hx-swap="outerHTML"
+                    hx-push-url="true">
+                <div class="drl__stat-icon drl__stat-icon--warning">
+                    <i class="fa-solid fa-clock"></i>
+                </div>
+                <div class="drl__stat-body">
+                    <div class="drl__stat-value">{{ pending_count }}</div>
+                    <div class="drl__stat-label">Pending Approval</div>
+                </div>
+            </button>
+            <button type="button" class="drl__stat-card {% if 'rejected' in selected_statuses or 'blocked' in selected_statuses or 'suspended' in selected_statuses %}drl__stat-card--active{% endif %}"
+                    hx-get="{% url 'workforce:drivers_list' %}?status=rejected&status=blocked&status=suspended"
+                    hx-target="#main-content"
+                    hx-select="#main-content"
+                    hx-swap="outerHTML"
+                    hx-push-url="true">
+                <div class="drl__stat-icon drl__stat-icon--danger">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                </div>
+                <div class="drl__stat-body">
+                    <div class="drl__stat-value">{{ inactive_count }}</div>
+                    <div class="drl__stat-label">Inactive</div>
+                </div>
+            </button>
         </div>
-        <form method="get" class="drl__filter-form"
-              id="workforce_drivers_form_filter">
-            {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
-            <div class="drl__filter-group drl__filter-group--lg">
-                <label for="searchInput" class="drl__filter-label">
-                    <i class="fa-solid fa-search"></i> Search Drivers
-                </label>
-                <input type="text" id="searchInput" name="search"
-                       class="drl__filter-input"
-                       placeholder="Search by name, code, phone..."
-                       value="{{ search }}"
-                       hx-get="{% url 'workforce:drivers_list' %}"
-                       hx-target="#main-content"
-                       hx-select="#main-content"
-                       hx-swap="outerHTML"
-                       hx-push-url="true"
-                       hx-include="closest form"
-                       hx-trigger="keyup changed delay:500ms">
-            </div>
-            <div class="drl__filter-group">
-                <label for="statusFilter" class="drl__filter-label">
-                    <i class="fa-solid fa-filter"></i> Driver Status
-                </label>
-                {% include "workforce/parts/components/_multiselect_filter.html" with field_name="status" label="Driver Status" icon="filter" choices=status_choices selected=selected_statuses all_text="All Status" %}
-            </div>
-            <div class="drl__filter-group">
-                <label for="jobTypeFilter" class="drl__filter-label">
-                    <i class="fa-solid fa-business-time"></i> Work Preference
-                </label>
-                <select id="jobTypeFilter" name="job_type" class="drl__filter-select"
-                        hx-get="{% url 'workforce:drivers_list' %}"
-                        hx-target="#main-content"
-                        hx-select="#main-content"
-                        hx-swap="outerHTML"
-                        hx-push-url="true"
-                        hx-include="closest form"
-                        hx-trigger="change">
-                    <option value="">All Types</option>
-                    {% for val, opt_label in job_type_choices %}
-                    <option value="{{ val }}" {% if selected_job_type == val %}selected{% endif %}>{{ opt_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="drl__filter-group">
-                <label for="slabFilter" class="drl__filter-label">
-                    <i class="fa-solid fa-clock"></i> Working Hours
-                </label>
-                <select id="slabFilter" name="slab" class="drl__filter-select"
-                        hx-get="{% url 'workforce:drivers_list' %}"
-                        hx-target="#main-content"
-                        hx-select="#main-content"
-                        hx-swap="outerHTML"
-                        hx-push-url="true"
-                        hx-include="closest form"
-                        hx-trigger="change">
-                    <option value="">Any Hours</option>
-                    {% for val, opt_label in work_time_slab_choices %}
-                    <option value="{{ val }}" {% if selected_slab == val %}selected{% endif %}>{{ opt_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="drl__filter-group">
-                <label for="sortSelect" class="drl__filter-label">
-                    <i class="fa-solid fa-arrow-down-wide-short"></i> Sort by
-                </label>
-                <select id="sortSelect" name="sort" class="drl__filter-select"
-                        hx-get="{% url 'workforce:drivers_list' %}"
-                        hx-target="#main-content"
-                        hx-select="#main-content"
-                        hx-swap="outerHTML"
-                        hx-push-url="true"
-                        hx-include="closest form"
-                        hx-trigger="change">
-                    {% for val, opt_label in sort_choices %}
-                    <option value="{{ val }}" {% if sort == val %}selected{% endif %}>{{ opt_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="drl__filter-actions">
-                <button type="button" class="drl__btn drl__btn--primary"
-                        hx-get="{% url 'workforce:drivers_list' %}"
-                        hx-target="#main-content"
-                        hx-select="#main-content"
-                        hx-swap="outerHTML"
-                        hx-push-url="true"
-                        hx-include="closest form">
-                    <i class="fa-solid fa-search"></i> Filter
-                </button>
-                <button type="button" class="drl__btn drl__btn--export" title="Export to CSV"
-                        data-bs-toggle="modal" data-bs-target="#wfExportModal">
-                    <i class="fa-solid fa-file-csv"></i>
-                </button>
-            </div>
-        </form>
-    </div>
 
-    <!-- Table -->
-    <div id="drivers-list-panel">
-        <div class="drl__table-wrap">
-        {% if page_obj %}
-        <table class="drl__table" id="workforce_drivers_table_list">
-            <thead>
-                <tr>
-                    <th>Driver</th>
-                    <th>Contact</th>
-                    <th>Status</th>
-                    <th>Availability</th>
-                    <th>Vehicle</th>
-                    <th>Rating</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for driver in page_obj %}
-                <tr>
-                    <td>
-                        <div class="drl__driver-cell">
-                            <div class="drl__driver-avatar">
-                                <i class="fa-solid fa-user"></i>
+        <!-- Filter -->
+        <div class="drl__filter">
+            <div class="drl__filter-header">
+                <i class="fa-solid fa-sliders drl__filter-header-icon"></i>
+                <span class="drl__filter-header-text">Filters</span>
+            </div>
+            <form method="get" class="drl__filter-form"
+                  id="workforce_drivers_form_filter">
+                {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+                <div class="drl__filter-group drl__filter-group--lg">
+                    <label for="searchInput" class="drl__filter-label">
+                        <i class="fa-solid fa-search"></i> Search Drivers
+                    </label>
+                    <input type="text" id="searchInput" name="search"
+                           class="drl__filter-input"
+                           placeholder="Search by name, code, phone..."
+                           value="{{ search }}"
+                           hx-get="{% url 'workforce:drivers_list' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true"
+                           hx-include="closest form"
+                           hx-trigger="keyup changed delay:500ms">
+                </div>
+                <div class="drl__filter-group">
+                    <label for="statusFilter" class="drl__filter-label">
+                        <i class="fa-solid fa-filter"></i> Driver Status
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="status" label="Driver Status" icon="filter" choices=status_choices selected=selected_statuses all_text="All Status" %}
+                </div>
+                <div class="drl__filter-group">
+                    <label for="jobTypeFilter" class="drl__filter-label">
+                        <i class="fa-solid fa-business-time"></i> Work Preference
+                    </label>
+                    <select id="jobTypeFilter" name="job_type" class="drl__filter-select"
+                            hx-get="{% url 'workforce:drivers_list' %}"
+                            hx-target="#main-content"
+                            hx-select="#main-content"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                            hx-include="closest form"
+                            hx-trigger="change">
+                        <option value="">All Types</option>
+                        {% for val, opt_label in job_type_choices %}
+                        <option value="{{ val }}" {% if selected_job_type == val %}selected{% endif %}>{{ opt_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="drl__filter-group">
+                    <label for="slabFilter" class="drl__filter-label">
+                        <i class="fa-solid fa-clock"></i> Working Hours
+                    </label>
+                    <select id="slabFilter" name="slab" class="drl__filter-select"
+                            hx-get="{% url 'workforce:drivers_list' %}"
+                            hx-target="#main-content"
+                            hx-select="#main-content"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                            hx-include="closest form"
+                            hx-trigger="change">
+                        <option value="">Any Hours</option>
+                        {% for val, opt_label in work_time_slab_choices %}
+                        <option value="{{ val }}" {% if selected_slab == val %}selected{% endif %}>{{ opt_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="drl__filter-group">
+                    <label for="sortSelect" class="drl__filter-label">
+                        <i class="fa-solid fa-arrow-down-wide-short"></i> Sort by
+                    </label>
+                    <select id="sortSelect" name="sort" class="drl__filter-select"
+                            hx-get="{% url 'workforce:drivers_list' %}"
+                            hx-target="#main-content"
+                            hx-select="#main-content"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                            hx-include="closest form"
+                            hx-trigger="change">
+                        {% for val, opt_label in sort_choices %}
+                        <option value="{{ val }}" {% if sort == val %}selected{% endif %}>{{ opt_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="drl__filter-actions">
+                    <button type="button" class="drl__btn drl__btn--primary"
+                            hx-get="{% url 'workforce:drivers_list' %}"
+                            hx-target="#main-content"
+                            hx-select="#main-content"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                            hx-include="closest form">
+                        <i class="fa-solid fa-search"></i> Filter
+                    </button>
+                    <button type="button" class="drl__btn drl__btn--export" title="Export to CSV"
+                            data-bs-toggle="modal" data-bs-target="#wfExportModal">
+                        <i class="fa-solid fa-file-csv"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table -->
+        <div id="drivers-list-panel">
+            <div class="drl__table-wrap">
+            {% if page_obj %}
+            <table class="drl__table" id="workforce_drivers_table_list">
+                <thead>
+                    <tr>
+                        <th>Driver</th>
+                        <th>Contact</th>
+                        <th>Status</th>
+                        <th>Availability</th>
+                        <th>Vehicle</th>
+                        <th>Rating</th>
+                        <th>Applied / Updated</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for driver in page_obj %}
+                    <tr>
+                        <td>
+                            <div class="drl__driver-cell">
+                                <div class="drl__driver-avatar">
+                                    <i class="fa-solid fa-user"></i>
+                                </div>
+                                <div>
+                                    <div class="drl__driver-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</div>
+                                    <div class="drl__driver-code">{{ driver.driver_code|default:"N/A" }} · @{{ driver.user.username }}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div class="drl__driver-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</div>
-                                <div class="drl__driver-code">{{ driver.driver_code|default:"N/A" }} · @{{ driver.user.username }}</div>
+                        </td>
+                        <td>
+                            {% if driver.driver_phone %}
+                            <div class="drl__contact-line">
+                                <i class="fa-solid fa-phone"></i> {{ driver.driver_phone }}
                             </div>
-                        </div>
-                    </td>
-                    <td>
-                        {% if driver.driver_phone %}
-                        <div class="drl__contact-line">
-                            <i class="fa-solid fa-phone"></i> {{ driver.driver_phone }}
-                        </div>
-                        {% endif %}
-                        {% if driver.driver_whatsapp %}
-                        <div class="drl__contact-line">
-                            <i class="fa-brands fa-whatsapp"></i> {{ driver.driver_whatsapp }}
-                        </div>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="drl__badge {% if driver.driver_status == 'approved' %}drl__badge--success{% elif driver.driver_status == 'pending' or driver.driver_status == 'processing' %}drl__badge--warning{% else %}drl__badge--danger{% endif %}">
-                            {{ driver.driver_status }}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
-                            {% if driver.driver_availability == 'available' %}<i class="fa-solid fa-circle-check"></i> Available
-                            {% elif driver.driver_availability == 'on_delivery' %}<i class="fa-solid fa-truck"></i> On Delivery
-                            {% elif driver.driver_availability == 'on_break' %}<i class="fa-solid fa-mug-hot"></i> On Break
-                            {% elif driver.driver_availability == 'returning' %}<i class="fa-solid fa-rotate-left"></i> Returning
-                            {% else %}<i class="fa-solid fa-circle-xmark"></i> Offline
                             {% endif %}
-                        </span>
-                        {% if driver.job_type %}
-                        <div class="drl__work-pref">{{ driver.get_job_type_display }}{% if driver.work_time_slabs %} &middot; {{ driver.work_time_slab_list|join:", "|title }}{% endif %}</div>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% with vehicle=driver.driver_vehicle.first %}
-                        {% if vehicle %}
-                        <div class="drl__vehicle-type">{{ vehicle.vehicle_type|title }}</div>
-                        {% if vehicle.vehicle_no %}
-                        <span class="drl__plate">
-                            <span class="drl__plate-band">QAT</span>
-                            <span class="drl__plate-no">{{ vehicle.vehicle_no }}</span>
-                        </span>
-                        {% endif %}
-                        {% else %}
-                        <span class="drl__text-muted">No vehicle</span>
-                        {% endif %}
-                        {% endwith %}
-                    </td>
-                    <td>
-                        <div class="drl__rating">
-                            <i class="fa-solid fa-star drl__rating-star"></i>
-                            <span>{{ driver.driver_rating|default:0 }}</span>
-                            <span class="drl__rating-count">({{ driver.driver_rating_count }})</span>
-                        </div>
-                    </td>
-                    <td>
-                        <a href="{% url 'workforce:driver_detail' driver.driver_id %}"
-                           class="drl__btn drl__btn--view">
-                            <i class="fa-solid fa-eye"></i> View
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% include "includes/components/_pagination.html" with page_obj=page_obj %}
-        {% else %}
-        <div class="drl__empty">
-            <i class="fa-solid fa-motorcycle"></i>
-            <h3>No Drivers Found</h3>
-            <p>{% if search or status_filter %}No drivers match your filter criteria.{% else %}There are no drivers registered yet.{% endif %}</p>
-        </div>
-        {% endif %}
+                            {% if driver.driver_whatsapp %}
+                            <div class="drl__contact-line">
+                                <i class="fa-brands fa-whatsapp"></i> {{ driver.driver_whatsapp }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="drl__badge {% if driver.driver_status == 'approved' %}drl__badge--success{% elif driver.driver_status == 'pending' or driver.driver_status == 'processing' %}drl__badge--warning{% else %}drl__badge--danger{% endif %}">
+                                {{ driver.driver_status }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
+                                {% if driver.driver_availability == 'available' %}<i class="fa-solid fa-circle-check"></i> Available
+                                {% elif driver.driver_availability == 'on_delivery' %}<i class="fa-solid fa-truck"></i> On Delivery
+                                {% elif driver.driver_availability == 'on_break' %}<i class="fa-solid fa-mug-hot"></i> On Break
+                                {% elif driver.driver_availability == 'returning' %}<i class="fa-solid fa-rotate-left"></i> Returning
+                                {% else %}<i class="fa-solid fa-circle-xmark"></i> Offline
+                                {% endif %}
+                            </span>
+                            {% if driver.job_type %}
+                            <div class="drl__work-pref">{{ driver.get_job_type_display }}{% if driver.work_time_slabs %} &middot; {{ driver.work_time_slab_list|join:", "|title }}{% endif %}</div>
+                            {% endif %}
+                            {% with zgs=driver.preferred_zone_groups.all %}
+                            {% if zgs %}
+                            <div class="drl__work-pref"><i class="fa-solid fa-map-location-dot"></i> {% for z in zgs|slice:":2" %}{{ z.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if zgs|length > 2 %} +{{ zgs|length|add:"-2" }}{% endif %}</div>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            {% with vehicle=driver.driver_vehicle.first %}
+                            {% if vehicle %}
+                            <div class="drl__vehicle-type">{{ vehicle.vehicle_type|title }}</div>
+                            {% if vehicle.vehicle_no %}
+                            <span class="drl__plate">
+                                <span class="drl__plate-band">QAT</span>
+                                <span class="drl__plate-no">{{ vehicle.vehicle_no }}</span>
+                            </span>
+                            {% endif %}
+                            {% else %}
+                            <span class="drl__text-muted">No vehicle</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <div class="drl__rating">
+                                <i class="fa-solid fa-star drl__rating-star"></i>
+                                <span>{{ driver.driver_rating|default:0 }}</span>
+                                <span class="drl__rating-count">({{ driver.driver_rating_count }})</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="drl__date-line" title="Applied {{ driver.created_at|date:'d M Y H:i' }}">
+                                <i class="fa-solid fa-file-signature"></i> {{ driver.created_at|date:"d M Y" }}
+                            </div>
+                            {% if driver.updated_at|date:"Ymd" != driver.created_at|date:"Ymd" %}
+                            <div class="drl__date-line drl__date-line--muted" title="Last updated {{ driver.updated_at|date:'d M Y H:i' }}">
+                                <i class="fa-solid fa-pen"></i> {{ driver.updated_at|date:"d M Y" }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'workforce:driver_detail' driver.driver_id %}"
+                               class="drl__btn drl__btn--view">
+                                <i class="fa-solid fa-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% include "includes/components/_pagination.html" with page_obj=page_obj %}
+            {% else %}
+            <div class="drl__empty">
+                <i class="fa-solid fa-motorcycle"></i>
+                <h3>No Drivers Found</h3>
+                <p>{% if search or status_filter %}No drivers match your filter criteria.{% else %}There are no drivers registered yet.{% endif %}</p>
+            </div>
+            {% endif %}
+            </div>
         </div>
     </div>
 </div>

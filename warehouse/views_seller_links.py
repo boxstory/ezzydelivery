@@ -84,13 +84,27 @@ def seller_warehouse_links(request):
         seller_links__isnull=False
     ).distinct().order_by('name')
 
-    # Pagination
-    paginator = Paginator(links, 25)  # 25 links per page
+    # Pagination — ?per_page= validated against the shared pager options
+    try:
+        per_page = int(request.GET.get('per_page', 25))
+    except (ValueError, TypeError):
+        per_page = 25
+    if per_page not in (10, 25, 50, 100):
+        per_page = 25
+
+    paginator = Paginator(links, per_page)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Query string carried by every pagination link (everything except page/per_page)
+    filter_qs = request.GET.copy()
+    filter_qs.pop('page', None)
+    filter_qs.pop('per_page', None)
+
     context = {
         'page_obj': page_obj,
+        'per_page': str(per_page),
+        'filter_params': filter_qs.urlencode(),
         'links': page_obj.object_list,
         'total_links': total_links,
         'active_links': active_links,

@@ -296,12 +296,20 @@ def orders_all_list(request):
             if note:
                 fallback_failure_notes[oid] = note
 
+    # Query string carried by every pagination link (everything except page/per_page):
+    # orderNumber, mobile, customerName, zone, cStatus, codStatus, dlStatus,
+    # dateRange/dateFrom/dateTo, deliveredRange/deliveredFrom/deliveredTo, sort, dir.
+    filter_qs = request.GET.copy()
+    filter_qs.pop('page', None)
+    filter_qs.pop('per_page', None)
+
     context = {
         'orders': orders,
         'business': business,
         'fallback_failure_notes': fallback_failure_notes,
         'len': paginator.count,  # Use paginator.count (cached) instead of items.count()
         'per_page': str(per_page),  # String for template comparison
+        'filter_params': filter_qs.urlencode(),
         'has_ecom_api': business_models.BusinessApiSettings.objects.filter(
             business=business, api_type__in=['shopify', 'woocommerce']
         ).exists(),
@@ -403,11 +411,18 @@ def orders_pending_list(request):
         orders = paginator.page(paginator.num_pages)
         logger.debug(f"Empty page, displaying last page {paginator.num_pages}")
 
+    # Query string carried by every pagination link (everything except page/per_page):
+    # sort, dir.
+    filter_qs = request.GET.copy()
+    filter_qs.pop('page', None)
+    filter_qs.pop('per_page', None)
+
     context = {
         'orders': orders,
         'business': business,
         'len': paginator.count,
         'per_page': str(per_page),
+        'filter_params': filter_qs.urlencode(),
         'can_create_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE),
         'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
         'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
@@ -2981,6 +2996,10 @@ def update_location(request):
                         building_number = update_form.cleaned_data.get('building_number')
                         notes = update_form.cleaned_data.get('notes')
 
+                        # Snapshot the pin the client is replacing, for the timeline row
+                        old_lat, old_lng = order.latitude, order.longitude
+                        old_accuracy = order.coords_accuracy or ''
+
                         # Atomic: order, verification, address and task updates commit as one unit
                         with transaction.atomic():
                             # Update Order
@@ -3026,6 +3045,17 @@ def update_location(request):
                             addr_verify.verification_result = 'address_verified'
                             addr_verify.customer_verified_at = timezone.now()
                             addr_verify.save()
+
+                            # Timeline: the client confirmed / moved their own pin
+                            from orders.location_history import log_location_update
+                            log_location_update(
+                                order, source='Customer verification link', actor=None,
+                                old_lat=old_lat, old_lng=old_lng, old_accuracy=old_accuracy,
+                                new_lat=order.latitude, new_lng=order.longitude,
+                                new_accuracy=order.coords_accuracy,
+                                note=(f'Zone {order.dl_zone}' if order.dl_zone else None),
+                                force=True,
+                            )
 
                             # Update DlAddressUpdate (always update, create if missing)
                             dl_update_fields = {}

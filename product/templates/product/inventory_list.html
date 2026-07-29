@@ -81,7 +81,7 @@
         <option value="">All Categories</option>
         {% for category in categories %}
         <option value="{{ category.id }}" {% if selected_category == category.id|stringformat:"s" %}selected{% endif %}>
-          {{ category.name }}
+          {{ category.category_name }}
         </option>
         {% endfor %}
       </select>
@@ -197,44 +197,8 @@
     {% endfor %}
   </div>
 
-  <!-- Pagination -->
-  {% if stock_levels.paginator.num_pages > 1 %}
-  <div class="ivl__pagination">
-    {% if stock_levels.has_previous %}
-    <a href="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-       class="ivl__page-btn"
-       hx-get="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-       hx-target="#main-content"
-       hx-swap="outerHTML"
-       hx-push-url="true">
-      <i class="fas fa-chevron-left"></i>
-    </a>
-    {% else %}
-    <button class="ivl__page-btn" disabled>
-      <i class="fas fa-chevron-left"></i>
-    </button>
-    {% endif %}
-
-    <span class="ivl__page-info">
-      Page {{ stock_levels.number }} of {{ stock_levels.paginator.num_pages }}
-    </span>
-
-    {% if stock_levels.has_next %}
-    <a href="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-       class="ivl__page-btn"
-       hx-get="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-       hx-target="#main-content"
-       hx-swap="outerHTML"
-       hx-push-url="true">
-      <i class="fas fa-chevron-right"></i>
-    </a>
-    {% else %}
-    <button class="ivl__page-btn" disabled>
-      <i class="fas fa-chevron-right"></i>
-    </button>
-    {% endif %}
-  </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries search / warehouse / category / low_stock -->
+  {% include "includes/components/_pagination.html" with page_obj=stock_levels filter_params=filter_params per_page=per_page pagination_id="product_inventory_list" %}
 
   {% else %}
   <!-- Empty State -->

@@ -1,46 +1,65 @@
 {% extends "socialaccount/base.html" %}
 {% load i18n %}
 {% load static %}
+{% comment %}
+Purpose: Social signup completion — confirms email/username after Google/Facebook auth before creating the account
+Used by: allauth socialaccount_signup (/accounts/3rdparty/signup/), reached from driver join + login Google flows
+Notes: Was the last auth template on pre-BEM classes (rendered unstyled); now uses auth__ classes from auth-common.css
+{% endcomment %}
 
 {% block head_title %}{% trans "Complete Sign Up" %}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'account/css/auth-common.css' %}">
-<link rel="stylesheet" href="{% static 'socialaccount/css/socialaccount-auth.css' %}">
+<link rel="stylesheet" href="{% static 'socialaccount/css/socialaccount-auth.css' %}?v=20260723a">
 {% endblock %}
 
 {% block account_content %}
-<div class="auth-container" id="social_signup_container_main">
-    <div class="auth-card" id="social_signup_card_main">
-        <div class="auth-header" id="social_signup_header">
-            <div class="auth-logo">
-                <i class="fa-solid fa-user-plus"></i>
+<div class="auth__container" id="social_signup_container_main">
+    <div class="auth__card" id="social_signup_card_main">
+        <div class="auth__header" id="social_signup_header">
+            <div class="auth__logo">
+                {% if account.get_provider.id == "google" %}
+                    <i class="fa-brands fa-google"></i>
+                {% elif account.get_provider.id == "facebook" %}
+                    <i class="fa-brands fa-facebook"></i>
+                {% else %}
+                    <i class="fa-solid fa-user-plus"></i>
+                {% endif %}
             </div>
             <h1 id="social_signup_title_main">{% trans "Complete Sign Up" %}</h1>
             <p id="social_signup_subtitle">{% trans "One more step to get started" %}</p>
         </div>
 
-        <div class="auth-body" id="social_signup_section_body">
-            <div class="provider-info" id="social_signup_provider_info">
+        <div class="auth__body" id="social_signup_section_body">
+            <div class="auth__provider-info" id="social_signup_provider_info">
                 <p>
                     {% blocktrans with provider_name=account.get_provider.name %}
-                    You are using your <span class="provider-name">{{ provider_name }}</span> account to sign up.
-                    Please complete the form below to finish creating your account.
+                    You are using your <span class="auth__provider-name">{{ provider_name }}</span> account to sign up.
+                    Please confirm the details below to finish creating your account.
                     {% endblocktrans %}
                 </p>
             </div>
 
+            {% if form.non_field_errors %}
+            <ul class="auth__errorlist" id="social_signup_errors_nonfield">
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
             <form class="signup" id="social_signup_form_main" method="post" action="{% url 'socialaccount_signup' %}" novalidate>
                 {% csrf_token %}
 
-                {% for field in form %}
-                <div class="form-group" id="social_signup_form_group_{{ field.name }}">
+                {% for field in form.visible_fields %}
+                <div class="auth__form-group" id="social_signup_form_group_{{ field.name }}">
                     <label for="{{ field.id_for_label }}">
                         {{ field.label }}
                     </label>
                     {{ field }}
                     {% if field.errors %}
-                        <ul class="errorlist">
+                        <ul class="auth__errorlist">
                             {% for error in field.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -51,12 +70,13 @@
                     {% endif %}
                 </div>
                 {% endfor %}
+                {% for field in form.hidden_fields %}{{ field }}{% endfor %}
 
                 {% if redirect_field_value %}
                 <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
                 {% endif %}
 
-                <button id="social_signup_btn_submit" type="submit" class="btn-signup">
+                <button id="social_signup_btn_submit" type="submit" class="auth__btn--signup">
                     <i class="fa-solid fa-user-check me-2"></i>
                     {% trans "Complete Sign Up" %}
                 </button>

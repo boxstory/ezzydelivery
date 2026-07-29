@@ -1,634 +1,699 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
+{# Purpose: Staff AI configuration console — providers, models, keys, budgets, conversation API. Tabbed, per-section AJAX save, live tests. #}
+{# Used by: workforce.views.wf_ai_config (+ wf_ai_config_test, wf_ai_models_api) #}
+{# Notes: aic__ namespace; each tab is its own form saved via fetch (section=…); toggles instant-save; model selects populate from wf_ai_models_api. #}
+
 {% block extra_css %}
-<link href="{% static 'workforce/css/ai-config.css' %}?v=6" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/ai-config.css' %}?v=15" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
+<div class="col-12 p-3 aic" id="aic_root">
 
-{% if messages %}
-  {% for msg in messages %}
-  <div class="alert alert-success alert-dismissible fade show mx-3 mt-3" role="alert">
-    {{ msg }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  </div>
-  {% endfor %}
-{% endif %}
-
-<!-- Header -->
-<header class="aic__hero d-flex align-items-center gap-3">
-  <div>
-    <h2><i class="fa-solid fa-microchip me-1" aria-hidden="true"></i>AI Agent Config</h2>
-    <span class="aic__hero__subtitle">Manage AI providers, models, budgets, and API credentials</span>
-  </div>
-  <div class="ms-auto">
-    {% if agent_status.available %}
-      <span class="aic__status-badge aic__status-badge--ok">
-        <i class="fa-solid fa-circle-check"></i> Online
-      </span>
-    {% else %}
-      <span class="aic__status-badge aic__status-badge--err">
-        <i class="fa-solid fa-circle-xmark"></i> Offline
-      </span>
-    {% endif %}
-  </div>
-</header>
-
-<div class="col-12 p-3">
-
-  <!-- Live Stats Row -->
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-      <div class="aic__stat-card">
-        <div class="aic__stat-card__value">{{ today_usage.calls }}</div>
-        <div class="aic__stat-card__label">API calls today</div>
-      </div>
+  <!-- Header -->
+  <header class="aic__hero d-flex align-items-center flex-wrap gap-3 mb-3">
+    <div>
+      <h2 class="mb-0"><i class="fa-solid fa-microchip me-1" aria-hidden="true"></i>AI Agent Config</h2>
+      <span class="aic__hero__subtitle">Providers, models, budgets, credentials &amp; the conversation API</span>
     </div>
-    <div class="col-6 col-md-3">
-      <div class="aic__stat-card">
-        <div class="aic__stat-card__value">${{ today_usage.cost|floatformat:4 }}</div>
-        <div class="aic__stat-card__label">Cost today</div>
-      </div>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <!-- Master toggles (instant save) -->
+      <label class="aic__switch" title="Master switch for the AI agent">
+        <input type="checkbox" role="switch" data-flag="AI_AGENT_ENABLED"
+               {% if env.AI_AGENT_ENABLED != 'False' %}checked{% endif %}>
+        <span class="aic__switch-track"></span>
+        <span class="aic__switch-label">AI Agent</span>
+      </label>
+      <label class="aic__switch" title="Auto-reply to inbound WhatsApp">
+        <input type="checkbox" role="switch" data-flag="AI_AGENT_WHATSAPP_ENABLED"
+               {% if env.AI_AGENT_WHATSAPP_ENABLED != 'False' %}checked{% endif %}>
+        <span class="aic__switch-track"></span>
+        <span class="aic__switch-label">WhatsApp AI</span>
+      </label>
+      {% if agent_status.available %}
+        <span class="aic__status-badge aic__status-badge--ok"><i class="fa-solid fa-circle-check"></i> Online</span>
+      {% else %}
+        <span class="aic__status-badge aic__status-badge--err"><i class="fa-solid fa-circle-xmark"></i> Offline</span>
+      {% endif %}
     </div>
-    <div class="col-6 col-md-3">
-      <div class="aic__stat-card">
-        <div class="aic__stat-card__value">${{ today_usage.month_cost|floatformat:2 }}</div>
-        <div class="aic__stat-card__label">Cost this month</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="aic__stat-card">
-        <div class="aic__stat-card__value">{{ today_usage.active_conversations }}</div>
-        <div class="aic__stat-card__label">Active conversations (24h)</div>
-      </div>
-    </div>
-  </div>
+  </header>
 
-  <!-- Budget Progress -->
-  {% if budget_usage %}
-  <div class="card mb-4">
-    <div class="card-header"><strong>Budget Usage</strong></div>
-    <div class="card-body">
-      <div class="row g-3">
-        <div class="col-12 col-md-6">
-          <div class="d-flex justify-content-between mb-1">
-            <small class="fw-semibold">Daily</small>
-            <small>${{ budget_usage.daily_used|floatformat:3 }} / ${{ budget_usage.daily_budget|floatformat:2 }}</small>
-          </div>
-          <div class="aic__budget-bar">
-            {% widthratio budget_usage.daily_used budget_usage.daily_budget 100 as dpct %}
-            <div class="aic__budget-bar__fill {% if dpct >= 80 %}aic__budget-bar__fill--danger{% elif dpct >= 60 %}aic__budget-bar__fill--warn{% endif %}"
-                 style="width:{{ dpct|default:0 }}%"></div>
-          </div>
-        </div>
-        <div class="col-12 col-md-6">
-          <div class="d-flex justify-content-between mb-1">
-            <small class="fw-semibold">Monthly</small>
-            <small>${{ budget_usage.monthly_used|floatformat:2 }} / ${{ budget_usage.monthly_budget|floatformat:2 }}</small>
-          </div>
-          <div class="aic__budget-bar">
-            {% widthratio budget_usage.monthly_used budget_usage.monthly_budget 100 as mpct %}
-            <div class="aic__budget-bar__fill {% if mpct >= 80 %}aic__budget-bar__fill--danger{% elif mpct >= 60 %}aic__budget-bar__fill--warn{% endif %}"
-                 style="width:{{ mpct|default:0 }}%"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+  <!-- Global toast -->
+  <div class="aic__toast" id="aic_toast" role="status" aria-live="polite"></div>
 
-  <!-- AI Usages Reference -->
-  <div class="card mb-3 border-0 bg-light">
-    <div class="card-body py-2 px-3">
-      <p class="mb-2 fw-semibold small"><i class="fa-solid fa-circle-info me-1 text-primary"></i>AI Usages — what each provider controls</p>
-      <div class="d-flex flex-wrap gap-2">
-        <span class="badge bg-white border text-dark fw-normal py-1 px-2"><i class="fa-solid fa-robot me-1 text-primary"></i><strong>Chat AI:</strong> Dashboard chat · Extract order text · Address zone lookup</span>
-        <span class="badge bg-white border text-dark fw-normal py-1 px-2"><i class="fa-brands fa-whatsapp me-1 text-success"></i><strong>WhatsApp AI:</strong> Auto-reply to inbound messages via n8n</span>
-      </div>
-    </div>
-  </div>
-
-  <form method="post">
-    {% csrf_token %}
-    <div class="row g-3">
-
-      <!-- LEFT COLUMN -->
-      <div class="col-12 col-lg-6">
-
-        <!-- Business Dashboard AI -->
-        <div class="card mb-3">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-solid fa-robot text-primary"></i>
-            <strong>Chat AI Provider</strong>
-            <span class="badge bg-light text-dark border ms-auto">Dashboard · Order Extract · Address Lookup</span>
-          </div>
-          <div class="card-body">
-            <p class="aic__section-title">Provider</p>
-            <div class="aic__provider-list mb-3" data-group="chat">
-              <label class="aic__provider-row {% if chat_provider == 'anthropic' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_CHAT_PROVIDER" value="anthropic" {% if chat_provider == 'anthropic' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--anthropic">A</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Anthropic</span>
-                  <span class="aic__provider-sub d-block">Claude Sonnet / Haiku / Opus</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if chat_provider == 'openai' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_CHAT_PROVIDER" value="openai" {% if chat_provider == 'openai' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--openai">AI</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">OpenAI</span>
-                  <span class="aic__provider-sub d-block">GPT-4o / GPT-4 Turbo</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if chat_provider == 'gemini' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_CHAT_PROVIDER" value="gemini" {% if chat_provider == 'gemini' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--gemini">G</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Google</span>
-                  <span class="aic__provider-sub d-block">Gemini 2.0 / 1.5 Pro</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if chat_provider == 'xai' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_CHAT_PROVIDER" value="xai" {% if chat_provider == 'xai' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--xai">xAI</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">xAI</span>
-                  <span class="aic__provider-sub d-block">Grok 3 / Grok 3 Mini</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if chat_provider == 'groq' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_CHAT_PROVIDER" value="groq" {% if chat_provider == 'groq' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--groq">GQ</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Groq</span>
-                  <span class="aic__provider-sub d-block">Llama 3.3 / Mixtral (Fast inference)</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if chat_provider == 'zhipu' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_CHAT_PROVIDER" value="zhipu" {% if chat_provider == 'zhipu' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--zhipu">ZP</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Zhipu AI</span>
-                  <span class="aic__provider-sub d-block">GLM-4.7 Flash (Free tier)</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-            </div>
-            <label class="form-label small fw-semibold" for="AI_CHAT_MODEL">Model</label>
-            <select class="form-select form-select-sm" id="AI_CHAT_MODEL" name="AI_CHAT_MODEL"
-                    data-current="{{ env.AI_CHAT_MODEL|default:'' }}">
-            </select>
-            <hr class="my-3">
-            <p class="aic__section-title">Fallback provider <span class="text-muted fw-normal">(auto-switch on rate limit / timeout)</span></p>
-            <div class="d-flex gap-2 align-items-end">
-              <div class="flex-grow-1">
-                <label class="form-label small fw-semibold mb-1" for="AI_CHAT_FALLBACK_PROVIDER">Provider</label>
-                <select class="form-select form-select-sm" id="AI_CHAT_FALLBACK_PROVIDER" name="AI_CHAT_FALLBACK_PROVIDER">
-                  <option value="">— None —</option>
-                  <option value="anthropic" {% if chat_fallback_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
-                  <option value="openai"    {% if chat_fallback_provider == 'openai'    %}selected{% endif %}>OpenAI</option>
-                  <option value="gemini"    {% if chat_fallback_provider == 'gemini'    %}selected{% endif %}>Google Gemini</option>
-                  <option value="groq"      {% if chat_fallback_provider == 'groq'      %}selected{% endif %}>Groq</option>
-                  <option value="xai"       {% if chat_fallback_provider == 'xai'       %}selected{% endif %}>xAI</option>
-                  <option value="zhipu"     {% if chat_fallback_provider == 'zhipu'     %}selected{% endif %}>Zhipu AI</option>
-                </select>
-              </div>
-              <div class="flex-grow-1">
-                <label class="form-label small fw-semibold mb-1" for="AI_CHAT_FALLBACK_MODEL">Model <span class="text-muted fw-normal">(optional)</span></label>
-                <input type="text" class="form-control form-control-sm font-monospace" id="AI_CHAT_FALLBACK_MODEL" name="AI_CHAT_FALLBACK_MODEL"
-                       value="{{ env.AI_CHAT_FALLBACK_MODEL|default:'' }}" placeholder="leave blank for default">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- WhatsApp Reply AI -->
-        <div class="card mb-3">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-brands fa-whatsapp text-success"></i>
-            <strong>WhatsApp Reply AI</strong>
-            <span class="badge bg-light text-dark border ms-auto">Auto-reply</span>
-          </div>
-          <div class="card-body">
-            <p class="aic__section-title">Provider</p>
-            <div class="aic__provider-list mb-3" data-group="wa">
-              <label class="aic__provider-row {% if wa_provider == 'anthropic' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_WA_PROVIDER" value="anthropic" {% if wa_provider == 'anthropic' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--anthropic">A</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Anthropic</span>
-                  <span class="aic__provider-sub d-block">Claude Sonnet / Haiku / Opus</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if wa_provider == 'openai' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_WA_PROVIDER" value="openai" {% if wa_provider == 'openai' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--openai">AI</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">OpenAI</span>
-                  <span class="aic__provider-sub d-block">GPT-4o / GPT-4 Turbo</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if wa_provider == 'gemini' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_WA_PROVIDER" value="gemini" {% if wa_provider == 'gemini' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--gemini">G</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Google</span>
-                  <span class="aic__provider-sub d-block">Gemini 2.0 / 1.5 Pro</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if wa_provider == 'xai' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_WA_PROVIDER" value="xai" {% if wa_provider == 'xai' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--xai">xAI</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">xAI</span>
-                  <span class="aic__provider-sub d-block">Grok 3 / Grok 3 Mini</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if wa_provider == 'groq' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_WA_PROVIDER" value="groq" {% if wa_provider == 'groq' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--groq">GQ</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Groq</span>
-                  <span class="aic__provider-sub d-block">Llama 3.3 / Mixtral (Fast inference)</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-              <label class="aic__provider-row {% if wa_provider == 'zhipu' %}aic__provider-row--active{% endif %}">
-                <input type="radio" name="AI_WA_PROVIDER" value="zhipu" {% if wa_provider == 'zhipu' %}checked{% endif %} hidden>
-                <span class="aic__provider-dot aic__provider-dot--zhipu">ZP</span>
-                <span class="aic__provider-info">
-                  <span class="aic__provider-name">Zhipu AI</span>
-                  <span class="aic__provider-sub d-block">GLM-4.7 Flash (Free tier)</span>
-                </span>
-                <span class="aic__provider-check"></span>
-              </label>
-            </div>
-            <label class="form-label small fw-semibold" for="AI_WA_MODEL">Model</label>
-            <select class="form-select form-select-sm" id="AI_WA_MODEL" name="AI_WA_MODEL"
-                    data-current="{{ env.AI_WA_MODEL|default:'' }}">
-            </select>
-            <hr class="my-3">
-            <p class="aic__section-title">Fallback provider <span class="text-muted fw-normal">(auto-switch on rate limit / timeout)</span></p>
-            <div class="d-flex gap-2 align-items-end">
-              <div class="flex-grow-1">
-                <label class="form-label small fw-semibold mb-1" for="AI_WA_FALLBACK_PROVIDER">Provider</label>
-                <select class="form-select form-select-sm" id="AI_WA_FALLBACK_PROVIDER" name="AI_WA_FALLBACK_PROVIDER">
-                  <option value="">— None —</option>
-                  <option value="anthropic" {% if wa_fallback_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
-                  <option value="openai"    {% if wa_fallback_provider == 'openai'    %}selected{% endif %}>OpenAI</option>
-                  <option value="gemini"    {% if wa_fallback_provider == 'gemini'    %}selected{% endif %}>Google Gemini</option>
-                  <option value="groq"      {% if wa_fallback_provider == 'groq'      %}selected{% endif %}>Groq</option>
-                  <option value="xai"       {% if wa_fallback_provider == 'xai'       %}selected{% endif %}>xAI</option>
-                  <option value="zhipu"     {% if wa_fallback_provider == 'zhipu'     %}selected{% endif %}>Zhipu AI</option>
-                </select>
-              </div>
-              <div class="flex-grow-1">
-                <label class="form-label small fw-semibold mb-1" for="AI_WA_FALLBACK_MODEL">Model <span class="text-muted fw-normal">(optional)</span></label>
-                <input type="text" class="form-control form-control-sm font-monospace" id="AI_WA_FALLBACK_MODEL" name="AI_WA_FALLBACK_MODEL"
-                       value="{{ env.AI_WA_FALLBACK_MODEL|default:'' }}" placeholder="leave blank for default">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Feature Flags -->
-        <div class="card mb-3">
-          <div class="card-header"><strong>Feature Flags</strong></div>
-          <div class="card-body d-flex flex-column gap-3">
-            <div class="d-flex align-items-center justify-content-between">
-              <div>
-                <div class="fw-semibold small">AI Agent Enabled</div>
-                <div class="text-muted" style="font-size:0.78rem">Business dashboard chat assistant</div>
-              </div>
-              <select class="form-select form-select-sm w-auto" name="AI_AGENT_ENABLED">
-                <option value="True" {% if env.AI_AGENT_ENABLED != 'False' %}selected{% endif %}>Enabled</option>
-                <option value="False" {% if env.AI_AGENT_ENABLED == 'False' %}selected{% endif %}>Disabled</option>
-              </select>
-            </div>
-            <div class="d-flex align-items-center justify-content-between">
-              <div>
-                <div class="fw-semibold small">WhatsApp AI Enabled</div>
-                <div class="text-muted" style="font-size:0.78rem">AI responds to WhatsApp messages automatically</div>
-              </div>
-              <select class="form-select form-select-sm w-auto" name="AI_AGENT_WHATSAPP_ENABLED">
-                <option value="True" {% if env.AI_AGENT_WHATSAPP_ENABLED != 'False' %}selected{% endif %}>Enabled</option>
-                <option value="False" {% if env.AI_AGENT_WHATSAPP_ENABLED == 'False' %}selected{% endif %}>Disabled</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- RIGHT COLUMN -->
-      <div class="col-12 col-lg-6">
-
-        <!-- API Keys -->
-        <div class="card mb-3">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-solid fa-key text-warning"></i>
-            <strong>API Keys</strong>
-            <small class="text-muted ms-1">(leave blank to keep existing)</small>
-          </div>
-          <div class="card-body d-flex flex-column gap-4" id="aic-keys-body">
-
-            <div data-key-provider="anthropic">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="aic__provider-pill aic__provider-pill--anthropic">Anthropic</span>
-                {% if masked_anthropic_key %}
-                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
-                  <span class="aic__key-mask">{{ masked_anthropic_key }}</span>
-                {% else %}
-                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
-                  <span class="text-danger small">Not set</span>
-                {% endif %}
-              </div>
-              <input type="password" class="form-control form-control-sm font-monospace" name="ANTHROPIC_API_KEY"
-                     autocomplete="off" placeholder="sk-ant-api03-...">
-              <div class="form-text">console.anthropic.com → API Keys</div>
-            </div>
-
-            <div data-key-provider="openai">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="aic__provider-pill aic__provider-pill--openai">OpenAI</span>
-                {% if masked_openai_key %}
-                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
-                  <span class="aic__key-mask">{{ masked_openai_key }}</span>
-                {% else %}
-                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
-                  <span class="text-muted small">Not set</span>
-                {% endif %}
-              </div>
-              <input type="password" class="form-control form-control-sm font-monospace" name="OPENAI_API_KEY"
-                     autocomplete="off" placeholder="sk-...">
-              <div class="form-text">platform.openai.com → API Keys</div>
-            </div>
-
-            <div data-key-provider="gemini">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="aic__provider-pill aic__provider-pill--gemini">Google</span>
-                {% if masked_gemini_key %}
-                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
-                  <span class="aic__key-mask">{{ masked_gemini_key }}</span>
-                {% else %}
-                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
-                  <span class="text-muted small">Not set</span>
-                {% endif %}
-              </div>
-              <input type="password" class="form-control form-control-sm font-monospace" name="GOOGLE_AI_API_KEY"
-                     autocomplete="off" placeholder="AIza...">
-              <div class="form-text">aistudio.google.com → Get API Key</div>
-            </div>
-
-            <div data-key-provider="groq">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="aic__provider-pill aic__provider-pill--groq">Groq</span>
-                {% if masked_groq_key %}
-                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
-                  <span class="aic__key-mask">{{ masked_groq_key }}</span>
-                {% else %}
-                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
-                  <span class="text-muted small">Not set</span>
-                {% endif %}
-              </div>
-              <input type="password" class="form-control form-control-sm font-monospace" name="GROQ_API_KEY"
-                     autocomplete="off" placeholder="gsk_...">
-              <div class="form-text">console.groq.com → API Keys</div>
-            </div>
-
-            <div data-key-provider="xai">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="aic__provider-pill aic__provider-pill--xai">xAI</span>
-                {% if masked_xai_key %}
-                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
-                  <span class="aic__key-mask">{{ masked_xai_key }}</span>
-                {% else %}
-                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
-                  <span class="text-muted small">Not set</span>
-                {% endif %}
-              </div>
-              <input type="password" class="form-control form-control-sm font-monospace" name="XAI_API_KEY"
-                     autocomplete="off" placeholder="xai-...">
-              <div class="form-text">console.x.ai → API Keys</div>
-            </div>
-
-            <div data-key-provider="zhipu">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="aic__provider-pill aic__provider-pill--zhipu">Zhipu</span>
-                {% if masked_glm_key %}
-                  <i class="fa-solid fa-circle-check aic__key-ok" title="Key configured"></i>
-                  <span class="aic__key-mask">{{ masked_glm_key }}</span>
-                {% else %}
-                  <i class="fa-solid fa-circle-xmark aic__key-missing" title="Not set"></i>
-                  <span class="text-muted small">Not set</span>
-                {% endif %}
-              </div>
-              <input type="password" class="form-control form-control-sm font-monospace" name="GLM_API_KEY"
-                     autocomplete="off" placeholder="xxxxxxxx.xxxxxxxxxxxxxxxx">
-              <div class="form-text">bigmodel.cn → API Keys (format: id.secret)</div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Budget -->
-        <div class="card mb-3">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-solid fa-wallet text-success"></i>
-            <strong>Budget Limits (USD)</strong>
-          </div>
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-6">
-                <label class="form-label small fw-semibold" for="AI_AGENT_DAILY_BUDGET">Daily limit ($)</label>
-                <input type="number" class="form-control form-control-sm" id="AI_AGENT_DAILY_BUDGET" name="AI_AGENT_DAILY_BUDGET"
-                       value="{{ env.AI_AGENT_DAILY_BUDGET|default:'5.0' }}" min="0.1" max="1000" step="0.5">
-              </div>
-              <div class="col-6">
-                <label class="form-label small fw-semibold" for="AI_AGENT_MONTHLY_BUDGET">Monthly limit ($)</label>
-                <input type="number" class="form-control form-control-sm" id="AI_AGENT_MONTHLY_BUDGET" name="AI_AGENT_MONTHLY_BUDGET"
-                       value="{{ env.AI_AGENT_MONTHLY_BUDGET|default:'25.0' }}" min="1" max="10000" step="1">
-              </div>
-            </div>
-            <div class="row g-3 mt-0">
-              <div class="col-6">
-                <label class="form-label small fw-semibold" for="AI_AGENT_MAX_TOKENS">Max tokens / response</label>
-                <input type="number" class="form-control form-control-sm" id="AI_AGENT_MAX_TOKENS" name="AI_AGENT_MAX_TOKENS"
-                       value="{{ env.AI_AGENT_MAX_TOKENS|default:'4096' }}" min="256" max="32000" step="256">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Rate Limits -->
-        <div class="card mb-3">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-solid fa-gauge-high"></i>
-            <strong>Rate Limits (requests / day)</strong>
-          </div>
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-6">
-                <label class="form-label small fw-semibold" for="AI_AGENT_RATE_LIMIT_USER">Per user</label>
-                <input type="number" class="form-control form-control-sm" id="AI_AGENT_RATE_LIMIT_USER" name="AI_AGENT_RATE_LIMIT_USER"
-                       value="{{ env.AI_AGENT_RATE_LIMIT_USER|default:'50' }}" min="1" max="10000">
-              </div>
-              <div class="col-6">
-                <label class="form-label small fw-semibold" for="AI_AGENT_RATE_LIMIT_BUSINESS">Per business</label>
-                <input type="number" class="form-control form-control-sm" id="AI_AGENT_RATE_LIMIT_BUSINESS" name="AI_AGENT_RATE_LIMIT_BUSINESS"
-                       value="{{ env.AI_AGENT_RATE_LIMIT_BUSINESS|default:'200' }}" min="1" max="10000">
-              </div>
-              <div class="col-6">
-                <label class="form-label small fw-semibold" for="AI_AGENT_RATE_LIMIT_GLOBAL">Global (all users)</label>
-                <input type="number" class="form-control form-control-sm" id="AI_AGENT_RATE_LIMIT_GLOBAL" name="AI_AGENT_RATE_LIMIT_GLOBAL"
-                       value="{{ env.AI_AGENT_RATE_LIMIT_GLOBAL|default:'1000' }}" min="1" max="100000">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Alert phones -->
-        <div class="card mb-3">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-brands fa-whatsapp text-success"></i>
-            <strong>Budget Alert Recipients</strong>
-          </div>
-          <div class="card-body">
-            <label class="form-label small fw-semibold" for="AI_AGENT_ALERT_PHONES">WhatsApp numbers (comma-separated, with country code)</label>
-            <input type="text" class="form-control form-control-sm font-monospace" id="AI_AGENT_ALERT_PHONES" name="AI_AGENT_ALERT_PHONES"
-                   value="{{ env.AI_AGENT_ALERT_PHONES|default:'' }}" placeholder="97412345678,97487654321">
-            <div class="form-text">Alerts sent when budget reaches 80% and 100%</div>
-          </div>
-        </div>
-
-        {% if not agent_status.available and agent_status.message %}
-        <div class="alert alert-danger py-2 small">
-          <i class="fa-solid fa-triangle-exclamation me-1"></i>
-          <strong>Agent offline:</strong> {{ agent_status.message }}
-        </div>
-        {% endif %}
-
-      </div>
-    </div>
-
-    <!-- Save -->
-    <div class="d-flex gap-2 mt-2 pb-4">
-      <button type="submit" class="btn btn-primary">
-        <i class="fa-solid fa-floppy-disk me-1"></i> Save &amp; Reload Server
+  <!-- Tabs -->
+  <ul class="nav nav-tabs aic__tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#aic-tab-overview" type="button" role="tab">
+        <i class="fa-solid fa-gauge me-1"></i>Overview
       </button>
-      <a href="{% url 'workforce:auto_triggers_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aic-tab-chat" type="button" role="tab">
+        <i class="fa-solid fa-robot me-1"></i>Chat AI
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aic-tab-wa" type="button" role="tab">
+        <i class="fa-brands fa-whatsapp me-1"></i>WhatsApp AI
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aic-tab-api" type="button" role="tab">
+        <i class="fa-solid fa-key me-1"></i>API Access
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aic-tab-limits" type="button" role="tab">
+        <i class="fa-solid fa-wallet me-1"></i>Budgets &amp; Limits
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content aic__panes">
+
+    <!-- ============ OVERVIEW ============ -->
+    <div class="tab-pane fade show active" id="aic-tab-overview" role="tabpanel">
+
+      <div class="aic__brief">
+        <span class="aic__brief-kicker">Overview</span>
+        <span class="aic__brief-text">What the agent spent and answered today, and which provider each surface is calling.</span>
+      </div>
+
+      <div class="aic__meter mb-3">
+        <div class="aic__meter-cell">
+          <div class="aic__meter-label">Calls today</div>
+          <div class="aic__meter-value">{{ today_usage.calls }}</div>
+          <div class="aic__meter-foot">{{ today_usage.tokens_in|default:0 }} in · {{ today_usage.tokens_out|default:0 }} out</div>
+        </div>
+        <div class="aic__meter-cell">
+          <div class="aic__meter-label">Cost today</div>
+          <div class="aic__meter-value"><sup>$</sup>{{ today_usage.cost|floatformat:4 }}</div>
+          <div class="aic__meter-foot">limit ${{ env.AI_AGENT_DAILY_BUDGET|default:'5.0' }}</div>
+        </div>
+        <div class="aic__meter-cell">
+          <div class="aic__meter-label">Cost this month</div>
+          <div class="aic__meter-value"><sup>$</sup>{{ today_usage.month_cost|floatformat:2 }}</div>
+          <div class="aic__meter-foot">{{ today_usage.month_calls }} calls</div>
+        </div>
+        <div class="aic__meter-cell">
+          <div class="aic__meter-label">Live conversations</div>
+          <div class="aic__meter-value">{{ today_usage.active_conversations }}</div>
+          <div class="aic__meter-foot">active in last 24h</div>
+        </div>
+      </div>
+
+      {% if budget_usage %}
+      <div class="card mb-3">
+        <div class="card-header"><strong>Budget usage</strong></div>
+        <div class="card-body">
+          {% widthratio budget_usage.daily_used budget_usage.daily_budget 100 as dpct %}
+          <div class="aic__gauge">
+            <div class="aic__gauge-head">
+              <span class="aic__gauge-name">Daily</span>
+              <span class="aic__gauge-nums">${{ budget_usage.daily_used|floatformat:3 }} <span>/ ${{ budget_usage.daily_budget|floatformat:2 }}</span></span>
+            </div>
+            <div class="aic__budget-bar">
+              <div class="aic__budget-bar__fill {% if dpct >= 80 %}aic__budget-bar__fill--danger{% elif dpct >= 60 %}aic__budget-bar__fill--warn{% endif %}" data-pct="{{ dpct|default:0 }}"></div>
+            </div>
+            <div class="aic__gauge-foot">{{ dpct|default:0 }}% of today's budget used. Alerts fire at 80% and 100%.</div>
+          </div>
+          {% widthratio budget_usage.monthly_used budget_usage.monthly_budget 100 as mpct %}
+          <div class="aic__gauge">
+            <div class="aic__gauge-head">
+              <span class="aic__gauge-name">Monthly</span>
+              <span class="aic__gauge-nums">${{ budget_usage.monthly_used|floatformat:2 }} <span>/ ${{ budget_usage.monthly_budget|floatformat:2 }}</span></span>
+            </div>
+            <div class="aic__budget-bar">
+              <div class="aic__budget-bar__fill {% if mpct >= 80 %}aic__budget-bar__fill--danger{% elif mpct >= 60 %}aic__budget-bar__fill--warn{% endif %}" data-pct="{{ mpct|default:0 }}"></div>
+            </div>
+            <div class="aic__gauge-foot">{{ mpct|default:0 }}% of this month's budget used.</div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card mb-3">
+        <div class="card-header"><strong>Where the agent runs</strong></div>
+        <div class="table-responsive">
+          <table class="aic__route">
+            <thead>
+              <tr><th scope="col">Surface</th><th scope="col">What it does</th><th scope="col">Provider</th><th scope="col">Model</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="aic__route-name"><i class="fa-solid fa-robot me-1"></i>Chat AI</span></td>
+                <td><span class="aic__route-note">Dashboard chat · order text extract · address zone lookup</span></td>
+                <td>{% for p in providers %}{% if p.id == chat_provider %}{{ p.name }}{% endif %}{% endfor %}</td>
+                <td><span class="aic__mono">{{ env.AI_CHAT_MODEL|default:"default" }}</span></td>
+              </tr>
+              <tr>
+                <td><span class="aic__route-name"><i class="fa-brands fa-whatsapp me-1"></i>WhatsApp AI</span></td>
+                <td><span class="aic__route-note">Auto-replies to inbound customer messages</span></td>
+                <td>{% for p in providers %}{% if p.id == wa_provider %}{{ p.name }}{% endif %}{% endfor %}</td>
+                <td><span class="aic__mono">{{ env.AI_WA_MODEL|default:"default" }}</span></td>
+              </tr>
+              <tr>
+                <td><span class="aic__route-name"><i class="fa-solid fa-plug me-1"></i>Conversation API</span></td>
+                <td><span class="aic__route-note">External workflows (n8n) talk to the agent</span></td>
+                <td>{% if masked_aiagent_token %}Token set{% else %}<span class="aic__muted">Disabled — no token</span>{% endif %}</td>
+                <td><span class="aic__mono">{{ env.AIAGENT_API_RATE_LIMIT|default:'120/min' }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% if not agent_status.available and agent_status.message %}
+      <div class="alert alert-danger py-2 small mb-0">
+        <i class="fa-solid fa-triangle-exclamation me-1"></i><strong>Agent offline:</strong> {{ agent_status.message }}
+      </div>
+      {% endif %}
     </div>
 
-  </form>
+    <!-- ============ CHAT AI ============ -->
+    <div class="tab-pane fade" id="aic-tab-chat" role="tabpanel">
+
+      <div class="aic__brief">
+        <span class="aic__brief-kicker">Chat AI</span>
+        <span class="aic__brief-text">Powers the <strong>dashboard chat</strong>, <strong>order text extraction</strong> and <strong>address zone lookup</strong>. Pick the provider it calls first and the one it falls back to.</span>
+      </div>
+
+      <div class="aic__chain">
+        <span class="aic__chain-tag">Routing</span>
+        <span class="aic__chain-step">{% for p in providers %}{% if p.id == chat_provider %}{{ p.name }}{% endif %}{% endfor %}</span>
+        <span class="aic__chain-arrow"><i class="fa-solid fa-arrow-right-long"></i></span>
+        {% if chat_fallback_provider %}
+          <span class="aic__chain-step">{% for p in providers %}{% if p.id == chat_fallback_provider %}{{ p.name }}{% endif %}{% endfor %}</span>
+        {% else %}
+          <span class="aic__chain-step aic__chain-step--none">no fallback</span>
+        {% endif %}
+      </div>
+
+      <form class="aic__form card" data-section="chat">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="fa-solid fa-robot"></i><strong>Primary provider</strong>
+          <span class="aic__ready-hint">{{ ready_count }}/{{ providers|length }} have a key ·
+            <button type="button" class="btn btn-link btn-sm p-0 align-baseline aic__goto-keys">add keys</button></span>
+        </div>
+        <div class="card-body">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="chat">
+          <div class="aic__provider-list mb-3" data-group="chat">
+            {% for p in providers %}
+            <label class="aic__provider-row {% if chat_provider == p.id %}aic__provider-row--active{% endif %} {% if not p.configured %}aic__provider-row--nokey{% endif %}">
+              <input type="radio" name="AI_CHAT_PROVIDER" value="{{ p.id }}" {% if chat_provider == p.id %}checked{% endif %} hidden>
+              <span class="aic__provider-dot aic__provider-dot--{{ p.id }}">{{ p.abbr }}</span>
+              <span class="aic__provider-info">
+                <span class="aic__provider-name">{{ p.name }}{% if not p.configured %}<span class="aic__ready aic__ready--off"><i class="fa-solid fa-key"></i> No key</span>{% endif %}</span>
+                <span class="aic__provider-sub d-block">{{ p.sub }}</span>
+              </span>
+              <span class="aic__provider-check"></span>
+            </label>
+            {% endfor %}
+          </div>
+          <label class="form-label" for="AI_CHAT_MODEL">Model</label>
+          <select class="form-select form-select-sm font-monospace" id="AI_CHAT_MODEL" name="AI_CHAT_MODEL" data-current="{{ env.AI_CHAT_MODEL|default:'' }}"></select>
+          <div class="aic__field-note">Currently saved: <strong>{{ env.AI_CHAT_MODEL|default:"provider default" }}</strong></div>
+          <hr class="my-3">
+          <p class="aic__section-title">Fallback <span class="fw-normal">— used when the primary hits a rate limit or times out</span></p>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="AI_CHAT_FALLBACK_PROVIDER">Provider</label>
+              <select class="form-select form-select-sm" id="AI_CHAT_FALLBACK_PROVIDER" name="AI_CHAT_FALLBACK_PROVIDER">
+                <option value="">— None —</option>
+                {% for p in providers %}<option value="{{ p.id }}" {% if chat_fallback_provider == p.id %}selected{% endif %}>{{ p.name }}{% if not p.configured %} (no key){% endif %}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="AI_CHAT_FALLBACK_MODEL">Model <span class="fw-normal">(optional)</span></label>
+              <input type="text" class="form-control form-control-sm font-monospace" id="AI_CHAT_FALLBACK_MODEL" name="AI_CHAT_FALLBACK_MODEL" value="{{ env.AI_CHAT_FALLBACK_MODEL|default:'' }}" placeholder="leave blank for default">
+            </div>
+          </div>
+        </div>
+        <div class="aic__form-foot">
+          <button type="button" class="btn btn-sm aic__btn-test aic__test-btn" data-test="chat">
+            <i class="fa-solid fa-vial me-1"></i>Send a test message
+          </button>
+          <button type="submit" class="btn btn-sm aic__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save Chat AI</button>
+        </div>
+        <div class="aic__test-result" data-test-result="chat" hidden></div>
+        <div class="aic__form-feedback" data-feedback></div>
+      </form>
+    </div>
+
+    <!-- ============ WHATSAPP AI ============ -->
+    <div class="tab-pane fade" id="aic-tab-wa" role="tabpanel">
+
+      <div class="aic__brief">
+        <span class="aic__brief-kicker">WhatsApp AI</span>
+        <span class="aic__brief-text">Answers <strong>inbound customer WhatsApp messages</strong> automatically. Turn it off with the WhatsApp AI switch in the header.</span>
+      </div>
+
+      <div class="aic__chain">
+        <span class="aic__chain-tag">Routing</span>
+        <span class="aic__chain-step">{% for p in providers %}{% if p.id == wa_provider %}{{ p.name }}{% endif %}{% endfor %}</span>
+        <span class="aic__chain-arrow"><i class="fa-solid fa-arrow-right-long"></i></span>
+        {% if wa_fallback_provider %}
+          <span class="aic__chain-step">{% for p in providers %}{% if p.id == wa_fallback_provider %}{{ p.name }}{% endif %}{% endfor %}</span>
+        {% else %}
+          <span class="aic__chain-step aic__chain-step--none">no fallback</span>
+        {% endif %}
+      </div>
+
+      <form class="aic__form card" data-section="wa">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="fa-brands fa-whatsapp"></i><strong>Primary provider</strong>
+          <span class="aic__ready-hint">{{ ready_count }}/{{ providers|length }} have a key ·
+            <button type="button" class="btn btn-link btn-sm p-0 align-baseline aic__goto-keys">add keys</button></span>
+        </div>
+        <div class="card-body">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="wa">
+          <div class="aic__provider-list mb-3" data-group="wa">
+            {% for p in providers %}
+            <label class="aic__provider-row {% if wa_provider == p.id %}aic__provider-row--active{% endif %} {% if not p.configured %}aic__provider-row--nokey{% endif %}">
+              <input type="radio" name="AI_WA_PROVIDER" value="{{ p.id }}" {% if wa_provider == p.id %}checked{% endif %} hidden>
+              <span class="aic__provider-dot aic__provider-dot--{{ p.id }}">{{ p.abbr }}</span>
+              <span class="aic__provider-info">
+                <span class="aic__provider-name">{{ p.name }}{% if not p.configured %}<span class="aic__ready aic__ready--off"><i class="fa-solid fa-key"></i> No key</span>{% endif %}</span>
+                <span class="aic__provider-sub d-block">{{ p.sub }}</span>
+              </span>
+              <span class="aic__provider-check"></span>
+            </label>
+            {% endfor %}
+          </div>
+          <label class="form-label" for="AI_WA_MODEL">Model</label>
+          <select class="form-select form-select-sm font-monospace" id="AI_WA_MODEL" name="AI_WA_MODEL" data-current="{{ env.AI_WA_MODEL|default:'' }}"></select>
+          <div class="aic__field-note">Currently saved: <strong>{{ env.AI_WA_MODEL|default:"provider default" }}</strong></div>
+          <hr class="my-3">
+          <p class="aic__section-title">Fallback <span class="fw-normal">— used when the primary hits a rate limit or times out</span></p>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="AI_WA_FALLBACK_PROVIDER">Provider</label>
+              <select class="form-select form-select-sm" id="AI_WA_FALLBACK_PROVIDER" name="AI_WA_FALLBACK_PROVIDER">
+                <option value="">— None —</option>
+                {% for p in providers %}<option value="{{ p.id }}" {% if wa_fallback_provider == p.id %}selected{% endif %}>{{ p.name }}{% if not p.configured %} (no key){% endif %}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="AI_WA_FALLBACK_MODEL">Model <span class="fw-normal">(optional)</span></label>
+              <input type="text" class="form-control form-control-sm font-monospace" id="AI_WA_FALLBACK_MODEL" name="AI_WA_FALLBACK_MODEL" value="{{ env.AI_WA_FALLBACK_MODEL|default:'' }}" placeholder="leave blank for default">
+            </div>
+          </div>
+        </div>
+        <div class="aic__form-foot">
+          <button type="button" class="btn btn-sm aic__btn-test aic__test-btn" data-test="wa">
+            <i class="fa-solid fa-vial me-1"></i>Send a test message
+          </button>
+          <button type="submit" class="btn btn-sm aic__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save WhatsApp AI</button>
+        </div>
+        <div class="aic__test-result" data-test-result="wa" hidden></div>
+        <div class="aic__form-feedback" data-feedback></div>
+      </form>
+    </div>
+
+    <!-- ============ API ACCESS ============ -->
+    <div class="tab-pane fade" id="aic-tab-api" role="tabpanel">
+
+      <div class="aic__brief">
+        <span class="aic__brief-kicker">API Access</span>
+        <span class="aic__brief-text">Two kinds of credential: <strong>keys we send out</strong> to the AI providers, and <strong>the token we accept</strong> from external workflows.</span>
+      </div>
+
+      <!-- Provider API keys -->
+      <form class="aic__form card mb-3" data-section="keys">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="fa-solid fa-key"></i><strong>Provider keys</strong>
+          <span class="aic__ready-hint">{{ ready_count }}/{{ providers|length }} set · open a row to add or replace one</span>
+        </div>
+        <div class="card-body">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="keys">
+          <div class="aic__cred-list" id="aic-keys-body">
+            {% for k in api_keys %}
+            <div class="aic__cred{% if k.in_use %} aic__cred--inuse{% endif %}" data-key-provider="{{ k.id }}">
+              <button type="button" class="aic__cred-head" data-cred-toggle
+                      aria-expanded="{% if k.needs_key %}true{% else %}false{% endif %}">
+                <span class="aic__cred-name">{{ k.name }}<span class="aic__cred-env">{{ k.env }}</span></span>
+                {% if k.needs_key %}
+                  <span class="aic__cred-state aic__cred-state--needed">Needed</span>
+                  <span class="aic__cred-key">selected as a provider, but nothing is stored</span>
+                {% elif k.masked %}
+                  <span class="aic__cred-state aic__cred-state--set">Set</span>
+                  <span class="aic__cred-key">{{ k.masked }}</span>
+                {% elif k.base_url_env %}
+                  <span class="aic__cred-state aic__cred-state--unset">Optional</span>
+                  <span class="aic__cred-key">{{ k.base_url|default:"no gateway URL yet" }}</span>
+                {% else %}
+                  <span class="aic__cred-state aic__cred-state--unset">Not set</span>
+                  <span class="aic__cred-key">—</span>
+                {% endif %}
+                <span class="aic__cred-inuse">In use</span>
+                <span class="aic__cred-action">{% if k.masked %}Replace{% else %}Add key{% endif %} <i class="fa-solid fa-chevron-down"></i></span>
+              </button>
+              <div class="aic__cred-body" {% if not k.needs_key %}hidden{% endif %}>
+                {% if k.base_url_env %}
+                <label class="form-label" for="aic_{{ k.base_url_env }}">Gateway base URL</label>
+                <input type="url" class="form-control form-control-sm font-monospace mb-2" id="aic_{{ k.base_url_env }}" name="{{ k.base_url_env }}" value="{{ k.base_url }}" placeholder="https://9router.yourdomain.qa/v1">
+                <div class="aic__cred-help mb-2">Include <code>/v1</code>. Models load from <code>{base}/models</code>.</div>
+                {% endif %}
+                <label class="form-label" for="aic_{{ k.env }}">{% if k.masked %}New key{% else %}API key{% endif %}</label>
+                <input type="password" class="form-control form-control-sm font-monospace" id="aic_{{ k.env }}" name="{{ k.env }}" autocomplete="off" placeholder="{{ k.placeholder }}">
+                <div class="aic__cred-help">Get it from {{ k.help }}{% if k.masked %} Leave blank to keep the current key.{% endif %}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="aic__form-foot">
+          <span class="aic__foot-note">Blank fields keep the key already stored.</span>
+          <button type="submit" class="btn btn-sm aic__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save keys</button>
+        </div>
+        <div class="aic__form-feedback" data-feedback></div>
+      </form>
+
+      <!-- Conversation API -->
+      <form class="aic__form card" data-section="aiagent">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="fa-solid fa-plug"></i><strong>Conversation API</strong>
+          <span class="aic__ready-hint">Inbound — lets n8n and other workflows chat with the agent</span>
+        </div>
+        <div class="card-body">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="aiagent">
+
+          <p class="aic__section-title">Endpoint</p>
+          <div class="aic__plate aic__plate--block mb-2">
+            <span class="aic__plate-method">POST</span>
+            <span class="aic__plate-text" id="aic_ep_url">{{ request.scheme }}://{{ request.get_host }}/api/ai-agent/aiagent/chat/</span>
+            <button type="button" class="aic__copy" data-copy="#aic_ep_url">Copy</button>
+          </div>
+          <div class="aic__plate aic__plate--block aic__plate--quiet aic__plate--code mb-2">
+            <span class="aic__plate-text" id="aic_ep_curl">curl -X POST {{ request.scheme }}://{{ request.get_host }}/api/ai-agent/aiagent/chat/ \
+  -H "X-AIAgent-Token: YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "n8n-12345", "message": "Where is order EZ1234?"}'</span>
+            <button type="button" class="aic__copy" data-copy="#aic_ep_curl">Copy</button>
+          </div>
+          <div class="aic__cred-help mb-3">
+            <div>Conversations are keyed by <code>session_id</code> — reuse it to continue a thread, send <code>"reset": true</code> to start over.</div>
+            <div class="mt-1">History <code>GET /aiagent/conversations/&lt;session_id&gt;/</code> · Close <code>POST /aiagent/conversations/&lt;session_id&gt;/close/</code> · Health <code>GET /aiagent/health/</code></div>
+          </div>
+
+          <hr class="my-3">
+
+          <p class="aic__section-title">Service token</p>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            {% if masked_aiagent_token %}
+              <span class="aic__cred-state aic__cred-state--set aic__cred-state--inline">Set</span>
+              <span class="aic__key-mask">{{ masked_aiagent_token }}</span>
+            {% else %}
+              <span class="aic__cred-state aic__cred-state--needed aic__cred-state--inline">Not set — the API rejects every call</span>
+            {% endif %}
+          </div>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control form-control-sm font-monospace" id="AIAGENT_API_TOKEN" name="AIAGENT_API_TOKEN" autocomplete="off" placeholder="Leave blank to keep the current token">
+            <button type="button" class="btn btn-outline-secondary" id="aic_aiagent_generate"><i class="fa-solid fa-rotate me-1"></i>Generate</button>
+            <button type="button" class="btn btn-outline-secondary" data-copy="#AIAGENT_API_TOKEN"><i class="fa-solid fa-copy me-1"></i>Copy</button>
+          </div>
+          <div class="aic__cred-help mb-3">Generate, copy it into the client, then save. Saving replaces the old token immediately — calls using it start failing.</div>
+
+          <label class="form-label" for="AIAGENT_API_RATE_LIMIT">Rate limit</label>
+          <input type="text" class="form-control form-control-sm font-monospace aic__input--short" id="AIAGENT_API_RATE_LIMIT" name="AIAGENT_API_RATE_LIMIT" value="{{ env.AIAGENT_API_RATE_LIMIT|default:'120/min' }}" placeholder="120/min">
+          <div class="aic__cred-help">Requests per window, e.g. <code>120/min</code> or <code>2000/hour</code>. Counted per token, not per caller.</div>
+        </div>
+        <div class="aic__form-foot">
+          <button type="button" class="btn btn-sm aic__btn-test aic__test-btn" data-test="aiagent_api">
+            <i class="fa-solid fa-vial me-1"></i>Check the API
+          </button>
+          <button type="submit" class="btn btn-sm aic__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save API</button>
+        </div>
+        <div class="aic__test-result" data-test-result="aiagent_api" hidden></div>
+        <div class="aic__form-feedback" data-feedback></div>
+      </form>
+    </div>
+
+    <!-- ============ BUDGETS & LIMITS ============ -->
+    <div class="tab-pane fade" id="aic-tab-limits" role="tabpanel">
+
+      <div class="aic__brief">
+        <span class="aic__brief-kicker">Budgets &amp; Limits</span>
+        <span class="aic__brief-text">Hard stops on spend and traffic. When a budget is reached the agent stops calling the provider until the window resets.</span>
+      </div>
+
+      <form class="aic__form card" data-section="limits">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="fa-solid fa-wallet"></i><strong>Budgets, limits &amp; alerts</strong>
+        </div>
+        <div class="card-body">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="limits">
+
+          <p class="aic__section-title">Spend caps</p>
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label" for="AI_AGENT_DAILY_BUDGET">Daily limit</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control form-control-sm font-monospace" id="AI_AGENT_DAILY_BUDGET" name="AI_AGENT_DAILY_BUDGET" value="{{ env.AI_AGENT_DAILY_BUDGET|default:'5.0' }}" min="0.1" max="1000" step="0.5">
+              </div>
+              <div class="aic__field-note">Spent today: <strong>${{ today_usage.cost|floatformat:4 }}</strong></div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label" for="AI_AGENT_MONTHLY_BUDGET">Monthly limit</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control form-control-sm font-monospace" id="AI_AGENT_MONTHLY_BUDGET" name="AI_AGENT_MONTHLY_BUDGET" value="{{ env.AI_AGENT_MONTHLY_BUDGET|default:'25.0' }}" min="1" max="10000" step="1">
+              </div>
+              <div class="aic__field-note">Spent this month: <strong>${{ today_usage.month_cost|floatformat:2 }}</strong></div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label" for="AI_AGENT_MAX_TOKENS">Max tokens per reply</label>
+              <input type="number" class="form-control form-control-sm font-monospace" id="AI_AGENT_MAX_TOKENS" name="AI_AGENT_MAX_TOKENS" value="{{ env.AI_AGENT_MAX_TOKENS|default:'4096' }}" min="256" max="32000" step="256">
+              <div class="aic__field-note">Caps the length of a single answer.</div>
+            </div>
+          </div>
+
+          <hr class="my-3">
+          <p class="aic__section-title">Request caps <span class="fw-normal">— per day</span></p>
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label" for="AI_AGENT_RATE_LIMIT_USER">Per user</label>
+              <input type="number" class="form-control form-control-sm font-monospace" id="AI_AGENT_RATE_LIMIT_USER" name="AI_AGENT_RATE_LIMIT_USER" value="{{ env.AI_AGENT_RATE_LIMIT_USER|default:'50' }}" min="1" max="10000">
+              <div class="aic__field-note">One person's daily allowance.</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label" for="AI_AGENT_RATE_LIMIT_BUSINESS">Per business</label>
+              <input type="number" class="form-control form-control-sm font-monospace" id="AI_AGENT_RATE_LIMIT_BUSINESS" name="AI_AGENT_RATE_LIMIT_BUSINESS" value="{{ env.AI_AGENT_RATE_LIMIT_BUSINESS|default:'200' }}" min="1" max="10000">
+              <div class="aic__field-note">All users of one client account.</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label" for="AI_AGENT_RATE_LIMIT_GLOBAL">Global</label>
+              <input type="number" class="form-control form-control-sm font-monospace" id="AI_AGENT_RATE_LIMIT_GLOBAL" name="AI_AGENT_RATE_LIMIT_GLOBAL" value="{{ env.AI_AGENT_RATE_LIMIT_GLOBAL|default:'1000' }}" min="1" max="100000">
+              <div class="aic__field-note">Everyone combined. Today: <strong>{{ today_usage.calls }}</strong> calls.</div>
+            </div>
+          </div>
+
+          <hr class="my-3">
+          <p class="aic__section-title">Alerts</p>
+          <label class="form-label" for="AI_AGENT_ALERT_PHONES">WhatsApp numbers</label>
+          <input type="text" class="form-control form-control-sm font-monospace" id="AI_AGENT_ALERT_PHONES" name="AI_AGENT_ALERT_PHONES" value="{{ env.AI_AGENT_ALERT_PHONES|default:'' }}" placeholder="97412345678,97487654321">
+          <div class="aic__cred-help">Comma-separated, with country code. Alerted when a budget reaches 80% and again at 100%.</div>
+        </div>
+        <div class="aic__form-foot">
+          <button type="submit" class="btn btn-sm aic__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save budgets &amp; limits</button>
+        </div>
+        <div class="aic__form-feedback" data-feedback></div>
+      </form>
+    </div>
+
+  </div>
 </div>
 
 <script>
 (function () {
   const MODELS_URL = '{% url "workforce:wf_ai_models_api" %}';
-  // Fallback models used while loading or on error
-  const FALLBACK = {{ models_by_provider_json|safe }};
-  // In-memory cache per provider so switching back is instant
+  const TEST_URL   = '{% url "workforce:wf_ai_config_test" %}';
+  const SAVE_URL   = '{% url "workforce:wf_ai_config" %}';
+  const FALLBACK   = {{ models_by_provider_json|safe }};
+  const CSRF = document.querySelector('meta[name="csrf-token"]')?.content
+            || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
   const _cache = {};
 
-  function setLoading(sel, on) {
-    sel.disabled = on;
-    if (on) {
-      sel.innerHTML = '<option>Loading…</option>';
-    }
+  function toast(msg, ok) {
+    const t = document.getElementById('aic_toast');
+    t.textContent = msg;
+    t.className = 'aic__toast aic__toast--show ' + (ok ? 'aic__toast--ok' : 'aic__toast--err');
+    setTimeout(function () { t.className = 'aic__toast'; }, 3200);
   }
 
+  // --- budget gauge widths (no inline styles in the template) ---
+  document.querySelectorAll('.aic__budget-bar__fill[data-pct]').forEach(function (el) {
+    const pct = Math.max(0, Math.min(100, parseFloat(el.dataset.pct) || 0));
+    requestAnimationFrame(function () { el.style.width = pct + '%'; });
+  });
+
+  // --- model selects ---
   function populateSelect(sel, models, currentVal) {
-    sel.innerHTML = '';
-    sel.disabled = false;
-    if (!models || !models.length) {
-      sel.innerHTML = '<option value="">No models found</option>';
-      return;
-    }
+    sel.innerHTML = ''; sel.disabled = false;
+    if (!models || !models.length) { sel.innerHTML = '<option value="">No models found</option>'; return; }
     models.forEach(function (m) {
       const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.label || m.id;
+      opt.value = m.id; opt.textContent = m.label || m.id;
       if (m.id === currentVal) opt.selected = true;
       sel.appendChild(opt);
     });
     if (!sel.value && sel.options.length) sel.options[0].selected = true;
   }
-
   function loadModels(sel, provider, currentVal) {
-    if (_cache[provider]) {
-      populateSelect(sel, _cache[provider], currentVal);
-      return;
-    }
-    setLoading(sel, true);
+    if (_cache[provider]) { populateSelect(sel, _cache[provider], currentVal); return; }
+    sel.disabled = true; sel.innerHTML = '<option>Loading…</option>';
     fetch(MODELS_URL + '?provider=' + encodeURIComponent(provider))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.error) throw new Error(data.error);
-        _cache[provider] = data.models;
-        populateSelect(sel, data.models, currentVal);
+        _cache[provider] = data.models; populateSelect(sel, data.models, currentVal);
       })
-      .catch(function (err) {
-        console.warn('Model fetch failed for', provider, err);
-        // Fall back to hardcoded list
-        const fb = FALLBACK[provider] || [];
-        populateSelect(sel, fb, currentVal);
-      });
+      .catch(function () { populateSelect(sel, FALLBACK[provider] || [], currentVal); });
   }
-
-  // --- API key visibility ---
   function getActiveProviders() {
     const active = new Set();
-    document.querySelectorAll('.aic__provider-list input[type=radio]:checked').forEach(function (r) {
-      active.add(r.value);
-    });
+    document.querySelectorAll('.aic__provider-list input[type=radio]:checked').forEach(function (r) { active.add(r.value); });
+    document.querySelectorAll('#AI_CHAT_FALLBACK_PROVIDER, #AI_WA_FALLBACK_PROVIDER').forEach(function (s) { if (s.value) active.add(s.value); });
     return active;
   }
-
-  function syncKeyVisibility() {
+  // Every provider key stays reachable — selection only marks which ones are live.
+  function syncKeyUsage() {
     const active = getActiveProviders();
     document.querySelectorAll('#aic-keys-body [data-key-provider]').forEach(function (el) {
-      el.style.display = active.has(el.dataset.keyProvider) ? '' : 'none';
+      el.classList.toggle('aic__cred--inuse', active.has(el.dataset.keyProvider));
     });
   }
-
   function initGroup(groupAttr, selectId) {
     const list = document.querySelector('.aic__provider-list[data-group="' + groupAttr + '"]');
     const sel  = document.getElementById(selectId);
     if (!list || !sel) return;
-
-    const initialVal      = sel.dataset.current || '';
-    const checkedRadio    = list.querySelector('input[type=radio]:checked');
-    const initialProvider = checkedRadio ? checkedRadio.value : 'anthropic';
-    loadModels(sel, initialProvider, initialVal);
-
+    loadModels(sel, (list.querySelector('input[type=radio]:checked') || {}).value || 'anthropic', sel.dataset.current || '');
     list.querySelectorAll('label.aic__provider-row').forEach(function (row) {
       row.addEventListener('click', function () {
-        list.querySelectorAll('label.aic__provider-row').forEach(function (r) {
-          r.classList.remove('aic__provider-row--active');
-        });
+        list.querySelectorAll('label.aic__provider-row').forEach(function (r) { r.classList.remove('aic__provider-row--active'); });
         row.classList.add('aic__provider-row--active');
-        const radio = row.querySelector('input[type=radio]');
-        if (radio) radio.checked = true;
-        loadModels(sel, radio.value, '');
-        syncKeyVisibility();
+        const radio = row.querySelector('input[type=radio]'); if (radio) radio.checked = true;
+        loadModels(sel, radio.value, ''); syncKeyUsage();
       });
     });
   }
-
   initGroup('chat', 'AI_CHAT_MODEL');
-  initGroup('wa',   'AI_WA_MODEL');
-  syncKeyVisibility(); // set initial state
+  initGroup('wa', 'AI_WA_MODEL');
+  document.querySelectorAll('#AI_CHAT_FALLBACK_PROVIDER, #AI_WA_FALLBACK_PROVIDER').forEach(function (s) {
+    s.addEventListener('change', syncKeyUsage);
+  });
+  syncKeyUsage();
+
+  // --- credential rows expand in place ---
+  document.querySelectorAll('[data-cred-toggle]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      const body = btn.nextElementSibling;
+      if (body) {
+        body.hidden = open;
+        if (!open) { const f = body.querySelector('input'); if (f) f.focus(); }
+      }
+    });
+  });
+
+  // --- copy buttons ---
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const el = document.querySelector(btn.dataset.copy);
+      if (!el) return;
+      const text = ('value' in el ? el.value : el.textContent).trim();
+      if (!text) { toast('Nothing to copy yet', false); return; }
+      const done = function () { toast('Copied', true); };
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done);
+      else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+    });
+  });
+
+  // --- per-section save ---
+  document.querySelectorAll('form.aic__form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = form.querySelector('button[type=submit]');
+      const fb  = form.querySelector('[data-feedback]');
+      const orig = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving…';
+      fetch(SAVE_URL, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF }, body: new FormData(form) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          btn.disabled = false; btn.innerHTML = orig;
+          if (d.success) { toast(d.message || 'Saved', true); if (fb) { fb.textContent = d.message; fb.className = 'aic__form-feedback aic__form-feedback--ok'; } }
+          else { toast(d.error || 'Save failed', false); }
+        })
+        .catch(function () { btn.disabled = false; btn.innerHTML = orig; toast('Network error', false); });
+    });
+  });
+
+  // --- master toggles (instant save) ---
+  document.querySelectorAll('input[data-flag]').forEach(function (sw) {
+    sw.addEventListener('change', function () {
+      const key = sw.dataset.flag, val = sw.checked ? 'True' : 'False';
+      const fd = new FormData(); fd.append('section', 'flags'); fd.append(key, val);
+      fetch(SAVE_URL, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF }, body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { toast(d.success ? (key.indexOf('WHATSAPP') > -1 ? 'WhatsApp AI ' : 'AI Agent ') + (sw.checked ? 'enabled' : 'disabled') : (d.error || 'Failed'), d.success); if (!d.success) sw.checked = !sw.checked; })
+        .catch(function () { sw.checked = !sw.checked; toast('Network error', false); });
+    });
+  });
+
+  // --- live tests ---
+  document.querySelectorAll('.aic__test-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const kind = btn.dataset.test;
+      const box  = document.querySelector('[data-test-result="' + kind + '"]');
+      const orig = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Testing…';
+      const fd = new FormData(); fd.append('kind', kind);
+      fetch(TEST_URL, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF }, body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          btn.disabled = false; btn.innerHTML = orig;
+          if (box) {
+            box.hidden = false;
+            if (d.success) {
+              box.className = 'aic__test-result aic__test-result--ok';
+              if (kind === 'aiagent_api') box.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i>' + d.message;
+              else box.innerHTML = '<div class="small mb-1"><i class="fa-solid fa-circle-check text-success me-1"></i><span class="aic__mono">' + (d.model || '') + '</span> · ' + d.elapsed_ms + ' ms</div><div><strong>You:</strong> ' + d.sample + '</div><div><strong>Agent:</strong> ' + d.reply + '</div>';
+            } else {
+              box.className = 'aic__test-result aic__test-result--err';
+              box.innerHTML = '<i class="fa-solid fa-circle-xmark me-1"></i>' + (d.error || 'Test failed');
+            }
+          }
+        })
+        .catch(function () { btn.disabled = false; btn.innerHTML = orig; if (box) { box.hidden = false; box.className = 'aic__test-result aic__test-result--err'; box.textContent = 'Network error'; } });
+    });
+  });
+
+  // --- jump to API Access tab ---
+  document.querySelectorAll('.aic__goto-keys').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var tab = document.querySelector('[data-bs-target="#aic-tab-api"]');
+      if (tab && window.bootstrap) window.bootstrap.Tab.getOrCreateInstance(tab).show();
+      else if (tab) tab.click();
+    });
+  });
+
+  // --- token generator ---
+  var gen = document.getElementById('aic_aiagent_generate');
+  if (gen) gen.addEventListener('click', function () {
+    var bytes = new Uint8Array(24); (window.crypto || window.msCrypto).getRandomValues(bytes);
+    var b64 = btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    var input = document.getElementById('AIAGENT_API_TOKEN'); input.value = 'aiagent_' + b64; input.focus();
+  });
 })();
 </script>
 {% endblock content %}

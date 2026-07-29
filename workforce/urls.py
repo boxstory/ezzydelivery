@@ -165,6 +165,7 @@ urlpatterns = [
     # User Verification URLs
     path('verification/business/', workforce_views.business_verification_list, name='business_verification_list'),
     path('verification/drivers/', workforce_views.driver_verification_list, name='driver_verification_list'),
+    path('drivers/<int:driver_id>/remind-completion/', workforce_views.driver_remind_completion, name='driver_remind_completion'),
     path('verification/users/', workforce_views.user_verification_list, name='user_verification_list'),
     path('verification/teams/', workforce_views.team_verification_list, name='team_verification_list'),
     path('verification/check-business-code/', workforce_views.check_business_code_unique, name='check_business_code_unique'),
@@ -188,8 +189,15 @@ urlpatterns = [
     path('fleet/driver-tasks/', workforce_views.wf_driver_tasks, name='wf_driver_tasks'),
     path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
     path('fleet/drivers-earnings/', workforce_views.fleet_drivers_earnings, name='fleet_drivers_earnings'),
+    path('fleet/driver-payout/<int:driver_id>/', workforce_views.driver_payout_worksheet, name='driver_payout_worksheet'),
+    path('fleet/driver-payout/<int:driver_id>/create/', workforce_views.driver_payout_create, name='driver_payout_create'),
     path('fleet/earnings-verification/', workforce_views.earnings_verification, name='earnings_verification'),
     path('fleet/earnings-verification/action/', workforce_views.earnings_verification_action, name='earnings_verification_action'),
+
+    # Client delivery-charge verification (client-side mirror of earnings verification)
+    path('client-charges/', workforce_views.client_charge_verification, name='client_charge_verification'),
+    path('client-charges/action/', workforce_views.client_charge_verification_action, name='client_charge_verification_action'),
+
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
     path('seller-transactions/', workforce_views.seller_transactions, name='seller_transactions'),
     path('fleet/bulk-settle-transactions/', workforce_views.bulk_settle_transactions, name='bulk_settle_transactions'),
@@ -200,6 +208,7 @@ urlpatterns = [
 
     # COD bookkeeping ledger (all COD transactions, filterable)
     path('fleet/cod-ledger/', workforce_views.cod_ledger, name='cod_ledger'),
+    path('fleet/cod-legacy-reconciliation/', workforce_views.cod_legacy_reconciliation, name='cod_legacy_reconciliation'),
 
     # COD Settlement Report URLs
     path('fleet/cod-settlement/', workforce_views.cod_settlement_report, name='cod_settlement_report'),
@@ -211,6 +220,7 @@ urlpatterns = [
     path('fleet/cod-business-settlement/action/', workforce_views.cod_business_settlement_action, name='cod_business_settlement_action'),
     path('fleet/cod-business-settlement/reverse/', workforce_views.cod_business_settlement_reverse, name='cod_business_settlement_reverse'),
     path('fleet/cod-business-settlement/pdf/', workforce_views.cod_business_settlement_pdf, name='cod_business_settlement_pdf'),
+    path('fleet/cod-business-settlement/invoice/<str:txn_code>/', workforce_views.cod_business_payout_invoice, name='cod_business_payout_invoice'),
 
     # COD Submissions Management (Staff)
     path('fleet/cod-submissions/', workforce_views.staff_cod_submissions_redirect, name='staff_cod_submissions'),
@@ -226,6 +236,7 @@ urlpatterns = [
     path('receipt-templates/<int:template_id>/preview/', workforce_views.receipt_template_preview, name='receipt_template_preview'),
     path('receipt-templates/<int:template_id>/delete/', workforce_views.receipt_template_delete, name='receipt_template_delete'),
     path('settlement/<int:settlement_id>/receipt/', workforce_views.settlement_receipt_print, name='settlement_receipt_print'),
+    path('settlement/<int:settlement_id>/payout-invoice/', workforce_views.driver_payout_invoice, name='driver_payout_invoice'),
     path('fleet/task-sheets/', workforce_views.fleet_task_sheets_list, name='fleet_task_sheets_list'),
     path('fleet/task-sheet/<int:driver_id>/', workforce_views.fleet_task_sheet, name='fleet_task_sheet'),
 
@@ -312,6 +323,7 @@ urlpatterns = [
 
     # CRM Leads
     path('crm/leads/board/', crm_views.crm_leads_board, name='crm_leads_board'),
+    path('crm/leads/board/drivers/', crm_views.crm_leads_board, {'board_category': 'driver'}, name='crm_driver_leads_board'),
     path('crm/leads/', crm_views.crm_leads_list, name='crm_leads_list'),
     path('crm/leads/new/', crm_views.crm_lead_create, name='crm_lead_create'),
     path('crm/leads/<int:lead_id>/', crm_views.crm_lead_detail, name='crm_lead_detail'),
@@ -396,6 +408,7 @@ urlpatterns = [
     # AI Agent Configuration
     path('auto-triggers/ai-config/', workforce_views.wf_ai_config, name='wf_ai_config'),
     path('auto-triggers/ai-config/models/', workforce_views.wf_ai_models_api, name='wf_ai_models_api'),
+    path('auto-triggers/ai-config/test/', workforce_views.wf_ai_config_test, name='wf_ai_config_test'),
 
     # WhatsApp Instances
     path('auto-triggers/whatsapp-instances/', workforce_views.whatsapp_instances_list, name='whatsapp_instances_list'),

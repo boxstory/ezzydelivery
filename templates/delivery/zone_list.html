@@ -4,7 +4,7 @@
 {% block title %}Zone List{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260728g">
 {% endblock extra_css %}
 
 {% block content %}
@@ -136,34 +136,7 @@
     {% endif %}
   </div>
 
-  <!-- Pagination -->
-  {% if zones.has_other_pages %}
-    <div class="znl__pager">
-      <div class="znl__pager-info">
-        Showing {{ zones.start_index }}-{{ zones.end_index }} of {{ zones.paginator.count }} zones
-      </div>
-      <div class="znl__pager-links">
-        {% if zones.has_previous %}
-          <a href="?page={{ zones.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-left"></i>
-          </a>
-        {% endif %}
-
-        {% for num in zones.paginator.page_range %}
-          {% if zones.number == num %}
-            <span class="znl__pager--active">{{ num }}</span>
-          {% elif num > zones.number|add:'-3' and num < zones.number|add:'3' %}
-            <a href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">{{ num }}</a>
-          {% endif %}
-        {% endfor %}
-
-        {% if zones.has_next %}
-          <a href="?page={{ zones.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-right"></i>
-          </a>
-        {% endif %}
-      </div>
-    </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries search / group / polygon -->
+  {% include "includes/components/_pagination.html" with page_obj=zones filter_params=filter_params per_page=per_page pagination_id="delivery_zone_list" %}
 </div>
 {% endblock content %}

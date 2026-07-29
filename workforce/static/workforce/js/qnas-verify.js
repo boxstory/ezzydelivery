@@ -16,7 +16,11 @@ function _saveQnasStatus(orderId, status) {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({ qnas_status: status })
+            body: JSON.stringify({ qnas_status: status, source: 'QNAS verify' })
+        }).then(function(resp) {
+            if (!resp.ok) console.error('[QNAS] qnas_status save failed:', resp.status);
+        }).catch(function(err) {
+            console.error('[QNAS] qnas_status save failed:', err);
         });
         // Update any visible status badges on the page
         _updateQnasStatusBadges(orderId, status);
@@ -41,6 +45,27 @@ function _updateQnasStatusBadges(orderId, status) {
         badge.className = 'qnas-verify__status ' + c.cls;
         badge.innerHTML = '<i class="fa-solid ' + c.icon + ' me-1"></i>' + c.label;
         badge.style.display = '';
+    });
+}
+
+/**
+ * Repaint the "Accuracy" chip(s) for an order after a coordinate save, so the
+ * page shows who/what set the pin without a reload.
+ * @param {number} orderId
+ * @param {string} accuracy - Order.coords_accuracy value returned by the server
+ * @param {string} display  - its human label ("By Staff", "Exact (Building)")
+ */
+function _updateAccuracyChips(orderId, accuracy, display) {
+    if (!accuracy) return;
+    var icons = {
+        by_customer: 'fa-user-check', by_staff: 'fa-user-gear', by_driver: 'fa-truck',
+        exact: 'fa-bullseye', street: 'fa-road', landmark: 'fa-map-marker-alt',
+        zone_center: 'fa-draw-polygon', ai_estimate: 'fa-robot'
+    };
+    var icon = icons[accuracy] || 'fa-location-dot';
+    document.querySelectorAll('[data-accuracy-wrap="' + orderId + '"]').forEach(function(wrap) {
+        wrap.innerHTML = '<span class="dtd__accuracy dtd__accuracy--' + accuracy + '">' +
+            '<i class="fa-solid ' + icon + '"></i> ' + (display || accuracy) + '</span>';
     });
 }
 
@@ -123,14 +148,38 @@ function verifyQNAS(zone, street, building, recordId, orderId) {
             coordsSpan.innerHTML = '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" class="text-success text-decoration-none d-inline-flex align-items-center gap-1" title="View on Google Maps"><i class="fa-solid fa-map-pin"></i><span>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</span></a>';
         }
 
-        // Persist coords + status to the Order
+        // Persist coords + status to the Order. The accuracy records how precise
+        // the QNAS hit was — a building match is "exact", a street-only match is
+        // "street" — so the order stops showing as a location issue.
         try {
             var csrfToken = _getCsrfToken();
             fetch(window.location.origin + '/workforce/orders/' + orderId + '/update-coords/', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ latitude: lat, longitude: lng, qnas_status: 'verified' })
+                body: JSON.stringify({
+                    latitude: lat,
+                    longitude: lng,
+                    qnas_status: 'verified',
+                    coords_accuracy: isExactMatch ? 'exact' : 'street',
+                    source: 'QNAS verify'
+                })
+            }).then(function(saveResp) {
+                return saveResp.json();
+            }).then(function(saveData) {
+                if (saveData && saveData.success) {
+                    _updateAccuracyChips(orderId, saveData.coords_accuracy, saveData.coords_accuracy_display);
+                } else {
+                    console.error('[QNAS] Save rejected:', saveData);
+                    if (resultSpan) {
+                        resultSpan.innerHTML += ' <span class="badge bg-danger ms-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>Not saved</span>';
+                    }
+                }
+            }).catch(function(err) {
+                console.error('[QNAS] Failed to save coords:', err);
+                if (resultSpan) {
+                    resultSpan.innerHTML += ' <span class="badge bg-danger ms-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>Not saved</span>';
+                }
             });
             _updateQnasStatusBadges(orderId, 'verified');
         } catch (e) {
@@ -192,13 +241,20 @@ function verifyAndUpdateCoords(zone, street, building, orderId) {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ latitude: data.latitude, longitude: data.longitude, qnas_status: 'verified' })
+                body: JSON.stringify({
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    qnas_status: 'verified',
+                    coords_accuracy: data.match_type === 'exact' ? 'exact' : 'street',
+                    source: 'QNAS verify'
+                })
             }).then(function(saveResp) {
                 return saveResp.json();
             }).then(function(saveData) {
                 if (saveData.success) {
                     var lat = saveData.latitude.toFixed(6);
                     var lng = saveData.longitude.toFixed(6);
+                    _updateAccuracyChips(orderId, saveData.coords_accuracy, saveData.coords_accuracy_display);
                     container.innerHTML = '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" class="text-decoration-none"><i class="fa-solid fa-map-pin me-1 text-success"></i>' + lat + ', ' + lng + '</a> <span class="badge bg-success ms-1"><i class="fa-solid fa-check me-1"></i>Saved</span>';
                 } else {
                     container.innerHTML = '<span class="text-danger"><i class="fa-solid fa-map-pin me-1"></i>' + data.latitude.toFixed(6) + ', ' + data.longitude.toFixed(6) + '</span> <span class="badge bg-warning text-dark">Save failed</span>';
@@ -579,7 +635,11 @@ function whatsappLocationSave(text, orderId, opts) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrfToken() },
-        body: JSON.stringify({ latitude: lat, longitude: lng, coords_accuracy: 'by_staff' })
+        body: JSON.stringify({
+            latitude: lat, longitude: lng,
+            coords_accuracy: 'by_staff',
+            source: 'Shared location pin (staff)'
+        })
     }).then(function(resp) {
         return resp.json();
     }).then(function(d) {

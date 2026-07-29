@@ -4,7 +4,7 @@
 {% block title %}Driver Tasks — Fleet A/Cs{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/fleet_driver_tasks.css' %}?v=20260718b">
+<link rel="stylesheet" href="{% static 'workforce/css/fleet_driver_tasks.css' %}?v=20260728g">
 {% endblock extra_css %}
 
 {% block content %}
@@ -107,6 +107,27 @@
 
   </div>
 
+  <!-- ── DAILY ACTIVITY CHART ──────────────────────────────── -->
+  {% if chart_daily.labels %}
+  <div class="fdt__chart">
+    <div class="fdt__chart-head">
+      <div>
+        <span class="fdt__chart-tag">Daily activity</span>
+        <h2 class="fdt__chart-title">Tasks taken per day</h2>
+      </div>
+      <div class="fdt__chart-legend">
+        <span class="fdt__legend-item"><span class="fdt__legend-total">12</span>Accepted</span>
+        <span class="fdt__legend-item"><span class="fdt__swatch fdt__swatch--green"></span>Delivered</span>
+        <span class="fdt__legend-item"><span class="fdt__swatch fdt__swatch--red"></span>Failed</span>
+        <span class="fdt__legend-item"><span class="fdt__swatch fdt__swatch--amber"></span>In progress</span>
+        <span class="fdt__legend-item"><span class="fdt__swatch fdt__swatch--grey"></span>Unstarted</span>
+      </div>
+    </div>
+    <div id="workforce_driver_tasks_chart_daily" class="fdt__chart-canvas"></div>
+    <p class="fdt__chart-note">Figure above each column = orders accepted that day; the segments show how those orders closed. Last {{ chart_daily.labels|length }} active day{{ chart_daily.labels|length|pluralize }} in the current filter.</p>
+  </div>
+  {% endif %}
+
   <!-- ── FILTERS ───────────────────────────────────────────── -->
   <form method="get" id="fdtFilterForm" class="fdt__filters">
     <input type="hidden" name="driver_id" value="{{ selected_driver.driver_id }}">
@@ -148,6 +169,9 @@
   <div class="fdt__sheet">
     <div class="fdt__sheet-head">
       <span class="fdt__sheet-count">{{ stats.total }} task{{ stats.total|pluralize }}</span>
+      {% if tasks %}
+      <span class="fdt__sheet-range">Rows {{ tasks.start_index }}–{{ tasks.end_index }}</span>
+      {% endif %}
     </div>
 
     {% if tasks %}
@@ -236,6 +260,9 @@
       </table>
     </div>
 
+    <!-- ── PAGER (shared brand component) ──────────────────── -->
+    {% include "includes/components/_pagination.html" with page_obj=tasks filter_params=filter_params per_page=per_page pagination_id="fdt_tasks" %}
+
     {% else %}
     <div class="fdt__empty">
       <p class="fdt__empty-text">No tasks match these filters.</p>
@@ -255,11 +282,62 @@
 
 </div><!-- /fdt -->
 
+{{ chart_daily|json_script:"workforce_driver_tasks_data_daily" }}
+
 <script>
 // Toggle custom date fields
 function fdtToggleDates(val) {
   document.getElementById('fdtCustomDates').hidden = (val !== 'custom');
 }
+
+// Daily activity chart — stacked columns, height = tasks taken that day
+(function () {
+  var el = document.getElementById('workforce_driver_tasks_chart_daily');
+  var dataEl = document.getElementById('workforce_driver_tasks_data_daily');
+  if (!el || !dataEl || typeof ApexCharts === 'undefined' || el.dataset.rendered) return;
+
+  var d = JSON.parse(dataEl.textContent);
+  if (!d.labels || !d.labels.length) return;
+  el.dataset.rendered = '1';
+
+  var NAVY = '#001f3f', MUTED = '#8a94a1', GRID = '#e2e6eb';
+
+  new ApexCharts(el, {
+    chart: { type: 'bar', height: 260, stacked: true, toolbar: { show: false }, fontFamily: 'inherit' },
+    series: [
+      { name: 'Delivered',   data: d.delivered },
+      { name: 'Failed',      data: d.failed },
+      { name: 'In progress', data: d.accepted },
+      { name: 'Unstarted',   data: d.open }
+    ],
+    colors: ['#1a7f4e', '#b33040', '#b45309', '#9aa4af'],
+    xaxis: {
+      categories: d.labels,
+      labels: { style: { colors: MUTED, fontSize: '11px' } },
+      axisBorder: { color: GRID }, axisTicks: { show: false }
+    },
+    yaxis: { labels: { style: { colors: MUTED, fontSize: '11px' }, formatter: function (v) { return Math.round(v); } } },
+    plotOptions: {
+      bar: {
+        columnWidth: '38%', borderRadius: 2, borderRadiusApplication: 'end',
+        // Stack total = orders accepted by the driver that day
+        dataLabels: { total: { enabled: true, offsetY: -2,
+          style: { color: NAVY, fontSize: '11px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' } } }
+      }
+    },
+    stroke: { show: true, width: 2, colors: ['#fff'] },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    grid: { borderColor: GRID, strokeDashArray: 0 },
+    tooltip: {
+      shared: true, intersect: false,
+      y: { formatter: function (v) { return v + ' task' + (v === 1 ? '' : 's'); } }
+    },
+    states: { active: { filter: { type: 'none' } } },
+    annotations: { position: 'back' },
+    noData: { text: 'No task activity in this range', style: { color: NAVY } }
+  }).render();
+})();
 
 // Set the completion meter width (CSP-safe: no inline styles in markup)
 document.addEventListener('DOMContentLoaded', () => {

@@ -5,30 +5,27 @@
 
 {% block extra_css %}
 {# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260718a">
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260727c">
 {% endblock extra_css %}
 
 {% block content %}
 <div class="col-12 p-2 p-md-3">
 
-    <!-- Back Button -->
-    <button type="button" class="btn btn-sm btn-outline-secondary mb-2" onclick="history.back()">
-        <i class="fa-solid fa-arrow-left me-1"></i> Back
-    </button>
-
     <!-- Hero Banner -->
     <div class="dtd__hero">
         <div class="dtd__hero__top">
             <div>
-                <h2 class="dtd__hero__title">
-                    <i class="fa-solid fa-clipboard-check"></i>
-                    Task #{{ task.dl_task_number }}
-                </h2>
+                <div class="dtd__hero__eyebrow">
+                    <i class="fa-solid fa-clipboard-check"></i> Delivery Task
+                </div>
+                <h2 class="dtd__hero__title">{{ task.dl_task_number }}</h2>
                 <div class="dtd__hero__sub">
-                    <i class="fa-solid fa-box-open"></i>
-                    Order: <span>{{ task.order.client_order_code }}</span>
-                    <span class="ms-2"><i class="fa-solid fa-store"></i></span>
-                    <span>{{ task.order.business.business_name }}</span>
+                    <span class="dtd__hero__chip" title="Client order code">
+                        <i class="fa-solid fa-box-open"></i>{{ task.order.client_order_code }}
+                    </span>
+                    <span class="dtd__hero__chip" title="Business">
+                        <i class="fa-solid fa-store"></i>{{ task.order.business.business_name }}
+                    </span>
                 </div>
             </div>
             <div class="dtd__hero__badges">
@@ -36,7 +33,10 @@
                     <i class="fa-solid fa-truck-fast"></i>
                     {{ task.get_dl_task_status_display }}
                 </span>
-</div>
+                <button type="button" class="dtd__back-btn dtd__back-btn--hero" onclick="history.back()">
+                    <i class="fa-solid fa-arrow-left"></i> Back
+                </button>
+            </div>
         </div>
     </div>
 
@@ -64,7 +64,7 @@
                             <!-- Contact Buttons -->
                             {% if task.order.customer_phone %}
                             <div class="dtd__fields">
-                                <div class="dtd__field">
+                                <div class="dtd__field dtd__field--contact">
                                     <span class="dtd__field__label"><i class="fa-solid fa-address-book"></i> Contact</span>
                                     <div class="dtd__contacts">
                                         <a href="tel:{{ task.order.customer_phone }}" class="dtd__contact dtd__contact--phone">
@@ -89,14 +89,15 @@
                             <div class="dtd__cod">
                                 <div class="dtd__cod__info">
                                     <span class="dtd__cod__label"><i class="fa-solid fa-money-bill-wave me-1"></i> COD Amount</span>
-                                    {% if task.cod_collected %}
-                                    <span class="dtd__update__pill dtd__update__pill--success" style="font-size:0.7rem;">
-                                        <i class="fa-solid fa-check-circle"></i> Collected{% if task.cod_collected_at %} · {{ task.cod_collected_at|date:"d M, H:i" }}{% endif %}
+                                    {% comment %}Use the resolved COD state, not task.cod_collected —
+                                    a delivered zero-COD task never sets that flag and would otherwise
+                                    read as "Pending Collection" forever.{% endcomment %}
+                                    {% if cod_state.collected %}
+                                    <span class="dtd__state dtd__state--success">
+                                        Collected{% if cod_state.collected_at %} · {{ cod_state.collected_at|date:"d M, H:i" }}{% endif %}{% if cod_state.is_zero %} · nothing to collect{% endif %}
                                     </span>
                                     {% else %}
-                                    <span class="dtd__update__pill dtd__update__pill--from" style="font-size:0.7rem;">
-                                        <i class="fa-solid fa-clock"></i> Pending Collection
-                                    </span>
+                                    <span class="dtd__state">Pending collection</span>
                                     {% endif %}
                                 </div>
                                 <div class="dtd__cod__value">
@@ -175,7 +176,7 @@
                                     <div class="qnas-plate" role="group" aria-label="Qatar national address code">
                                         <div class="qnas-plate__cell">
                                             <span class="qnas-plate__tag">Zone</span>
-                                            <span class="qnas-plate__num{% if not task.order.dl_zone %} qnas-plate__num--empty{% endif %}">{{ task.order.dl_zone|default:'—' }}</span>
+                                            <span id="dtdZoneNum{{ task.id }}" class="qnas-plate__num{% if not task.order.dl_zone %} qnas-plate__num--empty{% endif %}">{{ task.order.dl_zone|default:'—' }}</span>
                                         </div>
                                         <span class="qnas-plate__div">/</span>
                                         <div class="qnas-plate__cell">
@@ -221,12 +222,12 @@
                                 </label>
                                 <div id="dtdLocDrop{{ task.id }}" class="oap__loc-drop oap__loc-drop--sm"
                                      ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
-                                     ondrop="locDropSave(event, {{ task.order.id }}, {latId:'dtdLatInput{{ task.id }}', lngId:'dtdLngInput{{ task.id }}', accuracyWrapId:'dtdAccuracyWrap{{ task.id }}', resultId:'dtdLocResult{{ task.id }}', inputId:'dtdLocPaste{{ task.id }}'})">
+                                     ondrop="locDropSave(event, {{ task.order.id }}, {latId:'dtdLatInput{{ task.id }}', lngId:'dtdLngInput{{ task.id }}', accuracyWrapId:'dtdAccuracyWrap{{ task.id }}', resultId:'dtdLocResult{{ task.id }}', inputId:'dtdLocPaste{{ task.id }}', zoneNumId:'dtdZoneNum{{ task.id }}'})">
                                     <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
                                     <input type="text" id="dtdLocPaste{{ task.id }}" class="form-control form-control-sm oap__loc-drop__input"
                                            placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here">
-                                    <button type="button" class="btn btn-sm btn-success flex-shrink-0"
-                                            onclick="whatsappLocationSave(document.getElementById('dtdLocPaste{{ task.id }}').value, {{ task.order.id }}, {latId:'dtdLatInput{{ task.id }}', lngId:'dtdLngInput{{ task.id }}', accuracyWrapId:'dtdAccuracyWrap{{ task.id }}', resultId:'dtdLocResult{{ task.id }}'})">
+                                    <button type="button" class="dtd__btn dtd__btn--warning dtd__btn--sm flex-shrink-0"
+                                            onclick="whatsappLocationSave(document.getElementById('dtdLocPaste{{ task.id }}').value, {{ task.order.id }}, {latId:'dtdLatInput{{ task.id }}', lngId:'dtdLngInput{{ task.id }}', accuracyWrapId:'dtdAccuracyWrap{{ task.id }}', resultId:'dtdLocResult{{ task.id }}', zoneNumId:'dtdZoneNum{{ task.id }}'})">
                                         <i class="fa-solid fa-floppy-disk me-1"></i>Save
                                     </button>
                                 </div>
@@ -249,7 +250,7 @@
                                 </div>
                                 <div class="col-4 pe-0">
                                     <label class="dtd__field__label d-block mb-0">Accuracy</label>
-                                    <div id="dtdAccuracyWrap{{ task.id }}">
+                                    <div id="dtdAccuracyWrap{{ task.id }}" data-accuracy-wrap="{{ task.order.id }}">
                                     {% if task.order.coords_accuracy %}
                                     <span class="dtd__accuracy dtd__accuracy--{{ task.order.coords_accuracy }}">
                                         {% if task.order.coords_accuracy == 'by_customer' %}<i class="fa-solid fa-user-check"></i>
@@ -287,9 +288,9 @@
                     <!-- Summary: Package / Qty / COD -->
                     <div class="dtd__pkg-strip mb-3">
                         {% if task.order.package_description %}
-                        <div class="dtd__pkg-item" style="flex:2;align-items:flex-start;">
+                        <div class="dtd__pkg-item dtd__pkg-item--desc">
                             <span class="dtd__pkg-item__label"><i class="fa-solid fa-box-open"></i> Package</span>
-                            <span class="dtd__pkg-item__val" style="text-align:left;font-size:0.8rem;font-weight:500;">{{ task.order.package_description }}</span>
+                            <span class="dtd__pkg-item__val dtd__pkg-item__val--text">{{ task.order.package_description }}</span>
                         </div>
                         {% endif %}
                         <div class="dtd__pkg-item">
@@ -304,15 +305,15 @@
 
                     <!-- Product Items -->
                     {% if task.order.order_items.exists %}
-                    <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.65rem;">Product Items ({{ task.order.order_items.count }})</div>
+                    <div class="dtd__section-label">Product Items ({{ task.order.order_items.count }})</div>
                     {% for item in task.order.order_items.all %}
-                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}">
-                        <span class="flex-grow-1" style="overflow-wrap:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35;">{{ item.display_name }}</span>
-                        <span class="badge bg-light text-dark flex-shrink-0">{{ item.quantity }}</span>
+                    <div class="dtd__item-row">
+                        <span class="dtd__item-row__name">{{ item.display_name }}</span>
+                        <span class="dtd__item-row__qty">{{ item.quantity }}</span>
                         {% if item.stock_status == 'in_stock' %}
-                            <span class="badge bg-success flex-shrink-0">In Stock</span>
+                            <span class="dtd__item-row__stock">In stock</span>
                         {% else %}
-                            <span class="badge bg-danger flex-shrink-0">Out of Stock</span>
+                            <span class="dtd__item-row__stock dtd__item-row__stock--out">Out of stock</span>
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -329,11 +330,7 @@
                         <i class="fa-solid fa-clipboard-list"></i>
                         Pick List
                     </div>
-                    <span style="font-size:0.7rem;font-weight:600;padding:0.2rem 0.5rem;border-radius:0.375rem;
-                        {% if pick_list.status == 'completed' %}background:#dcfce7;color:#15803d;
-                        {% elif pick_list.status == 'in_progress' %}background:#eff6ff;color:#2563eb;
-                        {% elif pick_list.status == 'assigned' %}background:#eff6ff;color:#2563eb;
-                        {% else %}background:#fef3c7;color:#92400e;{% endif %}">
+                    <span class="dtd__pick-status dtd__pick-status--{{ pick_list.status }}">
                         {{ pick_list.get_status_display }}
                     </span>
                 </div>
@@ -365,18 +362,18 @@
                     <!-- Items table -->
                     <div class="dtd__picklist-header mb-2">Items to Pick</div>
                     {% for item in pick_list_items %}
-                    <div class="d-flex align-items-center gap-2 py-1 {% if not forloop.last %}border-bottom{% endif %}" style="font-size:0.82rem;">
-                        <span class="badge bg-light text-dark" style="min-width:28px;">{{ item.quantity_to_pick }}</span>
-                        <span class="flex-grow-1">{{ item.product.item_name }}</span>
+                    <div class="dtd__pick-row">
+                        <span class="dtd__item-row__qty">{{ item.quantity_to_pick }}</span>
+                        <span class="dtd__item-row__name">{{ item.product.item_name }}</span>
                         {% if item.location %}
-                        <code style="font-family:var(--dtd-font-mono);font-size:0.7rem;color:var(--dtd-muted);">{{ item.location.code }}</code>
+                        <code class="dtd__pick-row__loc">{{ item.location.code }}</code>
                         {% endif %}
                         {% if item.is_picked %}
-                        <i class="fa-solid fa-circle-check" style="color:var(--dtd-success);"></i>
+                        <i class="fa-solid fa-circle-check dtd__pick-row__done" title="Picked"></i>
                         {% elif item.quantity_picked > 0 %}
-                        <span style="font-size:0.7rem;color:var(--dtd-warning);">{{ item.quantity_picked }}/{{ item.quantity_to_pick }}</span>
+                        <span class="dtd__pick-row__partial">{{ item.quantity_picked }}/{{ item.quantity_to_pick }}</span>
                         {% else %}
-                        <i class="fa-solid fa-circle" style="color:var(--dtd-border-strong);font-size:0.6rem;"></i>
+                        <i class="fa-solid fa-circle dtd__pick-row__todo" title="Not picked"></i>
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -397,10 +394,13 @@
                         <i class="fa-solid fa-mobile-screen"></i>
                         Driver App Updates
                     </div>
-                    {% if driver_status_updates or driver_documents %}
-                    <span class="dtd__card__head-count">{{ driver_status_updates.count|add:driver_documents.count }}</span>
+                    {% if driver_documents %}
+                    <span class="dtd__card__head-count">{{ driver_documents.count }}</span>
                     {% endif %}
                 </div>
+                <!-- Delivery-leg stage rail (mirrors the First-Mile Pickup strip) -->
+                {% include "workforce/parts/_delivery_leg_card.html" with leg=delivery_leg %}
+
                 <div class="dtd__updates">
                     <!-- Driver assignment — always first -->
                     {% if task.driver %}
@@ -436,34 +436,9 @@
 
                     {% if driver_status_updates or driver_documents %}
 
-                    {% for entry in driver_status_updates %}
-                    <div class="dtd__update">
-                        <div class="dtd__update__icon dtd__update__icon--driver">
-                            <i class="fa-solid fa-truck-fast"></i>
-                        </div>
-                        <div class="dtd__update__body">
-                            <div class="dtd__update__title">{{ entry.get_field_name_display }}</div>
-                            <div class="dtd__update__transition">
-                                {% if entry.old_display %}
-                                <span class="dtd__update__pill dtd__update__pill--from">{{ entry.old_display }}</span>
-                                <i class="fa-solid fa-arrow-right dtd__update__arrow"></i>
-                                {% endif %}
-                                <span class="dtd__update__pill {% if entry.new_value == 'delivered' or entry.new_value == '2' %}dtd__update__pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == '9' %}dtd__update__pill--danger{% else %}dtd__update__pill--to{% endif %}">{{ entry.new_display }}</span>
-                            </div>
-                            <div class="dtd__update__meta">
-                                <i class="fa-regular fa-clock"></i> {{ entry.created_at|date:"d M Y, H:i" }}
-                                {% if entry.changed_by %}
-                                <span><i class="fa-regular fa-user"></i> {{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>
-                                {% endif %}
-                            </div>
-                            {% if entry.notes %}
-                            <div class="dtd__update__note {% if entry.new_value == 'failed' or entry.new_value == 'cancelled' %}dtd__update__note--danger{% endif %}">
-                                <i class="fa-regular fa-message"></i> {{ entry.notes }}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
+                    {% comment %}Status changes are not listed row-by-row here — the stage rail
+                    above already shows the same transitions in time order, and the Status Timeline
+                    card below carries the full merged history.{% endcomment %}
 
                     {% for doc in driver_documents %}
                     <div class="dtd__update">
@@ -540,7 +515,7 @@
             </div>
 
             <!-- First-Mile Pickup leg (only for orders with a pickup task) -->
-            {% include "workforce/parts/_pickup_leg_card.html" with pickup=task.order.pickup_task %}
+            {% include "workforce/parts/_pickup_leg_card.html" with pickup=pickup_task pickup_gps_pings=pickup_gps_pings %}
 
             <!-- Status Timeline (reusable include) -->
             {% with order=task.order delivery_task=task timeline_count=status_history.count %}
@@ -583,7 +558,7 @@
                     {% if task.driver %}
                     <div class="dtd__assigned-driver">
                         <div class="dtd__assigned-driver__info">
-                            <i class="fa-solid fa-circle-check" style="color:#10b981;"></i>
+                            <i class="fa-solid fa-circle-check dtd__assigned-driver__mark"></i>
                             <div>
                                 <div class="dtd__assigned-driver__name">{{ task.driver.driver_code }} — {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</div>
                                 <div class="dtd__assigned-driver__label">Assigned Driver</div>
@@ -693,9 +668,9 @@
                         {% else %}Cancellation GPS{% endif %}
                     </div>
                     {% if task.completion_latitude and task.completion_longitude %}
-                    <span class="badge bg-success"><i class="fa-solid fa-satellite-dish me-1"></i>Captured</span>
+                    <span class="dtd__state dtd__state--success">Captured</span>
                     {% else %}
-                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS</span>
+                    <span class="dtd__state dtd__state--warning">No GPS</span>
                     {% endif %}
                 </div>
                 <div class="dtd__card__body">
@@ -709,11 +684,11 @@
                             <span class="dtd__field__label"><i class="fa-solid fa-circle-info"></i> Status</span>
                             <span class="dtd__field__value">
                                 {% if task.dl_task_status == 'delivered' %}
-                                <span class="badge bg-success">Delivered</span>
+                                <span class="dtd__state dtd__state--success">Delivered</span>
                                 {% elif task.dl_task_status == 'failed' %}
-                                <span class="badge bg-danger">Failed / Returned</span>
+                                <span class="dtd__state dtd__state--danger">Failed / Returned</span>
                                 {% else %}
-                                <span class="badge bg-secondary">Cancelled</span>
+                                <span class="dtd__state">Cancelled</span>
                                 {% endif %}
                             </span>
                         </div>
@@ -725,8 +700,8 @@
                         {% endif %}
                     </div>
                     <a href="https://www.google.com/maps?q={{ task.completion_latitude }},{{ task.completion_longitude }}"
-                       target="_blank" class="btn btn-sm btn-outline-primary mt-2">
-                        <i class="fa-solid fa-external-link me-1"></i> View on Google Maps
+                       target="_blank" class="dtd__addr__map-btn">
+                        <i class="fa-solid fa-map-location-dot"></i> View on Google Maps
                     </a>
                     {% else %}
                     <div class="dtd__empty">
@@ -806,8 +781,8 @@
                         <i class="fa-solid fa-box"></i>
                         Order
                     </div>
-                    <a href="{% url 'workforce:order_detail' task.order.id %}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.7rem;">
-                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>View Order
+                    <a href="{% url 'workforce:order_detail' task.order.id %}" class="dtd__addr__map-btn dtd__addr__map-btn--flush">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> View Order
                     </a>
                 </div>
                 <div class="dtd__card__body">
@@ -858,68 +833,82 @@
                         {% if task.payment_method %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-wallet"></i> Method</span>
-                            <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.25rem;">
+                            <span class="dtd__pay-method">
                                 {% if task.payment_method == 'cash' %}
-                                <i class="fa-solid fa-money-bill" style="color:#10b981;"></i>
-                                <span class="dtd__field__value">Cash</span>
+                                <i class="fa-solid fa-money-bill"></i> Cash
                                 {% elif task.payment_method == 'card' %}
-                                <i class="fa-solid fa-credit-card" style="color:#3b82f6;"></i>
-                                <span class="dtd__field__value">Card</span>
+                                <i class="fa-solid fa-credit-card"></i> Card
                                 {% elif task.payment_method == 'pos' %}
-                                <i class="fa-solid fa-square-terminal" style="color:#8b5cf6;"></i>
-                                <span class="dtd__field__value">POS</span>
+                                <i class="fa-solid fa-square-terminal"></i> POS
                                 {% elif task.payment_method == 'fawran' %}
-                                <i class="fa-solid fa-mobile-screen" style="color:#f59e0b;"></i>
-                                <span class="dtd__field__value">Fawran</span>
+                                <i class="fa-solid fa-mobile-screen"></i> Fawran
                                 {% else %}
-                                <span class="dtd__field__value text-muted">{{ task.get_payment_method_display|default:'—' }}</span>
+                                {{ task.get_payment_method_display|default:'—' }}
                                 {% endif %}
-                            </div>
+                            </span>
                         </div>
                         {% endif %}
-                        {% if task.cod_collected %}
+                        {% if cod_state.collected %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-check-circle"></i> COD Status</span>
-                            <span class="dtd__field__value" style="color:#10b981; font-weight:600;">✓ Collected</span>
-                            {% if task.cod_collected_at %}
-                            <div style="font-size:0.75rem; color:#6b7280; margin-top:0.25rem;">
-                                <i class="fa-regular fa-clock me-1"></i>{{ task.cod_collected_at|date:"M d, Y H:i" }}
+                            <span class="dtd__cod-mark"><i class="fa-solid fa-circle-check"></i> Collected</span>
+                            {% if cod_state.collected_at %}
+                            <div class="dtd__cod-note">
+                                <i class="fa-regular fa-clock me-1"></i>{{ cod_state.collected_at|date:"M d, Y H:i" }}
                             </div>
                             {% endif %}
                         </div>
-                        {% endif %}
-                        {% if task.cod_collected_amount %}
+                        {% comment %}Rendered on the resolved state so a 0 QAR collection is
+                        shown as a real amount instead of being dropped as falsy.{% endcomment %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-money-bill-wave"></i> Amount Collected</span>
-                            <span class="dtd__field__value fw-semibold">{{ task.cod_collected_amount }} QAR</span>
+                            <span class="dtd__field__value fw-semibold">{{ cod_state.collected_amount }} QAR</span>
                         </div>
+                        {% if cod_returned_amount %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-rotate-left"></i> Handed Back to Customer</span>
+                            <span class="dtd__field__value fw-semibold">{{ cod_returned_amount }} QAR</span>
+                        </div>
+                        {% elif cod_refundable %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-rotate-left"></i> COD Return</span>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    id="workforce_task_btn_cod_return"
+                                    data-task-id="{{ task.id }}"
+                                    data-max="{{ cod_refundable }}"
+                                    data-order="{{ task.order.order_number|default:'' }}">
+                                <i class="fa-solid fa-rotate-left me-1"></i> Refund COD to customer
+                            </button>
+                            <div class="dtd__cod-note">Up to {{ cod_refundable }} QAR can be handed back.</div>
+                        </div>
+                        {% endif %}
                         {% endif %}
                         {% if payment_split_calc %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-chart-pie"></i> Payment Split (Calculated)</span>
-                            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.25rem;">
+                            <div class="dtd__split">
                                 {% if payment_split_calc.cash %}
-                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#f0fdf4; border-radius:0.375rem; border-left:3px solid #10b981;">
-                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-money-bill me-1" style="color:#10b981;"></i> Cash</span>
-                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.cash|floatformat:2 }} QAR</strong>
+                                <div class="dtd__split__row">
+                                    <span><i class="fa-solid fa-money-bill"></i>Cash</span>
+                                    <span class="dtd__split__amt">{{ payment_split_calc.cash|floatformat:2 }} QAR</span>
                                 </div>
                                 {% endif %}
                                 {% if payment_split_calc.pos %}
-                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#eff6ff; border-radius:0.375rem; border-left:3px solid #3b82f6;">
-                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-square-terminal me-1" style="color:#3b82f6;"></i> POS</span>
-                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.pos|floatformat:2 }} QAR</strong>
+                                <div class="dtd__split__row">
+                                    <span><i class="fa-solid fa-square-terminal"></i>POS</span>
+                                    <span class="dtd__split__amt">{{ payment_split_calc.pos|floatformat:2 }} QAR</span>
                                 </div>
                                 {% endif %}
                                 {% if payment_split_calc.fawran %}
-                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#fffbeb; border-radius:0.375rem; border-left:3px solid #f59e0b;">
-                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-mobile-screen me-1" style="color:#f59e0b;"></i> Fawran</span>
-                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.fawran|floatformat:2 }} QAR</strong>
+                                <div class="dtd__split__row">
+                                    <span><i class="fa-solid fa-mobile-screen"></i>Fawran</span>
+                                    <span class="dtd__split__amt">{{ payment_split_calc.fawran|floatformat:2 }} QAR</span>
                                 </div>
                                 {% endif %}
                                 {% if payment_split_calc.card %}
-                                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:#eff6ff; border-radius:0.375rem; border-left:3px solid #3b82f6;">
-                                    <span style="font-size:0.875rem;"><i class="fa-solid fa-credit-card me-1" style="color:#3b82f6;"></i> Card</span>
-                                    <strong style="font-size:0.875rem;">{{ payment_split_calc.card|floatformat:2 }} QAR</strong>
+                                <div class="dtd__split__row">
+                                    <span><i class="fa-solid fa-credit-card"></i>Card</span>
+                                    <span class="dtd__split__amt">{{ payment_split_calc.card|floatformat:2 }} QAR</span>
                                 </div>
                                 {% endif %}
                             </div>
@@ -1119,6 +1108,50 @@
         return null;
     }
     const csrftoken = getCSRFToken();
+
+    // COD refund — hands collected cash back to the customer and posts the
+    // matching cod_return so the driver stops carrying it as a liability.
+    (function () {
+        const btn = document.getElementById('workforce_task_btn_cod_return');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            const max = parseFloat(btn.dataset.max) || 0;
+            const raw = window.prompt(
+                'How much COD is being handed back to the customer for ' +
+                (btn.dataset.order || 'this order') + '?\nMaximum ' + max.toFixed(2) + ' QAR.',
+                max.toFixed(2)
+            );
+            if (raw === null) return;
+            const amount = parseFloat(raw);
+            if (!(amount > 0) || amount > max) {
+                alert('Enter an amount between 0.01 and ' + max.toFixed(2) + ' QAR.');
+                return;
+            }
+            const note = window.prompt('Reason for the refund (optional):', '') || '';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing…';
+            fetch('/workforce/delivery-task/' + btn.dataset.taskId + '/cod-return/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ amount: amount, notes: note })
+            })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    if (!res.ok || res.d.error) {
+                        alert(res.d.error || 'Could not process the refund.');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i> Refund COD to customer';
+                        return;
+                    }
+                    window.location.reload();
+                })
+                .catch(function () {
+                    alert('Could not reach the server. Nothing was refunded.');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i> Refund COD to customer';
+                });
+        });
+    })();
 
     function toggleInstanceEdit() {
         const display = document.getElementById('whatsappInstanceDisplay');

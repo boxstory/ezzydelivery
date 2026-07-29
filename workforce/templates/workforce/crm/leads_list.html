@@ -6,7 +6,7 @@
 {# Notes: crml__ namespace; shares tokens from crm.css; HTMX filters like pricing_inquiries_list. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718k" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260724b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -16,9 +16,29 @@
     <!-- HEADER BAR -->
     <div class="crm__head">
       <div class="crm__head-title">
-        <div class="crm__eyebrow">Sales Pipeline</div>
-        <h1 class="crm__title">Leads</h1>
+        <div class="crm__eyebrow">{% if category_filter == 'driver' %}Recruitment Pipeline{% elif category_filter == 'business' %}Sales Pipeline{% else %}All Pipelines{% endif %}</div>
+        <h1 class="crm__title">{% if category_filter == 'driver' %}Driver Leads{% elif category_filter == 'business' %}Business Leads{% else %}Leads{% endif %}</h1>
         <p class="crm__subtitle">All inbound leads — pricing form, WhatsApp and manual</p>
+        <div class="crm__board-tabs" role="tablist" aria-label="Lead categories">
+          <a href="{% url 'workforce:crm_leads_list' %}"
+             class="crm__board-tab {% if not category_filter %}crm__board-tab--active{% endif %}"
+             hx-get="{% url 'workforce:crm_leads_list' %}" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-layer-group"></i> All
+          </a>
+          <a href="{% url 'workforce:crm_leads_list' %}?category=business"
+             class="crm__board-tab {% if category_filter == 'business' %}crm__board-tab--active{% endif %}"
+             hx-get="{% url 'workforce:crm_leads_list' %}?category=business" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-briefcase"></i> Business
+          </a>
+          <a href="{% url 'workforce:crm_leads_list' %}?category=driver"
+             class="crm__board-tab {% if category_filter == 'driver' %}crm__board-tab--active{% endif %}"
+             hx-get="{% url 'workforce:crm_leads_list' %}?category=driver" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-motorcycle"></i> Drivers
+          </a>
+        </div>
       </div>
       <div class="crm__metrics">
         <div class="crm__metric">
@@ -39,12 +59,13 @@
         </div>
       </div>
       <div class="crm__head-actions">
-        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
-           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+        {% if category_filter == 'driver' %}{% url 'workforce:crm_driver_leads_board' as list_board_url %}{% else %}{% url 'workforce:crm_leads_board' as list_board_url %}{% endif %}
+        <a href="{{ list_board_url }}" class="crm__btn"
+           hx-get="{{ list_board_url }}" hx-target="#main-content"
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-columns"></i> Board
         </a>
-        <a href="{% url 'workforce:crm_lead_create' %}" class="crm__btn crm__btn--primary">
+        <a href="{% url 'workforce:crm_lead_create' %}{% if category_filter == 'driver' %}?category=driver{% endif %}" class="crm__btn crm__btn--primary">
           <i class="fa-solid fa-plus"></i> New Lead
         </a>
       </div>
@@ -89,15 +110,8 @@
             {% endfor %}
           </select>
 
-          <select name="category" class="crm__facet-select" aria-label="Filter by lead type"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_leads_form_filter">
-            <option value="">All types</option>
-            {% for value, label in category_choices %}
-            <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
+          {# Category is driven by the tabs above; kept here so other filters preserve the active tab #}
+          <input type="hidden" name="category" value="{{ category_filter }}">
 
           <select name="assigned" class="crm__facet-select" aria-label="Filter by assignee"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"

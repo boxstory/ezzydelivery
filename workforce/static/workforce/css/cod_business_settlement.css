@@ -1,7 +1,7 @@
-/* Purpose: "Teller's Tape" bold redesign for the Business COD Payout report */
+/* Purpose: Client payout console — "teller tape" ledger for counting out COD held for a business. */
 /* Used by: workforce/templates/workforce/cod_business_settlement_report.html */
-/* Notes: Subject = a cash settlement window. Money in tabular mono; signature is the
-   sticky adding-machine tape + receipt-style confirm modal. Self-contained tokens. */
+/* Notes: Origin of the teller token set shared with driver_payout_worksheet.css (dpw__) and
+   cod_payout_invoice.css (bpi__). Money is tabular mono, right-aligned; brass is used once per view. */
 
 .bcp {
   --tlr-ink: #16221D;
@@ -25,14 +25,22 @@
   padding: 1.5rem 1.25rem 7rem;
 }
 
-.bcp__wrap { max-width: 1120px; margin: 0 auto; }
+.bcp__wrap { max-width: 1240px; margin: 0 auto; }
 
 /* ── Masthead ─────────────────────────────────────────────── */
 .bcp__masthead {
   border-bottom: 2px solid var(--tlr-ink);
   padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
+.bcp__masthead-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.bcp__masthead-actions { display: flex; gap: 0.5rem; }
 .bcp__eyebrow {
   font-family: var(--tlr-mono);
   font-size: 0.72rem;
@@ -42,6 +50,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  margin: 0;
 }
 .bcp__eyebrow::before {
   content: "";
@@ -52,20 +61,19 @@
 .bcp__title {
   font-family: var(--tlr-cond);
   font-weight: 700;
-  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
   letter-spacing: -0.01em;
-  line-height: 0.98;
+  line-height: 1;
   text-transform: uppercase;
-  margin: 0.35rem 0 0;
+  margin: 0.35rem 0 0.3rem;
 }
-.bcp__masthead-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+.bcp__sub {
+  font-family: var(--tlr-mono);
+  font-size: 0.76rem;
+  color: var(--tlr-muted);
+  margin: 0;
 }
-.bcp__masthead-actions { display: flex; gap: 0.5rem; }
+.bcp__sep { color: var(--tlr-rule-strong); margin: 0 0.35rem; }
 
 /* ── Buttons / links ──────────────────────────────────────── */
 .bcp__ghost {
@@ -104,8 +112,8 @@
 .bcp__window {
   background: var(--tlr-card);
   border: 1px solid var(--tlr-rule-strong);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1.5rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.25rem;
   display: grid;
   grid-template-columns: 2fr 1fr 1fr auto;
   gap: 0.85rem;
@@ -114,23 +122,23 @@
 .bcp__field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .bcp__field-label {
   font-family: var(--tlr-mono);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tlr-muted);
+  margin: 0;
 }
 .bcp__input,
 .bcp__select {
   font-family: var(--tlr-sans);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--tlr-ink);
-  background: var(--tlr-paper);
+  background-color: var(--tlr-paper);
   border: 1px solid var(--tlr-rule-strong);
   border-radius: 0;
-  padding: 0.55rem 0.7rem;
+  padding: 0.5rem 0.7rem;
   width: 100%;
 }
-.bcp__select { font-family: var(--tlr-sans); }
 .bcp__input:focus,
 .bcp__select:focus {
   outline: 2px solid var(--tlr-brass);
@@ -139,50 +147,110 @@
 }
 .bcp__window-actions { display: flex; gap: 0.5rem; }
 
-/* ── Statement header (selected business) ─────────────────── */
-.bcp__statement {
+/* ── Money strip ──────────────────────────────────────────── */
+.bcp__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border: 1px solid var(--tlr-rule-strong);
+  background: var(--tlr-card);
+  margin-bottom: 0.75rem;
+}
+.bcp__sum-cell {
+  padding: 0.75rem 0.9rem;
+  border-right: 1px solid var(--tlr-rule);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.bcp__sum-cell:last-child { border-right: 0; }
+.bcp__sum-cell--lead { background: var(--tlr-brass-soft); }
+.bcp__sum-label {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+.bcp__sum-value {
+  font-family: var(--tlr-mono);
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bcp__sum-value--void { color: var(--tlr-void); }
+.bcp__sum-unit {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--tlr-muted);
+  margin-left: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bcp__note {
+  font-size: 0.78rem;
+  color: var(--tlr-muted);
+  margin: 0 0 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* ── Panels ───────────────────────────────────────────────── */
+.bcp__panel {
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  margin-bottom: 1.25rem;
+}
+.bcp__panel-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  padding: 0.7rem 0.9rem;
   border-bottom: 1px solid var(--tlr-rule);
-  padding-bottom: 0.75rem;
-  margin-bottom: 0.5rem;
 }
-.bcp__statement-name {
+.bcp__panel-title {
   font-family: var(--tlr-cond);
+  font-size: 1.05rem;
   font-weight: 700;
-  font-size: clamp(1.5rem, 3.5vw, 2.25rem);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
   margin: 0;
 }
-.bcp__statement-meta {
+.bcp__count {
   font-family: var(--tlr-mono);
-  font-size: 0.84rem;
+  font-size: 0.72rem;
   color: var(--tlr-muted);
+  font-variant-numeric: tabular-nums;
 }
-.bcp__statement-meta strong { color: var(--tlr-ink); }
-.bcp__statement-meta .bcp__fee-note { color: var(--tlr-brass-deep); }
 
-/* ── Toolbar (select all) ─────────────────────────────────── */
-.bcp__toolbar {
+.bcp__bar {
   display: flex;
   align-items: center;
-  margin: 0.75rem 0;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  background: var(--tlr-paper);
 }
-.bcp__checkall {
-  display: inline-flex;
+.bcp__check-label {
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   margin: 0;
   cursor: pointer;
+}
+.bcp__bar-count {
   font-family: var(--tlr-mono);
-  font-size: 0.74rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
   color: var(--tlr-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Checkbox styled as an "include" stamp */
@@ -197,7 +265,8 @@
   cursor: pointer;
   flex: none;
 }
-.bcp input[type="checkbox"]:checked {
+.bcp input[type="checkbox"]:checked,
+.bcp input[type="checkbox"]:indeterminate {
   background: var(--tlr-brass);
   border-color: var(--tlr-brass-deep);
 }
@@ -208,42 +277,189 @@
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) translateY(-1px);
 }
+.bcp input[type="checkbox"]:indeterminate::after {
+  content: "";
+  width: 8px; height: 2px;
+  background: var(--tlr-paper);
+}
 .bcp input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--tlr-brass);
   outline-offset: 2px;
 }
 
 /* ── Ledger table ─────────────────────────────────────────── */
-.bcp__ledger {
-  background: var(--tlr-card);
-  border: 1px solid var(--tlr-rule-strong);
-  margin-bottom: 1.5rem;
+.bcp__table-wrap { overflow-x: auto; }
+.bcp__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
 }
-.bcp__table { width: 100%; border-collapse: collapse; }
 .bcp__table thead th {
   font-family: var(--tlr-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tlr-muted);
+  font-weight: 500;
   text-align: left;
-  padding: 0.65rem 0.85rem;
-  border-bottom: 1.5px solid var(--tlr-ink);
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--tlr-rule-strong);
   white-space: nowrap;
 }
 .bcp__table tbody td {
-  padding: 0.7rem 0.85rem;
+  padding: 0.55rem 0.7rem;
   border-bottom: 1px solid var(--tlr-rule);
-  font-size: 0.9rem;
-  vertical-align: middle;
+  vertical-align: top;
 }
-.bcp__table tbody tr:last-child td { border-bottom: none; }
-.bcp__table tbody tr:hover { background: rgba(176, 131, 47, 0.06); }
-.bcp__num { font-family: var(--tlr-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bcp__table tbody tr:last-child td { border-bottom: 0; }
+.bcp__table tbody tr:hover { background: rgba(22, 34, 29, 0.03); }
+/* A counted row is marked, not flooded — a brass rule on the edge and the
+   faintest wash, so the accent stays scarce across a 100-row ledger. */
+.bcp__row--on,
+.bcp__table tbody tr.bcp__row--on:hover { background: rgba(176, 131, 47, 0.08); }
+.bcp__row--on td:first-child { box-shadow: inset 2px 0 0 var(--tlr-brass); }
+
+.bcp__col-check { width: 2.4rem; }
+.bcp__num {
+  font-family: var(--tlr-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
 .bcp__num--cod { font-weight: 600; }
 .bcp__num--fee { color: var(--tlr-muted); }
-.bcp__order { font-family: var(--tlr-mono); font-weight: 600; }
-.bcp__date { font-family: var(--tlr-mono); font-size: 0.8rem; color: var(--tlr-muted); white-space: nowrap; }
+.bcp__order { font-family: var(--tlr-mono); font-weight: 600; white-space: nowrap; }
+.bcp__date { font-family: var(--tlr-mono); font-size: 0.78rem; color: var(--tlr-muted); white-space: nowrap; }
+.bcp__sub-line {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--tlr-muted);
+  margin-top: 0.15rem;
+}
+.bcp__truncate {
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Charge verification: a swatch and a word, never a coloured pill. */
+.bcp__status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  font-weight: 400;
+  margin-top: 0.15rem;
+}
+.bcp__status::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--tlr-rule-strong);
+}
+.bcp__status--verified::before { background: var(--tlr-brass); }
+.bcp__status--published::before { background: var(--tlr-ink); }
+.bcp__status--rejected::before { background: var(--tlr-void); }
+
+/* ── Deduction ladder ─────────────────────────────────────── */
+/* The payout IS a subtraction, so the lines hang off one rail: gross at the top,
+   each charge stepping down it, net cutting across the bottom. */
+.bcp__ladder {
+  padding: 0.75rem 0.9rem;
+  max-width: 34rem;
+  font-family: var(--tlr-mono);
+}
+.bcp__ladder-line,
+.bcp__deduct-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  padding: 0.3rem 0 0.3rem 0.85rem;
+  border-left: 1px solid var(--tlr-rule-strong);
+  font-variant-numeric: tabular-nums;
+}
+.bcp__ladder-line { color: var(--tlr-muted); }
+.bcp__ladder-line--head { color: var(--tlr-ink); font-weight: 600; border-left-color: var(--tlr-ink); }
+.bcp__ladder-val { white-space: nowrap; }
+.bcp__ladder-val--void { color: var(--tlr-void); }
+.bcp__ladder-line--net {
+  border-left: none;
+  border-top: 2px solid var(--tlr-ink);
+  margin-top: 0.35rem;
+  padding: 0.6rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--tlr-ink);
+}
+.bcp__ladder-line--net .bcp__ladder-val { color: var(--tlr-brass-deep); }
+
+.bcp__receipt-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.bcp__deducts { display: flex; flex-direction: column; }
+.bcp__deduct-row { gap: 0.375rem; }
+.bcp__deduct-row .bcp__select,
+.bcp__deduct-row .bcp__input {
+  font-family: var(--tlr-mono);
+  font-size: 0.74rem;
+  padding: 0.2rem 0.3rem;
+  border: none;
+  border-bottom: 1px solid var(--tlr-rule-strong);
+  background-color: transparent;
+  min-width: 0;
+}
+.bcp__deduct-row .bcp__deduct-kind { flex: 1 1 8rem; }
+.bcp__deduct-row .bcp__deduct-label { flex: 1 1 6rem; }
+.bcp__deduct-row .bcp__deduct-amount { flex: 0 0 5.5rem; text-align: right; }
+.bcp__deduct-remove {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: var(--tlr-void);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+  cursor: pointer;
+}
+.bcp__deduct-remove:hover { color: #7d2c1f; }
+
+.bcp__add-deduct {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: var(--tlr-brass-deep);
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.375rem 0 0.375rem 0.85rem;
+  cursor: pointer;
+}
+.bcp__add-deduct:hover { color: var(--tlr-ink); }
+
+.bcp__over {
+  margin: 0;
+  padding: 0.55rem 0.9rem;
+  border-top: 1px solid var(--tlr-rule);
+  font-family: var(--tlr-mono);
+  font-size: 0.74rem;
+  color: var(--tlr-void);
+}
 
 /* ── Sticky teller tape ───────────────────────────────────── */
 .bcp__tape {
@@ -251,12 +467,8 @@
   left: 0; right: 0; bottom: 0;
   background: var(--tlr-ink);
   color: var(--tlr-paper);
-  z-index: 40;
+  z-index: 1030;
   padding: 0.9rem 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
   box-shadow: 0 -8px 24px rgba(22, 34, 29, 0.18);
 }
 /* torn / perforated top edge */
@@ -269,10 +481,18 @@
     radial-gradient(circle at 6px -2px, transparent 6px, var(--tlr-ink) 6.5px) repeat-x;
   background-size: 14px 10px;
 }
-.bcp__tape-inner { max-width: 1120px; margin: 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.bcp__tape-inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
 .bcp__tape-readout { display: flex; align-items: baseline; gap: 1.5rem; font-family: var(--tlr-mono); }
 .bcp__tape-count { font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: #9fb0a6; }
-.bcp__tape-count strong { color: var(--tlr-paper); font-size: 1rem; }
+.bcp__tape-count strong { color: var(--tlr-paper); font-size: 1rem; font-variant-numeric: tabular-nums; }
 .bcp__tape-total { display: flex; flex-direction: column; }
 .bcp__tape-total-label { font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase; color: #9fb0a6; }
 .bcp__tape-total-value {
@@ -283,6 +503,14 @@
   line-height: 1;
 }
 .bcp__tape-total-value .bcp__qr { font-size: 0.85rem; color: #9fb0a6; margin-left: 0.3rem; }
+/* Gross and the charges ride alongside the payout figure so the tape shows the
+   whole subtraction, not just its result. */
+.bcp__tape-total--sub .bcp__tape-sub-value {
+  font-size: 0.95rem;
+  color: var(--tlr-paper);
+  font-variant-numeric: tabular-nums;
+}
+.bcp__tape-total--sub .bcp__tape-total-label { color: #7f9088; }
 .bcp__tape .bcp__primary {
   background: var(--tlr-brass);
   color: var(--tlr-ink);
@@ -294,8 +522,32 @@
   100% { transform: translateY(0); opacity: 1; }
 }
 
-/* ── Receipt (settle modal) ───────────────────────────────── */
-.bcp__receipt { font-family: var(--tlr-mono); background: var(--tlr-card); border: none; border-radius: 0; }
+/* ── Receipt (confirm modal) ──────────────────────────────── */
+/* Bootstrap moves/renders the modal outside .bcp, so the teller tokens are
+   redeclared here — without them the sheet renders with no background at all. */
+.bcp__receipt {
+  --tlr-ink: #16221D;
+  --tlr-paper: #EEF1EA;
+  --tlr-card: #FBFCF9;
+  --tlr-rule: #D5DACE;
+  --tlr-rule-strong: #B9C0B1;
+  --tlr-brass: #B0832F;
+  --tlr-brass-deep: #8A6526;
+  --tlr-brass-soft: #ECE2C9;
+  --tlr-void: #9E3B2B;
+  --tlr-muted: #6B7468;
+  --tlr-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --tlr-cond: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --tlr-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  font-family: var(--tlr-mono);
+  color: var(--tlr-ink);
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  border-radius: 0;
+}
+.bcp__receipt .bcp__field-label { display: block; margin-bottom: 0.2rem; }
+.bcp__receipt hr { border-color: var(--tlr-rule); opacity: 1; }
 .bcp__receipt .modal-header,
 .bcp__receipt .modal-footer { border-color: var(--tlr-rule); }
 .bcp__receipt-title { font-family: var(--tlr-cond); font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
@@ -306,27 +558,70 @@
   padding: 0.5rem 0;
   margin-bottom: 0.85rem;
 }
-.bcp__receipt-line { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.15rem 0; font-variant-numeric: tabular-nums; }
+.bcp__receipt-line,
+.bcp__receipt-head {
+  display: grid;
+  grid-template-columns: 1fr 5.5rem 6rem;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  padding: 0.15rem 0;
+  font-variant-numeric: tabular-nums;
+}
 .bcp__receipt-line span:first-child { color: var(--tlr-muted); }
-.bcp__receipt-total { display: flex; justify-content: space-between; font-size: 1.05rem; font-weight: 600; }
+.bcp__receipt-fee,
+.bcp__receipt-cod { text-align: right; }
+.bcp__receipt-fee { color: var(--tlr-muted); }
+.bcp__receipt-cod { font-weight: 600; }
+.bcp__receipt-head {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  padding-bottom: 0.3rem;
+}
+.bcp__receipt-head-num { text-align: right; }
+
+.bcp__receipt-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  padding: 0.3rem 0 0.3rem 0.85rem;
+  border-left: 1px solid var(--tlr-rule-strong);
+  font-variant-numeric: tabular-nums;
+  color: var(--tlr-muted);
+}
+.bcp__receipt-sub:first-of-type { color: var(--tlr-ink); font-weight: 600; border-left-color: var(--tlr-ink); }
+
+.bcp__receipt-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-top: 2px solid var(--tlr-ink);
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+}
 .bcp__receipt-total .bcp__brass { color: var(--tlr-brass-deep); }
 
 /* ── Void panel ───────────────────────────────────────────── */
 .bcp__void {
   border: 1px dashed var(--tlr-void);
   background: rgba(158, 59, 43, 0.04);
-  padding: 1.1rem;
+  padding: 1rem;
   margin-bottom: 1rem;
 }
 .bcp__void-title {
   font-family: var(--tlr-cond);
   font-weight: 700;
+  font-size: 1.05rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--tlr-void);
   margin-bottom: 0.35rem;
 }
-.bcp__void-hint { color: var(--tlr-muted); font-size: 0.85rem; margin-bottom: 0.85rem; }
+.bcp__void-hint { color: var(--tlr-muted); font-size: 0.8rem; margin-bottom: 0.85rem; }
 .bcp__void-btn {
   font-family: var(--tlr-mono); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--tlr-paper); background: var(--tlr-void); border: none; padding: 0.6rem 1rem; cursor: pointer; width: 100%;
@@ -339,7 +634,7 @@
   padding: 4rem 1.5rem;
   border: 1px dashed var(--tlr-rule-strong);
   background: var(--tlr-card);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 .bcp__empty-mark {
   font-family: var(--tlr-cond);
@@ -348,19 +643,22 @@
   color: var(--tlr-brass);
   letter-spacing: 0.05em;
 }
-.bcp__empty-text { font-family: var(--tlr-mono); color: var(--tlr-muted); margin: 0.6rem 0 0; font-size: 0.92rem; }
+.bcp__empty-text { font-family: var(--tlr-mono); color: var(--tlr-muted); margin: 0.6rem 0 0; font-size: 0.9rem; }
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
   .bcp__window { grid-template-columns: 1fr 1fr; }
   .bcp__window .bcp__field--account { grid-column: 1 / -1; }
   .bcp__window-actions { grid-column: 1 / -1; }
-  .bcp__tape-inner { flex-direction: row; }
   .bcp__tape-readout { gap: 0.9rem; }
   .bcp__date { display: none; }
 }
-@media (max-width: 480px) {
-  .bcp__tape-count { display: none; }
+@media (max-width: 575.98px) {
+  .bcp { padding: 1rem 0.75rem 7rem; }
+  .bcp__tape { padding: 0.7rem 0.75rem; }
+  .bcp__tape-count,
+  .bcp__tape-total--sub { display: none; }
+  .bcp__ladder { max-width: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

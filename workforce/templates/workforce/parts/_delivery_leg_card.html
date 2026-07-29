@@ -1,0 +1,55 @@
+{% comment %}
+Purpose: Delivery-leg strip — stage rail, driver and evidence for the DeliveryTask itself.
+Used by: workforce/parts/delivery_task_detail.html (Driver App Updates card); pass leg=<dict from _delivery_leg>.
+Notes: Mirrors _pickup_leg_card.html so both legs of the job read the same way. A failed or
+       cancelled task shows a flat row instead of the rail.
+{% endcomment %}
+{% if leg %}
+<div class="pkl">
+    <div class="pkl__head">
+        <span class="pkl__title"><i class="fa-solid fa-truck-fast"></i> Delivery Leg</span>
+        <span class="pkl__meta">
+            {% if leg.published %}Published to fleet{% else %}Not published{% endif %}
+            {% if leg.speed %} · {{ leg.speed }}{% endif %}{% if leg.category %} · {{ leg.category }}{% endif %}
+            {% if leg.driver %}· {% include "workforce/parts/_driver_chip.html" with driver=leg.driver %}{% else %}· <span class="pkl__ev--none">No driver assigned</span>{% endif %}
+        </span>
+    </div>
+
+    {% if leg.terminal %}
+    <div class="pkl__cancelled"><i class="fa-solid fa-circle-xmark"></i> {{ leg.terminal }}</div>
+    {% if leg.failure_reason %}
+    <div class="pkl__note pkl__note--warn">
+        <i class="fa-solid fa-triangle-exclamation"></i> {{ leg.failure_reason }}{% if leg.failure_notes %} — {{ leg.failure_notes }}{% endif %}
+        {% if leg.attempts %} · attempt {{ leg.attempts }}{% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    {% include "workforce/parts/_leg_rail.html" with rail_steps=leg.steps %}
+
+    {% comment %}Drivers commonly jump straight from accepted to delivered, so a filled
+    rail can imply stages that were never actually recorded.{% endcomment %}
+    {% if leg.unrecorded %}
+    <div class="pkl__note pkl__note--warn">
+        <i class="fa-solid fa-timeline"></i>
+        {{ leg.unrecorded }} stage{{ leg.unrecorded|pluralize }} never recorded — the driver app skipped straight past {{ leg.unrecorded|pluralize:"it,them" }}.
+    </div>
+    {% endif %}
+
+    <div class="pkl__evidence">
+        {% if leg.accepted_at and leg.finished_at %}
+        <span class="pkl__ev"><i class="fa-regular fa-hourglass-half"></i> {{ leg.accepted_at|timesince:leg.finished_at }} accept &rarr; {{ leg.status_label|lower }}</span>
+        {% endif %}
+        {% if leg.gps_pings is not None %}
+        <span class="pkl__ev {% if leg.gps_pings == 0 %}pkl__ev--none{% endif %}">
+            <i class="fa-solid fa-location-crosshairs"></i>
+            {% if leg.gps_pings %}{{ leg.gps_pings }} GPS ping{{ leg.gps_pings|pluralize }} during leg{% else %}No GPS recorded during this leg{% endif %}
+        </span>
+        {% endif %}
+        <span class="pkl__ev {% if not leg.proof_count %}pkl__ev--none{% endif %}">
+            <i class="fa-solid fa-camera"></i>
+            {% if leg.proof_count %}{{ leg.proof_count }} proof file{{ leg.proof_count|pluralize }}{% else %}No proof of delivery{% endif %}
+        </span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

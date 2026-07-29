@@ -81,6 +81,12 @@ class DeliveryTaskListSerializer(serializers.ModelSerializer):
     customer_phone = serializers.CharField(source='order.customer_phone', read_only=True)
     customer_address = serializers.CharField(source='order.customer_address', read_only=True)
     cod_amount = serializers.IntegerField(source='order.cod_amount', read_only=True)
+    # dl_price became a DecimalField so the client charge can hold fils. Declared
+    # explicitly because DRF serialises Decimals as JSON *strings* by default,
+    # which would have turned an existing integer field into "20.00" for every
+    # external consumer of this endpoint. Kept as a JSON number.
+    dl_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, coerce_to_string=False, read_only=True)
 
     class Meta:
         model = delivery_models.DeliveryTask

@@ -2309,19 +2309,45 @@ def pickup_scan_process(request):
                 'error': f'No matching task found for code: {scanned_code}'
             })
 
-        # Check if already picked up
-        if task.dl_task_status == 'in_transit':
+        # Check if already picked up (or already moved past pickup)
+        if task.dl_task_status in ('picked_up', 'start_ride', 'in_transit', 'out_for_delivery'):
             return JsonResponse({
                 'success': False,
                 'error': 'Task already picked up',
                 'task_number': task.dl_task_number
             })
 
-        # Update task status to in_transit (picked up)
-        task.dl_task_status = 'in_transit'
-        task._status_actor = 'driver'  # state machine: accepted → in_transit allowed for driver
+        # A scan confirms the parcel is in the driver's hands, so the task lands
+        # on 'picked_up'. The scanner lists tasks still sitting on 'assigned' or
+        # 'pending', and the driver state machine has no edge from those straight
+        # to a pickup state — take them through 'accepted' first. Writing the
+        # target status straight over 'assigned' is silently rolled back by the
+        # pre_save guard, which is why no scanned task ever left 'assigned'.
+        if task.dl_task_status in ('assigned', 'pending', 'for_review'):
+            task.dl_task_status = 'accepted'
+            task._status_actor = 'driver'
+            task._status_changed_by = request.user
+            task.save(update_fields=['dl_task_status'])
+
+        task.dl_task_status = 'picked_up'
+        task._status_actor = 'driver'  # state machine: accepted → picked_up allowed for driver
         task._status_changed_by = request.user
         task.save(update_fields=['dl_task_status'])
+
+        # pre_save rolls the field back in place when a transition is rejected,
+        # so never report a confirmed pickup that was not actually persisted.
+        if task.dl_task_status != 'picked_up':
+            from delivery.state_machine import can_transition
+            _, reason = can_transition(task.dl_task_status, 'picked_up', actor='driver')
+            logger.warning(
+                f"Driver {driver.driver_id} pickup scan rejected for task "
+                f"{task.dl_task_number}: {reason}"
+            )
+            return JsonResponse({
+                'success': False,
+                'error': reason or 'Cannot confirm pickup for this task',
+                'task_number': task.dl_task_number
+            })
 
         logger.info(f"Driver {driver.driver_id} confirmed pickup for task {task.dl_task_number}")
 
@@ -2736,6 +2762,14 @@ def driver_tasks(request):
     paginator = Paginator(task_list, 20)
     cards = paginator.get_page(page)
 
+    # Filters the shared pagination component re-appends to every page link.
+    # The old hand-rolled pager hardcoded tab/area/type/status/sort (+zone)
+    # into its hrefs; `search` was silently dropped and is now kept too.
+    pager_params = request.GET.copy()
+    pager_params.pop('page', None)
+    pager_params.pop('per_page', None)
+    filter_params = pager_params.urlencode()
+
     # Available zones dropdown
     # Zone source: order.dl_zone is the staff-corrected primary (dl_to_address
     # rows rarely carry a zone), union the address fallback for completeness
@@ -2794,6 +2828,7 @@ def driver_tasks(request):
         'sort_by': sort_by,
         'zone_filter': zone_filter,
         'search_query': search_query,
+        'filter_params': filter_params,
         'available_zones': available_zones,
         'zone_group_map': zone_group_map,
         'zone_name_map': zone_name_map,
@@ -2910,6 +2945,120 @@ def fleet_task_take_scan(request):
     except Exception as e:
         logger.error(f"fleet_task_take_scan error: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_task_scan_take_any(request):
+    """
+    AJAX: Driver scans any package label to take that task — no card tapped first.
+    POST: code (label QR holds the order number; task number also accepted).
+    Resolves the code against the whole claimable pool, then assigns + accepts.
+    URL: /fleet/tasks/scan-take/
+    """
+    import json as _json
+    from django.db import transaction as db_transaction
+    from delivery import models as delivery_models
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    if driver.driver_status != 'approved':
+        return JsonResponse({'success': False, 'error': 'Your driver account is not approved yet'})
+
+    try:
+        data = _json.loads(request.body) if request.content_type == 'application/json' else request.POST
+    except _json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid request data'})
+
+    code = str(data.get('code') or '').strip()
+    if not code:
+        return JsonResponse({'success': False, 'error': 'No code scanned'})
+
+    code_l = code.lower()
+
+    def _code_q():
+        from django.db.models import Q as _Q
+        return _Q(dl_task_number__iexact=code) | _Q(order__order_number__iexact=code)
+
+    base = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'order__pickup_location', 'driver', 'dl_to_address')
+
+    # Claimable pool — same rule as the New tab, minus its UI filters
+    task = base.filter(
+        _code_q(), dl_task_publish=True, driver__isnull=True,
+        dl_task_status__in=['pending', 'for_review'],
+    ).exclude(order__order_status='cancelled').first()
+
+    if not task:
+        # Explain why this label is not takeable instead of a blank "not found"
+        other = base.filter(_code_q()).first()
+        if not other:
+            # Loose match — label may carry a prefix/suffix around the order number
+            for cand in base.filter(dl_task_publish=True, driver__isnull=True,
+                                    dl_task_status__in=['pending', 'for_review']
+                                    ).exclude(order__order_status='cancelled')[:500]:
+                order_num = (cand.order.order_number or '').lower() if cand.order else ''
+                if order_num and (order_num in code_l or code_l in order_num):
+                    task = cand
+                    break
+        if not task and other:
+            if other.driver_id == driver.pk:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'{other.dl_task_number or other.id} is already yours ({other.get_dl_task_status_display()})',
+                })
+            if other.driver_id:
+                return JsonResponse({'success': False, 'error': 'Another driver already took this task'})
+            if not other.dl_task_publish:
+                return JsonResponse({'success': False, 'error': 'Task is not published to fleet yet'})
+            return JsonResponse({
+                'success': False,
+                'error': f'Task is {other.get_dl_task_status_display()} — cannot take it',
+            })
+        if not task:
+            return JsonResponse({'success': False, 'error': f'No available task matches this code: {code}'})
+
+    # Lock the row so two drivers scanning the same label cannot both win,
+    # but still save through the model so the state machine + signals run.
+    with db_transaction.atomic():
+        locked = delivery_models.DeliveryTask.objects.select_for_update().filter(
+            pk=task.pk, driver__isnull=True, dl_task_status__in=['pending', 'for_review'],
+        ).first()
+        if not locked:
+            return JsonResponse({'success': False, 'error': 'Another driver just took this task'})
+
+        locked.driver = driver
+        locked.dl_task_status = 'accepted'
+        locked._status_actor = 'driver'
+        locked._status_changed_by = request.user
+        locked.save(update_fields=['driver', 'dl_task_status'])
+        delivery_models.AssignedDriver.objects.get_or_create(dl_task=locked, driver=driver)
+
+    task.refresh_from_db()
+    if task.dl_task_status != 'accepted':
+        return JsonResponse({'success': False, 'error': 'This task cannot be accepted right now'})
+    logger.info(f"Driver {driver.driver_id} took task {task.pk} via pool scan")
+
+    order = task.order
+    return JsonResponse({
+        'success': True,
+        'task_id': task.pk,
+        'task_number': task.dl_task_number or str(task.pk),
+        'order_number': order.order_number if order else '',
+        'business': order.business.business_name if order and order.business else '',
+        'customer': order.customer_name if order else '',
+        'zone': order.dl_zone if order else '',
+        'street': order.dl_street if order else '',
+        'building': order.dl_building if order else '',
+        'cod': str(order.cod_amount) if order and order.cod_amount else '',
+        'message': 'Task accepted! You are now assigned.',
+    })
 
 
 @login_required(login_url='/accounts/login/')
@@ -3105,19 +3254,27 @@ def fleet_partial_delivery(request, task_id):
             task.payment_method = payment_method
             task.payment_split  = {payment_method: float(cod_val)}
             update_fields += ['payment_method', 'payment_split']
+        cod_reference = (body.get('cod_reference') or '').strip()
+        if cod_reference:
+            task.cod_reference = cod_reference[:100]
+            update_fields.append('cod_reference')
     task.save(update_fields=update_fields)
 
     # Record the collected COD in the driver wallet so it appears in the
     # transactions + COD settlement reports (idempotent — once per task).
+    already_recorded = fleet_models.DriverTransaction.objects.filter(
+        delivery_task=task, transaction_type='cod_collection'
+    ).exists()
     if cod_val > 0:
-        if order.cod_status_by_staff != 'cod_with_driver':
-            order.cod_status_by_staff = 'cod_with_driver'
-            order.save(update_fields=['cod_status_by_staff'])
-        already_recorded = fleet_models.DriverTransaction.objects.filter(
-            delivery_task=task, transaction_type='cod_collection'
-        ).exists()
+        # Electronic COD (Fawran/POS) reached Ezzy at collection — the driver
+        # never held it, so the money is already with Ezzy, not "with driver".
+        # Mirrors the full-delivery path in ezzy_api.views.
+        from fleet.wallet_service import WalletService
+        electronic_only = WalletService.is_electronic_only(task)
+        from orders.cod_status import apply_cod_status
+        apply_cod_status(
+            order, 'cod_with_ezzy' if electronic_only else 'cod_with_driver')
         if not already_recorded:
-            from fleet.wallet_service import WalletService
             WalletService.record_transaction(
                 driver=driver,
                 transaction_type='cod_collection',
@@ -3127,6 +3284,27 @@ def fleet_partial_delivery(request, task_id):
                 created_by=request.user,
                 payment_method=task.payment_method or None,
             )
+        # Close out electronic COD immediately so it never counts as the
+        # driver's cod-in-hand and flows straight to the business payout.
+        if electronic_only and not task.cod_settled:
+            task.cod_settled = True
+            task.cod_settled_at = timezone.now()
+            task.save(update_fields=['cod_settled', 'cod_settled_at'])
+            WalletService.sync_cod_in_hand(driver)
+    elif not already_recorded:
+        # Nothing to collect, but the job still needs a ledger row so staff can
+        # add the delivery fee and bill it to the client. 0 QAR moves no balance.
+        from fleet.wallet_service import WalletService
+        WalletService.record_transaction(
+            driver=driver,
+            transaction_type='cod_collection',
+            amount=Decimal('0'),
+            description=f"Zero COD for order {order.order_number} (partial delivery, no cash due)",
+            notes="No cash collected — row exists so the delivery fee can be billed to the client.",
+            delivery_task=task,
+            created_by=request.user,
+            payment_method=task.payment_method or None,
+        )
 
     # Auto-create ReturnRequest for returned items
     returned_order_items = [(item, returned_map[item.id]) for item in all_items if item.id in returned_map]
@@ -3140,7 +3318,12 @@ def fleet_partial_delivery(request, task_id):
             reason='other',
             reason_notes='Partial delivery — items returned by customer at door',
             status='pending',
-            cod_reversal_amount=max((order.cod_amount or 0) - cod_val, Decimal('0')),
+            # Nothing to hand back: the driver charged only for what was
+            # actually delivered, so the shortfall against order.cod_amount was
+            # never collected. cod_reversal_amount is the refund owed to the
+            # customer, not the drop in order value — that is already visible as
+            # cod_collected_amount against cod_amount.
+            cod_reversal_amount=Decimal('0'),
         )
         for item, qty in returned_order_items:
             orders_models.ReturnItem.objects.create(
@@ -3513,6 +3696,8 @@ def fleet_task_edit_location(request, task_id):
         # Also update Order fields
         order = task.order
         if order:
+            old_lat, old_lng = order.latitude, order.longitude
+            old_accuracy = order.coords_accuracy or ''
             if zone:
                 order.dl_zone = zone
             if street:
@@ -3524,6 +3709,16 @@ def fleet_task_edit_location(request, task_id):
                 order.longitude = lng
                 order.coords_accuracy = 'by_driver'
             order.save()
+
+            if lat and lng:
+                from orders.location_history import log_location_update
+                log_location_update(
+                    order, source='Driver app', actor=None,
+                    old_lat=old_lat, old_lng=old_lng, old_accuracy=old_accuracy,
+                    new_lat=order.latitude, new_lng=order.longitude,
+                    new_accuracy=order.coords_accuracy,
+                    note=f'Updated by driver {task.driver}' if task.driver else None,
+                )
 
         messages.success(request, "Location updated successfully.")
         return redirect('fleet:driver_tasks')
@@ -3737,6 +3932,21 @@ def upload_delivery_proof(request, task_id):
 
 # Staff COD Submission Management =====================================================
 
+def _driver_display_name(driver):
+    """Best available human name for a driver, falling back to the driver code."""
+    if not driver:
+        return 'Unknown'
+    profile = getattr(driver, 'profile', None)
+    if profile:
+        name = f"{profile.first_name or ''} {profile.last_name or ''}".strip()
+        if name:
+            return name
+    user = getattr(driver, 'user', None)
+    if user:
+        return user.get_full_name() or user.username
+    return driver.driver_id or 'Unknown'
+
+
 @login_required(login_url='/accounts/login/')
 def staff_cod_submissions(request):
     """List all pending COD submissions for staff review and approval"""
@@ -3745,7 +3955,7 @@ def staff_cod_submissions(request):
 
     # Get all cod_driver_settle transactions (pending, verified, approved)
     submissions = DriverTransaction.objects.filter(
-        transaction_type='cod_driver_settle'
+        transaction_type__in=DriverTransaction.COD_SUBMISSION_TYPES
     ).select_related(
         'driver',
         'driver__user',
@@ -3772,7 +3982,7 @@ def staff_cod_submissions(request):
         submissions_list.append({
             'txn': txn,
             'task_count': task_count,
-            'driver_name': txn.driver.profile.get_full_name() if txn.driver else 'Unknown'
+            'driver_name': _driver_display_name(txn.driver),
         })
 
     context = {
@@ -3788,7 +3998,8 @@ def staff_cod_submission_edit(request, txn_code):
     if not request.user.is_staff:
         return redirect('fleet:fleet_dashboard')
 
-    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code,
+                          transaction_type__in=DriverTransaction.COD_SUBMISSION_TYPES)
 
     # Get all linked delivery tasks
     linked_tasks = txn.submission_tasks.select_related(
@@ -3825,7 +4036,8 @@ def staff_cod_submission_add_task(request, txn_code):
     if not request.user.is_staff or request.method != 'POST':
         return JsonResponse({'error': 'Forbidden'}, status=403)
 
-    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code,
+                          transaction_type__in=DriverTransaction.COD_SUBMISSION_TYPES)
 
     if txn.is_approved:
         return JsonResponse({'error': 'Cannot edit approved submission'}, status=400)
@@ -3865,7 +4077,8 @@ def staff_cod_submission_remove_task(request, txn_code):
     if not request.user.is_staff or request.method != 'POST':
         return JsonResponse({'error': 'Forbidden'}, status=403)
 
-    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code,
+                          transaction_type__in=DriverTransaction.COD_SUBMISSION_TYPES)
 
     if txn.is_approved:
         return JsonResponse({'error': 'Cannot edit approved submission'}, status=400)
@@ -3903,7 +4116,8 @@ def staff_cod_submission_approve(request, txn_code):
     if not request.user.is_staff or request.method != 'POST':
         return JsonResponse({'error': 'Forbidden'}, status=403)
 
-    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code, transaction_type='cod_driver_settle')
+    txn = get_object_or_404(DriverTransaction, transaction_code=txn_code,
+                          transaction_type__in=DriverTransaction.COD_SUBMISSION_TYPES)
 
     action = request.POST.get('action')  # 'receive', 'verify', 'approve', 'revert'
 
@@ -4042,6 +4256,94 @@ def accept_pickup(request):
     log_pickup_history(pickup, 'pending', 'accepted', actor=request.user,
                        notes=f"Accepted by {driver}")
     return JsonResponse({'success': True})
+
+
+@login_required(login_url='/accounts/login/')
+def pickup_scan_collect(request):
+    """
+    Scan a package QR/barcode on the Pickup > Mine tab to mark it collected.
+    POST: code (label QR holds the order number; pickup id also accepted).
+    Only matches pickups this driver already holds in accepted/in_progress/arrived.
+    URL: /fleet/pickups/scan/
+    """
+    import json as _json
+    from delivery.models import PickupTask
+    from delivery.services.pickup import log_pickup_history
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    try:
+        data = _json.loads(request.body) if request.content_type == 'application/json' else request.POST
+    except _json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid request data'})
+
+    code = str(data.get('code') or '').strip()
+    if not code:
+        return JsonResponse({'success': False, 'error': 'No code scanned'})
+
+    open_statuses = ['accepted', 'in_progress', 'arrived']
+    mine = PickupTask.objects.filter(
+        driver=driver, status__in=open_statuses,
+    ).exclude(order__order_status='cancelled').select_related(
+        'order', 'business', 'pickup_location', 'drop_warehouse__warehouse')
+
+    def _match(qs):
+        code_l = code.lower()
+        for task in qs:
+            order_num = (task.order.order_number or '').lower()
+            if order_num and (order_num == code_l or order_num in code_l or code_l in order_num):
+                return task
+            if code.isdigit() and int(code) == task.pk:
+                return task
+        return None
+
+    pickup = _match(mine)
+    if not pickup:
+        # Give a useful message when the label belongs to a pickup already done
+        done = _match(PickupTask.objects.filter(driver=driver).exclude(
+            status__in=open_statuses).select_related('order'))
+        if done:
+            return JsonResponse({
+                'success': False,
+                'error': f'{done.order.order_number} is already {done.get_status_display()}',
+            })
+        return JsonResponse({
+            'success': False,
+            'error': f'No pickup of yours matches this code: {code}',
+        })
+
+    old_status = pickup.status
+    pickup.status = 'collected'
+    pickup.collected_at = timezone.now()
+    pickup.save(update_fields=['status', 'collected_at', 'updated_at'])
+    log_pickup_history(pickup, old_status, 'collected', actor=request.user,
+                       notes=f"Package scanned and collected by {driver}")
+    logger.info(f"Driver {driver.driver_id} collected pickup {pickup.pk} via scan")
+
+    remaining = mine.exclude(pk=pickup.pk).count()
+    if pickup.disposition == 'drop':
+        next_step = 'Drop at hub'
+    elif pickup.disposition == 'self_deliver':
+        next_step = 'Deliver to customer yourself'
+    else:
+        next_step = 'Hand to another driver'
+
+    return JsonResponse({
+        'success': True,
+        'pickup_id': pickup.pk,
+        'order_number': pickup.order.order_number or '',
+        'business': pickup.business.business_name if pickup.business else '',
+        'customer': pickup.order.customer_name or '',
+        'zone': pickup.order.dl_zone or '',
+        'next_step': next_step,
+        'remaining': remaining,
+        'message': 'Package collected!',
+    })
 
 
 @login_required(login_url='/accounts/login/')

@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from orders import views as orders_views
 from django.contrib.sitemaps.views import sitemap
 from webpages.sitemaps import BusinessSitemap
-from core.sitemaps import StaticViewSitemap, BusinessPagesSitemap, WorkforcePagesSitemap, SEOLandingPageSitemap, BlogPostSitemap, BlogCategorySitemap
+from core.sitemaps import StaticViewSitemap, SEOLandingPageSitemap, BlogPostSitemap, BlogCategorySitemap
 from core.views_seo import robots_txt, security_txt, humans_txt, llms_txt
 from core.views import RateLimitedSignupView, rate_limit_exceeded
 from django.views.generic import TemplateView
@@ -44,8 +44,6 @@ def service_worker_view(request):
 sitemaps = {
     'static': StaticViewSitemap,
     'businesses': BusinessSitemap,
-    'business_pages': BusinessPagesSitemap,
-    'workforce_pages': WorkforcePagesSitemap,
     'seo_landing_pages': SEOLandingPageSitemap,
     'blog_posts': BlogPostSitemap,
     'blog_categories': BlogCategorySitemap,

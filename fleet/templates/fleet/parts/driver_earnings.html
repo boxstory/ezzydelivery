@@ -85,7 +85,7 @@
         </div>
       </div>
       <div class="pwa-transaction-item__amount" style="color: #059669; font-weight: 700; font-size: 1rem;">
-        {% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %} <span style="font-size: 0.75rem;">QR</span>
+        {% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0|floatformat:0 }}{% endif %} <span style="font-size: 0.75rem;">QR</span>
       </div>
     </div>
     {% endfor %}
@@ -187,7 +187,7 @@
         </div>
       </div>
       <div class="pwa-transaction-item__amount pwa-text-success">
-        +{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:2 }}{% else %}{{ task.dl_price|default:0 }}{% endif %} QR
+        +{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:2 }}{% else %}{{ task.dl_price|default:0|floatformat:2 }}{% endif %} QR
       </div>
     </div>
     {% endfor %}
@@ -337,7 +337,7 @@
                 <td>{{ task.order.customer_name|default:"-"|truncatechars:18 }}</td>
                 <td class="text-muted">{{ task.dl_to_address.area_name|default:"-"|truncatechars:15 }}</td>
                 <td class="text-muted">{{ task.completed_at|date:"d M"|default:task.dl_task_date|date:"d M" }}</td>
-                <td class="text-end fw-bold text-success">{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %}</td>
+                <td class="text-end fw-bold text-success">{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0|floatformat:0 }}{% endif %}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -435,7 +435,7 @@
               </td>
               <td class="text-end">
                 {% if task.earnings_verification_status == 'published' or task.driver_earnings %}
-                <span class="fw-bold text-success">{% if task.verified_earnings %}{{ task.verified_earnings|floatformat:0 }}{% elif task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %}</span>
+                <span class="fw-bold text-success">{% if task.verified_earnings %}{{ task.verified_earnings|floatformat:0 }}{% elif task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0|floatformat:0 }}{% endif %}</span>
                 {% else %}<span class="text-muted">-</span>{% endif %}
               </td>
             </tr>

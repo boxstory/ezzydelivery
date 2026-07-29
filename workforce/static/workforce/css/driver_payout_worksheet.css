@@ -1,0 +1,616 @@
+/* Purpose: Driver payout worksheet — flush ledger console for one driver's payable lines + verification queue. */
+/* Used by: workforce/templates/workforce/driver_payout_worksheet.html */
+/* Notes: Zero page padding — panels are separated by rules, not gaps. Ezzy yellow is spent twice only:
+   the fee marker on rows that leave the flat rate, and the create-payout action. COD is deliberately quiet. */
+
+.dpw {
+  /* Ledger vocabulary, anchored on the Brand Kit — no off-brand hexes. */
+  --tlr-ink: var(--brand-navy);
+  --tlr-ink-soft: var(--brand-navy-light);
+  --tlr-paper: var(--brand-grey-100);
+  --tlr-card: var(--brand-white);
+  --tlr-rule: var(--brand-grey-200);
+  --tlr-rule-strong: var(--brand-grey-300);
+  --tlr-mark: var(--brand-primary);
+  --tlr-mark-soft: var(--brand-accent);
+  --tlr-muted: var(--brand-grey-500);
+  --tlr-void: var(--brand-danger);
+  --tlr-good: var(--brand-success);
+  --tlr-info: var(--brand-info);
+  --tlr-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --tlr-cond: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --tlr-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  background: var(--tlr-paper);
+  color: var(--tlr-ink);
+  font-family: var(--tlr-sans);
+  font-size: 0.8125rem;
+  min-height: 100vh;
+  padding: 0;
+}
+.dpw--tape-open { padding-bottom: 2.75rem; }
+
+/* Control normalisation. The global mobile-app rules target `input[type=…]`
+   (0,1,1), which outranks a bare BEM class — so every control here is scoped
+   under .dpw and given one shared height. Never a `background:` shorthand:
+   .form-select carries an arrow as a background-image. */
+.dpw .form-control,
+.dpw .form-select,
+.dpw input[type="text"],
+.dpw input[type="number"] {
+  min-height: 0;
+  height: 1.625rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  border-radius: 0.25rem;
+  border: 1px solid var(--tlr-rule-strong);
+  color: var(--tlr-ink);
+}
+.dpw .form-select { padding-right: 1.5rem; background-size: 0.7rem; }
+/* Bootstrap's input-group and the global touch rules both raise these to
+   2.75rem at (0,2,0) — one notch higher puts every control on the same line. */
+.dpw .input-group > .form-control,
+.dpw .input-group > .input-group-text,
+.dpw .input-group > .btn,
+.dpw .dpw__acts > .dpw__btn {
+  min-height: 0;
+  height: 1.625rem;
+}
+.dpw .input-group-text {
+  padding: 0.125rem 0.375rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  border-color: var(--tlr-rule-strong);
+  border-radius: 0;
+}
+.dpw .btn, .dpw .btn-sm {
+  min-height: 0;
+  height: 1.625rem;
+  padding: 0 0.5rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 0.25rem;
+}
+.dpw .form-check-input { width: 0.85rem; height: 0.85rem; margin-top: 0; border-radius: 0.15rem; }
+.dpw .form-check-input:checked { background-color: var(--tlr-ink); border-color: var(--tlr-ink); }
+
+/* ── Masthead ─────────────────────────────────────────────── */
+.dpw__masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--tlr-ink);
+  color: #fff;
+}
+.dpw__ident { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; min-width: 0; }
+.dpw__eyebrow {
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.dpw__title {
+  font-family: var(--tlr-cond);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0;
+  color: #fff;
+}
+.dpw__ident-meta {
+  font-family: var(--tlr-mono);
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.62);
+}
+.dpw__sep { color: rgba(255, 255, 255, 0.3); margin: 0 0.4rem; }
+
+.dpw__masthead-actions { display: flex; gap: 0.375rem; }
+.dpw__ghost {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 0.25rem 0.5rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dpw__ghost:hover { color: var(--tlr-ink); background: var(--tlr-mark); border-color: var(--tlr-mark); }
+
+/* ── The ladder ───────────────────────────────────────────────
+   Four gates in the order money actually moves through them, so a lead figure
+   of 0.00 reads as "the money is still upstream" instead of as an error. Only
+   the gate holding money is marked; the rest stay muted. Each gate is a link
+   into the work it names. */
+.dpw__ladder {
+  display: flex;
+  flex-wrap: wrap;
+  background: var(--tlr-card);
+  border-bottom: 1px solid var(--tlr-rule-strong);
+}
+.dpw__gate {
+  position: relative;
+  flex: 1 1 11rem;
+  min-width: 10rem;
+  padding: 0.375rem 0.75rem;
+  border-right: 1px solid var(--tlr-rule);
+  text-decoration: none;
+  color: inherit;
+  background: var(--tlr-card);
+  transition: background-color 0.15s ease;
+}
+.dpw__gate:last-child { border-right: 0; }
+/* The arrow rides the rule between two gates and takes its backdrop from the
+   gate it belongs to, so it never punches a white notch through the wash. */
+.dpw__gate:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  z-index: 2;
+  right: -0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.15rem 0;
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--tlr-rule-strong);
+  background: inherit;
+}
+.dpw__gate-label {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+.dpw__gate-value {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  color: var(--tlr-muted);
+}
+.dpw__gate-sub {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--tlr-muted);
+}
+a.dpw__gate:hover { background: var(--tlr-paper); }
+a.dpw__gate:hover .dpw__gate-label { color: var(--tlr-ink); }
+
+/* Where the money is right now — the page's one piece of emphasis. */
+.dpw__gate--here {
+  background: var(--tlr-mark-soft);
+  box-shadow: inset 0 2px 0 var(--tlr-mark);
+}
+.dpw__gate--here .dpw__gate-label { color: var(--tlr-ink); }
+.dpw__gate--here .dpw__gate-value { color: var(--tlr-ink); }
+a.dpw__gate--here:hover { background: var(--brand-secondary); }
+/* The gate the queue is currently filtered to. */
+.dpw__gate--on { box-shadow: inset 0 -2px 0 var(--tlr-ink); }
+.dpw__gate--on .dpw__gate-value { color: var(--tlr-ink); }
+/* History, not a queue — settled, so it never carries the marker. */
+.dpw__gate--done .dpw__gate-value { color: var(--tlr-ink); font-size: 1rem; }
+.dpw__gate--null .dpw__gate-value { color: var(--tlr-muted); }
+
+.dpw__fig-unit {
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  margin-left: 0.3rem;
+}
+.dpw__note {
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--tlr-muted);
+}
+.dpw__sum-op { color: var(--tlr-rule-strong); margin: 0 0.15rem; }
+.dpw__sum-net { color: var(--tlr-ink); font-weight: 600; }
+
+/* ── Panels ───────────────────────────────────────────────── */
+.dpw__panel { background: var(--tlr-card); border-bottom: 1px solid var(--tlr-rule-strong); }
+.dpw__panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  background: var(--tlr-paper);
+}
+.dpw__panel-title {
+  font-family: var(--tlr-cond);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.dpw__meta {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--tlr-muted);
+}
+.dpw__meta--end { margin-left: auto; }
+
+.dpw__check {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+  cursor: pointer;
+}
+.dpw__field-label {
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* ── The rail: the flat rate, then everything that leaves it ── */
+.dpw__rail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--tlr-rule);
+}
+.dpw__rail-rate { display: inline-flex; align-items: baseline; gap: 0.375rem; }
+.dpw__rail-rate-label {
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+.dpw__rail-rate-value {
+  font-family: var(--tlr-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dpw__rail-split, .dpw__rail-tag, .dpw__rail-clear {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--tlr-muted);
+}
+.dpw__rail-split { padding-left: 0.75rem; border-left: 1px solid var(--tlr-rule); }
+.dpw__rail-tag {
+  text-decoration: none;
+  padding: 0.125rem 0.375rem;
+  border: 1px solid transparent;
+}
+.dpw__rail-tag:hover { color: var(--tlr-ink); border-color: var(--tlr-rule-strong); }
+/* A count that is not zero is the whole point of the rail — mark it. Ink, not
+   yellow: the accent is reserved for the ladder marker and the pay action. */
+.dpw__rail-tag--mark { color: var(--tlr-ink); box-shadow: inset 2px 0 0 var(--tlr-ink); }
+.dpw__rail-tag--on { color: var(--tlr-ink); background: var(--tlr-mark-soft); border-color: var(--tlr-mark); }
+.dpw__rail-clear { margin-left: auto; color: var(--tlr-ink); text-decoration: underline; }
+
+/* ── Tools row ────────────────────────────────────────────── */
+.dpw__tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  background: var(--tlr-paper);
+}
+.dpw__set { display: flex; align-items: center; gap: 0.375rem; }
+.dpw__set-group { width: 12rem; }
+.dpw__acts { display: flex; gap: 0.375rem; margin-left: auto; }
+.dpw__btn {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  color: var(--tlr-ink);
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+.dpw__btn:hover:not(:disabled) { border-color: var(--tlr-ink); }
+.dpw__btn--go:hover:not(:disabled) { color: var(--tlr-good); border-color: var(--tlr-good); }
+.dpw__btn--void:hover:not(:disabled) { color: var(--tlr-void); border-color: var(--tlr-void); }
+.dpw__btn:disabled { color: var(--tlr-muted); border-color: var(--tlr-rule); cursor: not-allowed; }
+
+/* ── Tables ───────────────────────────────────────────────── */
+.dpw__scroll { overflow-x: auto; }
+/* The dashboard shell is an overflow container, so a sticky header pinned to the
+   window never fires. The queue gets its own scrollport instead — 50 rows move
+   under a fixed header while the rail and the bulk actions stay put. */
+@media (min-width: 768px) {
+  .dpw__scroll--queue { max-height: calc(100vh - 17rem); overflow-y: auto; }
+}
+.dpw__table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.dpw__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  font-weight: 500;
+  text-align: left;
+  background: var(--tlr-card);
+  padding: 0.25rem 0.375rem;
+  border-bottom: 1px solid var(--tlr-rule-strong);
+  white-space: nowrap;
+}
+.dpw__table tbody td {
+  padding: 0.1875rem 0.375rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.dpw__table tbody tr:hover td { background: var(--tlr-paper); }
+.dpw__table tbody tr:last-child td { border-bottom: 0; }
+.dpw__num { text-align: right; }
+.dpw__mono { font-family: var(--tlr-mono); font-variant-numeric: tabular-nums; }
+.dpw__dim { color: var(--tlr-muted); }
+.dpw__col-check { width: 1.9rem; }
+/* One column absorbs the slack so the rest sit tight against their content,
+   instead of every column growing and leaving gaps between the figures. */
+.dpw__col-flex { width: 100%; }
+.dpw__col-check .form-check-input { margin: 0; }
+.dpw__truncate { max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
+/* The slack lands inside the flex column, so on a wide screen there is a gutter
+   between the last identity column and the first figure. Ruling it makes that
+   gutter structure: everything left of the rule describes the delivery,
+   everything right of it is money. */
+.dpw__col-money { border-left: 1px solid var(--tlr-rule-strong); }
+.dpw__table--queue .dpw__col-flex { min-width: 9rem; }
+.dpw__row--void td { background: rgba(220, 38, 38, 0.035); }
+
+.dpw__kind {
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.dpw__kind::before { content: ""; width: 6px; height: 6px; background: var(--tlr-muted); }
+.dpw__kind--earning::before { background: var(--tlr-ink); }
+.dpw__kind--bonus::before { background: var(--tlr-mark); }
+.dpw__kind--deduction::before { background: var(--tlr-void); }
+
+.dpw__route { font-size: 0.7rem; }
+.dpw__route-arrow { color: var(--tlr-rule-strong); margin: 0 0.25rem; }
+
+/* COD stays quiet — context, never money owed. It also carries the largest
+   figures on the page, and long numbers pull the eye on their own, so it is set
+   a size down from the fee it must not compete with. */
+.dpw__col-cod { color: var(--tlr-muted); font-size: 0.68rem; }
+.dpw__cod-method { font-size: 0.56rem; letter-spacing: 0.06em; text-transform: uppercase; margin-left: 0.3rem; color: var(--brand-grey-400); }
+
+/* ── The fee cell: the one place staff actually decide something ── */
+.dpw__fee { position: relative; }
+/* Fifty boxed inputs in a column are the loudest thing on a page whose whole
+   point is that all fifty hold the same number. The field is a plain figure
+   until the row is hovered, focused or actually changed — then it becomes a
+   control. Exception rows keep their edge, so a bordered fee always means
+   "this one is different". */
+.dpw input.dpw__fee-input {
+  width: 4.5rem;
+  font-family: var(--tlr-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-align: right;
+  padding: 0 0.3rem;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--tlr-ink);
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+.dpw__table tbody tr:hover .dpw__fee-input,
+.dpw .dpw__fee-input:focus,
+.dpw .dpw__fee-input--modified {
+  border-color: var(--tlr-rule-strong);
+  background-color: var(--tlr-card);
+}
+.dpw .dpw__fee-input:focus {
+  outline: none;
+  border-color: var(--tlr-mark);
+  box-shadow: 0 0 0 2px var(--tlr-mark-soft);
+}
+.dpw .dpw__fee-input--modified { border-color: var(--tlr-mark); background-color: var(--tlr-mark-soft); }
+/* Chromium paints spinners on hover and they shove the digits off centre. */
+.dpw .dpw__fee-input::-webkit-outer-spin-button,
+.dpw .dpw__fee-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dpw .dpw__fee-input { -moz-appearance: textfield; appearance: textfield; }
+/* Rows that leave the flat rate carry the mark; everything else stays silent. */
+.dpw__fee--metered, .dpw__fee--adjusted { box-shadow: inset 2px 0 0 var(--tlr-mark); }
+.dpw__fee-why {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  margin-top: 0.0625rem;
+}
+
+.dpw__status {
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--tlr-muted);
+}
+.dpw__status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--brand-grey-400); }
+.dpw__status--verified { color: var(--tlr-info); }
+.dpw__status--verified::before { background: var(--tlr-info); }
+.dpw__status--published { color: var(--tlr-good); }
+.dpw__status--published::before { background: var(--tlr-good); }
+.dpw__status--rejected { color: var(--tlr-void); }
+.dpw__status--rejected::before { background: var(--tlr-void); }
+.dpw__by { font-family: var(--tlr-mono); font-size: 0.6rem; color: var(--tlr-muted); margin-left: 0.375rem; }
+
+.dpw__log-btn {
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  background: transparent;
+  border: 1px solid var(--tlr-rule-strong);
+  color: var(--tlr-muted);
+  padding: 0 0.3rem;
+  cursor: pointer;
+}
+.dpw__log-btn:hover { color: var(--tlr-ink); border-color: var(--tlr-ink); }
+.dpw__log-btn--open { background: var(--tlr-ink); border-color: var(--tlr-ink); color: #fff; }
+.dpw__log-row td { background: var(--tlr-paper); white-space: normal; }
+.dpw__log-list { list-style: none; margin: 0; padding: 0.125rem 0 0.125rem 1.9rem; }
+.dpw__log-entry { display: flex; gap: 0.75rem; font-size: 0.7rem; padding: 0.0625rem 0; }
+.dpw__log-time { font-family: var(--tlr-mono); color: var(--tlr-muted); min-width: 6rem; }
+.dpw__log-type { font-weight: 600; min-width: 8.5rem; }
+.dpw__log-desc { color: var(--tlr-muted); }
+
+/* ── Pay form / empty / pager ─────────────────────────────── */
+.dpw__payform {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.375rem 0.75rem;
+  border-top: 1px solid var(--tlr-rule);
+  background: var(--tlr-paper);
+}
+.dpw__field { display: flex; flex-direction: column; gap: 0.125rem; min-width: 10rem; }
+.dpw__field--grow { flex: 1 1 16rem; }
+.dpw__period { display: flex; align-items: center; gap: 0.375rem; }
+.dpw__period .form-select, .dpw__field .form-select { width: auto; }
+
+.dpw__empty { padding: 0.75rem; margin: 0; font-size: 0.78rem; color: var(--tlr-muted); }
+.dpw__pager { padding: 0.375rem 0.75rem; border-top: 1px solid var(--tlr-rule); }
+
+/* ── Recent payouts ───────────────────────────────────────── */
+.dpw__payouts { list-style: none; margin: 0; padding: 0; }
+.dpw__payout {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-bottom: 1px solid var(--tlr-rule);
+}
+.dpw__payout:last-child { border-bottom: 0; }
+.dpw__payout-code {
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  color: var(--tlr-ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--tlr-rule-strong);
+}
+.dpw__payout-code:hover { border-bottom-color: var(--tlr-ink); }
+.dpw__payout-date { font-family: var(--tlr-mono); font-size: 0.68rem; color: var(--tlr-muted); }
+.dpw__payout-amt {
+  margin-left: auto;
+  font-family: var(--tlr-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+/* ── Sticky tape ──────────────────────────────────────────── */
+.dpw__tape {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1030;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--tlr-ink);
+  color: #fff;
+  box-shadow: 0 -1px 10px rgba(0, 31, 63, 0.28);
+  animation: dpw-tape-in 0.18s ease-out;
+}
+@keyframes dpw-tape-in { from { transform: translateY(100%); } to { transform: none; } }
+.dpw__tape-label {
+  font-family: var(--tlr-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+.dpw__tape-total {
+  margin-left: auto;
+  font-family: var(--tlr-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dpw__tape-total .dpw__fig-unit { color: rgba(255, 255, 255, 0.55); }
+.dpw__tape-btn {
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: var(--tlr-mark);
+  border: 1px solid var(--tlr-mark);
+  color: var(--tlr-ink);
+  padding: 0.3rem 0.9rem;
+  cursor: pointer;
+}
+.dpw__tape-btn:hover { background: var(--brand-primary-dark); }
+.dpw__tape-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Focus + motion floor ─────────────────────────────────── */
+.dpw a:focus-visible, .dpw button:focus-visible,
+.dpw input:focus-visible, .dpw select:focus-visible {
+  outline: 2px solid var(--tlr-mark);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dpw__tape { animation: none; }
+}
+
+@media (max-width: 767.98px) {
+  /* Two gates a row — the arrows only read along a single line, so drop them. */
+  .dpw__gate { flex: 1 1 45%; min-width: 0; border-bottom: 1px solid var(--tlr-rule); }
+  .dpw__gate:not(:last-child)::after { content: none; }
+  .dpw__gate-value { font-size: 1rem; }
+  .dpw__acts { margin-left: 0; }
+  .dpw__table thead th { position: static; }
+  .dpw__note { display: none; }
+  /* No hover on touch, so the fee field has to look like a field. */
+  .dpw input.dpw__fee-input { border-color: var(--tlr-rule-strong); background-color: var(--tlr-card); }
+}

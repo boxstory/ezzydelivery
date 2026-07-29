@@ -3290,6 +3290,21 @@ def returns_list(request):
     })
 
 
+def _collected_cod_for(order):
+    """COD actually taken from the customer on this order — the refund ceiling.
+
+    An order the driver never collected on has nothing to hand back, however
+    large its cod_amount is.
+    """
+    from decimal import Decimal
+    from delivery import models as delivery_models
+
+    total = delivery_models.DeliveryTask.objects.filter(
+        order=order, cod_collected=True,
+    ).aggregate(total=Sum('cod_collected_amount'))['total']
+    return total or Decimal('0')
+
+
 @login_required(login_url='account_login')
 @business_required
 def return_detail(request, return_id):
@@ -3381,7 +3396,10 @@ def return_create(request, order_id):
             business=business,
             reason=reason,
             reason_notes=reason_notes,
-            cod_reversal_amount=order.cod_amount or 0,
+            # Only COD that was actually collected can be handed back. Storing
+            # the order's face value would promise a refund on an order the
+            # driver never took money for.
+            cod_reversal_amount=_collected_cod_for(order),
         )
 
         for item, qty in selected_items:

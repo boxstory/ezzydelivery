@@ -86,7 +86,7 @@
                     <i class="fa-solid fa-map-location-dot"></i><span>Live Map</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_tasks_verify_queue" href="{% url 'workforce:temp_verify_queue' %}" class="wsm__nav-link d-flex align-items-center">
-                    <i class="fa-solid fa-location-dot"></i><span>Address Verify Queue</span>
+                    <i class="fa-solid fa-location-dot"></i><span>MSG Queue</span>
                     {% if address_verify_pending_count %}<span class="badge ms-auto" style="background:var(--brand-primary);color:#000;font-size:0.6rem;">{{ address_verify_pending_count }}</span>{% endif %}
                 </a>
                 <a id="workforce_sidebar_mob_link_tasks_fulfilled" href="{% url 'workforce:dl_list_fulfilled_clients' %}" class="wsm__nav-link">
@@ -184,9 +184,6 @@
             <div class="wsm__nav-submenu" id="mobile-section-sellers">
                 <a id="workforce_sidebar_mob_link_all_sellers" href="{% url 'workforce:sellers_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Sellers</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_sellers_pending" href="{% url 'workforce:sellers_pending' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-clock"></i><span>Pending Approval</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-box"></i><span>Orders by Seller</span>
@@ -287,8 +284,20 @@
                 <a id="workforce_sidebar_mob_link_cod_settlement" href="{% url 'workforce:cod_settlement_report' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice-dollar"></i><span>COD Settlement</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_driver_cod_requests" href="{% url 'workforce:cod_settlement_report' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-hand-holding-dollar"></i><span>Driver COD Requests</span>
+                <a id="workforce_sidebar_mob_link_business_cod_payout" href="{% url 'workforce:cod_business_settlement_report' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-building-columns"></i><span>Business COD Payout</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_cod_reconciliation" href="{% url 'workforce:cod_legacy_reconciliation' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-scale-balanced"></i><span>COD Reconciliation</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_finance_earnings_verification" href="{% url 'workforce:earnings_verification' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-clipboard-check"></i><span>Earnings Verification</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_finance_client_charges" href="{% url 'workforce:client_charge_verification' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-file-invoice"></i><span>Client Charges</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_finance_driver_payouts" href="{% url 'workforce:fleet_drivers_earnings' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-money-bill-wave"></i><span>Driver Payouts</span>
                 </a>
             </div>
         </div>
@@ -496,7 +505,7 @@
                     <i class="fa-solid fa-list-check"></i><span>Auto-Import Stages</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_temp_verify_queue" href="{% url 'workforce:temp_verify_queue' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-location-dot"></i><span>Address Verify Queue</span>
+                    <i class="fa-solid fa-location-dot"></i><span>MSG Queue</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_orders_bulk" href="{% url 'workforce:wf_orders_bulk_import' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-csv"></i><span>CSV / Excel Upload</span>
@@ -663,6 +672,10 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/tasks\//,                           section: 'tasks',         link: null},
         // Fleet / Accounts (task-sheets go to Reports, must be before generic /fleet/)
         {re: /^\/workforce\/fleet\/task-sheet/,                 section: 'reports',       link: 'workforce_sidebar_mob_link_task_sheets'},
+        // Finance COD pages live under /fleet/ — matched here so the generic
+        // /workforce/fleet/ rule below does not claim them for Accounts.
+        {re: /^\/workforce\/fleet\/cod-business-settlement\//,  section: 'finance',       link: 'workforce_sidebar_mob_link_business_cod_payout'},
+        {re: /^\/workforce\/fleet\/cod-legacy-reconciliation\//,section: 'finance',       link: 'workforce_sidebar_mob_link_cod_reconciliation'},
         {re: /^\/workforce\/fleet\/cod-settlement\//,           section: 'accounts',      link: 'workforce_sidebar_mob_link_fleet_transactions'},
         {re: /^\/workforce\/drivers\/\d+/,                      section: 'accounts',      link: 'workforce_sidebar_mob_link_all_drivers'},
         {re: /^\/workforce\/drivers\//,                         section: 'accounts',      link: null},

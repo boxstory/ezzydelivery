@@ -37,6 +37,14 @@
         {% csrf_token %}
         <div class="row g-3">
           <div class="col-12 col-md-6">
+            <label class="form-label" for="workforce_crm_new_select_leadtype">Lead type</label>
+            <select class="form-select" id="workforce_crm_new_select_leadtype" name="category">
+              {% for value, label in category_choices %}
+              <option value="{{ value }}" {% if initial_category == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-6">
             <label class="form-label" for="workforce_crm_new_input_company">Company / Business name</label>
             <input class="form-control" id="workforce_crm_new_input_company" name="company_name"
                    value="{{ form_data.company_name|default:'' }}" maxlength="200">

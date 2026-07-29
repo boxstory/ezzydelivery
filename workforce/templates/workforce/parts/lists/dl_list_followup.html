@@ -4,7 +4,7 @@
 {% load custom_filters %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/followup-list.css' %}?v=20260727f" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/followup-list.css' %}?v=20260728b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
 <div class="wfl">
@@ -142,6 +142,13 @@
                                 Driver <i class="fa-solid fa-sort{% if current_sort == 'driver' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
                             </a>
                         </th>
+                        <th class="wfl__th-pickup">
+                            <a href="?sort={% if current_sort == 'pickup' and current_dir == 'asc' %}pickup-desc{% else %}pickup{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'pickup' %} dl-table__sort--active{% endif %}">
+                                <span>Pickup</span>
+                                <span class="dl-table__sort-sub">Plan</span>
+                                <i class="fa-solid fa-sort{% if current_sort == 'pickup' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
+                            </a>
+                        </th>
                         <th class="dl-table__th-status">
                             <a href="?sort={% if current_sort == 'status' and current_dir == 'asc' %}status-desc{% else %}status{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'status' %} dl-table__sort--active{% endif %}">
                                 <span>DL Status</span>
@@ -198,6 +205,19 @@
                             {% else %}
                             <span class="dl-table__driver-none text-danger fw-semibold">Unassigned</span>
                             {% endif %}
+                        </td>
+                        <!-- First-mile pickup leg (empty for clients without pickup automation) -->
+                        <td class="wfl__pk-cell">
+                            {% with pk=dl.order.pickup_task %}
+                            {% if pk %}
+                            <div class="wfl__pk wfl__pk--{{ pk.status }}" title="{{ pk.get_status_display }} · {{ pk.get_disposition_display }}{% if pk.driver %} · {{ pk.driver }}{% endif %}">
+                                <span class="wfl__pk__status">{% if pk.status == 'arrived' %}Arrived{% elif pk.status == 'in_progress' %}In Progress{% elif pk.status == 'handed_off' %}Handed Off{% else %}{{ pk.get_status_display }}{% endif %}</span>
+                                <span class="wfl__pk__plan">{% if pk.disposition == 'drop' %}Hub{% elif pk.disposition == 'self_deliver' %}Self{% else %}Transfer{% endif %}{% if pk.driver %} · {{ pk.driver|truncatechars:10 }}{% endif %}</span>
+                            </div>
+                            {% else %}
+                            <span class="wfl__pk-none">--</span>
+                            {% endif %}
+                            {% endwith %}
                         </td>
                         <!-- Status -->
                         <td class="dl-table__td-status" onclick="event.stopPropagation();">
@@ -304,7 +324,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="dl-table__empty">
+                        <td colspan="10" class="dl-table__empty">
                             <i class="fa-solid fa-inbox me-2"></i>No tasks to display
                         </td>
                     </tr>

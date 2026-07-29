@@ -1,0 +1,252 @@
+{# Purpose: Client delivery-charge verification console — agree the charge billed to each business, per delivery. #}
+{# Used by: workforce.views.client_charge_verification (URL workforce:client_charge_verification) #}
+{# Notes: Client-side mirror of the driver earnings screens; publishing books nothing — the charge posts when the business payout runs. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+
+{% block title %}Client Charges{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260728c" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="ccv">
+  <div class="ccv__wrap">
+
+    <!-- Masthead -->
+    <header class="ccv__masthead">
+      <div class="ccv__masthead-row">
+        <div>
+          <p class="ccv__eyebrow">Client Billing</p>
+          <h1 class="ccv__title">Delivery Charge Verification</h1>
+          <p class="ccv__sub">
+            The figure the business is billed per delivery
+            <span class="ccv__sep">·</span> verified here, deducted on the payout
+          </p>
+        </div>
+        <div class="ccv__masthead-actions">
+          <a href="{% url 'workforce:earnings_verification' %}" class="ccv__ghost">Driver earnings</a>
+          <a href="{% url 'workforce:cod_business_settlement_report' %}" class="ccv__ghost">Business payout ▸</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Summary -->
+    <section class="ccv__summary">
+      <div class="ccv__sum-cell ccv__sum-cell--lead">
+        <span class="ccv__sum-label">Pending charge value</span>
+        <span class="ccv__sum-value">QAR {{ stats.total_pending_charge|floatformat:2|intcomma }}</span>
+      </div>
+      <div class="ccv__sum-cell">
+        <span class="ccv__sum-label">Pending</span>
+        <span class="ccv__sum-value">{{ stats.pending_count }}<span class="ccv__sum-unit">tasks</span></span>
+      </div>
+      <div class="ccv__sum-cell">
+        <span class="ccv__sum-label">Verified</span>
+        <span class="ccv__sum-value">{{ stats.verified_count }}<span class="ccv__sum-unit">tasks</span></span>
+      </div>
+      <div class="ccv__sum-cell">
+        <span class="ccv__sum-label">Published</span>
+        <span class="ccv__sum-value">{{ stats.published_count }}<span class="ccv__sum-unit">tasks</span></span>
+      </div>
+    </section>
+
+    <p class="ccv__note">
+      <i class="fa-solid fa-circle-info"></i>
+      Publishing agrees the figure — nothing is booked here. The charge is posted as a deduction line when the business payout runs. Published rows are locked against further edits.
+    </p>
+
+    <!-- ── Charge ledger ────────────────────────────────────── -->
+    <section class="ccv__panel">
+      <div class="ccv__panel-head">
+        <h2 class="ccv__panel-title">Charge ledger</h2>
+        <form method="get" class="ccv__filters" id="workforce_charges_filter_form">
+          <div class="ccv__filter">
+            <label for="workforce_charges_filter_business" class="ccv__field-label">Business</label>
+            <select name="business" id="workforce_charges_filter_business" class="form-select form-select-sm">
+              <option value="">All businesses</option>
+              {% for biz in all_businesses %}
+              <option value="{{ biz.business_id }}" {% if selected_business == biz.business_id|stringformat:"s" %}selected{% endif %}>
+                {{ biz.business_name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="ccv__filter">
+            <label for="workforce_charges_filter_status" class="ccv__field-label">Status</label>
+            <select name="status" id="workforce_charges_filter_status" class="form-select form-select-sm">
+              <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All</option>
+              <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+              <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Verified</option>
+              <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
+              <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+          </div>
+          <div class="ccv__filter">
+            <label for="workforce_charges_filter_days" class="ccv__field-label">Period</label>
+            <select name="days" id="workforce_charges_filter_days" class="form-select form-select-sm">
+              <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 days</option>
+              <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 days</option>
+              <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 days</option>
+              <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last year</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      {% if tasks %}
+      <div class="ccv__bar">
+        <label class="ccv__check-label">
+          <input type="checkbox" class="form-check-input" id="workforce_charges_select_all">
+          <span>Select all</span>
+        </label>
+        <span class="ccv__bar-count" id="workforce_charges_selected_count">0 selected</span>
+
+        <div class="ccv__bulk-set">
+          <label for="workforce_charges_bulk_amount" class="ccv__field-label">Set selected to</label>
+          <div class="input-group input-group-sm ccv__bulk-group">
+            <input type="number" class="form-control" id="workforce_charges_bulk_amount"
+                   placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+            <span class="input-group-text">QAR</span>
+            <button type="button" class="btn btn-outline-secondary" id="workforce_charges_btn_set" disabled>Apply</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ccv__table-wrap">
+        <table class="ccv__table" id="workforce_charges_table_ledger">
+          <thead>
+            <tr>
+              <th class="ccv__col-check"></th>
+              <th>Task</th>
+              <th>Business</th>
+              <th>Route</th>
+              <th>Date</th>
+              <th>Service</th>
+              <th class="ccv__num">Calculated</th>
+              <th class="ccv__num">Verified</th>
+              <th>Status</th>
+              <th>By</th>
+              <th>Log</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in tasks %}
+            <tr data-task-id="{{ task.id }}"{% if task.charge_verification_status == 'published' %} class="ccv__row--locked"{% endif %}>
+              <td class="ccv__col-check">
+                <input type="checkbox" class="form-check-input workforce_charges_task" value="{{ task.id }}"
+                       data-charge="{{ task.verified_delivery_charge|default:task.dl_price|default:0 }}"
+                       data-locked="{% if task.charge_verification_status == 'published' %}1{% else %}0{% endif %}">
+              </td>
+              <td class="ccv__mono">
+                {{ task.dl_task_number|default:task.id }}
+                <div class="ccv__line-desc">{{ task.order.order_number|default:"—"|truncatechars:18 }}</div>
+              </td>
+              <td class="ccv__truncate" title="{{ task.order.business.business_name|default:'' }}">
+                {{ task.order.business.business_name|default:"—" }}
+              </td>
+              <td class="ccv__route">
+                <span class="ccv__route-leg">
+                  {{ task.pickup_location.pickup_location_title|default:"No pickup"|truncatechars:20 }}
+                  <span class="ccv__zone">Z{{ task.pickup_location.pickup_zone_no|default:"–" }}</span>
+                </span>
+                <span class="ccv__route-leg">
+                  {{ task.dl_to_address.area_name|default:"No drop"|truncatechars:20 }}
+                  <span class="ccv__zone">Z{{ task.dl_to_address.dl_zone|default:"–" }}</span>
+                </span>
+              </td>
+              {# Pick the date first, format once. Formatting before `default`
+                 hands the second `date` filter a string, which yields ''. #}
+              <td class="ccv__mono">{{ task.completed_at|default:task.dl_task_date|date:"d M Y" }}</td>
+              <td>
+                <span class="ccv__service">{{ task.dl_speed|default:"—" }}</span>
+                <div class="ccv__line-desc">{{ task.dl_category|default:"—" }}</div>
+              </td>
+              <td class="ccv__num ccv__mono ccv__muted">{{ task.dl_price|default:0|floatformat:2 }}</td>
+              <td class="ccv__num">
+                <input type="number" class="ccv__amount-input"
+                       id="workforce_charges_input_{{ task.id }}"
+                       value="{{ task.verified_delivery_charge|default:task.dl_price|default:0 }}"
+                       data-original="{{ task.verified_delivery_charge|default:task.dl_price|default:0 }}"
+                       step="0.01" min="0"
+                       {% if task.charge_verification_status == 'published' %}readonly title="Published — locked to the agreed figure"{% endif %}>
+              </td>
+              <td>
+                <span class="ccv__status ccv__status--{{ task.charge_verification_status }}">
+                  {{ task.get_charge_verification_status_display }}
+                </span>
+              </td>
+              <td>
+                {% if task.charge_verified_by %}
+                <span class="ccv__by">{{ task.charge_verified_by.first_name|default:task.charge_verified_by.username|slice:":12" }}</span>
+                <div class="ccv__line-desc">{{ task.charge_verified_at|date:"d M H:i" }}</div>
+                {% else %}<span class="ccv__muted">—</span>{% endif %}
+              </td>
+              <td>
+                {% if task.activity_log %}
+                <button type="button" class="ccv__log-btn" data-log-for="{{ task.id }}"
+                        aria-expanded="false" aria-controls="workforce_charges_log_{{ task.id }}">
+                  {{ task.activity_log|length }} event{{ task.activity_log|length|pluralize }}
+                </button>
+                {% else %}<span class="ccv__muted">—</span>{% endif %}
+              </td>
+            </tr>
+            {% if task.activity_log %}
+            <tr class="ccv__log-row" id="workforce_charges_log_{{ task.id }}" hidden>
+              <td colspan="11">
+                <ol class="ccv__log-list">
+                  {% for entry in task.activity_log %}
+                  <li class="ccv__log-entry">
+                    <span class="ccv__log-time">{{ entry.created_at|date:"d M H:i" }}</span>
+                    <span class="ccv__log-type">{{ entry.get_activity_type_display }}</span>
+                    {% if entry.description %}<span class="ccv__log-desc">{{ entry.description }}</span>{% endif %}
+                  </li>
+                  {% endfor %}
+                </ol>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if tasks.has_other_pages %}
+      <div class="ccv__pager">
+        {% include "includes/components/_pagination.html" with page_obj=tasks filter_params=filter_params %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <p class="ccv__empty">No deliveries match this filter. Widen the period or clear the business filter.</p>
+      {% endif %}
+    </section>
+
+    <span class="d-none">{% csrf_token %}</span>
+  </div>
+
+  <!-- Sticky tape -->
+  <div class="ccv__tape" id="workforce_charges_tape" hidden>
+    <div class="ccv__tape-inner">
+      <span class="ccv__tape-label"><span id="workforce_charges_tape_count">0</span> selected</span>
+      <span class="ccv__tape-total">QAR <span id="workforce_charges_tape_total">0.00</span></span>
+      <div class="ccv__tape-actions">
+        <button type="button" class="ccv__tape-btn" id="workforce_charges_btn_verify">Verify</button>
+        <button type="button" class="ccv__tape-btn ccv__tape-btn--commit" id="workforce_charges_btn_publish">Verify &amp; publish</button>
+        <button type="button" class="ccv__tape-btn ccv__tape-btn--void" id="workforce_charges_btn_reject">Reject</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const workforceChargeActionUrl = "{% url 'workforce:client_charge_verification_action' %}";
+</script>
+<script src="{% static 'workforce/js/client-charge-verification.js' %}?v=20260728c"></script>
+{% endblock %}

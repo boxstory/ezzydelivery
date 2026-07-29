@@ -907,6 +907,15 @@ def driver_complete_task(request, task_id):
             elif payment_method in ('cash', 'pos', 'fawran'):
                 task.payment_method = payment_method
 
+            # Bank/terminal reference for the electronic leg, so the collection
+            # can be reconciled against the statement line by line.
+            cod_reference = (
+                request.data.get('cod_reference') if hasattr(request.data, 'get')
+                else request.POST.get('cod_reference')
+            ) or ''
+            if cod_reference.strip():
+                task.cod_reference = cod_reference.strip()[:100]
+
             task.save()
 
             # COD collection tracking (only on successful delivery, idempotent)
@@ -926,12 +935,14 @@ def driver_complete_task(request, task_id):
                     task.cod_collected_amount = collected
                     task.save(update_fields=['cod_collected_amount'])
 
-                # Set correct COD status: partial or full
-                if expected > 0 and collected < expected:
-                    task.order.cod_status_by_staff = 'partially_collected'
-                else:
-                    task.order.cod_status_by_staff = 'cod_with_driver'
-                task.order.save(update_fields=['cod_status_by_staff'])
+                # Set correct COD status: partial or full. apply_cod_status also
+                # advances the seller-facing ladder so the two stay in step.
+                from orders.cod_status import apply_cod_status
+                apply_cod_status(
+                    task.order,
+                    'partially_collected' if (expected > 0 and collected < expected)
+                    else 'cod_with_driver',
+                )
 
                 # Record COD collection in driver wallet (actual amount collected)
                 from fleet.wallet_service import WalletService
@@ -958,6 +969,29 @@ def driver_complete_task(request, task_id):
                 )
                 # Refresh the driver's cached cod_in_hand from the task truth.
                 WalletService.sync_cod_in_hand(task.driver)
+
+            # Zero-COD delivery (prepaid / free delivery) still needs a ledger row.
+            # It carries 0 QAR so no balance moves, but it gives staff the
+            # transaction to attach the delivery fee to when billing the client.
+            # cod_collected is deliberately left False — the driver settlement
+            # pages count these separately via order__cod_amount=0.
+            elif (task.order and status_value == 'delivered'
+                  and not (task.order.cod_amount or 0)
+                  and task.driver
+                  and not fleet_models.DriverTransaction.objects.filter(
+                      delivery_task=task, transaction_type='cod_collection').exists()):
+                from decimal import Decimal
+                from fleet.wallet_service import WalletService
+                WalletService.record_transaction(
+                    driver=task.driver,
+                    transaction_type='cod_collection',
+                    amount=Decimal('0'),
+                    description=f"Zero COD for order {task.order.order_number} (prepaid / no cash due)",
+                    notes="No cash collected — row exists so the delivery fee can be billed to the client.",
+                    delivery_task=task,
+                    created_by=request.user,
+                    payment_method=task.payment_method or None,
+                )
 
             # Fix 14: Allow additional COD collection on partially collected orders
             elif (task.order and status_value == 'delivered' and cod_collected and cod_amount_collected
@@ -997,6 +1031,7 @@ def driver_complete_task(request, task_id):
                     description=f"Additional COD for order {task.order.order_number} (remaining: {additional} of {expected})",
                     delivery_task=task,
                     created_by=request.user,
+                    payment_method=task.payment_method or None,
                 )
                 # Refresh the driver's cached cod_in_hand from the task truth.
                 WalletService.sync_cod_in_hand(task.driver)
@@ -1004,15 +1039,20 @@ def driver_complete_task(request, task_id):
             # Electronic COD (Fawran/POS/bank/ATM) settles to Ezzy at collection —
             # the driver never holds it. Mark it handed-to-Ezzy now so it never
             # counts as the driver's cod-in-hand and flows straight to business payout.
+            # is_electronic_only() also rejects a mixed collection whose dominant
+            # method is electronic (e.g. {cash: 200, fawran: 500} reads as
+            # 'fawran'). Auto-settling those would write off 200 QR of cash the
+            # driver is still holding.
+            from fleet.wallet_service import WalletService as _WS
             if (task.order and status_value == 'delivered' and task.cod_collected
-                    and task.payment_method in ('pos', 'fawran', 'bank', 'atm')
+                    and _WS.is_electronic_only(task)
                     and not task.cod_settled):
                 task.cod_settled = True
                 task.cod_settled_at = timezone.now()
                 task.save(update_fields=['cod_settled', 'cod_settled_at'])
                 if task.order.cod_status_by_staff != 'cod_settled_with_business':
-                    task.order.cod_status_by_staff = 'cod_with_ezzy'
-                    task.order.save(update_fields=['cod_status_by_staff'])
+                    from orders.cod_status import apply_cod_status
+                    apply_cod_status(task.order, 'cod_with_ezzy')
                 from fleet.wallet_service import WalletService
                 WalletService.sync_cod_in_hand(task.driver)
 

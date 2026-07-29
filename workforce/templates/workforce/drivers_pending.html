@@ -47,6 +47,7 @@
                     <th>Status</th>
                     <th>Vehicle</th>
                     <th>Documents</th>
+                    <th>Applied / Updated</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -97,6 +98,16 @@
                             <i class="fa-solid fa-file-alt"></i> {{ doc_count }} document{{ doc_count|pluralize }}
                         </span>
                         {% endwith %}
+                    </td>
+                    <td>
+                        <div class="drl__date-line" title="Applied {{ driver.created_at|date:'d M Y H:i' }}">
+                            <i class="fa-solid fa-file-signature"></i> {{ driver.created_at|date:"d M Y" }}
+                        </div>
+                        {% if driver.updated_at|date:"Ymd" != driver.created_at|date:"Ymd" %}
+                        <div class="drl__date-line drl__date-line--muted" title="Last updated {{ driver.updated_at|date:'d M Y H:i' }}">
+                            <i class="fa-solid fa-pen"></i> {{ driver.updated_at|date:"d M Y" }}
+                        </div>
+                        {% endif %}
                     </td>
                     <td>
                         <a href="{% url 'workforce:driver_detail' driver.driver_id %}"

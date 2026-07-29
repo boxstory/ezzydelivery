@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260319d1">
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260728g">
 Inventory
 {% endblock extra_head %}
 
@@ -186,26 +186,8 @@ Inventory
     {% endfor %}
   </div>
 
-  <!-- Pagination -->
-  {% if page_obj.has_other_pages %}
-  <div class="piv__pagination" id="product_inventory_pagination">
-    {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if show_low %}&low_stock=1{% endif %}"
-       class="piv__page-btn" id="product_inventory_btn_prev">
-      <i class="fas fa-chevron-left"></i> Prev
-    </a>
-    {% endif %}
-    <span class="piv__page-info">
-      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-    </span>
-    {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if show_low %}&low_stock=1{% endif %}"
-       class="piv__page-btn" id="product_inventory_btn_next">
-      Next <i class="fas fa-chevron-right"></i>
-    </a>
-    {% endif %}
-  </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries q / low_stock -->
+  {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="product_inventory" %}
 
   {% else %}
   <!-- Empty state -->

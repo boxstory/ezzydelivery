@@ -250,7 +250,7 @@ class DriverVehicleModelTest(DriverTestMixin, TestCase):
             vehicle_type='bike',
             vehicle_no='QA-5678',
         )
-        self.assertEqual(vehicle.vehicle_status, 'Inactive')
+        self.assertEqual(vehicle.vehicle_status, 'inactive')
 
     def test_multiple_vehicles_per_driver(self):
         fleet_models.DriverVehicle.objects.create(
@@ -428,24 +428,47 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         self.assertEqual(trans.pending_earnings_after, Decimal('20.00'))
 
     def test_cod_collection_transaction(self):
-        # Start with positive wallet balance
-        self.driver.wallet_balance = Decimal('5000.00')
-        self.driver.save()
+        # Both cod_in_hand and wallet_balance are derived from the task truth
+        # (see WalletService.live_cod_in_hand), so the collection has to exist
+        # on a task — a bare ledger row moves neither balance.
+        business, pickup, order = self.create_business_and_order(
+            self.user, self.profile)
+        task = self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-COLLECT', cod_collected=True,
+            cod_collected_amount=Decimal('100.00'), payment_method='cash')
 
         trans = WalletService.record_transaction(
             driver=self.driver,
             transaction_type='cod_collection',
             amount=Decimal('100.00'),
             description='COD collected',
+            delivery_task=task,
         )
         self.driver.refresh_from_db()
-        self.assertEqual(self.driver.wallet_balance, Decimal('4900.00'))
-        # cod_in_hand is now derived from tasks (see WalletService.live_cod_in_hand),
-        # so record_transaction no longer mutates it — it stays at its prior value.
+        self.assertEqual(self.driver.cod_in_hand, Decimal('100.00'))
+        # Cash held for Ezzy is a liability: the wallet goes negative by it.
+        self.assertEqual(self.driver.wallet_balance, Decimal('-100.00'))
+
+    def test_cod_collection_without_task_moves_nothing(self):
+        """A collection row with no task behind it is not a liability."""
+        self.driver.wallet_balance = Decimal('5000.00')
+        self.driver.save()
+
+        WalletService.record_transaction(
+            driver=self.driver,
+            transaction_type='cod_collection',
+            amount=Decimal('100.00'),
+            description='COD collected',
+        )
+        self.driver.refresh_from_db()
         self.assertEqual(self.driver.cod_in_hand, Decimal('0.00'))
+        # The hand-set 5000 was never backed by tasks or adjustments, so the
+        # re-derivation drops it rather than carrying the drift forward.
+        self.assertEqual(self.driver.wallet_balance, Decimal('0.00'))
 
     def test_cod_deposit_transaction(self):
-        # Set up driver with COD in hand
+        # Deposit with nothing outstanding: both balances derive back to zero.
         self.driver.wallet_balance = Decimal('-100.00')
         self.driver.cod_in_hand = Decimal('100.00')
         self.driver.save()
@@ -458,9 +481,7 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         )
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.wallet_balance, Decimal('0.00'))
-        # record_transaction moves wallet_balance only; cod_in_hand is synced from
-        # task state by submit_cod_to_admin, not here, so it is unchanged.
-        self.assertEqual(self.driver.cod_in_hand, Decimal('100.00'))
+        self.assertEqual(self.driver.cod_in_hand, Decimal('0.00'))
 
     def test_settlement_transaction(self):
         self.driver.pending_earnings = Decimal('500.00')
@@ -487,8 +508,15 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         self.assertEqual(self.driver.wallet_balance, Decimal('50.00'))
 
     def test_deduction_transaction(self):
-        self.driver.wallet_balance = Decimal('100.00')
-        self.driver.save()
+        # Seed the opening balance through the ledger, not by writing the field:
+        # wallet_balance is re-derived from adjustments minus live COD, so a raw
+        # field write is discarded on the next transaction.
+        WalletService.record_transaction(
+            driver=self.driver,
+            transaction_type='adjustment',
+            amount=Decimal('100.00'),
+            description='Opening balance',
+        )
 
         trans = WalletService.record_transaction(
             driver=self.driver,
@@ -510,21 +538,28 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         self.assertEqual(self.driver.wallet_balance, Decimal('10.00'))
 
     def test_transaction_records_balance_snapshots(self):
-        self.driver.wallet_balance = Decimal('1000.00')
-        self.driver.cod_in_hand = Decimal('200.00')
+        """The *_after columns are the running balance the ledger prints, so
+        they must be the balance after this row, not the one before it."""
         self.driver.pending_earnings = Decimal('50.00')
         self.driver.save()
+
+        business, pickup, order = self.create_business_and_order(
+            self.user, self.profile)
+        task = self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-SNAP', cod_collected=True,
+            cod_collected_amount=Decimal('100.00'), payment_method='cash')
 
         trans = WalletService.record_transaction(
             driver=self.driver,
             transaction_type='cod_collection',
             amount=Decimal('100.00'),
             description='COD collected',
+            delivery_task=task,
         )
-        self.assertEqual(trans.wallet_balance_after, Decimal('900.00'))
-        # cod_in_hand is no longer incremented by record_transaction, so the
-        # snapshot reflects the value at call time (unchanged), not 200+100.
-        self.assertEqual(trans.cod_in_hand_after, Decimal('200.00'))
+        self.assertEqual(trans.cod_in_hand_after, Decimal('100.00'))
+        self.assertEqual(trans.wallet_balance_after, Decimal('-100.00'))
+        self.assertEqual(trans.pending_earnings_after, Decimal('50.00'))
 
     def test_multiple_sequential_transactions(self):
         # Simulate a day: earn, collect COD, collect more COD, deposit COD
@@ -919,9 +954,17 @@ class FleetDashboardViewTest(DriverTestMixin, TestCase):
         self.assertIn(response.status_code, [301, 302])
 
     def test_fleets_list_loads(self):
+        # The all-drivers list is staff-only; a plain driver is bounced to their
+        # own dashboard (see fleet.views.fleets).
+        self.user.is_staff = True
+        self.user.save(update_fields=['is_staff'])
         response = self.client.get('/fleet/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('fleets', response.context)
+
+    def test_fleets_list_blocked_for_non_staff(self):
+        response = self.client.get('/fleet/')
+        self.assertEqual(response.status_code, 302)
 
 
 # =============================================================================
@@ -1226,12 +1269,27 @@ class CODSubmissionViewTest(DriverTestMixin, TestCase):
         self.assertIn(response.status_code, [301, 302])
 
     def test_cod_submission_post_success(self):
+        # The view never trusts a posted amount — it sums the cash COD of the
+        # delivery tasks being settled, so the hand-in needs real tasks behind it.
+        business, pickup, order = self.create_business_and_order(
+            self.user, self.profile)
+        handed_in = self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-200', cod_collected=True,
+            cod_collected_amount=Decimal('200.00'), payment_method='cash')
+        self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-300', cod_collected=True,
+            cod_collected_amount=Decimal('300.00'), payment_method='cash')
+
         response = self.client.post('/fleet/cod_submission/', {
-            'amount': '200',
+            'delivery_ids': str(handed_in.id),
             'reference_number': 'REF001',
             'notes': 'Cash deposit',
         })
         self.assertIn(response.status_code, [301, 302])
+        handed_in.refresh_from_db()
+        self.assertTrue(handed_in.cod_settled)
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.cod_in_hand, Decimal('300.00'))
 
@@ -1493,8 +1551,10 @@ class PickupScannerViewTest(DriverTestMixin, TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['task_number'], 'SCAN-001')
 
+        # A scan takes an assigned task through 'accepted' and lands on
+        # 'picked_up' — the only pickup state a driver may reach from there.
         task.refresh_from_db()
-        self.assertEqual(task.dl_task_status, 'in_transit')
+        self.assertEqual(task.dl_task_status, 'picked_up')
 
     def test_scan_process_empty_code(self):
         response = self.client.post(
@@ -1681,9 +1741,11 @@ class StartRideViewTest(DriverTestMixin, TestCase):
             self.user, self.profile)
 
     def test_start_ride_success(self):
+        # 'accepted' is the only status a driver may start a ride from —
+        # out_for_delivery is not reachable from 'assigned'.
         task = self.create_delivery_task(
             self.order, self.business, self.pickup,
-            driver=self.driver, status='assigned', task_number='RIDE-001',
+            driver=self.driver, status='accepted', task_number='RIDE-001',
             dl_task_publish=True)
         delivery_models.AssignedDriver.objects.create(
             driver=self.driver, dl_task=task)
@@ -1697,6 +1759,25 @@ class StartRideViewTest(DriverTestMixin, TestCase):
 
         task.refresh_from_db()
         self.assertEqual(task.dl_task_status, 'out_for_delivery')
+
+    def test_start_ride_before_accepting_is_rejected(self):
+        """A still-assigned task cannot go out for delivery — and must not
+        report success, or the driver is navigated on an unchanged task."""
+        task = self.create_delivery_task(
+            self.order, self.business, self.pickup,
+            driver=self.driver, status='assigned', task_number='RIDE-003',
+            dl_task_publish=True)
+        delivery_models.AssignedDriver.objects.create(
+            driver=self.driver, dl_task=task)
+
+        response = self.client.post(
+            '/delivery/delivery_task/start_ride/',
+            {'task_id': task.id})
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+
+        task.refresh_from_db()
+        self.assertEqual(task.dl_task_status, 'assigned')
 
     def test_start_ride_not_assigned_to_me(self):
         task = self.create_delivery_task(

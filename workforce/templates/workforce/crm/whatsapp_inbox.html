@@ -276,6 +276,38 @@
       body.scrollTop = body.scrollHeight;
     }
 
+    // After a sender is promoted, update the modal + row in place instead of
+    // redirecting to the lead detail page — staff stays on the inbox.
+    function markLeadCreated(data) {
+      var overlay = chatEl('workforce_crm_inbox_div_chat_overlay');
+      var leadId = data.lead_id;
+      var promoteBtn = chatEl('workforce_crm_inbox_btn_chat_promote');
+      var driverBtn = chatEl('workforce_crm_inbox_btn_chat_driver');
+      var dismissBtn = chatEl('workforce_crm_inbox_btn_chat_dismiss');
+      var leadLink = chatEl('workforce_crm_inbox_a_chat_lead');
+      if (promoteBtn) promoteBtn.hidden = true;
+      if (driverBtn) driverBtn.hidden = true;
+      if (dismissBtn) dismissBtn.hidden = true;
+      if (leadLink) {
+        leadLink.hidden = false;
+        leadLink.href = data.lead_url;
+        leadLink.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Open Lead #' + leadId;
+      }
+      var sender = overlay ? (overlay.dataset.sender || '') : '';
+      var chatBtn = document.querySelector('.crmi__chat-btn[data-chat="' + sender.replace(/"/g, '') + '"]');
+      if (chatBtn) {
+        chatBtn.setAttribute('data-chat-lead', leadId);
+        var actionsRow = chatBtn.closest('.crmi__actions-row');
+        if (actionsRow && !actionsRow.querySelector('.crm__chip')) {
+          var chip = document.createElement('span');
+          chip.className = 'crm__chip';
+          chip.title = 'This sender already has a lead';
+          chip.textContent = 'Lead #' + leadId;
+          actionsRow.appendChild(chip);
+        }
+      }
+    }
+
     function openChat(btn) {
       var ov = chatEl('workforce_crm_inbox_div_chat_overlay');
       var body = chatEl('workforce_crm_inbox_div_chat_body');
@@ -289,9 +321,11 @@
       var leadLink = chatEl('workforce_crm_inbox_a_chat_lead');
       var leadId = btn.getAttribute('data-chat-lead') || '';
       var hasLead = !!leadId;
-      if (promoteBtn) promoteBtn.hidden = hasLead;
-      if (driverBtn) driverBtn.hidden = hasLead;
-      if (dismissBtn) dismissBtn.hidden = hasLead;
+      // Reset disabled state — a prior promote/dismiss click leaves the button
+      // disabled, and without this the next sender's buttons show but won't click.
+      if (promoteBtn) { promoteBtn.hidden = hasLead; promoteBtn.disabled = false; }
+      if (driverBtn) { driverBtn.hidden = hasLead; driverBtn.disabled = false; }
+      if (dismissBtn) { dismissBtn.hidden = hasLead; dismissBtn.disabled = false; }
       if (leadLink) {
         leadLink.hidden = !hasLead;
         if (hasLead) {
@@ -332,7 +366,7 @@
           var pb = chatEl('workforce_crm_inbox_btn_chat_promote');
           pb.disabled = true;
           post(URL_PROMOTE, overlay.dataset.promote || overlay.dataset.sender).then(function (data) {
-            if (data.success) { window.location.href = data.lead_url; }
+            if (data.success) { markLeadCreated(data); }
             else { pb.disabled = false; alert(data.error || 'Failed to create lead'); }
           });
           return;
@@ -341,7 +375,7 @@
           var drb = chatEl('workforce_crm_inbox_btn_chat_driver');
           drb.disabled = true;
           post(URL_PROMOTE, overlay.dataset.promote || overlay.dataset.sender, { category: 'driver' }).then(function (data) {
-            if (data.success) { window.location.href = data.lead_url; }
+            if (data.success) { markLeadCreated(data); }
             else { drb.disabled = false; alert(data.error || 'Failed to create driver lead'); }
           });
           return;

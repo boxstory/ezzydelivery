@@ -121,19 +121,7 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
         </table>
     </div>
 
-    {% if page_obj.has_other_pages %}
-    <nav class="d-flex justify-content-center">
-        <ul class="pagination pagination-sm">
-            {% if page_obj.has_previous %}
-            <li class="page-item"><a class="page-link" href="?status={{ status_filter }}&mode={{ mode_filter }}&search={{ search }}&page={{ page_obj.previous_page_number }}">‹</a></li>
-            {% endif %}
-            <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
-            {% if page_obj.has_next %}
-            <li class="page-item"><a class="page-link" href="?status={{ status_filter }}&mode={{ mode_filter }}&search={{ search }}&page={{ page_obj.next_page_number }}">›</a></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj per_page=per_page filter_params="status="|add:status_filter|add:"&mode="|add:mode_filter|add:"&search="|add:search pagination_id="pickups" %}
 </div>
 
 <script>

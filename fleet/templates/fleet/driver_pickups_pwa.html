@@ -11,7 +11,7 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
 {% block page_title %}Pickups{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'fleet/css/fleet-pickup.css' %}?v=20260722i">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-pickup.css' %}?v=20260727b">
 {% endblock %}
 
 {% block content %}
@@ -34,6 +34,15 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
         {% if in_progress_count > 0 %}<span class="fleet-tab__badge">{{ in_progress_count }}</span>{% endif %}
     </button>
 </div>
+
+{% if current_tab == 'mine' and cards %}
+<div class="fps__scanbar fleet-fade-in">
+    <button type="button" class="fleet-btn fps__btn-scan" onclick="pickupOpenScanner()">
+        <i class="fa-solid fa-camera"></i> Scan package to collect
+    </button>
+    <span class="fps__scanbar-hint">Scan the label QR on each package you pick up</span>
+</div>
+{% endif %}
 
 {% if cards %}
 {% for pk_task in cards %}
@@ -112,7 +121,7 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
         <i class="fa-solid fa-user"></i>
         <div class="fps__customer-info">
             <span class="fps__customer-name">{{ pk_task.order.customer_name|default:"—" }}</span>
-            {% if current_tab == 'in_progress' and pk_task.order.dl_zone %}
+            {% if pk_task.order.dl_zone %}
             <span class="fps__customer-zone">Zone {{ pk_task.order.dl_zone }}{% if pk_task.dest_zone_name %} · {{ pk_task.dest_zone_name }}{% endif %}</span>
             {% endif %}
         </div>
@@ -211,6 +220,86 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
     </div>
 </div>
 
+<!-- Package scan sheet — Mine tab, marks the scanned pickup collected -->
+<div class="fleet-modal" id="fps_scan_modal" style="display:none;">
+    <div class="fleet-modal__overlay" onclick="pickupCloseScanner()"></div>
+    <div class="fleet-modal__content take-scan-modal">
+
+        <div class="fleet-modal__header">
+            <div>
+                <h3 class="fleet-modal__title"><i class="fa-solid fa-qrcode me-2"></i>Scan package</h3>
+                <p class="take-scan-subtitle">Marks the pickup as collected</p>
+            </div>
+            <button type="button" class="fleet-btn-icon" onclick="pickupCloseScanner()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="take-scan-camera-wrap" id="fps_scan_camera">
+            <video id="fps_scan_video" autoplay playsinline></video>
+            <div class="take-scan-frame">
+                <div class="take-scan-frame__corner take-scan-frame__corner--tl"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--tr"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--bl"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--br"></div>
+                <div class="take-scan-frame__line"></div>
+            </div>
+            <p class="take-scan-hint" id="fps_scan_hint"><i class="fa-solid fa-qrcode me-1"></i>Align the label QR within frame</p>
+        </div>
+
+        <div class="take-scan-success" id="fps_scan_success" style="display:none;">
+            <div class="take-scan-success__icon"><i class="fa-solid fa-circle-check"></i></div>
+            <h4 class="take-scan-success__title">Package collected!</h4>
+            <div class="take-scan-success__card">
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-hashtag"></i></span>
+                    <span id="fps_scan_order" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-store"></i></span>
+                    <span id="fps_scan_business" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-user"></i></span>
+                    <span id="fps_scan_customer" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-flag-checkered"></i></span>
+                    <span id="fps_scan_next" class="take-scan-info-val"></span>
+                </div>
+            </div>
+            <p class="fps__scan-remaining" id="fps_scan_remaining"></p>
+            <div class="fps__scan-again">
+                <button type="button" class="fleet-btn fps__btn-scan" onclick="pickupScanAgain()">
+                    <i class="fa-solid fa-camera"></i> Scan next package
+                </button>
+                <button type="button" class="fleet-btn fps__btn-step" onclick="pickupCloseScanner(true)">
+                    <i class="fa-solid fa-check"></i> Done
+                </button>
+            </div>
+        </div>
+
+        <div class="fleet-modal__body" id="fps_scan_manual" style="display:none;">
+            <div class="fps__scan-nocam">
+                <i class="fa-solid fa-camera-slash"></i>
+                <p>Camera unavailable. Type the order number from the label.</p>
+                <p class="fps__scan-reason" id="fps_scan_reason"></p>
+            </div>
+            <button type="button" class="fleet-btn fps__btn-scan fps__scan-retry" onclick="pickupScanAgain()">
+                <i class="fa-solid fa-rotate-right"></i> Try camera again
+            </button>
+            <form onsubmit="return pickupScanManual(event)">
+                <input type="text" id="fps_scan_manual_input" class="fleet-select"
+                       placeholder="Order number…" autocomplete="off">
+                <button type="submit" class="fleet-btn fps__btn-collect fps__scan-manual-btn">
+                    <i class="fa-solid fa-box-open"></i> Confirm collected
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+
 <script>
 (function () {
     'use strict';
@@ -281,6 +370,197 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
                     });
                 });
             });
+    };
+
+    // ── Package scanner (Mine tab) ────────────────────────────────────────
+    let scanStream = null;
+    let scanning = false;
+    let scanCollected = 0;
+
+    function el(id) { return document.getElementById(id); }
+
+    function showScanStage(stage) {
+        el('fps_scan_camera').style.display = stage === 'camera' ? 'block' : 'none';
+        el('fps_scan_success').style.display = stage === 'success' ? 'block' : 'none';
+        el('fps_scan_manual').style.display = stage === 'manual' ? 'block' : 'none';
+    }
+
+    function failToManual(reason) {
+        stopScanCamera();
+        el('fps_scan_reason').textContent = reason || '';
+        showScanStage('manual');
+        el('fps_scan_manual_input').focus();
+    }
+
+    function cameraErrorText(err) {
+        const name = (err && err.name) || '';
+        if (name === 'NotAllowedError' || name === 'SecurityError') {
+            return 'Camera permission was blocked. Open the browser site settings for ezzydelivery.qa and allow Camera, then try again.';
+        }
+        if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found on this device.';
+        if (name === 'NotReadableError') return 'Camera is busy — close other apps using it and try again.';
+        return name ? ('Camera error: ' + name) : 'Camera could not be started.';
+    }
+
+    // jsQR fallback for browsers without BarcodeDetector (iOS Safari, Firefox)
+    let jsqrLoad = null;
+    function loadJsQr() {
+        if (window.jsQR) return Promise.resolve(true);
+        if (jsqrLoad) return jsqrLoad;
+        jsqrLoad = new Promise(resolve => {
+            const s = document.createElement('script');
+            s.src = "{% static 'fleet/js/jsqr.min.js' %}?v=20260727a";
+            s.onload = () => resolve(!!window.jsQR);
+            s.onerror = () => resolve(false);
+            document.head.appendChild(s);
+        });
+        return jsqrLoad;
+    }
+
+    function detectLoopNative(video) {
+        const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
+        const detect = async () => {
+            if (!scanning) return;
+            try {
+                const found = await detector.detect(video);
+                if (found.length > 0) {
+                    scanning = false;
+                    if (typeof haptic === 'function') haptic([10, 80, 10]);
+                    submitScan(found[0].rawValue);
+                    return;
+                }
+            } catch (e) { /* keep trying */ }
+            requestAnimationFrame(detect);
+        };
+        detect();
+    }
+
+    function detectLoopJsQr(video) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const tick = () => {
+            if (!scanning) return;
+            if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                try {
+                    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+                    if (code && code.data) {
+                        scanning = false;
+                        if (typeof haptic === 'function') haptic([10, 80, 10]);
+                        submitScan(code.data);
+                        return;
+                    }
+                } catch (e) { /* keep trying */ }
+            }
+            setTimeout(tick, 120);
+        };
+        tick();
+    }
+
+    async function startScanCamera() {
+        scanning = true;
+        showScanStage('camera');
+        el('fps_scan_reason').textContent = '';
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            failToManual('This browser does not allow camera access on this page.');
+            return;
+        }
+
+        try {
+            scanStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+        } catch (err) {
+            try {
+                // Some devices reject the environment/resolution hints — retry with any camera
+                scanStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            } catch (err2) {
+                failToManual(cameraErrorText(err2));
+                return;
+            }
+        }
+
+        const video = el('fps_scan_video');
+        video.srcObject = scanStream;
+        try { await video.play(); } catch (e) { /* autoplay attr covers most cases */ }
+
+        if ('BarcodeDetector' in window) {
+            detectLoopNative(video);
+            return;
+        }
+        const ok = await loadJsQr();
+        if (!scanning) return;
+        if (ok) {
+            el('fps_scan_hint').innerHTML = '<i class="fa-solid fa-qrcode me-1"></i>Align the label QR within frame';
+            detectLoopJsQr(video);
+        } else {
+            failToManual('Scanner library failed to load. Type the order number instead.');
+        }
+    }
+
+    function stopScanCamera() {
+        scanning = false;
+        if (scanStream) {
+            scanStream.getTracks().forEach(t => t.stop());
+            scanStream = null;
+        }
+    }
+
+    function submitScan(code) {
+        stopScanCamera();
+        const form = new FormData();
+        form.append('code', code);
+        form.append('csrfmiddlewaretoken', csrf());
+        fetch('{% url "fleet:pickup_scan_collect" %}', { method: 'POST', body: form })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    scanCollected += 1;
+                    if (typeof haptic === 'function') haptic([10, 50, 10]);
+                    el('fps_scan_order').textContent = res.order_number || '—';
+                    el('fps_scan_business').textContent = res.business || '—';
+                    el('fps_scan_customer').textContent = res.customer || '—';
+                    el('fps_scan_next').textContent = res.next_step || '—';
+                    el('fps_scan_remaining').textContent = res.remaining
+                        ? res.remaining + ' more pickup(s) still to collect'
+                        : 'All your pickups are collected';
+                    showScanStage('success');
+                } else {
+                    if (typeof showToast === 'function') showToast(res.error || 'Scan failed', 'danger');
+                    else alert(res.error || 'Scan failed');
+                    startScanCamera();
+                }
+            })
+            .catch(() => {
+                if (typeof showToast === 'function') showToast('Network error. Try again.', 'danger');
+                startScanCamera();
+            });
+    }
+
+    window.pickupOpenScanner = function () {
+        if (typeof haptic === 'function') haptic([10]);
+        el('fps_scan_manual_input').value = '';
+        el('fps_scan_modal').style.display = 'flex';
+        startScanCamera();
+    };
+    window.pickupScanAgain = function () {
+        el('fps_scan_manual_input').value = '';
+        startScanCamera();
+    };
+    window.pickupScanManual = function (e) {
+        e.preventDefault();
+        const val = el('fps_scan_manual_input').value.trim();
+        if (val) submitScan(val);
+        return false;
+    };
+    window.pickupCloseScanner = function () {
+        stopScanCamera();
+        el('fps_scan_modal').style.display = 'none';
+        if (scanCollected > 0) { location.href = '?tab=in_progress'; }
     };
 })();
 </script>

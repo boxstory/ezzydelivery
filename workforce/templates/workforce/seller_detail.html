@@ -29,14 +29,12 @@
                     <span>since {{ business.business_since|date:"M Y" }}</span>
                     {% endif %}
                 </div>
+                {# Standing moved to the stamp block; this line is now just the service flags #}
+                {% if business.fulfillment_service_enabled %}
                 <div class="sld__rec-line sld__rec-line--status">
-                    <span class="sld__rec-status sld__rec-status--{% if business.business_status == 'active' %}active{% elif business.business_status == 'pending' %}pending{% elif business.business_status == 'suspended' %}suspended{% else %}inactive{% endif %}">
-                        <span class="sld__rec-status-dot"></span>{{ business.business_status|default:"unknown"|title }}
-                    </span>
-                    {% if business.fulfillment_service_enabled %}
                     <span class="sld__rec-flag"><i class="fa-solid fa-warehouse"></i> Fulfillment</span>
-                    {% endif %}
                 </div>
+                {% endif %}
                 <div class="sld__rec-contacts">
                     {% if business.business_phone %}
                     <a href="tel:{{ business.business_phone }}" class="sld__rec-contact"><i class="fa-solid fa-phone"></i> {{ business.business_phone }}</a>
@@ -47,8 +45,40 @@
                 </div>
             </div>
 
-            <!-- Verification stamp (the signature) -->
+            <!-- Stamps (the signature): account standing beside the verification mark -->
             <div class="sld__stamp-wrap" aria-hidden="true">
+                {% if business.business_status == 'active' %}
+                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-active">
+                    <i class="fa-solid fa-store sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Active</span>
+                    <span class="sld__stamp-sub">account standing</span>
+                </div>
+                {% elif business.business_status == 'suspended' %}
+                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-suspended">
+                    <i class="fa-solid fa-ban sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Suspended</span>
+                    <span class="sld__stamp-sub">account standing</span>
+                </div>
+                {% elif business.business_status == 'pending' %}
+                {# "Awaiting", not "Pending": the verification stamp beside it is already a gold PENDING #}
+                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-pending">
+                    <i class="fa-solid fa-clock sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Awaiting</span>
+                    <span class="sld__stamp-sub">account approval</span>
+                </div>
+                {% elif business.business_status == 'inactive' %}
+                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-inactive">
+                    <i class="fa-solid fa-store-slash sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Inactive</span>
+                    <span class="sld__stamp-sub">account standing</span>
+                </div>
+                {% else %}
+                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-unknown">
+                    <i class="fa-regular fa-circle-question sld__stamp-icon"></i>
+                    <span class="sld__stamp-text">Unknown</span>
+                    <span class="sld__stamp-sub">no standing set</span>
+                </div>
+                {% endif %}
                 {% if business.profile.verification_status == 'verified' %}
                 <div class="sld__stamp sld__stamp--verified">
                     <i class="fa-solid fa-certificate sld__stamp-icon"></i>

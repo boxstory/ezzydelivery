@@ -53,7 +53,7 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 # Permissions Policy (formerly Feature-Policy)
 PERMISSIONS_POLICY = {
     'geolocation': ['self'],
-    'camera': [],
+    'camera': ['self'],
     'microphone': [],
     'payment': ['self'],
 }
@@ -183,6 +183,8 @@ ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_FORMS = {
     'signup': 'core.forms.CustomSignupForm',
 }
+# Prefill username from the e-mail local part on social (Google/Facebook) signup
+SOCIALACCOUNT_ADAPTER = 'core.adapters.SocialAccountAdapter'
 
 # Session Configuration - Auto logout after 1 day of inactivity
 SESSION_COOKIE_AGE = 86400  # 1 day in seconds (86400 seconds = 24 hours)
@@ -267,6 +269,8 @@ TEMPLATES = [
                 'core.context_processors.dl_task_status_choices',
                 # Google One Tap: exposes client_id to public templates
                 'core.context_processors.google_one_tap',
+                # Keeps the shared pagination component's page size sticky
+                'core.context_processors.pagination_defaults',
             ],
         },
     },
@@ -835,6 +839,17 @@ try:
 except Exception:
     GLM_API_KEY = ''
 
+# Shared 9Router AI gateway (OpenAI-compatible). AI_BASE_URL includes the /v1
+# path, e.g. https://docker.yellowkey.qa/v1 — models list from {base}/models.
+try:
+    AI_BASE_URL = config('AI_BASE_URL') or ''
+except Exception:
+    AI_BASE_URL = ''
+try:
+    AI_API_KEY = config('AI_API_KEY') or ''
+except Exception:
+    AI_API_KEY = ''
+
 # Provider selection per use-case
 AI_CHAT_PROVIDER          = config('AI_CHAT_PROVIDER', default='anthropic')
 AI_CHAT_MODEL             = config('AI_CHAT_MODEL',    default='claude-sonnet-4-6')
@@ -878,6 +893,13 @@ AI_AGENT_WHATSAPP_ENABLED = config('AI_AGENT_WHATSAPP_ENABLED', default=True, ca
 N8N_AI_AGENT_WEBHOOK_URL = config('N8N_AI_AGENT_WEBHOOK_URL', default='')
 N8N_WHATSAPP_WEBHOOK_URL = config('N8N_WHATSAPP_WEBHOOK_URL', default='')
 N8N_WEBHOOK_SECRET_KEY = config('N8N_WEBHOOK_SECRET_KEY', default='')
+
+# Shared service token external clients (n8n, etc.) send to call the AI agent
+# conversation API (header: X-AIAgent-Token or Authorization: Bearer <token>).
+# Empty = API disabled.
+AIAGENT_API_TOKEN = config('AIAGENT_API_TOKEN', default='')
+# Requests/minute per token for the AI agent conversation API
+AIAGENT_API_RATE_LIMIT = config('AIAGENT_API_RATE_LIMIT', default='120/min')
 
 # Evolution API (WhatsApp)
 EVOLUTION_URL = config('EVOLUTION_URL', default='')

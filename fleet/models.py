@@ -243,6 +243,29 @@ class Driver(models.Model):
         return f"Driver {self.driver_code or self.driver_id}"
 
     @property
+    def driver_name(self):
+        """Human-readable driver name for display, alerts and receipts.
+
+        Six call sites already read `driver.driver_name` (the COD settlement
+        action, its auto-flow context, the CSV export, the availability alert,
+        and two API responses) and several templates render it. It never
+        existed, so the Python callers raised AttributeError the moment they
+        ran and the templates rendered blank.
+
+        The Profile holds the name staff maintain, so it wins; the auth user is
+        the fallback, then the code, then the id — always a non-empty string.
+        """
+        if self.profile:
+            name = f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+            if name:
+                return name
+        if self.user:
+            name = (self.user.get_full_name() or '').strip() or self.user.username
+            if name:
+                return name
+        return self.driver_code or f"Driver {self.driver_id}"
+
+    @property
     def available_wallet(self):
         """Calculate available wallet as wallet limit minus COD in hand"""
         return self.credit_limit - self.cod_in_hand
@@ -422,9 +445,16 @@ class DriverTransaction(models.Model):
         ('deduction', 'Deduction'),
         ('bonus', 'Bonus/Incentive'),
         ('adjustment', 'Manual Adjustment'),
-        # Legacy (kept for backward compatibility with existing data)
+        # Written by WalletService.submit_cod_to_admin — despite the "legacy"
+        # label this is the type every real hand-in carries. Always match a
+        # submission with COD_SUBMISSION_TYPES, never a single literal.
         ('cod_deposit', 'COD Deposit to Admin'),
     ]
+
+    # A driver hand-in is recorded under either of these. Anything that looks up
+    # a submission must accept both: filtering on 'cod_driver_settle' alone
+    # silently matches nothing, because the writer only ever emits 'cod_deposit'.
+    COD_SUBMISSION_TYPES = ['cod_driver_settle', 'cod_deposit']
 
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
@@ -520,6 +550,19 @@ class DriverTransaction(models.Model):
 
     def __str__(self):
         return f"{self.transaction_code or self.pk} - {self.get_transaction_type_display()} - {self.amount} QR"
+
+    @property
+    def cod_after_total(self):
+        """Total COD balance across all methods after this transaction.
+
+        Templates must use this rather than chaining the `add` filter: `add`
+        coerces with int(), so 100.60|add:50.60 renders 150, not 151.20.
+        """
+        return (
+            (self.cod_cash_after or 0) + (self.cod_fawran_after or 0)
+            + (self.cod_pos_after or 0) + (self.cod_bank_after or 0)
+            + (self.cod_atm_after or 0)
+        )
 
     def save(self, *args, **kwargs):
         if not self.transaction_code:
@@ -931,4 +974,56 @@ class DriverActivityLog(models.Model):
         indexes = [
             models.Index(fields=['driver', '-created_at']),
             models.Index(fields=['activity_type', '-created_at']),
+        ]
+
+
+class BusinessPayoutDeduction(models.Model):
+    """
+    One itemised line taken off a Leg-3 business COD payout — the delivery
+    charge recovered out of the COD, plus anything else billed at payout time
+    (fulfilment, cargo handling, ad-hoc charges).
+
+    The payout invoice is built from these rows, and a reversal unwinds the
+    exact charges it booked by following ``charge_txn`` instead of guessing at
+    them from the reference number.
+    """
+
+    # Each kind books its revenue row under the matching DriverTransaction type,
+    # so the finance ledger keeps its existing groupings.
+    KIND_CHOICES = [
+        ('delivery_charge', 'Delivery Charge'),
+        ('fulfillment_charge', 'Fulfillment Charge'),
+        ('inventory_handling', 'Cargo / Handling Charge'),
+        ('other_charge', 'Other Charge'),
+    ]
+
+    settle_txn = models.ForeignKey(
+        'DriverTransaction', on_delete=models.CASCADE,
+        related_name='payout_deductions',
+        help_text="The cod_client_settle transaction this line was deducted from"
+    )
+    charge_txn = models.ForeignKey(
+        'DriverTransaction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='deduction_line',
+        help_text="Revenue transaction booked for this line"
+    )
+    kind = models.CharField(max_length=30, choices=KIND_CHOICES, default='other_charge')
+    label = models.CharField(max_length=120)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='payout_deductions_created'
+    )
+
+    def __str__(self):
+        return f"{self.label} - {self.amount} QR"
+
+    class Meta:
+        verbose_name = "Business Payout Deduction"
+        verbose_name_plural = "Business Payout Deductions"
+        ordering = ['id']
+        indexes = [
+            models.Index(fields=['settle_txn']),
         ]

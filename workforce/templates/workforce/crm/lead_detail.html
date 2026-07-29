@@ -6,7 +6,7 @@
 {# Notes: crmd__ namespace; writes go through fetch-POST JSON endpoints via crm_lead_detail.js. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718e" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260724b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -232,6 +232,52 @@
 
     <!-- RIGHT: manage + timeline -->
     <div class="crmd__right">
+
+      {% if lead.category == 'driver' %}
+      <!-- DRIVER APPLICATION (source of truth the pipeline stage mirrors) -->
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-motorcycle"></i><h3>Driver Application</h3></div>
+        <div class="crm__panel-body">
+          {% if driver %}
+          <p class="crmd__appnote">Pipeline stage mirrors this application. Moving it to <strong>Under Review</strong>, <strong>Approved</strong> or <strong>Rejected</strong> updates the driver and notifies them on WhatsApp.</p>
+          <div class="crmd__timeline">
+            <div class="crmd__tl-step crmd__tl-step--done">
+              <span class="crmd__tl-dot"></span>
+              <span class="crmd__tl-label">Registered</span>
+              <span class="crmd__tl-date">{{ driver.profile.created_at|date:"d M Y" }}</span>
+            </div>
+            <div class="crmd__tl-step {% if driver.profile.verification_applied_at %}crmd__tl-step--done{% endif %}">
+              <span class="crmd__tl-dot"></span>
+              <span class="crmd__tl-label">Applied</span>
+              <span class="crmd__tl-date">{% if driver.profile.verification_applied_at %}{{ driver.profile.verification_applied_at|date:"d M Y" }}{% else %}Not yet applied{% endif %}</span>
+            </div>
+            <div class="crmd__tl-step {% if driver.profile.verified_at %}crmd__tl-step--done{% endif %}">
+              <span class="crmd__tl-dot"></span>
+              <span class="crmd__tl-label">Verified</span>
+              <span class="crmd__tl-date">{% if driver.profile.verified_at %}{{ driver.profile.verified_at|date:"d M Y" }}{% else %}{{ driver.profile.get_verification_status_display }}{% endif %}</span>
+            </div>
+          </div>
+          {% if driver_sections %}
+          <div class="crmd__section-lbl mt-3">Application form</div>
+          <div class="crmd__appsecs">
+            {% for sec in driver_sections %}
+            <span class="crmd__appsec {% if sec.done %}is-done{% else %}is-todo{% endif %}">
+              <i class="fa-solid {% if sec.done %}fa-circle-check{% else %}fa-circle-xmark{% endif %}"></i>
+              <span class="crmd__appsec-label">{{ sec.label }}</span>
+              <span class="crmd__appsec-detail">{{ sec.detail }}</span>
+            </span>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <a class="crm__btn w-100 mt-3" href="{% url 'workforce:driver_detail' driver.driver_id %}">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open driver profile
+          </a>
+          {% else %}
+          <p class="crmd__appnote">No matching driver application for this number yet. The card stays in <strong>New Application</strong> and will start moving automatically once they apply with this phone.</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
 
       <!-- MANAGE PANEL -->
       <div class="crm__panel">

@@ -51,6 +51,24 @@
     var sourceBody = card.parentElement;
     if (sourceBody === body) return;
 
+    var cfg = window.CRMB_CONFIG || {};
+
+    // On the driver board, decision columns write back to the real applicant
+    // (approve / reject / mark under review + WhatsApp). Confirm before moving,
+    // and collect a reason when rejecting.
+    var DECISION = { won: 'approve this driver', lost: 'reject this driver', negotiating: 'mark this driver under review' };
+    var rejectionReason = '';
+    if (cfg.driverBoard && DECISION[newStage]) {
+      var name = (card.querySelector('.crmb__card-name') || {}).textContent || 'this lead';
+      if (newStage === 'lost') {
+        var reason = prompt('Reject ' + name.trim() + '? This updates their application and notifies them on WhatsApp.\n\nRejection reason (optional):', '');
+        if (reason === null) return;   // cancelled
+        rejectionReason = reason;
+      } else if (!confirm('This will ' + DECISION[newStage] + ' (' + name.trim() + ') and update their real application status. Continue?')) {
+        return;
+      }
+    }
+
     // Optimistic move; revert if the server rejects it
     var emptyHint = body.querySelector('.crmb__col-empty');
     if (emptyHint) emptyHint.remove();
@@ -59,7 +77,8 @@
 
     var fd = new FormData();
     fd.append('stage', newStage);
-    fd.append('csrfmiddlewaretoken', (window.CRMB_CONFIG || {}).csrfToken || '');
+    fd.append('rejection_reason', rejectionReason);
+    fd.append('csrfmiddlewaretoken', cfg.csrfToken || '');
 
     fetch(card.getAttribute('data-stage-url'), { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })

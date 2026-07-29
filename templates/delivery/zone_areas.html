@@ -4,7 +4,7 @@
 {% block title %}Zone Areas{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260728g">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 {% endblock extra_css %}
 
@@ -142,35 +142,8 @@
     {% endif %}
   </div>
 
-  <!-- Pagination -->
-  {% if areas.has_other_pages %}
-    <div class="zna__pager">
-      <div class="zna__pager-info">
-        Showing {{ areas.start_index }}-{{ areas.end_index }} of {{ areas.paginator.count }} areas
-      </div>
-      <div class="zna__pager-links">
-        {% if areas.has_previous %}
-          <a href="?page={{ areas.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-left"></i>
-          </a>
-        {% endif %}
-
-        {% for num in areas.paginator.page_range %}
-          {% if areas.number == num %}
-            <span class="zna__pager--active">{{ num }}</span>
-          {% elif num > areas.number|add:'-3' and num < areas.number|add:'3' %}
-            <a href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">{{ num }}</a>
-          {% endif %}
-        {% endfor %}
-
-        {% if areas.has_next %}
-          <a href="?page={{ areas.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-right"></i>
-          </a>
-        {% endif %}
-      </div>
-    </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries search / zone -->
+  {% include "includes/components/_pagination.html" with page_obj=areas filter_params=filter_params per_page=per_page pagination_id="delivery_zone_areas" %}
 </div>
 <!-- Edit Pin Modal -->
 <div id="zna-pin-modal" class="zna__pin-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="zna-pin-modal-title">

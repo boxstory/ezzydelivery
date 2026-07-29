@@ -291,7 +291,9 @@
   gap: 0.9rem;
   padding: 1.1rem 1.5rem 1.4rem;
   overflow-x: auto;
-  align-items: flex-start;
+  align-items: stretch;
+  /* Fill down to the bottom of the viewport so lanes run full-height */
+  min-height: calc(100vh - 210px);
   background: var(--brand-white);
   scrollbar-width: thin;
 }
@@ -304,6 +306,8 @@
   background: var(--crm-well);
   border: 1px solid var(--crm-line);
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
 }
 /* Chevron connector in the gap between flowing stages */
 .crmb__column::before {
@@ -367,8 +371,8 @@
 }
 .crmb__col-late + .crmb__col-count { margin-left: 0; }
 .crmb__col-body {
+  flex: 1 1 auto;
   min-height: 5rem;
-  max-height: max(14rem, calc(100vh - 340px));
   overflow-y: auto;
   padding: 0.55rem;
   display: flex;
@@ -409,9 +413,10 @@
   .crmb__card:hover { transform: none; }
 }
 @media (max-width: 575px) {
-  .crmb__lanes { gap: 0.7rem; padding: 0.8rem 0.9rem 1.1rem; scroll-snap-type: x proximity; }
+  .crmb__lanes { gap: 0.7rem; padding: 0.8rem 0.9rem 1.1rem; scroll-snap-type: x proximity; min-height: 0; }
   .crmb__column { flex-basis: 82vw; width: 82vw; scroll-snap-align: start; }
   .crmb__column::before { content: none; }
+  .crmb__col-body { max-height: 70vh; }
 }
 .crmb__card--overdue { border-left: 3px solid var(--crm-alert); }
 .crmb__card-top { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
@@ -793,3 +798,68 @@
 @media (max-width: 991px) { .crmr__charts, .crmr__tables { grid-template-columns: 1fr; } }
 .crmr__tables { padding-top: 0; }
 .crmr__chart { min-height: 300px; }
+
+/* ── Board category tabs (Business / Drivers) ── */
+.crm__board-tabs {
+    display: inline-flex;
+    margin-top: 0.5rem;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    overflow: hidden;
+}
+.crm__board-tab {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    font-size: 0.75rem; font-weight: 600;
+    color: var(--brand-grey-600);
+    text-decoration: none;
+    background: #fff;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.crm__board-tab + .crm__board-tab { border-left: 1px solid var(--brand-grey-200); }
+.crm__board-tab:hover { background: var(--brand-grey-100); color: var(--brand-grey-800); }
+.crm__board-tab--active,
+.crm__board-tab--active:hover { background: var(--brand-navy); color: #fff; }
+.crm__board-tab i { font-size: 0.7rem; }
+
+/* ── Driver Application panel on the lead detail (timeline + form sections) ── */
+.crmd__appnote {
+  font-size: 0.72rem;
+  color: var(--crm-ink-2);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--crm-line);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  margin: 0 0 0.75rem;
+}
+.crmd__timeline { display: flex; flex-direction: column; gap: 0; }
+.crmd__tl-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+}
+.crmd__tl-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 0.44rem; top: 1.1rem; bottom: -0.2rem;
+  width: 2px; background: var(--crm-line-2);
+}
+.crmd__tl-dot {
+  width: 0.7rem; height: 0.7rem; border-radius: 50%;
+  background: #fff; border: 2px solid var(--crm-line-2); z-index: 1;
+}
+.crmd__tl-step--done .crmd__tl-dot { background: #15803d; border-color: #15803d; }
+.crmd__tl-label { font-size: 0.75rem; font-weight: 600; color: var(--crm-ink); }
+.crmd__tl-date { font-size: 0.72rem; color: var(--crm-muted); font-variant-numeric: tabular-nums; }
+.crmd__appsecs { display: flex; flex-direction: column; gap: 0.35rem; }
+.crmd__appsec {
+  display: flex; align-items: baseline; gap: 0.4rem;
+  font-size: 0.74rem; font-weight: 600; color: var(--crm-ink);
+}
+.crmd__appsec i { font-size: 0.72rem; align-self: center; }
+.crmd__appsec.is-done i { color: #15803d; }
+.crmd__appsec.is-todo i { color: #b91c1c; }
+.crmd__appsec-detail { font-weight: 400; color: var(--crm-muted); }

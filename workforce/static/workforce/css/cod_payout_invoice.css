@@ -1,0 +1,280 @@
+/* Purpose: Printable payout invoice sheet — business COD payout and driver payout */
+/* Used by: workforce/templates/workforce/cod_business_payout_invoice.html, driver_payout_invoice.html */
+/* Notes: Same teller tokens as cod_business_settlement.css. Print rules strip the
+   dashboard chrome so the sheet prints alone. Money is tabular mono throughout. */
+
+.bpi {
+  --tlr-ink: #16221D;
+  --tlr-paper: #EEF1EA;
+  --tlr-card: #FBFCF9;
+  --tlr-rule: #D5DACE;
+  --tlr-rule-strong: #B9C0B1;
+  --tlr-brass: #B0832F;
+  --tlr-brass-deep: #8A6526;
+  --tlr-void: #9E3B2B;
+  --tlr-muted: #6B7468;
+  --tlr-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --tlr-cond: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --tlr-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  background: var(--tlr-paper);
+  color: var(--tlr-ink);
+  font-family: var(--tlr-sans);
+  min-height: 100vh;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.bpi__toolbar { max-width: 900px; margin: 0 auto 1rem; }
+
+.bpi__ghost {
+  font-family: var(--tlr-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-ink);
+  background: transparent;
+  border: 1px solid var(--tlr-rule-strong);
+  padding: 0.4rem 0.85rem;
+  text-decoration: none;
+}
+.bpi__ghost:hover { background: var(--tlr-card); color: var(--tlr-brass-deep); }
+
+/* ── The sheet ────────────────────────────────────────────── */
+.bpi__sheet {
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule);
+  padding: 2rem 2.25rem 1.5rem;
+}
+
+.bpi__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.5rem;
+  border-bottom: 2px solid var(--tlr-ink);
+  padding-bottom: 1.1rem;
+}
+.bpi__head-left { min-width: 0; }
+.bpi__head-right { margin-left: auto; }
+.bpi__eyebrow {
+  font-family: var(--tlr-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tlr-brass-deep);
+  margin: 0;
+}
+.bpi__biz {
+  font-family: var(--tlr-cond);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 3.5vw, 2.25rem);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  margin: 0.3rem 0 0;
+}
+.bpi__biz-code,
+.bpi__driver-code {
+  font-family: var(--tlr-mono);
+  font-size: 0.78rem;
+  color: var(--tlr-muted);
+  margin: 0.2rem 0 0;
+}
+
+.bpi__meta { margin: 0; font-family: var(--tlr-mono); font-size: 0.78rem; }
+.bpi__meta-row { display: flex; gap: 0.75rem; justify-content: flex-end; }
+.bpi__meta-row dt { color: var(--tlr-muted); font-weight: 400; min-width: 5.5rem; text-align: right; }
+.bpi__meta-row dd { margin: 0; font-variant-numeric: tabular-nums; }
+.bpi__meta-code { color: var(--tlr-brass-deep); font-weight: 600; }
+
+.bpi__void-stamp {
+  font-family: var(--tlr-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tlr-void);
+  border: 1px solid var(--tlr-void);
+  padding: 0.45rem 0.75rem;
+  margin: 1rem 0 0;
+}
+.bpi__void-reason {
+  display: block;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--tlr-muted);
+  margin-top: 0.2rem;
+}
+
+/* ── Line table ───────────────────────────────────────────── */
+.bpi__table-wrap { overflow-x: auto; margin-top: 1.25rem; }
+.bpi__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+.bpi__table thead th {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  font-weight: 500;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--tlr-rule-strong);
+  white-space: nowrap;
+}
+.bpi__table tbody td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  vertical-align: top;
+}
+.bpi__num { text-align: right; font-family: var(--tlr-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bpi__num--fee { color: var(--tlr-muted); }
+.bpi__num--cod { font-weight: 600; }
+.bpi__col-idx { width: 2.5rem; color: var(--tlr-muted); font-family: var(--tlr-mono); }
+.bpi__order { font-family: var(--tlr-mono); font-weight: 600; white-space: nowrap; }
+.bpi__date { font-family: var(--tlr-mono); color: var(--tlr-muted); white-space: nowrap; }
+.bpi__empty { text-align: center; color: var(--tlr-muted); padding: 1.5rem 0; }
+
+.bpi__totals-row td {
+  border-top: 2px solid var(--tlr-ink);
+  border-bottom: none;
+  padding-top: 0.6rem;
+  font-family: var(--tlr-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+}
+.bpi__totals-row .bpi__num { font-size: 0.9rem; letter-spacing: 0; }
+
+/* ── Summary ladder ───────────────────────────────────────── */
+.bpi__summary {
+  margin: 1.5rem 0 0 auto;
+  max-width: 26rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.86rem;
+}
+/* The payout IS a subtraction, so the ladder is hung off one rail: gross at the
+   top, each charge stepping down it, net cutting across the bottom. */
+.bpi__summary-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.4rem 0 0.4rem 0.9rem;
+  border-left: 1px solid var(--tlr-rule-strong);
+}
+.bpi__summary-val { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bpi__summary-line--deduct { color: var(--tlr-muted); }
+.bpi__summary-line:first-child {
+  font-weight: 600;
+  border-left-color: var(--tlr-ink);
+}
+.bpi__kind {
+  display: block;
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-brass-deep);
+}
+.bpi__summary-line--sub { color: var(--tlr-ink); }
+.bpi__summary-line--net {
+  border-left: none;
+  border-top: 2px solid var(--tlr-ink);
+  margin-top: 0.35rem;
+  padding: 0.7rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.bpi__summary-line--net .bpi__summary-val { color: var(--tlr-brass-deep); }
+
+/* ── Signatures ───────────────────────────────────────────── */
+.bpi__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  margin-top: 3rem;
+  padding-top: 0.5rem;
+}
+.bpi__sign { flex: 1 1 12rem; }
+.bpi__sign-rule { display: block; border-top: 1px solid var(--tlr-rule-strong); }
+.bpi__sign-label {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  margin-top: 0.35rem;
+}
+
+/* ── Print ────────────────────────────────────────────────── */
+/* A4 portrait, dashboard chrome stripped, the sheet alone on the page. The base
+   template wraps the invoice in flex/overflow containers, so those are unwound
+   here — otherwise the ledger clips at the right edge on paper. */
+@page { size: A4 portrait; margin: 12mm; }
+
+@media print {
+  html, body { background: #fff !important; }
+  body { display: block !important; min-height: 0 !important; }
+
+  /* Dashboard chrome */
+  .site-nav,
+  .navbar,
+  .dashboard-sidebar,
+  #workforce_sidebar_main,
+  .wsm__sidebar-wrapper,
+  #htmx-loading-indicator,
+  .toast-container,
+  .modal,
+  .modal-backdrop,
+  .messages,
+  .bpi__toolbar { display: none !important; }
+
+  /* Unwind the base template's flex + overflow wrappers */
+  main,
+  main > div,
+  #main-content {
+    display: block !important;
+    overflow: visible !important;
+    max-width: none !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .bpi {
+    background: #fff;
+    padding: 0;
+    min-height: auto;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .bpi__sheet { border: none; max-width: none; padding: 0; background: #fff; }
+
+  .bpi__table-wrap { overflow: visible !important; margin-top: 1rem; }
+  .bpi__table { font-size: 0.72rem; width: 100% !important; }
+  .bpi__table thead { display: table-header-group; }
+  .bpi__table tfoot { display: table-footer-group; }
+  .bpi__table tr { break-inside: avoid; page-break-inside: avoid; }
+  .bpi__table td { word-break: break-word; }
+  .bpi__num,
+  .bpi__order,
+  .bpi__date { white-space: normal; }
+
+  .bpi__head,
+  .bpi__summary,
+  .bpi__foot { break-inside: avoid; page-break-inside: avoid; }
+  .bpi__summary { margin-top: 1.25rem; }
+  .bpi__foot { margin-top: 2.5rem; }
+}
+
+@media (max-width: 575.98px) {
+  .bpi { padding: 1rem 0.75rem 2rem; }
+  .bpi__sheet { padding: 1.25rem 1rem; }
+  .bpi__meta-row { justify-content: flex-start; }
+  .bpi__summary { max-width: none; }
+}

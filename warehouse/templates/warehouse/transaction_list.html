@@ -72,14 +72,13 @@
           <tr>
             <th class="wh__th">Date & Time</th>
             <th class="wh__th">Transaction #</th>
-            <th class="wh__th">Product</th>
-            <th class="wh__th">Warehouse</th>
+            <th class="wh__th wh__th--w15">Product</th>
+            <th class="wh__th wh__th--w15">Warehouse</th>
             <th class="wh__th">Type</th>
             <th class="wh__th wh__th--center">Quantity</th>
             <th class="wh__th wh__th--center">Before</th>
             <th class="wh__th wh__th--center">After</th>
             <th class="wh__th">Notes</th>
-            <th class="wh__th">Created By</th>
           </tr>
         </thead>
         <tbody>
@@ -89,9 +88,16 @@
               <span class="wh__product-name">{{ txn.created_at|date:"d M Y" }}</span>
               <div class="wh__meta">{{ txn.created_at|time:"H:i" }}</div>
             </td>
-            <td class="wh__td"><code class="wh__code">{{ txn.transaction_number|truncatechars:15 }}</code></td>
             <td class="wh__td">
-              <span class="wh__product-name">{{ txn.product.item_name|truncatechars:30 }}</span>
+              <code class="wh__code wh__code--nowrap">{{ txn.transaction_number }}</code>
+              {% if txn.reference_id %}
+              <div class="wh__meta">
+                {% if txn.reference_type == 'order' %}Order: {% endif %}{{ txn.reference_id }}
+              </div>
+              {% endif %}
+            </td>
+            <td class="wh__td">
+              <span class="wh__product-name wh__product-name--clamp2" title="{{ txn.product.item_name }}">{{ txn.product.item_name|truncatechars:80 }}</span>
               <div class="wh__meta">SKU: {{ txn.product.item_sku|default:"-" }}</div>
             </td>
             <td class="wh__td">
@@ -120,17 +126,7 @@
             <td class="wh__td wh__td--center"><strong>{{ txn.quantity_after|default:"-" }}</strong></td>
             <td class="wh__td">
               {% if txn.notes %}
-              <span class="wh__muted" title="{{ txn.notes }}">{{ txn.notes|truncatechars:40 }}</span>
-              {% else %}
-              <span class="wh__muted">-</span>
-              {% endif %}
-            </td>
-            <td class="wh__td">
-              {% if txn.created_by %}
-              <div class="d-flex align-items-center gap-2">
-                <div class="wh__avatar"><i class="fas fa-user"></i></div>
-                <span>{{ txn.created_by.username }}</span>
-              </div>
+              <span class="wh__muted wh__clamp3" title="{{ txn.notes }}">{{ txn.notes|truncatechars:160 }}</span>
               {% else %}
               <span class="wh__muted">-</span>
               {% endif %}
@@ -138,7 +134,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="10" class="wh__empty">
+            <td colspan="9" class="wh__empty">
               <i class="fas fa-exchange-alt"></i>
               <p>No transactions found</p>
               <p class="wh__meta">Transactions will appear here as you receive or move inventory</p>

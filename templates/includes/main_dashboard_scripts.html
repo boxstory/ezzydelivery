@@ -118,6 +118,115 @@
     }
   });
 
+  // ─── Searchable filter selects (staff + business dashboards) ───
+  // Filter bars pick from long lists — 130 drivers, 100+ businesses, a full
+  // status vocabulary — and scanning a native dropdown for one entry is
+  // unworkable. Every filter select becomes a Select2 so the whole bar reads
+  // the same and the long ones gain a search box. Done here rather than
+  // per-template so a new filter bar gets it for free and the behaviour
+  // cannot drift between pages.
+  (function () {
+    // Search appears only once a list is long enough to need it. Below this,
+    // Select2 renders the same box with no search field — consistent styling
+    // without a pointless search box over four options.
+    var SEARCH_FROM = 8;
+
+    // Gated on the body marker rather than the URL: order, product and
+    // delivery pages render inside the business base from their own apps, so
+    // a path test would miss them. The fleet base carries no marker on
+    // purpose — it is the driver phone PWA, where a desktop picker with a
+    // dropdown search does not belong.
+    function dashboardAllows() {
+      var kind = document.body && document.body.dataset
+        ? document.body.dataset.dashboard : '';
+      return kind === 'staff' || kind === 'business';
+    }
+
+    function enhanceFilterSelects(root) {
+      if (typeof jQuery === 'undefined' || !jQuery.fn || !jQuery.fn.select2) return;
+      if (!root || !dashboardAllows()) return;
+
+      jQuery(root).find('select').each(function () {
+        var el = this;
+        var $el = jQuery(el);
+
+        if (el.multiple) return;
+        if ($el.data('select2')) return;              // already enhanced
+        if ($el.is('[data-no-select2]')) return;      // explicit opt-out
+        // The pagination component's rows-per-page control is part of the
+        // pager, not the filter bar — leave it as the native control.
+        if (el.id && el.id.indexOf('pagination-per-page-select') === 0) return;
+        if ($el.closest('.pgn').length) return;
+
+        // Filter bars are the default target. Inside a posting form the only
+        // controls opted in are the driver pickers — the fleet is 130+ names,
+        // so those are unusable without a search — and only when optional:
+        // Select2 hides the real <select>, and a `required` field then fails
+        // HTML5 validation with "not focusable" because the browser cannot
+        // focus a hidden control.
+        var form = el.form;
+        if (form && (form.method || 'get').toLowerCase() !== 'get') {
+          var isDriverPicker = /driver/i.test(el.name || '') || /driver/i.test(el.id || '');
+          if (!isDriverPicker || el.required) return;
+        }
+
+        // A Select2 inside a Bootstrap modal must render its dropdown inside
+        // that modal. Left on <body> the dropdown sits outside the modal's
+        // focus trap, so Bootstrap pulls focus straight back to the dialog and
+        // the search box cannot be typed into at all — the control looks alive
+        // and silently refuses every keystroke.
+        var $modal = $el.closest('.modal');
+
+        $el.select2({
+          width: '100%',
+          minimumResultsForSearch: SEARCH_FROM,
+          placeholder: $el.data('placeholder') || undefined,
+          dropdownParent: $modal.length ? $modal : undefined
+        });
+
+        // Classes are applied by hand: `containerCssClass` is a Select2
+        // 3.x/4.0 option that 4.1 silently ignores, so the styling hook never
+        // landed and pickers rendered at Select2's default size.
+        var inst = $el.data('select2');
+        if (inst && inst.$container) inst.$container.addClass('ez-filter-select');
+        if (inst && inst.$dropdown) inst.$dropdown.addClass('ez-filter-select__menu');
+
+        // A dialog that opts in with `picker-modal__body` reserves room for the
+        // open list only while it is open, so a closed one stays compact.
+        var $pickerBody = $el.closest('.picker-modal__body');
+        if ($pickerBody.length) {
+          $el.on('select2:open', function () { $pickerBody.addClass('picker-modal__body--open'); });
+          $el.on('select2:close', function () { $pickerBody.removeClass('picker-modal__body--open'); });
+        }
+
+        // Bridge Select2 -> native change. Select2 announces a pick with
+        // jQuery's .trigger('change'), which only runs jQuery-bound handlers;
+        // it never dispatches a real DOM event. HTMX (hx-get on the select)
+        // and inline onchange="this.form.submit()" both listen natively, so
+        // without this the control looks like it works — the value updates —
+        // while the filter never actually runs.
+        $el.on('select2:select select2:clear', function () {
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      enhanceFilterSelects(document);
+    });
+    // HTMX swaps replace whole filter bars, which drops the Select2 instance.
+    document.body.addEventListener('htmx:afterSwap', function (evt) {
+      enhanceFilterSelects(evt.detail.target);
+    });
+    // Several driver pickers are built after page load — a modal injected via
+    // innerHTML, or a list fetched over AJAX once the dialog opens. Enhancing
+    // again as each modal is shown catches those; already-enhanced selects are
+    // skipped by the guard above.
+    document.addEventListener('shown.bs.modal', function (evt) {
+      enhanceFilterSelects(evt.target);
+    }, true);
+  })();
+
   // ─── Auto-enhance sidebar links with HTMX ───
   // Catches clicks on any sidebar link (desktop or mobile) that doesn't
   // already have hx-get, and loads content via htmx.ajax().
@@ -476,9 +585,11 @@
       }
 
       // STEP 3: Open ONLY the correct dropdown
+      var opened = false;
       if (targetDropdownId) {
         var targetDropdown = document.getElementById(targetDropdownId);
         if (targetDropdown) {
+          opened = true;
           targetDropdown.classList.add('show');
 
           var toggle = document.querySelector('[data-bs-target="#' + targetDropdownId + '"]');
@@ -513,6 +624,50 @@
               }
             }
           });
+        }
+      }
+
+      // STEP 4b: Generic fallback — the URL matched a dropdown ID above, but that
+      // element doesn't exist in this sidebar (e.g. the Warehouse dashboard uses
+      // wh-sub-ops / wh-sub-inventory / wh-sub-setup IDs, not submenu-*). Open
+      // whichever submenu contains the link that best matches the current path.
+      if (targetDropdownId && !opened) {
+        // Some warehouse pages have no sidebar link of their own but belong under
+        // a submenu (e.g. staff product-edit is reached from Inventory). Alias
+        // those paths to a sidebar link's path so they open the right submenu.
+        var matchPath = currentPath;
+        if (/\/warehouse\/products\/[^/]+\/edit\/?$/.test(currentPath)) {
+          matchPath = '/workforce/warehouse/inventory/';
+        }
+        var bestLink = null, bestLen = -1;
+        document.querySelectorAll('.dashboard-sidebar .multi-level a[href], .dashboard-sidebar .submenu a[href]').forEach(function(link) {
+          var href = link.getAttribute('href');
+          if (!href || href === '#') return;
+          var hrefPath = href.split('?')[0];
+          if (hrefPath.length < 2) return;
+          var hrefPrefix = hrefPath.replace(/\/?$/, '/');
+          if (matchPath === hrefPath || matchPath.startsWith(hrefPrefix)) {
+            if (hrefPath.length > bestLen) { bestLen = hrefPath.length; bestLink = link; }
+          }
+        });
+        if (bestLink) {
+          var fbSubmenu = bestLink.closest('.multi-level, .submenu');
+          if (fbSubmenu) {
+            fbSubmenu.classList.add('show');
+            var fbToggle = fbSubmenu.id ? document.querySelector('[data-bs-target="#' + fbSubmenu.id + '"]') : null;
+            if (fbToggle) {
+              fbToggle.setAttribute('aria-expanded', 'true');
+              fbToggle.classList.add('active');
+              var fbToggleItem = fbToggle.closest('.nav-item');
+              if (fbToggleItem) { fbToggleItem.classList.add('active'); }
+              var fbCaret = fbToggle.querySelector('.fa-caret-down, .fa-chevron-down');
+              if (fbCaret) { fbCaret.style.transform = 'rotate(180deg)'; }
+            }
+          }
+          bestLink.classList.add('active');
+          var fbLinkItem = bestLink.closest('.nav-item');
+          if (fbLinkItem) { fbLinkItem.classList.add('active'); }
+          opened = true;
         }
       }
 

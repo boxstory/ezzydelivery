@@ -3,12 +3,56 @@
    BEM prefix: ftr__
    ================================================ */
 
-/* Container */
+/* Container — the page reaches the shell edges; only a hairline gutter remains. */
 .ftr {
-    padding: 1.5rem;
+    padding: 0 0.375rem;
     background: #f8f9fa;
     min-height: 100vh;
 }
+
+/* ================================================
+   CONSOLE — one box for everything under the hero
+   ================================================
+   Driver, tabs, filters, actions and the ledger are one task, so they share one
+   border and are divided by hairlines. Children give up their own card frame;
+   overflow stays visible so filter dropdowns can escape. */
+/* `.wfd__hero` is the shared workforce hero — scope the tightening to this page. */
+.ftr .wfd__hero { margin-bottom: 0.375rem; }
+
+.ftr__console {
+    background: #fff;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    overflow: visible;
+}
+
+.ftr__console > .ftr__card,
+.ftr__console > .ftr__profile,
+.ftr__console > .ftr__bulk,
+.ftr__console > .ftr__toolbar,
+.ftr__console > .ftr__empty {
+    border: 0;
+    border-radius: 0;
+    margin: 0;
+    overflow: visible;
+}
+
+/* One hairline between steps — never after the last one. */
+.ftr__console > .ftr__card,
+.ftr__console > .ftr__profile,
+.ftr__console > .ftr__toolbar {
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+.ftr__console > *:last-child { border-bottom: 0; }
+
+/* The console already frames the page, so its inner steps pad to the baseline. */
+.ftr__console > .ftr__profile { padding: 0.75rem; }
+.ftr__console > .ftr__toolbar { padding: 0.375rem 0.75rem; }
+.ftr__console > .ftr__bulk { border-radius: 0; }
+.ftr__console .ftr__card-header { padding: 0.375rem 0.75rem; }
+.ftr__console .ftr__card-body { padding: 0.75rem; }
+/* The tab rail is its own divider — a second hairline under it reads as a seam. */
+.ftr__console > .ftr__card--tabs { border-bottom: 0; }
 
 /* ================================================
    HERO HEADER - Navy Gradient
@@ -363,21 +407,19 @@
     width: 100%;
 }
 
+/* Grid, not wrapping flex: with `flex: 1 1 150px` the last field on a wrapped
+   row had nothing to share with and stretched edge to edge, which read as a
+   broken layout. Grid columns are defined once, so an orphan keeps its width. */
 .ftr__filter-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 0.875rem;
-    align-items: flex-end;
+    align-items: end;
     width: 100%;
 }
 
 .ftr__filter-group {
-    flex: 1 1 150px;
     min-width: 0;
-}
-
-.ftr__filter-group--custom {
-    flex: 0 1 160px;
 }
 
 .ftr__hidden {
@@ -937,6 +979,27 @@ input.ftr__filter-input:focus {
     margin: 0;
 }
 
+/* Way out of a filtered-empty view, so staff are not left at a dead end. */
+.ftr__empty-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.85rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+    text-decoration: none;
+}
+
+.ftr__empty-action:hover {
+    border-color: var(--brand-navy, #001f3f);
+    background: var(--brand-grey-100, #fafafa);
+    color: var(--brand-navy, #001f3f);
+}
+
 /* ================================================
    SETTLEMENT RECEIPT MODAL
    ================================================ */
@@ -1194,6 +1257,23 @@ input.ftr__filter-input:focus {
 }
 .ftr__drawer-close:hover { color: #fff; }
 
+.ftr__drawer-print {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    color: rgba(255,255,255,0.85);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.ftr__drawer-print:hover {
+    background: var(--brand-primary, #f7c000);
+    border-color: var(--brand-primary, #f7c000);
+    color: var(--brand-navy, #001f3f);
+}
+
 .ftr__drawer-meta {
     display: flex;
     flex-wrap: wrap;
@@ -1434,15 +1514,7 @@ input.ftr__filter-input:focus {
     }
 
     .ftr__filter-row {
-        flex-direction: column;
-    }
-
-    .ftr__filter-group {
-        flex: 1 1 100%;
-    }
-
-    .ftr__filter-group--custom {
-        flex: 1 1 100%;
+        grid-template-columns: 1fr;
     }
 
     .ftr__bulk {
@@ -1669,3 +1741,282 @@ input.ftr__filter-input:focus {
         border: none !important;
     }
 }
+
+/* ================================================
+   LEDGER PASS (2026-07-23) — view tabs, ink splits,
+   row actions, JS-panel classes. Replaces the
+   template's inline rainbow styling.
+   ================================================ */
+
+/* View tab rail — navy ink; the page's single yellow accent
+   is the active tab's underline */
+.ftr__tabs {
+    display: flex;
+    border-bottom: 2px solid var(--brand-grey-200, #f0f0f0);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ftr__tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-500, #6c757d);
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.ftr__tab:hover {
+    color: var(--brand-navy, #001f3f);
+}
+
+.ftr__tab:focus-visible {
+    outline: 2px solid var(--brand-navy, #001f3f);
+    outline-offset: -2px;
+}
+
+.ftr__tab--active {
+    color: var(--brand-navy, #001f3f);
+    font-weight: 700;
+    border-bottom-color: var(--brand-primary, #f7c000);
+}
+
+/* Amount cell base size */
+.ftr__td-amount {
+    font-size: 0.8rem;
+}
+
+/* Payment-method splits — monochrome ink icons, mono numerals */
+.ftr__split {
+    font-size: 0.75rem;
+    line-height: 1.7;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    color: var(--brand-grey-700, #333);
+}
+
+.ftr__split i {
+    color: var(--brand-grey-400, #b0b0b0);
+    width: 1.1rem;
+    text-align: center;
+    font-size: 0.7rem;
+}
+
+.ftr__split-total {
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+    padding-top: 4px;
+    margin-top: 4px;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* Qualifier on the cash figure — the only balance a driver actually holds */
+.ftr__split-note {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+/* Single payment-method note under an amount */
+.ftr__pm-note {
+    font-size: 0.7rem;
+    color: var(--brand-grey-500, #6c757d);
+    margin-top: 4px;
+}
+
+.ftr__pm-note i {
+    color: var(--brand-grey-400, #b0b0b0);
+}
+
+/* Balance-after cells */
+.ftr__after {
+    white-space: nowrap;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 0.75rem;
+}
+
+.ftr__after i {
+    color: var(--brand-grey-400, #b0b0b0);
+}
+
+/* Row action buttons — navy primary, ghost danger, quiet secondary */
+.ftr__act-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.ftr__act {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.ftr__act:focus-visible {
+    outline: 2px solid var(--brand-navy, #001f3f);
+    outline-offset: 1px;
+}
+
+.ftr__act--approve,
+.ftr__act--receive {
+    background: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+    color: #fff;
+}
+
+.ftr__act--approve:hover,
+.ftr__act--receive:hover {
+    background: var(--brand-navy-light, #003366);
+}
+
+.ftr__act--reject {
+    background: transparent;
+    border-color: var(--brand-grey-300, #dcdcdc);
+    color: var(--brand-danger, #dc2626);
+}
+
+.ftr__act--reject:hover {
+    background: var(--brand-danger-bg, #fef2f2);
+    border-color: var(--brand-danger, #dc2626);
+}
+
+.ftr__act--verify {
+    background: var(--brand-grey-100, #fafafa);
+    border-color: var(--brand-grey-300, #dcdcdc);
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+.ftr__act--verify:hover {
+    background: var(--brand-secondary, #fff7d6);
+}
+
+/* Resolved state chip (semantic bg + text pair, no white-on-bright) */
+.ftr__act-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: var(--brand-success-bg, #dcfce7);
+    color: #166534;
+}
+
+/* Settlement breakdown panel (built by JS in the settle modal) */
+.ftr__bd {
+    background: var(--brand-grey-100, #fafafa);
+    border-left: 3px solid var(--brand-primary, #f7c000);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.ftr__bd-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+    margin-bottom: 0.75rem;
+}
+
+.ftr__bd-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+    font-size: 0.8125rem;
+}
+
+.ftr__bd-row i {
+    color: var(--brand-grey-400, #b0b0b0);
+    margin-right: 0.5rem;
+}
+
+.ftr__bd-amt {
+    font-weight: 600;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+}
+
+.ftr__bd-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.6rem 0;
+    margin-top: 0.5rem;
+    border-top: 2px solid var(--brand-navy, #001f3f);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+.ftr__drawer-err {
+    color: var(--brand-danger, #dc2626);
+    padding: 1rem;
+}
+
+.ftr__input--auto {
+    width: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ftr__tab,
+    .ftr__act {
+        transition: none;
+    }
+}
+
+/* Column plan — description flexes, data columns hold their width.
+   Widths apply to th; td follows the column. min-width guards the
+   squeeze inside the horizontally-scrolling wrap. */
+.ftr__table {
+    table-layout: fixed;
+    min-width: 1080px;
+}
+
+.ftr__th--code   { width: 9.5rem; }
+.ftr__th--date   { width: 8.5rem; }
+.ftr__th--type   { width: 8rem; }
+.ftr__th--desc   { width: auto; min-width: 16rem; }
+.ftr__th--amount { width: 8.5rem; }
+.ftr__th--after  { width: 8rem; }
+.ftr__th--status { width: 9rem; }
+.ftr__th--action { width: 10.5rem; }
+
+/* With fixed layout, let long descriptions wrap instead of clipping */
+.ftr__table td {
+    overflow-wrap: break-word;
+}
+
+/* Date cell: let "08 Jul 2026," and the time wrap onto tidy lines */
+.ftr__table td:nth-child(3) {
+    white-space: normal;
+}
+
+/* Payment-method icon colors (ops scan cue): cash green, card blue,
+   fawran purple, bank violet, atm teal — icons only, text stays ink */
+.ftr__split .fa-money-bill,
+.ftr__pm-note .fa-money-bill,
+.ftr__bd-row .fa-money-bill { color: var(--brand-success, #15803d); }
+
+.ftr__split .fa-credit-card,
+.ftr__pm-note .fa-credit-card,
+.ftr__bd-row .fa-credit-card { color: var(--brand-info, #2563eb); }
+
+.ftr__split .fa-mobile-screen,
+.ftr__pm-note .fa-mobile-screen,
+.ftr__bd-row .fa-mobile-screen { color: #7c3aed; }
+
+.ftr__split .fa-building-columns,
+.ftr__pm-note .fa-building-columns,
+.ftr__bd-row .fa-building-columns { color: #8b5cf6; }

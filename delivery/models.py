@@ -246,7 +246,10 @@ class DeliveryTask(models.Model):
     ]
     dl_speed = models.CharField(
         max_length=100, choices=DL_SPEED_CHOICES, blank=True)
-    dl_price = models.IntegerField(default=20, null=True, blank=True)
+    dl_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=20, null=True, blank=True,
+        help_text="System-calculated delivery charge billed to the client (QAR, fils-accurate)"
+    )
     dl_to_address = models.ForeignKey(
         DlAddressUpdate, on_delete=models.DO_NOTHING, blank=True, null=True)
 
@@ -334,6 +337,11 @@ class DeliveryTask(models.Model):
         null=True, blank=True,
         help_text="Split COD payment by method: {cash: 100, fawran: 50}"
     )
+    cod_reference = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Transfer/terminal reference for electronic COD (Fawran, POS) "
+                  "— the only way to reconcile a collection against the bank"
+    )
 
     # Earnings Verification Fields (for staff approval)
     EARNINGS_VERIFICATION_STATUS = [
@@ -370,6 +378,34 @@ class DeliveryTask(models.Model):
     earnings_notes = models.TextField(
         blank=True, null=True,
         help_text="Staff notes about earnings verification"
+    )
+
+    # Client Delivery-Charge Verification Fields (client-side mirror of the
+    # driver earnings verification set above — what we bill the business).
+    CHARGE_VERIFICATION_STATUS = [
+        ('pending', 'Pending Verification'),
+        ('verified', 'Verified'),
+        ('published', 'Published'),
+        ('rejected', 'Rejected'),
+    ]
+    charge_verification_status = models.CharField(
+        max_length=20, choices=CHARGE_VERIFICATION_STATUS, default='pending',
+        db_index=True,
+        help_text="Client delivery-charge verification status by staff"
+    )
+    verified_delivery_charge = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Staff-verified/adjusted delivery charge billed to the client "
+                  "(replaces raw dl_price on the client payout)"
+    )
+    charge_verified_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='verified_delivery_charges',
+        help_text="Staff member who verified the client delivery charge"
+    )
+    charge_verified_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the client delivery charge was verified by staff"
     )
 
     # --- Failure & Retry Tracking ---

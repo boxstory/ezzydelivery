@@ -114,23 +114,10 @@
             </table>
         </div>
 
-        {% if locations.has_other_pages %}
+        <!-- Pager (shared brand component) -->
         <div class="wh__card-footer">
-            <nav aria-label="Page navigation">
-                <ul class="pagination mb-0 justify-content-center">
-                    {% if locations.has_previous %}
-                    <li class="page-item"><a class="page-link" href="?page=1{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">First</a></li>
-                    <li class="page-item"><a class="page-link" href="?page={{ locations.previous_page_number }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Previous</a></li>
-                    {% endif %}
-                    <li class="page-item active"><span class="page-link">Page {{ locations.number }} of {{ locations.paginator.num_pages }}</span></li>
-                    {% if locations.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ locations.next_page_number }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Next</a></li>
-                    <li class="page-item"><a class="page-link" href="?page={{ locations.paginator.num_pages }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Last</a></li>
-                    {% endif %}
-                </ul>
-            </nav>
+            {% include "includes/components/_pagination.html" with page_obj=locations filter_params=filter_params per_page=per_page pagination_id="wh_locations" %}
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

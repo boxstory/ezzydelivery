@@ -947,6 +947,34 @@
 .uvl__pill__count { background: rgba(0,0,0,0.06); border-radius: 1rem; padding: 0.05rem 0.4rem; font-size: 0.65rem; font-weight: 700; min-width: 1.25rem; text-align: center; }
 .uvl__pill--active .uvl__pill__count { background: rgba(255,255,255,0.2); }
 
+/* Secondary filter bar (search + vehicle / job / zone / account) */
+.uvl__filterbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+    background: #fff; border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    padding: 0.6rem 0.75rem; margin-bottom: 0.85rem;
+}
+.uvl__filterbar-search { position: relative; flex: 1 1 220px; min-width: 180px; }
+.uvl__filterbar-search-icon {
+    position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
+    font-size: 0.75rem; color: var(--brand-grey-450, #9ca3af); pointer-events: none;
+}
+.uvl__filterbar-search .form-control { padding-left: 1.9rem; font-size: 0.8rem; }
+.uvl__filterbar-select { flex: 0 1 auto; width: auto; min-width: 130px; font-size: 0.8rem; }
+.uvl__filterbar .form-control:focus,
+.uvl__filterbar .form-select:focus { border-color: var(--brand-primary, #f7c000); box-shadow: none; }
+.uvl__filterbar-apply {
+    font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+    background: var(--brand-navy, #001f3f); border: 1px solid var(--brand-navy, #001f3f); color: #fff;
+}
+.uvl__filterbar-apply:hover { background: var(--brand-navy-light, #003366); border-color: var(--brand-navy-light, #003366); color: #fff; }
+.uvl__filterbar-clear {
+    font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+    background: var(--brand-grey-100, #fafafa); border: 1px solid var(--brand-grey-300, #dcdcdc);
+    color: var(--brand-grey-700, #333);
+}
+.uvl__filterbar-clear:hover { background: var(--brand-secondary, #fff7d6); color: var(--brand-grey-800, #1f1f1f); }
+
 /* Search / Filter Toolbar — view width split proportionally across elements */
 .uvl__toolbar {
     display: flex; flex-wrap: nowrap; gap: 0.35rem; align-items: center;
@@ -5658,6 +5686,67 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     transform: translateY(-2px);
 }
 
+/* Document photo preview strip — front (+ back) thumbnails above the card head */
+.wdd__doc__preview {
+    display: flex; gap: 0.5rem;
+}
+.wdd__doc__thumb {
+    position: relative;
+    flex: 1; min-width: 0;
+    height: 128px;
+    padding: 0; border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    background: var(--brand-grey-100);
+    overflow: hidden;
+    cursor: zoom-in;
+    transition: border-color 0.2s ease;
+}
+.wdd__doc__thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.wdd__doc__thumb:hover { border-color: var(--brand-grey-400); }
+.wdd__doc__thumb:focus-visible { outline: 2px solid var(--brand-navy); outline-offset: 2px; }
+.wdd__doc__thumb-zoom {
+    position: absolute; right: 0.375rem; bottom: 0.375rem;
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 31, 63, 0.72);
+    color: #fff; font-size: 0.65rem;
+    border-radius: var(--brand-radius-sm);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.wdd__doc__thumb:hover .wdd__doc__thumb-zoom,
+.wdd__doc__thumb:focus-visible .wdd__doc__thumb-zoom { opacity: 1; }
+.wdd__doc__thumb-side {
+    position: absolute; left: 0.375rem; top: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    background: rgba(0, 31, 63, 0.72);
+    color: #fff;
+    font-size: 0.6rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    border-radius: 999px;
+}
+.wdd__doc__thumb--file,
+.wdd__doc__thumb--empty {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0.375rem;
+    font-size: 0.7rem; font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+.wdd__doc__thumb--file { color: var(--brand-grey-600); }
+.wdd__doc__thumb--file i { font-size: 1.25rem; color: var(--brand-grey-400); }
+.wdd__doc__thumb--file:hover { color: var(--brand-navy); border-color: var(--brand-grey-400); }
+.wdd__doc__thumb--empty {
+    border-style: dashed;
+    color: var(--brand-grey-400);
+    cursor: default;
+}
+.wdd__doc__thumb--empty i { font-size: 1.25rem; color: var(--brand-grey-300); }
+
 .wdd__doc__head {
     display: flex; align-items: center; gap: 0.75rem;
 }
@@ -8094,6 +8183,38 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .odp__tl-gps__dist i{font-size:0.5625rem}
 .odp__tl-gps__dist--near{background:#dcfce7;color:#166534}
 .odp__tl-gps__dist--far{background:#fee2e2;color:#991b1b}
+/* Distance stamped from a cached fix — struck through so it is not read as evidence */
+.odp__tl-gps__dist--stale{background:var(--brand-grey-200,#f0f0f0);color:var(--brand-grey-500,#6c757d);text-decoration:line-through;text-decoration-thickness:1px}
+.odp__tl-gps__age{display:flex;align-items:center;gap:0.25rem;color:#92400e;font-weight:600}
+.odp__tl-gps__age i{font-size:0.5625rem}
+.odp__tl-gps__fresh{display:flex;flex-wrap:wrap;align-items:center;gap:0.35rem;margin-top:0.25rem;padding:0.375rem 0.5rem;border-left:2px solid var(--brand-grey-300,#d1d5db);font-size:0.6875rem;color:var(--brand-grey-600,#6b7280)}
+.odp__tl-gps__fresh i{color:var(--brand-grey-400,#9ca3af);font-size:0.625rem}
+.odp__tl-gps__fresh a{color:#3b82f6;text-decoration:none;font-family:monospace;font-size:0.625rem}
+.odp__tl-gps__fresh a:hover{text-decoration:underline}
+.odp__tl-gps__fresh--ok{border-left-color:#16a34a}
+.odp__tl-gps__fresh--ok strong{color:#166534}
+.odp__tl-gps__verdict{display:flex;align-items:flex-start;gap:0.375rem;margin-top:0.375rem;padding:0.4rem 0.55rem;border-radius:0.375rem;font-size:0.6875rem;line-height:1.45}
+.odp__tl-gps__verdict i{margin-top:0.1rem;font-size:0.625rem}
+.odp__tl-gps__verdict--ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.odp__tl-gps__verdict--warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.odp__tl-gps__verdict--bad{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+
+/* Merged-stream timeline: staff, notification, artifact, driver and audit rows */
+.odp__tl-icon--staff{background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;box-shadow:0 3px 8px rgba(67,56,202,0.3)}
+.odp__tl-icon--notify{background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 3px 8px rgba(5,150,105,0.3)}
+.odp__tl-icon--artifact{background:linear-gradient(135deg,var(--brand-grey-600,#555),var(--brand-grey-400,#9ca3af));color:#fff;box-shadow:0 3px 8px rgba(71,85,105,0.3)}
+.odp__tl-icon--driver{background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;box-shadow:0 3px 8px rgba(180,83,9,0.3)}
+.odp__tl-icon--proof{background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;box-shadow:0 3px 8px rgba(15,118,110,0.3)}
+.odp__tl-icon--audit{background:var(--brand-navy,#001f3f);color:var(--brand-primary,#f7c000);box-shadow:0 3px 8px rgba(0,31,63,0.25)}
+.odp__tl-card-inner--danger{border-left:4px solid #dc2626;background:linear-gradient(90deg,#fef2f2 0%,#fff 30%)}
+.odp__tl-card-inner--audit{border:1px solid var(--brand-navy,#001f3f);background:var(--brand-grey-100,#fafafa)}
+.odp__tl-note--danger{color:#991b1b;background:#fef2f2;border-color:#fecaca}
+.odp__tl-note--danger i{color:#dc2626}
+.odp__tl-note--warn{color:#92400e;background:#fffbeb;border-color:#fde68a}
+.odp__tl-note--warn i{color:#b58900}
+.odp__tl-audit{list-style:none;margin:0.5rem 0 0;padding:0;display:flex;flex-direction:column;gap:0.4rem}
+.odp__tl-audit li{display:flex;align-items:flex-start;gap:0.45rem;font-size:0.6875rem;line-height:1.45;color:var(--brand-grey-600,#4b5563)}
+.odp__tl-audit li i{margin-top:0.15rem;font-size:0.625rem;color:#b58900;flex:0 0 auto}
 
 /* Current state grid */
 .odp__tl-now-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.625rem;margin-top:0.5rem}
@@ -11018,14 +11139,24 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 
 /* ------------------------------------------------------------------
    Wrapper padding for list pages
+
+   `.drl` and `.sll` are excluded: both have had their ledger-console pass
+   (see the DRIVERS LIST / SELLERS LIST blocks further down) and run flush to
+   the frame — the hero and the post-hero card carry their own 0.375rem inset,
+   so the wrapper gap only ate horizontal room on a wide table. dra/dri/drp
+   and sla/sli/slp keep the padding until they get the same pass, matching how
+   the rest of that pass is scoped.
    ------------------------------------------------------------------ */
-.drl, .dra, .dri, .drp,
-.sll, .sla, .sli, .slp {
+.dra, .dri, .drp,
+.sla, .sli, .slp {
     padding: 1rem 1.25rem;
 }
+.drl, .sll {
+    padding: 0;
+}
 @media (max-width: 767px) {
-    .drl, .dra, .dri, .drp,
-    .sll, .sla, .sli, .slp {
+    .dra, .dri, .drp,
+    .sla, .sli, .slp {
         padding: 0.75rem;
     }
 }
@@ -18762,30 +18893,13 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     font-weight: 700;
 }
 .sld__rec-dot { color: rgba(255,255,255,0.3); }
+/* Standing now reads as a stamp (see .sld__stamp--biz); this line carries the
+   service flags only. */
 .sld__rec-line--status { margin-bottom: 0.6rem; }
-.sld__rec-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: inherit;
-    text-transform: capitalize;
-    color: #fff;
-}
-.sld__rec-status-dot {
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.4);
-    box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
-}
-.sld__rec-status--active   .sld__rec-status-dot { background: var(--brand-success-bright, #22c55e); box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
-.sld__rec-status--pending  .sld__rec-status-dot { background: var(--sld-gold); box-shadow: 0 0 0 3px rgba(247,192,0,0.2); }
-.sld__rec-status--suspended .sld__rec-status-dot { background: var(--brand-danger, #dc2626); box-shadow: 0 0 0 3px rgba(220,38,38,0.2); }
 .sld__rec-flag {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    margin-left: 0.75rem;
     font-family: inherit;
     font-size: 0.72rem;
     color: var(--sld-gold);
@@ -18810,8 +18924,17 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .sld__rec-contact:hover { color: var(--sld-gold); }
 .sld__rec-contact i { color: rgba(255,255,255,0.45); width: 0.9rem; text-align: center; }
 
-/* --- Verification stamp (signature) --- */
-.sld__stamp-wrap { flex: 0 0 auto; margin-left: auto; align-self: center; }
+/* --- Stamps (signature): account standing + verification, struck side by side
+   like two rubber stamps on a case file. The standing stamp counter-tilts so
+   the pair reads as stamped by hand rather than as a matched set of chips. --- */
+.sld__stamp-wrap {
+    flex: 0 0 auto;
+    margin-left: auto;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
 .sld__stamp {
     display: flex;
     flex-direction: column;
@@ -18844,6 +18967,18 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .sld__stamp--verified { color: var(--brand-success-bright, #22c55e); }
 .sld__stamp--pending  { color: var(--sld-gold, #f7c000); }
 .sld__stamp--none     { color: rgba(255,255,255,0.4); }
+
+/* Account-standing stamp: same die, tilted the other way. Its label carries a
+   longer word ("Suspended") than the verification marks, so it steps down a
+   size to stay inside the circle. */
+.sld__stamp--biz { transform: rotate(9deg); padding: 0 0.55rem; }
+.sld__stamp--biz .sld__stamp-text { font-size: 0.72rem; letter-spacing: 0.04em; }
+.sld__stamp--biz .sld__stamp-sub { font-size: 0.44rem; letter-spacing: 0.08em; }
+.sld__stamp--biz-active    { color: var(--brand-success-bright, #22c55e); }
+.sld__stamp--biz-pending   { color: var(--sld-gold, #f7c000); }
+.sld__stamp--biz-suspended { color: var(--brand-danger, #ef4444); }
+.sld__stamp--biz-inactive,
+.sld__stamp--biz-unknown   { color: rgba(255,255,255,0.4); }
 
 /* --- Ledger strip of figures --- */
 .sld__ledger-strip {
@@ -18896,6 +19031,12 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     .sld__stamp-wrap { margin-left: 0; order: 3; }
     .sld__stamp { width: 5.25rem; height: 5.25rem; }
     .sld__stamp-text { font-size: 0.78rem; }
+    /* The smaller die can't hold "SUSPENDED" at the desktop size — step the
+       standing stamp down again so the word stays inside the ring. */
+    .sld__stamp--biz { padding: 0 0.35rem; }
+    .sld__stamp--biz .sld__stamp-text { font-size: 0.58rem; }
+    .sld__stamp--biz .sld__stamp-sub { font-size: 0.4rem; letter-spacing: 0.04em; }
+    .sld__stamp--biz .sld__stamp-icon { font-size: 0.85rem; }
     .sld__figure { min-width: 33.33%; flex-basis: 33.33%; }
     .sld__figure:nth-child(3n+1) { border-left: 0; }
     .sld__figure:nth-child(n+4) { border-top: 1px solid rgba(255,255,255,0.09); }
@@ -18999,13 +19140,11 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
    applied filter segment carries the page's single yellow rule.
    ============================================================================ */
 
-/* --- Hero: flat navy, yellow base rule (kills the gradient card look) --- */
+/* --- Hero: flat navy, yellow base rule, standalone card above the console --- */
 .sll .wfd__hero {
     background: #001f3f;
-    border-radius: 0.5rem 0.5rem 0 0;
     border-bottom: 3px solid #f7c000;
     padding: 0.375rem 0.75rem;
-    margin-bottom: 0;
 }
 .sll .wfd__hero-title { font-size: 1.05rem; letter-spacing: -0.01em; }
 .sll .wfd__hero-subtitle { font-size: 0.72rem; color: rgba(255,255,255,0.6); }
@@ -19014,14 +19153,34 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     font-size: 1.6rem;
 }
 
-/* --- Tally strip: one hairline box, segments split by rules, mono counts --- */
+/* --- Post-hero console: everything under the hero lives in ONE card, same as
+   the drivers list. Strip, filter bar and roster keep their edges only as
+   hairline section rules — no card-in-card — and the 0.375rem padding lines
+   the sections up with the hero above. */
+.sll .sll__body {
+    padding: 0.375rem !important;   /* .wf-content zeroes padding with !important */
+}
+.sll .sll__body > .sll__stats,
+.sll .sll__body > .sll__filter {
+    border: 0;
+    border-bottom: 1px solid #eef1f5;
+    border-radius: 0;
+    background: transparent;
+    margin-bottom: 0.375rem;
+}
+.sll .sll__body > .sll__filter { padding: 0.375rem 0; }
+.sll .sll__body .sll__table-wrap {
+    border: 0;
+    border-radius: 0;
+}
+
+/* --- Tally strip: segments split by rules, mono counts --- */
 .sll .sll__stats {
     display: flex;
     gap: 0;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-top: 0;
-    border-radius: 0 0 0.5rem 0.5rem;
+    border-radius: 0.5rem;
     overflow: hidden;
     margin-bottom: 0.9rem;
 }
@@ -19147,13 +19306,11 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
    dot = live duty state, square swatch = administrative standing.
    ============================================================================ */
 
-/* --- Hero: flat navy, yellow base rule, fused to the tally strip --- */
+/* --- Hero: flat navy, yellow base rule, standalone card above the console --- */
 .drl .wfd__hero {
     background: #001f3f;
-    border-radius: 0.5rem 0.5rem 0 0;
     border-bottom: 3px solid #f7c000;
     padding: 0.375rem 0.75rem;
-    margin-bottom: 0;
 }
 .drl .wfd__hero-title { font-size: 1.05rem; letter-spacing: -0.01em; }
 .drl .wfd__hero-subtitle { font-size: 0.72rem; color: rgba(255,255,255,0.6); }
@@ -19162,14 +19319,34 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     font-size: 1.6rem;
 }
 
-/* --- Tally strip: one hairline box, ruled segments, mono counts --- */
+/* --- Post-hero console: everything under the hero lives in ONE card.
+   The tally strip, the filter bar and the roster keep their own edges only
+   as hairline section rules — no card-in-card. 0.375rem side padding is the
+   project's padding baseline and lines the sections up with the hero above. */
+.drl .drl__body {
+    padding: 0.375rem !important;   /* .wf-content zeroes padding with !important */
+}
+.drl .drl__body > .drl__stats,
+.drl .drl__body > .drl__filter {
+    border: 0;
+    border-bottom: 1px solid #eef1f5;
+    border-radius: 0;
+    background: transparent;
+    margin-bottom: 0.375rem;
+}
+.drl .drl__body > .drl__filter { padding: 0.375rem 0; }
+.drl .drl__body .drl__table-wrap {
+    border: 0;
+    border-radius: 0;
+}
+
+/* --- Tally strip: ruled segments, mono counts --- */
 .drl .drl__stats {
     display: flex;
     gap: 0;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-top: 0;
-    border-radius: 0 0 0.5rem 0.5rem;
+    border-radius: 0.5rem;
     overflow: hidden;
     margin-bottom: 0.9rem;
 }
@@ -19208,14 +19385,42 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     background: #fffdf4;
 }
 
-/* --- Sort select: match the filter inputs (base only styles the text input) --- */
+/* --- Filter selects: same box as the text input and the multiselect toggle ---
+   All three controls sit on one row, so they have to agree on the box. The
+   text input (input.drl__filter-input) and the multiselect toggle
+   (.msf__toggle) are both a fixed 34px; the select had no height at all and
+   was sized by its own larger padding, so it stood taller than its
+   neighbours. min-height:0 is explicit because the global mobile-app rules
+   set a min-height that would otherwise win. background-color, never the
+   `background` shorthand — a shorthand wipes the arrow tile if a select
+   anywhere in the cascade carries one as a background-image. */
 .drl select.drl__filter-select {
     width: 100%;
-    padding: 0.5rem 0.65rem;
+    min-height: 0;
+    height: 34px;
+    padding: 0.3rem 1.6rem 0.3rem 0.6rem;
     font-size: 0.78rem;
+    line-height: 1.2;
     color: #001f3f;
-    background: #fff;
     border: 1px solid #d5dbe3;
+    border-radius: 0.4rem;
+    /* The global control rules set appearance:none on every select without
+       putting an arrow back, so these two rendered as plain text boxes with
+       no affordance. Re-declared here in full — repeat/size/position are
+       explicit because a later `background` shorthand would otherwise wipe
+       the tile, and the right padding keeps the value clear of it. */
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23001f3f' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-size: 0.65rem;
+    background-position: right 0.55rem center;
+}
+/* Export sits on the same row as the search, the multiselect, the selects and
+   the primary button — all 34px. It had no height, so its padding + 1px border
+   left it a couple of pixels short and the row read as ragged. */
+.drl .drl__btn--export {
+    height: 34px;
+    padding: 0 0.7rem;
     border-radius: 0.4rem;
 }
 .drl select.drl__filter-select:focus {
@@ -19320,6 +19525,17 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 /* --- Vehicle: registration plate chip (page signature) --- */
 .drl .drl__vehicle-type { font-size: 0.7rem; color: #6b7280; margin-bottom: 0.15rem; }
 .drl__work-pref { font-size: 0.7rem; color: #6b7280; margin-top: 0.25rem; }
+
+/* Applied / Updated dates column (drivers list + pending queue) */
+.drl__date-line {
+    display: flex; align-items: center; gap: 0.375rem;
+    font-size: 0.75rem; font-weight: 600;
+    color: var(--brand-grey-700);
+    white-space: nowrap;
+}
+.drl__date-line + .drl__date-line { margin-top: 0.25rem; }
+.drl__date-line i { font-size: 0.625rem; color: var(--brand-grey-400); }
+.drl__date-line--muted { color: var(--brand-grey-500); font-weight: 400; }
 .drl .drl__plate {
     display: inline-flex;
     align-items: stretch;
@@ -19826,7 +20042,7 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 
 .dvm__header {
     display: grid;
-    grid-template-columns: 108px minmax(200px, 1.5fr) 108px 120px 150px 100px 20px;
+    grid-template-columns: 108px minmax(170px, 1.4fr) 92px 110px 56px 104px 130px 104px 20px;
     gap: 0.75rem;
     align-items: center;
     padding: 0.5rem 0.9rem;
@@ -19846,7 +20062,7 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 
 .dvm__summary {
     display: grid;
-    grid-template-columns: 108px minmax(200px, 1.5fr) 108px 120px 150px 100px 20px;
+    grid-template-columns: 108px minmax(170px, 1.4fr) 92px 110px 56px 104px 130px 104px 20px;
     gap: 0.75rem;
     align-items: center;
     padding: 0.65rem 0.9rem;
@@ -19919,6 +20135,88 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 }
 .dvm__lang { font-size: 0.72rem; color: #6b7280; }
 
+.dvm__vehicle { font-size: 0.72rem; color: #374151; }
+.dvm__vehicle-no {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-weight: 700;
+    color: #001f3f;
+}
+.dvm__docs {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-size: 0.72rem; font-weight: 600;
+}
+.dvm__docs i { font-size: 0.65rem; }
+.dvm__docs--has { color: #15803d; }
+.dvm__docs--none { color: #b91c1c; }
+
+/* WhatsApp completion-reminder button (verification manifest) */
+.uvl__btn--wa {
+    background: var(--brand-success-bg);
+    border: 1px solid #86efac;
+    color: var(--brand-success);
+}
+.uvl__btn--wa:hover:not(:disabled) {
+    background: var(--brand-success);
+    border-color: var(--brand-success);
+    color: #fff;
+}
+.uvl__btn--wa:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* WhatsApp reminder modal — green header + message preview */
+.uvl__modal__header--wa {
+    background: var(--brand-success-bg);
+    border-bottom: 1px solid #86efac;
+}
+.uvl__modal__header--wa .uvl__modal__header-icon {
+    background: var(--brand-success);
+    color: #fff;
+}
+.dvm__remind-preview {
+    margin: 0;
+    padding: 0.75rem 0.9rem;
+    background: var(--brand-gray-50, #f8fafc);
+    border: 1px solid var(--brand-gray-200, #e2e8f0);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--brand-ink, #1e293b);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.dvm__remind-note {
+    margin: 0.6rem 0 0;
+    font-size: 0.75rem;
+    color: var(--brand-gray-500, #64748b);
+}
+
+/* Application-form section progress strip (expanded case) */
+.dvm__secs { margin-bottom: 0.9rem; }
+.dvm__secs-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+}
+.dvm__sec {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.55rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #eef1f5;
+    border-radius: 6px;
+    font-size: 0.72rem; font-weight: 600;
+    line-height: 1.35;
+}
+.dvm__sec i { grid-column: 1; grid-row: 1 / span 2; align-self: center; font-size: 0.85rem; }
+.dvm__sec--done i { color: #15803d; }
+.dvm__sec--todo i { color: #b91c1c; }
+.dvm__sec-label { grid-column: 2; color: #374151; }
+.dvm__sec-detail { grid-column: 2; color: #6b7280; font-weight: 400; }
+
 .dvm__meter { display: flex; align-items: center; gap: 0.4rem; }
 .dvm__meter-track {
     flex: 1;
@@ -19944,6 +20242,9 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     color: #6b7280;
 }
 .dvm__applied em { font-style: italic; color: #b91c1c; }
+/* Applied/Updated stacked lines inherit the manifest's compact mono scale */
+.dvm__applied .drl__date-line { font-size: 0.68rem; font-weight: 500; }
+.dvm__applied .drl__date-line--muted { font-weight: 400; }
 
 /* --- Case file: revealed on expand --- */
 .dvm__case { padding: 0.9rem 0.9rem 1rem; border-top: 1px solid #eef1f5; background: #fbfbfc; }
@@ -20060,9 +20361,10 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     .dvm__who { flex: 1 1 100%; order: 1; }
     .dvm__stamp { order: 0; }
     .dvm__chev { order: 2; margin-left: auto; }
-    .dvm__code, .dvm__lang, .dvm__applied { order: 3; font-size: 0.68rem; }
+    .dvm__code, .dvm__lang, .dvm__applied, .dvm__vehicle, .dvm__docs { order: 3; font-size: 0.68rem; }
     .dvm__meter { order: 3; flex: 1 1 110px; }
-    .dvm__code::before, .dvm__lang::before, .dvm__applied::before, .dvm__meter::before {
+    .dvm__code::before, .dvm__lang::before, .dvm__applied::before, .dvm__meter::before,
+    .dvm__vehicle::before, .dvm__docs::before {
         content: attr(data-label) ": ";
         color: #9ca3af;
         font-weight: 600;
@@ -20658,16 +20960,23 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .pkl__title i { color: #b58900; margin-right: 0.3rem; }
 .pkl__meta { font-size: 0.7rem; color: #6b7280; }
 .pkl__driver {
-    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
     font-size: 0.68rem;
     color: #001f3f;
     font-weight: 600;
 }
-.pkl__rail {
+/* Fleet code stays monospace so codes align when scanning down a list */
+.pkl__driver-code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.64rem;
+    color: #6b7280;
+    font-weight: 600;
+}
+/* Shared leg rail — used by both the first-mile pickup and delivery leg strips */
+.lgr__rail {
     display: flex;
     align-items: flex-start;
 }
-.pkl__step {
+.lgr__step {
     flex: 1 1 0;
     position: relative;
     display: flex;
@@ -20678,7 +20987,7 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     min-width: 0;
 }
 /* connector line between dots */
-.pkl__step::before {
+.lgr__step::before {
     content: "";
     position: absolute;
     top: 5px;
@@ -20687,9 +20996,9 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     height: 2px;
     background: #e5e7eb;
 }
-.pkl__step:first-child::before { display: none; }
-.pkl__step--done::before { background: #001f3f; }
-.pkl__dot {
+.lgr__step:first-child::before { display: none; }
+.lgr__step--done::before { background: #001f3f; }
+.lgr__dot {
     position: relative;
     z-index: 1;
     width: 12px;
@@ -20698,20 +21007,20 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     background: #fff;
     border: 2px solid #d1d5db;
 }
-.pkl__step--done .pkl__dot { background: #001f3f; border-color: #001f3f; }
-.pkl__step--now .pkl__dot {
+.lgr__step--done .lgr__dot { background: #001f3f; border-color: #001f3f; }
+.lgr__step--now .lgr__dot {
     background: #001f3f;
     border-color: #f7c000;
     box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.35);
 }
-.pkl__step-label {
+.lgr__step-label {
     font-size: 0.62rem;
     font-weight: 600;
     color: #9ca3af;
     line-height: 1.15;
 }
-.pkl__step--done .pkl__step-label { color: #001f3f; }
-.pkl__step-time {
+.lgr__step--done .lgr__step-label { color: #001f3f; }
+.lgr__step-time {
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
     font-size: 0.58rem;
     color: #6b7280;
@@ -20737,9 +21046,43 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 /* Timeline icon for pickup_status entries (matches odp__tl-icon variants) */
 .odp__tl-icon--pickup { background: #fff3c9; color: #8a6d00; }
 
+/* Timeline icon for location_update entries (pin moved / address confirmed) */
+.odp__tl-icon--location {
+    background: linear-gradient(135deg, #be123c, #f43f5e);
+    color: #fff;
+    box-shadow: 0 3px 8px rgba(190, 18, 60, 0.3);
+}
+
+/* Pickup leg — hub target, stall warning and location-coverage evidence */
+.pkl__hub {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #001f3f;
+}
+.pkl__hub i { color: #6b7280; margin-right: 0.2rem; }
+.pkl__note--warn { color: #92400e; font-weight: 600; }
+.pkl__evidence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    margin-top: 0.55rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #eef1f5;
+}
+.pkl__ev {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.65rem;
+    color: #6b7280;
+}
+.pkl__ev i { font-size: 0.6rem; color: #9ca3af; }
+.pkl__ev--none { color: #92400e; font-weight: 600; }
+.pkl__ev--none i { color: #b58900; }
+
 @media (max-width: 575.98px) {
-    .pkl__step-label { font-size: 0.55rem; }
-    .pkl__step-time { display: none; }
+    .lgr__step-label { font-size: 0.55rem; }
+    .lgr__step-time { display: none; }
 }
 
 /* Seller detail — pickup location map pin line (coords in mono, ledger style) */
@@ -20849,3 +21192,6 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .wfx__col:hover { background: var(--brand-grey-100, #fafafa); }
 .wfx__col input { margin: 0; flex-shrink: 0; }
 @media (max-width: 575.98px) { .wfx__cols { grid-template-columns: 1fr; } }
+
+/* ── Order Auto/API: sheet row jump input (sits beside the shared pager) ── */
+.woa__goto-row { width: 4.5rem; }

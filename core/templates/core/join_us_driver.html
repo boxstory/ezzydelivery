@@ -10,7 +10,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260718c" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260723f" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -20,13 +20,17 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
         <!-- Hero -->
         <div class="cja__hero p-4 p-md-5 mb-4 text-center">
             <h1 class="cja__hero-title h3 mb-2">Become an Ezzy Delivery Driver</h1>
-            <p class="mb-0">Apply in 3 quick steps — your details, your vehicle, and your documents.</p>
+            {% if show_status_only %}
+            <p class="mb-0">Your application is in — here's where it stands.</p>
+            {% else %}
+            <p class="mb-0">Apply in 4 quick steps — your details, your vehicle, your zones &amp; hours, and your documents.</p>
+            {% endif %}
         </div>
 
         {% if already_business %}
         <!-- Already registered as business -->
         <div class="cja__section-card p-4 p-md-5 text-center mx-auto col-12 col-md-8 col-lg-6">
-            <div class="cja__status-icon text-warning mb-2">&#9888;</div>
+            <div class="cja__status-icon text-warning mb-2"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></div>
             <h2 class="h5 mb-2">You're already registered as a Business</h2>
             <p class="text-muted mb-3">
                 This Google account ({{ user_email }}) has a business profile.
@@ -40,17 +44,31 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
         <!-- Application status -->
         <div class="cja__section-card p-4 p-md-5 text-center mx-auto col-12 col-md-8 col-lg-6">
             {% if application_status == 'verified' %}
-                <div class="cja__status-icon text-success mb-2">&#10003;</div>
+                <div class="cja__status-icon text-success mb-2"><i class="fas fa-circle-check" aria-hidden="true"></i></div>
                 <h2 class="h5 mb-2">You're approved!</h2>
                 <p class="text-muted mb-3">Your driver account is active. Open your fleet dashboard to start accepting tasks.</p>
-                <a href="{% url 'fleet:fleet_dashboard' %}" class="btn btn-dark">Go to Fleet Dashboard</a>
+                <a href="{% url 'fleet:fleet_dashboard' %}" class="btn cja__btn-navy">Go to Fleet Dashboard</a>
             {% else %}
-                <div class="cja__status-icon text-warning mb-2">&#8987;</div>
+                <div class="cja__status-icon text-warning mb-2"><i class="fas fa-hourglass-half" aria-hidden="true"></i></div>
                 <h2 class="h5 mb-2">Application under review</h2>
                 <p class="text-muted mb-3">
                     We received your application{% if profile.verification_applied_at %} on {{ profile.verification_applied_at|date:"d M Y" }}{% endif %}.
                     Our team will contact you on WhatsApp after review.
                 </p>
+                <ol class="cja__stepper cja__stepper--mini d-flex list-unstyled mb-4">
+                    <li class="cja__stepper-item cja__stepper-item--done">
+                        <span class="cja__stepper-dot"><i class="fas fa-check" aria-hidden="true"></i></span>
+                        <span class="cja__stepper-label">Submitted</span>
+                    </li>
+                    <li class="cja__stepper-item cja__stepper-item--active">
+                        <span class="cja__stepper-dot"><i class="fas fa-hourglass-half" aria-hidden="true"></i></span>
+                        <span class="cja__stepper-label">Under review</span>
+                    </li>
+                    <li class="cja__stepper-item">
+                        <span class="cja__stepper-dot"><i class="fas fa-flag-checkered" aria-hidden="true"></i></span>
+                        <span class="cja__stepper-label">Approved</span>
+                    </li>
+                </ol>
                 <a href="{% url 'core:join_driver' %}?edit=1" class="btn btn-outline-dark btn-sm">Edit application</a>
             {% endif %}
         </div>
@@ -66,39 +84,45 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 
         <div class="cja__form-wrap mx-auto col-12 col-lg-10 col-xl-8">
 
-            {% if user.is_authenticated and progress.has_any %}
-            <!-- Resume progress strip -->
-            <div class="cja__section-card p-3 mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-bold small">Your application progress</span>
-                    <span class="small text-muted">{{ progress.percent }}%</span>
-                </div>
-                <div class="progress mb-2" role="progressbar" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar bg-dark cja__progress-bar" data-percent="{{ progress.percent }}"></div>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <span class="badge {% if progress.sec1_complete %}text-bg-success{% else %}text-bg-light border{% endif %}">
-                        1. Profile {{ progress.sec1_done }}/{{ progress.sec1_total }}
-                    </span>
-                    <span class="badge {% if progress.sec2_complete %}text-bg-success{% else %}text-bg-light border{% endif %}">
-                        2. Vehicle {% if progress.sec2_complete %}&#10003;{% else %}pending{% endif %}
-                    </span>
-                    <span class="badge {% if progress.sec3_complete %}text-bg-success{% else %}text-bg-light border{% endif %}">
-                        3. Documents {% if progress.sec3_selfie %}selfie &#10003;{% else %}selfie missing{% endif %} · {{ progress.sec3_ids }}/2 IDs
-                    </span>
-                </div>
-            </div>
-            {% endif %}
+            <!-- Wizard stepper -->
+            <ol class="cja__stepper d-flex list-unstyled mb-4" id="core_join_driver_stepper">
+                <li class="cja__stepper-item {% if progress.sec1_complete %}cja__stepper-item--done{% endif %}" data-step="1">
+                    <button type="button" class="cja__stepper-btn" data-step-btn="1">
+                        <span class="cja__stepper-dot">1</span>
+                        <span class="cja__stepper-label">Profile</span>
+                    </button>
+                </li>
+                <li class="cja__stepper-item {% if progress.sec2_complete %}cja__stepper-item--done{% endif %}" data-step="2">
+                    <button type="button" class="cja__stepper-btn" data-step-btn="2">
+                        <span class="cja__stepper-dot">2</span>
+                        <span class="cja__stepper-label">Vehicle</span>
+                    </button>
+                </li>
+                <li class="cja__stepper-item {% if progress.sec3_complete %}cja__stepper-item--done{% endif %}" data-step="3">
+                    <button type="button" class="cja__stepper-btn" data-step-btn="3">
+                        <span class="cja__stepper-dot">3</span>
+                        <span class="cja__stepper-label">Zones &amp; Hours</span>
+                    </button>
+                </li>
+                <li class="cja__stepper-item {% if progress.sec4_complete %}cja__stepper-item--done{% endif %}" data-step="4">
+                    <button type="button" class="cja__stepper-btn" data-step-btn="4">
+                        <span class="cja__stepper-dot">4</span>
+                        <span class="cja__stepper-label">Documents</span>
+                    </button>
+                </li>
+            </ol>
 
-            <form id="core_join_driver_form_apply" method="post" enctype="multipart/form-data" novalidate>
+            <form id="core_join_driver_form_apply" method="post" enctype="multipart/form-data" novalidate
+                  data-initial-step="{{ initial_step|default:1 }}">
                 {% csrf_token %}
                 <input type="hidden" name="geo_lat" id="core_join_driver_input_geolat">
                 <input type="hidden" name="geo_lng" id="core_join_driver_input_geolng">
                 <input type="hidden" name="geo_accuracy" id="core_join_driver_input_geoacc">
                 <input type="hidden" name="action" value="" id="core_join_driver_input_action">
+                <input type="hidden" name="step" value="" id="core_join_driver_input_step">
 
                 <!-- Section 1: Profile -->
-                <div class="cja__section-card p-3 p-md-4 mb-4">
+                <div class="cja__section-card cja__wiz-step p-3 p-md-4 mb-4" data-wiz-step="1">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="cja__step-badge d-flex align-items-center justify-content-center">1</span>
                         <h2 class="h6 mb-0">Your Profile</h2>
@@ -153,7 +177,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                 </div>
 
                 <!-- Section 2: Vehicle -->
-                <div class="cja__section-card p-3 p-md-4 mb-4">
+                <div class="cja__section-card cja__wiz-step p-3 p-md-4 mb-4" data-wiz-step="2">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="cja__step-badge d-flex align-items-center justify-content-center">2</span>
                         <h2 class="h6 mb-0">Vehicle Available</h2>
@@ -194,24 +218,80 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                                    id="core_join_driver_input_licenseno" placeholder="e.g. 1234567"
                                    value="{{ driver.driver_license_number|default:'' }}">
                         </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label mb-1" for="core_join_driver_select_jobtype">Work Preference *</label>
-                            <select class="form-select" name="job_type" id="core_join_driver_select_jobtype">
-                                <option value="">Select Work Preference</option>
-                                {% for value, label in job_type_choices %}
-                                <option value="{{ value }}" {% if driver.job_type == value %}selected{% endif %}>{{ label }}</option>
+                    </div>
+                </div>
+
+                <!-- Section 3: Work zones & availability -->
+                <div class="cja__section-card cja__wiz-step p-3 p-md-4 mb-4" data-wiz-step="3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="cja__step-badge d-flex align-items-center justify-content-center">3</span>
+                        <h2 class="h6 mb-0">Work Zones &amp; Availability</h2>
+                        {% if progress.sec3_complete %}<span class="cja__doc-status ms-auto">Complete &#10003;</span>{% endif %}
+                    </div>
+                    <p class="text-muted small mb-3">Pick the areas you know best and when you can work — we use this to send you nearby delivery tasks.</p>
+                    <div class="row g-3">
+                        {% if zone_groups %}
+                        <div class="col-12">
+                            <label class="form-label mb-1">Preferred Delivery Zones *</label>
+                            <div class="row g-2">
+                                {% for zg in zone_groups %}
+                                <div class="col-12 col-sm-6 col-lg-4">
+                                    <label class="cja__pick-tile d-flex align-items-start gap-2 p-2 h-100 mb-0" for="core_join_driver_check_zone_{{ zg.id }}">
+                                        <input class="form-check-input mt-1 flex-shrink-0" type="checkbox" name="zone_groups"
+                                               value="{{ zg.id }}" id="core_join_driver_check_zone_{{ zg.id }}"
+                                               {% if zg.id in driver_zone_group_ids %}checked{% endif %}>
+                                        <span>
+                                            <span class="d-block fw-bold small">{{ zg.name }}</span>
+                                            <span class="d-block text-muted cja__pick-sub">Zones {{ zg.zone_numbers_display|truncatechars:38 }}</span>
+                                        </span>
+                                    </label>
+                                </div>
                                 {% endfor %}
-                            </select>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-12">
+                            <label class="form-label mb-1">Work Preference *</label>
+                            <div class="row g-2">
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <label class="cja__pick-tile d-flex align-items-start gap-2 p-2 h-100 mb-0" for="core_join_driver_check_jobtype_full">
+                                        <input class="form-check-input mt-1 flex-shrink-0" type="checkbox" name="job_type_opts" value="full_time"
+                                               id="core_join_driver_check_jobtype_full"
+                                               {% if driver.job_type == 'full_time' or driver.job_type == 'flexible' %}checked{% endif %}>
+                                        <span>
+                                            <span class="d-block fw-bold small"><i class="fas fa-briefcase cja__pick-ico me-1" aria-hidden="true"></i>Full Time</span>
+                                            <span class="d-block text-muted cja__pick-sub">Driving is my main job</span>
+                                        </span>
+                                    </label>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <label class="cja__pick-tile d-flex align-items-start gap-2 p-2 h-100 mb-0" for="core_join_driver_check_jobtype_part">
+                                        <input class="form-check-input mt-1 flex-shrink-0" type="checkbox" name="job_type_opts" value="part_time"
+                                               id="core_join_driver_check_jobtype_part"
+                                               {% if driver.job_type == 'part_time' or driver.job_type == 'flexible' %}checked{% endif %}>
+                                        <span>
+                                            <span class="d-block fw-bold small"><i class="fas fa-clock cja__pick-ico me-1" aria-hidden="true"></i>Part Time</span>
+                                            <span class="d-block text-muted cja__pick-sub">Alongside another job</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-text small">Tick both if you can work flexible hours.</div>
                         </div>
                         <div class="col-12">
                             <label class="form-label mb-1">Preferred Working Hours</label>
-                            <div class="d-flex flex-wrap gap-3">
-                                {% for value, label in work_time_slab_choices %}
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="work_time_slabs"
-                                           value="{{ value }}" id="core_join_driver_check_slab_{{ value }}"
-                                           {% if value in driver_time_slabs %}checked{% endif %}>
-                                    <label class="form-check-label" for="core_join_driver_check_slab_{{ value }}">{{ label }}</label>
+                            <div class="row g-2">
+                                {% for slab in work_time_slab_tiles %}
+                                <div class="col-6 col-md-3">
+                                    <label class="cja__pick-tile d-flex align-items-start gap-2 p-2 h-100 mb-0" for="core_join_driver_check_slab_{{ slab.value }}">
+                                        <input class="form-check-input mt-1 flex-shrink-0" type="checkbox" name="work_time_slabs"
+                                               value="{{ slab.value }}" id="core_join_driver_check_slab_{{ slab.value }}"
+                                               {% if slab.value in driver_time_slabs %}checked{% endif %}>
+                                        <span>
+                                            <span class="d-block fw-bold small"><i class="fas {{ slab.icon }} cja__pick-ico me-1" aria-hidden="true"></i>{{ slab.label }}</span>
+                                            <span class="d-block text-muted cja__pick-sub">{{ slab.time }}</span>
+                                        </span>
+                                    </label>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -219,21 +299,22 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                     </div>
                 </div>
 
-                <!-- Section 3: Documents -->
-                <div class="cja__section-card p-3 p-md-4 mb-4">
+                <!-- Section 4: Documents -->
+                <div class="cja__section-card cja__wiz-step p-3 p-md-4 mb-4" data-wiz-step="4">
                     <div class="d-flex align-items-center gap-2 mb-1">
-                        <span class="cja__step-badge d-flex align-items-center justify-content-center">3</span>
+                        <span class="cja__step-badge d-flex align-items-center justify-content-center">4</span>
                         <h2 class="h6 mb-0">Documents</h2>
-                        {% if progress.sec3_complete %}<span class="cja__doc-status ms-auto">Complete &#10003;</span>{% endif %}
+                        {% if progress.sec4_complete %}<span class="cja__doc-status ms-auto">Complete &#10003;</span>{% endif %}
                     </div>
-                    <p class="text-muted small mb-3">Minimum 3 uploads: a selfie photo plus any 2 ID documents. Max 5MB each (JPG/PNG).</p>
+                    <p class="text-muted small mb-1">Minimum 3 uploads: a selfie photo plus any 2 ID documents. Max 5MB each (JPG/PNG).</p>
+                    <div class="small fw-bold text-muted mb-3" id="core_join_driver_text_docmeter" aria-live="polite"></div>
                     <div class="row g-3">
                         {% for item in doc_list %}
                         <div class="col-12 col-md-6">
                             <div class="cja__doc-tile {% if item.doc %}cja__doc-tile--done{% endif %} p-3 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label class="form-label mb-0 fw-bold" for="core_join_driver_file_{{ item.key }}">
-                                        {{ item.type }}{% if item.type == 'Selfie' %} *{% endif %}
+                                        <i class="fas {{ item.icon }} cja__pick-ico me-1" aria-hidden="true"></i>{{ item.type }}{% if item.type == 'Selfie' %} *{% endif %}
                                     </label>
                                     {% if item.doc %}<span class="cja__doc-status">Uploaded &#10003;</span>{% endif %}
                                 </div>
@@ -258,12 +339,19 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                     <p class="text-muted small mb-0" id="core_join_driver_text_geohint">
                         Your location is captured when you submit, to help us assign nearby deliveries.
                     </p>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex flex-wrap justify-content-center gap-2 cja__wiz-actions">
+                        <button type="button" class="btn btn-outline-dark btn-lg d-none" id="core_join_driver_btn_back">
+                            Back
+                        </button>
+                        <button type="button" class="btn cja__btn-navy btn-lg px-4 d-none" id="core_join_driver_btn_next"
+                                {% if not user.is_authenticated %}disabled{% endif %}>
+                            Save &amp; Continue
+                        </button>
                         <button type="submit" class="btn btn-outline-dark btn-lg" id="core_join_driver_btn_save"
                                 {% if not user.is_authenticated %}disabled{% endif %}>
                             Save Progress
                         </button>
-                        <button type="submit" class="btn btn-dark btn-lg px-5" id="core_join_driver_btn_submit"
+                        <button type="submit" class="btn cja__btn-navy btn-lg px-5" id="core_join_driver_btn_submit"
                                 {% if not user.is_authenticated %}disabled{% endif %}>
                             Submit Application
                         </button>
@@ -307,20 +395,25 @@ document.addEventListener('DOMContentLoaded', function() {
         new bootstrap.Modal(loginModal).show();
     }
 
-    // Progress bar width (no inline styles in template)
-    var pbar = document.querySelector('.cja__progress-bar');
-    if (pbar) { pbar.style.width = (pbar.dataset.percent || 0) + '%'; }
-
-    // Auto-fill WhatsApp from Phone when WhatsApp is empty
+    // Auto-fill WhatsApp from Phone with Qatar code (974), live while typing.
+    // Stops mirroring as soon as the user edits WhatsApp themselves.
     var phone = document.getElementById('id_phone');
     var whatsapp = document.getElementById('id_whatsapp');
     if (phone && whatsapp) {
-        phone.addEventListener('blur', function() {
-            if (phone.value && !whatsapp.value) {
-                var val = phone.value.replace(/\D/g, '');
-                whatsapp.value = val.startsWith('974') ? val : '974' + val;
-            }
-        });
+        var waEdited = whatsapp.value !== '';
+        whatsapp.addEventListener('input', function() { waEdited = whatsapp.value !== ''; });
+        function qatarize(v) {
+            var d = String(v).replace(/\D/g, '');
+            if (d.indexOf('00974') === 0) { d = d.slice(2); }
+            if (d.length === 8) { d = '974' + d; }
+            return d;
+        }
+        function syncWhatsapp() {
+            if (waEdited) { return; }
+            whatsapp.value = phone.value ? qatarize(phone.value) : '';
+        }
+        phone.addEventListener('input', syncWhatsapp);
+        phone.addEventListener('blur', syncWhatsapp);
     }
 
     var form = document.getElementById('core_join_driver_form_apply');
@@ -336,6 +429,96 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.addEventListener('click', function() { actionField.value = 'submit'; });
     }
 
+    // --- Wizard: one section at a time, Next = save this stage then advance ---
+    var steps = form.querySelectorAll('.cja__wiz-step');
+    var backBtn = document.getElementById('core_join_driver_btn_back');
+    var nextBtn = document.getElementById('core_join_driver_btn_next');
+    var stepField = document.getElementById('core_join_driver_input_step');
+    var stepperItems = document.querySelectorAll('#core_join_driver_stepper .cja__stepper-item');
+    var geoHint = document.getElementById('core_join_driver_text_geohint');
+    var TOTAL = steps.length;
+    var current = parseInt(form.dataset.initialStep || '1', 10) || 1;
+
+    function showStep(n) {
+        current = Math.min(TOTAL, Math.max(1, n));
+        form.classList.add('cja__wiz');
+        steps.forEach(function(s) {
+            s.classList.toggle('cja__wiz-step--active', parseInt(s.dataset.wizStep, 10) === current);
+        });
+        stepperItems.forEach(function(it) {
+            it.classList.toggle('cja__stepper-item--active', parseInt(it.dataset.step, 10) === current);
+        });
+        var last = current === TOTAL;
+        if (backBtn) backBtn.classList.toggle('d-none', current === 1);
+        if (nextBtn) nextBtn.classList.toggle('d-none', last);
+        if (saveBtn) saveBtn.classList.toggle('d-none', !last);
+        if (submitBtn) submitBtn.classList.toggle('d-none', !last);
+        if (geoHint) geoHint.classList.toggle('d-none', !last);
+    }
+
+    function fieldByName(name) { return form.querySelector('[name="' + name + '"]'); }
+
+    function validateStep(n) {
+        var errs = [];
+        var focusEl = null;
+        function req(name, label) {
+            var el = fieldByName(name);
+            if (el && !el.value.trim()) { errs.push(label + ' is required.'); if (!focusEl) { focusEl = el; } }
+        }
+        if (n === 1) {
+            req('first_name', 'First name'); req('last_name', 'Last name');
+            req('phone', 'Phone'); req('whatsapp', 'WhatsApp');
+            req('nationlity', 'Nationality'); req('date_of_birth', 'Date of birth');
+            req('zone_name', 'Zone / area'); req('address', 'Address');
+        } else if (n === 2) {
+            var vt = fieldByName('veh-vehicle_type');
+            if (vt && (!vt.value || vt.value === 'none')) { errs.push('Please select your vehicle type.'); focusEl = vt; }
+        } else if (n === 3) {
+            var zoneChecks = form.querySelectorAll('input[name="zone_groups"]');
+            if (zoneChecks.length && !form.querySelector('input[name="zone_groups"]:checked')) {
+                errs.push('Select at least one delivery zone you want to work in.');
+            }
+            if (!form.querySelector('input[name="job_type_opts"]:checked')) {
+                errs.push('Select your work preference — full time, part time, or both.');
+            }
+        }
+        if (errs.length) { alert(errs.join('\n')); if (focusEl) { focusEl.focus(); } return false; }
+        return true;
+    }
+
+    if (steps.length) {
+        showStep(current);
+        stepperItems.forEach(function(it) {
+            if (it.classList.contains('cja__stepper-item--done')) {
+                var d = it.querySelector('.cja__stepper-dot');
+                if (d && parseInt(it.dataset.step, 10) !== current) { d.innerHTML = '&#10003;'; }
+            }
+            var btn = it.querySelector('[data-step-btn]');
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    var n = parseInt(it.dataset.step, 10);
+                    if (n < current) { showStep(n); }
+                });
+            }
+        });
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function() {
+                if (!validateStep(current)) { return; }
+                actionField.value = 'save';
+                stepField.value = String(current + 1);
+                nextBtn.disabled = true;
+                nextBtn.textContent = 'Saving…';
+                form.submit();
+            });
+        }
+        if (backBtn) {
+            backBtn.addEventListener('click', function() {
+                showStep(current - 1);
+                window.scrollTo({ top: 0 });
+            });
+        }
+    }
+
     function docState() {
         var selfieOk = false, idCount = 0;
         form.querySelectorAll('.cja__doc-input').forEach(function(inp) {
@@ -345,6 +528,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         return { selfieOk: selfieOk, idCount: idCount };
     }
+
+    // Live "selfie + 2 IDs" meter on the Documents step
+    var docMeter = document.getElementById('core_join_driver_text_docmeter');
+    function updateDocMeter() {
+        if (!docMeter) { return; }
+        var d = docState();
+        var done = d.selfieOk && d.idCount >= 2;
+        docMeter.textContent = 'Selfie ' + (d.selfieOk ? '✓' : 'missing') +
+            ' · ID documents ' + Math.min(d.idCount, 2) + '/2' +
+            (done ? ' — ready to submit' : '');
+        docMeter.classList.toggle('text-success', done);
+        docMeter.classList.toggle('text-muted', !done);
+    }
+    form.querySelectorAll('.cja__doc-input').forEach(function(inp) {
+        inp.addEventListener('change', updateDocMeter);
+    });
+    updateDocMeter();
 
     form.addEventListener('submit', function(e) {
         if (form.dataset.geoDone === '1') return;
@@ -360,6 +560,10 @@ document.addEventListener('DOMContentLoaded', function() {
         var errs = [];
         if (!docs.selfieOk) errs.push('Please upload a selfie photo.');
         if (docs.idCount < 2) errs.push('Please upload at least 2 ID documents (QID, Passport, Driving License or Istimara).');
+        var zoneChecks = form.querySelectorAll('input[name="zone_groups"]');
+        if (zoneChecks.length && !form.querySelector('input[name="zone_groups"]:checked')) {
+            errs.push('Select at least one delivery zone you want to work in.');
+        }
         if (errs.length) {
             e.preventDefault();
             alert(errs.join('\n'));

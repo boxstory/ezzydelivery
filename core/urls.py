@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic.base import RedirectView
 from core import views as core_views
 from core import password_reset_views
 from webpages import views as webpages_views
@@ -35,6 +36,13 @@ urlpatterns = [
          core_views.join_driver, name='join_driver'),
     path('join_us/driver/start/',
          core_views.join_driver_start, name='join_driver_start'),
+    # Arabic hreflang pair of the driver landing page
+    path('ar/join_us/driver/start/',
+         core_views.join_driver_start_ar, name='join_driver_start_ar'),
+    # Short URL: /driver/start/ -> /join_us/driver/start/
+    path('driver/start/',
+         RedirectView.as_view(pattern_name='core:join_driver_start', permanent=True),
+         name='join_driver_start_short'),
     path('join_us/business/update/',
          core_views.business_profile_update, name='business_profile_update'),
     path('join_us/driver/update/',

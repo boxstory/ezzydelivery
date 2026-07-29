@@ -10,7 +10,7 @@ This service handles all business logic related to:
 - Wallet status checks
 """
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 
 from fleet import models as fleet_models
 from delivery import models as delivery_models
+from orders.cod_status import CLIENT_STATES_NOT_DERIVED
 
 # Local aliases for commonly used models
 Driver = fleet_models.Driver
@@ -65,64 +66,36 @@ class WalletService:
                 driver = Driver.objects.select_for_update().get(pk=driver.pk)
 
                 # Update driver balances based on transaction type.
-                # NOTE: cod_in_hand is NOT mutated here. It is a denormalization of
-                # the task truth (see WalletService.live_cod_in_hand) and is refreshed
-                # via sync_cod_in_hand() at the point the task COD state actually
-                # changes (collection / submission / return). Mutating it here too
-                # would double-count. wallet_balance remains a transaction-log ledger.
+                # NOTE: neither cod_in_hand nor wallet_balance is accumulated here.
+                # Both are denormalizations of the task truth and are re-derived by
+                # sync_cod_in_hand() at the point the task COD state actually changes
+                # (collection / submission / return). Accumulating a COD delta here
+                # as well would double-count, and accumulating it from the passed
+                # payment_method — which is null on ~14% of rows — is what let
+                # wallet_balance drift away from cod_in_hand in the first place.
                 if transaction_type == 'earning':
                     driver.pending_earnings += amount
                     driver.total_earnings += amount
-                elif transaction_type == 'cod_collection':
-                    # Only cash creates a driver liability; electronic COD goes
-                    # straight to Ezzy so it must not debit the driver's wallet.
-                    if payment_method not in WalletService.ELECTRONIC_METHODS:
-                        driver.wallet_balance -= abs(amount)
-                elif transaction_type in ['cod_deposit', 'cod_driver_settle']:
-                    driver.wallet_balance += abs(amount)
-                elif transaction_type == 'cod_return':
-                    driver.wallet_balance += abs(amount)
+                    driver.save(update_fields=['pending_earnings', 'total_earnings'])
                 elif transaction_type == 'settlement':
                     driver.pending_earnings -= abs(amount)
                     driver.last_settlement_date = timezone.now()
-                elif transaction_type in ['deduction', 'bonus', 'adjustment']:
-                    driver.wallet_balance += amount
+                    driver.save(update_fields=['pending_earnings', 'last_settlement_date'])
+                # deduction / bonus / adjustment and every COD type are folded in
+                # by the sync_cod_in_hand() call after the row exists — running it
+                # here would miss the row being written right now.
 
-                driver.save()
-
-            # Calculate COD breakdown by payment method (running balance up to this point)
+            # Per-method COD balances are stamped after the row exists, by
+            # replaying the ledger in recalculate_cod_balances() below. They
+            # cannot be derived from a point-in-time query here: a deposit links
+            # the tasks it settled through DeliveryTask.cod_submission_txn, not
+            # through DriverTransaction.delivery_task, so a "not yet settled"
+            # lookup from this side sees nothing and returns lifetime totals.
             cod_cash_after = Decimal('0')
             cod_pos_after = Decimal('0')
             cod_fawran_after = Decimal('0')
             cod_bank_after = Decimal('0')
             cod_atm_after = Decimal('0')
-
-            if driver and transaction_type in ('cod_collection', 'cod_deposit', 'cod_driver_settle'):
-                # Get all COD collected up to now (delivered but not yet settled)
-                settled_task_ids = DriverTransaction.objects.filter(
-                    driver=driver,
-                    transaction_type__in=['cod_driver_settle', 'cod_deposit'],
-                    delivery_task_id__isnull=False,
-                    created_at__lte=timezone.now()
-                ).values_list('delivery_task_id', flat=True)
-
-                cod_collected = DeliveryTask.objects.filter(
-                    driver=driver,
-                    cod_collected=True,
-                    dl_task_status__in=['delivered', 'partial_delivery'],
-                    completed_at__isnull=False
-                ).exclude(id__in=settled_task_ids)
-
-                cod_cash_after = cod_collected.filter(payment_method='cash').aggregate(
-                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
-                cod_pos_after = cod_collected.filter(payment_method='pos').aggregate(
-                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
-                cod_fawran_after = cod_collected.filter(payment_method='fawran').aggregate(
-                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
-                cod_bank_after = cod_collected.filter(payment_method='bank').aggregate(
-                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
-                cod_atm_after = cod_collected.filter(payment_method='atm').aggregate(
-                    total=Sum('cod_collected_amount'))['total'] or Decimal('0')
 
             # Create transaction record
             trans = DriverTransaction.objects.create(
@@ -146,6 +119,33 @@ class WalletService:
                 notes=notes,
                 payment_method=payment_method
             )
+
+            # Stamp the running per-method balances on the new row immediately.
+            # Without this the row carries zeros until the staff transactions
+            # page happens to run the recalc (once per driver per day), so any
+            # consumer reading it before then — CSV export, print voucher,
+            # driver PWA, API — sees a balance that was never true.
+            if driver and transaction_type in DRIVER_WALLET_TYPES:
+                # Re-derive cod_in_hand and wallet_balance from the task truth now
+                # that this row exists. Doing it here rather than trusting each
+                # caller means no COD path can leave the cached balances stale.
+                WalletService.sync_cod_in_hand(driver)
+
+                # Re-stamp the "after" columns from the just-synced driver. They
+                # were written above from the pre-sync values, which is the
+                # balance BEFORE this transaction — every ledger row (COD ledger,
+                # PWA transaction detail, print voucher, CSV, API) was showing a
+                # running balance one row behind itself.
+                trans.wallet_balance_after = driver.wallet_balance
+                trans.cod_in_hand_after = driver.cod_in_hand
+                trans.pending_earnings_after = driver.pending_earnings
+                trans.save(update_fields=[
+                    'wallet_balance_after', 'cod_in_hand_after', 'pending_earnings_after',
+                ])
+
+            if driver and transaction_type in ('cod_collection', 'cod_deposit', 'cod_driver_settle'):
+                WalletService.recalculate_cod_balances(driver)
+                trans.refresh_from_db()
 
             return trans
 
@@ -260,12 +260,13 @@ class WalletService:
 
             # Lock the candidate unsettled tasks so a concurrent submission cannot
             # claim the same rows. Determine which to settle and their COD sum.
-            # Cash only: electronic collections (Fawran/POS/bank/ATM) settle to
-            # Ezzy at collection and are never part of a driver hand-in.
+            # A task counts for its CASH LEG only: electronic collections
+            # (Fawran/POS/bank/ATM) settled to Ezzy at collection and are never
+            # part of a hand-in, while a mixed collection still owes its cash
+            # portion. task_cash_leg() returns 0 for the electronic-only ones,
+            # so they drop out of both loops below on their own.
             base_qs = DeliveryTask.objects.select_for_update().filter(
                 driver=driver, cod_collected=True, cod_settled=False
-            ).exclude(
-                payment_method__in=WalletService.ELECTRONIC_METHODS
             )
             settled_task_ids = []
             settled_amount = Decimal('0')
@@ -275,7 +276,7 @@ class WalletService:
                 # still unsettled, and deposit their actual COD sum. This makes a
                 # duplicate submission of the same tasks a no-op.
                 for task in base_qs.filter(id__in=delivery_ids):
-                    task_cod = task.cod_collected_amount or Decimal('0')
+                    task_cod = WalletService.task_cash_leg(task)
                     if task_cod <= Decimal('0'):
                         continue
                     settled_task_ids.append(task.id)
@@ -291,7 +292,7 @@ class WalletService:
                 # re-read under the lock below, so this is race-safe.
                 remaining = Decimal(str(amount))
                 for task in base_qs.order_by('completed_at'):
-                    task_cod = task.cod_collected_amount or Decimal('0')
+                    task_cod = WalletService.task_cash_leg(task)
                     if task_cod <= Decimal('0'):
                         continue
                     if remaining >= task_cod:
@@ -339,9 +340,22 @@ class WalletService:
                     id__in=settled_task_ids
                 ).values_list('order_id', flat=True))
                 if order_ids:
-                    Order.objects.filter(id__in=order_ids).update(
-                        cod_status_by_staff='cod_with_ezzy'
+                    Order.objects.filter(id__in=order_ids).exclude(
+                        cod_status_by_client__in=CLIENT_STATES_NOT_DERIVED
+                    ).update(
+                        cod_status_by_staff='cod_with_ezzy',
+                        cod_status_by_client='received_by_company',
                     )
+                    Order.objects.filter(
+                        id__in=order_ids,
+                        cod_status_by_client__in=CLIENT_STATES_NOT_DERIVED,
+                    ).update(cod_status_by_staff='cod_with_ezzy')
+
+            # Stamp the running COD balances on the whole ledger now that the
+            # settled tasks are linked, so the new deposit row shows the amount
+            # still in hand immediately (not only after the next page load).
+            WalletService.recalculate_cod_balances(driver)
+            trans.refresh_from_db()
 
         return trans
 
@@ -351,6 +365,13 @@ class WalletService:
         Recalculate cod_cash_after, cod_fawran_after, cod_pos_after for all COD
         transactions in chronological order. Saves any changed values back to DB.
         Called on each fleet_transactions page load to keep balances accurate.
+
+        A deposit does NOT blank the ledger: it subtracts what was actually
+        handed in, so a partial hand-in leaves the remaining cash on the
+        driver's running balance. Per-method amounts come from the tasks the
+        deposit settled (cod_submission_txn); older deposits with no linked
+        tasks fall back to debiting the deposit amount against cash. Fawran/POS
+        are already in Ezzy's bank, so any deposit sweeps them off the ledger.
         """
         txns = list(
             DriverTransaction.objects.filter(
@@ -359,21 +380,61 @@ class WalletService:
             ).select_related('delivery_task').order_by('created_at')
         )
 
+        # Per-deposit settled amounts by method, from the tasks each deposit settled
+        deposit_ids = [t.id for t in txns
+                       if t.transaction_type in ('cod_deposit', 'cod_driver_settle')]
+        settled_by_txn = {}
+        if deposit_ids:
+            rows = DeliveryTask.objects.filter(
+                cod_submission_txn_id__in=deposit_ids
+            ).values_list(
+                'cod_submission_txn_id', 'payment_method',
+                'payment_split', 'cod_collected_amount',
+            )
+            for txn_id, method, split, total in rows:
+                bucket = settled_by_txn.setdefault(
+                    txn_id,
+                    {'cash': Decimal('0'), 'fawran': Decimal('0'), 'pos': Decimal('0')})
+                cash_leg = WalletService.split_cash_leg(split)
+                if cash_leg is not None:
+                    # Mixed collection — credit each leg to its own bucket.
+                    bucket['cash'] += cash_leg
+                    bucket['fawran'] += Decimal(str(split.get('fawran') or 0))
+                    bucket['pos'] += Decimal(str(split.get('pos') or 0))
+                    continue
+                key = 'fawran' if method == 'fawran' else (
+                    'pos' if method in ('pos', 'card') else 'cash')
+                bucket[key] += total or Decimal('0')
+
         running_cash = Decimal('0')
         running_fawran = Decimal('0')
         running_pos = Decimal('0')
+        running_bank = Decimal('0')
+        running_atm = Decimal('0')
         to_update = []
+        zero = Decimal('0')
 
         for t in txns:
             if t.transaction_type in ['cod_deposit', 'cod_driver_settle']:
-                running_cash = Decimal('0')
-                running_fawran = Decimal('0')
-                running_pos = Decimal('0')
-                # After a deposit the running balance should be 0
-                if t.cod_cash_after != 0 or t.cod_fawran_after != 0 or t.cod_pos_after != 0:
-                    t.cod_cash_after = Decimal('0')
-                    t.cod_fawran_after = Decimal('0')
-                    t.cod_pos_after = Decimal('0')
+                settled = settled_by_txn.get(t.id)
+                cash_paid = settled['cash'] if settled else abs(t.amount)
+                running_cash = max(running_cash - cash_paid, zero)
+                # Electronic collections were never in the driver's hands —
+                # a deposit closes them out on the ledger.
+                running_fawran = zero
+                running_pos = zero
+                running_bank = zero
+                running_atm = zero
+                if (t.cod_cash_after != running_cash
+                        or t.cod_fawran_after != running_fawran
+                        or t.cod_pos_after != running_pos
+                        or t.cod_bank_after != running_bank
+                        or t.cod_atm_after != running_atm):
+                    t.cod_cash_after = running_cash
+                    t.cod_fawran_after = running_fawran
+                    t.cod_pos_after = running_pos
+                    t.cod_bank_after = running_bank
+                    t.cod_atm_after = running_atm
                     to_update.append(t)
                 continue
 
@@ -384,26 +445,44 @@ class WalletService:
             )
             amt = abs(t.amount)
 
-            if method == 'cash':
-                running_cash += amt
+            # A mixed-method collection splits across buckets — booking the whole
+            # amount under the dominant method would misstate both sides.
+            split = t.delivery_task.payment_split if t.delivery_task else None
+            cash_leg = WalletService.split_cash_leg(split)
+            if cash_leg is not None:
+                running_cash += cash_leg
+                running_fawran += Decimal(str(split.get('fawran') or 0))
+                running_pos += Decimal(str(split.get('pos') or 0))
+                running_bank += Decimal(str(split.get('bank') or 0))
+                running_atm += Decimal(str(split.get('atm') or 0))
             elif method == 'fawran':
                 running_fawran += amt
             elif method in ['pos', 'card']:
                 running_pos += amt
+            elif method == 'bank':
+                running_bank += amt
+            elif method == 'atm':
+                running_atm += amt
             else:
                 running_cash += amt
 
             if (t.cod_cash_after != running_cash
                     or t.cod_fawran_after != running_fawran
-                    or t.cod_pos_after != running_pos):
+                    or t.cod_pos_after != running_pos
+                    or t.cod_bank_after != running_bank
+                    or t.cod_atm_after != running_atm):
                 t.cod_cash_after = running_cash
                 t.cod_fawran_after = running_fawran
                 t.cod_pos_after = running_pos
+                t.cod_bank_after = running_bank
+                t.cod_atm_after = running_atm
                 to_update.append(t)
 
         if to_update:
             DriverTransaction.objects.bulk_update(
-                to_update, ['cod_cash_after', 'cod_fawran_after', 'cod_pos_after']
+                to_update,
+                ['cod_cash_after', 'cod_fawran_after', 'cod_pos_after',
+                 'cod_bank_after', 'cod_atm_after']
             )
 
         return len(to_update)
@@ -446,10 +525,15 @@ class WalletService:
     @staticmethod
     def _collection_method_counts(coll_qs):
         """Distinct collected tasks per method in a cod_collection queryset
-        (txns without a linked task count once each)."""
+        (txns without a linked task count once each).
+
+        Zero-amount rows are excluded: they exist so a prepaid delivery still has
+        a ledger entry to bill the delivery fee against, but no cash was handed
+        over, and the settlement pages already count them separately as zero-COD
+        deliveries. Including them here would double-count those orders."""
         seen = {'cash': set(), 'fawran': set(), 'pos': set()}
         extra = {'cash': 0, 'fawran': 0, 'pos': 0}
-        for c in coll_qs.select_related('delivery_task'):
+        for c in coll_qs.exclude(amount=0).select_related('delivery_task'):
             method = (
                 (c.delivery_task.payment_method if c.delivery_task else None)
                 or c.payment_method or 'cash'
@@ -507,34 +591,110 @@ class WalletService:
     @staticmethod
     def settle_cod_with_client(business, amount, delivery_task_ids=None,
                                created_by=None, reference_number=None, notes=None,
-                               payment_method=None):
+                               payment_method=None, delivery_charge=None,
+                               deductions=None):
         """
         Record COD settlement from EzzyDelivery to business client.
 
         Args:
             business: Business instance receiving the COD
-            amount: Decimal amount being settled
+            amount: Decimal GROSS COD being settled
             delivery_task_ids: Optional list of DeliveryTask IDs included
             created_by: User processing the settlement
             reference_number: Payment reference
             notes: Optional notes
             payment_method: Payment method used
+            delivery_charge: Legacy single-figure delivery fee. Folded into
+                ``deductions`` as one line; prefer passing ``deductions``.
+            deductions: List of dicts ``{kind, label, amount}`` — every charge
+                taken off the gross at payout (delivery, fulfilment, cargo
+                handling, ad-hoc). Each becomes an invoice line, a revenue
+                transaction and a BusinessPayoutDeduction row.
 
         Returns:
-            DriverTransaction instance
+            (DriverTransaction, settled_count)
         """
+        from fleet.models import BusinessPayoutDeduction
+
+        valid_kinds = {k for k, _ in BusinessPayoutDeduction.KIND_CHOICES}
+        lines = []
+        for raw in (deductions or []):
+            line_amount = Decimal(str(raw.get('amount') or '0'))
+            if line_amount < 0:
+                raise ValueError("Deduction amount cannot be negative")
+            if line_amount == 0:
+                continue
+            kind = raw.get('kind') or 'other_charge'
+            if kind not in valid_kinds:
+                raise ValueError(f"Unknown deduction kind '{kind}'")
+            lines.append({
+                'kind': kind,
+                'label': (raw.get('label') or dict(BusinessPayoutDeduction.KIND_CHOICES)[kind])[:120],
+                'amount': line_amount,
+            })
+
+        # Back-compat: callers still passing a bare delivery_charge get it as a
+        # line, so old and new callers produce the same invoice shape.
+        delivery_charge = Decimal(str(delivery_charge or '0'))
+        if delivery_charge < 0:
+            raise ValueError("Delivery charge cannot be negative")
+        if delivery_charge > 0 and not any(l['kind'] == 'delivery_charge' for l in lines):
+            lines.insert(0, {
+                'kind': 'delivery_charge',
+                'label': 'Delivery charges',
+                'amount': delivery_charge,
+            })
+
+        total_deductions = sum((l['amount'] for l in lines), Decimal('0'))
+        if total_deductions > amount:
+            raise ValueError(
+                f"Deductions {total_deductions} exceed the COD being settled {amount}"
+            )
+        net_amount = amount - total_deductions
+
         with transaction.atomic():
+            # The COD row records the cash that actually left the bank, so it
+            # matches the transfer the business will see on their statement.
             trans = WalletService.record_transaction(
                 driver=None,
                 transaction_type='cod_client_settle',
-                amount=amount,
-                description=f"COD settlement to {business.business_name} - {amount} QR",
+                amount=net_amount,
+                description=(
+                    f"COD settlement to {business.business_name} - {net_amount} QR"
+                    + (f" (gross {amount} less {total_deductions} deductions)"
+                       if total_deductions else "")
+                ),
                 created_by=created_by,
                 reference_number=reference_number,
                 notes=notes,
                 payment_method=payment_method,
                 business=business
             )
+
+            # Each charge is booked as its own revenue row rather than netted
+            # away silently — otherwise what Ezzy earned leaves no trace — and
+            # is recorded as an invoice line linked to both transactions.
+            for line in lines:
+                charge_txn = WalletService.record_transaction(
+                    driver=None,
+                    transaction_type=line['kind'],
+                    amount=line['amount'],
+                    description=(
+                        f"{line['label']} recovered from {business.business_name} "
+                        f"at COD payout {trans.transaction_code or trans.pk}"
+                    ),
+                    created_by=created_by,
+                    reference_number=reference_number,
+                    business=business,
+                )
+                BusinessPayoutDeduction.objects.create(
+                    settle_txn=trans,
+                    charge_txn=charge_txn,
+                    kind=line['kind'],
+                    label=line['label'],
+                    amount=line['amount'],
+                    created_by=created_by,
+                )
 
             settled_count = 0
             if delivery_task_ids:
@@ -567,9 +727,16 @@ class WalletService:
                             order_id=oid, cod_collected=True, cod_client_settled=False
                         ).exists()
                         if not remaining:
-                            Order.objects.filter(id=oid).update(
-                                cod_status_by_staff='cod_settled_with_business'
+                            Order.objects.filter(id=oid).exclude(
+                                cod_status_by_client__in=CLIENT_STATES_NOT_DERIVED
+                            ).update(
+                                cod_status_by_staff='cod_settled_with_business',
+                                cod_status_by_client='settled',
                             )
+                            Order.objects.filter(
+                                id=oid,
+                                cod_status_by_client__in=CLIENT_STATES_NOT_DERIVED,
+                            ).update(cod_status_by_staff='cod_settled_with_business')
 
             return trans, settled_count
 
@@ -609,9 +776,64 @@ class WalletService:
             else:
                 business = tasks[0].order.business if tasks[0].order else None
 
-            reversed_amount = amount if amount is not None else sum(
-                (t.cod_collected_amount or Decimal('0')) for t in tasks
+            # Reverse the NET that was actually paid, not the gross — otherwise
+            # unwinding a payout hands back money that was never sent. The
+            # invoice lines say exactly what was deducted, so follow those.
+            deduction_lines = []
+            charge_recovered = Decimal('0')
+            if settle_txn is not None:
+                deduction_lines = list(settle_txn.payout_deductions.all())
+                charge_recovered = sum(
+                    (l.amount or Decimal('0') for l in deduction_lines), Decimal('0'))
+
+                # Payouts made before deduction lines existed booked their fee
+                # as a loose delivery_charge row — fall back to matching it.
+                if not deduction_lines:
+                    charge_recovered = DriverTransaction.objects.filter(
+                        transaction_type='delivery_charge',
+                        business=settle_txn.business,
+                        reference_number=settle_txn.reference_number,
+                        created_at__gte=settle_txn.created_at,
+                    ).exclude(reference_number__isnull=True).exclude(
+                        reference_number=''
+                    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+            reversed_amount = amount if amount is not None else (
+                sum((t.cod_collected_amount or Decimal('0')) for t in tasks)
+                - charge_recovered
             )
+
+            # Give the charges back too — the deliveries were un-settled, so
+            # everything recovered against them comes off the books as well.
+            if deduction_lines:
+                for line in deduction_lines:
+                    if not line.amount:
+                        continue
+                    WalletService.record_transaction(
+                        driver=None,
+                        transaction_type=line.kind,
+                        amount=-line.amount,
+                        description=(
+                            f"{line.label} reversed for "
+                            f"{business.business_name if business else 'business'} "
+                            f"(payout {settle_txn.transaction_code if settle_txn else ''} reversed)"
+                        ),
+                        created_by=created_by,
+                        business=business,
+                    )
+            elif charge_recovered > 0:
+                WalletService.record_transaction(
+                    driver=None,
+                    transaction_type='delivery_charge',
+                    amount=-charge_recovered,
+                    description=(
+                        f"Delivery charges reversed for "
+                        f"{business.business_name if business else 'business'} "
+                        f"(payout {settle_txn.transaction_code if settle_txn else ''} reversed)"
+                    ),
+                    created_by=created_by,
+                    business=business,
+                )
 
             reversal = WalletService.record_transaction(
                 driver=None,
@@ -637,9 +859,16 @@ class WalletService:
             from orders.models import Order
             order_ids = {t.order_id for t in tasks if t.order_id}
             if order_ids:
-                Order.objects.filter(id__in=order_ids).update(
-                    cod_status_by_staff='cod_with_ezzy'
+                Order.objects.filter(id__in=order_ids).exclude(
+                    cod_status_by_client__in=CLIENT_STATES_NOT_DERIVED
+                ).update(
+                    cod_status_by_staff='cod_with_ezzy',
+                    cod_status_by_client='received_by_company',
                 )
+                Order.objects.filter(
+                    id__in=order_ids,
+                    cod_status_by_client__in=CLIENT_STATES_NOT_DERIVED,
+                ).update(cod_status_by_staff='cod_with_ezzy')
 
             return reversal, len(task_ids_to_reset)
 
@@ -806,32 +1035,84 @@ class WalletService:
     ELECTRONIC_METHODS = ['pos', 'fawran', 'bank', 'atm']
 
     @staticmethod
+    def split_cash_leg(payment_split):
+        """Cash portion of a mixed-method collection, or None if not a mix.
+
+        payment_method only records the *dominant* method of a split, so on a
+        {cash: 200, fawran: 500} collection it reads 'fawran' and would classify
+        the whole 700 as electronic — silently erasing 200 QR of driver
+        liability. Whenever a real split is present the cash leg is the only
+        part the driver actually holds.
+        """
+        if not isinstance(payment_split, dict) or len(payment_split) < 2:
+            return None
+        try:
+            return Decimal(str(payment_split.get('cash') or 0))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def task_cash_leg(task):
+        """Cash a driver is holding for one collected task (0 for electronic)."""
+        mixed = WalletService.split_cash_leg(task.payment_split)
+        if mixed is not None:
+            return mixed
+        if (task.payment_method or '') in WalletService.ELECTRONIC_METHODS:
+            return Decimal('0.00')
+        return Decimal(str(task.cod_collected_amount or 0))
+
+    @staticmethod
+    def is_electronic_only(task):
+        """True when nothing about this collection is cash the driver holds."""
+        return (task.payment_method or '') in WalletService.ELECTRONIC_METHODS \
+            and WalletService.task_cash_leg(task) <= Decimal('0')
+
+    @staticmethod
     def live_cod_in_hand(driver):
         """Single source of truth for a driver's COD-in-hand, derived from tasks.
 
         COD is 'in hand' only when it was collected as CASH and has NOT left the
-        driver by either route: submitted to admin (cod_settled=True) or reversed
-        to the customer (a cod_return transaction exists). Electronic payments
+        driver by either route: submitted to admin (cod_settled=True) or handed
+        back to the customer (a cod_return transaction). Electronic payments
         (Fawran/POS/bank/ATM) land in Ezzy's account directly, so they never count
         as the driver's in-hand liability. Everything that reports or gates on
         cod_in_hand goes through this — the cached Driver.cod_in_hand column is
         only a denormalization kept in sync with it.
-        """
-        returned_task_ids = fleet_models.DriverTransaction.objects.filter(
-            driver=driver,
-            transaction_type='cod_return',
-            delivery_task__isnull=False,
-        ).values_list('delivery_task_id', flat=True)
 
-        return delivery_models.DeliveryTask.objects.filter(
+        A return is subtracted by AMOUNT, not by dropping the task: refunding
+        100 of a 300 collection leaves 200 in the driver's hands, and excluding
+        the whole task would wipe all 300 off the liability.
+        """
+        base = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
             cod_collected=True,
             cod_settled=False,
-        ).exclude(
-            id__in=returned_task_ids
-        ).exclude(
+        )
+
+        # Mixed-method collections are counted by their cash leg only; their
+        # payment_method is just the dominant method and cannot classify the
+        # whole amount. Handled separately so the common case stays one query.
+        mixed_ids, mixed_cash = [], Decimal('0.00')
+        for task_id, split in base.exclude(
+            payment_split__isnull=True
+        ).values_list('id', 'payment_split'):
+            leg = WalletService.split_cash_leg(split)
+            if leg is not None:
+                mixed_ids.append(task_id)
+                mixed_cash += leg
+
+        plain = base.exclude(id__in=mixed_ids).exclude(
             payment_method__in=WalletService.ELECTRONIC_METHODS
         ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+
+        # Cash already handed back to customers on these still-unsettled tasks.
+        refunded = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type='cod_return',
+            delivery_task_id__in=base.values('id'),
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        return max(plain + mixed_cash - abs(refunded), Decimal('0.00'))
 
     @staticmethod
     def sync_cod_in_hand(driver, save=True):
@@ -840,13 +1121,32 @@ class WalletService:
         Call this inside the same locked transaction as any change to a driver's
         COD task state (collection, submission, return). Callers should already
         hold a select_for_update lock on the driver row. Returns the live value.
+
+        wallet_balance is re-derived here too. It used to be accumulated
+        independently inside record_transaction, which let it drift from the
+        task truth (a collection recorded without a payment_method was debited
+        as cash even when the task was Fawran). Deriving both from the same
+        source means they cannot disagree again.
         """
         live = WalletService.live_cod_in_hand(driver)
-        if save and driver.cod_in_hand != live:
+
+        # COD is the only thing that moves the wallet today; manual bonuses and
+        # deductions are added on top so they are never silently discarded.
+        adjustments = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['deduction', 'bonus', 'adjustment'],
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        wallet = adjustments - live
+
+        changed = []
+        if driver.cod_in_hand != live:
             driver.cod_in_hand = live
-            driver.save(update_fields=['cod_in_hand'])
-        else:
-            driver.cod_in_hand = live
+            changed.append('cod_in_hand')
+        if driver.wallet_balance != wallet:
+            driver.wallet_balance = wallet
+            changed.append('wallet_balance')
+        if save and changed:
+            driver.save(update_fields=changed)
         return live
 
     @staticmethod

@@ -1,0 +1,352 @@
+{# Purpose: One driver's payout desk — money ready to pay, plus the deliveries still awaiting verification. #}
+{# Used by: workforce.views.driver_payout_worksheet (URL workforce:driver_payout_worksheet) #}
+{# Notes: Flush layout, no page padding. COD is read-only context and is never part of a payout total. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+
+{% block title %}Payout · {{ driver_display_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/driver_payout_worksheet.css' %}?v=20260728i" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="dpw" id="workforce_payout_root">
+
+  <!-- Masthead — one line: who, and what the desk knows about them -->
+  <header class="dpw__masthead">
+    <div class="dpw__ident">
+      <span class="dpw__eyebrow">Driver payout</span>
+      <h1 class="dpw__title">{{ driver_display_name }}</h1>
+      <span class="dpw__ident-meta">
+        {# Last-paid lives on the ladder's fourth gate; repeating it here was the one duplicated fact on the page. #}
+        {{ driver.driver_code|default:"—" }}<span class="dpw__sep">/</span>ID {{ driver.driver_id }}
+      </span>
+    </div>
+    <nav class="dpw__masthead-actions">
+      <a href="{% url 'workforce:fleet_drivers_earnings' %}" class="dpw__ghost">All drivers</a>
+      <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="dpw__ghost">Transactions</a>
+    </nav>
+  </header>
+
+  {% comment %}
+  The ladder. A driver's money only ever moves through these four gates, in this
+  order, so the page states the whole pipeline instead of five loose figures —
+  and marks the gate holding money right now. Each gate is also the way into the
+  work it describes.
+  {% endcomment %}
+  <nav class="dpw__ladder" aria-label="Where this driver's money is">
+    <a href="?days={{ selected_days }}&amp;only=pending"
+       class="dpw__gate {% if money_at == 'pending' %}dpw__gate--here{% endif %} {% if only == 'pending' %}dpw__gate--on{% endif %}">
+      <span class="dpw__gate-label">Awaiting verification</span>
+      <span class="dpw__gate-value">{{ pending_value|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
+      <span class="dpw__gate-sub">{{ pending_count|intcomma }} deliver{{ pending_count|pluralize:"y,ies" }}</span>
+    </a>
+    <a href="?days={{ selected_days }}&amp;only=verified"
+       class="dpw__gate {% if money_at == 'verified' %}dpw__gate--here{% endif %} {% if only == 'verified' %}dpw__gate--on{% endif %}">
+      <span class="dpw__gate-label">Verified, not published</span>
+      <span class="dpw__gate-value">{{ verified_value|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
+      <span class="dpw__gate-sub">{{ verified_count|intcomma }} deliver{{ verified_count|pluralize:"y,ies" }}</span>
+    </a>
+    <a href="#workforce_payout_panel"
+       class="dpw__gate {% if money_at == 'payable' %}dpw__gate--here{% endif %}">
+      <span class="dpw__gate-label">Ready to pay</span>
+      <span class="dpw__gate-value">{{ net_payable|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
+      <span class="dpw__gate-sub">
+        {% if payable_lines %}{{ payable_lines|length }} line{{ payable_lines|length|pluralize }}{% else %}nothing published yet{% endif %}
+      </span>
+    </a>
+    {% if last_payout %}
+    <a href="{% url 'workforce:driver_payout_invoice' last_payout.settlement_id %}" class="dpw__gate dpw__gate--done">
+      <span class="dpw__gate-label">Last paid</span>
+      <span class="dpw__gate-value">{{ last_payout.net_amount|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
+      <span class="dpw__gate-sub">{{ last_payout.paid_at|date:"d M Y"|default:last_payout.created_at|date:"d M Y" }}</span>
+    </a>
+    {% else %}
+    <span class="dpw__gate dpw__gate--done dpw__gate--null">
+      <span class="dpw__gate-label">Last paid</span>
+      <span class="dpw__gate-value">—</span>
+      <span class="dpw__gate-sub">never paid out</span>
+    </span>
+    {% endif %}
+  </nav>
+
+  <!-- ── Ready to pay ─────────────────────────────────────────── -->
+  {% comment %}
+  Only rendered when there is money to pay. When there isn't, the ladder's third
+  gate already says so — an empty panel would just repeat it.
+  {% endcomment %}
+  {% if payable_lines %}
+  <form method="post" action="{% url 'workforce:driver_payout_create' driver.driver_id %}" id="workforce_payout_form">
+    {% csrf_token %}
+    <section class="dpw__panel" id="workforce_payout_panel">
+      <div class="dpw__panel-head">
+        <h2 class="dpw__panel-title">Ready to pay</h2>
+        <label class="dpw__check">
+          <input type="checkbox" class="form-check-input" id="workforce_payout_select_all">
+          <span>Select all</span>
+        </label>
+        <span class="dpw__meta" id="workforce_payout_selected_count">0 selected</span>
+        <span class="dpw__meta dpw__meta--end">
+          {{ earnings_total|floatformat:2|intcomma }} earned{% if deductions_total %}
+          <span class="dpw__sum-op">−</span> {{ deductions_total|floatformat:2|intcomma }} deducted{% endif %}
+          <span class="dpw__sum-op">=</span> <span class="dpw__sum-net">{{ net_payable|floatformat:2|intcomma }}</span>
+        </span>
+      </div>
+
+      <div class="dpw__scroll">
+        <table class="dpw__table">
+          <thead>
+            <tr>
+              <th class="dpw__col-check"></th>
+              <th>Line</th>
+              <th class="dpw__col-flex">Description</th>
+              <th>Task</th>
+              <th>Business</th>
+              <th>Date</th>
+              <th class="dpw__num">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in payable_lines %}
+            <tr class="{% if line.transaction_type == 'deduction' %}dpw__row--void{% endif %}">
+              <td class="dpw__col-check">
+                <input type="checkbox" class="form-check-input workforce_payout_line" name="txn_ids[]"
+                       value="{{ line.id }}" data-amount="{{ line.amount|default:0 }}" checked>
+              </td>
+              <td><span class="dpw__kind dpw__kind--{{ line.transaction_type }}">{{ line.get_transaction_type_display }}</span></td>
+              <td class="dpw__truncate dpw__col-flex" title="{{ line.description|default:'' }}">{{ line.description|default:"—" }}</td>
+              <td class="dpw__mono">{% if line.delivery_task %}{{ line.delivery_task.dl_task_number|default:line.delivery_task.id }}{% else %}—{% endif %}</td>
+              <td class="dpw__truncate" title="{{ line.delivery_task.order.business.business_name|default:'' }}">{{ line.delivery_task.order.business.business_name|default:"—" }}</td>
+              <td class="dpw__mono dpw__dim">{{ line.created_at|date:"d M y" }}</td>
+              <td class="dpw__num dpw__mono">{{ line.amount|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="dpw__payform">
+        <div class="dpw__field">
+          <label for="workforce_payout_method" class="dpw__field-label">Paid by</label>
+          <select name="payment_method" id="workforce_payout_method" class="form-select form-select-sm">
+            <option value="cash">Cash</option>
+            <option value="bank">Bank transfer</option>
+            <option value="fawran">Fawran</option>
+          </select>
+        </div>
+        <div class="dpw__field dpw__field--grow">
+          <label for="workforce_payout_reference" class="dpw__field-label">Reference</label>
+          <input type="text" name="payment_reference" id="workforce_payout_reference"
+                 class="form-control form-control-sm" placeholder="Transfer or voucher number" maxlength="100">
+        </div>
+      </div>
+    </section>
+  </form>
+  {% endif %}
+
+  <!-- ── Verification queue ───────────────────────────────────── -->
+  <section class="dpw__panel">
+    <div class="dpw__panel-head">
+      <h2 class="dpw__panel-title">Verification queue</h2>
+      <span class="dpw__meta">{{ queue_total|intcomma }} deliver{{ queue_total|pluralize:"y,ies" }}</span>
+      <span class="dpw__note">COD below is cash the driver holds for Ezzy — read-only here, settled on its own leg.</span>
+      <form method="get" class="dpw__period dpw__meta--end" id="workforce_payout_filter_form">
+        {% if only %}<input type="hidden" name="only" value="{{ only }}">{% endif %}
+        <label for="workforce_payout_days" class="dpw__field-label">Period</label>
+        <select name="days" id="workforce_payout_days" class="form-select form-select-sm">
+          <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 days</option>
+          <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 days</option>
+          <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 days</option>
+          <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last year</option>
+        </select>
+      </form>
+    </div>
+
+    <!-- The rail: state the rate once, then point at everything that leaves it -->
+    <div class="dpw__rail">
+      <span class="dpw__rail-rate">
+        <span class="dpw__rail-rate-label">Flat rate</span>
+        <span class="dpw__rail-rate-value">{{ flat_fee|floatformat:2 }}</span>
+        <span class="dpw__fig-unit">QAR</span>
+      </span>
+      <span class="dpw__rail-split">
+        {{ flat_count|intcomma }} at the flat rate
+      </span>
+      <a href="?days={{ selected_days }}&only=metered"
+         class="dpw__rail-tag {% if only == 'metered' %}dpw__rail-tag--on{% endif %} {% if metered_count %}dpw__rail-tag--mark{% endif %}">
+        {{ metered_count|intcomma }} priced from the client charge
+      </a>
+      <a href="?days={{ selected_days }}&only=adjusted"
+         class="dpw__rail-tag {% if only == 'adjusted' %}dpw__rail-tag--on{% endif %} {% if adjusted_count %}dpw__rail-tag--mark{% endif %}">
+        {{ adjusted_count|intcomma }} adjusted by staff
+      </a>
+      {% if only %}
+      <a href="?days={{ selected_days }}" class="dpw__rail-clear">Show all</a>
+      {% endif %}
+    </div>
+
+    {% if tasks %}
+    <div class="dpw__tools">
+      <label class="dpw__check">
+        <input type="checkbox" class="form-check-input" id="workforce_verify_select_all">
+        <span>Select all</span>
+      </label>
+      <span class="dpw__meta" id="workforce_verify_selected_count">0 selected</span>
+
+      <div class="dpw__set">
+        <label for="workforce_verify_bulk_amount" class="dpw__field-label">Set selected to</label>
+        <div class="input-group input-group-sm dpw__set-group">
+          <input type="number" class="form-control" id="workforce_verify_bulk_amount"
+                 placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+          <span class="input-group-text">QAR</span>
+          <button type="button" class="btn btn-outline-secondary" id="workforce_verify_btn_set" disabled>Apply</button>
+        </div>
+      </div>
+
+      <div class="dpw__acts">
+        <button type="button" class="dpw__btn" id="workforce_verify_btn_verify" disabled>Verify</button>
+        <button type="button" class="dpw__btn dpw__btn--go" id="workforce_verify_btn_publish" disabled>Verify &amp; publish</button>
+        <button type="button" class="dpw__btn dpw__btn--void" id="workforce_verify_btn_reject" disabled>Reject</button>
+      </div>
+    </div>
+
+    <div class="dpw__scroll dpw__scroll--queue">
+      <table class="dpw__table dpw__table--queue">
+        <thead>
+          <tr>
+            <th class="dpw__col-check"></th>
+            <th>Task</th>
+            <th>Date</th>
+            <th class="dpw__col-flex">Business</th>
+            <th>Route</th>
+            <th class="dpw__num dpw__col-money">Charge</th>
+            <th class="dpw__num dpw__col-cod">COD</th>
+            <th class="dpw__num">Driver fee</th>
+            <th>Status</th>
+            <th class="dpw__num">Log</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in tasks %}
+          <tr data-task-id="{{ task.id }}">
+            <td class="dpw__col-check">
+              <input type="checkbox" class="form-check-input workforce_verify_task" value="{{ task.id }}">
+            </td>
+            <td class="dpw__mono">{{ task.dl_task_number }}</td>
+            {# Not `|date|default:…|date` and not `{% firstof … as %}` — both hand the second date filter a string, which is why this column rendered blank. #}
+            <td class="dpw__mono dpw__dim">{% if task.completed_at %}{{ task.completed_at|date:"d M y" }}{% elif task.dl_task_date %}{{ task.dl_task_date|date:"d M y" }}{% else %}—{% endif %}</td>
+            <td class="dpw__truncate dpw__col-flex" title="{{ task.order.business.business_name|default:'' }}">{{ task.order.business.business_name|default:"—" }}</td>
+            {% comment %}Qatar addresses read as zone numbers, so the route is a zone pair. The drop zone lives on the order (QNAS), not on the address record.{% endcomment %}
+            <td class="dpw__dim dpw__route"
+                title="{{ task.pickup_location.pickup_location_title|default:'No pickup' }} → zone {{ task.order.dl_zone|default:'?' }}{% if task.order.dl_street %}, street {{ task.order.dl_street }}{% endif %}">
+              {% if task.pickup_location.pickup_zone_no %}<span class="dpw__mono">Z{{ task.pickup_location.pickup_zone_no }}</span>
+              {% else %}<span class="dpw__mono">{{ task.pickup_location.pickup_location_title|default:"—"|truncatechars:9 }}</span>{% endif %}
+              <span class="dpw__route-arrow">→</span>
+              {% firstof task.dl_to_address.dl_zone task.order.dl_zone as drop_zone %}
+              {% if drop_zone %}<span class="dpw__mono">Z{{ drop_zone }}</span>
+              {% else %}<span class="dpw__mono">—</span>{% endif %}
+            </td>
+            {# Zero renders as an em dash so the row carrying a real charge stands out. #}
+            <td class="dpw__num dpw__mono dpw__dim dpw__col-money">{% if task.dl_price %}{{ task.dl_price|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="dpw__num dpw__mono dpw__col-cod">
+              {% if task.cod_collected %}
+                {{ task.cod_collected_amount|default:0|floatformat:2 }}
+                <span class="dpw__cod-method">{{ task.get_payment_method_display|default:"" }}</span>
+              {% else %}
+                <span class="dpw__dim">prepaid</span>
+              {% endif %}
+            </td>
+            <td class="dpw__num dpw__fee {% if task.fee_metered %}dpw__fee--metered{% elif task.fee_adjusted %}dpw__fee--adjusted{% endif %}">
+              <input type="number" class="dpw__fee-input"
+                     id="workforce_verify_input_{{ task.id }}"
+                     aria-label="Driver fee for task {{ task.dl_task_number }}"
+                     value="{{ task.fee_value|floatformat:2 }}"
+                     data-original="{{ task.fee_value|floatformat:2 }}"
+                     data-calculated="{{ task.fee_calculated|floatformat:2 }}"
+                     step="0.01" min="0">
+              {% if task.fee_metered %}<span class="dpw__fee-why" title="Pick &amp; drop — 80% of the client charge">metered</span>
+              {% elif task.fee_adjusted %}<span class="dpw__fee-why" title="Calculated {{ task.fee_calculated|floatformat:2 }} QAR">was {{ task.fee_calculated|floatformat:2 }}</span>{% endif %}
+            </td>
+            <td class="dpw__col-flex">
+              <span class="dpw__status dpw__status--{{ task.earnings_verification_status }}"
+                    title="{{ task.get_earnings_verification_status_display }}">{{ task.earnings_verification_status }}</span>
+              {% if task.earnings_verified_by %}<span class="dpw__by">{{ task.earnings_verified_by.first_name|default:task.earnings_verified_by.username|slice:":10" }}</span>{% endif %}
+            </td>
+            <td class="dpw__num">
+              {% if task.activity_log %}
+              <button type="button" class="dpw__log-btn" data-log-for="{{ task.id }}"
+                      aria-expanded="false" aria-controls="workforce_verify_log_{{ task.id }}">{{ task.activity_log|length }}</button>
+              {% else %}<span class="dpw__dim">—</span>{% endif %}
+            </td>
+          </tr>
+          {% if task.activity_log %}
+          <tr class="dpw__log-row" id="workforce_verify_log_{{ task.id }}" hidden>
+            <td colspan="10">
+              <ol class="dpw__log-list">
+                {% for entry in task.activity_log %}
+                <li class="dpw__log-entry">
+                  <span class="dpw__log-time">{{ entry.created_at|date:"d M H:i" }}</span>
+                  <span class="dpw__log-type">{{ entry.get_activity_type_display }}</span>
+                  {% if entry.description %}<span class="dpw__log-desc">{{ entry.description }}</span>{% endif %}
+                </li>
+                {% endfor %}
+              </ol>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if tasks.has_other_pages %}
+    <div class="dpw__pager">
+      {% include "includes/components/_pagination.html" with page_obj=tasks %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <p class="dpw__empty">
+      {% if only %}No delivery in this period matches that filter. <a href="?days={{ selected_days }}">Show all</a>.
+      {% else %}No deliveries awaiting verification in this period.{% endif %}
+    </p>
+    {% endif %}
+  </section>
+
+  <!-- ── Recent payouts ───────────────────────────────────────── -->
+  {% if recent_payouts %}
+  <section class="dpw__panel">
+    <div class="dpw__panel-head">
+      <h2 class="dpw__panel-title">Recent payouts</h2>
+    </div>
+    <ul class="dpw__payouts">
+      {% for s in recent_payouts %}
+      <li class="dpw__payout">
+        <a href="{% url 'workforce:driver_payout_invoice' s.settlement_id %}" class="dpw__payout-code">{{ s.settlement_code }}</a>
+        <span class="dpw__payout-date">{{ s.paid_at|date:"d M Y"|default:s.created_at|date:"d M Y" }}</span>
+        <span class="dpw__payout-amt">{{ s.net_amount|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <!-- Sticky tape — appears only while lines are selected -->
+  <div class="dpw__tape" id="workforce_payout_tape" hidden>
+    <span class="dpw__tape-label"><span id="workforce_payout_tape_count">0</span> lines selected</span>
+    <span class="dpw__tape-total"><span id="workforce_payout_tape_total">0.00</span><span class="dpw__fig-unit">QAR</span></span>
+    <button type="button" class="dpw__tape-btn" id="workforce_payout_btn_create">Create payout</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const workforceEarningsActionUrl = "{% url 'workforce:earnings_verification_action' %}";
+</script>
+<script src="{% static 'workforce/js/driver-payout-worksheet.js' %}?v=20260728i"></script>
+{% endblock %}

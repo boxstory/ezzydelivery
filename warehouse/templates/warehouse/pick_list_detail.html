@@ -3,12 +3,14 @@
 
 {% block title %}Pick List {{ pick_list.pick_number }}{% endblock %}
 
-{% block extra_css %}{% endblock extra_css %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/pick-detail.css' %}?v=20260727k" type="text/css" />
+{% endblock extra_css %}
 
 {% block content %}
 {% csrf_token %}
 {% include "warehouse/parts/qr_scanner.html" %}
-<div class="wh">
+<div class="wh pkl-detail">
   <!-- Breadcrumb -->
   <div class="wh__breadcrumb">
     <a href="{% url 'warehouse:pick_list_list' %}">Pick Lists</a>
@@ -26,7 +28,7 @@
       </div>
     </div>
     <div class="d-flex align-items-center gap-2">
-      {% if pick_list.status == 'in_progress' %}
+      {% if pick_list.status == 'in_progress' and grouped_items %}
       <button class="wh__btn wh__btn--primary" onclick="openQrScanner(onProductScanned)" title="Scan product QR code">
         <i class="fas fa-qrcode"></i> <span class="d-none d-md-inline">Scan</span>
       </button>
@@ -62,89 +64,76 @@
     </div>
   </div>
 
-  <!-- Info + Actions -->
-  <div class="row g-3">
-    <div class="col-md-6">
-      <div class="wh__card">
-        <div class="wh__card-header">
-          <div class="wh__card-header-left"><i class="fas fa-info-circle"></i> <span>Details</span></div>
-        </div>
-        <div class="wh__card-body">
-          <div class="pkl__detail-row"><span class="wh__meta">Warehouse</span><strong>{{ pick_list.warehouse.name }}</strong></div>
-          <div class="pkl__detail-row"><span class="wh__meta">Created</span><strong>{{ pick_list.created_at|date:"d M Y H:i" }}</strong></div>
-          <div class="pkl__detail-row"><span class="wh__meta">Assigned To</span><strong>{% if pick_list.assigned_to %}{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}{% else %}Unassigned{% endif %}</strong></div>
-          {% if pick_list.started_at %}
-          <div class="pkl__detail-row"><span class="wh__meta">Started</span><strong>{{ pick_list.started_at|date:"d M Y H:i" }}</strong></div>
-          {% endif %}
-          {% if pick_list.completed_at %}
-          <div class="pkl__detail-row"><span class="wh__meta">Completed</span><strong class="pkl__completed-time">{{ pick_list.completed_at|date:"d M Y H:i" }}</strong></div>
-          {% endif %}
-        </div>
+  <!-- Pick console strip: facts + contextual action/progress -->
+  <div class="pks">
+    <div class="pks__meta">
+      <div class="pks__meta-item">
+        <span class="pks__meta-label">Warehouse</span>
+        <span class="pks__meta-val" title="{{ pick_list.warehouse.name }}">{{ pick_list.warehouse.name }}</span>
       </div>
-    </div>
-    <div class="col-md-6">
-      <div class="wh__card">
-        <div class="wh__card-header">
-          <div class="wh__card-header-left"><i class="fas fa-hand-pointer"></i> <span>Actions</span></div>
-        </div>
-        <div class="wh__card-body pkl__action-body">
-          {% if pick_list.status == 'pending' %}
-            <p class="pkl__action-hint">Assign this pick list and start picking items.</p>
-            <form method="POST" action="{% url 'warehouse:start_pick_list' pick_list.pk %}" novalidate>
-              {% csrf_token %}
-              <button type="submit" class="pkl__btn pkl__btn--start"><i class="fas fa-play"></i> Assign & Start Picking</button>
-            </form>
-          {% elif pick_list.status == 'assigned' %}
-            <p class="pkl__action-hint"><i class="fas fa-user-check pkl__status-label"></i> Assigned to <strong>{% if pick_list.assigned_to %}{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}{% else %}Unassigned{% endif %}</strong></p>
-            <form method="POST" action="{% url 'warehouse:start_pick_list' pick_list.pk %}" novalidate>
-              {% csrf_token %}
-              <button type="submit" class="pkl__btn pkl__btn--start"><i class="fas fa-play"></i> Start Picking</button>
-            </form>
-          {% elif pick_list.status == 'in_progress' %}
-            <div class="pkl__status-label"><i class="fas fa-spinner fa-spin"></i> Picking in Progress</div>
-            <div class="pkl__progress-wrap" id="pkl_progress_wrap">
-              <div class="pkl__progress-label">
-                <span>Progress</span>
-                <span id="pkl_progress_text">{{ pick_list.picked_items }}/{{ pick_list.total_items }}</span>
-              </div>
-              <div class="pkl__progress-bar">
-                <div class="pkl__progress-fill {% if pick_list.progress_percentage == 100 %}pkl__progress-fill--done{% endif %}"
-                     id="pkl_progress_fill" style="width:{{ pick_list.progress_percentage }}%;"></div>
-              </div>
-            </div>
-            <p class="wh__meta mb-0">Tap a product to expand, then mark each order item as picked</p>
-          {% elif pick_list.status == 'completed' or pick_list.status == 'packing' %}
-            <div class="pkl__complete-banner">
-              <i class="fas fa-circle-check d-block"></i>
-              <p>All items picked!</p>
-            </div>
-            <a href="{% url 'warehouse:pack_station' pick_list.pk %}" class="pkl__btn pkl__btn--start mt-3">
-              <i class="fas fa-box-open"></i> Start Packing Orders
-            </a>
-          {% elif pick_list.status == 'packed' %}
-            <div class="pkl__complete-banner">
-              <i class="fas fa-box d-block"></i>
-              <p>All orders packed &amp; ready!</p>
-            </div>
-          {% endif %}
-        </div>
+      <div class="pks__meta-item">
+        <span class="pks__meta-label">Assigned</span>
+        <span class="pks__meta-val">{% if pick_list.assigned_to %}{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}{% else %}Unassigned{% endif %}</span>
       </div>
+      {% if pick_list.started_at %}
+      <div class="pks__meta-item">
+        <span class="pks__meta-label">Started</span>
+        <span class="pks__meta-val">{{ pick_list.started_at|date:"d M H:i" }}</span>
+      </div>
+      {% else %}
+      <div class="pks__meta-item">
+        <span class="pks__meta-label">Created</span>
+        <span class="pks__meta-val">{{ pick_list.created_at|date:"d M H:i" }}</span>
+      </div>
+      {% endif %}
+      {% if pick_list.completed_at %}
+      <div class="pks__meta-item">
+        <span class="pks__meta-label">Completed</span>
+        <span class="pks__meta-val pks__meta-val--done">{{ pick_list.completed_at|date:"d M H:i" }}</span>
+      </div>
+      {% endif %}
     </div>
-  </div>
 
-  <!-- Main progress (in_progress) -->
-  {% if pick_list.status == 'in_progress' %}
-  <div class="pkl__progress-wrap mt-3" id="pkl_progress_wrap_main">
-    <div class="pkl__progress-label">
-      <span>Picking Progress</span>
-      <span id="pkl_progress_text_main">{{ pick_list.picked_items }} of {{ pick_list.total_items }} items</span>
-    </div>
-    <div class="pkl__progress-bar pkl__progress-bar--lg">
-      <div class="pkl__progress-fill {% if pick_list.progress_percentage == 100 %}pkl__progress-fill--done{% endif %}"
-           id="pkl_progress_fill_main" style="width:{{ pick_list.progress_percentage }}%;"></div>
+    <div class="pks__action">
+      {% if pick_list.status == 'pending' %}
+        <p class="pks__prompt">Assign this list and begin the pick route.</p>
+        <form method="POST" action="{% url 'warehouse:start_pick_list' pick_list.pk %}" novalidate>
+          {% csrf_token %}
+          <button type="submit" class="pks__cta"><i class="fas fa-play"></i> Assign &amp; Start</button>
+        </form>
+      {% elif pick_list.status == 'assigned' %}
+        <p class="pks__prompt">Assigned to <b>{% if pick_list.assigned_to %}{{ pick_list.assigned_to.get_full_name|default:pick_list.assigned_to.username }}{% else %}Unassigned{% endif %}</b> — ready to pick.</p>
+        <form method="POST" action="{% url 'warehouse:start_pick_list' pick_list.pk %}" novalidate>
+          {% csrf_token %}
+          <button type="submit" class="pks__cta"><i class="fas fa-play"></i> Start Picking</button>
+        </form>
+      {% elif pick_list.status == 'in_progress' %}
+        {% if grouped_items %}
+        <div class="pks__progress">
+          <div class="pks__ring" id="pkl_progress_ring" style="--pct: {{ pick_list.progress_percentage }}%;">
+            <div class="pks__ring-center">
+              <span class="pks__ring-count" id="pkl_progress_text">{{ pick_list.picked_items }}/{{ pick_list.total_items }}</span>
+              <span class="pks__ring-label">picked</span>
+            </div>
+          </div>
+          <div class="pks__progress-body">
+            <div class="pks__progress-title"><i class="fas fa-person-walking"></i> Picking in progress</div>
+            <p class="pks__progress-hint">Tap a product to expand its bin, then confirm each order item as picked.</p>
+          </div>
+        </div>
+        {% else %}
+        <p class="pks__prompt"><i class="fas fa-circle-info"></i> This list has no items to pick.</p>
+        {% endif %}
+      {% elif pick_list.status == 'completed' or pick_list.status == 'packing' %}
+        <div class="pks__done"><i class="fas fa-circle-check"></i> All items picked</div>
+        <a href="{% url 'warehouse:pack_station' pick_list.pk %}" class="pks__cta">
+          <i class="fas fa-box-open"></i> Start Packing
+        </a>
+      {% elif pick_list.status == 'packed' %}
+        <div class="pks__done pks__done--sealed"><i class="fas fa-box"></i> All orders packed &amp; ready</div>
+      {% endif %}
     </div>
   </div>
-  {% endif %}
 
   <!-- ═══ PRODUCT-GROUPED PICK VIEW ═══ -->
   <div class="wh__card mt-3">
@@ -165,17 +154,22 @@
           <div class="pkl__grp-check">
             {% if grp.all_picked %}<i class="fas fa-check"></i>{% endif %}
           </div>
+          {% if any_location %}
+          <div class="pkl__grp-bin {% if not grp.location %}pkl__grp-bin--none{% endif %}"
+               title="{% if grp.location %}Bin {{ grp.location.code }}{% else %}No bin assigned{% endif %}">
+            {% if grp.location %}{{ grp.location.code }}{% else %}—{% endif %}
+          </div>
+          {% endif %}
           <div class="pkl__grp-info">
             <div class="pkl__grp-name">{{ grp.product.item_name }}</div>
             <div class="pkl__grp-meta">
-              {% if grp.location %}<span><i class="fas fa-location-dot"></i> {{ grp.location.code }}</span>{% endif %}
-              <span><i class="fas fa-hashtag"></i> {{ grp.product.item_sku }}</span>
+              <span class="pkl__grp-sku"><i class="fas fa-hashtag"></i> {{ grp.product.item_sku }}</span>
               <span><i class="fas fa-file-invoice"></i> {{ grp.orders|length }} order{{ grp.orders|length|pluralize }}</span>
             </div>
           </div>
           <div class="pkl__grp-qty">
             {% if grp.all_picked %}
-            <i class="fas fa-circle-check" style="color:#15803d;"></i>
+            <i class="fas fa-circle-check pkl__done-ic"></i>
             {% else %}
             {{ grp.picked_qty }}/{{ grp.total_qty }}
             {% endif %}
@@ -212,7 +206,7 @@
               <div class="pkl__grp-item-meta">Qty: {{ item.quantity_to_pick }}</div>
             </div>
             <div class="pkl__grp-item-qty" id="pkl_qty_{{ item.id }}">
-              {% if item.is_picked %}<i class="fas fa-circle-check" style="color:#15803d;"></i>{% else %}{{ item.quantity_picked }}/{{ item.quantity_to_pick }}{% endif %}
+              {% if item.is_picked %}<i class="fas fa-circle-check pkl__done-ic"></i>{% else %}{{ item.quantity_picked }}/{{ item.quantity_to_pick }}{% endif %}
             </div>
           </div>
           {% endfor %}
@@ -335,7 +329,7 @@ function togglePickItem(itemId, isPicked) {
             if (checkEl) { checkEl.classList.add('pkl__grp-item-check--done'); checkEl.innerHTML = '<i class="fas fa-check"></i>'; }
             checkEl.setAttribute('onclick', 'event.stopPropagation(); togglePickItem(' + itemId + ', true)');
             checkEl.title = 'Undo pick';
-            if (qtyEl) { qtyEl.classList.add('pkl__grp-item--picked'); qtyEl.innerHTML = '<i class="fas fa-circle-check" style="color:#15803d;"></i>'; }
+            if (qtyEl) { qtyEl.classList.add('pkl__grp-item--picked'); qtyEl.innerHTML = '<i class="fas fa-circle-check pkl__done-ic"></i>'; }
         } else {
             if (row) row.classList.remove('pkl__grp-item--picked');
             if (checkEl) { checkEl.classList.remove('pkl__grp-item-check--done'); checkEl.innerHTML = ''; }
@@ -354,15 +348,11 @@ function togglePickItem(itemId, isPicked) {
 }
 
 function updateProgress(picked, total, pct, status) {
+    // Ring count + arc (the console progress signature)
     var pText = document.getElementById('pkl_progress_text');
-    var pFill = document.getElementById('pkl_progress_fill');
     if (pText) pText.textContent = picked + '/' + total;
-    if (pFill) { pFill.style.width = pct + '%'; pFill.className = 'pkl__progress-fill' + (pct >= 100 ? ' pkl__progress-fill--done' : ''); }
-
-    var pTextMain = document.getElementById('pkl_progress_text_main');
-    var pFillMain = document.getElementById('pkl_progress_fill_main');
-    if (pTextMain) pTextMain.textContent = picked + ' of ' + total + ' items';
-    if (pFillMain) { pFillMain.style.width = pct + '%'; pFillMain.className = 'pkl__progress-fill' + (pct >= 100 ? ' pkl__progress-fill--done' : ''); }
+    var ring = document.getElementById('pkl_progress_ring');
+    if (ring) ring.style.setProperty('--pct', pct + '%');
 
     if (status === 'completed') { setTimeout(function() { location.reload(); }, 800); }
 }

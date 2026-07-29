@@ -310,51 +310,23 @@
             </div>
         </div>
 
-        <!-- Pagination -->
-        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <!-- Sheet row jump + PAGER (shared brand component) -->
+        {% if page_obj and page_obj.paginator.count > 0 %}
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
-            <div class="small text-muted">
-                Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ total_filtered }}
-                {% if live_total and live_total != total_filtered %} ({{ live_total }} total in sheet){% endif %}
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <select class="form-select form-select-sm" style="width:auto;"
-                        onchange="window.location.href='?business={{ selected_business_id }}&status={{ status_filter }}&per_page='+this.value+'&page=1'">
-                    <option value="10"  {% if per_page == 10  %}selected{% endif %}>10 / page</option>
-                    <option value="25"  {% if per_page == 25  %}selected{% endif %}>25 / page</option>
-                    <option value="50"  {% if per_page == 50  %}selected{% endif %}>50 / page</option>
-                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100 / page</option>
-                </select>
-                {% if page_obj.has_previous %}
-                <a class="btn btn-sm btn-outline-primary" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">
-                    <i class="fa-solid fa-chevron-left me-1"></i>Previous {{ per_page }}
-                </a>
-                {% else %}
-                <button class="btn btn-sm btn-outline-secondary" disabled>
-                    <i class="fa-solid fa-chevron-left me-1"></i>Previous {{ per_page }}
+            {% if live_total and live_total != total_filtered %}
+            <div class="small text-muted">{{ live_total }} total rows in sheet</div>
+            {% endif %}
+            <div class="d-flex align-items-center gap-1 ms-auto">
+                <label class="small text-muted text-nowrap mb-0" for="wfapi_goto_row">Go to row:</label>
+                <input type="number" id="wfapi_goto_row" class="form-control form-control-sm woa__goto-row" min="2" max="{{ total_filtered|add:1 }}" placeholder="Row" {% if default_goto_row %}value="{{ default_goto_row }}"{% endif %}>
+                <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="goToRow()">
+                    <i class="fa-solid fa-arrow-right"></i>
                 </button>
-                {% endif %}
-                <span class="badge bg-primary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-                {% if page_obj.has_next %}
-                <a class="btn btn-sm btn-outline-primary" href="?business={{ selected_business_id }}&status={{ status_filter }}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}">
-                    Next {{ per_page }} <i class="fa-solid fa-chevron-right ms-1"></i>
-                </a>
-                {% else %}
-                <button class="btn btn-sm btn-outline-secondary" disabled>
-                    Next {{ per_page }} <i class="fa-solid fa-chevron-right ms-1"></i>
-                </button>
-                {% endif %}
-                <span class="text-muted mx-1">|</span>
-                <div class="d-flex align-items-center gap-1">
-                    <label class="small text-muted text-nowrap mb-0">Go to row:</label>
-                    <input type="number" id="wfapi_goto_row" class="form-control form-control-sm" style="width:70px;" min="2" max="{{ total_filtered|add:1 }}" placeholder="Row" {% if default_goto_row %}value="{{ default_goto_row }}"{% endif %}>
-                    <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="goToRow()">
-                        <i class="fa-solid fa-arrow-right"></i>
-                    </button>
-                </div>
             </div>
         </div>
         {% endif %}
+
+        {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="wf_orders_api" %}
 
         {% else %}
         <!-- No business selected: prompt to pick one -->
@@ -616,7 +588,7 @@ function goToRow() {
         return;
     }
     const page = Math.floor(dataIdx / perPage) + 1;
-    window.location.href = '?business={{ selected_business_id }}&status={{ status_filter }}&per_page=' + perPage + '&page=' + page + '#row-' + rowNum;
+    window.location.href = '?page=' + page + '&per_page=' + perPage + '{% if filter_params %}&{{ filter_params|escapejs }}{% endif %}' + '#row-' + rowNum;
 }
 // Allow Enter key in the input
 document.addEventListener('DOMContentLoaded', function() {

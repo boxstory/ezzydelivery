@@ -449,12 +449,13 @@ def _apply_inbound_location(msg):
 
         OrderStatusHistory.objects.create(
             order=order,
-            field_name='latitude/longitude',
+            field_name='location_update',
             old_value='',
             new_value=f'{lat},{lng}',
-            old_display='No coords',
-            new_display=f'Pinned by customer via WhatsApp ({lat}, {lng})',
+            old_display='No pin',
+            new_display=f'By Client · {lat}, {lng}',
             changed_by=None,
+            notes='Shared WhatsApp location pin',
         )
 
         job.status = 'verified'

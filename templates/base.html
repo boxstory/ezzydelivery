@@ -1,14 +1,16 @@
 {% load static %}
 {% load crispy_forms_tags %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{% block html_lang %}en{% endblock html_lang %}"{% block html_dir %}{% endblock html_dir %}>
 
 <head>
   {% include 'includes/head.html' %}
+  {% block head_hreflang %}
+  {% endblock head_hreflang %}
   <!-- extra css -->
   {% block extra_css %}
   {% endblock extra_css %}
-  <title>{% if seo %}{{ seo.title }}{% else %}{% block title %}Home | EzzyDelivery Qatar{% endblock title %}{% endif %}</title>
+  <title>{% if seo and not seo.is_default %}{{ seo.title }}{% else %}{% block title %}{% if seo.title %}{{ seo.title }}{% else %}Home | EzzyDelivery Qatar{% endif %}{% endblock title %}{% endif %}</title>
 </head>
 
 <body class="d-flex flex-column min-vh-100">

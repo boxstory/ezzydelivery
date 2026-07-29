@@ -3006,6 +3006,80 @@
 }
 
 /* ============================================================================
+   SCAN-TO-TAKE BAR + POOL SCANNER (tasks New tab)
+   ============================================================================ */
+
+.tsk-scanbar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 0 12px;
+  padding: 11px 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+}
+
+.tsk-scanbar__hint {
+  font-size: .66rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.tsk-scanbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: #001f3f;
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.tsk-scanbar__btn i { color: #f7c000; }
+.tsk-scanbar__btn:active { transform: scale(.98); }
+
+.tsk-scanbar__btn--done {
+  background: #fff;
+  color: #001f3f;
+  border: 1.5px solid #d5d9e0;
+}
+
+.tsk-scanbar__btn--done i { color: #16a34a; }
+
+.tsk-scanbar__taken {
+  margin: 10px 0 0;
+  font-size: .72rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: center;
+}
+
+.tsk-scanbar__again {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tsk-scanbar__again .fleet-btn { flex: 1; }
+
+#poolScanVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ============================================================================
    PROFILE HEADER (profile page)
    ============================================================================ */
 
@@ -6625,71 +6699,20 @@ img.vf-photo-preview {
    PAGINATION
    ───────────────────────────────────────────────────────────────────────── */
 
-.fleet-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-md) var(--spacing-sm);
+.fleet-pagination-wrap {
     margin-top: var(--spacing-md);
     margin-bottom: var(--spacing-xl);
 }
 
-.fleet-pagination__btn {
-    min-width: 44px;
-    height: 44px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--fleet-grey-300);
-    background: var(--fleet-white);
-    color: var(--fleet-dark);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: var(--font-size-base);
-    transition: all 0.2s ease;
-    text-decoration: none;
-    flex-shrink: 0;
+/* The shared component ships its own card chrome; only the rhythm and the
+   compact variant (which pagination.css leaves unstyled) are set here. */
+.fleet-pagination-wrap .pgn {
+    margin-top: 0;
 }
 
-.fleet-pagination__btn:not(:disabled) {
-    &:active {
-        background: var(--fleet-dark);
-        color: var(--fleet-white);
-        border-color: var(--fleet-dark);
-    }
-}
-
-.fleet-pagination__btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.fleet-pagination__btn--first,
-.fleet-pagination__btn--last {
-    display: none;
-}
-
-@media (min-width: 576px) {
-    .fleet-pagination__btn--first,
-    .fleet-pagination__btn--last {
-        display: flex;
-    }
-}
-
-.fleet-pagination__info {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 80px;
-    padding: 0 var(--spacing-xs);
-}
-
-.fleet-pagination__current {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--fleet-dark);
-    white-space: nowrap;
+.fleet-pagination-wrap .pgn--compact {
+    padding: 0.625rem 0.75rem;
+    gap: 0.5rem;
 }
 
 /* ============================================================================

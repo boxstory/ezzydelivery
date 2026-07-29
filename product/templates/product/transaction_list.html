@@ -148,44 +148,8 @@
     {% endfor %}
   </div>
 
-  <!-- Pagination -->
-  {% if transactions.paginator.num_pages > 1 %}
-  <div class="txl__pagination">
-    {% if transactions.has_previous %}
-    <a href="?page={{ transactions.previous_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
-       class="txl__page-btn"
-       hx-get="?page={{ transactions.previous_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
-       hx-target="#main-content"
-       hx-swap="outerHTML"
-       hx-push-url="true">
-      <i class="fas fa-chevron-left"></i>
-    </a>
-    {% else %}
-    <button class="txl__page-btn" disabled>
-      <i class="fas fa-chevron-left"></i>
-    </button>
-    {% endif %}
-
-    <span class="txl__page-info">
-      Page {{ transactions.number }} of {{ transactions.paginator.num_pages }}
-    </span>
-
-    {% if transactions.has_next %}
-    <a href="?page={{ transactions.next_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
-       class="txl__page-btn"
-       hx-get="?page={{ transactions.next_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
-       hx-target="#main-content"
-       hx-swap="outerHTML"
-       hx-push-url="true">
-      <i class="fas fa-chevron-right"></i>
-    </a>
-    {% else %}
-    <button class="txl__page-btn" disabled>
-      <i class="fas fa-chevron-right"></i>
-    </button>
-    {% endif %}
-  </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries type / warehouse -->
+  {% include "includes/components/_pagination.html" with page_obj=transactions filter_params=filter_params per_page=per_page pagination_id="product_txn_list" %}
 
   {% else %}
   <!-- Empty State -->

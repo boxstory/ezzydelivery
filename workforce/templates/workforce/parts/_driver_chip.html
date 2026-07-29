@@ -1,0 +1,11 @@
+{% comment %}
+Purpose: Driver identity chip — person's name plus fleet code, matching the Assigned Driver block.
+Used by: workforce/parts/_pickup_leg_card.html, workforce/parts/_delivery_leg_card.html (pass driver=<Driver>).
+Notes: Driver.__str__ is the login username (ezzy.dr001), which is not what staff identify drivers by —
+       always render the user's full name here, falling back to the phone when no name is set.
+{% endcomment %}
+{% if driver %}
+<span class="pkl__driver" title="{{ driver.user.username }}{% if driver.driver_phone %} · {{ driver.driver_phone }}{% endif %}">
+    {{ driver.user.get_full_name|default:driver.driver_phone|default:driver.user.username }}{% if driver.driver_code %} <span class="pkl__driver-code">— {{ driver.driver_code }}</span>{% endif %}
+</span>
+{% endif %}

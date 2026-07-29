@@ -602,6 +602,7 @@ class OrderStatusHistory(models.Model):
         ('task_edited', 'Task Edited'),
         ('item_deleted', 'Item Deleted'),
         ('cod_correction', 'COD Correction'),
+        ('location_update', 'Location Updated'),
     ]
 
     order = models.ForeignKey(

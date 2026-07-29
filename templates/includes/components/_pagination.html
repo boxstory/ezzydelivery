@@ -13,9 +13,9 @@ Parameters:
 {% endcomment %}
 
 {% load static %}
-<link href="{% static 'webpages/css/pagination.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/pagination.css' %}?v=20260728h" rel="stylesheet" type="text/css" />
 
-{% comment %}Determine current per_page value - use passed variable or default to 50{% endcomment %}
+{% comment %}Current per_page: explicit context var (views should pass it), else 50{% endcomment %}
 {% with current_per_page=per_page|default:"50" %}
 
 {% if page_obj.has_other_pages or page_obj.paginator.count > 0 %}
@@ -104,9 +104,10 @@ Parameters:
 
     <!-- Page Info -->
     <div class="pgn__info">
-        Page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+        Showing <strong>{{ page_obj.start_index }}&ndash;{{ page_obj.end_index }}</strong>
+        of <strong>{{ page_obj.paginator.count }}</strong>
         <span class="d-none d-sm-inline">
-            &bull; <strong>{{ page_obj.paginator.count }}</strong> total items
+            &bull; Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
         </span>
     </div>
 

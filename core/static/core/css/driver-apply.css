@@ -1,5 +1,5 @@
 /* Purpose: Public driver application page — 3-section form, doc tiles, Google login gate */
-/* Used by: core/templates/core/join_us_driver.html (core:join_driver) */
+/* Used by: core/templates/core/join_us_driver.html (core:join_driver), core/templates/core/join_driver_start.html (core:join_driver_start) */
 /* Notes: BEM prefix cja__ — layout via Bootstrap utilities, only visual styling here */
 
 .cja__hero {
@@ -69,4 +69,335 @@
 .cja__status-icon {
     font-size: 2.5rem;
     line-height: 1;
+}
+
+/* Picker tiles (application form, Section 3: zones, work preference, hours) */
+.cja__pick-tile {
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    background: var(--brand-white, #fff);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+    min-height: 2.75rem;
+}
+
+.cja__pick-tile:hover {
+    border-color: var(--brand-grey-400);
+}
+
+.cja__pick-tile:has(.form-check-input:checked) {
+    border-color: var(--brand-navy);
+    background: var(--brand-grey-100);
+}
+
+.cja__pick-sub {
+    font-size: 0.7rem;
+}
+
+.cja__pick-ico {
+    color: var(--brand-navy);
+    font-size: 0.75rem;
+    width: 1rem;
+    text-align: center;
+}
+
+/* Wizard: one section visible at a time (JS adds .cja__wiz; no-JS shows all) */
+.cja__wiz .cja__wiz-step {
+    display: none;
+}
+
+.cja__wiz .cja__wiz-step--active {
+    display: block;
+}
+
+.cja__stepper {
+    gap: 0;
+}
+
+.cja__stepper-item {
+    flex: 1;
+    position: relative;
+    text-align: center;
+}
+
+.cja__stepper-item:not(:first-child)::before {
+    content: "";
+    position: absolute;
+    top: 0.9375rem;
+    left: -50%;
+    width: 100%;
+    height: 2px;
+    background: var(--brand-grey-300);
+}
+
+.cja__stepper-btn {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.cja__stepper-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    border-radius: 50%;
+    background: var(--brand-white, #fff);
+    border: 2px solid var(--brand-grey-300);
+    color: var(--brand-grey-500);
+    font-size: 0.8125rem;
+    font-weight: var(--brand-font-weight-bold);
+}
+
+.cja__stepper-label {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.7rem;
+    color: var(--brand-grey-500);
+}
+
+.cja__stepper-item--active .cja__stepper-dot {
+    background: var(--brand-navy);
+    border-color: var(--brand-navy);
+    color: var(--brand-white, #fff);
+}
+
+.cja__stepper-item--active .cja__stepper-label {
+    color: var(--brand-grey-800);
+    font-weight: var(--brand-font-weight-bold);
+}
+
+.cja__stepper-item--done .cja__stepper-dot {
+    border-color: var(--brand-success, #15803d);
+    color: var(--brand-success, #15803d);
+}
+
+.cja__stepper-btn:focus-visible .cja__stepper-dot {
+    outline: 2px solid var(--brand-navy);
+    outline-offset: 2px;
+}
+
+/* Mini review-status stepper (application status card) */
+.cja__stepper--mini {
+    max-width: 22rem;
+    margin-inline: auto;
+}
+
+.cja__stepper--mini .cja__stepper-dot {
+    width: 1.625rem;
+    height: 1.625rem;
+    font-size: 0.7rem;
+}
+
+.cja__stepper--mini .cja__stepper-item:not(:first-child)::before {
+    top: 0.8125rem;
+}
+
+/* Wizard action buttons: full-width rows on phones instead of overflowing */
+@media (max-width: 575.98px) {
+    .cja__wiz-actions {
+        width: 100%;
+    }
+
+    .cja__wiz-actions .btn {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .cja__stepper-label {
+        font-size: 0.6rem;
+    }
+}
+
+/* ---- Recruitment landing (join_driver_start.html) — "--lp" scope ---- */
+
+.cja__lp-kicker {
+    font-size: 0.7rem;
+    font-weight: var(--brand-font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--brand-primary);
+}
+
+.cja__lp-title {
+    font-size: clamp(1.65rem, 4.5vw, 2.5rem);
+    line-height: 1.15;
+}
+
+.cja__lp-sub {
+    max-width: 40rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.cja__lp-meta {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Signature: yellow road center-line connecting the steps */
+.cja__route-step {
+    position: relative;
+}
+
+.cja__route-step:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: calc(1rem - 1.5px);
+    top: 2.375rem;
+    height: calc(100% - 2.375rem + 0.75rem);
+    width: 3px;
+    border-radius: 2px;
+    background: repeating-linear-gradient(
+        to bottom,
+        var(--brand-primary) 0 7px,
+        transparent 7px 14px
+    );
+}
+
+.cja__btn-navy {
+    --bs-btn-disabled-bg: var(--brand-navy);
+    --bs-btn-disabled-color: var(--brand-white, #fff);
+    --bs-btn-disabled-border-color: var(--brand-navy);
+    background: var(--brand-navy);
+    color: var(--brand-white, #fff);
+    font-weight: var(--brand-font-weight-bold);
+}
+
+.cja__btn-navy:hover,
+.cja__btn-navy:focus {
+    background: var(--brand-navy-light);
+    color: var(--brand-white, #fff);
+    transform: translateY(-1px);
+    box-shadow: var(--brand-shadow-sm);
+}
+
+.cja__perk {
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-md);
+    background: var(--brand-white, #fff);
+}
+
+.cja__perk-icon {
+    color: var(--brand-navy);
+    font-size: 1.125rem;
+    line-height: 1;
+}
+
+.cja__req-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.cja__req-list li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.cja__req-list li i {
+    color: var(--brand-success, #15803d);
+    font-size: 0.75rem;
+    flex: 0 0 auto;
+}
+
+/* FAQ accordion — component CSS absent from bootstrap-custom build, styled here */
+.cja__faq .accordion-item {
+    border: 0;
+    border-bottom: 1px solid var(--brand-grey-200);
+    background: transparent;
+}
+
+.cja__faq .accordion-item:last-child {
+    border-bottom: 0;
+}
+
+.cja__faq .accordion-header {
+    margin: 0;
+    font-size: inherit;
+}
+
+.cja__faq .accordion-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.875rem 0.25rem;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: var(--brand-font-weight-bold);
+    color: var(--brand-grey-800);
+    cursor: pointer;
+}
+
+.cja__faq .accordion-button:hover {
+    color: var(--brand-navy);
+}
+
+.cja__faq .accordion-button:focus-visible {
+    outline: 2px solid var(--brand-navy);
+    outline-offset: 2px;
+}
+
+.cja__faq .accordion-button::after {
+    content: "";
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-top: -0.25rem;
+    border-right: 2px solid var(--brand-grey-400);
+    border-bottom: 2px solid var(--brand-grey-400);
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+}
+
+.cja__faq .accordion-button:not(.collapsed)::after {
+    margin-top: 0.25rem;
+    border-color: var(--brand-navy);
+    transform: rotate(225deg);
+}
+
+.cja__faq .accordion-body {
+    padding: 0 0.25rem 0.875rem;
+}
+
+/* Links inside landing cards: navy, never yellow-on-white */
+#core_join_driver_start_section_main a:not(.btn) {
+    color: var(--brand-navy);
+    text-decoration: underline;
+}
+
+#core_join_driver_start_section_main a:not(.btn):hover {
+    color: var(--brand-navy-light);
+}
+
+/* RTL (Arabic landing /ar/join_us/driver/start/): mirror the physical left/right rules above */
+[dir="rtl"] .cja__route-step:not(:last-child)::before {
+    left: auto;
+    right: calc(1rem - 1.5px);
+}
+
+[dir="rtl"] .cja__faq .accordion-button {
+    text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cja__btn-navy:hover,
+    .cja__btn-navy:focus {
+        transform: none;
+    }
+
+    .cja__faq .accordion-button::after {
+        transition: none;
+    }
 }

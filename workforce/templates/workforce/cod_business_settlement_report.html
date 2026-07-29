@@ -1,17 +1,18 @@
-{# Purpose: Leg-3 Business COD Payout — "Teller's Tape" cash-settlement window #}
+{# Purpose: Client payout desk — count out the COD Ezzy holds for one business, less the charges it owes. #}
 {# Used by: workforce.views.cod_business_settlement_report (URL workforce:cod_business_settlement_report) #}
-{# Notes: Subject = counting out collected COD to a business. Signature = sticky tape + receipt modal. #}
+{# Notes: Same "teller tape" vocabulary as the driver payout worksheet. The POST contract to #}
+{#        cod_business_settlement_action is fixed — task_ids[] / deduct_charges / deduction_*[] must not change. #}
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static humanize %}
 
-{% block title %}Business COD Payout{% endblock %}
+{% block title %}Client Payout{% endblock %}
 
 {% block extra_css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260630d" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260728d" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -23,7 +24,12 @@
       <div class="bcp__masthead-row">
         <div>
           <p class="bcp__eyebrow">Leg 3 · Ezzy ▸ Business</p>
-          <h1 class="bcp__title">Business COD Payout</h1>
+          <h1 class="bcp__title">Client Payout</h1>
+          <p class="bcp__sub">
+            {% if date_from or date_to %}{{ date_from|default:"…" }} → {{ date_to|default:"…" }}{% else %}All COD held{% endif %}
+            <span class="bcp__sep">·</span> {{ task_count }} deliver{{ task_count|pluralize:"y,ies" }} awaiting payout
+            <span class="bcp__sep">·</span> {{ all_businesses|length }} account{{ all_businesses|length|pluralize }} with COD held
+          </p>
         </div>
         <div class="bcp__masthead-actions">
           <a href="{% url 'workforce:cod_business_settlement_pdf' %}{% if business_filter %}?business_id={{ business_filter }}{% endif %}"
@@ -34,23 +40,25 @@
     </header>
 
     <!-- Teller window: pick an account -->
-    <form method="GET" class="bcp__window">
+    <form method="GET" class="bcp__window" id="workforce_client_payout_form_filter">
       <div class="bcp__field bcp__field--account">
-        <label class="bcp__field-label">Account</label>
-        <select name="business_id" class="bcp__select">
+        <label class="bcp__field-label" for="workforce_client_payout_select_business">Account</label>
+        <select name="business_id" id="workforce_client_payout_select_business" class="bcp__select">
           <option value="">Choose a business…</option>
           {% for biz in all_businesses|code_last %}
-          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
+          {# The outstanding figure rides on the option so staff can see which
+             accounts are owed money without selecting each one in turn. #}
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.pending_count %} — {{ biz.pending_total|floatformat:0|intcomma }} QR held{% else %} — nothing held{% endif %}</option>
           {% endfor %}
         </select>
       </div>
       <div class="bcp__field">
-        <label class="bcp__field-label">From</label>
-        <input type="date" name="date_from" class="bcp__input" value="{{ date_from }}">
+        <label class="bcp__field-label" for="workforce_client_payout_input_from">From</label>
+        <input type="date" name="date_from" id="workforce_client_payout_input_from" class="bcp__input" value="{{ date_from }}">
       </div>
       <div class="bcp__field">
-        <label class="bcp__field-label">To</label>
-        <input type="date" name="date_to" class="bcp__input" value="{{ date_to }}">
+        <label class="bcp__field-label" for="workforce_client_payout_input_to">To</label>
+        <input type="date" name="date_to" id="workforce_client_payout_input_to" class="bcp__input" value="{{ date_to }}">
       </div>
       <div class="bcp__window-actions">
         <button type="submit" class="bcp__primary">Open</button>
@@ -59,50 +67,99 @@
     </form>
 
     {% if business_groups %}
+    <!-- Money strip: the whole subtraction, live off the selection -->
+    <section class="bcp__summary" id="workforce_client_payout_summary_strip">
+      <div class="bcp__sum-cell bcp__sum-cell--lead">
+        <span class="bcp__sum-label">Net payable</span>
+        <span class="bcp__sum-value">QAR <span id="bcp_sum_net">0.00</span></span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">COD selected</span>
+        <span class="bcp__sum-value">
+          <span id="bcp_sum_gross">0.00</span>
+          <span class="bcp__sum-unit"><span id="bcp_sum_count">0</span> of {{ task_count }}</span>
+        </span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">Delivery charges</span>
+        <span class="bcp__sum-value bcp__sum-value--void">− <span id="bcp_sum_fee">0.00</span></span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">Other deductions</span>
+        <span class="bcp__sum-value bcp__sum-value--void">− <span id="bcp_sum_extra">0.00</span></span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">COD held on account</span>
+        <span class="bcp__sum-value">{{ grand_total|floatformat:2|intcomma }}<span class="bcp__sum-unit">held</span></span>
+      </div>
+    </section>
+
+    <p class="bcp__note">
+      <i class="fa-solid fa-circle-info"></i>
+      Delivery charges and any lines you add below come out of the COD at payout — the invoice itemises every one of them.
+    </p>
+
     {% for g in business_groups %}
-    <section class="bcp__statement-block">
-      <div class="bcp__statement">
-        <h2 class="bcp__statement-name">{{ g.business.business_name }}</h2>
-        <p class="bcp__statement-meta">
-          Holding <strong>QAR {{ g.subtotal|floatformat:2|intcomma }}</strong>
-          · {{ g.tasks|length }} deliver{{ g.tasks|length|pluralize:"y,ies" }}
-          · <span class="bcp__fee-note">fees QAR {{ g.fee_subtotal|floatformat:2|intcomma }} (info)</span>
-        </p>
+    <section class="bcp__panel">
+      <div class="bcp__panel-head">
+        <h2 class="bcp__panel-title">{{ g.business.business_name }}</h2>
+        <span class="bcp__count">
+          Holding {{ g.subtotal|floatformat:2|intcomma }}
+          <span class="bcp__sep">·</span> {{ g.tasks|length }} deliver{{ g.tasks|length|pluralize:"y,ies" }}
+          <span class="bcp__sep">·</span> charges {{ g.fee_subtotal|floatformat:2|intcomma }}
+        </span>
       </div>
 
-      <div class="bcp__toolbar">
-        <label class="bcp__checkall">
-          <input type="checkbox" id="bcp_select_all" class="bcp__biz-check" data-business="{{ g.business.business_id }}">
-          Count all
+      <div class="bcp__bar">
+        <label class="bcp__check-label" for="workforce_client_payout_check_all_{{ g.business.business_id }}">
+          <input type="checkbox" class="bcp__biz-check"
+                 id="workforce_client_payout_check_all_{{ g.business.business_id }}"
+                 data-business="{{ g.business.business_id }}">
+          <span>Count all</span>
         </label>
+        <span class="bcp__bar-count"><span class="bcp__biz-selected" data-business="{{ g.business.business_id }}">0</span> selected</span>
       </div>
 
-      <div class="bcp__ledger">
-        <table class="bcp__table">
+      <div class="bcp__table-wrap">
+        <table class="bcp__table" id="workforce_client_payout_table_{{ g.business.business_id }}">
           <thead>
             <tr>
-              <th></th>
+              <th class="bcp__col-check"></th>
               <th>Order</th>
               <th>Customer</th>
-              <th>Delivered</th>
-              <th>Received</th>
-              <th class="bcp__num">Del. fee</th>
-              <th class="bcp__num">COD</th>
+              <th class="bcp__date">Delivered</th>
+              <th class="bcp__date">COD received</th>
+              <th class="bcp__num">Del. charge</th>
+              <th class="bcp__num">COD held</th>
             </tr>
           </thead>
           <tbody>
             {% for t in g.tasks %}
             <tr>
-              <td>
+              <td class="bcp__col-check">
                 <input type="checkbox" class="bcp__task-check" data-business="{{ g.business.business_id }}"
                        value="{{ t.id }}" data-amount="{{ t.cod_collected_amount|floatformat:2 }}"
+                       data-fee="{{ t.verified_delivery_charge|default_if_none:t.dl_price|default:0|floatformat:2 }}"
                        data-order="{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}{{ t.id }}{% endif %}">
               </td>
-              <td class="bcp__order">{% if t.order %}#{{ t.order.order_number|default:t.order_id }}{% else %}—{% endif %}</td>
-              <td>{% if t.order %}{{ t.order.customer_name|default:"—" }}{% else %}—{% endif %}</td>
+              <td class="bcp__order">
+                {% if t.order %}#{{ t.order.order_number|default:t.order_id }}{% else %}—{% endif %}
+                {% if t.dl_task_number and t.dl_task_number != t.order.order_number %}
+                <span class="bcp__sub-line">{{ t.dl_task_number }}</span>
+                {% endif %}
+              </td>
+              <td class="bcp__truncate" title="{% if t.order %}{{ t.order.customer_name|default:'' }}{% endif %}">
+                {% if t.order %}{{ t.order.customer_name|default:"—" }}{% else %}—{% endif %}
+              </td>
               <td class="bcp__date">{{ t.completed_at|date:"d M Y"|default:"—" }}</td>
               <td class="bcp__date">{{ t.cod_settled_at|date:"d M Y"|default:"—" }}</td>
-              <td class="bcp__num bcp__num--fee">{{ t.dl_price|default:0|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--fee">
+                {# default_if_none, not default: a charge deliberately verified at 0.00 must stay 0.00
+                   rather than falling back to dl_price. Mirrors the view's `is not None` resolution. #}
+                {{ t.verified_delivery_charge|default_if_none:t.dl_price|default:0|floatformat:2|intcomma }}
+                <span class="bcp__status bcp__status--{{ t.charge_verification_status|default:'pending' }}"
+                      title="Client delivery-charge verification">{{ t.charge_verification_status|default:"pending"|title }}</span>
+              </td>
               <td class="bcp__num bcp__num--cod">{{ t.cod_collected_amount|floatformat:2|intcomma }}</td>
             </tr>
             {% endfor %}
@@ -111,6 +168,38 @@
       </div>
     </section>
     {% endfor %}
+
+    <!-- Deduction editor: what comes off the COD before it is handed over -->
+    <section class="bcp__panel" id="workforce_client_payout_panel_deductions">
+      <div class="bcp__panel-head">
+        <h2 class="bcp__panel-title">Deductions</h2>
+        <span class="bcp__count">Applied to the current selection</span>
+      </div>
+
+      <div class="bcp__ladder">
+        <div class="bcp__ladder-line bcp__ladder-line--head">
+          <span>COD selected</span>
+          <span class="bcp__ladder-val" id="bcp_line_gross">0.00</span>
+        </div>
+        <div class="bcp__ladder-line">
+          <label class="bcp__receipt-toggle" for="bcp_deduct_charges">
+            <input type="checkbox" id="bcp_deduct_charges" checked>
+            Delivery charges
+          </label>
+          <span class="bcp__ladder-val bcp__ladder-val--void" id="bcp_line_fee">0.00</span>
+        </div>
+
+        <div class="bcp__deducts" id="bcp_deduct_rows"></div>
+        <button type="button" class="bcp__add-deduct" id="bcp_add_deduct">+ Add deduction</button>
+
+        <div class="bcp__ladder-line bcp__ladder-line--net">
+          <span>Net payable</span>
+          <span class="bcp__ladder-val" id="bcp_line_net">0.00</span>
+        </div>
+      </div>
+
+      <p class="bcp__over" id="bcp_over_warn" hidden>Deductions are more than the COD selected — the payout will be refused.</p>
+    </section>
 
     {% elif business_filter %}
     <div class="bcp__empty">
@@ -130,11 +219,11 @@
       <p class="bcp__void-hint">Use when a settled order is returned and the COD must be clawed back from the business.</p>
       <div class="row g-2 align-items-end">
         <div class="col-12 col-md-4">
-          <label class="bcp__field-label">Settlement code</label>
+          <label class="bcp__field-label" for="bcp_reverse_code">Settlement code</label>
           <input type="text" id="bcp_reverse_code" class="bcp__input" placeholder="CODCS-…">
         </div>
         <div class="col-12 col-md-5">
-          <label class="bcp__field-label">Reason</label>
+          <label class="bcp__field-label" for="bcp_reverse_notes">Reason</label>
           <input type="text" id="bcp_reverse_notes" class="bcp__input" placeholder="Order returned by customer">
         </div>
         <div class="col-12 col-md-3">
@@ -151,6 +240,18 @@
     <div class="bcp__tape-inner">
       <div class="bcp__tape-readout">
         <span class="bcp__tape-count">Counted <strong id="bcp_sel_count">0</strong></span>
+        <span class="bcp__tape-total bcp__tape-total--sub">
+          <span class="bcp__tape-total-label">COD</span>
+          <span class="bcp__tape-sub-value" id="bcp_sel_gross">0.00</span>
+        </span>
+        <span class="bcp__tape-total bcp__tape-total--sub">
+          <span class="bcp__tape-total-label">Del. charge</span>
+          <span class="bcp__tape-sub-value" id="bcp_sel_fee">0.00</span>
+        </span>
+        <span class="bcp__tape-total bcp__tape-total--sub">
+          <span class="bcp__tape-total-label">Other</span>
+          <span class="bcp__tape-sub-value" id="bcp_sel_extra">0.00</span>
+        </span>
         <span class="bcp__tape-total">
           <span class="bcp__tape-total-label">Pay out</span>
           <span class="bcp__tape-total-value" id="bcp_tape_value"><span id="bcp_sel_total">0.00</span><span class="bcp__qr">QAR</span></span>
@@ -171,14 +272,33 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
+        <div class="bcp__receipt-head">
+          <span>Order</span>
+          <span class="bcp__receipt-head-num">Del. charge</span>
+          <span class="bcp__receipt-head-num">COD</span>
+        </div>
         <div class="bcp__receipt-lines" id="bcp_receipt_lines"></div>
+
+        <div class="bcp__receipt-sub">
+          <span>Total COD · <span id="bcp_modal_count">0</span> orders</span>
+          <span id="bcp_modal_gross">0.00</span>
+        </div>
+        <div class="bcp__receipt-sub">
+          <span>Delivery charges</span>
+          <span id="bcp_modal_fee">0.00</span>
+        </div>
+        <div class="bcp__receipt-sub">
+          <span>Other deductions</span>
+          <span id="bcp_modal_extra">0.00</span>
+        </div>
+
         <div class="bcp__receipt-total">
-          <span>Total · <span id="bcp_modal_count">0</span> deliveries</span>
+          <span>Net payable</span>
           <span><span class="bcp__brass">QAR <span id="bcp_modal_total">0.00</span></span></span>
         </div>
         <hr>
         <div class="mb-2">
-          <label class="bcp__field-label">Paid by</label>
+          <label class="bcp__field-label" for="bcp_payment_method">Paid by</label>
           <select id="bcp_payment_method" class="bcp__select">
             <option value="bank">Bank transfer</option>
             <option value="cash">Cash</option>
@@ -186,7 +306,7 @@
           </select>
         </div>
         <div>
-          <label class="bcp__field-label">Reference</label>
+          <label class="bcp__field-label" for="bcp_reference">Reference</label>
           <input type="text" id="bcp_reference" class="bcp__input" placeholder="Transfer ref / cheque no.">
         </div>
       </div>
@@ -203,21 +323,123 @@
 <script>
 (function () {
   const csrftoken = '{{ csrf_token }}';
+  const el = (id) => document.getElementById(id);
   const taskChecks = () => Array.from(document.querySelectorAll('.bcp__task-check'));
   const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const put = (id, value) => { const node = el(id); if (node) node.textContent = value; };
+
+  // ── Extra deduction lines (fulfilment, cargo handling, ad-hoc) ──
+  const DEDUCT_KINDS = [
+    ['fulfillment_charge', 'Fulfilment charge'],
+    ['inventory_handling', 'Cargo / handling charge'],
+    ['other_charge', 'Other charge'],
+  ];
+
+  function deductRows() { return Array.from(document.querySelectorAll('.bcp__deduct-row')); }
+
+  function deductTotal() {
+    return deductRows().reduce((sum, r) => {
+      const v = parseFloat(r.querySelector('.bcp__deduct-amount').value || '0');
+      return sum + (isNaN(v) ? 0 : v);
+    }, 0);
+  }
+
+  // Single source of truth for the arithmetic. The tape, the strip, the ladder
+  // and the receipt all read the same numbers, so what staff see is what posts.
+  function totals() {
+    let count = 0, gross = 0, fee = 0;
+    taskChecks().forEach(c => {
+      if (c.checked) {
+        count++;
+        gross += parseFloat(c.dataset.amount || '0');
+        fee += parseFloat(c.dataset.fee || '0');
+      }
+    });
+    const toggle = el('bcp_deduct_charges');
+    const feeApplied = (!toggle || toggle.checked) ? Math.min(fee, gross) : 0;
+    const extras = deductTotal();
+    return { count, gross, fee, feeApplied, extras, net: gross - feeApplied - extras };
+  }
 
   function recompute() {
-    let count = 0, total = 0;
-    taskChecks().forEach(c => {
-      if (c.checked) { count++; total += parseFloat(c.dataset.amount || '0'); }
+    const t = totals();
+
+    // Money strip
+    put('bcp_sum_net', fmt(t.net));
+    put('bcp_sum_gross', fmt(t.gross));
+    put('bcp_sum_fee', fmt(t.feeApplied));
+    put('bcp_sum_extra', fmt(t.extras));
+    put('bcp_sum_count', t.count);
+
+    // Sticky tape
+    put('bcp_sel_count', t.count);
+    put('bcp_sel_gross', fmt(t.gross));
+    put('bcp_sel_fee', fmt(t.feeApplied));
+    put('bcp_sel_extra', fmt(t.extras));
+    put('bcp_sel_total', fmt(t.net));
+
+    // Deduction ladder
+    put('bcp_line_gross', fmt(t.gross));
+    put('bcp_line_fee', t.feeApplied ? '− ' + fmt(t.feeApplied) : '0.00');
+    put('bcp_line_net', fmt(t.net));
+
+    // Receipt
+    put('bcp_modal_count', t.count);
+    put('bcp_modal_gross', fmt(t.gross));
+    put('bcp_modal_fee', t.feeApplied ? '− ' + fmt(t.feeApplied) : '0.00');
+    put('bcp_modal_extra', t.extras ? '− ' + fmt(t.extras) : '0.00');
+    put('bcp_modal_total', fmt(t.net));
+
+    // Per-business selected counts + row marking
+    document.querySelectorAll('.bcp__biz-selected').forEach(node => {
+      const biz = node.dataset.business;
+      const rows = Array.from(document.querySelectorAll(`.bcp__task-check[data-business="${biz}"]`));
+      const on = rows.filter(c => c.checked).length;
+      node.textContent = on;
+      const master = document.querySelector(`.bcp__biz-check[data-business="${biz}"]`);
+      if (master) {
+        master.checked = on > 0 && on === rows.length;
+        master.indeterminate = on > 0 && on < rows.length;
+      }
     });
-    document.getElementById('bcp_sel_count').textContent = count;
-    document.getElementById('bcp_sel_total').textContent = fmt(total);
-    const btn = document.getElementById('bcp_settle_btn');
-    if (btn) btn.disabled = count === 0;
-    const val = document.getElementById('bcp_tape_value');
+    taskChecks().forEach(c => {
+      const row = c.closest('tr');
+      if (row) row.classList.toggle('bcp__row--on', c.checked);
+    });
+
+    // Deductions can never exceed the COD — the backend refuses it too.
+    const over = t.net < 0;
+    const warn = el('bcp_over_warn');
+    if (warn) warn.hidden = !over;
+    const settleBtn = el('bcp_settle_btn');
+    if (settleBtn) settleBtn.disabled = t.count === 0 || over;
+    const confirmBtn = el('bcp_confirm_settle');
+    if (confirmBtn) confirmBtn.disabled = over;
+
+    const val = el('bcp_tape_value');
     if (val) { val.classList.remove('bcp__tick'); void val.offsetWidth; val.classList.add('bcp__tick'); }
-    return { count, total };
+    return t;
+  }
+
+  function addDeductRow() {
+    const wrap = el('bcp_deduct_rows');
+    if (!wrap) return;
+    const row = document.createElement('div');
+    row.className = 'bcp__deduct-row';
+    row.innerHTML = `
+      <select class="bcp__select bcp__deduct-kind">
+        ${DEDUCT_KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+      </select>
+      <input type="text" class="bcp__input bcp__deduct-label" placeholder="Description (optional)">
+      <input type="number" class="bcp__input bcp__deduct-amount" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+      <button type="button" class="bcp__deduct-remove" aria-label="Remove line">×</button>`;
+    wrap.appendChild(row);
+    row.querySelector('.bcp__deduct-amount').addEventListener('input', recompute);
+    row.querySelector('.bcp__deduct-remove').addEventListener('click', () => {
+      row.remove();
+      recompute();
+    });
+    row.querySelector('.bcp__deduct-amount').focus();
   }
 
   // Per-business "count all"
@@ -231,31 +453,42 @@
 
   taskChecks().forEach(c => c.addEventListener('change', recompute));
 
+  el('bcp_add_deduct')?.addEventListener('click', addDeductRow);
+  el('bcp_deduct_charges')?.addEventListener('change', recompute);
+
   // Hand over → build the receipt
-  const settleBtn = document.getElementById('bcp_settle_btn');
-  if (settleBtn) settleBtn.addEventListener('click', () => {
-    const { count, total } = recompute();
+  el('bcp_settle_btn')?.addEventListener('click', () => {
+    const { count } = recompute();
     if (!count) return;
-    const lines = document.getElementById('bcp_receipt_lines');
+    const lines = el('bcp_receipt_lines');
     lines.innerHTML = '';
     taskChecks().filter(c => c.checked).forEach(c => {
       const row = document.createElement('div');
       row.className = 'bcp__receipt-line';
-      row.innerHTML = `<span>#${c.dataset.order}</span><span>${fmt(parseFloat(c.dataset.amount || '0'))}</span>`;
+      row.innerHTML = `<span>#${c.dataset.order}</span>`
+        + `<span class="bcp__receipt-fee">${fmt(parseFloat(c.dataset.fee || '0'))}</span>`
+        + `<span class="bcp__receipt-cod">${fmt(parseFloat(c.dataset.amount || '0'))}</span>`;
       lines.appendChild(row);
     });
-    document.getElementById('bcp_modal_total').textContent = fmt(total);
-    document.getElementById('bcp_modal_count').textContent = count;
-    new bootstrap.Modal(document.getElementById('bcpSettleModal')).show();
+    new bootstrap.Modal(el('bcpSettleModal')).show();
   });
 
-  document.getElementById('bcp_confirm_settle')?.addEventListener('click', async function () {
+  el('bcp_confirm_settle')?.addEventListener('click', async function () {
+    if (recompute().net < 0) { alert('Deductions are more than the COD collected'); return; }
     this.disabled = true;
     const ids = taskChecks().filter(c => c.checked).map(c => c.value);
     const body = new URLSearchParams();
     ids.forEach(id => body.append('task_ids[]', id));
-    body.append('payment_method', document.getElementById('bcp_payment_method').value);
-    body.append('reference', document.getElementById('bcp_reference').value);
+    body.append('payment_method', el('bcp_payment_method').value);
+    body.append('reference', el('bcp_reference').value);
+    body.append('deduct_charges', el('bcp_deduct_charges')?.checked ? '1' : '0');
+    deductRows().forEach(r => {
+      const amount = (r.querySelector('.bcp__deduct-amount').value || '').trim();
+      if (!amount || parseFloat(amount) === 0) return;
+      body.append('deduction_kind[]', r.querySelector('.bcp__deduct-kind').value);
+      body.append('deduction_label[]', r.querySelector('.bcp__deduct-label').value);
+      body.append('deduction_amount[]', amount);
+    });
     try {
       const resp = await fetch('{% url "workforce:cod_business_settlement_action" %}', {
         method: 'POST',
@@ -263,20 +496,22 @@
         body: body.toString(),
       });
       const data = await resp.json();
-      if (data.success) { window.location.reload(); }
+      // Land on the invoice — the payout is not done until there is a document.
+      if (data.success && data.invoice_url) { window.location.href = data.invoice_url; }
+      else if (data.success) { window.location.reload(); }
       else { alert(data.error || 'Handover failed'); this.disabled = false; }
     } catch (e) { alert('Network error'); this.disabled = false; }
   });
 
   // Void a payout
-  document.getElementById('bcp_reverse_btn')?.addEventListener('click', async function () {
-    const code = document.getElementById('bcp_reverse_code').value.trim();
+  el('bcp_reverse_btn')?.addEventListener('click', async function () {
+    const code = el('bcp_reverse_code').value.trim();
     if (!code) { alert('Enter the settlement code'); return; }
     if (!confirm('Void payout ' + code + '? This claws the COD back from the business.')) return;
     this.disabled = true;
     const body = new URLSearchParams();
     body.append('txn_code', code);
-    body.append('notes', document.getElementById('bcp_reverse_notes').value);
+    body.append('notes', el('bcp_reverse_notes').value);
     try {
       const resp = await fetch('{% url "workforce:cod_business_settlement_reverse" %}', {
         method: 'POST',

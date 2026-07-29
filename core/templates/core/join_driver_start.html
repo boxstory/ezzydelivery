@@ -2,15 +2,21 @@
 {% load static %}
 {% load socialaccount %}
 {% comment %}
-Purpose: Small public onboarding intro — how to become a driver, 4 steps + join button
-Used by: core.views.join_driver_start (/join_us/driver/start/)
-Notes: Join button starts Google sign-in for anonymous visitors, links straight to the form when logged in
+Purpose: Public driver recruitment landing — SEO-optimized "join as delivery driver in Qatar" page with steps, requirements, FAQ + JobPosting/FAQPage schema
+Used by: core.views.join_driver_start (/join_us/driver/start/, short URL /driver/start/)
+Notes: Join button starts Google sign-in for anonymous visitors, links straight to the form when logged in; JSON-LD lives in extra_js block
 {% endcomment %}
 
-{% block title %}Become a Driver - Ezzy Delivery{% endblock title %}
+{% block title %}Delivery Driver Jobs in Qatar - Ezzy Delivery{% endblock title %}
+
+{% block head_hreflang %}
+<link rel="alternate" hreflang="en" href="https://ezzydelivery.qa/join_us/driver/start/" />
+<link rel="alternate" hreflang="ar" href="https://ezzydelivery.qa/ar/join_us/driver/start/" />
+<link rel="alternate" hreflang="x-default" href="https://ezzydelivery.qa/join_us/driver/start/" />
+{% endblock head_hreflang %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260718c" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260724a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -18,39 +24,41 @@ Notes: Join button starts Google sign-in for anonymous visitors, links straight 
     <div class="container-lg px-3 py-4">
 
         <!-- Hero -->
-        <div class="cja__hero p-4 p-md-5 mb-4 text-center">
-            <h1 class="cja__hero-title h3 mb-2">Become an Ezzy Delivery Driver</h1>
-            <p class="mb-0">Deliver across Qatar on your own schedule and get paid for every drop.</p>
+        <div class="cja__hero cja__hero--lp p-4 p-md-5 mb-4 text-center">
+            <div class="cja__lp-kicker mb-2">Now hiring — {% now "F Y" %}</div>
+            <h1 class="cja__hero-title cja__lp-title mb-2">Delivery Driver Jobs in Qatar</h1>
+            <p class="cja__lp-sub mx-auto mb-2">EzzyDelivery is looking for delivery drivers across Doha, Al Wakrah and Lusail. Drive your own car or bike, choose your own hours and get paid for every drop.</p>
+            <p class="cja__lp-meta small mb-0">Apply online in about 5 minutes — no office visit needed.</p>
         </div>
 
         <!-- How to join -->
-        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8">
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4" id="join-cta">
             <h2 class="h5 text-center mb-2">How to join — 4 easy steps</h2>
             <p class="text-muted text-center small mb-4">Takes about 5 minutes. All you need is your phone, your ID and your vehicle.</p>
 
             <div class="d-flex flex-column gap-3 mb-4">
-                <div class="d-flex align-items-start gap-3">
+                <div class="cja__route-step d-flex align-items-start gap-3">
                     <span class="cja__step-badge d-flex align-items-center justify-content-center">1</span>
                     <div>
                         <div class="fw-bold">Sign in with Google</div>
                         <div class="text-muted small">Use your Gmail account — one tap, no password to remember.</div>
                     </div>
                 </div>
-                <div class="d-flex align-items-start gap-3">
+                <div class="cja__route-step d-flex align-items-start gap-3">
                     <span class="cja__step-badge d-flex align-items-center justify-content-center">2</span>
                     <div>
                         <div class="fw-bold">Fill your details</div>
                         <div class="text-muted small">Your name, phone, WhatsApp and the vehicle you drive. You can save and continue later anytime.</div>
                     </div>
                 </div>
-                <div class="d-flex align-items-start gap-3">
+                <div class="cja__route-step d-flex align-items-start gap-3">
                     <span class="cja__step-badge d-flex align-items-center justify-content-center">3</span>
                     <div>
                         <div class="fw-bold">Upload 3 photos</div>
                         <div class="text-muted small">A selfie plus any 2 IDs — QID, passport, driving license or Istimara.</div>
                     </div>
                 </div>
-                <div class="d-flex align-items-start gap-3">
+                <div class="cja__route-step d-flex align-items-start gap-3">
                     <span class="cja__step-badge d-flex align-items-center justify-content-center">4</span>
                     <div>
                         <div class="fw-bold">Get approved &amp; start earning</div>
@@ -61,7 +69,7 @@ Notes: Join button starts Google sign-in for anonymous visitors, links straight 
 
             {% if user.is_authenticated %}
             <div class="text-center">
-                <a href="{% url 'core:join_driver' %}" class="btn btn-dark btn-lg px-5" id="core_join_driver_start_btn_join">
+                <a href="{% url 'core:join_driver' %}" class="btn cja__btn-navy btn-lg px-5" id="core_join_driver_start_btn_join">
                     Start My Application
                 </a>
             </div>
@@ -77,6 +85,210 @@ Notes: Join button starts Google sign-in for anonymous visitors, links straight 
             </form>
             {% endif %}
         </div>
+
+        <!-- Why drive with us -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">Why drive with EzzyDelivery?</h2>
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fas fa-clock" aria-hidden="true"></i></div>
+                        <div class="fw-bold">Choose your own hours</div>
+                        <p class="text-muted small mb-0">Work full-time or part-time. Accept the delivery tasks that fit your day — there is no fixed shift.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fas fa-coins" aria-hidden="true"></i></div>
+                        <div class="fw-bold">Earn per delivery</div>
+                        <p class="text-muted small mb-0">You are paid for every completed drop, so the more you deliver, the more you earn.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fas fa-map-location-dot" aria-hidden="true"></i></div>
+                        <div class="fw-bold">Deliver across Qatar</div>
+                        <p class="text-muted small mb-0">Orders in Doha, Al Wakrah, Lusail, Al Khor and the rest of Qatar — pick the zones you know best.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fab fa-whatsapp" aria-hidden="true"></i></div>
+                        <div class="fw-bold">Support on WhatsApp</div>
+                        <p class="text-muted small mb-0">Task updates, approval confirmation and help from our operations team come straight to your WhatsApp.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Earnings -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">Earnings</h2>
+            <p class="mb-0">You're paid for every completed delivery — the more you deliver, the more you earn. Weekly payouts, flexible hours, no fixed shifts.</p>
+            {% comment %}Enable only once Ezzy confirms a real figure — never publish a guessed number:
+            <p class="mb-0 mt-2">Active drivers earn up to QAR [CONFIRMED_NUMBER]/month.</p>
+            {% endcomment %}
+        </div>
+
+        <!-- Requirements -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">What do you need to become a delivery driver?</h2>
+            <ul class="cja__req-list list-unstyled mb-0">
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>A vehicle you can drive in Qatar — car, motorbike or van.</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>A valid Qatar driving license.</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>Any 2 ID documents: QID, passport, driving license or Istimara.</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>A smartphone with WhatsApp and a Gmail account to sign in.</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>Basic knowledge of Doha roads and neighbourhoods helps, but is not required.</span></li>
+            </ul>
+        </div>
+
+        <!-- FAQ -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">Delivery driver FAQ</h2>
+            <div class="accordion accordion-flush cja__faq" id="core_join_driver_start_accordion_faq">
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_how_join">
+                            How do I join EzzyDelivery as a delivery driver?
+                        </button>
+                    </h3>
+                    <div id="faq_how_join" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">Apply online in about 5 minutes: sign in with Google, fill in your details and vehicle, and upload a selfie plus 2 ID documents. Our team reviews your application and confirms your approval on WhatsApp.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_vehicle">
+                            Do I need my own vehicle to join?
+                        </button>
+                    </h3>
+                    <div id="faq_vehicle" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">Yes — you deliver with your own car, motorbike or van. During the application you tell us which vehicle you drive so we can assign you the right delivery tasks.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_parttime">
+                            Can I work part-time as a delivery driver?
+                        </button>
+                    </h3>
+                    <div id="faq_parttime" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">Yes. There are no fixed shifts — you choose when to work and which delivery tasks to accept, so you can drive full-time or alongside another job.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_documents">
+                            What documents do I need to apply?
+                        </button>
+                    </h3>
+                    <div id="faq_documents" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">A selfie photo plus any 2 of these: QID, passport, driving license or Istimara (vehicle registration). You upload them as photos directly in the online application.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_paid">
+                            How do delivery drivers get paid?
+                        </button>
+                    </h3>
+                    <div id="faq_paid" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">You earn per completed delivery. Your earnings are tracked in your driver dashboard, where you can see every drop and settlement with the EzzyDelivery team.</div>
+                    </div>
+                </div>
+            </div>
+            <p class="small text-muted mt-3 mb-0">More questions? Read the full <a href="{% url 'webpages:driver_faq' %}">driver FAQ</a> or the step-by-step <a href="{% url 'webpages:driver_guide' %}">driver guide</a>.</p>
+        </div>
+
+        <!-- Bottom CTA -->
+        <div class="text-center mb-2">
+            <a href="#join-cta" class="btn cja__btn-navy btn-lg px-5">Apply Now — It's Free</a>
+            <p class="text-muted small mt-2 mb-0">Looking for office roles instead? See all <a href="{% url 'webpages:careers' %}">careers at EzzyDelivery</a>.</p>
+        </div>
     </div>
 </section>
 {% endblock content %}
+
+{% block extra_js %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "JobPosting",
+  "title": "Delivery Driver",
+  "inLanguage": "en",
+  "url": "https://ezzydelivery.qa/join_us/driver/start/",
+  "description": "<p>EzzyDelivery is hiring delivery drivers across Qatar (Doha, Al Wakrah, Lusail). Drive your own car, motorbike or van, choose your own hours and earn per completed delivery. Apply online in 5 minutes with Google sign-in — upload a selfie and 2 ID documents (QID, passport, driving license or Istimara), get approved on WhatsApp and start delivering.</p><p>Requirements: own vehicle, valid Qatar driving license, smartphone with WhatsApp.</p>",
+  "datePosted": "{% now 'Y-m-d' %}",
+  "validThrough": "{{ job_valid_through }}",
+  "employmentType": ["FULL_TIME", "PART_TIME", "CONTRACTOR"],
+  "directApply": true,
+  "baseSalary": {
+    "@type": "MonetaryAmount",
+    "currency": "QAR",
+    "value": { "@type": "QuantitativeValue", "unitText": "DELIVERY" }
+  },
+  "hiringOrganization": {
+    "@type": "Organization",
+    "name": "EzzyDelivery",
+    "sameAs": "https://ezzydelivery.qa",
+    "logo": "https://ezzydelivery.qa/static/webpages/img/ezzy-logo-sqr-round.png"
+  },
+  "jobLocation": {
+    "@type": "Place",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Doha",
+      "addressCountry": "QA"
+    }
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I join EzzyDelivery as a delivery driver?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Apply online in about 5 minutes: sign in with Google, fill in your details and vehicle, and upload a selfie plus 2 ID documents. Our team reviews your application and confirms your approval on WhatsApp."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need my own vehicle to join?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes — you deliver with your own car, motorbike or van. During the application you tell us which vehicle you drive so we can assign you the right delivery tasks."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I work part-time as a delivery driver?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. There are no fixed shifts — you choose when to work and which delivery tasks to accept, so you can drive full-time or alongside another job."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What documents do I need to apply?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A selfie photo plus any 2 of these: QID, passport, driving license or Istimara (vehicle registration). You upload them as photos directly in the online application."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do delivery drivers get paid?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You earn per completed delivery. Your earnings are tracked in your driver dashboard, where you can see every drop and settlement with the EzzyDelivery team."
+      }
+    }
+  ]
+}
+</script>
+{% endblock extra_js %}

@@ -22,7 +22,7 @@
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="{{ seo.og_title }}">
     <meta property="og:description" content="{{ seo.og_description }}">
-    <meta property="og:url" content="{{ seo.og_url }}">
+    <meta property="og:url" content="{% if seo.og_url %}{{ seo.og_url }}{% else %}{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% endif %}">
     <meta property="og:image" content="{{ seo.og_image }}">
     <meta property="og:type" content="{{ seo.og_type }}">
     <meta property="og:site_name" content="{{ seo.og_site_name }}">
@@ -46,15 +46,19 @@
     <meta name="distribution" content="{{ seo.distribution }}">
     <meta name="rating" content="{{ seo.rating }}">
 
-    <!-- Canonical URL -->
+    <!-- Canonical URL: explicit from the view, else self-referencing (path only, no query string) -->
+    {% if seo.canonical_url %}
     <link rel="canonical" href="{{ seo.canonical_url }}">
+    {% else %}
+    <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+    {% endif %}
 {% else %}
     <!-- Fallback Default SEO - Used when views don't pass seo context -->
     <meta name="description" content="EzzyDelivery offers fast, reliable delivery services across Qatar. Same-day courier in Doha, Al Wakrah & Lusail. E-commerce fulfillment and COD available.">
     <meta property="og:title" content="EzzyDelivery Qatar | Fast Delivery & Courier Service">
     <meta property="og:description" content="Qatar's trusted delivery service for businesses. Same-day delivery, COD, real-time tracking across Doha.">
     <meta property="og:image" content="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}">
-    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+    <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
 {% endif %}
 
 <!-- Dublin Core Metadata -->

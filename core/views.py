@@ -59,7 +59,7 @@ from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from PIL import Image
 
 from business import forms as business_forms
@@ -351,7 +351,40 @@ def join_driver_start(request):
     Anonymous visitors get a 'Join with Google' button (sign-in returns to the
     application form); logged-in users get a direct link to the form.
     """
-    return render(request, 'core/join_driver_start.html')
+    from core.seo import SEOMetadata
+    meta = SEOMetadata.get_page_meta(
+        title="Delivery Driver Jobs in Qatar",
+        description=(
+            "Delivery driver jobs in Qatar with EzzyDelivery. Earn per delivery, "
+            "choose your own hours, drive your own car or bike in Doha. Apply "
+            "online in 5 minutes."
+        ),
+        url=f"{SEOMetadata.SITE_URL}/join_us/driver/start/",
+    )
+    context = {
+        'seo': meta,
+        # JobPosting schema: rolling 60-day validity window, refreshed on every render
+        'job_valid_through': (dj_timezone.now() + timedelta(days=60)).strftime('%Y-%m-%d'),
+    }
+    return render(request, 'core/join_driver_start.html', context)
+
+
+def join_driver_start_ar(request):
+    """Arabic RTL mirror of join_driver_start — hreflang pair targeting 'وظائف سائق توصيل قطر'."""
+    from core.seo import SEOMetadata
+    meta = SEOMetadata.get_page_meta(
+        title="وظائف سائق توصيل في قطر | انضم إلى أسطول Ezzy Delivery",
+        description=(
+            "وظائف سائق توصيل في قطر مع Ezzy Delivery. أجر مقابل كل توصيلة، "
+            "ساعات مرنة، اعمل بسيارتك أو دراجتك في الدوحة. قدّم عبر الإنترنت خلال 5 دقائق."
+        ),
+        url=f"{SEOMetadata.SITE_URL}/ar/join_us/driver/start/",
+    )
+    context = {
+        'seo': meta,
+        'job_valid_through': (dj_timezone.now() + timedelta(days=60)).strftime('%Y-%m-%d'),
+    }
+    return render(request, 'core/join_driver_start_ar.html', context)
 
 
 def join_driver(request):
@@ -362,8 +395,15 @@ def join_driver(request):
     account / existing profile. Browser geolocation is captured on submit
     and stored in driver_meta['registration_location'].
     """
+    from delivery.models import ZoneGroup
+
     APPLY_DOC_TYPES = ['Selfie', 'QID', 'Passport', 'Driving License', 'Istimara']
     ID_DOC_TYPES = [d for d in APPLY_DOC_TYPES if d != 'Selfie']
+
+    zone_groups = list(
+        ZoneGroup.objects.filter(is_active=True).order_by('display_order', 'name')
+    )
+    valid_zone_ids = {str(zg.id) for zg in zone_groups}
 
     profile = None
     driver = None
@@ -427,6 +467,17 @@ def join_driver(request):
         veh_type = request.POST.get('veh-vehicle_type', '')
         vehicle_selected = bool(veh_type) and veh_type != 'none'
 
+        selected_zone_ids = [z for z in request.POST.getlist('zone_groups') if z in valid_zone_ids]
+
+        # Work preference comes as checkboxes: both ticked = flexible/both
+        job_opts = {v for v in request.POST.getlist('job_type_opts') if v in ('full_time', 'part_time')}
+        if job_opts == {'full_time', 'part_time'}:
+            job_type_val = 'flexible'
+        elif job_opts:
+            job_type_val = next(iter(job_opts))
+        else:
+            job_type_val = (request.POST.get('job_type') or '').strip()
+
         # Minimum requirements enforced only on final submission:
         # selfie + at least 2 ID documents + a vehicle type
         if not is_partial_save:
@@ -437,8 +488,10 @@ def join_driver(request):
                 upload_errors.append("Upload at least 2 ID documents (QID, Passport, Driving License or Istimara).")
             if not vehicle_selected:
                 upload_errors.append("Please select your available vehicle type.")
-            if request.POST.get('job_type') not in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):
-                upload_errors.append("Please select your work preference (full time / part time / flexible).")
+            if job_type_val not in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):
+                upload_errors.append("Please select your work preference (full time, part time or both).")
+            if valid_zone_ids and not selected_zone_ids:
+                upload_errors.append("Select at least one delivery zone you want to work in.")
 
         if pform.is_valid() and (not vehicle_selected or vform.is_valid()) and not upload_errors:
             from django.db import transaction
@@ -468,8 +521,9 @@ def join_driver(request):
                     or vehicle_selected
                     or bool((request.POST.get('driver_license_number') or '').strip())
                     or request.POST.get('has_driver_license') == 'on'
-                    or bool(request.POST.get('job_type'))
+                    or bool(job_type_val)
                     or bool(request.POST.getlist('work_time_slabs'))
+                    or bool(selected_zone_ids)
                 )
                 is_new_driver = driver is None
                 if is_new_driver and need_driver_row:
@@ -499,10 +553,9 @@ def join_driver(request):
                     if license_no:
                         driver.driver_license_number = license_no
 
-                    # Work availability preference (Section 2)
-                    job_type = (request.POST.get('job_type') or '').strip()
-                    if job_type in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):
-                        driver.job_type = job_type
+                    # Work availability preference (Section 3)
+                    if job_type_val in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):
+                        driver.job_type = job_type_val
                     valid_slabs = dict(fleet_models.WORK_TIME_SLAB_CHOICES)
                     slabs = [s for s in request.POST.getlist('work_time_slabs') if s in valid_slabs]
                     driver.work_time_slabs = ','.join(slabs)
@@ -523,6 +576,11 @@ def join_driver(request):
                         }
                         driver.driver_meta = meta
                     driver.save()
+
+                    # Preferred delivery zones (Section 3) — a partial save with
+                    # nothing ticked keeps whatever was saved before
+                    if selected_zone_ids or not is_partial_save:
+                        driver.preferred_zone_groups.set(selected_zone_ids)
 
                     if vehicle_selected:
                         vehicle = vform.save(commit=False)
@@ -550,6 +608,10 @@ def join_driver(request):
 
             if is_partial_save:
                 logger.info(f"Driver application progress saved for user {request.user.id}")
+                # Wizard "Save & Continue": jump straight to the next section, no toast
+                step_next = request.POST.get('step', '')
+                if step_next in ('2', '3', '4'):
+                    return redirect(f"{reverse('core:join_driver')}?step={step_next}")
                 messages.success(request, "Progress saved! You can continue your application anytime.")
             else:
                 logger.info(f"Driver application submitted for user {request.user.id} (new={is_new_driver})")
@@ -559,6 +621,15 @@ def join_driver(request):
             for err in upload_errors:
                 messages.error(request, err)
             messages.error(request, "Please fix the highlighted fields and try again.")
+            # Reopen the wizard on the first section that has a problem
+            if not pform.is_valid():
+                initial_step = 1
+            elif vehicle_selected and not vform.is_valid():
+                initial_step = 2
+            elif any('zone' in e or 'work preference' in e for e in upload_errors):
+                initial_step = 3
+            else:
+                initial_step = 4
     else:
         pform = core_forms.DriverApplyProfileForm(instance=profile)
         vform = fleet_forms.DriverVehicleForm(prefix='veh', instance=primary_vehicle)
@@ -566,6 +637,10 @@ def join_driver(request):
         if request.user.is_authenticated and profile and not profile.first_name:
             pform.initial['first_name'] = request.user.first_name
             pform.initial['last_name'] = request.user.last_name
+        try:
+            initial_step = min(4, max(1, int(request.GET.get('step', 1))))
+        except (TypeError, ValueError):
+            initial_step = 1
 
     application_status = ''
     if profile and profile.is_driver and driver:
@@ -575,8 +650,13 @@ def join_driver(request):
     if driver:
         for doc in driver.driver_document.filter(document_type__in=APPLY_DOC_TYPES).exclude(document_file=''):
             existing_docs[doc.document_type] = doc
+    DOC_ICONS = {
+        'Selfie': 'fa-camera', 'QID': 'fa-id-card', 'Passport': 'fa-passport',
+        'Driving License': 'fa-id-badge', 'Istimara': 'fa-car',
+    }
     doc_list = [
-        {'type': dt, 'key': dt.replace(' ', '_'), 'doc': existing_docs.get(dt)}
+        {'type': dt, 'key': dt.replace(' ', '_'), 'doc': existing_docs.get(dt),
+         'icon': DOC_ICONS.get(dt, 'fa-file')}
         for dt in APPLY_DOC_TYPES
     ]
 
@@ -595,24 +675,32 @@ def join_driver(request):
     sec1_total = len(PROFILE_PROGRESS_FIELDS)
     sec2_complete = bool(
         primary_vehicle and primary_vehicle.vehicle_type and primary_vehicle.vehicle_type != 'none'
-        and driver and driver.job_type
     )
-    sec3_selfie = 'Selfie' in existing_docs
-    sec3_ids = len([t for t in existing_docs if t != 'Selfie'])
-    sec3_complete = sec3_selfie and sec3_ids >= 2
+    driver_zone_group_ids = set(
+        driver.preferred_zone_groups.values_list('id', flat=True)
+    ) if driver else set()
+    sec3_complete = bool(
+        driver and driver.job_type
+        and (driver_zone_group_ids or not zone_groups)
+    )
+    sec4_selfie = 'Selfie' in existing_docs
+    sec4_ids = len([t for t in existing_docs if t != 'Selfie'])
+    sec4_complete = sec4_selfie and sec4_ids >= 2
     sections_progress = {
         'sec1_done': sec1_done,
         'sec1_total': sec1_total,
         'sec1_complete': sec1_done == sec1_total,
         'sec2_complete': sec2_complete,
-        'sec3_selfie': sec3_selfie,
-        'sec3_ids': sec3_ids,
         'sec3_complete': sec3_complete,
-        'has_any': bool(sec1_done or sec2_complete or existing_docs),
+        'sec4_selfie': sec4_selfie,
+        'sec4_ids': sec4_ids,
+        'sec4_complete': sec4_complete,
+        'has_any': bool(sec1_done or sec2_complete or sec3_complete or existing_docs),
         'percent': int(
-            (sec1_done / sec1_total * 60)
-            + (20 if sec2_complete else 0)
-            + (20 if sec3_complete else (10 if (sec3_selfie or sec3_ids) else 0))
+            (sec1_done / sec1_total * 50)
+            + (15 if sec2_complete else 0)
+            + (15 if sec3_complete else 0)
+            + (20 if sec4_complete else (10 if (sec4_selfie or sec4_ids) else 0))
         ),
     }
 
@@ -622,8 +710,16 @@ def join_driver(request):
         'profile': profile,
         'driver': driver,
         'job_type_choices': fleet_models.DRIVER_JOB_TYPE_CHOICES,
-        'work_time_slab_choices': fleet_models.WORK_TIME_SLAB_CHOICES,
+        'work_time_slab_tiles': [
+            {'value': 'morning', 'label': 'Morning', 'time': '6 AM – 12 PM', 'icon': 'fa-cloud-sun'},
+            {'value': 'afternoon', 'label': 'Afternoon', 'time': '12 PM – 6 PM', 'icon': 'fa-sun'},
+            {'value': 'evening', 'label': 'Evening', 'time': '6 PM – 12 AM', 'icon': 'fa-cloud-moon'},
+            {'value': 'night', 'label': 'Night', 'time': '12 AM – 6 AM', 'icon': 'fa-moon'},
+        ],
         'driver_time_slabs': driver.work_time_slab_list if driver else [],
+        'zone_groups': zone_groups,
+        'driver_zone_group_ids': driver_zone_group_ids,
+        'initial_step': initial_step,
         'doc_list': doc_list,
         'application_status': application_status,
         'show_status_only': show_status_only,

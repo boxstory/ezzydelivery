@@ -6,9 +6,9 @@
 {% block page_title %}My Tasks{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'fleet:pickup_scanner' %}" class="fleet-btn-icon" title="Scan Package" style="text-decoration:none;">
-    <i class="fa-solid fa-qrcode"></i>
-</a>
+<button type="button" class="fleet-btn-icon" title="Search tasks" onclick="headerSearchToggle()">
+    <i class="fa-solid fa-magnifying-glass"></i>
+</button>
 <a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon" title="Tasks Map" style="text-decoration:none;">
     <i class="fa-solid fa-map-location-dot"></i>
 </a>
@@ -131,6 +131,16 @@
                enterkeyhint="search">
     </div>
 </form>
+
+{% if current_tab == 'all' and driver_active %}
+<!-- Scan any package label to take that task -->
+<div class="tsk-scanbar fleet-fade-in">
+    <button type="button" class="fleet-btn tsk-scanbar__btn" onclick="openPoolScanner()">
+        <i class="fa-solid fa-camera"></i> Scan package to take
+    </button>
+    <span class="tsk-scanbar__hint">Scan the label QR to take the task without searching for it</span>
+</div>
+{% endif %}
 
 <!-- Task Cards -->
 {% if cards %}
@@ -409,48 +419,10 @@
 </div>{% endwith %}
 {% endfor %}
 
-<!-- Pagination Controls -->
+<!-- Pagination Controls (shared brand component — phone build: no per-page / go-to) -->
 {% if paginator.num_pages > 1 %}
-<div class="fleet-pagination">
-    {% if page_obj.has_previous %}
-    <a href="?page=1&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
-       class="fleet-pagination__btn fleet-pagination__btn--first" title="First page">
-        <i class="fa-solid fa-angles-left"></i>
-    </a>
-    <a href="?page={{ page_obj.previous_page_number }}&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
-       class="fleet-pagination__btn fleet-pagination__btn--prev" title="Previous page">
-        <i class="fa-solid fa-angle-left"></i>
-    </a>
-    {% else %}
-    <button class="fleet-pagination__btn fleet-pagination__btn--first" disabled>
-        <i class="fa-solid fa-angles-left"></i>
-    </button>
-    <button class="fleet-pagination__btn fleet-pagination__btn--prev" disabled>
-        <i class="fa-solid fa-angle-left"></i>
-    </button>
-    {% endif %}
-
-    <div class="fleet-pagination__info">
-        <span class="fleet-pagination__current">{{ page_obj.number }} / {{ paginator.num_pages }}</span>
-    </div>
-
-    {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
-       class="fleet-pagination__btn fleet-pagination__btn--next" title="Next page">
-        <i class="fa-solid fa-angle-right"></i>
-    </a>
-    <a href="?page={{ paginator.num_pages }}&tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}"
-       class="fleet-pagination__btn fleet-pagination__btn--last" title="Last page">
-        <i class="fa-solid fa-angles-right"></i>
-    </a>
-    {% else %}
-    <button class="fleet-pagination__btn fleet-pagination__btn--next" disabled>
-        <i class="fa-solid fa-angle-right"></i>
-    </button>
-    <button class="fleet-pagination__btn fleet-pagination__btn--last" disabled>
-        <i class="fa-solid fa-angles-right"></i>
-    </button>
-    {% endif %}
+<div class="fleet-pagination-wrap">
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page="20" pagination_id="driver_tasks" show_per_page="false" show_goto="false" variant="compact" %}
 </div>
 {% endif %}
 
@@ -594,6 +566,88 @@
     </div>
 </div>
 
+<!-- ── Scan-to-Take Pool Modal (New tab — no card tapped first) ────────── -->
+<div class="fleet-modal" id="poolScanModal" style="display:none;">
+    <div class="fleet-modal__overlay" onclick="closePoolScanner()"></div>
+    <div class="fleet-modal__content take-scan-modal">
+
+        <div class="fleet-modal__header">
+            <div>
+                <h3 class="fleet-modal__title"><i class="fa-solid fa-qrcode me-2"></i>Scan package to take</h3>
+                <p class="take-scan-subtitle">Any available task — no need to find the card</p>
+            </div>
+            <button type="button" class="fleet-btn-icon" onclick="closePoolScanner()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+
+        <div class="take-scan-camera-wrap" id="poolScanCameraWrap">
+            <video id="poolScanVideo" autoplay playsinline></video>
+            <div class="take-scan-frame">
+                <div class="take-scan-frame__corner take-scan-frame__corner--tl"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--tr"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--bl"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--br"></div>
+                <div class="take-scan-frame__line"></div>
+            </div>
+            <p class="take-scan-hint"><i class="fa-solid fa-qrcode me-1"></i>Align the label QR within frame</p>
+        </div>
+
+        <div class="take-scan-success" id="poolScanSuccess" style="display:none;">
+            <div class="take-scan-success__icon"><i class="fa-solid fa-circle-check"></i></div>
+            <h4 class="take-scan-success__title">Task Accepted!</h4>
+            <div class="take-scan-success__card">
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-hashtag"></i></span>
+                    <span id="poolScanTaskNum" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-store"></i></span>
+                    <span id="poolScanBusiness" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-user"></i></span>
+                    <span id="poolScanCustomer" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row" id="poolScanZoneRow">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-location-dot"></i></span>
+                    <span id="poolScanZone" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row" id="poolScanCodRow">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-money-bill-wave"></i></span>
+                    <span id="poolScanCod" class="take-scan-info-val take-scan-info-val--cod"></span>
+                </div>
+            </div>
+            <p class="tsk-scanbar__taken" id="poolScanTaken"></p>
+            <div class="tsk-scanbar__again">
+                <button type="button" class="fleet-btn tsk-scanbar__btn" onclick="poolScanAgain()">
+                    <i class="fa-solid fa-camera"></i> Scan next package
+                </button>
+                <button type="button" class="fleet-btn tsk-scanbar__btn tsk-scanbar__btn--done" onclick="closePoolScanner()">
+                    <i class="fa-solid fa-check"></i> Done
+                </button>
+            </div>
+        </div>
+
+        <div class="fleet-modal__body" id="poolScanManualWrap" style="display:none;">
+            <div class="text-center mb-3">
+                <i class="fa-solid fa-camera-slash" style="font-size:2rem;color:var(--fleet-grey-400)"></i>
+                <p class="text-muted mt-2 mb-0" style="font-size:.85rem">Camera not available. Enter code below.</p>
+            </div>
+            <form onsubmit="return poolScanManual(event)">
+                <div class="fleet-form-group">
+                    <label class="fleet-label">Order / task number</label>
+                    <input type="text" id="poolScanManualInput" class="fleet-input" placeholder="Type or paste code…" autocomplete="off">
+                </div>
+                <button type="submit" class="fleet-btn fleet-btn--primary fleet-btn--block">
+                    <i class="fa-solid fa-check me-2"></i>Take task
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+
 {% block extra_css %}{% endblock %}
 
 <script>
@@ -644,6 +698,17 @@
                 document.getElementById('filterForm').submit();
             }
         }
+    }
+
+    // Header search icon — opens the filter-bar search and scrolls it into view
+    function headerSearchToggle() {
+        const bar = document.getElementById('fleetFilterBar');
+        if (!bar) return;
+        if (!bar.classList.contains('fleet-filter-bar--search-active')) {
+            toggleFleetSearch();
+        }
+        bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => document.getElementById('fleetSearchInput')?.focus(), 250);
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -964,6 +1029,124 @@
             closeTakeScanner();
             window.location.reload();
         }, 3000);
+    }
+
+    // ── Scan-to-Take from the pool (New tab section button) ───────────────────
+    let _poolStream = null;
+    let _poolDetecting = false;
+    let _poolTaken = 0;
+
+    function openPoolScanner() {
+        haptic([10]);
+        document.getElementById('poolScanManualInput').value = '';
+        document.getElementById('poolScanModal').style.display = 'flex';
+        _startPoolCamera();
+    }
+
+    function _poolStage(stage) {
+        document.getElementById('poolScanCameraWrap').style.display = stage === 'camera' ? 'block' : 'none';
+        document.getElementById('poolScanSuccess').style.display = stage === 'success' ? 'block' : 'none';
+        document.getElementById('poolScanManualWrap').style.display = stage === 'manual' ? 'block' : 'none';
+    }
+
+    async function _startPoolCamera() {
+        _poolDetecting = true;
+        _poolStage('camera');
+        try {
+            _poolStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            const video = document.getElementById('poolScanVideo');
+            video.srcObject = _poolStream;
+            if (!('BarcodeDetector' in window)) return;
+            const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
+            const detect = async () => {
+                if (!_poolDetecting) return;
+                try {
+                    const found = await detector.detect(video);
+                    if (found.length > 0) {
+                        _poolDetecting = false;
+                        haptic([10, 80, 10]);
+                        _submitPoolScan(found[0].rawValue);
+                    } else {
+                        requestAnimationFrame(detect);
+                    }
+                } catch { requestAnimationFrame(detect); }
+            };
+            video.addEventListener('loadeddata', detect, { once: true });
+        } catch (err) {
+            _stopPoolCamera();
+            _poolStage('manual');
+            document.getElementById('poolScanManualInput').focus();
+        }
+    }
+
+    function _stopPoolCamera() {
+        _poolDetecting = false;
+        if (_poolStream) {
+            _poolStream.getTracks().forEach(t => t.stop());
+            _poolStream = null;
+        }
+    }
+
+    function poolScanAgain() {
+        document.getElementById('poolScanManualInput').value = '';
+        _startPoolCamera();
+    }
+
+    function poolScanManual(e) {
+        e.preventDefault();
+        const val = document.getElementById('poolScanManualInput').value.trim();
+        if (val) _submitPoolScan(val);
+        return false;
+    }
+
+    function closePoolScanner() {
+        _stopPoolCamera();
+        document.getElementById('poolScanModal').style.display = 'none';
+        if (_poolTaken > 0) { window.location.href = '?tab=accepted'; }
+    }
+
+    async function _submitPoolScan(code) {
+        _stopPoolCamera();
+        try {
+            const resp = await fetch('{% url "fleet:fleet_task_scan_take_any" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ code: code })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                _poolTaken += 1;
+                haptic([10, 50, 10, 50, 10]);
+                document.getElementById('poolScanTaskNum').textContent = data.task_number || data.order_number || '—';
+                document.getElementById('poolScanBusiness').textContent = data.business || '—';
+                document.getElementById('poolScanCustomer').textContent = data.customer || '—';
+
+                const zone = [data.zone ? 'Zone ' + data.zone : '', data.street ? 'St ' + data.street : '', data.building ? 'Bldg ' + data.building : ''].filter(Boolean).join(', ');
+                document.getElementById('poolScanZone').textContent = zone || '—';
+                document.getElementById('poolScanZoneRow').style.display = zone ? '' : 'none';
+
+                const codRow = document.getElementById('poolScanCodRow');
+                if (data.cod) {
+                    document.getElementById('poolScanCod').textContent = data.cod + ' QR';
+                    codRow.style.display = '';
+                } else {
+                    codRow.style.display = 'none';
+                }
+
+                document.getElementById('poolScanTaken').textContent =
+                    _poolTaken + ' task' + (_poolTaken > 1 ? 's' : '') + ' taken this scan session';
+                _poolStage('success');
+                showToast('Task accepted!', 'success');
+            } else {
+                showToast(data.error || 'Take failed', 'danger');
+                _startPoolCamera();
+            }
+        } catch (err) {
+            showToast('Network error. Try again.', 'danger');
+            _startPoolCamera();
+        }
     }
 </script>
 

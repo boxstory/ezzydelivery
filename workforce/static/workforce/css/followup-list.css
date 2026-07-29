@@ -143,6 +143,68 @@
 .wfl__age--stale { color: var(--brand-danger, #dc2626); }
 .wfl__age--stale::before { background: #ef4444; }
 
+/* ── First-mile pickup column (sits left of DL Status) ──
+   Ledger treatment: ink text + a single leading swatch keyed to the leg stage,
+   so it never competes with the coloured DL status badge beside it. */
+.wfl .wfl__th-pickup,
+.wfl .wfl__pk-cell {
+  width: 6.5rem;
+  max-width: 6.5rem;
+  white-space: nowrap;
+}
+
+.wfl__pk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  padding-left: 0.4rem;
+  border-left: 3px solid var(--brand-grey-300, #dcdcdc);
+}
+.wfl__pk__status,
+.wfl__pk__plan {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wfl__pk__status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-700, #333);
+  line-height: 1.2;
+}
+.wfl__pk__plan {
+  font-size: 0.62rem;
+  color: var(--brand-grey-500, #6c757d);
+  line-height: 1.2;
+}
+
+/* Stage swatches: waiting → grey, in flight → amber, custody taken → navy,
+   closed → success, cancelled → danger */
+.wfl__pk--accepted,
+.wfl__pk--in_progress,
+.wfl__pk--arrived { border-left-color: #f59e0b; }
+.wfl__pk--accepted .wfl__pk__status,
+.wfl__pk--in_progress .wfl__pk__status,
+.wfl__pk--arrived .wfl__pk__status { color: #92400e; }
+
+.wfl__pk--collected { border-left-color: var(--brand-navy, #001f3f); }
+.wfl__pk--collected .wfl__pk__status { color: var(--brand-navy, #001f3f); }
+
+.wfl__pk--dropped,
+.wfl__pk--handed_off { border-left-color: var(--brand-success, #15803d); }
+.wfl__pk--dropped .wfl__pk__status,
+.wfl__pk--handed_off .wfl__pk__status { color: var(--brand-success, #15803d); }
+
+.wfl__pk--cancelled { border-left-color: var(--brand-danger, #dc2626); }
+.wfl__pk--cancelled .wfl__pk__status { color: var(--brand-danger, #dc2626); }
+
+.wfl__pk-none {
+  font-size: 0.75rem;
+  color: var(--brand-grey-400, #b0b0b0);
+}
+
 @media (max-width: 575.98px) {
   .wfl__hero { align-items: flex-start; }
   .wfl__hero__shape { gap: 0.75rem; }

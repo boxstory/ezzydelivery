@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% load static %}
+{% load socialaccount %}
+{% comment %}
+Purpose: Arabic RTL driver recruitment landing — "وظائف سائق توصيل قطر" hreflang pair of the English /join_us/driver/start/, with Arabic JobPosting/FAQPage schema
+Used by: core.views.join_driver_start_ar (/ar/join_us/driver/start/)
+Notes: Mirrors join_driver_start.html; keep hreflang block identical on both pages; JSON-LD lives in extra_js block
+{% endcomment %}
+
+{% block html_lang %}ar{% endblock html_lang %}
+{% block html_dir %} dir="rtl"{% endblock html_dir %}
+
+{% block title %}وظائف سائق توصيل في قطر | انضم إلى أسطول Ezzy Delivery{% endblock title %}
+
+{% block head_hreflang %}
+<link rel="alternate" hreflang="en" href="https://ezzydelivery.qa/join_us/driver/start/" />
+<link rel="alternate" hreflang="ar" href="https://ezzydelivery.qa/ar/join_us/driver/start/" />
+<link rel="alternate" hreflang="x-default" href="https://ezzydelivery.qa/join_us/driver/start/" />
+{% endblock head_hreflang %}
+
+{% block extra_css %}
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260724a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<section id="core_join_driver_start_section_main">
+    <div class="container-lg px-3 py-4">
+
+        <!-- Hero -->
+        <div class="cja__hero cja__hero--lp p-4 p-md-5 mb-4 text-center">
+            <div class="cja__lp-kicker mb-2">نوظّف الآن</div>
+            <h1 class="cja__hero-title cja__lp-title mb-2">وظائف سائق توصيل في قطر</h1>
+            <p class="cja__lp-sub mx-auto mb-2">نحن نوسّع أسطول Ezzy Delivery في جميع أنحاء قطر ونبحث عن سائقين ومندوبي توصيل موثوقين. اعمل بسيارتك أو دراجتك النارية أو الفان، واحصل على أجر مقابل كل عملية توصيل — كلما أوصلت أكثر، ربحت أكثر.</p>
+            <p class="cja__lp-meta small mb-0">نخدم الدوحة، الوكرة، لوسيل، الخور وجميع مناطق قطر.</p>
+        </div>
+
+        <!-- Apply steps -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4" id="join-cta">
+            <h2 class="h5 text-center mb-2">خطوات التقديم — 5 دقائق</h2>
+            <p class="text-muted text-center small mb-4">كل ما تحتاجه هو هاتفك، وثائق هويتك ومركبتك.</p>
+
+            <div class="d-flex flex-column gap-3 mb-4">
+                <div class="cja__route-step d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">1</span>
+                    <div>
+                        <div class="fw-bold">سجّل الدخول عبر Gmail</div>
+                        <div class="text-muted small">بنقرة واحدة عبر حساب Google — بدون كلمة مرور جديدة.</div>
+                    </div>
+                </div>
+                <div class="cja__route-step d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">2</span>
+                    <div>
+                        <div class="fw-bold">أدخل بياناتك ومعلومات مركبتك</div>
+                        <div class="text-muted small">اسمك، رقم هاتفك وواتساب، ونوع المركبة التي تقودها. يمكنك الحفظ والمتابعة لاحقاً في أي وقت.</div>
+                    </div>
+                </div>
+                <div class="cja__route-step d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">3</span>
+                    <div>
+                        <div class="fw-bold">ارفع صورة سيلفي وصورتين للهوية</div>
+                        <div class="text-muted small">صورة شخصية (سيلفي) مع أي وثيقتين: البطاقة الشخصية، جواز السفر، رخصة القيادة أو الاستمارة.</div>
+                    </div>
+                </div>
+                <div class="cja__route-step d-flex align-items-start gap-3">
+                    <span class="cja__step-badge d-flex align-items-center justify-content-center">4</span>
+                    <div>
+                        <div class="fw-bold">انتظر الموافقة عبر واتساب</div>
+                        <div class="text-muted small">يراجع فريقنا طلبك ويؤكد الموافقة عبر واتساب — ثم افتح لوحة السائق وابدأ التوصيل والربح.</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if user.is_authenticated %}
+            <div class="text-center">
+                <a href="{% url 'core:join_driver' %}" class="btn cja__btn-navy btn-lg px-5" id="core_join_driver_start_btn_join">
+                    قدّم الآن
+                </a>
+            </div>
+            {% else %}
+            <form method="post" action="{% provider_login_url 'google' %}" class="text-center">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'core:join_driver' %}">
+                <button type="submit" class="btn cja__google-btn btn-lg px-5" id="core_join_driver_start_btn_googlejoin">
+                    <img src="https://accounts.google.com/favicon.ico" alt="" width="20" height="20" class="ms-2 align-text-bottom">
+                    قدّم الآن عبر Google
+                </button>
+                <div class="text-muted small mt-2">قدّمت من قبل؟ سجّل الدخول بنفس حساب Gmail لمتابعة حالة طلبك.</div>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Benefits -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">المزايا</h2>
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fas fa-coins" aria-hidden="true"></i></div>
+                        <div class="fw-bold">أجر مقابل كل عملية توصيل</div>
+                        <p class="text-muted small mb-0">تحصل على أجر عن كل عملية توصيل مكتملة — كلما أوصلت أكثر، ربحت أكثر.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fas fa-clock" aria-hidden="true"></i></div>
+                        <div class="fw-bold">ساعات عمل مرنة</div>
+                        <p class="text-muted small mb-0">دوام كامل أو جزئي، بدون مناوبات ثابتة — اقبل مهام التوصيل التي تناسب يومك.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fas fa-map-location-dot" aria-hidden="true"></i></div>
+                        <div class="fw-bold">اختر مناطق التوصيل الخاصة بك</div>
+                        <p class="text-muted small mb-0">طلبات في الدوحة، الوكرة، لوسيل، الخور وبقية مناطق قطر — اختر المناطق التي تعرفها جيداً.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="cja__perk h-100 p-3">
+                        <div class="cja__perk-icon mb-2"><i class="fab fa-whatsapp" aria-hidden="true"></i></div>
+                        <div class="fw-bold">دعم مخصص عبر واتساب</div>
+                        <p class="text-muted small mb-0">تحديثات المهام، تأكيد الموافقة والمساعدة من فريق العمليات تصلك مباشرة على واتساب.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Earnings -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">الأرباح</h2>
+            <p class="mb-0">تحصل على أجر مقابل كل عملية توصيل مكتملة — كلما أوصلت أكثر، ربحت أكثر. دفعات أسبوعية، ساعات عمل مرنة، وبدون مناوبات ثابتة.</p>
+            {% comment %}Enable only once Ezzy confirms a real figure — never publish a guessed number:
+            <p class="mb-0 mt-2">يحقق السائقون النشطون ما يصل إلى [CONFIRMED_NUMBER] ريال قطري شهرياً.</p>
+            {% endcomment %}
+        </div>
+
+        <!-- Requirements -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">المتطلبات</h2>
+            <ul class="cja__req-list list-unstyled mb-0">
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>رخصة قيادة قطرية سارية.</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>مركبتك الخاصة — سيارة، دراجة نارية أو فان.</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>وثيقتان من الهوية: البطاقة الشخصية، جواز السفر، رخصة القيادة أو الاستمارة.</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>صورة شخصية (سيلفي).</span></li>
+                <li><i class="fas fa-check" aria-hidden="true"></i><span>هاتف ذكي مع واتساب وحساب Gmail لتسجيل الدخول.</span></li>
+            </ul>
+        </div>
+
+        <!-- FAQ -->
+        <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <h2 class="h5 mb-3">الأسئلة الشائعة</h2>
+            <div class="accordion accordion-flush cja__faq" id="core_join_driver_start_accordion_faq">
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_how_join">
+                            كيف أنضم إلى Ezzy Delivery كسائق توصيل؟
+                        </button>
+                    </h3>
+                    <div id="faq_how_join" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">قدّم عبر الإنترنت خلال 5 دقائق تقريباً: سجّل الدخول عبر Gmail، أدخل بياناتك ومعلومات مركبتك، وارفع صورة سيلفي مع وثيقتين من الهوية. يراجع فريقنا طلبك ويؤكد الموافقة عبر واتساب.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_vehicle">
+                            هل أحتاج إلى مركبة خاصة للانضمام؟
+                        </button>
+                    </h3>
+                    <div id="faq_vehicle" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">نعم — تقوم بالتوصيل بسيارتك أو دراجتك النارية أو الفان الخاص بك. أثناء التقديم تخبرنا بنوع مركبتك لنرسل لك مهام التوصيل المناسبة.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_parttime">
+                            هل يمكنني العمل بدوام جزئي؟
+                        </button>
+                    </h3>
+                    <div id="faq_parttime" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">نعم. لا توجد مناوبات ثابتة — أنت تختار متى تعمل وأي مهام توصيل تقبل، لذا يمكنك القيادة بدوام كامل أو إلى جانب عمل آخر.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_documents">
+                            ما الوثائق المطلوبة للتقديم؟
+                        </button>
+                    </h3>
+                    <div id="faq_documents" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">صورة سيلفي مع أي وثيقتين من: البطاقة الشخصية، جواز السفر، رخصة القيادة أو الاستمارة. ترفعها كصور مباشرة في طلب التقديم عبر الإنترنت.</div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq_paid">
+                            كيف يتقاضى سائقو التوصيل أجورهم؟
+                        </button>
+                    </h3>
+                    <div id="faq_paid" class="accordion-collapse collapse" data-bs-parent="#core_join_driver_start_accordion_faq">
+                        <div class="accordion-body small text-muted">تحصل على أجر مقابل كل عملية توصيل مكتملة. تُسجَّل أرباحك في لوحة السائق حيث ترى كل عملية توصيل وكل تسوية مع فريق Ezzy Delivery.</div>
+                    </div>
+                </div>
+            </div>
+            <p class="small text-muted mt-3 mb-0">لديك المزيد من الأسئلة؟ اقرأ <a href="{% url 'webpages:driver_faq' %}">الأسئلة الشائعة للسائقين</a> أو <a href="{% url 'webpages:driver_guide' %}">دليل السائق</a> خطوة بخطوة.</p>
+        </div>
+
+        <!-- Bottom CTA -->
+        <div class="text-center mb-2">
+            <a href="#join-cta" class="btn cja__btn-navy btn-lg px-5">قدّم الآن</a>
+            <p class="text-muted small mt-2 mb-0">تبحث عن وظائف مكتبية؟ اطّلع على <a href="{% url 'webpages:careers' %}">الوظائف في Ezzy Delivery</a>. <a href="{% url 'core:join_driver_start' %}">English version</a></p>
+        </div>
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "JobPosting",
+  "title": "سائق توصيل",
+  "inLanguage": "ar",
+  "url": "https://ezzydelivery.qa/ar/join_us/driver/start/",
+  "description": "<p>تبحث Ezzy Delivery عن سائقي توصيل في جميع أنحاء قطر (الدوحة، الوكرة، لوسيل، الخور). اعمل بسيارتك أو دراجتك النارية أو الفان، اختر ساعات عملك واحصل على أجر مقابل كل عملية توصيل مكتملة. قدّم عبر الإنترنت خلال 5 دقائق بتسجيل الدخول عبر Google — ارفع صورة سيلفي ووثيقتين من الهوية (البطاقة الشخصية، جواز السفر، رخصة القيادة أو الاستمارة)، واحصل على الموافقة عبر واتساب وابدأ التوصيل.</p><p>المتطلبات: مركبة خاصة، رخصة قيادة قطرية سارية، هاتف ذكي مع واتساب.</p>",
+  "datePosted": "{% now 'Y-m-d' %}",
+  "validThrough": "{{ job_valid_through }}",
+  "employmentType": ["FULL_TIME", "PART_TIME", "CONTRACTOR"],
+  "directApply": true,
+  "baseSalary": {
+    "@type": "MonetaryAmount",
+    "currency": "QAR",
+    "value": { "@type": "QuantitativeValue", "unitText": "DELIVERY" }
+  },
+  "hiringOrganization": {
+    "@type": "Organization",
+    "name": "EzzyDelivery",
+    "sameAs": "https://ezzydelivery.qa",
+    "logo": "https://ezzydelivery.qa/static/webpages/img/ezzy-logo-sqr-round.png"
+  },
+  "jobLocation": {
+    "@type": "Place",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Doha",
+      "addressCountry": "QA"
+    }
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "inLanguage": "ar",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "كيف أنضم إلى Ezzy Delivery كسائق توصيل؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "قدّم عبر الإنترنت خلال 5 دقائق تقريباً: سجّل الدخول عبر Gmail، أدخل بياناتك ومعلومات مركبتك، وارفع صورة سيلفي مع وثيقتين من الهوية. يراجع فريقنا طلبك ويؤكد الموافقة عبر واتساب."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "هل أحتاج إلى مركبة خاصة للانضمام؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نعم — تقوم بالتوصيل بسيارتك أو دراجتك النارية أو الفان الخاص بك. أثناء التقديم تخبرنا بنوع مركبتك لنرسل لك مهام التوصيل المناسبة."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "هل يمكنني العمل بدوام جزئي؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نعم. لا توجد مناوبات ثابتة — أنت تختار متى تعمل وأي مهام توصيل تقبل، لذا يمكنك القيادة بدوام كامل أو إلى جانب عمل آخر."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "ما الوثائق المطلوبة للتقديم؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "صورة سيلفي مع أي وثيقتين من: البطاقة الشخصية، جواز السفر، رخصة القيادة أو الاستمارة. ترفعها كصور مباشرة في طلب التقديم عبر الإنترنت."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "كيف يتقاضى سائقو التوصيل أجورهم؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "تحصل على أجر مقابل كل عملية توصيل مكتملة. تُسجَّل أرباحك في لوحة السائق حيث ترى كل عملية توصيل وكل تسوية مع فريق Ezzy Delivery."
+      }
+    }
+  ]
+}
+</script>
+{% endblock extra_js %}

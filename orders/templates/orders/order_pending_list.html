@@ -95,36 +95,8 @@
 
     {% include "orders/parts/_reconfirm_modal.html" %}
 
-    {% if orders %}
-    <div class="pwa-mobile-pagination">
-      <div class="pwa-mobile-pagination__pages">
-        {% for p in orders.paginator.page_range %}
-          {% if p >= orders.number|add:"-1" and p <= orders.number|add:"1" %}
-            {% if p == orders.number %}
-            <span class="pwa-mobile-pagination__page active">{{ p }}</span>
-            {% else %}
-            <a href="?page={{ p }}&per_page={{ per_page }}" class="pwa-mobile-pagination__page">{{ p }}</a>
-            {% endif %}
-          {% endif %}
-        {% endfor %}
-      </div>
-      <span class="pwa-mobile-pagination__sep"></span>
-      <div class="pwa-mobile-pagination__perpage">
-        <a href="?per_page=10" class="pwa-mobile-pagination__size{% if per_page == '10' %} active{% endif %}">10</a>
-        <a href="?per_page=25" class="pwa-mobile-pagination__size{% if per_page == '25' %} active{% endif %}">25</a>
-        <a href="?per_page=50" class="pwa-mobile-pagination__size{% if per_page == '50' %} active{% endif %}">50</a>
-      </div>
-      {% if orders.has_next %}
-      <a href="?page={{ orders.next_page_number }}&per_page={{ per_page }}" class="pwa-mobile-pagination__btn">
-        <i class="fas fa-chevron-right"></i>
-      </a>
-      {% else %}
-      <span class="pwa-mobile-pagination__btn pwa-mobile-pagination__btn--disabled">
-        <i class="fas fa-chevron-right"></i>
-      </span>
-      {% endif %}
-    </div>
-    {% endif %}
+    <!-- Mobile Pager (shared brand component) -->
+    {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params per_page=per_page pagination_id="pending_mobile" %}
   </div>
 
   <!-- ==========================================

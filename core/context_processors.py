@@ -117,8 +117,10 @@ def seo_defaults(request):
     # Get current path for canonical URL
     current_url = request.build_absolute_uri()
 
-    # Default metadata
+    # Default metadata — flagged so base.html lets a template's
+    # {% block title %} outrank it (view-passed seo has no flag and wins)
     default_meta = SEOMetadata.get_page_meta(url=current_url)
+    default_meta['is_default'] = True
 
     return {
         'seo': default_meta,
@@ -281,3 +283,45 @@ def google_one_tap(request):
         return {'GOOGLE_ONE_TAP_CLIENT_ID': app.client_id}
     except Exception:
         return {'GOOGLE_ONE_TAP_CLIENT_ID': ''}
+
+
+def pagination_defaults(request):
+    """Supply `per_page` and `filter_params` to every template so the shared
+    pagination component keeps the user's page size and their filters.
+
+    Both were being lost the same way. The component reads them off the
+    template context, and most list views paginate correctly off ?per_page=
+    and filter correctly off the query string, but never put either value
+    back in context — so the selector re-rendered as 50 and every pagination
+    link was built with no filters. Page 2 then quietly showed a different,
+    unfiltered data set at a page size the user had not chosen.
+
+    `per_page` is compared as a STRING by the component when marking the
+    selected <option>, so it is returned as one.
+
+    `filter_params` is the whole query string minus page/per_page (the
+    component supplies those itself). Taking the entire QueryDict rather than
+    an allow-list means a filter cannot be dropped by someone forgetting to
+    add it here later.
+
+    A view that passes its own value still wins: render() context is applied
+    after context processors.
+    """
+    if not hasattr(request, 'GET'):
+        return {'per_page': '50', 'filter_params': ''}
+
+    per_page = '50'
+    raw = request.GET.get('per_page')
+    if raw:
+        try:
+            value = int(raw)
+            if value in (10, 25, 50, 100):
+                per_page = str(value)
+        except (ValueError, TypeError):
+            pass
+
+    params = request.GET.copy()
+    params.pop('page', None)
+    params.pop('per_page', None)
+
+    return {'per_page': per_page, 'filter_params': params.urlencode()}

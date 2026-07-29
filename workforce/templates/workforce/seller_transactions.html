@@ -1,36 +1,91 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
-{% load static %}
+{% load static humanize %}
 
 {% block title %}Seller Transactions - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/seller_roster.css' %}?v=20260728b" type="text/css" />
+{% endblock extra_css %}
 
 {% block content %}
 <div class="ftr">
     <!-- Hero Header -->
     {% include "workforce/parts/components/_page_header.html" with title="Seller Transactions" icon="fa-store" subtitle="Track and manage seller COD collections and settlements" %}
 
-    <!-- Seller Selector - Hidden when seller selected -->
+    {% comment %}
+    Landing state: a card per active seller instead of a bare dropdown. The
+    dropdown told staff nothing — they had to open accounts one at a time to
+    find who was owed money. Cards are ordered by outstanding balance, so the
+    money leads. Switching seller later still uses the dropdown in the header.
+    {% endcomment %}
     {% if not selected_seller %}
-    <div class="ftr__card ftr__card--driver">
-        <div class="ftr__card-header">
-            <i class="fa-solid fa-store ftr__card-icon"></i>
-            <span class="ftr__card-title">SELECT SELLER</span>
+    <section class="sro" aria-labelledby="workforce_seller_roster_heading">
+        <div class="sro__head">
+            <h2 class="sro__title" id="workforce_seller_roster_heading">Active sellers</h2>
+            <span class="sro__count">{{ seller_roster|length }} account{{ seller_roster|length|pluralize }}</span>
+            <label class="sro__search">
+                <span class="visually-hidden">Filter sellers</span>
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" id="workforce_seller_roster_input_search"
+                       class="sro__search-input" placeholder="Filter by name or code"
+                       autocomplete="off">
+            </label>
         </div>
-        <div class="ftr__card-body">
-            <div class="ftr__select-row">
-                <div class="ftr__select-group">
-                    <select id="sellerFilter" class="ftr__filter-select" onchange="ftrGo('seller_id', this.value)">
-                        <option value="">-- Select a Seller --</option>
-                        {% for seller in all_sellers|code_last %}
-                        <option value="{{ seller.business_id }}">
-                            {% if seller.business_code %}{{ seller.business_code }}{% else %}*{{ seller.business_id }}{% endif %} - {{ seller.business_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-        </div>
-    </div>
+
+        <ul class="sro__grid" id="workforce_seller_roster_list">
+            {% for row in seller_roster %}
+            <li class="sro__item" data-seller="{{ row.business.business_name|lower }} {{ row.business.business_code|lower }}">
+                <a href="?seller_id={{ row.business.business_id }}" class="sro__card{% if row.owed %} sro__card--owed{% endif %}">
+                    <div class="sro__ident">
+                        <span class="sro__code">{% if row.business.business_code %}{{ row.business.business_code }}{% else %}*{{ row.business.business_id }}{% endif %}</span>
+                        <span class="sro__name">{{ row.business.business_name }}</span>
+                    </div>
+
+                    <div class="sro__figure">
+                        <span class="sro__figure-label">Held for this seller</span>
+                        <span class="sro__figure-value{% if not row.owed %} sro__figure-value--nil{% endif %}">
+                            {{ row.owed|floatformat:0|intcomma }}<span class="sro__figure-unit">QAR</span>
+                        </span>
+                    </div>
+
+                    {% comment %}
+                    The rail is the signature: where this seller's collected COD
+                    currently sits across the three legs it moves through.
+                    Percentages are precomputed in the view and applied by
+                    seller-roster.js — data attributes rather than inline styles,
+                    which the project forbids in templates.
+                    {% endcomment %}
+                    <div class="sro__rail" role="img"
+                         aria-label="COD split — {{ row.with_driver|floatformat:0 }} with driver, {{ row.owed|floatformat:0 }} held by Ezzy, {{ row.paid_out|floatformat:0 }} paid out">
+                        <span class="sro__rail-seg sro__rail-seg--driver" data-seg="{{ row.pct_driver|floatformat:2 }}"></span>
+                        <span class="sro__rail-seg sro__rail-seg--owed" data-seg="{{ row.pct_owed|floatformat:2 }}"></span>
+                        <span class="sro__rail-seg sro__rail-seg--paid" data-seg="{{ row.pct_paid|floatformat:2 }}"></span>
+                    </div>
+
+                    <dl class="sro__legs">
+                        <div class="sro__leg">
+                            <dt>With driver</dt>
+                            <dd>{{ row.with_driver|floatformat:0|intcomma }}</dd>
+                        </div>
+                        <div class="sro__leg">
+                            <dt>Paid out</dt>
+                            <dd>{{ row.paid_out|floatformat:0|intcomma }}</dd>
+                        </div>
+                        <div class="sro__leg">
+                            <dt>Orders</dt>
+                            <dd>{{ row.order_count|intcomma }}</dd>
+                        </div>
+                    </dl>
+                </a>
+            </li>
+            {% empty %}
+            <li class="sro__empty">No active sellers.</li>
+            {% endfor %}
+        </ul>
+
+        <p class="sro__none" id="workforce_seller_roster_no_match" hidden>No seller matches that filter.</p>
+    </section>
     {% endif %}
 
     {% if selected_seller %}
@@ -260,6 +315,7 @@
 <!-- Export column picker -->
 {% include "workforce/parts/components/_export_columns_modal.html" %}
 <script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
+<script src="{% static 'workforce/js/seller-roster.js' %}?v=20260728a"></script>
 
 {% endblock content %}
 

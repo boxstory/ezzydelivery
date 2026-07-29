@@ -78,6 +78,42 @@ logger = logging.getLogger('delivery')
 
 
 # =============================================================================
+# PAGINATION HELPERS (shared brand pagination component)
+# =============================================================================
+
+PER_PAGE_CHOICES = [10, 25, 50, 100]
+
+
+def get_per_page(request, default=50):
+    """
+    Validated `per_page` for the shared pagination component.
+    Returns a STRING — the component compares it as a string when marking the
+    selected <option>, so an int would leave the selector blank.
+    """
+    raw = request.GET.get('per_page')
+    if raw:
+        try:
+            value = int(raw)
+            if value in PER_PAGE_CHOICES:
+                return str(value)
+        except (ValueError, TypeError):
+            pass
+    return str(default)
+
+
+def get_filter_params(request):
+    """
+    Urlencoded query string of every GET param except `page` / `per_page`
+    (the pagination component supplies those itself). Keeping the whole
+    QueryDict means no filter can silently be dropped on page 2.
+    """
+    params = request.GET.copy()
+    params.pop('page', None)
+    params.pop('per_page', None)
+    return params.urlencode()
+
+
+# =============================================================================
 # ADDRESS MANAGEMENT VIEWS
 # =============================================================================
 
@@ -529,6 +565,18 @@ def start_ride(request):
             task._status_actor = 'driver'  # state machine: accepted → out_for_delivery allowed for driver
             task._status_changed_by = request.user
             task.save(update_fields=['dl_task_status'])
+
+            # pre_save rolls the field back in place when the transition is not
+            # legal for a driver (e.g. the task is still 'assigned' and has not
+            # been accepted). Reporting success there navigates the driver into
+            # the delivery screen on a task that never left its old status.
+            if task.dl_task_status != 'out_for_delivery':
+                from delivery.state_machine import can_transition
+                _, reason = can_transition(task.dl_task_status, 'out_for_delivery', actor='driver')
+                logger.warning(
+                    f"Driver {driver.driver_id} start ride rejected for task {task_id}: {reason}")
+                return JsonResponse({"success": False, "error": reason or "Cannot start ride for this task"})
+
             logger.info(f"Driver {driver.driver_id} started ride for task {task_id}")
 
             return JsonResponse({
@@ -1177,7 +1225,8 @@ def zone_areas(request):
     ).filter(area_count__gt=0).order_by('zone_number')
 
     # Pagination
-    paginator = Paginator(areas, 50)
+    per_page = get_per_page(request, default=50)
+    paginator = Paginator(areas, int(per_page))
     areas_page = paginator.get_page(page)
 
     # Stats
@@ -1225,6 +1274,9 @@ def zone_areas(request):
         'search': search,
         'zone_filter': zone_filter,
         'suggestions': suggestions,
+        # Pagination component: carries search / zone
+        'per_page': per_page,
+        'filter_params': get_filter_params(request),
     }
     return render(request, 'delivery/zone_areas.html', context)
 
@@ -1353,7 +1405,8 @@ def zone_list(request):
     groups = delivery_models.ZoneGroup.objects.filter(is_active=True).order_by('display_order')
 
     # Pagination
-    paginator = Paginator(zones, 50)
+    per_page = get_per_page(request, default=50)
+    paginator = Paginator(zones, int(per_page))
     zones_page = paginator.get_page(page)
 
     # Stats
@@ -1370,6 +1423,9 @@ def zone_list(request):
         'search': search,
         'group_filter': group_filter,
         'polygon_filter': polygon_filter,
+        # Pagination component: carries search / group / polygon
+        'per_page': per_page,
+        'filter_params': get_filter_params(request),
     }
     return render(request, 'delivery/zone_list.html', context)
 

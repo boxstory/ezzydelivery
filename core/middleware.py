@@ -308,6 +308,7 @@ class SecurityHeadersMiddleware:
                 "https://cdn.datatables.net https://accounts.google.com; "
                 "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
                 "img-src 'self' data: blob: https:; "
+                "media-src 'self' data: blob: mediastream:; "
                 "connect-src 'self' https://www.google-analytics.com https://unpkg.com "
                 "https://*.basemaps.cartocdn.com https://www.google.com/recaptcha/ "
                 "https://cdn.jsdelivr.net https://cdn.datatables.net "
@@ -320,7 +321,7 @@ class SecurityHeadersMiddleware:
         if 'Permissions-Policy' not in response:
             response['Permissions-Policy'] = (
                 "geolocation=(self), "
-                "camera=(), "
+                "camera=(self), "   # driver PWA barcode/QR scanners need getUserMedia
                 "microphone=(), "
                 "payment=(), "
                 "usb=()"

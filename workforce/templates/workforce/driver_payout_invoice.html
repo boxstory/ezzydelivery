@@ -1,0 +1,134 @@
+{# Purpose: Printable payout invoice for one driver settlement — earnings only, no COD. #}
+{# Used by: workforce.views.driver_payout_invoice (URL workforce:driver_payout_invoice) #}
+{# Notes: COD is the driver's hand-in leg, not money owed — it never appears here by design. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+
+{% block title %}Driver Payout {{ settlement.settlement_code }}{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260728e" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="bpi">
+  <div class="bpi__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="bpi__ghost">◂ Back to transactions</a>
+    <button type="button" class="bpi__ghost" id="workforce_driver_payout_btn_print">Print invoice</button>
+  </div>
+
+  <article class="bpi__sheet">
+
+    <header class="bpi__head">
+      <div class="bpi__head-left">
+        <p class="bpi__eyebrow">Driver Payout</p>
+        <h1 class="bpi__biz">
+          {% if driver.user %}{{ driver.user.first_name }} {{ driver.user.last_name }}{% else %}{{ driver.driver_code|default:"—" }}{% endif %}
+        </h1>
+        {% if driver.driver_code %}<p class="bpi__driver-code">{{ driver.driver_code }}</p>{% endif %}
+      </div>
+      <div class="bpi__head-right">
+        <dl class="bpi__meta">
+          <div class="bpi__meta-row">
+            <dt>Payout</dt><dd class="bpi__meta-code">{{ settlement.settlement_code }}</dd>
+          </div>
+          <div class="bpi__meta-row">
+            <dt>Period</dt><dd>{{ settlement.period_start|date:"d M Y" }} – {{ settlement.period_end|date:"d M Y" }}</dd>
+          </div>
+          <div class="bpi__meta-row">
+            <dt>Paid</dt><dd>{{ settlement.paid_at|date:"d M Y"|default:"—" }}</dd>
+          </div>
+          {% if settlement.payment_reference %}
+          <div class="bpi__meta-row">
+            <dt>Reference</dt><dd>{{ settlement.payment_reference }}</dd>
+          </div>
+          {% endif %}
+          <div class="bpi__meta-row">
+            <dt>Issued by</dt>
+            <dd>{% if settlement.created_by %}{{ settlement.created_by.get_full_name|default:settlement.created_by.username }}{% else %}—{% endif %}</dd>
+          </div>
+        </dl>
+      </div>
+    </header>
+
+    <!-- Payout lines -->
+    <div class="bpi__table-wrap">
+      <table class="bpi__table">
+        <thead>
+          <tr>
+            <th class="bpi__col-idx">#</th>
+            <th>Task</th>
+            <th>Details</th>
+            <th>Date</th>
+            <th class="bpi__num">Earning</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lines %}
+          <tr>
+            <td class="bpi__col-idx">{{ forloop.counter }}</td>
+            <td class="bpi__order">{% if l.task %}{{ l.task.dl_task_number|default:l.task.id }}{% else %}—{% endif %}</td>
+            <td>{{ l.txn.description|default:l.txn.get_transaction_type_display }}</td>
+            <td class="bpi__date">{{ l.txn.created_at|date:"d M Y" }}</td>
+            <td class="bpi__num bpi__num--cod">{{ l.amount|floatformat:2|intcomma }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="bpi__empty">No payout lines are linked to this settlement.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="bpi__totals-row">
+            <td colspan="4">Total · {{ lines|length }} line{{ lines|length|pluralize }}</td>
+            <td class="bpi__num bpi__num--cod">{{ total_earnings|floatformat:2|intcomma }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Settlement summary -->
+    <section class="bpi__summary">
+      <div class="bpi__summary-line">
+        <span>Total earnings</span>
+        <span class="bpi__summary-val">{{ total_earnings|floatformat:2|intcomma }}</span>
+      </div>
+
+      {% for d in deductions %}
+      <div class="bpi__summary-line bpi__summary-line--deduct">
+        <span>{{ d.description|default:"Deduction" }}</span>
+        <span class="bpi__summary-val">− {{ d.amount|floatformat:2|intcomma }}</span>
+      </div>
+      {% endfor %}
+
+      <div class="bpi__summary-line bpi__summary-line--net">
+        <span>Net paid to driver</span>
+        <span class="bpi__summary-val">QAR {{ net_paid|floatformat:2|intcomma }}</span>
+      </div>
+    </section>
+
+    <footer class="bpi__foot">
+      <div class="bpi__sign">
+        <span class="bpi__sign-rule"></span>
+        <span class="bpi__sign-label">Received by (driver)</span>
+      </div>
+      <div class="bpi__sign">
+        <span class="bpi__sign-rule"></span>
+        <span class="bpi__sign-label">Paid out by (EzzyDelivery)</span>
+      </div>
+    </footer>
+
+  </article>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.getElementById('workforce_driver_payout_btn_print')?.addEventListener('click', function () {
+    window.print();
+  });
+</script>
+{% endblock %}

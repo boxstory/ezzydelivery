@@ -6,19 +6,34 @@
 {# Notes: crmb__ namespace; HTML5 drag-and-drop posts to crm_lead_update_stage; Won/Lost show last {{ closed_window_days }} days only. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718j" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260724b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
+{% if is_driver_board %}{% url 'workforce:crm_driver_leads_board' as board_url %}{% else %}{% url 'workforce:crm_leads_board' as board_url %}{% endif %}
 <div class="crm crmb col-12 p-3">
   <div class="crm__console">
 
     <!-- HEADER BAR -->
     <div class="crm__head">
       <div class="crm__head-title">
-        <div class="crm__eyebrow">Sales Pipeline</div>
-        <h1 class="crm__title">Leads Board</h1>
+        <div class="crm__eyebrow">{% if is_driver_board %}Recruitment Pipeline{% else %}Sales Pipeline{% endif %}</div>
+        <h1 class="crm__title">{% if is_driver_board %}Driver Leads Board{% else %}Leads Board{% endif %}</h1>
         <p class="crm__subtitle">Drag a card to change its stage · Won/Lost show last {{ closed_window_days }} days</p>
+        <div class="crm__board-tabs" role="tablist" aria-label="Lead boards">
+          <a href="{% url 'workforce:crm_leads_board' %}"
+             class="crm__board-tab {% if not is_driver_board %}crm__board-tab--active{% endif %}"
+             hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-briefcase"></i> Business
+          </a>
+          <a href="{% url 'workforce:crm_driver_leads_board' %}"
+             class="crm__board-tab {% if is_driver_board %}crm__board-tab--active{% endif %}"
+             hx-get="{% url 'workforce:crm_driver_leads_board' %}" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-motorcycle"></i> Drivers
+          </a>
+        </div>
       </div>
       <div class="crm__metrics d-none d-md-flex">
         <div class="crm__metric">
@@ -35,12 +50,12 @@
         </div>
       </div>
       <div class="crm__head-actions">
-        <a href="{% url 'workforce:crm_leads_list' %}" class="crm__btn"
-           hx-get="{% url 'workforce:crm_leads_list' %}" hx-target="#main-content"
+        <a href="{% url 'workforce:crm_leads_list' %}{% if is_driver_board %}?category=driver{% endif %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_leads_list' %}{% if is_driver_board %}?category=driver{% endif %}" hx-target="#main-content"
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-list"></i> List
         </a>
-        <a href="{% url 'workforce:crm_lead_create' %}" class="crm__btn crm__btn--primary">
+        <a href="{% url 'workforce:crm_lead_create' %}{% if is_driver_board %}?category=driver{% endif %}" class="crm__btn crm__btn--primary">
           <i class="fa-solid fa-plus"></i> New Lead
         </a>
       </div>
@@ -75,16 +90,6 @@
             {% endfor %}
           </select>
 
-          <select name="category" class="crm__facet-select" aria-label="Filter by lead type"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_board_form_filter">
-            <option value="">All types</option>
-            {% for value, label in category_choices %}
-            <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-
           <select name="assigned" class="crm__facet-select" aria-label="Filter by assignee"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
@@ -100,9 +105,9 @@
           </select>
         </div>
 
-        {% if search or source_filter or assigned_filter or category_filter %}
-        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__clear-all"
-           hx-get="{% url 'workforce:crm_leads_board' %}"
+        {% if search or source_filter or assigned_filter %}
+        <a href="{{ board_url }}" class="crm__clear-all"
+           hx-get="{{ board_url }}"
            hx-target="#main-content" hx-select="#main-content"
            hx-swap="outerHTML" hx-push-url="true">Reset</a>
         {% endif %}
@@ -170,7 +175,7 @@
 
 <!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
 <script>
-  window.CRMB_CONFIG = { csrfToken: "{{ csrf_token }}" };
+  window.CRMB_CONFIG = { csrfToken: "{{ csrf_token }}", driverBoard: {{ is_driver_board|yesno:"true,false" }} };
 </script>
-<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260718d"></script>
+<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260724a"></script>
 {% endblock %}

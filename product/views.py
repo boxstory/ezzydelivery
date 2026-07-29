@@ -64,6 +64,42 @@ logger = logging.getLogger('product')
 
 
 # =============================================================================
+# PAGINATION HELPERS (shared brand pagination component)
+# =============================================================================
+
+PER_PAGE_CHOICES = [10, 25, 50, 100]
+
+
+def get_per_page(request, default=50):
+    """
+    Validated `per_page` for the shared pagination component.
+    Returns a STRING — the component compares it as a string when marking the
+    selected <option>, so an int would leave the selector blank.
+    """
+    raw = request.GET.get('per_page')
+    if raw:
+        try:
+            value = int(raw)
+            if value in PER_PAGE_CHOICES:
+                return str(value)
+        except (ValueError, TypeError):
+            pass
+    return str(default)
+
+
+def get_filter_params(request):
+    """
+    Urlencoded query string of every GET param except `page` / `per_page`
+    (the pagination component supplies those itself). Keeping the whole
+    QueryDict means no filter can silently be dropped on page 2.
+    """
+    params = request.GET.copy()
+    params.pop('page', None)
+    params.pop('per_page', None)
+    return params.urlencode()
+
+
+# =============================================================================
 # PRODUCT LIST VIEWS
 # =============================================================================
 
@@ -241,7 +277,8 @@ def product_inventory(request):
         Q(warehouse_stock__isnull=True) | Q(warehouse_stock__lte=5)
     ).count()
 
-    paginator = Paginator(qs, 20)
+    per_page = get_per_page(request, default=25)
+    paginator = Paginator(qs, int(per_page))
     page_obj = paginator.get_page(request.GET.get('page'))
 
     data = {
@@ -252,6 +289,9 @@ def product_inventory(request):
         'total_products': total_products,
         'total_in_stock': total_in_stock,
         'low_stock_count': low_stock_count,
+        # Pagination component: carries `q` + `low_stock` (and anything else)
+        'per_page': per_page,
+        'filter_params': get_filter_params(request),
     }
     return render(request, 'product/product_inventory.html', data)
 
@@ -850,13 +890,14 @@ def inventory_list(request):
         category_ids = stock_levels.values_list('product__product_category_id', flat=True).distinct()
         categories = product_models.ProductCategory.objects.filter(
             id__in=[cat_id for cat_id in category_ids if cat_id is not None]
-        ).order_by('name')
+        ).order_by('category_name')
     except Exception as e:
         logger.error(f"Error fetching categories: {e}")
         categories = product_models.ProductCategory.objects.none()
 
     # Pagination
-    paginator = Paginator(stock_levels, 25)
+    per_page = get_per_page(request, default=25)
+    paginator = Paginator(stock_levels, int(per_page))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
@@ -880,6 +921,9 @@ def inventory_list(request):
         'low_stock_only': low_stock_only,
         'total_value': total_value,
         'is_staff': is_staff,
+        # Pagination component: carries search / warehouse / category / low_stock
+        'per_page': per_page,
+        'filter_params': get_filter_params(request),
     }
     return render(request, 'product/inventory_list.html', context)
 
@@ -953,7 +997,8 @@ def transaction_list(request):
         transactions = transactions.filter(warehouse_id=warehouse_id)
 
     # Pagination
-    paginator = Paginator(transactions, 50)
+    per_page = get_per_page(request, default=50)
+    paginator = Paginator(transactions, int(per_page))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
@@ -970,6 +1015,9 @@ def transaction_list(request):
         'selected_type': transaction_type,
         'selected_warehouse': warehouse_id,
         'is_staff': is_staff,
+        # Pagination component: carries type / warehouse
+        'per_page': per_page,
+        'filter_params': get_filter_params(request),
     }
     return render(request, 'product/transaction_list.html', context)
 

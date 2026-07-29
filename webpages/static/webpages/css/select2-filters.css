@@ -1,0 +1,120 @@
+/* Purpose: Brand sizing for the searchable filter selects (Select2) across the staff dashboards. */
+/* Used by: templates/includes/main_dashboard_scripts.html initialiser — every filter select in a GET form under /workforce/. */
+/* Notes: Scoped to .ez-filter-select so the project's other Select2 instances (order add/edit, product forms) keep their own sizing. */
+
+/* The host control is 34px across the staff filter bars, so the picker adopts
+   that box rather than Select2's default 28px. Scoped by container class —
+   never style .select2-container globally, other pages size their own. */
+.select2-container.ez-filter-select {
+    width: 100% !important;
+}
+
+.select2-container.ez-filter-select .select2-selection--single {
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--brand-grey-300, #d5dbe3);
+    border-radius: 0.4rem;
+    background-color: var(--brand-white, #fff);
+}
+
+.select2-container.ez-filter-select .select2-selection--single .select2-selection__rendered {
+    height: 32px;
+    line-height: 32px;
+    padding-left: 0.6rem;
+    padding-right: 1.6rem;
+    font-size: 0.78rem;
+    color: var(--brand-navy, #001f3f);
+}
+
+.select2-container.ez-filter-select .select2-selection--single .select2-selection__arrow {
+    height: 32px;
+    right: 0.3rem;
+}
+
+.select2-container.ez-filter-select .select2-selection--single .select2-selection__placeholder {
+    color: var(--brand-grey-500, #6c757d);
+    font-size: 0.78rem;
+}
+
+/* Focus ring matches the yellow the filter inputs use. */
+.select2-container.ez-filter-select.select2-container--focus .select2-selection--single,
+.select2-container.ez-filter-select.select2-container--open .select2-selection--single {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.15);
+}
+
+/* ── Dropdown ─────────────────────────────────────────────────
+   `ez-filter-select__menu` is applied to Select2's dropdown *container*
+   (`inst.$dropdown` is the container span, not the `.select2-dropdown` panel
+   inside it), so these are descendant selectors. Written as
+   `.select2-dropdown.ez-filter-select__menu` they matched nothing at all and
+   every rule below was dead — the pickers rendered with stock Select2 chrome. */
+.ez-filter-select__menu .select2-dropdown {
+    border-color: var(--brand-grey-300, #d5dbe3);
+    border-radius: 0.4rem;
+    box-shadow: 0 6px 18px rgba(0, 31, 63, 0.12);
+    overflow: hidden;
+}
+
+.ez-filter-select__menu .select2-search--dropdown {
+    padding: 0.4rem;
+}
+
+/* The search field is the whole point of this picker — give it the same box
+   as the filter inputs it sits under. */
+.ez-filter-select__menu .select2-search--dropdown .select2-search__field {
+    height: 30px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.78rem;
+    border: 1px solid var(--brand-grey-300, #d5dbe3);
+    border-radius: 0.3rem;
+    color: var(--brand-navy, #001f3f);
+}
+
+.ez-filter-select__menu .select2-search--dropdown .select2-search__field:focus {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+}
+
+.ez-filter-select__menu .select2-results__option {
+    font-size: 0.78rem;
+    padding: 0.35rem 0.6rem;
+}
+
+.ez-filter-select__menu .select2-results__option--highlighted[aria-selected] {
+    background-color: var(--brand-navy, #001f3f);
+    color: var(--brand-white, #fff);
+}
+
+.ez-filter-select__menu .select2-results__option[aria-selected="true"] {
+    background-color: var(--brand-grey-100, #f5f6f8);
+    color: var(--brand-navy, #001f3f);
+}
+
+/* ── Inside a Bootstrap modal ─────────────────────────────────
+   The dropdown is parented to the modal (see main_dashboard_scripts.html) so
+   its search box sits inside the focus trap and can actually be typed into.
+   The side effect is that it can hang off the bottom of a short dialog, which
+   reads as a rendering fault — so the results are capped and the dialog that
+   carries a picker reserves the room the open list needs. */
+.modal .ez-filter-select__menu { z-index: 1060; }
+
+.modal .ez-filter-select__menu .select2-results__options {
+    max-height: 11rem;
+}
+
+/* Put `picker-modal__body` on the .modal-body of any dialog whose main control
+   is a picker. The room is only reserved while the list is actually open —
+   holding it permanently left a dialog containing one select standing 20rem
+   tall with nothing in it. The enhancer toggles the modifier on open/close. */
+.picker-modal__body {
+    transition: min-height 0.15s ease;
+}
+
+.picker-modal__body--open {
+    min-height: 20.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .picker-modal__body { transition: none; }
+}

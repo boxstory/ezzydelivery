@@ -24,6 +24,24 @@ logger = logging.getLogger(__name__)
 
 BOARD_CLOSED_WINDOW_DAYS = 30
 
+# Driver recruitment funnel — the same Lead.stage keys carry driver-relevant
+# labels + order on the driver board. Cards auto-move between these columns to
+# match each applicant's real status (see crm.services.sync_driver_lead_stages).
+DRIVER_STAGE_LABELS = {
+    Lead.STAGE_NEW: 'New Application',
+    Lead.STAGE_CONTACTED: 'Applied',
+    Lead.STAGE_ON_HOLD: 'Incomplete',
+    Lead.STAGE_QUOTED: 'Uploads Completed',
+    Lead.STAGE_NEGOTIATING: 'Under Review',
+    Lead.STAGE_WON: 'Approved',
+    Lead.STAGE_LOST: 'Rejected',
+}
+# Column order for the driver board (funnel left→right)
+DRIVER_STAGE_ORDER = [
+    Lead.STAGE_NEW, Lead.STAGE_CONTACTED, Lead.STAGE_ON_HOLD, Lead.STAGE_QUOTED,
+    Lead.STAGE_NEGOTIATING, Lead.STAGE_WON, Lead.STAGE_LOST,
+]
+
 
 def _staff_users():
     return User.objects.filter(is_staff=True).order_by('first_name', 'username')
@@ -135,9 +153,21 @@ def _annotate_wa_chats(leads):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
-def crm_leads_board(request):
-    """Kanban pipeline board grouped by stage."""
+def crm_leads_board(request, board_category=Lead.CATEGORY_BUSINESS):
+    """Kanban pipeline board grouped by stage — one board per lead category
+    (business sales pipeline vs driver recruitment pipeline)."""
     leads, search, source_filter, assigned_filter, category_filter = _filtered_leads(request)
+    leads = leads.filter(category=board_category)
+
+    is_driver_board = board_category == Lead.CATEGORY_DRIVER
+
+    # Driver board mirrors the real applicant pool: ensure a card exists for every
+    # driver application and each card's stage matches the driver's form status.
+    if is_driver_board:
+        try:
+            crm_services.reconcile_driver_leads()
+        except Exception:
+            logger.exception('crm: driver lead reconcile failed')
 
     closed_cutoff = timezone.now() - timedelta(days=BOARD_CLOSED_WINDOW_DAYS)
     leads = list(
@@ -151,15 +181,18 @@ def crm_leads_board(request):
     for lead in leads:
         by_stage.setdefault(lead.stage, []).append(lead)
 
+    stage_labels = DRIVER_STAGE_LABELS if is_driver_board else dict(Lead.STAGE_CHOICES)
+    stage_order = DRIVER_STAGE_ORDER if is_driver_board else [k for k, _ in Lead.STAGE_CHOICES]
+    default_labels = dict(Lead.STAGE_CHOICES)
     columns = [
         {
             'key': key,
-            'label': label,
+            'label': stage_labels.get(key, default_labels.get(key, key)),
             'leads': by_stage[key],
             'count': len(by_stage[key]),
             'overdue': sum(1 for lead in by_stage[key] if lead.is_overdue),
         }
-        for key, label in Lead.STAGE_CHOICES
+        for key in stage_order
     ]
 
     open_total = sum(c['count'] for c in columns if c['key'] not in Lead.CLOSED_STAGES)
@@ -167,7 +200,9 @@ def crm_leads_board(request):
     won_window = len(by_stage[Lead.STAGE_WON])
 
     context = {
-        'page_title': 'Leads Board',
+        'page_title': 'Driver Leads Board' if is_driver_board else 'Leads Board',
+        'board_category': board_category,
+        'is_driver_board': is_driver_board,
         'columns': columns,
         'open_total': open_total,
         'overdue_total': overdue_total,
@@ -205,13 +240,17 @@ def crm_leads_list(request):
 
     leads = leads.order_by('-created_at')
 
-    total_count = Lead.objects.count()
-    open_count = Lead.objects.exclude(stage__in=Lead.CLOSED_STAGES).count()
+    # Metrics scoped to the active category tab (All / Business / Drivers)
+    scoped = Lead.objects.all()
+    if category_filter in {c for c, _ in Lead.CATEGORY_CHOICES}:
+        scoped = scoped.filter(category=category_filter)
+    total_count = scoped.count()
+    open_count = scoped.exclude(stage__in=Lead.CLOSED_STAGES).count()
     overdue_count = (
-        Lead.objects.filter(next_followup_at__lt=timezone.localdate())
+        scoped.filter(next_followup_at__lt=timezone.localdate())
         .exclude(stage__in=Lead.CLOSED_STAGES).count()
     )
-    won_count = Lead.objects.filter(stage=Lead.STAGE_WON).count()
+    won_count = scoped.filter(stage=Lead.STAGE_WON).count()
 
     page_obj = paginate_queryset(request, leads, items_per_page=50)
 
@@ -407,12 +446,30 @@ def crm_lead_detail(request, lead_id):
 
     wa_messages, wa_media = _lead_wa_conversation(lead)
 
+    # Driver leads: keep the pipeline stage in sync with the applicant's real
+    # form status (the timeline) and show driver-funnel labels + the timeline.
+    driver = None
+    driver_sections = None
+    if lead.category == Lead.CATEGORY_DRIVER:
+        driver = crm_services._driver_for_lead(lead)
+        if driver:
+            target = crm_services.driver_lead_target_stage(driver)
+            if target and target != lead.stage:
+                crm_services.set_lead_stage(lead, target, request.user)
+            from workforce.views import _driver_application_sections
+            driver_sections = _driver_application_sections(driver)
+        stage_choices = [(k, DRIVER_STAGE_LABELS[k]) for k in DRIVER_STAGE_ORDER]
+    else:
+        stage_choices = Lead.STAGE_CHOICES
+
     context = {
         'page_title': f'Lead – {lead.company_name or lead.contact_name or lead.phone}',
         'lead': lead,
         'activities': lead.activities.select_related('created_by').order_by('-created_at'),
         'staff_users': _staff_users(),
-        'stage_choices': Lead.STAGE_CHOICES,
+        'stage_choices': stage_choices,
+        'driver': driver,
+        'driver_sections': driver_sections,
         'wa_messages': wa_messages,
         'wa_media': wa_media,
         'ai_summary': lead.ai_summary,
@@ -752,6 +809,8 @@ def crm_lead_create(request):
                 'staff_users': _staff_users(),
                 'error': 'Provide at least a company, contact name, or phone number.',
                 'form_data': request.POST,
+                'category_choices': Lead.CATEGORY_CHOICES,
+                'initial_category': request.POST.get('category', Lead.CATEGORY_BUSINESS),
             }
             return render(request, 'workforce/crm/lead_form.html', context)
 
@@ -762,11 +821,17 @@ def crm_lead_create(request):
                 'staff_users': _staff_users(),
                 'error': date_error,
                 'form_data': request.POST,
+                'category_choices': Lead.CATEGORY_CHOICES,
+                'initial_category': request.POST.get('category', Lead.CATEGORY_BUSINESS),
             }
             return render(request, 'workforce/crm/lead_form.html', context)
 
+        category = request.POST.get('category', '').strip()
+        if category not in {c for c, _ in Lead.CATEGORY_CHOICES}:
+            category = Lead.CATEGORY_BUSINESS
         lead = Lead.objects.create(
             source=Lead.SOURCE_MANUAL,
+            category=category,
             company_name=company_name[:200],
             contact_name=contact_name[:100],
             phone=phone[:50],
@@ -787,7 +852,15 @@ def crm_lead_create(request):
         )
         return redirect('workforce:crm_lead_detail', lead.pk)
 
-    context = {'page_title': 'New Lead', 'staff_users': _staff_users()}
+    initial_category = request.GET.get('category', '').strip()
+    if initial_category not in {c for c, _ in Lead.CATEGORY_CHOICES}:
+        initial_category = Lead.CATEGORY_BUSINESS
+    context = {
+        'page_title': 'New Lead',
+        'staff_users': _staff_users(),
+        'category_choices': Lead.CATEGORY_CHOICES,
+        'initial_category': initial_category,
+    }
     return render(request, 'workforce/crm/lead_form.html', context)
 
 
@@ -799,14 +872,27 @@ def crm_lead_update_stage(request, lead_id):
         return JsonResponse({'error': 'POST required'}, status=405)
     lead = get_object_or_404(Lead, pk=lead_id)
     new_stage = request.POST.get('stage', '').strip()
+    rejection_reason = request.POST.get('rejection_reason', '').strip()
     try:
         crm_services.set_lead_stage(lead, new_stage, request.user)
     except ValueError as exc:
         return JsonResponse({'success': False, 'error': str(exc)}, status=400)
+
+    # Driver leads: moving into a decision column updates the real applicant
+    synced_driver = None
+    try:
+        driver = crm_services.sync_driver_status_from_lead(
+            lead, request.user, rejection_reason=rejection_reason
+        )
+        synced_driver = driver.driver_id if driver else None
+    except Exception:
+        logger.exception('crm: driver status sync failed for lead %s', lead.pk)
+
     return JsonResponse({
         'success': True,
         'stage': lead.stage,
         'stage_display': lead.get_stage_display(),
+        'synced_driver': synced_driver,
     })
 
 

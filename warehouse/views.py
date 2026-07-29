@@ -110,6 +110,15 @@ def get_business_filter(request):
     return business, False
 
 
+def wh_per_page(request, default=25):
+    """Validated ?per_page= for warehouse list pagination (10/25/50/100)."""
+    try:
+        pp = int(request.GET.get('per_page', default))
+    except (ValueError, TypeError):
+        return default
+    return pp if pp in (10, 25, 50, 100) else default
+
+
 # =============================================================================
 # DASHBOARD
 # =============================================================================
@@ -365,7 +374,7 @@ def inventory_list(request):
             logger.error(f"Error fetching businesses for inventory filter: {e}")
 
     # Pagination
-    paginator = Paginator(stock_levels, 25)
+    paginator = Paginator(stock_levels, wh_per_page(request, 25))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
@@ -381,6 +390,7 @@ def inventory_list(request):
 
     context = {
         'stock_levels': items,
+        'per_page': str(wh_per_page(request, 25)),
         'warehouses': warehouses,
         'categories': categories,
         'businesses': businesses,
@@ -558,7 +568,7 @@ def transaction_list(request):
         transactions = warehouse_models.InventoryTransaction.objects.filter(warehouse_id__in=linked_warehouse_ids)
         warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
-    transactions = transactions.select_related('product', 'warehouse', 'location', 'created_by').order_by('-created_at')
+    transactions = transactions.select_related('product', 'warehouse', 'location').order_by('-created_at')
 
     # Filters
     transaction_type = request.GET.get('type')
@@ -570,12 +580,13 @@ def transaction_list(request):
         transactions = transactions.filter(warehouse_id=warehouse_id)
 
     # Pagination
-    paginator = Paginator(transactions, 50)
+    paginator = Paginator(transactions, wh_per_page(request, 50))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
     context = {
         'transactions': items,
+        'per_page': str(wh_per_page(request, 50)),
         'warehouses': warehouses,
         'transaction_types': warehouse_models.TRANSACTION_TYPE_CHOICES,
         'selected_type': transaction_type,
@@ -857,7 +868,7 @@ def pick_list_list(request):
     if zone_filter:
         pick_lists = pick_lists.filter(zone_id=zone_filter)
 
-    paginator = Paginator(pick_lists, 25)
+    paginator = Paginator(pick_lists, wh_per_page(request, 25))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
@@ -872,6 +883,7 @@ def pick_list_list(request):
 
     context = {
         'pick_lists': items,
+        'per_page': str(wh_per_page(request, 25)),
         'status_choices': warehouse_models.PICKLIST_STATUS_CHOICES,
         'selected_status': status,
         'businesses': businesses,
@@ -1081,6 +1093,8 @@ def pick_list_detail(request, pk):
         if not item.is_picked:
             grp['all_picked'] = False
     grouped_items = list(product_groups.values())
+    # Show the bin/location route column only when at least one product has a bin
+    any_location = any(g['location'] for g in grouped_items)
 
     # Prev/next navigation
     base_qs = warehouse_models.PickList.objects.all()
@@ -1093,6 +1107,7 @@ def pick_list_detail(request, pk):
         'pick_list': pick_list,
         'items': items,
         'grouped_items': grouped_items,
+        'any_location': any_location,
         'is_staff': is_staff,
         'prev_pk': prev_pl,
         'next_pk': next_pl,
@@ -1546,11 +1561,12 @@ def rma_list(request):
 
     returns = returns.select_related('order', 'business', 'warehouse').order_by('-created_at')
 
-    paginator = Paginator(returns, 20)
+    paginator = Paginator(returns, wh_per_page(request, 20))
     returns = paginator.get_page(request.GET.get('page'))
 
     context = {
         'returns': returns,
+        'per_page': str(wh_per_page(request, 20)),
         'status_choices': warehouse_models.RMA_STATUS_CHOICES,
         'selected_status': status,
         'is_staff': is_staff,
@@ -1753,12 +1769,13 @@ def return_task_list(request):
 
     returns = returns.select_related('warehouse', 'order', 'pick_list').order_by('-created_at')
 
-    paginator = Paginator(returns, 20)
+    paginator = Paginator(returns, wh_per_page(request, 20))
     page = request.GET.get('page')
     returns = paginator.get_page(page)
 
     context = {
         'returns': returns,
+        'per_page': str(wh_per_page(request, 20)),
         'status_choices': warehouse_models.RETURN_STATUS_CHOICES,
         'selected_status': status_filter,
         'is_staff': is_staff,
@@ -1853,12 +1870,13 @@ def cycle_count_list(request):
     if status:
         cycle_counts = cycle_counts.filter(status=status)
 
-    paginator = Paginator(cycle_counts, 25)
+    paginator = Paginator(cycle_counts, wh_per_page(request, 25))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
     context = {
         'cycle_counts': items,
+        'per_page': str(wh_per_page(request, 25)),
         'status_choices': warehouse_models.CYCLE_COUNT_STATUS_CHOICES,
         'selected_status': status,
         'is_staff': is_staff,
@@ -2212,12 +2230,13 @@ def low_stock_alerts(request):
     if status:
         alerts = alerts.filter(status=status)
 
-    paginator = Paginator(alerts, 25)
+    paginator = Paginator(alerts, wh_per_page(request, 25))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
     context = {
         'alerts': items,
+        'per_page': str(wh_per_page(request, 25)),
         'status_choices': warehouse_models.ALERT_STATUS_CHOICES,
         'selected_status': status,
         'is_staff': is_staff,
@@ -3091,15 +3110,23 @@ def warehouse_location_list(request):
         ).order_by('warehouse__name', '-is_default', 'name')
         selected_warehouse = None
 
-    paginator = Paginator(locations, 25)
+    per_page = wh_per_page(request, 25)
+    paginator = Paginator(locations, per_page)
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
+
+    # Query string carried by every pagination link (everything except page/per_page)
+    filter_qs = request.GET.copy()
+    filter_qs.pop('page', None)
+    filter_qs.pop('per_page', None)
 
     context = {
         'locations': items,
         'warehouses': warehouses,
         'selected_warehouse': selected_warehouse,
         'is_staff': is_staff,
+        'per_page': str(per_page),
+        'filter_params': filter_qs.urlencode(),
     }
     return render(request, 'warehouse/warehouse_location_list.html', context)
 
@@ -3204,12 +3231,13 @@ def put_away_list(request):
 
     tasks = tasks.select_related('warehouse', 'assigned_to', 'inbound_request').order_by('-created_at')
 
-    paginator = Paginator(tasks, 20)
+    paginator = Paginator(tasks, wh_per_page(request, 20))
     page = request.GET.get('page')
     tasks = paginator.get_page(page)
 
     context = {
         'tasks': tasks,
+        'per_page': str(wh_per_page(request, 20)),
         'status_choices': warehouse_models.PUTAWAY_STATUS_CHOICES,
         'selected_status': status_filter,
         'is_staff': is_staff,

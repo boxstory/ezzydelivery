@@ -13,10 +13,14 @@ class StaticViewSitemap(Sitemap):
 
     # Per-page priority overrides (default is 0.8)
     _priority_map = {
+        'core:join_driver_start': 0.9,
+        'core:join_driver_start_ar': 0.9,
         'webpages:affiliate_marketing': 0.7,
         'webpages:delivery_request': 0.7,
+        'webpages:delivery_inquiry': 0.7,
         'webpages:client_faq': 0.6,
         'webpages:driver_faq': 0.6,
+        'webpages:client_faq_100': 0.6,
         'webpages:help_guides': 0.6,
         'webpages:client_guide': 0.6,
         'webpages:driver_guide': 0.6,
@@ -42,9 +46,15 @@ class StaticViewSitemap(Sitemap):
             'webpages:delivery_request',
             'webpages:client_faq',
             'webpages:driver_faq',
+            'webpages:client_faq_100',
             'webpages:help_guides',
             'webpages:client_guide',
             'webpages:driver_guide',
+            'webpages:p2p_pricing',
+            'webpages:delivery_inquiry',
+            'core:join_driver_start',
+            'core:join_driver_start_ar',
+            'blog:index',
         ]
 
     def priority(self, item):
@@ -86,35 +96,6 @@ class SEOLandingPageSitemap(Sitemap):
             # Arabic keyword pages
             'webpages:delivery_qatar_arabic',
             'webpages:courier_doha_arabic',
-        ]
-
-    def location(self, item):
-        return reverse(item)
-
-
-class BusinessPagesSitemap(Sitemap):
-    """Sitemap for business-related pages"""
-    priority = 0.7
-    changefreq = 'daily'
-
-    def items(self):
-        return [
-            'business:all_business',
-            'business:workflow_guide',
-        ]
-
-    def location(self, item):
-        return reverse(item)
-
-
-class WorkforcePagesSitemap(Sitemap):
-    """Sitemap for workforce pages"""
-    priority = 0.6
-    changefreq = 'daily'
-
-    def items(self):
-        return [
-            'workforce:workflow_guide',
         ]
 
     def location(self, item):

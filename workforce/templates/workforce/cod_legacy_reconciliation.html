@@ -1,0 +1,274 @@
+{% extends "wf_dashboard_base.html" %}
+{% comment %}
+Purpose: Read-only reconciliation of electronic COD (Fawran/POS) that was swept into cash hand-ins before the electronic-methods exclusion existed.
+Used by: workforce.views.cod_legacy_reconciliation at /workforce/fleet/cod-legacy-reconciliation/
+Notes: Deliberately has no write action — the deposits are historical and correcting them would restate settled figures.
+{% endcomment %}
+{% load static %}
+
+{% block title %}Legacy Electronic COD Reconciliation{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/cod_legacy_reconciliation.css' %}?v=20260728b" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="clr__hero d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <div class="clr__hero-kicker">Historical variance · closed set</div>
+      <h1 class="clr__hero-title">Legacy Electronic COD Reconciliation</h1>
+      <p class="clr__hero-sub mb-0">
+        Fawran and POS collections that were included in a driver cash hand-in before
+        electronic methods were excluded from submissions. That money reached Ezzy at
+        collection, so each deposit below records more physical cash than the driver
+        could have handed over.
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#wfExportModal">
+        <i class="fa-solid fa-file-csv me-1"></i> Export CSV
+      </button>
+      <a href="{% url 'workforce:cod_ledger' %}" class="btn btn-sm btn-outline-light">
+        <i class="fa-solid fa-book me-1"></i> COD Ledger
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter card — narrows the deposits listed and the legs printed under each -->
+  <div class="clr__filters mt-2">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-6 col-md-3 col-xl-2">
+        <label class="clr__filter-label" for="clr_filter_driver">Driver</label>
+        <select id="clr_filter_driver" name="driver_id" class="form-select form-select-sm">
+          <option value="">All drivers</option>
+          {% for d in driver_options %}
+          <option value="{{ d.driver_id }}" {% if f_driver_id == d.driver_id|stringformat:'s' %}selected{% endif %}>
+            {{ d.driver_code|default:d.driver_id }} — {{ d.user.get_full_name|default:d.user.username }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-3 col-xl-2">
+        <label class="clr__filter-label" for="clr_filter_date_from">Deposit from</label>
+        <input type="date" id="clr_filter_date_from" name="date_from" class="form-control form-control-sm" value="{{ f_date_from }}">
+      </div>
+      <div class="col-6 col-md-3 col-xl-2">
+        <label class="clr__filter-label" for="clr_filter_date_to">Deposit to</label>
+        <input type="date" id="clr_filter_date_to" name="date_to" class="form-control form-control-sm" value="{{ f_date_to }}">
+      </div>
+      <div class="col-6 col-md-3 col-xl-2">
+        <label class="clr__filter-label" for="clr_filter_method">Method</label>
+        <select id="clr_filter_method" name="method" class="form-select form-select-sm">
+          <option value="">Any method</option>
+          {% for val, label in method_options %}
+          <option value="{{ val }}" {% if val == f_method %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <label class="clr__filter-label" for="clr_filter_business">Business</label>
+        <select id="clr_filter_business" name="business_id" class="form-select form-select-sm">
+          <option value="">All businesses</option>
+          {% for b in business_options %}
+          <option value="{{ b.business_id }}" {% if f_business_id == b.business_id|stringformat:'s' %}selected{% endif %}>
+            {{ b.business_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <label class="clr__filter-label" for="clr_filter_status">Order COD status</label>
+        <select id="clr_filter_status" name="cod_status" class="form-select form-select-sm">
+          <option value="">Any status</option>
+          {% for val, label in cod_status_choices %}
+          <option value="{{ val }}" {% if val == f_cod_status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4 col-xl-3">
+        <label class="clr__filter-label" for="clr_filter_q">Search</label>
+        <input type="text" id="clr_filter_q" name="q" class="form-control form-control-sm"
+               placeholder="Deposit code, task #, order #, customer, reference…" value="{{ f_q }}">
+      </div>
+      <div class="col-12 col-md-4 col-xl-3">
+        <label class="clr__filter-label" for="clr_filter_legs">Legs to list</label>
+        <select id="clr_filter_legs" name="legs" class="form-select form-select-sm">
+          <option value="electronic" {% if legs_mode == 'electronic' %}selected{% endif %}>Electronic legs only</option>
+          <option value="all" {% if legs_mode == 'all' %}selected{% endif %}>All legs in the deposit</option>
+        </select>
+      </div>
+      <div class="col-12 col-xl-6 d-flex flex-wrap gap-2 justify-content-xl-end">
+        <button type="submit" class="btn btn-sm btn-dark">
+          <i class="fa-solid fa-filter me-1"></i> Apply
+        </button>
+        <a href="{% url 'workforce:cod_legacy_reconciliation' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+        <span class="clr__filter-count">
+          {{ deposits|length }} of {{ total_deposits }} deposit{{ total_deposits|pluralize }}
+          · {{ totals.shown_legs }} leg{{ totals.shown_legs|pluralize }} listed
+        </span>
+      </div>
+    </form>
+  </div>
+
+  <div class="row g-2 mt-2">
+    <div class="col-6 col-lg-3">
+      <div class="clr__stat">
+        <div class="clr__stat-label">Declared hand-in{% if has_filters %} · filtered{% endif %}</div>
+        <div class="clr__stat-value num">{{ totals.declared|floatformat:2 }}</div>
+        <div class="clr__stat-note">across {{ deposits|length }} deposit{{ deposits|length|pluralize }} · {{ totals.drivers }} driver{{ totals.drivers|pluralize }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="clr__stat clr__stat--flag">
+        <div class="clr__stat-label">Electronic inside it</div>
+        <div class="clr__stat-value num">{{ totals.electronic|floatformat:2 }}</div>
+        <div class="clr__stat-note">{{ totals.electronic_tasks }} task{{ totals.electronic_tasks|pluralize }} never held as cash</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="clr__stat">
+        <div class="clr__stat-label">Physical cash expected</div>
+        <div class="clr__stat-value num">{{ totals.actual_cash|floatformat:2 }}</div>
+        <div class="clr__stat-note">what should have been counted in</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="clr__stat">
+        <div class="clr__stat-label">Declared beyond linked tasks</div>
+        <div class="clr__stat-value num">{{ totals.unlinked|floatformat:2 }}</div>
+        <div class="clr__stat-note">separate anomaly — not the sweep</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="clr__note mt-2">
+    <i class="fa-solid fa-circle-info"></i>
+    <div>
+      <strong>This page changes nothing.</strong> Driver balances are already correct — the
+      electronic legs were never counted as cash-in-hand. What is overstated is the
+      recorded size of each hand-in, which is a cash-desk and bank matching problem.
+      The set cannot grow: submissions now exclude electronic collections.
+      Filters choose which deposits and legs are printed; every figure still covers
+      the deposit's full leg set, because a hand-in only reconciles as a whole.
+      {% if payout_flags.with_driver or payout_flags.with_business %}
+      Business-payout status on these orders is shown for information only and is out of
+      scope here.
+      {% endif %}
+    </div>
+  </div>
+
+  {% if payout_flags.with_driver or payout_flags.with_ezzy or payout_flags.with_business or payout_flags.other %}
+  <div class="clr__flags mt-2">
+    <span class="clr__flags-label">Order COD status on the electronic legs</span>
+    <span class="clr__status clr__status--ezzy">With Ezzy — {{ payout_flags.with_ezzy }}</span>
+    <span class="clr__status clr__status--business">Settled with business — {{ payout_flags.with_business }}</span>
+    {% if payout_flags.with_driver %}
+    <span class="clr__status clr__status--driver">Still flagged "with driver" — {{ payout_flags.with_driver }}</span>
+    {% endif %}
+    {% if payout_flags.other %}
+    <span class="clr__status clr__status--other">Other — {{ payout_flags.other }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% for d in deposits %}
+  <div class="clr__card mt-3">
+    <div class="clr__card-head d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <span class="clr__code num">{{ d.txn.transaction_code|default:d.txn.id }}</span>
+        <span class="clr__meta">{{ d.txn.created_at|date:"d M Y, H:i" }}</span>
+        <span class="clr__meta">
+          <i class="fa-solid fa-id-badge"></i>
+          {% if d.txn.driver %}{{ d.txn.driver.driver_id }}{% if d.txn.driver.user %} · {{ d.txn.driver.user.get_full_name|default:d.txn.driver.user.username }}{% endif %}{% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <span class="clr__meta">{{ d.shown_count }} of {{ d.leg_count }} leg{{ d.leg_count|pluralize }} listed</span>
+        <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ d.txn.driver_id }}&view=cod_submit"
+           class="clr__link"><i class="fa-solid fa-arrow-up-right-from-square"></i> Transactions</a>
+      </div>
+    </div>
+
+    <div class="clr__figures">
+      <div class="clr__figure">
+        <span class="clr__figure-label">Declared</span>
+        <span class="clr__figure-value num">{{ d.declared|floatformat:2 }}</span>
+      </div>
+      <div class="clr__figure">
+        <span class="clr__figure-label">Cash legs</span>
+        <span class="clr__figure-value num">{{ d.cash|floatformat:2 }}</span>
+      </div>
+      <div class="clr__figure clr__figure--variance">
+        <span class="clr__figure-label">Electronic legs</span>
+        <span class="clr__figure-value num">−{{ d.electronic|floatformat:2 }}</span>
+      </div>
+      <div class="clr__figure clr__figure--total">
+        <span class="clr__figure-label">Physical cash expected</span>
+        <span class="clr__figure-value num">{{ d.actual_cash|floatformat:2 }}</span>
+      </div>
+      {% if d.unlinked %}
+      <div class="clr__figure clr__figure--warn">
+        <span class="clr__figure-label">Declared beyond linked tasks</span>
+        <span class="clr__figure-value num">{{ d.unlinked|floatformat:2 }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 clr__table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Order</th>
+            <th>Business</th>
+            <th>Method</th>
+            <th class="text-end">Amount</th>
+            <th>Collected</th>
+            <th>Reference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in d.rows %}
+          <tr class="{% if r.is_electronic %}clr__row--electronic{% endif %}">
+            <td>
+              <a href="{% url 'workforce:delivery_task_detail' r.task.id %}" class="clr__link num">
+                {{ r.task.dl_task_number|default:r.task.id }}
+              </a>
+            </td>
+            <td>{{ r.task.order.order_number|default:"—" }}</td>
+            <td>{{ r.task.order.business.business_name|default:"—" }}</td>
+            <td>
+              {% if r.method == 'fawran' %}<span class="clr__status clr__status--elec"><i class="fa-solid fa-mobile-screen"></i> Fawran</span>
+              {% elif r.method == 'pos' %}<span class="clr__status clr__status--elec"><i class="fa-solid fa-credit-card"></i> POS</span>
+              {% elif r.method == 'bank' %}<span class="clr__status clr__status--elec"><i class="fa-solid fa-building-columns"></i> Bank</span>
+              {% elif r.method == 'atm' %}<span class="clr__status clr__status--elec"><i class="fa-solid fa-credit-card"></i> ATM</span>
+              {% else %}<span class="clr__status clr__status--cash"><i class="fa-solid fa-money-bill"></i> Cash</span>{% endif %}
+            </td>
+            <td class="text-end num">{{ r.amount|floatformat:2 }}</td>
+            <td class="clr__meta">{{ r.task.cod_collected_at|date:"d M Y, H:i"|default:"—" }}</td>
+            <td class="clr__meta">{{ r.task.cod_reference|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty-state mt-3">
+    {% if has_filters %}
+    <i class="fa-solid fa-filter-circle-xmark"></i>
+    <p class="mb-2">No deposit in the affected set matches these filters.</p>
+    <a href="{% url 'workforce:cod_legacy_reconciliation' %}" class="btn btn-sm btn-outline-secondary">Clear filters</a>
+    {% else %}
+    <i class="fa-solid fa-circle-check"></i>
+    <p class="mb-0">No hand-in contains an electronic collection. Nothing to reconcile.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+</div>
+
+{% include "workforce/parts/components/_export_columns_modal.html" %}
+{% endblock %}

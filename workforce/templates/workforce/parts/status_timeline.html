@@ -10,6 +10,12 @@ Required context variables (passed directly, NOT via timeline_items):
   - timeline_count: int (event count)
   - status_point_map: dict mapping "old__new" to TaskStatusPoint (optional)
 
+Optional merged-stream mode (delivery_task_detail only):
+  - timeline_events: pre-merged chronological event dicts from _build_task_timeline
+  - timeline_evidence: dict of data-integrity flags rendered as a strip
+  - timeline_now_at: real last-activity timestamp for the Current State row
+  When timeline_events is supplied the legacy per-queryset rendering is skipped.
+
 Usage:
   {% include "workforce/parts/status_timeline.html" %}
 {% endcomment %}
@@ -21,12 +27,135 @@ Usage:
             <i class="fa-solid fa-clock-rotate-left me-2"></i>
             Status Timeline
         </div>
-        {% if timeline_count is not None %}
+        {% if timeline_events %}
+        <span class="odp__tl-header__count">{{ timeline_events|length }} event{{ timeline_events|length|pluralize }}</span>
+        {% elif timeline_count is not None %}
         <span class="odp__tl-header__count">{{ timeline_count }} event{{ timeline_count|pluralize }}</span>
         {% endif %}
     </div>
     <div class="odp__tl-content">
         <div class="odp__tl-wrap">
+
+        {% if timeline_events %}
+            {% for ev in timeline_events %}
+            <div class="odp__tl-item{% if forloop.first %} odp__tl-item--first{% endif %}">
+                <div class="odp__tl-track">
+                    <div class="odp__tl-icon odp__tl-icon--{{ ev.ikind|default:'default' }}"><i class="{{ ev.icon }}"></i></div>
+                </div>
+                <div class="odp__tl-body">
+                    <div class="odp__tl-card-inner{% if ev.tone == 'success' %} odp__tl-card-inner--success{% elif ev.tone == 'danger' %} odp__tl-card-inner--danger{% elif ev.tone == 'created' %} odp__tl-card-inner--created{% endif %}">
+                        <div class="odp__tl-row">
+                            <span class="odp__tl-title">{{ ev.title }}</span>
+                            <span class="odp__tl-timestamp"><i class="fa-regular fa-clock me-1"></i>{{ ev.ts|date:"d M Y, H:i" }}</span>
+                        </div>
+
+                        {% if ev.from_label or ev.to_label %}
+                        <div class="odp__tl-transition">
+                            {% if ev.from_label %}
+                            <span class="odp__tl-pill odp__tl-pill--from">{{ ev.from_label }}</span>
+                            <span class="odp__tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
+                            {% endif %}
+                            {% if ev.to_label %}
+                            <span class="odp__tl-pill {% if ev.tone == 'success' %}odp__tl-pill--success{% elif ev.tone == 'danger' %}odp__tl-pill--danger{% else %}odp__tl-pill--to{% endif %}">{{ ev.to_label }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        {% if ev.pills %}
+                        <div class="odp__tl-detail">
+                            {% for pill in ev.pills %}<span class="odp__tl-pill odp__tl-pill--muted">{{ pill }}</span>{% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if ev.note %}
+                        <div class="odp__tl-note{% if ev.tone == 'danger' %} odp__tl-note--danger{% elif ev.tone == 'warn' %} odp__tl-note--warn{% endif %}"><i class="fa-regular fa-message"></i> {{ ev.note }}</div>
+                        {% endif %}
+
+                        {% if ev.actor %}
+                        <div class="odp__tl-meta"><i class="fa-regular fa-user"></i> {{ ev.actor }}</div>
+                        {% endif %}
+
+                        {% if ev.gps %}
+                        <div class="odp__tl-gps">
+                            {% if ev.gps.verdict == 'none' %}
+                            <span class="odp__tl-gps__none"><i class="fa-solid fa-location-crosshairs"></i> No GPS recorded</span>
+                            {% else %}
+                            <span class="odp__tl-gps__pin" title="Coordinate stamped on this status change">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <a href="https://www.google.com/maps?q={{ ev.gps.lat }},{{ ev.gps.lng }}" target="_blank" rel="noopener">{{ ev.gps.lat }}, {{ ev.gps.lng }}</a>
+                            </span>
+                            {% if ev.gps.accuracy %}
+                            <span class="odp__tl-gps__acc" title="GPS accuracy"><i class="fa-solid fa-crosshairs"></i> &plusmn;{{ ev.gps.accuracy|floatformat:0 }}m</span>
+                            {% endif %}
+                            {% if ev.gps.distance is not None %}
+                            <span class="odp__tl-gps__dist {% if ev.gps.verdict == 'corroborated' %}odp__tl-gps__dist--stale{% elif ev.gps.verdict == 'far' %}odp__tl-gps__dist--far{% elif ev.gps.verdict == 'near' %}odp__tl-gps__dist--near{% elif ev.gps.verdict == 'stale' %}odp__tl-gps__dist--stale{% endif %}" title="Distance from delivery location">
+                                <i class="fa-solid fa-route"></i> {{ ev.gps.distance|floatformat:2 }} km
+                            </span>
+                            {% endif %}
+                            {% if ev.gps.stale_seconds %}
+                            <span class="odp__tl-gps__age" title="Age of the stamped fix when the status changed">
+                                <i class="fa-regular fa-hourglass-half"></i> fix was {{ ev.gps.stale_seconds|duration_short }} old
+                            </span>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+
+                        {% if ev.gps.fresh %}
+                        <div class="odp__tl-gps__fresh {% if ev.gps.verdict == 'corroborated' %}odp__tl-gps__fresh--ok{% endif %}">
+                            <i class="fa-solid fa-satellite-dish"></i>
+                            Next live fix {{ ev.gps.fresh.delay_seconds|duration_short }} later:
+                            <a href="https://www.google.com/maps?q={{ ev.gps.fresh.lat }},{{ ev.gps.fresh.lng }}" target="_blank" rel="noopener">{{ ev.gps.fresh.lat }}, {{ ev.gps.fresh.lng }}</a>
+                            {% if ev.gps.fresh.distance is not None %}<strong>{{ ev.gps.fresh.distance|floatformat:2 }} km</strong> from drop{% endif %}
+                        </div>
+                        {% endif %}
+
+                        {% if ev.gps.verdict == 'corroborated' %}
+                        <div class="odp__tl-gps__verdict odp__tl-gps__verdict--ok">
+                            <i class="fa-solid fa-circle-check"></i>
+                            Stamped position was a stale cached fix — the next live reading puts the driver at the drop. Treat the distance above as unreliable.
+                        </div>
+                        {% elif ev.gps.verdict == 'stale' %}
+                        <div class="odp__tl-gps__verdict odp__tl-gps__verdict--warn">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            Stamped from a cached fix, not a live reading — distance is not evidence of where the driver actually was.
+                        </div>
+                        {% elif ev.gps.verdict == 'far' %}
+                        <div class="odp__tl-gps__verdict odp__tl-gps__verdict--bad">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            Live fix, far from the drop point — worth investigating.
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if timeline_evidence.has_flags %}
+            <div class="odp__tl-item">
+                <div class="odp__tl-track">
+                    <div class="odp__tl-icon odp__tl-icon--audit"><i class="fa-solid fa-clipboard-check"></i></div>
+                </div>
+                <div class="odp__tl-body">
+                    <div class="odp__tl-card-inner odp__tl-card-inner--audit">
+                        <div class="odp__tl-row">
+                            <span class="odp__tl-title">Record Gaps</span>
+                            <span class="odp__tl-timestamp">not events — missing data</span>
+                        </div>
+                        <ul class="odp__tl-audit">
+                            {% if timeline_evidence.proof_missing %}<li><i class="fa-solid fa-camera-slash"></i> No proof of delivery — task closed with no photo, signature or scan.</li>{% endif %}
+                            {% if timeline_evidence.txn_missing_zero_cod %}<li><i class="fa-solid fa-receipt"></i> No ledger row — a zero-COD delivery still needs a 0 QAR collection transaction so the delivery fee can be added and claimed from the client.</li>
+                            {% elif timeline_evidence.txn_missing %}<li><i class="fa-solid fa-receipt"></i> No driver transaction — nothing credited or debited for this job.</li>{% endif %}
+                            {% if timeline_evidence.notify_failures %}<li><i class="fa-brands fa-whatsapp"></i> {{ timeline_evidence.notify_failures }} customer notification{{ timeline_evidence.notify_failures|pluralize }} failed to send.</li>{% endif %}
+                            {% if timeline_evidence.label_unprinted %}<li><i class="fa-solid fa-print"></i> Shipping label generated but never marked printed.</li>{% endif %}
+                            {% if timeline_evidence.client_status_stale %}<li><i class="fa-solid fa-eye-slash"></i> Client-facing status still &ldquo;{{ timeline_evidence.client_status_label }}&rdquo; while internally delivered.</li>{% endif %}
+                            {% if timeline_evidence.leg_mismatch %}<li><i class="fa-solid fa-code-branch"></i> Pickup planned as drop-at-hub but the task runs as a single leg.</li>{% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
 
             <!-- Order Created -->
             <div class="odp__tl-item odp__tl-item--first">
@@ -50,8 +179,9 @@ Usage:
             {% for entry in status_history %}
                         <div class="odp__tl-item">
                 <div class="odp__tl-track">
-                    <div class="odp__tl-icon {% if entry.field_name == 'order_status' %}odp__tl-icon--order{% elif entry.field_name == 'verification_status' %}odp__tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}odp__tl-icon--task{% elif entry.field_name == 'pickup_status' %}odp__tl-icon--pickup{% elif entry.field_name == 'cod_status_by_staff' or entry.field_name == 'cod_correction' %}odp__tl-icon--cod{% elif entry.field_name == 'dl_task_publish' %}odp__tl-icon--publish{% elif entry.field_name == 'order_edited' or entry.field_name == 'task_edited' %}odp__tl-icon--default{% elif entry.field_name == 'item_deleted' %}odp__tl-icon--default{% else %}odp__tl-icon--default{% endif %}">
-                        {% if entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
+                    <div class="odp__tl-icon {% if entry.field_name == 'order_status' %}odp__tl-icon--order{% elif entry.field_name == 'verification_status' %}odp__tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}odp__tl-icon--task{% elif entry.field_name == 'pickup_status' %}odp__tl-icon--pickup{% elif entry.field_name == 'location_update' or entry.field_name == 'latitude/longitude' %}odp__tl-icon--location{% elif entry.field_name == 'cod_status_by_staff' or entry.field_name == 'cod_correction' %}odp__tl-icon--cod{% elif entry.field_name == 'dl_task_publish' %}odp__tl-icon--publish{% elif entry.field_name == 'order_edited' or entry.field_name == 'task_edited' %}odp__tl-icon--default{% elif entry.field_name == 'item_deleted' %}odp__tl-icon--default{% else %}odp__tl-icon--default{% endif %}">
+                        {% if entry.field_name == 'location_update' or entry.field_name == 'latitude/longitude' %}<i class="fa-solid fa-location-dot"></i>
+                        {% elif entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
                         {% elif entry.field_name == 'verification_status' %}<i class="fa-solid fa-shield-halved"></i>
                         {% elif entry.field_name == 'pickup_status' %}<i class="fa-solid fa-box-open"></i>
                         {% elif entry.field_name == 'dl_task_status' %}<i class="fa-solid fa-truck-fast"></i>
@@ -237,6 +367,7 @@ Usage:
                 </div>
             </div>
             {% endif %}
+        {% endif %}
 
             <!-- Current State -->
             <div class="odp__tl-item odp__tl-item--last">
@@ -247,7 +378,10 @@ Usage:
                     <div class="odp__tl-card-inner odp__tl-card-inner--now">
                         <div class="odp__tl-row">
                             <span class="odp__tl-title">Current State</span>
-                            <span class="odp__tl-timestamp"><i class="fa-regular fa-clock me-1"></i>{{ order.updated_at|date:"d M Y, H:i" }}</span>
+                            {% comment %}order.updated_at misses transitions written via queryset .update(),
+                            which can date the row before its own Delivered event — prefer the real
+                            last-activity stamp when the page supplies one.{% endcomment %}
+                            <span class="odp__tl-timestamp"><i class="fa-regular fa-clock me-1"></i>{% firstof timeline_now_at order.updated_at as now_stamp %}{{ now_stamp|date:"d M Y, H:i" }}</span>
                         </div>
                         <div class="odp__tl-now-grid">
                             <div class="odp__tl-now-cell">

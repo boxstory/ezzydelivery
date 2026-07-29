@@ -1,22 +1,22 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}Driver Earnings - Ezzy Delivery{% endblock title %}
+{% block title %}Driver Payouts - Ezzy Delivery{% endblock title %}
 
 {% block content %}
 <div class="fde">
     <!-- Hero Header -->
-    {% include "workforce/parts/components/_page_header.html" with title="Fleet Driver Earnings" icon="fa-money-bill-wave" subtitle="Track and manage driver earnings and delivery performance" %}
+    {% include "workforce/parts/components/_page_header.html" with title="Driver Payouts" icon="fa-money-bill-wave" subtitle="What each driver is owed — COD hand-ins are tracked separately" %}
 
     <!-- Summary Stats -->
     <div class="fde__stats">
         <div class="fde__stat fde__stat--green">
             <div class="fde__stat-top">
-                <span class="fde__stat-label">TOTAL EARNINGS</span>
+                <span class="fde__stat-label">PENDING PAYOUT</span>
                 <i class="fa-solid fa-coins fde__stat-icon"></i>
             </div>
-            <div class="fde__stat-value">QAR {{ total_earnings|default:"0.00" }}</div>
-            <div class="fde__stat-desc">Pending driver earnings</div>
+            <div class="fde__stat-value">QAR {{ total_payout|floatformat:2 }}</div>
+            <div class="fde__stat-desc">Earnings + bonuses not yet paid</div>
         </div>
         <div class="fde__stat fde__stat--blue">
             <div class="fde__stat-top">
@@ -58,7 +58,7 @@
     {% if drivers %}
     <div class="fde__grid">
         {% for driver in drivers %}
-        <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.id }}" class="fde__card" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
+        <a href="{% url 'workforce:driver_payout_worksheet' driver.driver_id %}" class="fde__card" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
             <div class="fde__card-top">
                 <div class="fde__avatar">
                     {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
@@ -70,11 +70,15 @@
             </div>
             <div class="fde__card-body">
                 <div class="fde__detail">
-                    <span class="fde__detail-label">Deliveries After Settlement</span>
-                    <span class="fde__detail-value fde__detail-value--highlight">{{ driver.deliveries_after_settlement|default:"0" }}</span>
+                    <span class="fde__detail-label">Pending Payout</span>
+                    <span class="fde__detail-value fde__detail-value--highlight">QAR {{ driver.pending_payout|floatformat:2 }}</span>
+                </div>
+                <div class="fde__detail">
+                    <span class="fde__detail-label">Deliveries Since Payout</span>
+                    <span class="fde__detail-value">{{ driver.deliveries_after_settlement|default:"0" }}</span>
                 </div>
                 <div class="fde__detail fde__detail--last">
-                    <span class="fde__detail-label">Last Settled</span>
+                    <span class="fde__detail-label">Last Paid</span>
                     <span class="fde__detail-value">{{ driver.last_settled_date|date:"d M Y"|default:"Never" }}</span>
                 </div>
             </div>

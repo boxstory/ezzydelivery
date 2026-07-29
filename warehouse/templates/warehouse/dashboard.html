@@ -23,12 +23,8 @@
         {% endif %}
     </div>
 
-    <!-- Summary Stats -->
-    <div class="wh__stats">
-        <a href="{% url 'warehouse:warehouse_list' %}" class="wh__stat wh__stat--link">
-            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-warehouse"></i></div>
-            <div><div class="wh__stat-value">{{ warehouses|length }}</div><div class="wh__stat-label">Active Warehouses</div></div>
-        </a>
+    <!-- Summary Stats — 8 tiles in a 4-column grid (2 rows) -->
+    <div class="wh__stats wh__stats--4">
         <a href="{% url 'warehouse:inventory_list' %}" class="wh__stat wh__stat--link">
             <div class="wh__stat-icon wh__stat-icon--success"><i class="fa-solid fa-cubes"></i></div>
             <div><div class="wh__stat-value">{{ total_on_hand }}</div><div class="wh__stat-label">Items On Hand</div></div>
@@ -41,10 +37,6 @@
             <div class="wh__stat-icon wh__stat-icon--warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
             <div><div class="wh__stat-value">{{ low_stock_count }}</div><div class="wh__stat-label">Low Stock Alerts</div></div>
         </a>
-    </div>
-
-    <!-- Second Row Stats -->
-    <div class="wh__stats">
         <a href="{% url 'warehouse:seller_warehouse_links' %}" class="wh__stat wh__stat--link">
             <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-link"></i></div>
             <div><div class="wh__stat-value">{{ total_links }}</div><div class="wh__stat-label">Seller Links ({{ active_links }} active)</div></div>
@@ -61,11 +53,7 @@
             <div class="wh__stat-icon wh__stat-icon--warning"><i class="fa-solid fa-truck-loading"></i></div>
             <div><div class="wh__stat-value">{{ total_incoming }}</div><div class="wh__stat-label">Incoming Stock</div></div>
         </a>
-    </div>
-
-    <!-- Pickup Tasks -->
-    <div class="wh__stats">
-        <a href="{% url 'workforce:wf_dashboard' %}" class="wh__stat wh__stat--link wh__stat--wide">
+        <a href="{% url 'workforce:wf_dashboard' %}" class="wh__stat wh__stat--link">
             <div class="wh__stat-icon wh__stat-icon--accent"><i class="fa-solid fa-truck-fast"></i></div>
             <div><div class="wh__stat-value">{{ pending_pickup_tasks }}</div><div class="wh__stat-label">Pending Pickup Tasks</div></div>
         </a>
@@ -87,7 +75,10 @@
                     <div class="wh__list-row-icon"><i class="fa-solid fa-building-warehouse"></i></div>
                     <div>
                         <div class="wh__list-row-title">{{ wh.name }}</div>
-                        <div class="wh__meta">{{ wh.code }} &middot; {{ wh.city }}{% if wh.state %}, {{ wh.state }}{% endif %}</div>
+                        <div class="wh__meta d-flex align-items-center gap-2 flex-wrap">
+                            <span class="wh-plate wh-plate--sm"><i class="fa-solid fa-location-dot wh-plate__pin"></i>{{ wh.code }}</span>
+                            <span>{{ wh.city }}{% if wh.state %}, {{ wh.state }}{% endif %}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="wh__list-row-right">
@@ -168,92 +159,6 @@
                 {% endfor %}
             </div>
             {% endif %}
-        </div>
-    </div>
-
-    <!-- Seller-Warehouse Links -->
-    <div class="wh__card">
-        <div class="wh__card-header">
-            <div class="wh__card-header-left"><i class="fa-solid fa-link"></i> <span>SELLER-WAREHOUSE LINKS</span></div>
-            <a href="{% url 'warehouse:seller_warehouse_links' %}" class="wh__action-btn wh__action-btn--pill"
-               hx-get="{% url 'warehouse:seller_warehouse_links' %}" hx-target="body" hx-push-url="true">
-                Manage Links
-            </a>
-        </div>
-        <div class="wh__card-body">
-            {% for link in seller_links %}
-            <div class="wh__list-row">
-                <div class="wh__list-row-left">
-                    <div class="wh__list-row-icon"><i class="fa-solid fa-store"></i></div>
-                    <div>
-                        <div class="wh__list-row-title">{{ link.business.business_name|default:"(No business)" }}</div>
-                        <div class="wh__meta"><i class="fa-solid fa-arrow-right"></i> {{ link.warehouse.name }}</div>
-                    </div>
-                </div>
-                <div class="wh__list-row-right">
-                    {% if link.is_default %}<span class="wh__badge wh__badge--warning">Default</span>{% endif %}
-                    {% if link.is_active %}<span class="wh__badge wh__badge--success">Active</span>{% else %}<span class="wh__badge wh__badge--muted">Inactive</span>{% endif %}
-                    <span class="wh__meta">Priority: {{ link.priority }}</span>
-                    <a href="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" class="wh__action-btn wh__action-btn--pill"
-                       hx-get="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" hx-target="body" hx-push-url="true">
-                        View
-                    </a>
-                </div>
-            </div>
-            {% empty %}
-            <div class="wh__empty">
-                <i class="fa-solid fa-link-slash"></i>
-                <p><strong>No Seller Links</strong></p>
-                <p>Link sellers to warehouses for fulfillment.</p>
-                <a href="{% url 'warehouse:seller_warehouse_link_add' %}" class="wh__btn wh__btn--primary"
-                   hx-get="{% url 'warehouse:seller_warehouse_link_add' %}" hx-target="body" hx-push-url="true">
-                    <i class="fa-solid fa-plus"></i> Add Link
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- Recent Transactions -->
-    <div class="wh__card">
-        <div class="wh__card-header">
-            <div class="wh__card-header-left"><i class="fa-solid fa-arrow-right-arrow-left"></i> <span>RECENT TRANSACTIONS</span></div>
-            <a href="{% url 'warehouse:transaction_list' %}" class="wh__action-btn wh__action-btn--pill"
-               hx-get="{% url 'warehouse:transaction_list' %}" hx-target="body" hx-push-url="true">
-                View All
-            </a>
-        </div>
-        <div class="wh__card-body">
-            {% for txn in recent_transactions %}
-            <div class="wh__list-row">
-                <div class="wh__list-row-left">
-                    <div class="wh__list-row-icon">
-                        {% if txn.quantity > 0 %}
-                        <i class="fa-solid fa-arrow-down wh__amount--positive"></i>
-                        {% else %}
-                        <i class="fa-solid fa-arrow-up wh__amount--negative"></i>
-                        {% endif %}
-                    </div>
-                    <div>
-                        <div class="wh__list-row-title">{{ txn.product.item_name|default:txn.transaction_number }}</div>
-                        <div class="wh__meta">{{ txn.transaction_type }} &middot; {{ txn.warehouse.code }} &middot; Qty: {{ txn.quantity }}</div>
-                    </div>
-                </div>
-                <div class="wh__list-row-right">
-                    <span class="wh__meta">{{ txn.created_at|date:"M d, h:i A" }}</span>
-                </div>
-            </div>
-            {% empty %}
-            <div class="wh__empty">
-                <i class="fa-solid fa-arrow-right-arrow-left"></i>
-                <p><strong>No Transactions Yet</strong></p>
-                <p>Inventory transactions will appear here when stock is received or moved.</p>
-                <a href="{% url 'warehouse:receive_stock' %}" class="wh__btn wh__btn--primary"
-                   hx-get="{% url 'warehouse:receive_stock' %}" hx-target="body" hx-push-url="true">
-                    <i class="fa-solid fa-truck-loading"></i> Receive Stock
-                </a>
-            </div>
-            {% endfor %}
         </div>
     </div>
 

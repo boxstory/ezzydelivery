@@ -2,10 +2,11 @@
 {# Purpose: Workforce sidebar section — CRM leads pipeline (board, list, WA inbox, reports). #}
 {# Used by: workforce/parts/dashboard_sidebar_workforce.html #}
 {% url 'workforce:crm_leads_board' as u_crm_board %}
+{% url 'workforce:crm_driver_leads_board' as u_crm_driver_board %}
 {% url 'workforce:crm_leads_list' as u_crm_list %}
 {% url 'workforce:crm_whatsapp_inbox' as u_crm_inbox %}
 {% url 'workforce:crm_reports' as u_crm_reports %}
-{% with active="crm_leads_board,crm_leads_list,crm_lead_detail,crm_lead_create,crm_whatsapp_inbox,crm_reports" %}
+{% with active="crm_leads_board,crm_driver_leads_board,crm_leads_list,crm_lead_detail,crm_lead_create,crm_whatsapp_inbox,crm_reports" %}
 <li id="workforce_sidebar_menu_crm" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_crm" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-crm" data-title="CRM">
     <i class="fa-solid fa-filter-circle-dollar me-2"></i>
@@ -15,6 +16,7 @@
   <div id="submenu-crm" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_board" url=u_crm_board icon="fa-solid fa-table-columns" label="Leads Board" active_names="crm_leads_board,crm_lead_detail,crm_lead_create" badge_var=crm_overdue_count badge_key="crm_overdue" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_board" url=u_crm_driver_board icon="fa-solid fa-motorcycle" label="Driver Leads" active_names="crm_driver_leads_board" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_list" url=u_crm_list icon="fa-solid fa-table-list" label="Leads List" active_names="crm_leads_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_inbox" url=u_crm_inbox icon="fa-brands fa-whatsapp" label="WhatsApp Inbox" active_names="crm_whatsapp_inbox" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_reports" url=u_crm_reports icon="fa-solid fa-chart-column" label="Reports" active_names="crm_reports" %}

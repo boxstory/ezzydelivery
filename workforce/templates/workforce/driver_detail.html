@@ -616,6 +616,45 @@
             <div class="wdd__docs-grid">
                 {% for doc in documents %}
                 <div class="wdd__doc">
+                    <div class="wdd__doc__preview">
+                        {% if doc.document_file and doc.file_is_image %}
+                        <button type="button" class="wdd__doc__thumb"
+                                data-doc-url="{{ doc.document_file.url }}"
+                                data-doc-title="{{ doc.document_type|default:'Document' }} - {{ doc.document_no }}"
+                                aria-label="Preview {{ doc.document_type|default:'document' }}">
+                            <img src="{{ doc.document_file.url }}" loading="lazy"
+                                 alt="{{ doc.document_type|default:'Document' }} {{ doc.document_no }} photo">
+                            <span class="wdd__doc__thumb-zoom"><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i></span>
+                            {% if doc.document_file_back %}<span class="wdd__doc__thumb-side">Front</span>{% endif %}
+                        </button>
+                        {% elif doc.document_file %}
+                        <a class="wdd__doc__thumb wdd__doc__thumb--file" href="{{ doc.document_file.url }}" target="_blank" rel="noopener">
+                            <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+                            <span>Open file</span>
+                        </a>
+                        {% else %}
+                        <div class="wdd__doc__thumb wdd__doc__thumb--empty">
+                            <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                            <span>No file uploaded</span>
+                        </div>
+                        {% endif %}
+                        {% if doc.document_file_back and doc.back_is_image %}
+                        <button type="button" class="wdd__doc__thumb"
+                                data-doc-url="{{ doc.document_file_back.url }}"
+                                data-doc-title="{{ doc.document_type|default:'Document' }} - {{ doc.document_no }} (Back)"
+                                aria-label="Preview {{ doc.document_type|default:'document' }} back side">
+                            <img src="{{ doc.document_file_back.url }}" loading="lazy"
+                                 alt="{{ doc.document_type|default:'Document' }} {{ doc.document_no }} back side photo">
+                            <span class="wdd__doc__thumb-zoom"><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i></span>
+                            <span class="wdd__doc__thumb-side">Back</span>
+                        </button>
+                        {% elif doc.document_file_back %}
+                        <a class="wdd__doc__thumb wdd__doc__thumb--file" href="{{ doc.document_file_back.url }}" target="_blank" rel="noopener">
+                            <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+                            <span>Open back file</span>
+                        </a>
+                        {% endif %}
+                    </div>
                     <div class="wdd__doc__head">
                         <div class="wdd__doc__icon">
                             <i class="fa-solid {% if doc.document_type == 'QID' %}fa-id-card{% elif doc.document_type == 'Driving License' %}fa-id-badge{% elif doc.document_type == 'Passport' %}fa-passport{% else %}fa-address-card{% endif %}"></i>
@@ -795,7 +834,7 @@
             <button type="button" class="wdd__modal__close" id="docModalClose"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="wdd__modal__body">
-            <img id="docModalImage" src="" alt="{{ doc.document_type|default:'Driver' }} document image">
+            <img id="docModalImage" src="" alt="Driver document image">
         </div>
         <div class="wdd__modal__footer">
             <a href="#" id="docModalDownload" class="wdd__action-btn" target="_blank">
@@ -1084,30 +1123,33 @@ var docModalTitle = document.getElementById('docModalTitle');
 var docModalImage = document.getElementById('docModalImage');
 var docModalDownload = document.getElementById('docModalDownload');
 
-function openDocModal(url, title) {
+// Named openDocViewer, NOT openDocModal — that name belongs to the add/edit
+// form modal below, and a duplicate declaration would shadow this one.
+function openDocViewer(url, title) {
     docModalTitle.textContent = title;
     docModalImage.src = url;
+    docModalImage.alt = title;
     docModalDownload.href = url;
     docModal.classList.add('show');
     document.body.style.overflow = 'hidden';
 }
 
-function closeDocModal() {
+function closeDocViewer() {
     docModal.classList.remove('show');
     document.body.style.overflow = '';
     docModalImage.src = '';
 }
 
-document.querySelectorAll('.wdd__doc__view-btn--available').forEach(function(btn) {
+document.querySelectorAll('.wdd__doc__view-btn--available, .wdd__doc__thumb[data-doc-url]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-        openDocModal(this.getAttribute('data-doc-url'), this.getAttribute('data-doc-title'));
+        openDocViewer(this.getAttribute('data-doc-url'), this.getAttribute('data-doc-title'));
     });
 });
 
-document.getElementById('docModalClose').addEventListener('click', closeDocModal);
-document.getElementById('docModalCloseBtn').addEventListener('click', closeDocModal);
-docModal.addEventListener('click', function(e) { if (e.target === docModal) closeDocModal(); });
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && docModal.classList.contains('show')) closeDocModal(); });
+document.getElementById('docModalClose').addEventListener('click', closeDocViewer);
+document.getElementById('docModalCloseBtn').addEventListener('click', closeDocViewer);
+docModal.addEventListener('click', function(e) { if (e.target === docModal) closeDocViewer(); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && docModal.classList.contains('show')) closeDocViewer(); });
 
 // Form submit
 function _submitDriverForm(form, btn, msg, doneLabel) {

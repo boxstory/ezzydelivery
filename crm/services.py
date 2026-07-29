@@ -442,3 +442,227 @@ def generate_lead_ai_summary(lead, wa_messages):
     except Exception:
         logger.exception('crm: AI summary failed for lead %s', lead.pk)
         return '', 'AI summary failed — check the server logs for details.'
+
+
+# ── Driver lead ⇄ driver application status sync ─────────────────────────────
+# Driver-category leads mirror the applicant's real form status. The same
+# Lead.stage keys carry driver-funnel meaning on the driver board, driven by
+# the profile's verification_status:
+#   new         → New Application (no matched driver record yet)
+#   on_hold     → Incomplete       (verification_status 'incomplete' — form not submitted)
+#   contacted   → Applied          (verification_status 'pending' — form submitted)
+#   quoted      → Uploads Completed (applied AND all documents/sections done)
+#   negotiating → Under Review      (verification_status 'under_review')
+#   won         → Approved          (verified / driver approved)
+#   lost        → Rejected          (rejected / blocked)
+
+def _driver_match_keys(*phones):
+    """Last-8-digit keys used to match a lead phone against a driver's numbers."""
+    keys = set()
+    for p in phones:
+        n = normalize_phone(p)
+        if len(n) >= 8:
+            keys.add(n[-8:])
+    return keys
+
+
+def driver_lead_target_stage(driver):
+    """Lead.stage a driver-category lead should sit in for this driver's status."""
+    from workforce.views import _driver_application_sections
+
+    prof = getattr(driver, 'profile', None)
+    vs = (getattr(prof, 'verification_status', '') or '') if prof else ''
+
+    # Negative terminal state wins even if an older 'verified' flag lingers.
+    if vs == 'rejected' or driver.driver_status in ('rejected', 'blocked', 'suspended'):
+        return Lead.STAGE_LOST
+    if vs == 'verified' or driver.driver_status == 'approved':
+        return Lead.STAGE_WON
+    if vs == 'under_review':
+        return Lead.STAGE_NEGOTIATING
+
+    # Form status is authoritative for the middle of the funnel.
+    if vs == 'pending':
+        # Submitted the application. If every section + document is in, show it
+        # as ready-for-review; otherwise it just sits as Applied.
+        sections = _driver_application_sections(driver)
+        if sections and all(s['done'] for s in sections):
+            return Lead.STAGE_QUOTED   # Uploads Completed
+        return Lead.STAGE_CONTACTED    # Applied
+
+    # 'incomplete' (default) or anything else — application not submitted.
+    return Lead.STAGE_ON_HOLD          # Incomplete
+
+
+def sync_driver_lead_stages(leads):
+    """Move each driver-category lead into the column matching its applicant's
+    current status. Mutates the passed Lead objects in place and persists only
+    the ones whose stage changed. Safe to call on every driver-board render."""
+    from django.db.models import Q
+    from fleet.models import Driver
+
+    driver_leads = [l for l in leads if l.category == Lead.CATEGORY_DRIVER]
+    if not driver_leads:
+        return
+
+    key_to_leads = {}
+    for lead in driver_leads:
+        for k in _driver_match_keys(lead.phone, lead.wa_chat_override):
+            key_to_leads.setdefault(k, []).append(lead)
+    if not key_to_leads:
+        return
+
+    q = Q()
+    for k in key_to_leads:
+        q |= Q(driver_phone__endswith=k) | Q(driver_whatsapp__endswith=k)
+    drivers = (
+        Driver.objects.select_related('profile')
+        .prefetch_related('driver_document', 'driver_vehicle', 'preferred_zone_groups')
+        .filter(q)
+    )
+
+    key_to_driver = {}
+    for d in drivers:
+        prof = getattr(d, 'profile', None)
+        for k in _driver_match_keys(d.driver_phone, d.driver_whatsapp, getattr(prof, 'whatsapp', '')):
+            cur = key_to_driver.get(k)
+            if cur is None or (d.updated_at and cur.updated_at and d.updated_at > cur.updated_at):
+                key_to_driver[k] = d
+
+    now = timezone.now()
+    changed = []
+    for lead in driver_leads:
+        driver = next(
+            (key_to_driver[k] for k in _driver_match_keys(lead.phone, lead.wa_chat_override)
+             if k in key_to_driver),
+            None,
+        )
+        if driver is None:
+            continue
+        target = driver_lead_target_stage(driver)
+        if not target or lead.stage == target:
+            continue
+        lead.stage = target
+        lead.stage_changed_at = now
+        lead.updated_at = now
+        lead.closed_at = now if target in Lead.CLOSED_STAGES else None
+        changed.append(lead)
+
+    if changed:
+        Lead.objects.bulk_update(
+            changed, ['stage', 'stage_changed_at', 'closed_at', 'updated_at']
+        )
+
+
+def reconcile_driver_leads():
+    """Make the driver board mirror the real applicant pool: ensure every driver
+    application has a driver-category lead, and set each lead's stage to match
+    its driver's current form status. Creates missing leads, advances existing
+    ones. Safe (and cheap) to call on every driver-board render."""
+    from fleet.models import Driver
+
+    drivers = (
+        Driver.objects.select_related('user', 'profile')
+        .prefetch_related('driver_document', 'driver_vehicle', 'preferred_zone_groups')
+    )
+    existing = list(Lead.objects.filter(category=Lead.CATEGORY_DRIVER))
+
+    # Index existing driver leads by every phone key they can match on.
+    key_to_lead = {}
+    for lead in existing:
+        for k in _driver_match_keys(lead.phone, lead.wa_chat_override):
+            key_to_lead.setdefault(k, lead)
+
+    now = timezone.now()
+    to_create, to_update = [], []
+    for d in drivers:
+        prof = getattr(d, 'profile', None)
+        keys = _driver_match_keys(d.driver_phone, d.driver_whatsapp, getattr(prof, 'whatsapp', ''))
+        if not keys:
+            continue
+        target = driver_lead_target_stage(d)
+        name = ''
+        if d.user:
+            name = (d.user.get_full_name() or d.user.username or '').strip()
+
+        lead = next((key_to_lead[k] for k in keys if k in key_to_lead), None)
+        if lead is None:
+            phone = normalize_phone(d.driver_phone or d.driver_whatsapp or (getattr(prof, 'whatsapp', '') or ''))
+            new_lead = Lead(
+                category=Lead.CATEGORY_DRIVER,
+                source=Lead.SOURCE_MANUAL,
+                phone=phone[:50],
+                contact_name=name[:100],
+                stage=target,
+                stage_changed_at=now,
+                closed_at=now if target in Lead.CLOSED_STAGES else None,
+            )
+            to_create.append(new_lead)
+            # Register so two drivers sharing a number don't double-create.
+            for k in keys:
+                key_to_lead.setdefault(k, new_lead)
+        elif lead.stage != target:
+            lead.stage = target
+            lead.stage_changed_at = now
+            lead.updated_at = now
+            lead.closed_at = now if target in Lead.CLOSED_STAGES else None
+            to_update.append(lead)
+
+    if to_create:
+        Lead.objects.bulk_create(to_create)
+    if to_update:
+        Lead.objects.bulk_update(
+            to_update, ['stage', 'stage_changed_at', 'closed_at', 'updated_at']
+        )
+    return len(to_create), len(to_update)
+
+
+# Reverse direction: staff moving a driver lead into a decision column writes
+# that outcome back to the applicant's real verification status (mirrors the
+# Approve / Reject / Under-review actions on the verification page, including
+# WhatsApp auto-flows). Only decision stages map back — the earlier funnel
+# columns reflect the applicant's own progress and can't be forced by a drag.
+LEAD_STAGE_TO_VERIFICATION = {
+    Lead.STAGE_WON: 'verified',
+    Lead.STAGE_LOST: 'rejected',
+    Lead.STAGE_NEGOTIATING: 'under_review',
+}
+
+
+def _driver_for_lead(lead):
+    """The fleet.Driver whose phone matches this lead, or None."""
+    from django.db.models import Q
+    from fleet.models import Driver
+
+    keys = _driver_match_keys(lead.phone, lead.wa_chat_override)
+    if not keys:
+        return None
+    q = Q()
+    for k in keys:
+        q |= Q(driver_phone__endswith=k) | Q(driver_whatsapp__endswith=k)
+    return (
+        Driver.objects.select_related('profile')
+        .filter(q).order_by('-updated_at').first()
+    )
+
+
+def sync_driver_status_from_lead(lead, user=None, rejection_reason=''):
+    """Apply a driver lead's decision stage to the matched driver's verification
+    status. No-op for non-driver leads, non-decision stages, or no match.
+    Returns the driver whose status changed, or None."""
+    if lead.category != Lead.CATEGORY_DRIVER:
+        return None
+    target = LEAD_STAGE_TO_VERIFICATION.get(lead.stage)
+    if not target:
+        return None
+    driver = _driver_for_lead(lead)
+    profile = getattr(driver, 'profile', None) if driver else None
+    if profile is None or profile.verification_status == target:
+        return None
+    from workforce.views import apply_verification_status
+    apply_verification_status(profile, target, user, {'rejection_reason': rejection_reason})
+    _log_activity(
+        lead, LeadActivity.TYPE_STAGE_CHANGE,
+        f'Driver application status set to "{target}" from board move', user,
+    )
+    return driver

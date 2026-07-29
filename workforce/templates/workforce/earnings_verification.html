@@ -9,7 +9,7 @@
   <div class="wfd__hero">
     <div class="wfd__hero-content">
       <h1 class="wfd__hero-title"><i class="fa-solid fa-coins"></i>Earnings Verification</h1>
-      <p class="wfd__hero-subtitle">Verify and publish driver earnings for delivered orders with COD collected</p>
+      <p class="wfd__hero-subtitle">Verify and publish driver earnings for every completed delivery — COD or prepaid</p>
       <p class="wfd__hero-note"><i class="fa-solid fa-circle-info"></i> Earnings Calculation: Pick &amp; Drop = 80% of delivery price | Normal = QAR 10 flat rate</p>
     </div>
     <div class="wfd__hero-actions">
@@ -106,6 +106,18 @@
         <span class="text-muted">Select All</span>
         <span class="badge bg-secondary" id="workforce_earnings_selected_count">0 selected</span>
       </div>
+      <div class="evr__bulk-set">
+        <label for="workforce_earnings_bulk_amount" class="evr__bulk-set-label">Set all selected to</label>
+        <div class="input-group input-group-sm evr__bulk-set-group">
+          <input type="number" class="form-control" id="workforce_earnings_bulk_amount"
+                 placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+          <span class="input-group-text">QAR</span>
+          <button type="button" class="btn btn-outline-secondary"
+                  id="workforce_earnings_btn_set_amount" disabled>
+            <i class="fa-solid fa-pen-to-square me-1"></i> Apply
+          </button>
+        </div>
+      </div>
       <div class="btn-group">
         <button type="button" class="btn btn-sm btn-outline-primary" id="workforce_earnings_btn_verify" disabled>
           <i class="fa-solid fa-check me-1"></i> Verify
@@ -128,10 +140,12 @@
             <th>Business</th>
             <th>Locations (Pickup / Drop)</th>
             <th>Type</th>
+            <th class="evr__cod-col">COD</th>
             <th>Calculated</th>
             <th>Verified</th>
             <th>Status</th>
             <th>By</th>
+            <th class="evr__log-col">Log</th>
           </tr>
         </thead>
         <tbody>
@@ -185,6 +199,14 @@
               <span class="evr__type-badge evr__type-badge--primary">Normal</span>
               {% endif %}
             </td>
+            <td class="evr__cod-cell">
+              {% if task.cod_collected %}
+                <span class="evr__cod-amount">{{ task.cod_collected_amount|default:0|floatformat:2 }}</span>
+                <div class="evr__cod-method">{{ task.get_payment_method_display|default:"—" }}</div>
+              {% else %}
+                <span class="evr__cod-none">Prepaid</span>
+              {% endif %}
+            </td>
             <td class="text-muted">
               {{ task.calculate_driver_earnings|floatformat:0 }}
               {% if task.is_long_distance %}
@@ -219,12 +241,35 @@
               {{ task.earnings_verified_by.first_name|slice:":8" }}
               {% else %}<span class="text-muted">-</span>{% endif %}
             </td>
+            <td class="evr__log-cell">
+              {% if task.activity_log %}
+              <button type="button" class="evr__log-btn" data-log-for="{{ task.id }}"
+                      aria-expanded="false" aria-controls="workforce_earnings_log_{{ task.id }}">
+                {{ task.activity_log|length }} event{{ task.activity_log|length|pluralize }}
+              </button>
+              {% else %}<span class="text-muted">-</span>{% endif %}
+            </td>
           </tr>
+          {% if task.activity_log %}
+          <tr class="evr__log-row" id="workforce_earnings_log_{{ task.id }}" hidden>
+            <td colspan="12">
+              <ol class="evr__log-list">
+                {% for entry in task.activity_log %}
+                <li class="evr__log-entry">
+                  <span class="evr__log-time">{{ entry.created_at|date:"d M H:i" }}</span>
+                  <span class="evr__log-type">{{ entry.get_activity_type_display }}</span>
+                  {% if entry.description %}<span class="evr__log-desc">{{ entry.description }}</span>{% endif %}
+                </li>
+                {% endfor %}
+              </ol>
+            </td>
+          </tr>
+          {% endif %}
           {% empty %}
           <tr>
-            <td colspan="10" class="evr__empty">
+            <td colspan="12" class="evr__empty">
               <i class="fa-solid fa-inbox"></i>
-              No deliveries with collected COD found matching your filters
+              No deliveries found matching your filters
             </td>
           </tr>
           {% endfor %}
@@ -263,5 +308,5 @@
   // Pass Django URL to JavaScript
   const workforceEarningsVerificationActionUrl = "{% url 'workforce:earnings_verification_action' %}";
 </script>
-<script src="{% static 'workforce/js/earnings-verification.js' %}"></script>
+<script src="{% static 'workforce/js/earnings-verification.js' %}?v=20260728b"></script>
 {% endblock %}
